@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE Games - Community browser games and interactive experiences.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Games | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/about.css">
+  <link rel="stylesheet" href="/css/pages/games.css">
+</head>
+<body data-page="games">
+
+  <div id="site-header"></div>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+    <h1 class="page-hero-title">Games</h1>
+    <p class="page-hero-subtitle">Community games and interactive chaos</p>
+  </section>
+
+  <!-- Game Cards -->
+  <section class="page-container">
+    <div class="section-header">Play Now</div>
+    <div class="games-grid">
+
+      <!-- Memory Match -->
+      <div class="card game-card">
+        <div class="game-card-thumb">
+          <img src="/assets/images/phantomace-logo.png" alt="Memory Match">
+          <div class="game-card-thumb-overlay"></div>
+        </div>
+        <div class="game-card-body">
+          <div class="game-card-title">Memory Match</div>
+          <div class="game-card-desc">Flip cards to find matching pairs. Test your memory with PhantomACE emotes and logos.</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-puzzle">Puzzle</span>
+            </div>
+            <button class="btn-primary game-play-btn" onclick="launchGame('Memory Match', '/games/memory-match/index.html')">Play</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skull Clicker -->
+      <div class="card game-card">
+        <div class="game-card-thumb">
+          <img src="/assets/images/skull.png" alt="Skull Clicker">
+          <div class="game-card-thumb-overlay"></div>
+        </div>
+        <div class="game-card-body">
+          <div class="game-card-title">Skull Clicker</div>
+          <div class="game-card-desc">Click the skull, earn points, buy upgrades. How high can you go? Embrace the chaos.</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-clicker">Clicker</span>
+            </div>
+            <button class="btn-primary game-play-btn" onclick="launchGame('Skull Clicker', '/games/skull-clicker/index.html')">Play</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Commander Bingo -->
+      <div class="card game-card">
+        <div class="game-card-thumb">
+          <img src="/assets/images/phantomace-logo.png" alt="Commander Bingo">
+          <div class="game-card-thumb-overlay"></div>
+        </div>
+        <div class="game-card-body">
+          <div class="game-card-title">Commander Bingo</div>
+          <div class="game-card-desc">Live bingo during Commander games! Get a random card and mark off events as they happen on stream.</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-multiplayer">Live</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-primary game-play-btn" onclick="launchGame('Commander Bingo', '/games/commander-bingo/index.html')">Join</button>
+              <button class="btn-primary game-play-btn role-moderator" onclick="launchGame('Bingo Host', '/games/commander-bingo/host.html')">Host</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coming Soon placeholder -->
+      <div class="card game-card" style="opacity: 0.5;">
+        <div class="game-card-thumb">
+          <img src="/assets/images/phantomace-logo-mythic.png" alt="Coming Soon">
+          <div class="game-card-thumb-overlay"></div>
+          <div class="game-card-locked"><span>Coming Soon</span></div>
+        </div>
+        <div class="game-card-body">
+          <div class="game-card-title">Chaos Trivia</div>
+          <div class="game-card-desc">Test your knowledge of PhantomACE lore, stream history, and community memes.</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-multiplayer">Multiplayer</span>
+            </div>
+            <button class="btn-primary game-play-btn" disabled>Soon</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Game Launcher Modal -->
+  <div class="game-launcher" id="gameLauncher">
+    <div class="game-launcher-header">
+      <span class="game-launcher-title" id="gameLauncherTitle"></span>
+      <button class="game-launcher-close" onclick="closeLauncher()" aria-label="Close">&times;</button>
+    </div>
+    <iframe class="game-launcher-frame" id="gameLauncherFrame" src="about:blank"></iframe>
+  </div>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script>
+    function launchGame(title, src) {
+      const launcher = document.getElementById('gameLauncher');
+      const frame = document.getElementById('gameLauncherFrame');
+      const titleEl = document.getElementById('gameLauncherTitle');
+
+      titleEl.textContent = title;
+      frame.src = src;
+      launcher.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLauncher() {
+      const launcher = document.getElementById('gameLauncher');
+      const frame = document.getElementById('gameLauncherFrame');
+
+      launcher.classList.remove('open');
+      frame.src = 'about:blank';
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLauncher();
+    });
+
+    window.addEventListener('message', (e) => {
+      if (e.data === 'close-game') closeLauncher();
+    });
+  </script>
+</body>
+</html>

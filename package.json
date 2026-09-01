@@ -1,0 +1,10 @@
+{
+  "name": "phantomace-website",
+  "version": "1.0.0",
+  "description": "Community website for PhantomACE on Twitch",
+  "private": true,
+  "scripts": {
+    "dev": "npx wrangler pages dev . --port 8788",
+    "deploy": "npx wrangler pages deploy ."
+  }
+}

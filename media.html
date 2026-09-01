@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE Media Gallery - Clips, screenshots, fan art, and highlights.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Media | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/about.css">
+  <link rel="stylesheet" href="/css/pages/media.css">
+</head>
+<body data-page="media">
+
+  <div id="site-header"></div>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+    <h1 class="page-hero-title">Media</h1>
+    <p class="page-hero-subtitle">Clips, screenshots, and highlights</p>
+  </section>
+
+  <!-- Gallery -->
+  <section class="page-container">
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="clip">Clips</button>
+      <button class="filter-btn" data-filter="screenshot">Screenshots</button>
+      <button class="filter-btn" data-filter="art">Art</button>
+      <button class="filter-btn" data-filter="highlight">Highlights</button>
+      <button class="btn-primary upload-btn role-moderator" id="uploadBtn" onclick="openUploadModal()">+ Upload</button>
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </section>
+
+  <!-- Upload Modal (moderator+ only) -->
+  <div class="upload-modal" id="uploadModal">
+    <div class="upload-modal-content card">
+      <div class="upload-modal-header">
+        <h3>Upload Media</h3>
+        <button class="lightbox-close upload-modal-close" onclick="closeUploadModal()" aria-label="Close">&times;</button>
+      </div>
+      <form id="uploadForm" onsubmit="handleUpload(event)">
+        <div class="upload-field">
+          <label for="uploadTitle">Title</label>
+          <input type="text" id="uploadTitle" required placeholder="Enter a title">
+        </div>
+        <div class="upload-field">
+          <label for="uploadCategory">Category</label>
+          <select id="uploadCategory" required>
+            <option value="clip">Clip</option>
+            <option value="screenshot">Screenshot</option>
+            <option value="art">Art</option>
+            <option value="highlight">Highlight</option>
+          </select>
+        </div>
+        <div class="upload-field">
+          <label for="uploadRole">Visibility</label>
+          <select id="uploadRole">
+            <option value="">Everyone</option>
+            <option value="follower">Followers+</option>
+            <option value="sub_tier1">Tier 1 Subs+</option>
+            <option value="sub_tier2">Tier 2 Subs+</option>
+            <option value="sub_tier3">Tier 3 Subs+</option>
+            <option value="moderator">Moderators+</option>
+            <option value="broadcaster">Broadcaster Only</option>
+          </select>
+        </div>
+        <div class="upload-field">
+          <label for="uploadFile">File</label>
+          <div class="upload-dropzone" id="uploadDropzone">
+            <input type="file" id="uploadFile" accept="image/*,video/*" required>
+            <p>Drop a file or click to browse</p>
+            <span>Images and video clips accepted</span>
+          </div>
+        </div>
+        <div class="upload-preview" id="uploadPreview"></div>
+        <div class="upload-actions">
+          <button type="button" class="btn-secondary" onclick="closeUploadModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="uploadSubmitBtn">Upload</button>
+        </div>
+        <div class="upload-status" id="uploadStatus"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" aria-label="Close">&times;</button>
+    <button class="lightbox-nav lightbox-prev" aria-label="Previous">&lsaquo;</button>
+    <button class="lightbox-nav lightbox-next" aria-label="Next">&rsaquo;</button>
+    <div class="lightbox-content"></div>
+    <div class="lightbox-info">
+      <div class="lightbox-title"></div>
+      <div class="lightbox-meta"></div>
+    </div>
+  </div>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/media.js" defer></script>
+</body>
+</html>

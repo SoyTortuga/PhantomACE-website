@@ -1,0 +1,194 @@
+/* Card */
+.card {
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  border-top: 2px solid var(--red);
+  border-radius: 6px;
+  padding: 24px;
+  transition: border-color 0.2s;
+}
+.card:hover {
+  border-color: var(--red);
+}
+
+/* Pill Button */
+.pill-btn {
+  display: inline-block;
+  padding: 6px 16px;
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-sec);
+  background: transparent;
+  transition: border-color 0.2s, color 0.2s;
+  cursor: pointer;
+}
+.pill-btn:hover {
+  border-color: var(--red);
+  color: var(--white);
+}
+.pill-btn.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--white);
+}
+
+/* Primary Button */
+.btn-primary {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--red);
+  color: var(--white);
+  border: none;
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover {
+  opacity: 0.85;
+  color: var(--white);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  display: inline-block;
+  padding: 10px 24px;
+  background: transparent;
+  color: var(--text-sec);
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-secondary:hover {
+  border-color: var(--red);
+  color: var(--white);
+}
+
+/* Status Dot */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+.status-dot.live {
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+  animation: blink-red 1.8s ease infinite;
+}
+.status-dot.online {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+/* Pulsing Red Dot */
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+  animation: blink-red 1.8s ease infinite;
+}
+
+@keyframes blink-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: var(--font-system);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge-live {
+  background: var(--red);
+  color: var(--white);
+}
+.badge-offline {
+  background: var(--gray-hi);
+  color: var(--text-dim);
+}
+
+/* Section Header */
+.section-header {
+  font-family: var(--font-system);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+/* Skull Watermark */
+.skull-watermark {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 160px;
+  opacity: 0.06;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Corner Accent */
+.corner-accent {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+.corner-accent.top-left {
+  top: 24px;
+  left: 24px;
+  border-top: 2px solid var(--red);
+  border-left: 2px solid var(--red);
+}
+.corner-accent.top-right {
+  top: 24px;
+  right: 24px;
+  border-top: 2px solid var(--red);
+  border-right: 2px solid var(--red);
+}
+.corner-accent.bottom-left {
+  bottom: 24px;
+  left: 24px;
+  border-bottom: 2px solid var(--red);
+  border-left: 2px solid var(--red);
+}
+.corner-accent.bottom-right {
+  bottom: 24px;
+  right: 24px;
+  border-bottom: 2px solid var(--red);
+  border-right: 2px solid var(--red);
+}
+
+/* Mixed-font capitals */
+.cap {
+  font-family: var(--font-display);
+}
+
+/* Divider */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 32px 0;
+}

@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commander Bingo - Host</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+
+    /* ── SCREENS ─────────────────────────── */
+    .screen { display: none; width: 100%; max-width: 600px; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ── CREATE SCREEN ───────────────────── */
+    .create-screen {
+      align-items: center;
+      padding-top: 40px;
+    }
+
+    .host-title {
+      font-size: 28px;
+      color: #ff0000;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .host-subtitle {
+      font-size: 11px;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .create-btn {
+      padding: 14px 40px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: inherit;
+    }
+
+    .create-btn:hover { background: #cc0000; }
+
+    .create-note {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #333;
+      text-align: center;
+      max-width: 280px;
+      line-height: 1.5;
+    }
+
+    /* ── HOST PANEL ──────────────────────── */
+    .host-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 16px;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .code-section {}
+
+    .code-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #444;
+      margin-bottom: 4px;
+    }
+
+    .code-display {
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 0.25em;
+      color: #ff0000;
+      line-height: 1;
+    }
+
+    .code-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .code-copy-btn {
+      padding: 4px 12px;
+      background: transparent;
+      border: 1px solid #222;
+      border-radius: 3px;
+      color: #555;
+      font-size: 10px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+
+    .code-copy-btn:hover { border-color: #ff0000; color: #fff; }
+    .code-copy-btn.copied { border-color: #00cc66; color: #00cc66; }
+
+    .host-stats {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .stat-row {
+      font-size: 11px;
+      color: #555;
+    }
+
+    .stat-row span { color: #fff; font-weight: bold; }
+    .stat-row .count-red { color: #ff0000; }
+
+    /* ── MAIN CONTENT AREA ────────────────── */
+    .host-body {
+      display: flex;
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── VERTICAL SIDEBAR ────────────────── */
+    .cat-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .cat-tab {
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid #1a1a1a;
+      border-radius: 3px;
+      color: #444;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      font-family: inherit;
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    .cat-tab:hover { border-color: #333; color: #888; }
+    .cat-tab.active { border-color: #ff0000; color: #ff0000; background: rgba(255, 0, 0, 0.05); }
+
+    /* ── RIGHT PANEL (search + list) ─────── */
+    .events-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 8px;
+    }
+
+    .search-input:focus { border-color: #ff0000; }
+    .search-input::placeholder { color: #333; }
+
+    /* ── EVENT LIST ──────────────────────── */
+    .events-list {
+      flex: 1;
+      overflow-y: auto;
+      max-height: calc(100vh - 300px);
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      background: #050505;
+    }
+
+    .event-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #0f0f0f;
+      transition: background 0.15s;
+    }
+
+    .event-item:last-child { border-bottom: none; }
+    .event-item:hover { background: #0a0a0a; }
+
+    .event-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .event-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .event-item.called .event-dot {
+      background: #ff0000;
+      border-color: #ff0000;
+      box-shadow: 0 0 6px rgba(255, 0, 0, 0.3);
+    }
+
+    .event-text {
+      font-size: 12px;
+      color: #777;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .event-item.called .event-text { color: #fff; }
+
+    .event-cat {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 1px 6px;
+      border-radius: 2px;
+      border: 1px solid transparent;
+      flex-shrink: 0;
+    }
+
+    .event-cat.gameplay { color: #cc88ff; border-color: rgba(204, 136, 255, 0.2); }
+    .event-cat.social { color: #ffaa00; border-color: rgba(255, 170, 0, 0.2); }
+
+    .event-call-btn {
+      padding: 4px 14px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+
+    .btn-call {
+      background: transparent;
+      border: 1px solid #222;
+      color: #555;
+    }
+
+    .btn-call:hover { border-color: #ff0000; color: #ff0000; background: rgba(255, 0, 0, 0.05); }
+
+    .btn-undo {
+      background: rgba(255, 0, 0, 0.1);
+      border: 1px solid rgba(255, 0, 0, 0.3);
+      color: #ff0000;
+    }
+
+    .btn-undo:hover { background: rgba(255, 0, 0, 0.2); }
+
+    /* ── END GAME ────────────────────────── */
+    .host-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #1a1a1a;
+    }
+
+    .called-summary {
+      font-size: 11px;
+      color: #444;
+    }
+
+    .called-summary span { color: #ff0000; }
+
+    .end-game-btn {
+      padding: 8px 24px;
+      background: transparent;
+      border: 1px solid #ff0000;
+      border-radius: 3px;
+      color: #ff0000;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: inherit;
+    }
+
+    .end-game-btn:hover { background: rgba(255, 0, 0, 0.1); }
+
+    /* ── RESULTS SCREEN ──────────────────── */
+    .results-panel {
+      align-items: center;
+    }
+
+    .results-title {
+      font-size: 24px;
+      color: #ff0000;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    .results-sub {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .leaderboard {
+      width: 100%;
+      max-width: 450px;
+    }
+
+    .lb-header {
+      display: grid;
+      grid-template-columns: 40px 1fr 80px 80px;
+      padding: 8px 12px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #444;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .lb-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 80px 80px;
+      padding: 10px 12px;
+      border-bottom: 1px solid #0f0f0f;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .lb-row:first-of-type { background: rgba(255, 0, 0, 0.05); }
+
+    .lb-rank {
+      font-weight: bold;
+      color: #555;
+    }
+
+    .lb-row:first-of-type .lb-rank { color: #ff0000; }
+
+    .lb-name { color: #ccc; overflow: hidden; text-overflow: ellipsis; }
+    .lb-bingos { color: #ff0000; text-align: center; font-weight: bold; }
+    .lb-marked { color: #555; text-align: center; }
+
+    .results-actions {
+      margin-top: 20px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .new-game-btn {
+      padding: 10px 28px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: inherit;
+    }
+
+    .new-game-btn:hover { background: #cc0000; }
+
+    .back-btn {
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid #222;
+      border-radius: 4px;
+      color: #555;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+
+    .back-btn:hover { border-color: #ff0000; color: #fff; }
+
+    .no-players {
+      text-align: center;
+      padding: 24px;
+      color: #333;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════ CREATE SCREEN ════ -->
+  <div class="screen active create-screen" id="createScreen">
+    <h1 class="host-title">Commander Bingo</h1>
+    <p class="host-subtitle">Host Control Panel</p>
+    <button class="create-btn" onclick="createGame()">Create Game</button>
+    <p class="create-note">
+      Creates a game session with a 4-letter code. Share the code with your audience so they can join and get their bingo cards.
+    </p>
+  </div>
+
+  <!-- ════ HOST PANEL ════ -->
+  <div class="screen" id="hostScreen">
+    <div class="host-header">
+      <div class="code-section">
+        <div class="code-label">Game Code</div>
+        <div class="code-display" id="codeDisplay"></div>
+        <div class="code-actions">
+          <button class="code-copy-btn" id="copyCodeBtn" onclick="copyCode()">Copy Code</button>
+          <button class="code-copy-btn" id="copyLinkBtn" onclick="copyLink()">Copy Join Link</button>
+        </div>
+      </div>
+      <div class="host-stats">
+        <div class="stat-row">Players: <span id="playerCount">0</span></div>
+        <div class="stat-row">Called: <span class="count-red" id="calledCount">0</span> / <span id="totalCount">68</span></div>
+      </div>
+    </div>
+
+    <div class="host-body">
+      <div class="cat-sidebar">
+        <button class="cat-tab active" data-cat="all" onclick="setCat('all')">All</button>
+        <button class="cat-tab" data-cat="gameplay" onclick="setCat('gameplay')">Gameplay</button>
+        <button class="cat-tab" data-cat="social" onclick="setCat('social')">Social</button>
+      </div>
+      <div class="events-panel">
+        <input class="search-input" id="searchInput" type="text"
+               placeholder="Search events..." oninput="filterEvents()">
+        <div class="events-list" id="eventsList"></div>
+      </div>
+    </div>
+
+    <div class="host-footer">
+      <div class="called-summary">
+        <span id="calledCountFooter">0</span> events called
+      </div>
+      <button class="end-game-btn" onclick="endGame()">End Game</button>
+    </div>
+  </div>
+
+  <!-- ════ RESULTS SCREEN ════ -->
+  <div class="screen results-panel" id="resultsScreen">
+    <h2 class="results-title">Game Over</h2>
+    <p class="results-sub" id="resultsSub"></p>
+
+    <div class="leaderboard" id="leaderboard">
+      <div class="lb-header">
+        <div>#</div>
+        <div>Player</div>
+        <div style="text-align:center">Bingos</div>
+        <div style="text-align:center">Marked</div>
+      </div>
+      <div id="lbBody"></div>
+    </div>
+
+    <div class="results-actions">
+      <button class="new-game-btn" onclick="createGame()">New Game</button>
+      <button class="back-btn" onclick="backToCreate()">Back</button>
+    </div>
+  </div>
+
+  <script src="events.js"></script>
+  <script>
+    let gameCode = null;
+    let calledEvents = new Set();
+    let currentCat = 'all';
+    let useApi = false;
+
+    const TOTAL = BINGO_EVENTS.length;
+    document.getElementById('totalCount').textContent = TOTAL;
+
+    function generateCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+
+    /* ── Create game ─────────────────────── */
+    async function createGame() {
+      calledEvents = new Set();
+      gameCode = generateCode();
+
+      try {
+        const res = await fetch('/api/bingo/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: gameCode })
+        });
+        if (res.ok) {
+          useApi = true;
+        } else {
+          throw new Error('api fail');
+        }
+      } catch {
+        useApi = false;
+        localStorage.setItem('bingo_game_' + gameCode, JSON.stringify({
+          code: gameCode,
+          status: 'active',
+          calledEvents: [],
+          players: [],
+          createdAt: Date.now()
+        }));
+      }
+
+      document.getElementById('codeDisplay').textContent = gameCode;
+      updateCalledCount();
+      renderEvents();
+      showScreen('hostScreen');
+
+      if (!useApi) startPlayerPoll();
+    }
+
+    let playerPollTimer = null;
+    function startPlayerPoll() {
+      if (playerPollTimer) clearInterval(playerPollTimer);
+      playerPollTimer = setInterval(() => {
+        const raw = localStorage.getItem('bingo_game_' + gameCode);
+        if (!raw) return;
+        const game = JSON.parse(raw);
+        document.getElementById('playerCount').textContent = game.players.length;
+      }, 2000);
+    }
+
+    /* ── Render event list ───────────────── */
+    function renderEvents() {
+      const list = document.getElementById('eventsList');
+      list.innerHTML = BINGO_EVENTS.map(evt => {
+        const isCalled = calledEvents.has(evt.id);
+        return '<div class="event-item' + (isCalled ? ' called' : '') +
+               '" data-id="' + evt.id + '" data-cat="' + evt.cat +
+               '" data-text="' + evt.text.toLowerCase() + '">' +
+               '<div class="event-left">' +
+               '<div class="event-dot"></div>' +
+               '<span class="event-text">' + evt.text + '</span>' +
+               '<span class="event-cat ' + evt.cat + '">' + evt.cat + '</span>' +
+               '</div>' +
+               '<button class="event-call-btn ' + (isCalled ? 'btn-undo' : 'btn-call') +
+               '" onclick="toggleEvent(' + evt.id + ')">' +
+               (isCalled ? 'Undo' : 'Call') + '</button>' +
+               '</div>';
+      }).join('');
+      filterEvents();
+    }
+
+    /* ── Call / uncall event ──────────────── */
+    async function toggleEvent(id) {
+      const wasCalled = calledEvents.has(id);
+
+      if (wasCalled) {
+        calledEvents.delete(id);
+      } else {
+        calledEvents.add(id);
+      }
+
+      if (useApi) {
+        try {
+          await fetch('/api/bingo/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: gameCode,
+              eventId: id,
+              action: wasCalled ? 'uncall' : 'call'
+            })
+          });
+        } catch { /* silent */ }
+      } else {
+        const raw = localStorage.getItem('bingo_game_' + gameCode);
+        if (raw) {
+          const game = JSON.parse(raw);
+          game.calledEvents = [...calledEvents];
+          localStorage.setItem('bingo_game_' + gameCode, JSON.stringify(game));
+        }
+      }
+
+      const item = document.querySelector('.event-item[data-id="' + id + '"]');
+      if (item) {
+        const btn = item.querySelector('.event-call-btn');
+        if (wasCalled) {
+          item.classList.remove('called');
+          btn.className = 'event-call-btn btn-call';
+          btn.textContent = 'Call';
+        } else {
+          item.classList.add('called');
+          btn.className = 'event-call-btn btn-undo';
+          btn.textContent = 'Undo';
+        }
+      }
+
+      updateCalledCount();
+    }
+
+    /* ── Filter events ───────────────────── */
+    function setCat(cat) {
+      currentCat = cat;
+      document.querySelectorAll('.cat-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.cat === cat);
+      });
+      filterEvents();
+    }
+
+    function filterEvents() {
+      const search = document.getElementById('searchInput').value.toLowerCase().trim();
+      document.querySelectorAll('.event-item').forEach(item => {
+        const text = item.dataset.text;
+        const cat = item.dataset.cat;
+        const matchSearch = !search || text.includes(search);
+        const matchCat = currentCat === 'all' || cat === currentCat;
+        item.style.display = (matchSearch && matchCat) ? '' : 'none';
+      });
+    }
+
+    function updateCalledCount() {
+      const count = calledEvents.size;
+      document.getElementById('calledCount').textContent = count;
+      document.getElementById('calledCountFooter').textContent = count;
+    }
+
+    /* ── Copy helpers ────────────────────── */
+    function copyCode() {
+      navigator.clipboard.writeText(gameCode).then(() => {
+        flashBtn('copyCodeBtn', 'Copied!');
+      }).catch(() => {});
+    }
+
+    function copyLink() {
+      const base = window.location.href.replace(/host\.html.*/, 'index.html');
+      const link = base + '?code=' + gameCode;
+      navigator.clipboard.writeText(link).then(() => {
+        flashBtn('copyLinkBtn', 'Copied!');
+      }).catch(() => {});
+    }
+
+    function flashBtn(id, text) {
+      const btn = document.getElementById(id);
+      const orig = btn.textContent;
+      btn.textContent = text;
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    }
+
+    /* ── End game ────────────────────────── */
+    async function endGame() {
+      if (calledEvents.size === 0) {
+        if (!confirm('No events have been called. End the game anyway?')) return;
+      } else {
+        if (!confirm('End the game and calculate results?')) return;
+      }
+
+      if (playerPollTimer) clearInterval(playerPollTimer);
+
+      let players = [];
+
+      if (useApi) {
+        try {
+          const res = await fetch('/api/bingo/end', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: gameCode })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            players = data.players || [];
+          }
+        } catch { /* fall through to local */ }
+      }
+
+      if (!useApi || players.length === 0) {
+        const raw = localStorage.getItem('bingo_game_' + gameCode);
+        if (raw) {
+          const game = JSON.parse(raw);
+          game.status = 'ended';
+          localStorage.setItem('bingo_game_' + gameCode, JSON.stringify(game));
+          players = game.players || [];
+        }
+      }
+
+      const results = players.map(p => {
+        const cardEvents = p.cardIds.map(id => id === 0 ? 'free' : id);
+        const marked = cardEvents.filter(id => id === 'free' || calledEvents.has(id));
+        const bingos = countBingos(cardEvents);
+        return { name: p.name, bingos, marked: marked.length };
+      });
+
+      results.sort((a, b) => b.bingos - a.bingos || b.marked - a.marked);
+      showResults(results);
+    }
+
+    function countBingos(cardEvents) {
+      const m = cardEvents.map(id => id === 'free' || calledEvents.has(id));
+      let count = 0;
+
+      for (let r = 0; r < 5; r++) {
+        if ([0,1,2,3,4].every(c => m[r*5+c])) count++;
+      }
+      for (let c = 0; c < 5; c++) {
+        if ([0,1,2,3,4].every(r => m[r*5+c])) count++;
+      }
+      if ([0,6,12,18,24].every(i => m[i])) count++;
+      if ([4,8,12,16,20].every(i => m[i])) count++;
+      if ([0,4,20,24].every(i => m[i])) count++;
+      if (m.every(Boolean)) count++;
+
+      return count;
+    }
+
+    function showResults(results) {
+      document.getElementById('resultsSub').textContent =
+        calledEvents.size + ' events called · ' + results.length + ' players';
+
+      const body = document.getElementById('lbBody');
+
+      if (results.length === 0) {
+        body.innerHTML = '<div class="no-players">No players joined this game.</div>';
+      } else {
+        body.innerHTML = results.map((r, i) =>
+          '<div class="lb-row">' +
+          '<div class="lb-rank">' + (i + 1) + '</div>' +
+          '<div class="lb-name">' + escHtml(r.name) + '</div>' +
+          '<div class="lb-bingos">' + r.bingos + '</div>' +
+          '<div class="lb-marked">' + r.marked + '/25</div>' +
+          '</div>'
+        ).join('');
+      }
+
+      showScreen('resultsScreen');
+    }
+
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    /* ── Navigation ──────────────────────── */
+    function backToCreate() {
+      if (playerPollTimer) clearInterval(playerPollTimer);
+      showScreen('createScreen');
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window.parent !== window) {
+        window.parent.postMessage('close-game', '*');
+      }
+    });
+  </script>
+</body>
+</html>

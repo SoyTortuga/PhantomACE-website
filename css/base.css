@@ -1,0 +1,54 @@
+@font-face {
+  font-family: 'PhantomACE';
+  src: url('/assets/fonts/PHANTOMACE.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GodOfWar';
+  src: url('/assets/fonts/GODOFWAR.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  background: var(--black);
+  color: var(--text-pri);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 0, 0, 0.03) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
+}
+
+h1, h2, h3 {
+  font-family: var(--font-gothic);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-pri);
+}
+
+h1 { font-size: clamp(28px, 5vw, 48px); }
+h2 { font-size: clamp(20px, 3vw, 32px); }
+h3 { font-size: clamp(16px, 2vw, 22px); }
+
+p { color: var(--text-sec); }
+
+a { transition: color 0.2s; }
+a:hover { color: var(--red); }
+
+::selection {
+  background: var(--red);
+  color: var(--white);
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--gray-lo); }
+::-webkit-scrollbar-thumb { background: var(--red); border-radius: 3px; opacity: 0.5; }
+::-webkit-scrollbar-thumb:hover { background: #ff3333; }

@@ -1,0 +1,27 @@
+:root {
+  --black:      #000000;
+  --gray-hi:    #222222;
+  --gray-mid:   #111111;
+  --gray-lo:    #0a0a0a;
+
+  --red:        #FF0000;
+  --red-dim:    #FF000060;
+  --red-glow:   #FF000018;
+
+  --white:      #FFFFFF;
+  --text-pri:   #FFFFFF;
+  --text-sec:   #cccccc;
+  --text-dim:   #999999;
+
+  --green:      #00cc66;
+  --amber:      #ffaa00;
+  --purple:     #cc88ff;
+
+  --border:     #ffffff14;
+  --border-mid: #ffffff28;
+
+  --font-display: 'PhantomACE', 'UnifrakturMaguntia', serif;
+  --font-gothic:  'GodOfWar', 'Cinzel Decorative', serif;
+  --font-ui:      'IM Fell English', Georgia, serif;
+  --font-system:  system-ui, -apple-system, sans-serif;
+}

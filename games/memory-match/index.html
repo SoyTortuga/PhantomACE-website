@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Match</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      color: #ff0000;
+      margin-bottom: 8px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #999;
+    }
+
+    .stats span { color: #fff; }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .card {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      cursor: pointer;
+      perspective: 600px;
+      position: relative;
+    }
+
+    .card-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.4s;
+    }
+
+    .card.flipped .card-inner { transform: rotateY(180deg); }
+    .card.matched .card-inner { transform: rotateY(180deg); }
+
+    .card-front, .card-back {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-front {
+      background: #111;
+      border: 1px solid #333;
+    }
+
+    .card-front::after {
+      content: '?';
+      font-size: 28px;
+      color: #ff0000;
+      opacity: 0.4;
+    }
+
+    .card:hover .card-front {
+      border-color: #ff0000;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.15);
+    }
+
+    .card-back {
+      background: #1a1a1a;
+      border: 1px solid #444;
+      transform: rotateY(180deg);
+    }
+
+    .card-back img {
+      width: 65%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .card.matched .card-front { display: none; }
+    .card.matched .card-back {
+      border-color: #00cc66;
+      box-shadow: 0 0 12px rgba(0, 204, 102, 0.2);
+    }
+
+    .win-message {
+      display: none;
+      text-align: center;
+      margin-top: 24px;
+    }
+
+    .win-message.show { display: block; }
+
+    .win-message h2 {
+      font-size: 20px;
+      color: #ff0000;
+      margin-bottom: 8px;
+    }
+
+    .win-message p {
+      font-size: 13px;
+      color: #999;
+      margin-bottom: 16px;
+    }
+
+    .restart-btn {
+      padding: 8px 24px;
+      background: #ff0000;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .restart-btn:hover { background: #cc0000; }
+  </style>
+</head>
+<body>
+  <h1>Memory Match</h1>
+  <div class="stats">
+    Moves: <span id="moveCount">0</span>
+    &nbsp;&middot;&nbsp;
+    Pairs: <span id="pairCount">0</span> / <span id="totalPairs">4</span>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="win-message" id="winMessage">
+    <h2>You Win!</h2>
+    <p>Completed in <span id="finalMoves">0</span> moves</p>
+    <button class="restart-btn" onclick="startGame()">Play Again</button>
+  </div>
+
+  <script>
+    const CARD_IMAGES = [
+      '/assets/images/phantomace-logo.png',
+      '/assets/images/phantomace-logo-mythic.png',
+      '/assets/images/skull.png',
+      '/assets/images/logo.png',
+      '/assets/images/phantomace-logo.png',
+      '/assets/images/phantomace-logo-mythic.png',
+      '/assets/images/skull.png',
+      '/assets/images/logo.png',
+    ];
+
+    let cards = [];
+    let flipped = [];
+    let matched = 0;
+    let moves = 0;
+    let locked = false;
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function startGame() {
+      const board = document.getElementById('board');
+      matched = 0;
+      moves = 0;
+      flipped = [];
+      locked = false;
+
+      document.getElementById('moveCount').textContent = '0';
+      document.getElementById('pairCount').textContent = '0';
+      document.getElementById('winMessage').classList.remove('show');
+
+      const pairs = [];
+      CARD_IMAGES.forEach((src, i) => {
+        pairs.push({ id: i, pairId: i % 4, src });
+      });
+
+      cards = shuffle(pairs);
+
+      board.innerHTML = cards.map((card, index) => `
+        <div class="card" data-index="${index}" data-pair="${card.pairId}" onclick="flipCard(this)">
+          <div class="card-inner">
+            <div class="card-front"></div>
+            <div class="card-back">
+              <img src="${card.src}" alt="card">
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function flipCard(el) {
+      if (locked) return;
+      if (el.classList.contains('flipped') || el.classList.contains('matched')) return;
+      if (flipped.length >= 2) return;
+
+      el.classList.add('flipped');
+      flipped.push(el);
+
+      if (flipped.length === 2) {
+        moves++;
+        document.getElementById('moveCount').textContent = moves;
+        locked = true;
+
+        const a = flipped[0].dataset.pair;
+        const b = flipped[1].dataset.pair;
+
+        if (a === b) {
+          flipped[0].classList.add('matched');
+          flipped[1].classList.add('matched');
+          matched++;
+          document.getElementById('pairCount').textContent = matched;
+          flipped = [];
+          locked = false;
+
+          if (matched === 4) {
+            setTimeout(() => {
+              document.getElementById('finalMoves').textContent = moves;
+              document.getElementById('winMessage').classList.add('show');
+            }, 500);
+          }
+        } else {
+          setTimeout(() => {
+            flipped[0].classList.remove('flipped');
+            flipped[1].classList.remove('flipped');
+            flipped = [];
+            locked = false;
+          }, 800);
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window.parent !== window) {
+        window.parent.postMessage('close-game', '*');
+      }
+    });
+
+    startGame();
+  </script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE - Digital Chaos & Drum Fills. Join the community on Twitch.">
+  <meta property="og:title" content="PhantomACE">
+  <meta property="og:description" content="Digital Chaos & Drum Fills. Join the community on Twitch.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/home.css">
+</head>
+<body data-page="home">
+
+  <div id="site-header"></div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-vignette"></div>
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+
+    <div class="hero-content">
+      <img src="/assets/images/phantomace-logo.png" alt="PhantomACE" class="hero-logo">
+      <img src="/assets/images/hero-title.png" alt="PhantomACE" class="hero-title-img">
+      <p class="hero-subtitle">Digital Chaos & Drum Fills</p>
+
+      <div class="hero-live-status" id="heroLiveStatus">
+        <div class="hero-live-label">
+          <span class="status-dot"></span>
+          <span>Checking status...</span>
+        </div>
+      </div>
+
+      <div class="hero-buttons">
+        <a href="https://twitch.tv/phantomace" target="_blank" rel="noopener" class="btn-primary">Watch on Twitch</a>
+        <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="btn-secondary">Join the Community</a>
+      </div>
+
+      <div class="hero-embed" id="heroEmbed">
+          <iframe
+            src="https://player.twitch.tv/?channel=phantomace&parent=localhost&muted=true"
+            allowfullscreen
+            title="PhantomACE Twitch Stream"></iframe>
+        </div>
+    </div>
+  </section>
+
+  <!-- Upcoming Events -->
+  <section class="home-section">
+    <div class="section-header">Upcoming Events</div>
+    <div class="grid-3" id="upcomingEvents">
+      <div class="card event-card">
+        <div class="event-card-date">Coming Soon</div>
+        <div class="event-card-title">Events Loading</div>
+        <div class="event-card-desc">Check back soon for upcoming streams and community events.</div>
+      </div>
+      <div class="card event-card">
+        <div class="event-card-date">TBD</div>
+        <div class="event-card-title">Community Game Night</div>
+        <div class="event-card-desc">Join the community for games, chaos, and good times.</div>
+      </div>
+      <div class="card event-card">
+        <div class="event-card-date">TBD</div>
+        <div class="event-card-title">Phamathon</div>
+        <div class="event-card-desc">The legendary marathon stream. Donate to spin the wheel!</div>
+      </div>
+    </div>
+    <a href="/events.html" class="pill-btn section-more">View All Events</a>
+  </section>
+
+  <!-- Latest Media -->
+  <section class="home-section">
+    <div class="section-header">Latest Media</div>
+    <div class="grid-4" id="latestMedia">
+      <div class="media-thumb">
+        <div class="media-thumb-overlay">Coming soon</div>
+      </div>
+      <div class="media-thumb">
+        <div class="media-thumb-overlay">Coming soon</div>
+      </div>
+      <div class="media-thumb">
+        <div class="media-thumb-overlay">Coming soon</div>
+      </div>
+      <div class="media-thumb">
+        <div class="media-thumb-overlay">Coming soon</div>
+      </div>
+    </div>
+    <a href="/media.html" class="pill-btn section-more">View Gallery</a>
+  </section>
+
+  <!-- Community -->
+  <section class="home-section">
+    <div class="section-header">Community</div>
+    <div class="card community-preview">
+      <h3>Join the PhantomACE Community</h3>
+      <p>Connect with fellow viewers, share clips, and be part of the chaos.</p>
+      <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="btn-primary">Join Discord</a>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/home.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+/* Role-gated visibility
+   Hierarchy: visitor → follower → sub_tier1 → sub_tier2 → sub_tier3 → moderator → broadcaster
+   Each role sees its own content + everything below it */
+
+.role-follower,
+.role-sub_tier1,
+.role-sub_tier2,
+.role-sub_tier3,
+.role-moderator,
+.role-broadcaster {
+  display: none;
+}
+
+/* Follower+ content */
+body[data-role="follower"] .role-follower,
+body[data-role="sub_tier1"] .role-follower,
+body[data-role="sub_tier2"] .role-follower,
+body[data-role="sub_tier3"] .role-follower,
+body[data-role="moderator"] .role-follower,
+body[data-role="broadcaster"] .role-follower { display: block; }
+
+/* Tier 1+ content */
+body[data-role="sub_tier1"] .role-sub_tier1,
+body[data-role="sub_tier2"] .role-sub_tier1,
+body[data-role="sub_tier3"] .role-sub_tier1,
+body[data-role="moderator"] .role-sub_tier1,
+body[data-role="broadcaster"] .role-sub_tier1 { display: block; }
+
+/* Tier 2+ content */
+body[data-role="sub_tier2"] .role-sub_tier2,
+body[data-role="sub_tier3"] .role-sub_tier2,
+body[data-role="moderator"] .role-sub_tier2,
+body[data-role="broadcaster"] .role-sub_tier2 { display: block; }
+
+/* Tier 3+ content */
+body[data-role="sub_tier3"] .role-sub_tier3,
+body[data-role="moderator"] .role-sub_tier3,
+body[data-role="broadcaster"] .role-sub_tier3 { display: block; }
+
+/* Moderator+ content */
+body[data-role="moderator"] .role-moderator,
+body[data-role="broadcaster"] .role-moderator { display: block; }
+
+/* Broadcaster-only content */
+body[data-role="broadcaster"] .role-broadcaster { display: block; }
+
+/* Visitor-only content (hidden when logged in) */
+.role-visitor-only { display: block; }
+body[data-role="follower"] .role-visitor-only,
+body[data-role="sub_tier1"] .role-visitor-only,
+body[data-role="sub_tier2"] .role-visitor-only,
+body[data-role="sub_tier3"] .role-visitor-only,
+body[data-role="moderator"] .role-visitor-only,
+body[data-role="broadcaster"] .role-visitor-only { display: none; }
+
+/* Inline variants for spans/badges inside flex/grid */
+.role-follower-inline,
+.role-sub_tier1-inline,
+.role-sub_tier2-inline,
+.role-sub_tier3-inline,
+.role-moderator-inline,
+.role-broadcaster-inline {
+  display: none;
+}
+
+body[data-role="follower"] .role-follower-inline,
+body[data-role="sub_tier1"] .role-follower-inline,
+body[data-role="sub_tier2"] .role-follower-inline,
+body[data-role="sub_tier3"] .role-follower-inline,
+body[data-role="moderator"] .role-follower-inline,
+body[data-role="broadcaster"] .role-follower-inline { display: inline; }
+
+body[data-role="sub_tier1"] .role-sub_tier1-inline,
+body[data-role="sub_tier2"] .role-sub_tier1-inline,
+body[data-role="sub_tier3"] .role-sub_tier1-inline,
+body[data-role="moderator"] .role-sub_tier1-inline,
+body[data-role="broadcaster"] .role-sub_tier1-inline { display: inline; }
+
+body[data-role="sub_tier2"] .role-sub_tier2-inline,
+body[data-role="sub_tier3"] .role-sub_tier2-inline,
+body[data-role="moderator"] .role-sub_tier2-inline,
+body[data-role="broadcaster"] .role-sub_tier2-inline { display: inline; }
+
+body[data-role="sub_tier3"] .role-sub_tier3-inline,
+body[data-role="moderator"] .role-sub_tier3-inline,
+body[data-role="broadcaster"] .role-sub_tier3-inline { display: inline; }
+
+body[data-role="moderator"] .role-moderator-inline,
+body[data-role="broadcaster"] .role-moderator-inline { display: inline; }
+
+body[data-role="broadcaster"] .role-broadcaster-inline { display: inline; }
+
+/* Role badge colors */
+.role-badge {
+  font-family: var(--font-system);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.role-badge-follower {
+  color: var(--green);
+  border: 1px solid rgba(0, 204, 102, 0.3);
+}
+
+.role-badge-sub_tier1 {
+  color: #b388ff;
+  border: 1px solid rgba(179, 136, 255, 0.3);
+}
+
+.role-badge-sub_tier2 {
+  color: #e040fb;
+  border: 1px solid rgba(224, 64, 251, 0.3);
+}
+
+.role-badge-sub_tier3 {
+  color: #ffd740;
+  border: 1px solid rgba(255, 215, 64, 0.3);
+}
+
+.role-badge-moderator {
+  color: var(--amber);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.role-badge-broadcaster {
+  color: var(--red);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+/* Auth UI in header */
+.auth-login-btn {
+  font-family: var(--font-system);
+  font-size: 11px;
+  color: var(--text-sec);
+  padding: 4px 12px;
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  background: transparent;
+}
+
+.auth-login-btn:hover {
+  border-color: var(--red);
+  color: var(--white);
+}
+
+.auth-user-info {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-system);
+  font-size: 11px;
+  color: var(--text-sec);
+}
+
+.auth-user-name {
+  color: var(--text-pri);
+}
+
+/* Mobile auth */
+.nav-auth-link {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .auth-login-btn,
+  .auth-user-info {
+    display: none !important;
+  }
+
+  .nav-auth-link {
+    display: block;
+    border-top: 1px solid var(--border);
+    color: var(--red) !important;
+  }
+}
