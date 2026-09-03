@@ -1,0 +1,3911 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dino Park</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #0a0a0a;
+      border-bottom: 2px solid #ff0000;
+      z-index: 100;
+      height: 38px;
+    }
+    .top-bar-title { font-size: 16px; font-weight: 700; color: #ff0000; letter-spacing: 1px; }
+    .top-bar-stats { display: flex; gap: 12px; font-size: 11px; }
+    .stat-item { display: flex; align-items: center; gap: 3px; color: #999; }
+    .stat-item .val { color: #fff; font-weight: 600; }
+
+    /* Tabs */
+    .tab-bar { display: flex; background: #0a0a0a; border-bottom: 1px solid #ffffff14; height: 42px; }
+    .tab-btn {
+      flex: 1; padding: 6px 4px; background: transparent; border: none; color: #666;
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: #ccc; }
+    .tab-btn.active { color: #ff0000; border-bottom-color: #ff0000; }
+    .tab-btn .tab-icon { font-size: 13px; display: block; margin-bottom: 1px; }
+
+    /* Tab Content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .tab-content.scrollable { padding: 12px; height: calc(100vh - 80px); overflow-y: auto; }
+
+    /* ======================== VISUAL PARK ======================== */
+    .park-viewport {
+      position: relative;
+      width: 100%;
+      height: calc(100vh - 80px);
+      overflow: hidden;
+      background: #2d5a1e;
+    }
+
+    .park-world {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background-color: #4a8a3a;
+      background-image:
+        radial-gradient(circle 1.5px at 30% 40%, #3f7a32 100%, transparent 100%),
+        radial-gradient(circle 1px at 70% 20%, #55994a 100%, transparent 100%),
+        radial-gradient(circle 1px at 50% 80%, #3f7a32 100%, transparent 100%);
+      background-size: 24px 24px;
+      overflow: hidden;
+    }
+
+    /* Fence */
+    .park-fence {
+      position: absolute;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .fence-h {
+      left: 4px; right: 4px; height: 14px;
+      background: repeating-linear-gradient(90deg,
+        #8B5E3C 0px, #8B5E3C 3px,
+        #a0704d 3px, #a0704d 10px,
+        #8B5E3C 10px, #8B5E3C 13px,
+        #6B4226 13px, #6B4226 14px
+      );
+      border-top: 2px solid #5a3a1e;
+      border-bottom: 2px solid #5a3a1e;
+    }
+    .fence-h.top { top: 4px; }
+    .fence-h.bottom { bottom: 4px; }
+    .fence-v {
+      top: 4px; bottom: 4px; width: 14px;
+      background: repeating-linear-gradient(180deg,
+        #8B5E3C 0px, #8B5E3C 3px,
+        #a0704d 3px, #a0704d 10px,
+        #8B5E3C 10px, #8B5E3C 13px,
+        #6B4226 13px, #6B4226 14px
+      );
+      border-left: 2px solid #5a3a1e;
+      border-right: 2px solid #5a3a1e;
+    }
+    .fence-v.left { left: 4px; }
+    .fence-v.right { right: 4px; }
+
+    /* Pond */
+    .park-pond {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 40% 40%, #4a9ecc, #2980b9, #1a6090);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3), 0 0 6px rgba(41,128,185,0.3);
+      z-index: 2;
+      opacity: 0.85;
+    }
+    .park-pond::after {
+      content: '';
+      position: absolute;
+      top: 20%; left: 25%;
+      width: 30%; height: 15%;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      transform: rotate(-20deg);
+    }
+
+    /* Dirt patches */
+    .park-dirt {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 50% 50%, #8a6b4a, #6d5438);
+      z-index: 1;
+      opacity: 0.6;
+    }
+
+    /* Decorations */
+    .park-deco {
+      position: absolute;
+      z-index: 3;
+      font-size: 10px;
+      line-height: 1;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+    .park-deco.flower { opacity: 0.8; }
+    .park-deco.rock { opacity: 0.5; font-size: 8px; }
+
+    /* Roaming dino */
+    .park-dino {
+      position: absolute;
+      z-index: 5;
+      cursor: pointer;
+      transition: filter 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -50%) scale(var(--park-scale, 1));
+      transform-origin: center bottom;
+    }
+    .park-dino:hover { filter: brightness(1.2); z-index: 6; }
+    .park-dino.selected { z-index: 7; filter: brightness(1.3) drop-shadow(0 0 6px rgba(255,255,255,0.5)); }
+    .park-dino-shadow {
+      width: 20px;
+      height: 6px;
+      background: radial-gradient(ellipse, rgba(0,0,0,0.3), transparent);
+      border-radius: 50%;
+      margin-top: -2px;
+    }
+    .park-dino-sprite {
+      line-height: 0;
+      transition: transform 0.3s;
+    }
+    .sprite-img { image-rendering: pixelated; display: block; }
+    .park-dino-sprite.habitat-sky {
+      animation: dinoFloat 3s ease-in-out infinite;
+    }
+    @keyframes dinoFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    .park-dino-sprite.habitat-water {
+      animation: dinoSwim 2.5s ease-in-out infinite;
+    }
+    @keyframes dinoSwim {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-2px) rotate(3deg); }
+      75% { transform: translateY(2px) rotate(-3deg); }
+    }
+
+    .park-dino-label {
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 8px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      margin-bottom: 2px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .park-dino:hover .park-dino-label,
+    .park-dino.selected .park-dino-label { opacity: 1; }
+
+    /* Debris */
+    .park-debris {
+      position: absolute; z-index: 4; cursor: pointer;
+      font-size: calc(14px * var(--park-scale, 1)); line-height: 1;
+      transition: transform 0.15s, opacity 0.2s;
+      filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.4));
+    }
+    .park-debris:hover { transform: scale(1.3); filter: brightness(1.3) drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); }
+    .park-debris.clearing { transform: scale(0); opacity: 0; }
+
+    /* Energy bar */
+    .park-energy-bar {
+      position: absolute; top: 22px; right: 22px; z-index: 12;
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px;
+      border: 1px solid #ffffff14;
+    }
+    .energy-icon { font-size: 12px; }
+    .energy-fill-ctr { width: 60px; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
+    .energy-fill { height: 100%; background: #ffaa00; border-radius: 3px; transition: width 0.3s; }
+    .energy-text { font-size: 9px; color: #ccc; font-weight: 600; min-width: 30px; }
+    .energy-refill {
+      font-size: 8px; padding: 2px 6px; background: #222; border: 1px solid #ffffff28;
+      border-radius: 3px; color: #ffaa00; cursor: pointer; font-weight: 600;
+    }
+    .energy-refill:hover { background: #333; border-color: #ffaa00; }
+    .energy-refill:disabled { opacity: 0.3; cursor: default; }
+
+    /* Sell price in panel */
+    .panel-sell-info { display: flex; align-items: center; gap: 6px; }
+    .panel-sell-price { font-size: 10px; color: #ffaa00; font-weight: 700; }
+    .panel-action.sell-action { color: #ffaa00; }
+    .panel-action.sell-action:hover { color: #ff6600; border-color: #ff6600; }
+
+    .park-dino-alert {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 6px;
+      height: 6px;
+      background: #ff0000;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 4px #ff0000; }
+      50% { opacity: 0.3; box-shadow: 0 0 0px #ff0000; }
+    }
+
+    /* Park empty state */
+    .park-empty-msg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #fff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      z-index: 20;
+    }
+    .park-empty-msg .big { font-size: 40px; display: block; margin-bottom: 8px; }
+    .park-empty-msg .msg { font-size: 12px; opacity: 0.8; }
+
+    /* ======================== BOTTOM PANEL ======================== */
+    .park-panel {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(10,10,10,0.95);
+      border-top: 2px solid #333;
+      z-index: 50;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      max-height: 50%;
+      overflow-y: auto;
+    }
+    .park-panel.open { transform: translateY(0); }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px 6px;
+    }
+    .panel-emoji { font-size: 32px; line-height: 0; }
+    .panel-info { flex: 1; min-width: 0; }
+    .panel-name { font-size: 14px; font-weight: 700; color: #fff; }
+    .panel-meta { display: flex; gap: 6px; margin-top: 3px; align-items: center; }
+    .panel-badge {
+      font-size: 8px; padding: 1px 6px; border-radius: 3px;
+      text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700;
+    }
+    .pbadge-common { background: #7a7a7a33; color: #aaa; }
+    .pbadge-uncommon { background: #2ecc7122; color: #2ecc71; }
+    .pbadge-rare { background: #3498db22; color: #3498db; }
+    .pbadge-epic { background: #9b59b622; color: #9b59b6; }
+    .pbadge-legendary { background: #f39c1222; color: #f39c12; }
+    .pbadge-diet { background: #ffffff0a; color: #888; }
+    .panel-close {
+      background: transparent; border: 1px solid #333; color: #666;
+      width: 24px; height: 24px; border-radius: 4px; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .panel-close:hover { border-color: #ff0000; color: #ff0000; }
+
+    /* Compact stats */
+    .panel-stats {
+      display: flex;
+      gap: 6px;
+      padding: 6px 12px;
+      flex-wrap: wrap;
+    }
+    .panel-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      min-width: 80px;
+    }
+    .panel-stat-icon { font-size: 10px; }
+    .panel-stat-bar {
+      flex: 1;
+      height: 6px;
+      background: #1a1a1a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .panel-stat-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s;
+    }
+    .panel-stat-fill.hunger { background: linear-gradient(90deg, #c0392b, #e67e22); }
+    .panel-stat-fill.thirst { background: linear-gradient(90deg, #2980b9, #3498db); }
+    .panel-stat-fill.happiness { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+
+    /* Growth row */
+    .panel-growth {
+      padding: 2px 12px 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 9px;
+      color: #555;
+    }
+    .panel-growth-bar {
+      flex: 1;
+      height: 4px;
+      background: #1a1a1a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .panel-growth-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff0000, #ff4444);
+      border-radius: 2px;
+      transition: width 0.5s;
+    }
+
+    /* Action buttons */
+    .panel-actions {
+      display: flex;
+      gap: 1px;
+      background: #1a1a1a;
+      border-top: 1px solid #ffffff14;
+    }
+    .panel-action {
+      flex: 1;
+      padding: 10px 6px 8px;
+      background: #0d0d0d;
+      border: none;
+      color: #ccc;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s, color 0.2s;
+    }
+    .panel-action:hover:not(:disabled) { background: #1a1a1a; color: #fff; }
+    .panel-action:disabled { opacity: 0.3; cursor: not-allowed; }
+    .panel-action .action-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+    .panel-action .action-cd { font-size: 8px; color: #666; display: block; margin-top: 1px; }
+    .panel-action.details-btn { max-width: 60px; color: #888; }
+    .panel-action.details-btn:hover { color: #ff0000; }
+    .panel-action.release-action { max-width: 50px; color: #555; font-size: 9px; }
+    .panel-action.release-action:hover { color: #ff0000; }
+
+    /* ======================== MARKETPLACE ======================== */
+    .market-login { text-align: center; padding: 40px 20px; color: #666; }
+    .market-login-btn {
+      display: inline-block; margin-top: 12px; padding: 10px 24px;
+      background: #9146FF; border: none; border-radius: 6px;
+      color: #fff; font-size: 12px; font-weight: 700; cursor: pointer;
+      text-decoration: none;
+    }
+    .market-login-btn:hover { background: #7c3aed; }
+    .market-earnings {
+      background: #1a1a0a; border: 1px solid #ffaa0040; border-radius: 6px;
+      padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center;
+      justify-content: space-between;
+    }
+    .market-earnings-text { font-size: 11px; color: #ffaa00; font-weight: 600; }
+    .market-earnings-btn {
+      padding: 4px 12px; background: #ffaa00; border: none; border-radius: 4px;
+      color: #000; font-size: 10px; font-weight: 700; cursor: pointer;
+    }
+    .market-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 10px; }
+    .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .market-card {
+      background: #111; border: 1px solid #ffffff14; border-radius: 8px;
+      padding: 12px; text-align: center; cursor: pointer; transition: border-color 0.2s;
+    }
+    .market-card:hover { border-color: #ffaa00; }
+    .market-card-sprite { margin-bottom: 6px; }
+    .market-card-name { font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .market-card-meta { font-size: 9px; color: #888; margin-bottom: 6px; }
+    .market-card-seller { font-size: 8px; color: #666; margin-bottom: 6px; }
+    .market-card-price { font-size: 14px; font-weight: 700; color: #ffaa00; margin-bottom: 6px; }
+    .market-card-buy {
+      padding: 4px 16px; background: #ffaa00; border: none; border-radius: 4px;
+      color: #000; font-size: 10px; font-weight: 700; cursor: pointer;
+    }
+    .market-card-buy:hover { background: #ff8800; }
+    .market-card-buy:disabled { opacity: 0.4; cursor: default; }
+    .market-card-cancel {
+      padding: 4px 12px; background: transparent; border: 1px solid #ffffff28;
+      border-radius: 4px; color: #888; font-size: 9px; cursor: pointer; margin-top: 4px;
+    }
+    .market-card-cancel:hover { border-color: #ff0000; color: #ff0000; }
+    .market-empty { text-align: center; color: #444; font-size: 12px; padding: 30px; }
+    .market-card .rarity-chip { display: inline-block; font-size: 8px; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+    .market-card .rarity-common { background: #333; color: #999; }
+    .market-card .rarity-uncommon { background: #1a3a1a; color: #4CAF50; }
+    .market-card .rarity-rare { background: #1a2a4a; color: #42A5F5; }
+    .market-card .rarity-epic { background: #2a1a3a; color: #AB47BC; }
+    .market-card .rarity-legendary { background: #3a2a0a; color: #FFC107; }
+    .market-mut-badge { font-size: 8px; color: #ffaa00; margin-top: 2px; }
+
+    /* Sell dialog overlay */
+    .sell-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sell-dialog {
+      background: #111; border: 2px solid #ff0000; border-radius: 10px;
+      padding: 20px; width: 280px; text-align: center;
+    }
+    .sell-dialog-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+    .sell-dialog-sprite { margin-bottom: 8px; }
+    .sell-dialog-info { font-size: 10px; color: #888; margin-bottom: 12px; }
+    .sell-dialog-price-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
+    .sell-dialog-price-row label { font-size: 11px; color: #ccc; }
+    .sell-dialog-price-input {
+      width: 80px; padding: 6px 10px; background: #222; border: 1px solid #ffffff28;
+      border-radius: 4px; color: #ffaa00; font-size: 14px; font-weight: 700;
+      text-align: center; outline: none;
+    }
+    .sell-dialog-price-input:focus { border-color: #ffaa00; }
+    .sell-dialog-btns { display: flex; gap: 8px; justify-content: center; }
+    .sell-dialog-btns button {
+      padding: 8px 20px; border: none; border-radius: 4px; font-size: 11px;
+      font-weight: 700; cursor: pointer;
+    }
+    .sell-confirm { background: #ffaa00; color: #000; }
+    .sell-confirm:hover { background: #ff8800; }
+    .sell-cancel { background: #222; color: #888; border: 1px solid #ffffff28 !important; }
+    .sell-cancel:hover { color: #fff; }
+
+    /* ======================== EGGS TAB ======================== */
+    .eggs-section { margin-bottom: 24px; }
+    .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 12px; }
+
+    /* Incubator */
+    .incubator-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+    .egg-slot {
+      background: #111; border: 1px solid #ffffff14; border-radius: 8px;
+      padding: 16px; text-align: center; min-height: 120px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .egg-slot.empty { border-style: dashed; color: #333; font-size: 11px; }
+    .egg-emoji { font-size: 36px; margin-bottom: 6px; animation: eggWobble 2s infinite ease-in-out; }
+    @keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+    .egg-name { font-size: 10px; color: #ccc; font-weight: 600; margin-bottom: 4px; }
+    .egg-timer { font-size: 18px; font-weight: 700; color: #ff0000; margin-bottom: 4px; }
+    .egg-progress { width: 80%; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
+    .egg-progress-fill { height: 100%; background: #ff0000; border-radius: 2px; transition: width 1s linear; }
+    .egg-hatch-btn {
+      margin-top: 8px; padding: 6px 16px; background: #ff0000; border: none;
+      border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
+      animation: pulse 1s infinite;
+    }
+
+    /* Egg source cards */
+    .egg-sources { display: flex; flex-direction: column; gap: 10px; }
+    .egg-source {
+      background: #111; border: 1px solid #ffffff14; border-radius: 8px;
+      padding: 14px 16px; display: flex; align-items: center; gap: 14px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .egg-source.available { border-color: #ff000044; cursor: pointer; }
+    .egg-source.available:hover { border-color: #ff0000; background: rgba(255,0,0,0.04); }
+    .egg-source.claimed, .egg-source.locked { opacity: 0.4; }
+    .egg-source-icon { font-size: 30px; flex-shrink: 0; width: 40px; text-align: center; }
+    .egg-source-info { flex: 1; min-width: 0; }
+    .egg-source-name { font-size: 12px; font-weight: 700; color: #ccc; margin-bottom: 2px; }
+    .egg-source-desc { font-size: 10px; color: #666; line-height: 1.4; }
+    .egg-source-timer { font-size: 10px; color: #ff0000; font-weight: 600; margin-top: 3px; }
+    .egg-source-badge {
+      font-size: 8px; padding: 2px 8px; border-radius: 3px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0;
+    }
+    .esbadge-ready { background: #ff000033; color: #ff4444; }
+    .esbadge-claimed { background: #27ae6022; color: #2ecc71; }
+    .esbadge-waiting { background: #ffffff0a; color: #555; }
+    .esbadge-locked { background: #ffffff0a; color: #333; }
+
+    /* Random event banner */
+    .event-banner {
+      background: linear-gradient(135deg, #1a0505 0%, #111 100%);
+      border: 1px solid #ff000044;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 16px;
+      animation: eventGlow 2s ease-in-out infinite;
+    }
+    @keyframes eventGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255,0,0,0.1); }
+      50% { box-shadow: 0 0 16px rgba(255,0,0,0.25); }
+    }
+    .event-banner-icon { font-size: 32px; margin-bottom: 6px; }
+    .event-banner-title { font-size: 13px; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
+    .event-banner-desc { font-size: 10px; color: #888; margin-bottom: 10px; }
+    .event-banner-timer { font-size: 11px; color: #ff0000; font-weight: 600; margin-bottom: 8px; }
+    .event-banner-btn {
+      padding: 8px 24px; background: #ff0000; border: none; border-radius: 4px;
+      color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.2s;
+    }
+    .event-banner-btn:hover { background: #cc0000; }
+    .event-banner-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .event-banner.expired { opacity: 0.3; animation: none; }
+
+    /* Code redeem */
+    .redeem-row { display: flex; gap: 6px; margin-top: 8px; }
+    .redeem-input {
+      flex: 1; padding: 8px 10px; background: #0a0a0a; border: 1px solid #ffffff14;
+      border-radius: 4px; color: #fff; font-size: 11px; font-family: monospace;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .redeem-input::placeholder { color: #333; text-transform: none; letter-spacing: normal; }
+    .redeem-input:focus { outline: none; border-color: #ff0000; }
+    .redeem-btn {
+      padding: 8px 16px; background: #ff0000; border: none; border-radius: 4px;
+      color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .redeem-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ======================== COLLECTION ======================== */
+    .coll-layout {
+      display: flex;
+      height: calc(100vh - 80px);
+      overflow: hidden;
+    }
+    .coll-list {
+      width: 140px;
+      border-right: 1px solid #ffffff14;
+      overflow-y: auto;
+      padding: 8px;
+      flex-shrink: 0;
+    }
+    .coll-card {
+      background: #111;
+      border: 2px solid #ffffff14;
+      border-radius: 6px;
+      padding: 6px;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: border-color 0.2s;
+    }
+    .coll-card:hover { border-color: #ffffff28; }
+    .coll-card.selected { border-color: #ff0000; }
+    .coll-card.rarity-common { border-color: #7a7a7a55; }
+    .coll-card.rarity-uncommon { border-color: #2ecc7155; }
+    .coll-card.rarity-rare { border-color: #3498db55; }
+    .coll-card.rarity-epic { border-color: #9b59b655; }
+    .coll-card.rarity-legendary { border-color: #f39c1255; }
+    .coll-card.selected.rarity-common { border-color: #7a7a7a; }
+    .coll-card.selected.rarity-uncommon { border-color: #2ecc71; }
+    .coll-card.selected.rarity-rare { border-color: #3498db; }
+    .coll-card.selected.rarity-epic { border-color: #9b59b6; }
+    .coll-card.selected.rarity-legendary { border-color: #f39c12; }
+    .coll-card-sprite { margin: 0 auto 4px; }
+    .coll-card-name { font-size: 9px; font-weight: 600; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .coll-card-level { font-size: 8px; color: #666; margin-top: 2px; }
+    .coll-card-bars { display: flex; gap: 2px; margin-top: 4px; height: 3px; }
+    .coll-card-bars > div { flex: 1; border-radius: 1px; }
+
+    .coll-detail {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .coll-detail-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: #333; font-size: 12px;
+    }
+    .coll-sprite-large { margin-bottom: 12px; }
+    .coll-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .coll-species { font-size: 11px; color: #888; margin-bottom: 10px; }
+    .coll-badges { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+    .coll-badge {
+      font-size: 9px; padding: 3px 10px; border-radius: 3px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+
+    .coll-stats { width: 100%; max-width: 280px; margin-bottom: 16px; }
+    .coll-stat-row {
+      display: flex; align-items: center; gap: 8px; padding: 5px 0;
+      border-bottom: 1px solid #ffffff0a;
+    }
+    .coll-stat-label { font-size: 10px; color: #666; width: 70px; }
+    .coll-stat-dots { display: flex; gap: 3px; flex: 1; }
+    .coll-dot {
+      width: 12px; height: 12px; border-radius: 2px; background: #1a1a1a;
+    }
+    .coll-dot.filled { background: #ff0000; }
+    .coll-dot.filled.hunger { background: #e67e22; }
+    .coll-dot.filled.thirst { background: #3498db; }
+    .coll-dot.filled.happiness { background: #2ecc71; }
+
+    .coll-attrs {
+      display: flex; gap: 12px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap;
+    }
+    .coll-attr { text-align: center; }
+    .coll-attr-label { font-size: 8px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+    .coll-attr-val { font-size: 14px; font-weight: 700; color: #ccc; }
+
+    .coll-actions { display: flex; gap: 6px; width: 100%; max-width: 280px; }
+    .coll-action {
+      flex: 1; padding: 10px 6px; background: #111; border: 1px solid #ffffff14;
+      border-radius: 4px; color: #ccc; font-size: 10px; font-weight: 600;
+      cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .coll-action:hover:not(:disabled) { border-color: #ff0000; color: #fff; }
+    .coll-action:disabled { opacity: 0.3; cursor: not-allowed; }
+    .coll-action .ca-icon { font-size: 14px; display: block; margin-bottom: 2px; }
+    .coll-action .ca-cd { font-size: 8px; color: #666; }
+
+    .coll-growth-section { width: 100%; max-width: 280px; margin-bottom: 16px; }
+    .coll-growth-label { font-size: 9px; color: #555; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .coll-growth-bar { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
+    .coll-growth-fill { height: 100%; background: linear-gradient(90deg, #ff0000, #ff4444); border-radius: 3px; transition: width 0.5s; }
+
+    .coll-desc { font-size: 10px; color: #555; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
+
+    /* ======================== DINODEX ======================== */
+    .dex-stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+    .dex-stat-card {
+      background: #111; border: 1px solid #ffffff14; border-radius: 6px;
+      padding: 8px; text-align: center;
+    }
+    .dex-stat-val { font-size: 18px; font-weight: 700; color: #fff; }
+    .dex-stat-lbl { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+    .dex-progress-row { display: flex; gap: 4px; margin-bottom: 12px; align-items: center; }
+    .dex-progress-bar { flex: 1; height: 6px; background: #111; border-radius: 3px; overflow: hidden; }
+    .dex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .dex-progress-lbl { font-size: 9px; color: #666; min-width: 50px; }
+    .dex-rarity-row { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+    .dex-rarity-chip {
+      font-size: 9px; padding: 3px 8px; border-radius: 3px; border: 1px solid;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .dex-filters { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    .dex-filter {
+      padding: 5px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 3px;
+      color: #666; font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; cursor: pointer; transition: all 0.2s;
+    }
+    .dex-filter:hover { color: #ccc; border-color: #ffffff28; }
+    .dex-filter.active { color: #ff0000; border-color: #ff0000; }
+    .dex-counter { font-size: 11px; color: #444; margin-bottom: 8px; }
+    .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .dex-entry {
+      background: #111; border: 1px solid #ffffff14; border-radius: 6px;
+      padding: 10px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .dex-entry:hover { border-color: #ffffff28; background: #181818; }
+    .dex-entry.discovered { border-left: 2px solid; }
+    .dex-entry.discovered.rarity-common { border-left-color: #7a7a7a; }
+    .dex-entry.discovered.rarity-uncommon { border-left-color: #2ecc71; }
+    .dex-entry.discovered.rarity-rare { border-left-color: #3498db; }
+    .dex-entry.discovered.rarity-epic { border-left-color: #9b59b6; }
+    .dex-entry.discovered.rarity-legendary { border-left-color: #f39c12; }
+    .dex-entry.undiscovered { opacity: 0.35; }
+    .dex-emoji { font-size: 24px; flex-shrink: 0; }
+    .dex-info { flex: 1; min-width: 0; }
+    .dex-name { font-size: 11px; font-weight: 600; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dex-sub { font-size: 9px; color: #666; margin-top: 1px; }
+    .dex-mut-dots { display: flex; gap: 2px; margin-top: 3px; }
+    .dex-mut-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid #ffffff28; }
+    .dex-mut-dot.found { box-shadow: 0 0 4px currentColor; }
+    .dex-detail-panel {
+      background: #0a0a0a; border: 1px solid #ffffff14; border-radius: 8px;
+      padding: 16px; margin-bottom: 12px;
+    }
+    .dex-detail-header { display: flex; gap: 16px; margin-bottom: 12px; }
+    .dex-detail-portrait { flex-shrink: 0; }
+    .dex-detail-info { flex: 1; }
+    .dex-detail-name { font-size: 18px; font-weight: 700; color: #fff; }
+    .dex-detail-species { font-size: 11px; color: #666; margin-top: 2px; }
+    .dex-detail-badges { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+    .dex-detail-badge {
+      font-size: 9px; padding: 2px 8px; border-radius: 3px; text-transform: uppercase;
+      font-weight: 600; letter-spacing: 0.04em;
+    }
+    .dex-detail-desc { font-size: 11px; color: #888; line-height: 1.5; margin-top: 8px; font-style: italic; }
+    .dex-detail-section { margin-top: 12px; }
+    .dex-detail-section-title {
+      font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 6px; font-weight: 600;
+    }
+    .dex-mut-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+    .dex-mut-card {
+      background: #111; border: 1px solid #ffffff14; border-radius: 4px;
+      padding: 6px; display: flex; align-items: center; gap: 6px; font-size: 10px;
+    }
+    .dex-mut-card.found { border-color: #ffffff28; }
+    .dex-mut-card.unfound { opacity: 0.3; }
+    .dex-mut-card .mut-swatch {
+      width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; border: 1px solid #ffffff14;
+    }
+    .dex-mut-label { color: #ccc; flex: 1; }
+    .dex-mut-tier { font-size: 8px; color: #666; text-transform: uppercase; }
+    .dex-owned-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+    .dex-owned-chip {
+      background: #111; border: 1px solid #ffffff14; border-radius: 4px;
+      padding: 3px 6px; font-size: 9px; color: #aaa; display: flex; align-items: center; gap: 4px;
+    }
+    .dex-close-btn {
+      padding: 4px 12px; background: transparent; border: 1px solid #ffffff28; border-radius: 3px;
+      color: #888; font-size: 10px; cursor: pointer; float: right;
+    }
+    .dex-close-btn:hover { color: #fff; border-color: #ff0000; }
+
+    /* ======================== OVERLAYS ======================== */
+    .hatch-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+      z-index: 200; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    }
+    .hatch-overlay.show { display: flex; }
+    .hatch-emoji { font-size: 80px; animation: hatchBounce 0.6s ease; }
+    @keyframes hatchBounce { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.3); } 100% { transform: scale(1); opacity: 1; } }
+    .hatch-name { font-size: 22px; font-weight: 700; color: #fff; margin-top: 16px; }
+    .hatch-rarity { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
+    .hatch-desc { font-size: 13px; color: #999; margin-top: 12px; max-width: 300px; line-height: 1.5; }
+    .hatch-close {
+      margin-top: 24px; padding: 10px 32px; background: #ff0000; border: none;
+      border-radius: 4px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+
+    .toast {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #111; border: 1px solid #ffffff28; border-radius: 6px;
+      padding: 10px 20px; font-size: 12px; color: #ccc; z-index: 150;
+      transition: transform 0.3s ease; white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-bar-title">DINO PARK</div>
+  <div class="top-bar-stats">
+    <div class="stat-item">🪙 <span class="val" id="coinDisplay">0</span></div>
+    <div class="stat-item">🦕 <span class="val" id="dinoCountDisplay">0</span>/20</div>
+    <div class="stat-item">Lv.<span class="val" id="levelDisplay">1</span></div>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('park')"><span class="tab-icon">🏕️</span>Park</button>
+  <button class="tab-btn" onclick="switchTab('eggs')"><span class="tab-icon">🥚</span>Eggs</button>
+  <button class="tab-btn" onclick="switchTab('collection')"><span class="tab-icon">🦕</span>Collection</button>
+  <button class="tab-btn" onclick="switchTab('market')"><span class="tab-icon">🏪</span>Market</button>
+  <button class="tab-btn" onclick="switchTab('dinodex')"><span class="tab-icon">📖</span>Dinodex</button>
+</div>
+
+<!-- Park Tab -->
+<div class="tab-content active" id="tab-park">
+  <div class="park-viewport" id="parkViewport">
+    <div class="park-energy-bar" id="parkEnergy" style="display:none;">
+      <span class="energy-icon">⚡</span>
+      <div class="energy-fill-ctr"><div class="energy-fill" id="energyFill"></div></div>
+      <span class="energy-text" id="energyText">10/10</span>
+      <button class="energy-refill" id="energyRefill" onclick="refillEnergy()">🔋 25</button>
+    </div>
+    <div class="park-world" id="parkWorld">
+      <!-- Fence -->
+      <div class="park-fence fence-h top"></div>
+      <div class="park-fence fence-h bottom"></div>
+      <div class="park-fence fence-v left"></div>
+      <div class="park-fence fence-v right"></div>
+      <!-- Dynamic content rendered by JS -->
+    </div>
+    <div class="park-panel" id="parkPanel"></div>
+  </div>
+</div>
+
+<!-- Eggs Tab -->
+<div class="tab-content scrollable" id="tab-eggs">
+  <div id="eventBannerArea"></div>
+  <div class="eggs-section">
+    <div class="section-title">Incubator</div>
+    <div class="incubator-grid" id="incubatorGrid"></div>
+  </div>
+  <div class="eggs-section">
+    <div class="section-title">How to Get Eggs</div>
+    <div class="egg-sources" id="eggSources"></div>
+  </div>
+  <div class="eggs-section">
+    <div class="section-title">Redeem Egg Code</div>
+    <div style="font-size: 10px; color: #555; margin-bottom: 8px;">Mods and the broadcaster drop egg codes during stream!</div>
+    <div class="redeem-row">
+      <input type="text" class="redeem-input" id="redeemInput" placeholder="Enter egg code..." maxlength="20">
+      <button class="redeem-btn" onclick="redeemCode()">Redeem</button>
+    </div>
+  </div>
+</div>
+
+<!-- Collection Tab -->
+<div class="tab-content" id="tab-collection">
+  <div class="coll-layout">
+    <div class="coll-list" id="collList"></div>
+    <div class="coll-detail" id="collDetail">
+      <div class="coll-detail-empty">Select a dinosaur</div>
+    </div>
+  </div>
+</div>
+
+<!-- Market Tab -->
+<div class="tab-content scrollable" id="tab-market">
+  <div id="marketContent"></div>
+</div>
+
+<!-- Dinodex Tab -->
+<div class="tab-content scrollable" id="tab-dinodex">
+  <div class="dex-stats-bar" id="dexStats"></div>
+  <div class="dex-rarity-row" id="dexRarityRow"></div>
+  <div id="dexDetailPanel"></div>
+  <div class="dex-filters" id="dexFilters"></div>
+  <div class="dex-counter" id="dexCounter"></div>
+  <div class="dex-grid" id="dexGrid"></div>
+</div>
+
+<!-- Hatch Overlay -->
+<div class="hatch-overlay" id="hatchOverlay">
+  <div class="hatch-emoji" id="hatchEmoji"></div>
+  <div class="hatch-name" id="hatchName"></div>
+  <div class="hatch-rarity" id="hatchRarity"></div>
+  <div class="hatch-desc" id="hatchDesc"></div>
+  <button class="hatch-close" onclick="closeHatch()">Welcome to the Park!</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SAVE_KEY = 'pham_dino_park';
+const RARITY_ORDER = ['common','uncommon','rare','epic','legendary'];
+const RARITY_COLORS = { common:'#7a7a7a', uncommon:'#2ecc71', rare:'#3498db', epic:'#9b59b6', legendary:'#f39c12' };
+const GROWTH_THRESHOLDS = { juvenile: 20, adult: 60 };
+const STAT_DECAY_RATE = 1;
+const DECAY_INTERVAL_SEC = 600;
+const CARE_AMOUNT = 25;
+const CARE_COOLDOWN = 10000;
+const MAX_PARK_SIZE = 20;
+const HATCH_TIMES = { common: 1800, uncommon: 3600, rare: 7200, epic: 14400, legendary: 28800 };
+
+
+const ROSTER = [
+  { id:'compy', name:'Compsognathus', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'Tiny but fierce — this chicken-sized predator hunts in packs.' },
+  { id:'proto', name:'Protoceratops', emoji:'🐑', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A small frill-faced herbivore. Tough and scrappy despite its size.' },
+  { id:'galli', name:'Gallimimus', emoji:'🐔', rarity:'common', diet:'Omnivore', habitat:'Land', era:'Cretaceous', desc:'The ostrich mimic — built for speed and curious about everything.' },
+  { id:'coelo', name:'Coelophysis', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Triassic', desc:'One of the earliest predators. Lean, fast, and hungry.' },
+  { id:'dimetro', name:'Dimetrodon', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Permian', desc:'Not technically a dinosaur, but that sail-back is iconic.' },
+  { id:'iguan', name:'Iguanodon', emoji:'🦕', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Famous for its thumb spikes. A gentle giant with attitude.' },
+  { id:'edmont', name:'Edmontosaurus', emoji:'🦆', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A massive duck-billed dinosaur that roamed in huge herds.' },
+  { id:'maia', name:'Maiasaura', emoji:'🦕', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'"Good mother lizard" — known for nurturing its young.' },
+  { id:'dimor', name:'Dimorphodon', emoji:'🦇', rarity:'common', diet:'Piscivore', habitat:'Sky', era:'Jurassic', desc:'A small pterosaur with a head too big for its body. Adorable chaos.' },
+  { id:'pachy', name:'Pachycephalosaurus', emoji:'🐏', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A dome-headed headbutter. Don\'t stand too close.' },
+  { id:'kentro', name:'Kentrosaurus', emoji:'🦔', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Covered in spikes from head to tail. Nature\'s pincushion.' },
+  { id:'ovira', name:'Oviraptor', emoji:'🐓', rarity:'common', diet:'Omnivore', habitat:'Land', era:'Cretaceous', desc:'Falsely accused of egg theft. Actually a devoted parent.' },
+  { id:'micro', name:'Microraptor', emoji:'🐦', rarity:'common', diet:'Carnivore', habitat:'Sky', era:'Cretaceous', desc:'A four-winged glider. Part bird, part dinosaur, all cool.' },
+  { id:'archae', name:'Archaeopteryx', emoji:'🐦', rarity:'common', diet:'Carnivore', habitat:'Sky', era:'Jurassic', desc:'The first bird — a living link between dinosaurs and flight.' },
+  { id:'dodo', name:'Dodo', emoji:'🦤', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Holocene', desc:'Famously fearless and famously extinct. Give it a second chance.' },
+  { id:'raptor', name:'Velociraptor', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Clever girl. Small but devastatingly smart and fast.' },
+  { id:'dilopho', name:'Dilophosaurus', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'Double-crested and dramatic. May or may not spit venom.' },
+  { id:'stego', name:'Stegosaurus', emoji:'🦕', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Iconic plates and a spiked tail. Brain the size of a walnut.' },
+  { id:'para', name:'Parasaurolophus', emoji:'🦕', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'That magnificent crest is basically a built-in trombone.' },
+  { id:'baryo', name:'Baryonyx', emoji:'🦖', rarity:'uncommon', diet:'Piscivore', habitat:'Land', era:'Cretaceous', desc:'A fish-eating theropod with massive hook claws. River predator.' },
+  { id:'cory', name:'Corythosaurus', emoji:'🦕', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Helmet-crested hadrosaur. The marching band leader of the Cretaceous.' },
+  { id:'styra', name:'Styracosaurus', emoji:'🦏', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A frill full of spikes. Nature went all-in on this design.' },
+  { id:'rhamph', name:'Rhamphorhynchus', emoji:'🦇', rarity:'uncommon', diet:'Piscivore', habitat:'Sky', era:'Jurassic', desc:'Long-tailed pterosaur. A graceful fisherman of ancient skies.' },
+  { id:'ichthy', name:'Ichthyosaurus', emoji:'🐬', rarity:'uncommon', diet:'Piscivore', habitat:'Water', era:'Jurassic', desc:'Dolphin-shaped marine reptile. Built for speed in ancient seas.' },
+  { id:'megalo', name:'Megalosaurus', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'The first dinosaur ever named. A pioneer of prehistoric science.' },
+  { id:'utah', name:'Utahraptor', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Velociraptor\'s bigger, scarier cousin. Those claws mean business.' },
+  { id:'deino', name:'Deinonychus', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'"Terrible claw" — the raptor that changed how we see dinosaurs.' },
+  { id:'trike', name:'Triceratops', emoji:'🦏', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Three horns and a massive frill. Nature\'s tank.' },
+  { id:'allo', name:'Allosaurus', emoji:'🦖', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'The apex predator of the Jurassic. Fast, fierce, and relentless.' },
+  { id:'anky', name:'Ankylosaurus', emoji:'🐢', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Armored from head to tail with a club that could shatter bone.' },
+  { id:'diplo', name:'Diplodocus', emoji:'🦕', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Impossibly long neck and whip-crack tail. Gentle and enormous.' },
+  { id:'carno', name:'Carnotaurus', emoji:'🦖', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Bull-horned speedster with hilariously tiny arms.' },
+  { id:'plesio', name:'Plesiosaurus', emoji:'🐉', rarity:'rare', diet:'Piscivore', habitat:'Water', era:'Jurassic', desc:'Long-necked sea serpent. Probably inspired the Loch Ness legend.' },
+  { id:'pterano', name:'Pteranodon', emoji:'🦅', rarity:'rare', diet:'Piscivore', habitat:'Sky', era:'Cretaceous', desc:'Giant crested flyer. Wingspan wider than a small plane.' },
+  { id:'brachio', name:'Brachiosaurus', emoji:'🦕', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Tower of the Jurassic. Head high enough to peek over buildings.' },
+  { id:'smilo', name:'Smilodon', emoji:'🐯', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Pleistocene', desc:'Saber-toothed cat. Those fangs were built for ambush kills.' },
+  { id:'therizo', name:'Therizinosaurus', emoji:'🦖', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Claws like swords on a body that ate plants. Nature\'s paradox.' },
+  { id:'trex', name:'Tyrannosaurus Rex', emoji:'🦖', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'The king of dinosaurs. 12,000 pounds of apex predator.' },
+  { id:'spino', name:'Spinosaurus', emoji:'🦖', rarity:'epic', diet:'Piscivore', habitat:'Water', era:'Cretaceous', desc:'Sail-backed river hunter. Bigger than T. rex and semi-aquatic.' },
+  { id:'apato', name:'Apatosaurus', emoji:'🦕', rarity:'epic', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Thunder lizard. Each footstep shook the earth.' },
+  { id:'gigano', name:'Giganotosaurus', emoji:'🦖', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'South America\'s answer to T. rex. Possibly even larger.' },
+  { id:'mosa', name:'Mosasaurus', emoji:'🐋', rarity:'epic', diet:'Carnivore', habitat:'Water', era:'Cretaceous', desc:'60-foot ocean predator. Nothing was safe in the water.' },
+  { id:'bronto', name:'Brontosaurus', emoji:'🦕', rarity:'epic', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'The classic long-neck. Declared fake, then un-declared. It\'s back.' },
+  { id:'mammoth', name:'Woolly Mammoth', emoji:'🦣', rarity:'epic', diet:'Herbivore', habitat:'Land', era:'Pleistocene', desc:'Ice Age icon. Massive tusks, thick wool, and a gentle soul.' },
+  { id:'elasmo', name:'Elasmosaurus', emoji:'🐉', rarity:'epic', diet:'Piscivore', habitat:'Water', era:'Cretaceous', desc:'Neck longer than its entire body. The sea serpent of nightmares.' },
+  { id:'argent', name:'Argentinosaurus', emoji:'🦕', rarity:'legendary', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'The largest land animal to ever exist. 100 tons of pure majesty.' },
+  { id:'megashark', name:'Megalodon', emoji:'🦈', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Miocene', desc:'A 60-foot shark. The ocean\'s ultimate nightmare, now in your park.' },
+  { id:'quetz', name:'Quetzalcoatlus', emoji:'🦅', rarity:'legendary', diet:'Carnivore', habitat:'Sky', era:'Cretaceous', desc:'Giraffe-sized pterosaur. The largest creature to ever fly.' },
+  { id:'liopl', name:'Liopleurodon', emoji:'🐋', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Jurassic', desc:'Massive marine predator with jaws built like a bear trap.' },
+  { id:'titano', name:'Titanoboa', emoji:'🐍', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Paleocene', desc:'50-foot snake. The undisputed ruler of the post-dino swamps.' },
+];
+
+/* ======================== PIXEL ART SPRITES ======================== */
+// ==================== SPRITE SYSTEM v3 — HD ====================
+// Color utilities
+function hexRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
+function rgbHex(r,g,b){return'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('')}
+function adj(hex,amt){const[r,g,b]=hexRgb(hex);const f=amt>0?255:0;const t=Math.abs(amt)/100;return rgbHex(r+(f-r)*t,g+(f-g)*t,b+(f-b)*t)}
+
+function genPalette(pri,acc,iris){
+  return{body:pri,mid:adj(pri,15),light:adj(pri,35),dark:adj(pri,-20),
+    outline:adj(pri,-42),belly:adj(pri,50),accent:acc||adj(pri,30),
+    iris:iris||'#FFD700',claw:'#E8DCC8',detail:adj(pri,-10)};
+}
+
+// Species: t=body type, p=primary color, a=accent, i=iris
+const SPECIES_DEF = {
+  compy:{t:'raptor',p:'#6B8E23',a:'#B5D45A',i:'#FFD700'},
+  proto:{t:'horned',p:'#C19A6B',a:'#E8C090',i:'#8B6914'},
+  galli:{t:'duck',p:'#C9A84C',a:'#E8D070',i:'#8B4513'},
+  coelo:{t:'raptor',p:'#D2691E',a:'#F0A050',i:'#FFD700'},
+  dimetro:{t:'armored',p:'#8B7355',a:'#C4A878',i:'#DAA520'},
+  iguan:{t:'sauropod',p:'#5B8C5A',a:'#8DC88C',i:'#2E8B57'},
+  edmont:{t:'duck',p:'#7B886B',a:'#A8B898',i:'#556B2F'},
+  maia:{t:'sauropod',p:'#8FBC8F',a:'#C0E8C0',i:'#2E8B57'},
+  dimor:{t:'flyer',p:'#8B4513',a:'#D4783C',i:'#FFD700'},
+  pachy:{t:'armored',p:'#6B6B3E',a:'#A0A068',i:'#8B8000'},
+  kentro:{t:'armored',p:'#A0522D',a:'#D87850',i:'#CD853F'},
+  ovira:{t:'raptor',p:'#BF5B3B',a:'#E89070',i:'#FF6347'},
+  micro:{t:'raptor',p:'#2F4F4F',a:'#5F9090',i:'#40E0D0'},
+  archae:{t:'flyer',p:'#DAA520',a:'#F0D870',i:'#8B6914'},
+  dodo:{t:'flyer',p:'#808080',a:'#B0B0B0',i:'#4169E1'},
+  raptor:{t:'raptor',p:'#B8860B',a:'#E0B840',i:'#FF4500'},
+  dilopho:{t:'raptor',p:'#CC3333',a:'#FF6666',i:'#FFD700'},
+  stego:{t:'armored',p:'#4E7A4E',a:'#80C080',i:'#228B22'},
+  para:{t:'duck',p:'#4682B4',a:'#78B8E0',i:'#00BFFF'},
+  baryo:{t:'rex',p:'#607B8B',a:'#90B8D0',i:'#B0C4DE'},
+  cory:{t:'duck',p:'#6A5ACD',a:'#9988F0',i:'#9370DB'},
+  styra:{t:'horned',p:'#CD5C5C',a:'#F08080',i:'#FF6347'},
+  rhamph:{t:'flyer',p:'#556B2F',a:'#88A848',i:'#ADFF2F'},
+  ichthy:{t:'marine',p:'#4169E1',a:'#7098F0',i:'#00BFFF'},
+  megalo:{t:'rex',p:'#8B6914',a:'#C0A040',i:'#FFD700'},
+  utah:{t:'raptor',p:'#A0522D',a:'#D08050',i:'#FF4500'},
+  deino:{t:'raptor',p:'#CD6839',a:'#F09060',i:'#FFD700'},
+  trike:{t:'horned',p:'#6B8E8E',a:'#98C4C4',i:'#48D1CC'},
+  allo:{t:'rex',p:'#8B0000',a:'#CC3030',i:'#FF4500'},
+  anky:{t:'armored',p:'#696969',a:'#989898',i:'#B0C4DE'},
+  diplo:{t:'sauropod',p:'#9370DB',a:'#B898F0',i:'#9400D3'},
+  carno:{t:'rex',p:'#B22222',a:'#E04848',i:'#FF6347'},
+  plesio:{t:'marine',p:'#20B2AA',a:'#60D8D0',i:'#00CED1'},
+  pterano:{t:'flyer',p:'#4682B4',a:'#78B8E0',i:'#87CEEB'},
+  brachio:{t:'sauropod',p:'#6B8E23',a:'#A0C840',i:'#ADFF2F'},
+  smilo:{t:'beast',p:'#DAA520',a:'#F0D060',i:'#FF4500'},
+  therizo:{t:'rex',p:'#556B2F',a:'#88A848',i:'#ADFF2F'},
+  trex:{t:'rex',p:'#5D4037',a:'#8B6E58',i:'#FF4500'},
+  spino:{t:'marine',p:'#B8860B',a:'#E0B840',i:'#FFD700'},
+  apato:{t:'sauropod',p:'#8B7355',a:'#C0A880',i:'#DAA520'},
+  gigano:{t:'rex',p:'#4A4A2A',a:'#787848',i:'#ADFF2F'},
+  mosa:{t:'marine',p:'#2F4F4F',a:'#588888',i:'#00CED1'},
+  bronto:{t:'sauropod',p:'#808060',a:'#B0B088',i:'#BDB76B'},
+  mammoth:{t:'beast',p:'#8B4513',a:'#C87838',i:'#CD853F'},
+  elasmo:{t:'marine',p:'#5F9EA0',a:'#88D0D0',i:'#00CED1'},
+  argent:{t:'sauropod',p:'#C0C0C0',a:'#E0E0E0',i:'#87CEEB'},
+  megashark:{t:'marine',p:'#4A5568',a:'#788898',i:'#B0C4DE'},
+  quetz:{t:'flyer',p:'#FF6347',a:'#FF9878',i:'#FFD700'},
+  liopl:{t:'marine',p:'#1E3A5F',a:'#486898',i:'#4169E1'},
+  titano:{t:'marine',p:'#556B2F',a:'#88A848',i:'#ADFF2F'},
+};
+
+const MUTATIONS = {
+  albino:{label:'Albino',boost:1,p:'#F0EDE6',a:'#FFD0D0',i:'#FF4444'},
+  melanistic:{label:'Melanistic',boost:1,p:'#1A1A1A',a:'#333333',i:'#888888'},
+  golden:{label:'Golden',boost:1,p:'#DAA520',a:'#FFD700',i:'#8B4513'},
+  crystal:{label:'Crystal',boost:2,p:'#B0E0E6',a:'#E0F0FF',i:'#4169E1'},
+  volcanic:{label:'Volcanic',boost:2,p:'#2D1F1F',a:'#FF4500',i:'#FF6600',overlay:'lava'},
+  phantomace:{label:'PhantomACE',boost:'legendary',p:'#0A0A0A',a:'#FF0000',i:'#FF0000',overlay:'punk'},
+  spectral:{label:'Spectral',boost:2,p:'#8878B0',a:'#C0A8F0',i:'#E8E0FF',overlay:'ghost'},
+  toxic:{label:'Toxic',boost:1,p:'#2D5A1E',a:'#7FFF00',i:'#ADFF2F'},
+};
+
+// ============ SPECIES MUTATION SYSTEM ============
+const COLOR_SWAPS=[
+  {id:'azure',l:'Azure',p:'#2E4A7A',a:'#4A78C4',i:'#00BFFF'},
+  {id:'crimson',l:'Crimson',p:'#8B0000',a:'#DC143C',i:'#FF4500'},
+  {id:'jade',l:'Jade',p:'#2E5A2E',a:'#4A8A4A',i:'#7FFF00'},
+  {id:'amethyst',l:'Amethyst',p:'#4A2E6A',a:'#7848A8',i:'#9370DB'},
+  {id:'amber',l:'Amber',p:'#8B5A00',a:'#D4882E',i:'#FFB347'},
+  {id:'arctic',l:'Arctic',p:'#B8C8D8',a:'#D8E8F0',i:'#87CEEB'},
+  {id:'obsidian',l:'Obsidian',p:'#1A1A2E',a:'#3A3A5A',i:'#6A6A8E'},
+  {id:'rose',l:'Rose',p:'#8B2252',a:'#CD5C8C',i:'#FF69B4'},
+  {id:'copper',l:'Copper',p:'#7A4A2A',a:'#B87333',i:'#DAA520'},
+  {id:'teal',l:'Teal',p:'#006B6B',a:'#20B2AA',i:'#40E0D0'},
+  {id:'ivory',l:'Ivory',p:'#C8BFA0',a:'#E8DCC0',i:'#8B8000'},
+  {id:'slate',l:'Slate',p:'#4A5568',a:'#708090',i:'#B0C4DE'},
+];
+function pickSwaps(baseHex){
+  const b=hexRgb(baseHex);
+  return COLOR_SWAPS.map(s=>{const c=hexRgb(s.p);return{...s,d:Math.abs(b[0]-c[0])+Math.abs(b[1]-c[1])+Math.abs(b[2]-c[2])}})
+    .sort((a,b)=>b.d-a.d).slice(0,3);
+}
+const SPECIAL_MUTS={
+  baryo:['Deepwater','#0A1A2E','#1E90FF','#00CED1','aqua'],
+  megalo:['Living Fossil','#8B7D6B','#C4B090','#FFD700','stellar'],
+  allo:['Blood Moon','#2E0000','#8B0000','#FF0000','ember'],
+  carno:['Sandstorm','#C2A060','#E8C878','#FF8C00','prism'],
+  therizo:['Enchanted','#2E5A4A','#4ABA8A','#7FFFD4','bloom'],
+  trex:['Inferno','#1A0A00','#FF4500','#FFD700','ember'],
+  gigano:['Volcanic','#2D1F1F','#FF4500','#FF6600','ember'],
+  compy:['Electric','#1A1A3A','#FFFF00','#00FF00','volt'],
+  coelo:['Phantom','#2A2A3A','#8888BB','#AAAAFF','shadow'],
+  ovira:['Tropical','#FF6B35','#FFD700','#FF1493','prism'],
+  micro:['Aurora','#0A2A4A','#00FF88','#FF00FF','prism'],
+  raptor:['Neon Hunter','#0A0A2A','#00FF88','#FF00FF','volt'],
+  dilopho:['Toxin','#1A2E1A','#00FF00','#ADFF2F','bloom'],
+  utah:['War Paint','#5A3A2A','#CC4400','#FFD700','tribal'],
+  deino:['Nightfall','#0A0A1E','#4A2E8A','#9370DB','shadow'],
+  iguan:['Mossy','#3A5A2A','#6B8A4A','#ADFF2F','bloom'],
+  maia:['Sunrise','#C87838','#FFB347','#FFD700','prism'],
+  diplo:['Cloudwalker','#8AA8C8','#C0D8E8','#F0F8FF','stellar'],
+  brachio:['Ancient Grove','#4A3A2A','#6B8A3A','#ADFF2F','bloom'],
+  apato:['Earthshaker','#5A4A2A','#8B7355','#DAA520','crystal'],
+  bronto:['Twilight','#3A2A4A','#7A58A8','#DDA0DD','stellar'],
+  argent:['Platinum','#D8D8E0','#E8E8F0','#B0C4DE','crystal'],
+  proto:['Desert Bloom','#C4A060','#E8C878','#FF8C00','bloom'],
+  styra:['Warlord','#5A2A2A','#A84A3A','#FF4500','tribal'],
+  trike:['Thunderhorn','#2A3A4A','#5A8AAA','#00BFFF','volt'],
+  dimetro:['Solar Sail','#8B5A00','#FFD700','#FF8C00','ember'],
+  pachy:['Meteor','#4A3A2A','#8B6914','#FF4500','ember'],
+  kentro:['Thorned Crystal','#2A4A4A','#48D1CC','#7FFFD4','crystal'],
+  stego:['Opal','#5A7A8A','#88C8D8','#E0F0FF','prism'],
+  anky:['Fortress','#4A4A4A','#787878','#B0C4DE','crystal'],
+  galli:['Lightning','#8B8800','#FFFF00','#FFD700','volt'],
+  edmont:['Elder','#4A5A4A','#7A8A7A','#98FB98','bloom'],
+  para:['Siren','#3A2A5A','#7848C8','#FF69B4','prism'],
+  cory:['Regal','#4A2A6A','#8868C8','#FFD700','royal'],
+  dimor:['Stormy','#2A2A3A','#5A5A8A','#FFD700','volt'],
+  archae:['Primal Fire','#5A2A0A','#FF6B35','#FFD700','ember'],
+  dodo:['Disco','#4A2A5A','#FF69B4','#00FFFF','prism'],
+  rhamph:['Storm Rider','#1A2A3A','#4A78B4','#00BFFF','volt'],
+  pterano:['Dawn Patrol','#B85A2A','#FFB347','#FFD700','ember'],
+  quetz:['Sun God','#8B6914','#FFD700','#FF4500','stellar'],
+  ichthy:['Bioluminescent','#0A1A2E','#00FFFF','#00FF88','aqua'],
+  plesio:['Misty','#6A8A8A','#A0C8C8','#E0F0F0','frost'],
+  spino:['Leviathan','#1A0A2A','#4A2A8A','#8A2BE2','shadow'],
+  mosa:['Depth Charge','#0A0A2E','#1E3A8A','#4169E1','aqua'],
+  elasmo:['Spectral','#6A7A8A','#A0B0C0','#E0E8FF','frost'],
+  megashark:['Blood Water','#3A0A0A','#8B0000','#FF0000','ember'],
+  liopl:['Abyss','#0A0A1A','#1A2A4A','#4169E1','shadow'],
+  titano:['Venomous','#1A3A1A','#00FF00','#ADFF2F','bloom'],
+  smilo:['Frost Fang','#8AA8C8','#C0D8F0','#00BFFF','frost'],
+  mammoth:['Elder Sage','#4A3A3A','#7A5A4A','#DAA520','stellar'],
+};
+const RARE_MUTS={
+  trex:['Mech Rex','#4A4A4A','#C0C0C0','#00FF00','mech'],
+  baryo:['Abyssal Angler','#0A0A1A','#00FFFF','#FF00FF','aqua'],
+  megalo:['Fossil King','#8B7D5A','#C4A870','#FFD700','royal'],
+  allo:['Berserker','#5A0000','#FF0000','#FFD700','tribal'],
+  carno:['Matador','#2A0A0A','#DC143C','#FFD700','royal'],
+  therizo:['Samurai','#1A1A2E','#C0C0C0','#FF0000','mech'],
+  gigano:['Kaiju','#1A2A1A','#00FF88','#00FFFF','volt'],
+  compy:['Hive Mind','#4A3A0A','#FFD700','#FF8C00','royal'],
+  coelo:['Ancestral Spirit','#E8E0FF','#C0A8F0','#FF69B4','stellar'],
+  ovira:['Carnival','#FF1493','#FFD700','#00FF00','prism'],
+  micro:['Stealth Jet','#1A1A1A','#333333','#00FF00','mech'],
+  raptor:['Cyber Raptor','#0A0A1A','#FF0066','#00FFFF','mech'],
+  dilopho:['Plague Bearer','#2A1A2A','#8B00FF','#ADFF2F','shadow'],
+  utah:['Alpha','#3A0A0A','#8B0000','#FF4500','tribal'],
+  deino:['Shadow Strike','#0A0A0A','#1A1A3A','#FF0000','shadow'],
+  iguan:['Knight','#4A5568','#C0C0C0','#FFD700','mech'],
+  maia:['Garden Mother','#3A6A3A','#8ACA8A','#FF69B4','bloom'],
+  diplo:['Nebula','#1A0A2E','#6A28B2','#FF69B4','stellar'],
+  brachio:['World Tree','#3A2A1A','#5A8A2A','#ADFF2F','bloom'],
+  apato:['Earthquake','#5A4A2A','#C4A060','#FF4500','crystal'],
+  bronto:['Cosmic','#0A0A2E','#4A2A8A','#FFD700','stellar'],
+  argent:['Titan','#E8E0D0','#FFD700','#FF4500','royal'],
+  proto:['War Shield','#5A4A3A','#B87333','#FFD700','mech'],
+  styra:['Crystal Crown','#4A2A6A','#B878FF','#FFD700','crystal'],
+  trike:['Gladiator','#6A4A2A','#B87333','#FF4500','mech'],
+  dimetro:['Reactor','#2A2A4A','#00FF00','#00FFFF','volt'],
+  pachy:['Iron Dome','#4A4A5A','#A0A0B0','#FFD700','mech'],
+  kentro:['Gem Lord','#2A2A5A','#7B68EE','#FF69B4','crystal'],
+  stego:['Prism Plates','#4A5A6A','#88B8D8','#FF69B4','crystal'],
+  anky:['Battle Tank','#3A4A3A','#6B8B4A','#FFD700','mech'],
+  galli:['Roadrunner','#6A4A2A','#FFD700','#FF4500','volt'],
+  edmont:['Ancient One','#3A4A3A','#6A8A6A','#FFD700','bloom'],
+  para:['Maestro','#2A1A4A','#9370DB','#FFD700','prism'],
+  cory:['Herald King','#3A1A4A','#DAA520','#FFD700','royal'],
+  dimor:['Gargoyle','#4A4A4A','#707070','#FF4500','crystal'],
+  archae:['Phoenix','#8B2500','#FF6347','#FFD700','ember'],
+  dodo:['Disco King','#FF1493','#00FFFF','#FFD700','prism'],
+  rhamph:['Tempest','#1A1A3A','#4A78C4','#FFFFFF','volt'],
+  pterano:['Valkyrie','#C0C0C0','#FFD700','#87CEEB','royal'],
+  quetz:['Aztec God','#006B6B','#FFD700','#FF4500','royal'],
+  ichthy:['Neon Racer','#0A0A2E','#FF00FF','#00FFFF','volt'],
+  plesio:['Loch Ness','#2A3A2A','#4A6A4A','#ADFF2F','shadow'],
+  spino:['Kraken','#1A0A2E','#8A2BE2','#FF00FF','shadow'],
+  mosa:['Ocean Apex','#0A0A0A','#DC143C','#FF0000','tribal'],
+  elasmo:['Ghost Ship','#C8C8D8','#E8E8F0','#FF69B4','frost'],
+  megashark:['Apex Predator','#1A0A0A','#8B0000','#FF0000','tribal'],
+  liopl:['Abyssal Lord','#0A0A0A','#191970','#4169E1','shadow'],
+  titano:['World Serpent','#0A0A2E','#4A2A8A','#FFD700','stellar'],
+  smilo:['Ice King','#4A6A8A','#88C8E8','#FFFFFF','frost'],
+  mammoth:['Woolly Emperor','#3A1A4A','#8A68B8','#FFD700','royal'],
+};
+function getMutationsForSpecies(specId){
+  const def=SPECIES_DEF[specId];if(!def)return[];
+  const normals=pickSwaps(def.p).map(s=>({id:s.id,label:s.l,tier:'normal',p:s.p,a:s.a,i:s.i}));
+  const sp=SPECIAL_MUTS[specId];const ra=RARE_MUTS[specId];
+  const result=[...normals];
+  if(sp)result.push({id:'sp_'+specId,label:sp[0],tier:'special',p:sp[1],a:sp[2],i:sp[3],overlay:sp[4]});
+  if(ra)result.push({id:'rare_'+specId,label:ra[0],tier:'rare',p:ra[1],a:ra[2],i:ra[3],overlay:ra[4]});
+  return result;
+}
+function resolveSpeciesMut(specId,mutId){
+  if(!mutId)return null;
+  if(MUTATIONS[mutId])return MUTATIONS[mutId];
+  const muts=getMutationsForSpecies(specId);
+  const found=muts.find(m=>m.id===mutId);
+  if(found)return{label:found.label,boost:found.tier==='rare'?'legendary':found.tier==='special'?2:1,
+    p:found.p,a:found.a,i:found.i,overlay:found.overlay||null};
+  return null;
+}
+function rollMutation(specId){
+  const r=Math.random()*100;
+  if(r<0.5&&RARE_MUTS[specId])return'rare_'+specId;
+  if(r<3&&SPECIAL_MUTS[specId])return'sp_'+specId;
+  if(r<15){const n=pickSwaps(SPECIES_DEF[specId].p);return n[Math.floor(Math.random()*n.length)].id;}
+  if(r<18){const gk=Object.keys(MUTATIONS);return gk[Math.floor(Math.random()*gk.length)];}
+  return null;
+}
+
+const spriteCache = {};
+
+// Drawing helpers
+function px(ctx,x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w||1,h||1)}
+function fe(ctx,cx,cy,rx,ry,c){ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);ctx.fill()}
+function frr(ctx,x,y,w,h,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function fp(ctx,pts,c){ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);ctx.closePath();ctx.fill()}
+function dit(ctx,x,y,w,h,c){ctx.fillStyle=c;for(let dy=0;dy<h;dy++)for(let dx=((dy&1)?1:0);dx<w;dx+=2)ctx.fillRect(x+dx,y+dy,1,1)}
+
+function drawEye(ctx,x,y,r,P){
+  fe(ctx,x,y,r+1,r+1,P.outline);
+  fe(ctx,x,y,r,r,'#FFFFFF');
+  fe(ctx,x+1,y,Math.max(1,r-1),r,P.iris);
+  fe(ctx,x+1,y+1,Math.max(1,r-2),Math.max(1,r-1),'#111');
+  px(ctx,x-1,y-r+1,2,1,'#FFFFFF');
+}
+
+function drawBody(ctx,type,P){
+  switch(type){
+    case 'rex':{
+      // Tail
+      fp(ctx,[[2,42],[6,36],[12,34],[20,36],[22,42],[20,50],[12,52],[6,48]],P.body);
+      fp(ctx,[[4,44],[8,40],[16,38],[18,44],[16,48],[8,48]],P.mid);
+      dit(ctx,4,46,12,4,P.dark);
+      // Back leg (behind body)
+      frr(ctx,40,56,10,22,4,P.outline);frr(ctx,41,57,8,20,3,P.dark);
+      frr(ctx,36,78,16,8,4,P.outline);frr(ctx,37,79,14,6,3,P.dark);
+      // Body
+      fe(ctx,38,44,23,16,P.outline);fe(ctx,38,44,22,15,P.body);
+      fe(ctx,38,40,19,10,P.mid);dit(ctx,22,36,32,6,P.light);
+      fe(ctx,38,50,18,8,P.belly);dit(ctx,24,46,28,4,P.dark);
+      // Front leg
+      frr(ctx,26,56,10,22,4,P.outline);frr(ctx,27,57,8,20,3,P.body);
+      frr(ctx,28,58,6,10,2,P.mid);frr(ctx,26,68,10,3,1,P.dark);
+      frr(ctx,22,78,16,8,4,P.outline);frr(ctx,23,79,14,6,3,P.dark);
+      // Toes
+      fe(ctx,26,85,4,3,P.outline);fe(ctx,34,85,4,3,P.outline);
+      fe(ctx,42,85,4,3,P.outline);fe(ctx,50,85,4,3,P.outline);
+      px(ctx,24,86,3,2,P.claw);px(ctx,32,86,3,2,P.claw);
+      px(ctx,40,86,3,2,P.claw);px(ctx,48,86,3,2,P.claw);
+      // Neck
+      fp(ctx,[[50,30],[56,26],[62,22],[64,28],[62,38],[56,42],[50,42]],P.body);
+      fp(ctx,[[52,32],[58,28],[62,26],[62,34],[58,38],[52,40]],P.mid);
+      // Head
+      fe(ctx,68,20,16,12,P.outline);fe(ctx,68,20,15,11,P.body);
+      fe(ctx,68,17,13,7,P.mid);dit(ctx,58,12,20,6,P.light);
+      // Brow ridge
+      frr(ctx,60,10,14,4,2,P.dark);frr(ctx,62,9,10,3,2,P.detail);
+      // Jaw
+      fe(ctx,72,28,14,5,P.outline);fe(ctx,72,28,13,4,P.body);fe(ctx,74,29,10,3,P.dark);
+      // Teeth
+      for(let i=0;i<5;i++){px(ctx,68+i*3,24,2,4,'#FFF');px(ctx,68+i*3,27,2,1,'#DDD')}
+      for(let i=0;i<4;i++){px(ctx,70+i*3,30,2,3,'#FFF')}
+      // Eye
+      drawEye(ctx,74,18,4,P);
+      // Nostril
+      fe(ctx,82,20,2,2,P.outline);
+      // Tiny arms
+      frr(ctx,54,36,4,8,2,P.body);frr(ctx,55,42,3,4,1,P.mid);px(ctx,56,46,3,2,P.claw);
+      // Scales
+      px(ctx,30,38,2,2,P.detail);px(ctx,36,36,2,2,P.detail);px(ctx,44,38,2,2,P.detail);
+      px(ctx,34,42,2,2,P.detail);px(ctx,42,40,2,2,P.detail);px(ctx,28,44,2,2,P.detail);
+      break;
+    }
+    case 'raptor':{
+      // Tail
+      fp(ctx,[[0,30],[2,26],[6,24],[14,28],[16,34],[14,40],[6,42],[2,38]],P.body);
+      fp(ctx,[[2,32],[6,28],[12,30],[12,36],[6,38]],P.mid);
+      fp(ctx,[[0,28],[4,26],[4,30]],P.accent);fp(ctx,[[0,36],[4,38],[4,34]],P.accent);
+      // Body
+      fe(ctx,34,40,18,11,P.outline);fe(ctx,34,40,17,10,P.body);
+      fe(ctx,34,38,15,7,P.mid);dit(ctx,20,34,28,4,P.light);
+      fe(ctx,34,44,14,6,P.belly);
+      frr(ctx,18,38,32,3,1,P.accent);
+      // Back leg
+      frr(ctx,38,48,6,16,3,P.outline);frr(ctx,39,49,4,14,2,P.body);
+      frr(ctx,38,58,6,3,1,P.dark);frr(ctx,36,64,4,10,2,P.body);
+      frr(ctx,34,74,10,6,3,P.dark);
+      fe(ctx,32,78,3,3,P.outline);px(ctx,30,78,3,2,P.claw);
+      fe(ctx,40,78,3,3,P.outline);px(ctx,40,80,3,2,P.claw);
+      // Front leg
+      frr(ctx,26,48,6,16,3,P.outline);frr(ctx,27,49,4,14,2,P.body);
+      frr(ctx,26,58,6,3,1,P.dark);frr(ctx,24,64,4,10,2,P.body);
+      frr(ctx,20,74,10,6,3,P.dark);
+      fe(ctx,20,78,3,3,P.outline);px(ctx,18,76,2,4,P.claw);px(ctx,18,78,3,2,P.claw);
+      fe(ctx,28,78,3,3,P.outline);px(ctx,28,80,3,2,P.claw);
+      // Neck
+      fp(ctx,[[46,32],[52,28],[56,24],[58,30],[54,38],[48,40]],P.body);
+      fp(ctx,[[48,34],[54,30],[56,28],[56,34],[52,38]],P.mid);
+      // Head
+      fe(ctx,62,22,14,9,P.outline);fe(ctx,62,22,13,8,P.body);
+      fe(ctx,62,20,11,5,P.mid);dit(ctx,52,16,20,4,P.light);
+      // Feather crest
+      fp(ctx,[[52,14],[56,8],[58,6],[60,4],[62,6],[60,12],[56,16]],P.accent);
+      fp(ctx,[[54,12],[58,8],[60,6],[60,10],[56,14]],P.light);
+      // Jaw
+      fe(ctx,66,28,12,4,P.outline);fe(ctx,66,28,11,3,P.body);
+      for(let i=0;i<4;i++){px(ctx,62+i*3,25,2,3,'#FFF')}
+      for(let i=0;i<3;i++){px(ctx,64+i*3,29,2,2,'#FFF')}
+      // Eye
+      drawEye(ctx,66,20,4,P);
+      fe(ctx,76,22,2,1,P.outline);
+      // Arms
+      frr(ctx,48,34,4,10,2,P.body);frr(ctx,49,42,3,4,1,P.mid);
+      px(ctx,50,46,2,3,P.claw);px(ctx,48,46,2,3,P.claw);
+      // Texture
+      px(ctx,28,36,2,2,P.detail);px(ctx,36,34,2,2,P.detail);px(ctx,42,36,2,2,P.detail);
+      break;
+    }
+    case 'sauropod':{
+      // Tail
+      fp(ctx,[[0,44],[2,38],[8,36],[16,40],[16,50],[8,52],[2,50]],P.body);
+      fp(ctx,[[2,46],[6,42],[12,42],[12,48],[6,48]],P.mid);
+      dit(ctx,2,48,10,4,P.dark);px(ctx,0,42,2,4,P.outline);
+      // Back legs
+      frr(ctx,34,62,8,18,4,P.outline);frr(ctx,35,63,6,16,3,P.body);
+      frr(ctx,30,80,14,6,4,P.outline);frr(ctx,31,81,12,4,3,P.dark);
+      fe(ctx,32,85,3,3,P.outline);fe(ctx,40,85,3,3,P.outline);
+      px(ctx,30,86,3,2,P.claw);px(ctx,38,86,3,2,P.claw);
+      // Body
+      fe(ctx,30,50,22,17,P.outline);fe(ctx,30,50,21,16,P.body);
+      fe(ctx,30,46,18,10,P.mid);dit(ctx,14,40,32,6,P.light);
+      fe(ctx,30,56,18,10,P.belly);dit(ctx,16,52,28,4,P.dark);
+      // Front legs
+      frr(ctx,18,62,8,18,4,P.outline);frr(ctx,19,63,6,16,3,P.body);
+      frr(ctx,14,80,14,6,4,P.outline);frr(ctx,15,81,12,4,3,P.dark);
+      fe(ctx,16,85,3,3,P.outline);fe(ctx,24,85,3,3,P.outline);
+      px(ctx,14,86,3,2,P.claw);px(ctx,22,86,3,2,P.claw);
+      // Neck
+      fp(ctx,[[44,44],[48,38],[52,32],[56,26],[60,20],[64,16],[66,20],[62,26],[58,32],[54,38],[48,44]],P.body);
+      fp(ctx,[[46,42],[50,36],[54,30],[58,24],[62,18],[64,20],[60,26],[56,32],[50,40]],P.mid);
+      fp(ctx,[[46,48],[50,44],[54,38],[56,34],[54,36],[50,42]],P.belly);
+      // Head
+      fe(ctx,70,12,10,7,P.outline);fe(ctx,70,12,9,6,P.body);
+      fe(ctx,70,10,7,4,P.mid);dit(ctx,64,8,12,4,P.light);
+      frr(ctx,74,14,8,3,1,P.dark);px(ctx,80,15,2,2,P.outline);
+      drawEye(ctx,74,10,3,P);fe(ctx,80,12,2,1,P.outline);
+      px(ctx,78,16,2,1,P.outline);
+      // Texture
+      px(ctx,24,44,2,2,P.detail);px(ctx,32,42,2,2,P.detail);px(ctx,38,44,2,2,P.detail);
+      px(ctx,28,48,2,2,P.detail);px(ctx,36,50,2,2,P.detail);px(ctx,22,50,2,2,P.detail);
+      break;
+    }
+    case 'horned':{
+      // Tail
+      fp(ctx,[[2,46],[4,42],[10,40],[16,44],[14,52],[8,54],[2,52]],P.body);
+      fp(ctx,[[4,48],[8,44],[12,44],[12,50],[8,50]],P.mid);
+      // Back legs
+      frr(ctx,32,60,8,16,4,P.outline);frr(ctx,33,61,6,14,3,P.body);
+      frr(ctx,28,76,14,6,4,P.outline);frr(ctx,29,77,12,4,3,P.dark);
+      fe(ctx,30,81,3,3,P.outline);fe(ctx,38,81,3,3,P.outline);
+      px(ctx,28,82,3,2,P.claw);px(ctx,36,82,3,2,P.claw);
+      // Body
+      fe(ctx,30,50,21,15,P.outline);fe(ctx,30,50,20,14,P.body);
+      fe(ctx,30,46,17,9,P.mid);dit(ctx,14,40,32,6,P.light);
+      fe(ctx,30,56,17,8,P.belly);
+      // Front legs
+      frr(ctx,16,60,8,16,4,P.outline);frr(ctx,17,61,6,14,3,P.body);
+      frr(ctx,12,76,14,6,4,P.outline);frr(ctx,13,77,12,4,3,P.dark);
+      fe(ctx,14,81,3,3,P.outline);fe(ctx,22,81,3,3,P.outline);
+      px(ctx,12,82,3,2,P.claw);px(ctx,20,82,3,2,P.claw);
+      // Frill
+      fe(ctx,60,22,18,18,P.outline);fe(ctx,60,22,17,17,P.body);fe(ctx,60,22,14,14,P.mid);
+      fe(ctx,54,18,4,6,P.accent);fe(ctx,66,18,4,6,P.accent);fe(ctx,60,14,3,4,P.accent);
+      for(let a=0;a<7;a++){const ang=Math.PI*0.2+a*Math.PI*0.6/6;fe(ctx,60+Math.cos(ang)*17,22-Math.sin(ang)*17,3,3,P.dark)}
+      // Face
+      fe(ctx,64,36,12,8,P.outline);fe(ctx,64,36,11,7,P.body);fe(ctx,64,34,9,5,P.mid);
+      // Horns
+      fp(ctx,[[74,30],[76,24],[78,22],[80,24],[78,30]],P.claw);fp(ctx,[[75,28],[77,24],[79,24],[78,28]],P.light);
+      fp(ctx,[[56,22],[54,14],[56,12],[58,14],[58,22]],P.claw);fp(ctx,[[67,22],[66,14],[68,12],[70,14],[69,22]],P.claw);
+      // Beak
+      fe(ctx,76,38,6,4,P.dark);fe(ctx,76,38,5,3,P.outline);
+      drawEye(ctx,68,34,3,P);px(ctx,76,34,2,2,P.outline);
+      break;
+    }
+    case 'armored':{
+      // Tail + club
+      fp(ctx,[[2,38],[4,34],[10,34],[16,38],[16,46],[10,48],[4,48]],P.body);
+      fp(ctx,[[4,40],[8,36],[14,38],[14,44],[8,46]],P.mid);
+      fe(ctx,4,36,6,5,P.dark);fe(ctx,4,36,5,4,P.body);
+      fe(ctx,2,34,3,3,P.outline);fe(ctx,2,40,3,3,P.outline);
+      // Legs
+      frr(ctx,18,52,8,14,3,P.outline);frr(ctx,19,53,6,12,2,P.body);
+      frr(ctx,14,66,14,6,3,P.outline);frr(ctx,15,67,12,4,2,P.dark);
+      frr(ctx,30,52,8,14,3,P.outline);frr(ctx,31,53,6,12,2,P.body);
+      frr(ctx,26,66,14,6,3,P.outline);frr(ctx,27,67,12,4,2,P.dark);
+      frr(ctx,44,52,8,14,3,P.outline);frr(ctx,45,53,6,12,2,P.body);
+      frr(ctx,40,66,14,6,3,P.outline);frr(ctx,41,67,12,4,2,P.dark);
+      frr(ctx,56,52,8,14,3,P.outline);frr(ctx,57,53,6,12,2,P.body);
+      frr(ctx,52,66,14,6,3,P.outline);frr(ctx,53,67,12,4,2,P.dark);
+      // Body
+      fe(ctx,40,42,28,14,P.outline);fe(ctx,40,42,27,13,P.body);
+      fe(ctx,40,40,24,9,P.mid);dit(ctx,16,34,48,6,P.light);
+      fe(ctx,40,48,24,8,P.belly);
+      // Armor plates
+      for(let i=0;i<5;i++){fe(ctx,22+i*10,32,5,4,P.dark);fe(ctx,22+i*10,31,4,3,P.mid);fe(ctx,22+i*10,30,2,2,P.light)}
+      // Side spikes
+      for(let i=0;i<4;i++){fp(ctx,[[20+i*12-2,48],[20+i*12,44],[20+i*12+2,48]],P.accent)}
+      // Head
+      fe(ctx,68,38,10,8,P.outline);fe(ctx,68,38,9,7,P.body);fe(ctx,68,36,7,5,P.mid);
+      frr(ctx,62,30,12,6,2,P.dark);frr(ctx,63,31,10,4,1,P.mid);
+      drawEye(ctx,72,36,3,P);px(ctx,76,38,2,2,P.outline);px(ctx,74,42,6,2,P.outline);
+      break;
+    }
+    case 'duck':{
+      // Tail
+      fp(ctx,[[4,42],[6,36],[12,34],[18,38],[18,48],[12,50],[6,48]],P.body);
+      fp(ctx,[[6,44],[10,40],[16,40],[16,46],[10,46]],P.mid);
+      // Back leg
+      frr(ctx,36,52,6,16,3,P.outline);frr(ctx,37,53,4,14,2,P.body);
+      frr(ctx,36,62,6,3,1,P.dark);frr(ctx,32,68,12,6,3,P.outline);frr(ctx,33,69,10,4,2,P.dark);
+      fe(ctx,34,73,4,3,P.outline);fe(ctx,40,73,4,3,P.outline);
+      px(ctx,32,74,3,2,P.claw);px(ctx,40,74,3,2,P.claw);
+      // Body
+      fe(ctx,32,42,19,13,P.outline);fe(ctx,32,42,18,12,P.body);
+      fe(ctx,32,40,15,8,P.mid);dit(ctx,18,34,28,4,P.light);
+      fe(ctx,32,46,15,7,P.belly);frr(ctx,16,40,32,3,1,P.accent);
+      // Front leg
+      frr(ctx,24,52,6,16,3,P.outline);frr(ctx,25,53,4,14,2,P.body);
+      frr(ctx,24,62,6,3,1,P.dark);frr(ctx,20,68,12,6,3,P.outline);frr(ctx,21,69,10,4,2,P.dark);
+      fe(ctx,22,73,4,3,P.outline);fe(ctx,28,73,4,3,P.outline);
+      px(ctx,20,74,3,2,P.claw);px(ctx,28,74,3,2,P.claw);
+      // Neck
+      fp(ctx,[[44,34],[48,28],[52,22],[56,18],[58,22],[54,30],[48,38]],P.body);
+      fp(ctx,[[46,32],[50,26],[54,22],[56,22],[52,28],[48,34]],P.mid);
+      // Head
+      fe(ctx,60,16,11,9,P.outline);fe(ctx,60,16,10,8,P.body);
+      fe(ctx,60,14,8,5,P.mid);dit(ctx,54,10,14,4,P.light);
+      // Crest
+      fp(ctx,[[58,8],[60,0],[62,0],[66,2],[68,6],[66,10],[62,12],[58,12]],P.accent);
+      fp(ctx,[[60,6],[62,2],[64,2],[66,4],[64,8],[62,10]],P.light);
+      dit(ctx,60,4,6,6,P.mid);
+      // Bill
+      fe(ctx,72,20,8,4,P.dark);fe(ctx,72,20,7,3,P.outline);
+      px(ctx,78,19,2,1,P.outline);px(ctx,68,18,8,2,P.detail);
+      drawEye(ctx,64,14,3,P);px(ctx,72,16,2,2,P.outline);
+      break;
+    }
+    case 'flyer':{
+      // Left wing
+      fp(ctx,[[0,26],[2,20],[6,16],[12,14],[18,18],[26,22],[32,26],[32,38],[26,40],[18,38],[10,34],[4,30]],P.body);
+      fp(ctx,[[4,24],[8,18],[14,16],[22,20],[28,24],[28,34],[22,36],[14,32],[8,28]],P.mid);
+      dit(ctx,6,20,20,8,P.light);
+      for(let i=0;i<4;i++){px(ctx,4+i*6,20+i*3,12-i*2,1,P.dark)}
+      fe(ctx,2,24,3,4,P.dark);px(ctx,0,22,2,2,P.outline);
+      // Right wing
+      fp(ctx,[[64,26],[64,38],[70,40],[78,38],[86,34],[92,30],[94,26],[92,20],[86,16],[78,14],[70,18]],P.body);
+      fp(ctx,[[68,24],[68,34],[74,36],[82,32],[88,28],[88,24],[82,18],[74,16]],P.mid);
+      dit(ctx,70,20,20,8,P.light);
+      for(let i=0;i<4;i++){px(ctx,78+i*4,20+i*3,10-i*2,1,P.dark)}
+      fe(ctx,94,24,3,4,P.dark);px(ctx,94,22,2,2,P.outline);
+      // Body
+      fe(ctx,48,34,12,9,P.outline);fe(ctx,48,34,11,8,P.body);
+      fe(ctx,48,32,9,5,P.mid);fe(ctx,48,38,9,4,P.belly);
+      // Tail
+      fp(ctx,[[36,38],[40,36],[44,38],[44,44],[40,48],[36,46]],P.body);
+      fp(ctx,[[38,40],[42,38],[42,42],[38,44]],P.mid);dit(ctx,36,42,6,4,P.dark);
+      // Neck
+      fp(ctx,[[56,28],[60,24],[64,22],[66,26],[62,32],[58,34]],P.body);
+      fp(ctx,[[58,28],[62,26],[64,24],[64,28],[60,32]],P.mid);
+      // Head
+      fe(ctx,68,20,10,8,P.outline);fe(ctx,68,20,9,7,P.body);fe(ctx,68,18,7,4,P.mid);
+      // Crest
+      fp(ctx,[[62,12],[66,6],[68,4],[72,6],[74,10],[72,14],[68,16],[64,16]],P.accent);
+      fp(ctx,[[64,12],[68,6],[70,6],[72,10],[70,14],[66,14]],P.light);
+      // Beak
+      fp(ctx,[[76,18],[82,20],[88,22],[88,24],[82,24],[76,22]],P.dark);
+      fp(ctx,[[78,20],[84,22],[84,24],[78,22]],P.outline);px(ctx,86,22,2,2,P.outline);
+      drawEye(ctx,72,18,3,P);
+      // Legs
+      frr(ctx,44,42,4,10,2,P.body);frr(ctx,50,42,4,10,2,P.body);
+      frr(ctx,42,52,6,3,2,P.dark);frr(ctx,48,52,6,3,2,P.dark);
+      px(ctx,42,54,2,2,P.claw);px(ctx,46,54,2,2,P.claw);
+      px(ctx,48,54,2,2,P.claw);px(ctx,52,54,2,2,P.claw);
+      break;
+    }
+    case 'marine':{
+      // Tail fin
+      fp(ctx,[[0,24],[4,20],[8,22],[10,28],[10,36],[8,38],[4,40],[0,38]],P.body);
+      fp(ctx,[[2,28],[6,24],[8,28],[8,34],[6,36],[2,34]],P.mid);
+      fp(ctx,[[0,22],[4,18],[6,22]],P.dark);fp(ctx,[[0,38],[4,42],[6,38]],P.dark);
+      px(ctx,0,20,2,2,P.outline);px(ctx,0,40,2,2,P.outline);
+      // Body
+      fe(ctx,44,34,32,14,P.outline);fe(ctx,44,34,31,13,P.body);
+      fe(ctx,44,30,27,8,P.mid);dit(ctx,16,24,56,6,P.light);
+      fe(ctx,44,40,28,8,P.belly);dit(ctx,20,36,48,4,P.dark);
+      frr(ctx,14,32,56,2,1,P.accent);
+      // Dorsal fin
+      fp(ctx,[[38,20],[42,12],[44,10],[46,12],[48,18],[46,22],[40,22]],P.body);
+      fp(ctx,[[40,20],[44,14],[46,14],[46,20]],P.mid);px(ctx,44,10,2,2,P.outline);
+      // Head
+      fe(ctx,74,32,12,10,P.outline);fe(ctx,74,32,11,9,P.body);fe(ctx,74,30,9,6,P.mid);
+      // Snout
+      fe(ctx,84,34,8,5,P.body);fe(ctx,86,34,6,4,P.mid);
+      px(ctx,84,36,10,2,P.outline);
+      for(let i=0;i<3;i++){px(ctx,84+i*3,34,2,2,'#FFF');px(ctx,85+i*3,37,2,2,'#FFF')}
+      drawEye(ctx,78,30,4,P);px(ctx,90,32,2,2,P.outline);
+      // Flippers
+      fp(ctx,[[32,42],[28,48],[24,52],[22,54],[24,50],[28,46],[34,44]],P.body);
+      fp(ctx,[[30,44],[26,50],[24,52],[26,48],[32,44]],P.dark);
+      fp(ctx,[[54,42],[58,48],[62,52],[64,54],[62,50],[58,46],[56,44]],P.body);
+      fp(ctx,[[56,44],[60,50],[62,52],[60,48],[56,44]],P.dark);
+      // Texture
+      px(ctx,30,30,2,2,P.detail);px(ctx,42,28,2,2,P.detail);px(ctx,54,30,2,2,P.detail);
+      px(ctx,36,34,2,2,P.detail);px(ctx,48,32,2,2,P.detail);px(ctx,62,30,2,2,P.detail);
+      break;
+    }
+    case 'beast':{
+      // Tail
+      fp(ctx,[[2,36],[4,30],[8,28],[14,34],[14,42],[8,44],[4,42]],P.body);
+      fp(ctx,[[4,38],[8,34],[12,36],[12,40],[8,40]],P.mid);
+      fe(ctx,4,32,4,4,P.accent);
+      // Mane
+      fe(ctx,46,28,12,12,P.accent);fe(ctx,46,28,10,10,P.light);dit(ctx,38,20,16,16,P.mid);
+      // Back legs
+      frr(ctx,34,54,8,18,4,P.outline);frr(ctx,35,55,6,16,3,P.body);frr(ctx,34,64,8,3,1,P.dark);
+      frr(ctx,30,72,14,6,4,P.outline);frr(ctx,31,73,12,4,3,P.dark);
+      fe(ctx,32,77,4,3,P.outline);fe(ctx,40,77,4,3,P.outline);
+      px(ctx,30,78,3,2,P.claw);px(ctx,38,78,3,2,P.claw);
+      // Body
+      fe(ctx,32,44,21,15,P.outline);fe(ctx,32,44,20,14,P.body);
+      fe(ctx,32,42,17,10,P.mid);dit(ctx,16,34,32,6,P.light);
+      fe(ctx,32,50,17,8,P.belly);
+      for(let i=0;i<3;i++){frr(ctx,20+i*8,36,3,12,1,P.dark)}
+      // Front legs
+      frr(ctx,18,54,8,18,4,P.outline);frr(ctx,19,55,6,16,3,P.body);frr(ctx,18,64,8,3,1,P.dark);
+      frr(ctx,14,72,14,6,4,P.outline);frr(ctx,15,73,12,4,3,P.dark);
+      fe(ctx,16,77,4,3,P.outline);fe(ctx,24,77,4,3,P.outline);
+      px(ctx,14,78,3,2,P.claw);px(ctx,22,78,3,2,P.claw);
+      // Head
+      fe(ctx,58,24,13,11,P.outline);fe(ctx,58,24,12,10,P.body);
+      fe(ctx,58,22,10,7,P.mid);dit(ctx,50,16,16,6,P.light);
+      // Ears
+      fe(ctx,52,12,4,5,P.body);fe(ctx,52,12,3,4,P.mid);fe(ctx,52,13,2,2,P.accent);
+      fe(ctx,64,12,4,5,P.body);fe(ctx,64,12,3,4,P.mid);fe(ctx,64,13,2,2,P.accent);
+      drawEye(ctx,60,22,4,P);fe(ctx,70,26,3,2,P.outline);
+      px(ctx,66,30,8,2,P.dark);
+      // Fangs
+      fp(ctx,[[64,30],[65,36],[66,30]],P.claw);fp(ctx,[[68,30],[69,34],[70,30]],P.claw);
+      px(ctx,65,34,1,2,'#FFF');px(ctx,69,32,1,2,'#FFF');
+      px(ctx,70,24,4,1,P.detail);px(ctx,70,26,4,1,P.detail);px(ctx,70,28,4,1,P.detail);
+      break;
+    }
+  }
+}
+
+function getBodyLandmarks(type){
+  const lm={rex:{head:[68,12],back:[38,30],spine:[[20,38],[30,34],[40,32],[50,30],[60,24]]},
+    raptor:{head:[62,14],back:[34,30],spine:[[12,30],[22,32],[32,30],[42,28],[52,24]]},
+    sauropod:{head:[70,6],back:[30,36],spine:[[14,42],[24,38],[34,36],[44,36],[56,28]]},
+    horned:{head:[64,28],back:[30,36],spine:[[12,42],[22,38],[32,36],[42,34],[52,32]]},
+    armored:{head:[68,30],back:[40,28],spine:[[16,36],[26,32],[36,30],[46,30],[56,32]]},
+    duck:{head:[60,10],back:[32,32],spine:[[12,38],[22,34],[32,32],[42,30],[52,24]]},
+    flyer:{head:[68,12],back:[48,26],spine:[[38,34],[42,30],[46,28],[50,26],[56,22]]},
+    marine:{head:[78,24],back:[44,22],spine:[[16,30],[28,26],[40,24],[52,24],[64,26]]},
+    beast:{head:[58,14],back:[32,30],spine:[[12,36],[22,32],[32,30],[42,28],[48,24]]}};
+  return lm[type]||{head:[48,10],back:[40,30],spine:[]};
+}
+
+function drawOverlay(ctx,overlay,type,P){
+  const lm=getBodyLandmarks(type);
+  switch(overlay){
+    case 'punk':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        const h=10+Math.abs(i-2)*2;
+        fp(ctx,[[sp[i][0]-2,sp[i][1]],[sp[i][0],sp[i][1]-h],[sp[i][0]+2,sp[i][1]-h+2],[sp[i][0]+4,sp[i][1]]],P.accent);
+      }
+      const hx=lm.head[0]-10,hy=lm.head[1]+10;
+      frr(ctx,hx,hy,20,4,1,'#222');
+      for(let i=0;i<4;i++){fe(ctx,hx+3+i*5,hy+2,2,2,'#C0C0C0')}
+      break;
+    }
+    case 'lava':{
+      const sp=lm.spine;
+      ctx.strokeStyle='#FF4500';ctx.lineWidth=1.5;ctx.beginPath();
+      for(let i=0;i<sp.length-1;i++){ctx.moveTo(sp[i][0],sp[i][1]+4);ctx.lineTo(sp[i][0]+3,sp[i][1]+8);ctx.lineTo(sp[i+1][0],sp[i+1][1]+4)}
+      ctx.stroke();
+      fe(ctx,lm.head[0]+6,lm.head[1]+8,3,3,'#FF4500');fe(ctx,lm.head[0]+6,lm.head[1]+8,2,2,'#FFD700');
+      break;
+    }
+    case 'ghost':{
+      ctx.globalAlpha=0.3;
+      const bx=lm.back[0],by=lm.back[1];
+      for(let i=0;i<6;i++){fe(ctx,bx-10+i*8,by+Math.sin(i)*6,4,8,'#E0E0FF')}
+      ctx.globalAlpha=1;
+      fe(ctx,lm.head[0]+6,lm.head[1]+8,4,4,'#E0E0FF');fe(ctx,lm.head[0]+6,lm.head[1]+8,2,2,'#FFF');
+      break;
+    }
+    case 'ember':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        const fx=sp[i][0],fy=sp[i][1]-4;
+        fp(ctx,[[fx-1,fy],[fx,fy-6-i],[fx+1,fy-4],[fx+2,fy]],P.accent);
+        px(ctx,fx,fy-7-i,1,2,'#FFD700');
+      }
+      fe(ctx,lm.head[0]+4,lm.head[1]+6,3,3,'#FF4500');fe(ctx,lm.head[0]+4,lm.head[1]+6,2,2,'#FFD700');
+      break;
+    }
+    case 'frost':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        const fx=sp[i][0],fy=sp[i][1];
+        px(ctx,fx-2,fy-4,1,8,'#B0E0FF');px(ctx,fx-4,fy,8,1,'#B0E0FF');
+        px(ctx,fx-1,fy-3,1,1,'#FFF');px(ctx,fx+1,fy+3,1,1,'#FFF');
+      }
+      ctx.globalAlpha=0.4;fe(ctx,lm.head[0],lm.head[1]-2,6,6,'#E0F0FF');ctx.globalAlpha=1;
+      break;
+    }
+    case 'volt':{
+      const sp=lm.spine;
+      ctx.strokeStyle='#FFFF00';ctx.lineWidth=1;ctx.beginPath();
+      for(let i=0;i<sp.length-1;i++){
+        ctx.moveTo(sp[i][0],sp[i][1]-2);ctx.lineTo(sp[i][0]+3,sp[i][1]-6);ctx.lineTo(sp[i+1][0],sp[i+1][1]-2);
+      }
+      ctx.stroke();px(ctx,lm.head[0]+4,lm.head[1]-4,2,2,'#FFFF00');
+      break;
+    }
+    case 'bloom':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        const fx=sp[i][0],fy=sp[i][1]-4;
+        fe(ctx,fx,fy,3,3,'#3A8A3A');
+        px(ctx,fx,fy-2,1,1,'#FF69B4');px(ctx,fx-2,fy,1,1,'#FFD700');px(ctx,fx+2,fy,1,1,'#FF6347');
+      }
+      break;
+    }
+    case 'prism':{
+      const colors=['#FF0000','#FF8800','#FFFF00','#00FF00','#0088FF','#8800FF'];
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        px(ctx,sp[i][0]-1,sp[i][1]-6,3,1,colors[i%colors.length]);
+        px(ctx,sp[i][0],sp[i][1]-8,1,2,colors[(i+3)%colors.length]);
+      }
+      ctx.globalAlpha=0.3;const bx2=lm.back[0],by2=lm.back[1];
+      for(let i=0;i<4;i++){px(ctx,bx2-8+i*6,by2-4+i*2,2,2,colors[i%colors.length])}
+      ctx.globalAlpha=1;
+      break;
+    }
+    case 'shadow':{
+      ctx.globalAlpha=0.4;const bx3=lm.back[0],by3=lm.back[1];
+      for(let i=0;i<8;i++){fe(ctx,bx3-12+i*6,by3+4+Math.sin(i*1.5)*4,3,6,'#2A1A4A')}
+      ctx.globalAlpha=1;
+      fe(ctx,lm.head[0]+4,lm.head[1]+6,3,3,P.iris);fe(ctx,lm.head[0]+4,lm.head[1]+6,2,2,'#FFF');
+      break;
+    }
+    case 'stellar':{
+      const sp=lm.spine;const bx4=lm.back[0],by4=lm.back[1];
+      ctx.globalAlpha=0.7;
+      for(let i=0;i<sp.length;i++){px(ctx,sp[i][0],sp[i][1]-6,1,1,'#FFD700')}
+      for(let i=0;i<6;i++){px(ctx,bx4-10+i*7,by4-2+Math.sin(i)*4,1,1,'#FFF')}
+      ctx.globalAlpha=1;px(ctx,lm.head[0]-2,lm.head[1]-4,2,2,'#FFD700');
+      break;
+    }
+    case 'mech':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        frr(ctx,sp[i][0]-2,sp[i][1]-1,4,3,1,'#C0C0C0');px(ctx,sp[i][0]-1,sp[i][1],2,1,'#808080');
+      }
+      frr(ctx,lm.head[0]-4,lm.head[1]+4,8,3,1,'#A0A0A0');px(ctx,lm.head[0]-2,lm.head[1]+5,4,1,'#606060');
+      fe(ctx,lm.head[0]+6,lm.head[1]+4,2,2,'#00FF00');
+      break;
+    }
+    case 'crystal':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        const h=4+i*2;
+        fp(ctx,[[sp[i][0]-1,sp[i][1]],[sp[i][0],sp[i][1]-h],[sp[i][0]+1,sp[i][1]-h+2],[sp[i][0]+2,sp[i][1]]],P.accent);
+        px(ctx,sp[i][0],sp[i][1]-h+1,1,1,'#FFF');
+      }
+      break;
+    }
+    case 'royal':{
+      const hx=lm.head[0]-6,hy=lm.head[1]-6;
+      frr(ctx,hx,hy+4,12,3,1,'#DAA520');
+      fp(ctx,[[hx+2,hy+4],[hx+3,hy],[hx+4,hy+3]],P.iris);
+      fp(ctx,[[hx+5,hy+4],[hx+6,hy-1],[hx+7,hy+3]],P.iris);
+      fp(ctx,[[hx+8,hy+4],[hx+9,hy],[hx+10,hy+3]],P.iris);
+      px(ctx,hx+3,hy,1,1,'#FFF');px(ctx,hx+6,hy-1,1,1,'#FF0000');px(ctx,hx+9,hy,1,1,'#FFF');
+      break;
+    }
+    case 'tribal':{
+      const sp=lm.spine;
+      ctx.strokeStyle=P.accent;ctx.lineWidth=1;
+      for(let i=0;i<sp.length-1;i++){
+        ctx.beginPath();ctx.moveTo(sp[i][0],sp[i][1]+6);ctx.lineTo(sp[i][0]+4,sp[i][1]+10);ctx.lineTo(sp[i+1][0],sp[i+1][1]+6);ctx.stroke();
+      }
+      px(ctx,lm.head[0]-2,lm.head[1]+8,2,4,P.accent);px(ctx,lm.head[0]+4,lm.head[1]+8,2,4,P.accent);
+      break;
+    }
+    case 'aqua':{
+      const sp=lm.spine;
+      for(let i=0;i<sp.length;i++){
+        fe(ctx,sp[i][0]+2,sp[i][1]+6,2,2,'#00FFFF');fe(ctx,sp[i][0]-2,sp[i][1]+4,1,1,'#00FF88');
+      }
+      ctx.globalAlpha=0.3;const bx5=lm.back[0],by5=lm.back[1];
+      for(let i=0;i<5;i++){fe(ctx,bx5-8+i*6,by5+8,3,2,'#00FFFF')}
+      ctx.globalAlpha=1;
+      break;
+    }
+  }
+}
+
+function getSprite(specId, size, mutation) {
+  const key = specId + '_' + size + (mutation ? '_' + mutation : '');
+  if (spriteCache[key]) return spriteCache[key];
+
+  const def = SPECIES_DEF[specId];
+  if (!def) return '';
+
+  let pri = def.p, acc = def.a, iris = def.i;
+  let overlay = null;
+  const m = mutation ? resolveSpeciesMut(specId, mutation) : null;
+  if (m) { if(m.p)pri=m.p; if(m.a)acc=m.a; if(m.i)iris=m.i; if(m.overlay)overlay=m.overlay; }
+
+  const pal = genPalette(pri, acc, iris);
+  const canvas = document.createElement('canvas');
+  canvas.width = 96; canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  drawBody(ctx, def.t, pal);
+  if (overlay) drawOverlay(ctx, overlay, def.t, pal);
+
+  const url = canvas.toDataURL();
+  spriteCache[key] = url;
+  return url;
+}
+
+function spriteImg(specId, size, cls, mutation) {
+  const url = getSprite(specId, size, mutation);
+  return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
+}
+
+// ==================== PORTRAIT SYSTEM ====================
+// Species-specific detailed sprites shown in Collection detail view
+
+const PFEAT={
+  baryo:{f:['long_snout','hook_claw']},megalo:{f:['brow_ridge']},allo:{f:['brow_ridge']},
+  carno:{f:['bull_horns','tiny_arms']},therizo:{f:['sword_claws','feathers','pot_belly']},
+  trex:{f:['big_head','tiny_arms']},gigano:{f:['long_snout']},
+  compy:{f:['tiny']},coelo:{f:['slim']},ovira:{f:['beak','sm_crest']},
+  micro:{f:['quad_wings']},raptor:{f:['feathers','sickle']},dilopho:{f:['twin_crests']},
+  utah:{f:['sickle','heavy']},deino:{f:['sickle']},
+  iguan:{f:['thumb_spike']},maia:{f:[]},diplo:{f:['long_neck','whip_tail']},
+  brachio:{f:['tall_front','high_head']},apato:{f:['stocky']},bronto:{f:[]},argent:{f:['massive']},
+  proto:{f:['sm_frill']},styra:{f:['spike_frill']},trike:{f:['tri_horns','lg_frill']},
+  dimetro:{f:['sail']},pachy:{f:['dome']},kentro:{f:['body_spikes']},
+  stego:{f:['plates','thagomizer']},anky:{f:['armor','tail_club']},
+  galli:{f:['long_legs']},edmont:{f:['wide_bill']},para:{f:['tube_crest']},cory:{f:['helm_crest']},
+  dimor:{f:['big_head']},archae:{f:['feathers','teeth']},dodo:{pt:'dodo'},
+  rhamph:{f:['tail_vane','teeth']},pterano:{f:['back_crest']},quetz:{f:['long_neck']},
+  ichthy:{pt:'dolphin'},plesio:{pt:'plesio'},spino:{pt:'spino'},
+  mosa:{pt:'mosasaur'},elasmo:{pt:'plesio',f:['long_neck','tiny_head']},
+  megashark:{pt:'shark'},liopl:{pt:'mosasaur',f:['big_head']},titano:{pt:'snake'},
+  smilo:{f:['saber']},mammoth:{f:['tusks','trunk','wool']},
+};
+
+function drawPortrait(ctx,specId,P){
+  const def=SPECIES_DEF[specId];if(!def)return;
+  const pf=PFEAT[specId]||{};
+  const pt=pf.pt||def.t;
+  drawPortraitBase(ctx,pt,P);
+  if(pf.f)pf.f.forEach(f=>drawPFeat(ctx,f,pt,P));
+}
+
+function drawPortraitBase(ctx,pt,P){
+  switch(pt){
+    case 'rex':{
+      // Tail
+      fp(ctx,[[2,66],[6,56],[16,52],[28,56],[36,62],[36,70],[28,76],[16,76],[6,72]],P.body);
+      fp(ctx,[[4,68],[10,60],[22,58],[30,62],[30,68],[22,72],[10,72]],P.mid);
+      dit(ctx,6,70,24,4,P.dark);
+      fp(ctx,[[2,64],[6,58],[6,66]],P.accent);fp(ctx,[[2,72],[6,74],[6,68]],P.accent);
+      // Body
+      fe(ctx,54,66,30,22,P.outline);fe(ctx,54,66,28,20,P.body);
+      fe(ctx,54,60,24,14,P.mid);dit(ctx,30,52,48,8,P.light);
+      fe(ctx,54,74,24,12,P.belly);dit(ctx,34,70,40,6,P.dark);
+      // Back leg
+      frr(ctx,58,82,14,28,5,P.outline);frr(ctx,60,84,10,24,4,P.dark);
+      frr(ctx,62,88,6,10,2,P.mid);frr(ctx,58,104,14,4,2,P.dark);
+      frr(ctx,54,110,22,10,5,P.outline);frr(ctx,56,112,18,8,4,P.dark);
+      fe(ctx,56,120,5,4,P.outline);fe(ctx,70,120,5,4,P.outline);
+      px(ctx,54,121,4,3,P.claw);px(ctx,68,121,4,3,P.claw);
+      // Front leg
+      frr(ctx,38,82,14,28,5,P.outline);frr(ctx,40,84,10,24,4,P.body);
+      frr(ctx,42,86,6,10,2,P.mid);frr(ctx,38,104,14,4,2,P.dark);
+      frr(ctx,34,110,22,10,5,P.outline);frr(ctx,36,112,18,8,4,P.body);
+      fe(ctx,36,120,5,4,P.outline);fe(ctx,50,120,5,4,P.outline);
+      px(ctx,34,121,4,3,P.claw);px(ctx,48,121,4,3,P.claw);
+      // Neck
+      fp(ctx,[[72,54],[80,44],[88,36],[92,32],[94,38],[88,50],[80,58]],P.body);
+      fp(ctx,[[74,52],[82,44],[90,38],[92,38],[88,48],[80,54]],P.mid);
+      fp(ctx,[[74,60],[80,58],[86,52],[84,54],[78,58]],P.belly);
+      // Head
+      fe(ctx,98,28,20,14,P.outline);fe(ctx,98,28,18,12,P.body);
+      fe(ctx,98,24,16,8,P.mid);dit(ctx,84,18,28,6,P.light);
+      frr(ctx,88,16,16,5,2,P.dark);frr(ctx,90,17,12,3,2,P.detail);
+      // Jaw
+      fe(ctx,102,38,18,6,P.outline);fe(ctx,102,38,16,5,P.body);fe(ctx,104,39,14,4,P.dark);
+      for(let i=0;i<6;i++){px(ctx,92+i*4,30,3,5,'#FFF');px(ctx,92+i*4,34,3,1,'#DDD')}
+      for(let i=0;i<5;i++){px(ctx,94+i*4,38,3,4,'#FFF')}
+      drawEye(ctx,102,24,5,P);fe(ctx,116,26,3,2,P.outline);
+      // Arms
+      frr(ctx,78,54,6,14,2,P.body);frr(ctx,79,66,4,6,1,P.mid);px(ctx,80,72,4,3,P.claw);
+      for(let i=0;i<6;i++)px(ctx,38+i*8,58+(i%3)*4,3,3,P.detail);
+      break;
+    }
+    case 'raptor':{
+      // Tail (long, horizontal)
+      fp(ctx,[[0,42],[2,36],[8,32],[18,34],[28,40],[28,48],[18,52],[8,52],[2,48]],P.body);
+      fp(ctx,[[2,44],[8,38],[16,38],[24,42],[24,46],[16,48],[8,48]],P.mid);
+      fp(ctx,[[0,40],[4,36],[4,42]],P.accent);fp(ctx,[[0,48],[4,50],[4,44]],P.accent);
+      dit(ctx,4,48,18,3,P.dark);
+      // Body
+      fe(ctx,46,50,22,14,P.outline);fe(ctx,46,50,20,12,P.body);
+      fe(ctx,46,46,17,8,P.mid);dit(ctx,28,42,36,4,P.light);
+      fe(ctx,46,54,17,7,P.belly);
+      frr(ctx,28,48,36,3,1,P.accent);
+      // Back leg
+      frr(ctx,50,60,8,22,3,P.outline);frr(ctx,51,62,6,18,2,P.body);
+      frr(ctx,50,74,8,3,1,P.dark);frr(ctx,48,82,6,14,2,P.body);
+      frr(ctx,44,96,14,8,4,P.outline);frr(ctx,46,98,10,6,3,P.dark);
+      fe(ctx,44,104,4,3,P.outline);fe(ctx,54,104,4,3,P.outline);
+      px(ctx,42,105,3,3,P.claw);px(ctx,53,105,3,3,P.claw);
+      // Front leg
+      frr(ctx,36,60,8,22,3,P.outline);frr(ctx,37,62,6,18,2,P.body);
+      frr(ctx,36,74,8,3,1,P.dark);frr(ctx,34,82,6,14,2,P.body);
+      frr(ctx,30,96,14,8,4,P.outline);frr(ctx,32,98,10,6,3,P.dark);
+      fe(ctx,32,104,4,3,P.outline);fe(ctx,40,104,4,3,P.outline);
+      px(ctx,30,105,3,3,P.claw);px(ctx,39,105,3,3,P.claw);
+      // Neck
+      fp(ctx,[[60,42],[66,36],[72,30],[76,26],[78,32],[74,40],[66,46]],P.body);
+      fp(ctx,[[62,40],[68,34],[74,30],[76,30],[72,38],[66,42]],P.mid);
+      // Head
+      fe(ctx,82,24,16,10,P.outline);fe(ctx,82,24,14,8,P.body);
+      fe(ctx,82,20,12,5,P.mid);dit(ctx,72,16,20,4,P.light);
+      // Feather crest
+      fp(ctx,[[72,18],[76,10],[80,6],[84,4],[86,8],[84,14],[78,18]],P.accent);
+      fp(ctx,[[74,16],[80,8],[84,6],[84,12],[78,16]],P.light);
+      // Jaw
+      fe(ctx,88,30,14,4,P.outline);fe(ctx,88,30,12,3,P.body);
+      for(let i=0;i<5;i++)px(ctx,82+i*4,26,3,4,'#FFF');
+      for(let i=0;i<4;i++)px(ctx,84+i*4,30,3,3,'#FFF');
+      drawEye(ctx,86,22,4,P);fe(ctx,98,24,2,1,P.outline);
+      // Arms
+      frr(ctx,64,42,5,12,2,P.body);frr(ctx,65,52,4,6,1,P.mid);
+      px(ctx,66,58,3,3,P.claw);px(ctx,64,58,3,3,P.claw);
+      for(let i=0;i<4;i++)px(ctx,34+i*8,44+(i%2)*4,2,2,P.detail);
+      break;
+    }
+    case 'sauropod':{
+      // Tail
+      fp(ctx,[[0,66],[4,58],[12,56],[22,60],[22,72],[12,76],[4,74]],P.body);
+      fp(ctx,[[2,68],[8,62],[18,62],[18,70],[8,72]],P.mid);
+      dit(ctx,4,70,14,4,P.dark);
+      // Body
+      fe(ctx,40,68,26,20,P.outline);fe(ctx,40,68,24,18,P.body);
+      fe(ctx,40,62,20,12,P.mid);dit(ctx,20,56,40,6,P.light);
+      fe(ctx,40,76,20,12,P.belly);dit(ctx,24,72,32,4,P.dark);
+      // Back legs
+      frr(ctx,46,84,10,24,4,P.outline);frr(ctx,48,86,6,20,3,P.body);
+      frr(ctx,42,108,16,8,4,P.outline);frr(ctx,44,110,12,6,3,P.dark);
+      fe(ctx,44,116,4,3,P.outline);fe(ctx,52,116,4,3,P.outline);
+      px(ctx,42,117,3,3,P.claw);px(ctx,51,117,3,3,P.claw);
+      // Front legs
+      frr(ctx,26,84,10,24,4,P.outline);frr(ctx,28,86,6,20,3,P.body);
+      frr(ctx,22,108,16,8,4,P.outline);frr(ctx,24,110,12,6,3,P.dark);
+      fe(ctx,24,116,4,3,P.outline);fe(ctx,32,116,4,3,P.outline);
+      px(ctx,22,117,3,3,P.claw);px(ctx,31,117,3,3,P.claw);
+      // Neck
+      fp(ctx,[[56,58],[60,50],[64,42],[68,34],[72,28],[76,22],[80,18],[82,22],[78,28],[74,36],[70,44],[64,52],[58,58]],P.body);
+      fp(ctx,[[58,56],[64,46],[70,36],[76,28],[80,22],[80,26],[76,32],[70,40],[64,48],[60,54]],P.mid);
+      fp(ctx,[[58,62],[62,58],[66,52],[68,48],[66,50],[62,56]],P.belly);
+      // Head
+      fe(ctx,86,14,12,8,P.outline);fe(ctx,86,14,10,6,P.body);
+      fe(ctx,86,12,8,4,P.mid);dit(ctx,80,10,14,4,P.light);
+      frr(ctx,92,16,10,4,2,P.dark);px(ctx,100,18,3,2,P.outline);
+      drawEye(ctx,90,12,3,P);fe(ctx,100,14,2,1,P.outline);
+      px(ctx,96,18,2,1,P.outline);
+      for(let i=0;i<5;i++)px(ctx,32+i*6,60+(i%3)*2,3,3,P.detail);
+      break;
+    }
+    case 'horned':{
+      // Tail
+      fp(ctx,[[4,66],[6,60],[14,58],[22,62],[20,72],[12,74],[6,72]],P.body);
+      fp(ctx,[[6,68],[12,62],[18,64],[18,68],[12,70]],P.mid);
+      // Body
+      fe(ctx,38,66,24,18,P.outline);fe(ctx,38,66,22,16,P.body);
+      fe(ctx,38,62,18,10,P.mid);dit(ctx,20,56,36,6,P.light);
+      fe(ctx,38,72,18,10,P.belly);
+      // Back legs
+      frr(ctx,44,80,10,22,4,P.outline);frr(ctx,46,82,6,18,3,P.body);
+      frr(ctx,40,102,16,8,4,P.outline);frr(ctx,42,104,12,6,3,P.dark);
+      fe(ctx,42,110,4,3,P.outline);fe(ctx,50,110,4,3,P.outline);
+      px(ctx,40,111,3,3,P.claw);px(ctx,49,111,3,3,P.claw);
+      // Front legs
+      frr(ctx,24,80,10,22,4,P.outline);frr(ctx,26,82,6,18,3,P.body);
+      frr(ctx,20,102,16,8,4,P.outline);frr(ctx,22,104,12,6,3,P.dark);
+      fe(ctx,22,110,4,3,P.outline);fe(ctx,30,110,4,3,P.outline);
+      px(ctx,20,111,3,3,P.claw);px(ctx,29,111,3,3,P.claw);
+      // Frill base
+      fe(ctx,72,38,22,22,P.outline);fe(ctx,72,38,20,20,P.body);fe(ctx,72,38,16,16,P.mid);
+      for(let a=0;a<7;a++){const ang=Math.PI*0.2+a*Math.PI*0.6/6;fe(ctx,72+Math.cos(ang)*20,38-Math.sin(ang)*20,4,4,P.dark)}
+      fe(ctx,66,32,5,7,P.accent);fe(ctx,78,32,5,7,P.accent);fe(ctx,72,28,4,5,P.accent);
+      // Face
+      fe(ctx,78,54,14,10,P.outline);fe(ctx,78,54,12,8,P.body);fe(ctx,78,50,10,5,P.mid);
+      // Beak
+      fe(ctx,92,56,8,5,P.dark);fe(ctx,92,56,7,4,P.outline);
+      drawEye(ctx,82,50,4,P);px(ctx,92,50,3,2,P.outline);
+      // Base nose horn
+      fp(ctx,[[88,48],[90,42],[92,48]],P.claw);
+      break;
+    }
+    case 'armored':{
+      // Tail
+      fp(ctx,[[2,52],[6,46],[14,46],[22,50],[22,58],[14,62],[6,60]],P.body);
+      fp(ctx,[[4,54],[10,50],[18,50],[18,56],[10,58]],P.mid);
+      // Body (low and wide)
+      fe(ctx,48,56,32,16,P.outline);fe(ctx,48,56,30,14,P.body);
+      fe(ctx,48,52,26,10,P.mid);dit(ctx,22,46,52,6,P.light);
+      fe(ctx,48,62,26,8,P.belly);
+      // Legs (4 stumpy)
+      frr(ctx,26,66,10,18,3,P.outline);frr(ctx,28,68,6,14,2,P.body);
+      frr(ctx,22,84,16,8,3,P.outline);frr(ctx,24,86,12,6,2,P.dark);
+      frr(ctx,38,66,10,18,3,P.outline);frr(ctx,40,68,6,14,2,P.body);
+      frr(ctx,34,84,16,8,3,P.outline);frr(ctx,36,86,12,6,2,P.dark);
+      frr(ctx,54,66,10,18,3,P.outline);frr(ctx,56,68,6,14,2,P.body);
+      frr(ctx,50,84,16,8,3,P.outline);frr(ctx,52,86,12,6,2,P.dark);
+      frr(ctx,66,66,10,18,3,P.outline);frr(ctx,68,68,6,14,2,P.body);
+      frr(ctx,62,84,16,8,3,P.outline);frr(ctx,64,86,12,6,2,P.dark);
+      // Head
+      fe(ctx,82,50,12,10,P.outline);fe(ctx,82,50,10,8,P.body);fe(ctx,82,48,8,5,P.mid);
+      frr(ctx,76,42,14,6,2,P.dark);frr(ctx,78,43,10,4,1,P.mid);
+      drawEye(ctx,86,48,3,P);px(ctx,92,50,3,2,P.outline);px(ctx,88,56,8,2,P.outline);
+      for(let i=0;i<5;i++)px(ctx,30+i*10,50+(i%2)*2,3,3,P.detail);
+      break;
+    }
+    case 'duck':{
+      // Tail
+      fp(ctx,[[4,56],[8,48],[16,46],[24,50],[24,60],[16,64],[8,62]],P.body);
+      fp(ctx,[[6,58],[12,52],[20,52],[20,58],[12,60]],P.mid);
+      // Body
+      fe(ctx,42,56,22,16,P.outline);fe(ctx,42,56,20,14,P.body);
+      fe(ctx,42,52,17,9,P.mid);dit(ctx,26,46,32,4,P.light);
+      fe(ctx,42,60,17,9,P.belly);
+      frr(ctx,24,54,36,3,1,P.accent);
+      // Back leg
+      frr(ctx,48,68,8,22,3,P.outline);frr(ctx,49,70,6,18,2,P.body);
+      frr(ctx,48,82,8,3,1,P.dark);frr(ctx,44,90,14,8,4,P.outline);frr(ctx,46,92,10,6,3,P.dark);
+      fe(ctx,44,98,5,3,P.outline);fe(ctx,52,98,5,3,P.outline);
+      px(ctx,42,99,4,3,P.claw);px(ctx,51,99,4,3,P.claw);
+      // Front leg
+      frr(ctx,34,68,8,22,3,P.outline);frr(ctx,35,70,6,18,2,P.body);
+      frr(ctx,34,82,8,3,1,P.dark);frr(ctx,30,90,14,8,4,P.outline);frr(ctx,32,92,10,6,3,P.dark);
+      fe(ctx,32,98,5,3,P.outline);fe(ctx,40,98,5,3,P.outline);
+      px(ctx,30,99,4,3,P.claw);px(ctx,39,99,4,3,P.claw);
+      // Neck
+      fp(ctx,[[56,46],[60,38],[66,30],[70,24],[72,28],[68,38],[62,46]],P.body);
+      fp(ctx,[[58,44],[64,34],[68,28],[70,28],[66,36],[62,42]],P.mid);
+      // Head
+      fe(ctx,76,22,14,10,P.outline);fe(ctx,76,22,12,8,P.body);
+      fe(ctx,76,18,10,5,P.mid);dit(ctx,68,14,16,4,P.light);
+      // Bill
+      fe(ctx,90,26,10,5,P.dark);fe(ctx,90,26,9,4,P.outline);
+      px(ctx,98,25,3,1,P.outline);px(ctx,84,24,10,2,P.detail);
+      drawEye(ctx,80,20,4,P);px(ctx,90,22,2,2,P.outline);
+      break;
+    }
+    case 'flyer':{
+      // Left wing
+      fp(ctx,[[0,36],[4,28],[10,22],[18,20],[28,24],[38,30],[44,38],[44,50],[38,52],[28,50],[16,46],[6,40]],P.body);
+      fp(ctx,[[4,34],[10,26],[18,22],[28,26],[38,32],[38,46],[28,48],[16,42],[8,36]],P.mid);
+      dit(ctx,8,28,28,8,P.light);
+      for(let i=0;i<5;i++)px(ctx,4+i*8,28+i*4,14-i*2,1,P.dark);
+      fe(ctx,2,34,4,5,P.dark);px(ctx,0,30,2,3,P.outline);
+      // Right wing
+      fp(ctx,[[84,36],[84,50],[90,52],[100,50],[112,46],[122,40],[124,36],[122,28],[114,22],[106,20],[96,24]],P.body);
+      fp(ctx,[[88,34],[88,46],[98,48],[110,42],[120,36],[120,26],[112,22],[102,22],[94,26]],P.mid);
+      dit(ctx,92,28,28,8,P.light);
+      for(let i=0;i<5;i++)px(ctx,100+i*6,28+i*4,12-i*2,1,P.dark);
+      fe(ctx,124,34,4,5,P.dark);px(ctx,124,30,2,3,P.outline);
+      // Body
+      fe(ctx,64,44,14,10,P.outline);fe(ctx,64,44,12,8,P.body);
+      fe(ctx,64,40,10,5,P.mid);fe(ctx,64,48,10,5,P.belly);
+      // Tail
+      fp(ctx,[[48,48],[52,46],[56,48],[56,56],[52,60],[48,58]],P.body);
+      fp(ctx,[[50,50],[54,48],[54,54],[50,56]],P.mid);dit(ctx,48,54,8,4,P.dark);
+      // Neck
+      fp(ctx,[[74,38],[80,32],[86,28],[88,32],[84,40],[78,44]],P.body);
+      fp(ctx,[[76,38],[82,34],[86,30],[86,34],[82,40]],P.mid);
+      // Head
+      fe(ctx,92,26,12,10,P.outline);fe(ctx,92,26,10,8,P.body);fe(ctx,92,22,8,5,P.mid);
+      // Beak
+      fp(ctx,[[100,24],[110,28],[118,30],[118,32],[110,32],[100,28]],P.dark);
+      fp(ctx,[[104,26],[112,30],[112,32],[104,28]],P.outline);px(ctx,116,30,2,2,P.outline);
+      drawEye(ctx,96,24,4,P);
+      // Legs
+      frr(ctx,58,54,5,14,2,P.body);frr(ctx,66,54,5,14,2,P.body);
+      frr(ctx,56,68,8,4,2,P.dark);frr(ctx,64,68,8,4,2,P.dark);
+      px(ctx,56,71,3,3,P.claw);px(ctx,62,71,3,3,P.claw);
+      px(ctx,64,71,3,3,P.claw);px(ctx,70,71,3,3,P.claw);
+      break;
+    }
+    case 'marine':{
+      // Tail fin
+      fp(ctx,[[0,38],[6,30],[12,34],[14,42],[14,52],[12,54],[6,58],[0,54]],P.body);
+      fp(ctx,[[2,42],[8,36],[12,40],[12,48],[8,52],[2,50]],P.mid);
+      fp(ctx,[[0,34],[6,28],[8,34]],P.dark);fp(ctx,[[0,54],[6,60],[8,54]],P.dark);
+      px(ctx,0,32,2,3,P.outline);px(ctx,0,56,2,3,P.outline);
+      // Body
+      fe(ctx,56,46,38,16,P.outline);fe(ctx,56,46,36,14,P.body);
+      fe(ctx,56,42,32,10,P.mid);dit(ctx,24,34,64,6,P.light);
+      fe(ctx,56,52,32,8,P.belly);dit(ctx,28,50,56,4,P.dark);
+      frr(ctx,22,44,64,2,1,P.accent);
+      // Dorsal fin
+      fp(ctx,[[48,30],[52,20],[56,16],[60,20],[64,28],[60,32],[52,32]],P.body);
+      fp(ctx,[[50,30],[54,22],[58,18],[58,28]],P.mid);px(ctx,56,16,2,2,P.outline);
+      // Head
+      fe(ctx,92,44,14,12,P.outline);fe(ctx,92,44,12,10,P.body);fe(ctx,92,40,10,6,P.mid);
+      // Snout
+      fe(ctx,106,46,10,6,P.body);fe(ctx,108,46,8,5,P.mid);
+      px(ctx,106,50,14,2,P.outline);
+      for(let i=0;i<4;i++){px(ctx,106+i*4,46,3,3,'#FFF');px(ctx,108+i*4,50,3,3,'#FFF')}
+      drawEye(ctx,96,40,5,P);px(ctx,114,44,3,2,P.outline);
+      // Flippers
+      fp(ctx,[[42,58],[36,64],[32,70],[30,74],[34,70],[38,64],[44,60]],P.body);
+      fp(ctx,[[40,60],[36,66],[34,70],[36,66],[42,60]],P.dark);
+      fp(ctx,[[68,58],[74,64],[78,70],[80,74],[76,70],[72,64],[70,60]],P.body);
+      fp(ctx,[[70,60],[74,66],[76,70],[74,66],[68,60]],P.dark);
+      for(let i=0;i<5;i++)px(ctx,36+i*10,40+(i%2)*2,3,3,P.detail);
+      break;
+    }
+    case 'beast':{
+      // Tail
+      fp(ctx,[[2,50],[6,42],[12,40],[20,46],[20,54],[12,58],[6,56]],P.body);
+      fp(ctx,[[4,52],[10,46],[16,48],[16,52],[10,54]],P.mid);
+      fe(ctx,4,44,5,5,P.accent);
+      // Mane
+      fe(ctx,58,40,14,14,P.accent);fe(ctx,58,40,12,12,P.light);dit(ctx,48,30,20,20,P.mid);
+      // Body
+      fe(ctx,42,56,24,18,P.outline);fe(ctx,42,56,22,16,P.body);
+      fe(ctx,42,52,18,10,P.mid);dit(ctx,24,46,36,6,P.light);
+      fe(ctx,42,62,18,10,P.belly);
+      for(let i=0;i<3;i++)frr(ctx,28+i*10,48,4,14,1,P.dark);
+      // Back legs
+      frr(ctx,46,70,10,22,4,P.outline);frr(ctx,48,72,6,18,3,P.body);frr(ctx,46,84,10,3,1,P.dark);
+      frr(ctx,42,92,16,8,4,P.outline);frr(ctx,44,94,12,6,3,P.dark);
+      fe(ctx,44,100,5,3,P.outline);fe(ctx,52,100,5,3,P.outline);
+      px(ctx,42,101,4,3,P.claw);px(ctx,51,101,4,3,P.claw);
+      // Front legs
+      frr(ctx,26,70,10,22,4,P.outline);frr(ctx,28,72,6,18,3,P.body);frr(ctx,26,84,10,3,1,P.dark);
+      frr(ctx,22,92,16,8,4,P.outline);frr(ctx,24,94,12,6,3,P.dark);
+      fe(ctx,24,100,5,3,P.outline);fe(ctx,32,100,5,3,P.outline);
+      px(ctx,22,101,4,3,P.claw);px(ctx,31,101,4,3,P.claw);
+      // Head
+      fe(ctx,72,36,16,12,P.outline);fe(ctx,72,36,14,10,P.body);
+      fe(ctx,72,32,12,7,P.mid);dit(ctx,62,28,20,6,P.light);
+      // Ears
+      fe(ctx,64,22,5,6,P.body);fe(ctx,64,22,4,5,P.mid);fe(ctx,64,24,3,3,P.accent);
+      fe(ctx,80,22,5,6,P.body);fe(ctx,80,22,4,5,P.mid);fe(ctx,80,24,3,3,P.accent);
+      drawEye(ctx,74,34,5,P);fe(ctx,86,38,3,2,P.outline);
+      px(ctx,82,42,10,2,P.dark);
+      // Whiskers
+      px(ctx,86,36,8,1,P.detail);px(ctx,86,38,10,1,P.detail);px(ctx,86,40,8,1,P.detail);
+      break;
+    }
+    // === MARINE SUB-TYPES ===
+    case 'dolphin':{
+      // Dolphin-shaped (ichthyosaur)
+      fe(ctx,56,50,48,16,P.outline);fe(ctx,56,50,46,14,P.body);
+      fe(ctx,56,46,40,10,P.mid);dit(ctx,14,38,84,6,P.light);
+      fe(ctx,56,56,40,8,P.belly);dit(ctx,20,52,72,4,P.dark);
+      // Tail
+      fp(ctx,[[4,42],[8,36],[14,40],[14,50],[8,54],[4,50]],P.body);
+      fp(ctx,[[0,38],[4,32],[8,38]],P.dark);fp(ctx,[[0,54],[4,58],[8,54]],P.dark);
+      px(ctx,0,36,2,2,P.outline);px(ctx,0,56,2,2,P.outline);
+      // Dorsal fin
+      fp(ctx,[[52,34],[56,24],[60,22],[62,26],[60,34]],P.body);
+      fp(ctx,[[54,32],[58,26],[60,24],[60,30]],P.mid);
+      // Head/snout
+      fe(ctx,98,48,14,10,P.outline);fe(ctx,98,48,12,8,P.body);fe(ctx,98,44,10,5,P.mid);
+      fe(ctx,112,50,8,4,P.body);fe(ctx,114,50,6,3,P.mid);px(ctx,110,52,14,2,P.outline);
+      drawEye(ctx,102,44,5,P);
+      // Flippers
+      fp(ctx,[[46,60],[40,68],[36,74],[34,76],[38,72],[44,64],[48,62]],P.body);
+      fp(ctx,[[64,60],[70,68],[74,74],[76,76],[72,72],[66,64],[62,62]],P.body);
+      break;
+    }
+    case 'plesio':{
+      // Long-necked marine reptile
+      // Body
+      fe(ctx,36,64,24,16,P.outline);fe(ctx,36,64,22,14,P.body);
+      fe(ctx,36,60,18,10,P.mid);dit(ctx,18,54,36,6,P.light);
+      fe(ctx,36,70,18,8,P.belly);
+      // Tail
+      fp(ctx,[[4,62],[8,56],[16,58],[16,66],[8,68],[4,66]],P.body);
+      fp(ctx,[[6,64],[12,60],[12,64],[6,66]],P.mid);
+      fp(ctx,[[0,58],[4,54],[6,58]],P.dark);fp(ctx,[[0,68],[4,72],[6,68]],P.dark);
+      // Flippers (4 large paddles)
+      fp(ctx,[[26,74],[20,82],[16,90],[14,94],[18,90],[24,82],[28,76]],P.body);
+      fp(ctx,[[24,76],[20,84],[18,90],[20,84],[26,76]],P.dark);
+      fp(ctx,[[44,74],[50,82],[54,90],[56,94],[52,90],[46,82],[42,76]],P.body);
+      fp(ctx,[[46,76],[50,84],[52,90],[50,84],[44,76]],P.dark);
+      fp(ctx,[[28,58],[22,52],[18,48]],P.body);fp(ctx,[[42,58],[48,52],[52,48]],P.body);
+      // Neck
+      fp(ctx,[[54,58],[60,50],[66,42],[72,34],[78,28],[84,24],[86,28],[82,34],[76,42],[70,50],[64,58]],P.body);
+      fp(ctx,[[56,56],[64,44],[72,36],[80,28],[84,26],[82,30],[76,38],[68,48],[62,54]],P.mid);
+      fp(ctx,[[56,62],[62,58],[68,52],[70,48],[68,50],[62,56]],P.belly);
+      // Head
+      fe(ctx,90,20,10,7,P.outline);fe(ctx,90,20,8,5,P.body);fe(ctx,90,18,6,3,P.mid);
+      fe(ctx,100,22,6,3,P.outline);fe(ctx,100,22,5,2,P.body);
+      px(ctx,100,24,8,2,P.outline);
+      for(let i=0;i<3;i++)px(ctx,98+i*3,20,2,3,'#FFF');
+      drawEye(ctx,94,18,3,P);px(ctx,104,20,2,1,P.outline);
+      break;
+    }
+    case 'mosasaur':{
+      // Streamlined marine predator
+      fe(ctx,58,48,44,18,P.outline);fe(ctx,58,48,42,16,P.body);
+      fe(ctx,58,44,36,12,P.mid);dit(ctx,22,36,72,6,P.light);
+      fe(ctx,58,54,36,10,P.belly);dit(ctx,26,50,64,4,P.dark);
+      // Tail
+      fp(ctx,[[4,44],[8,38],[16,40],[16,50],[8,54],[4,50]],P.body);
+      fp(ctx,[[0,40],[4,34],[8,40]],P.dark);fp(ctx,[[0,52],[4,58],[8,52]],P.dark);
+      // Head
+      fe(ctx,100,46,16,12,P.outline);fe(ctx,100,46,14,10,P.body);fe(ctx,100,42,12,6,P.mid);
+      fe(ctx,114,48,8,5,P.body);fe(ctx,116,48,6,4,P.mid);
+      px(ctx,108,52,16,2,P.outline);
+      for(let i=0;i<5;i++){px(ctx,106+i*4,46,3,3,'#FFF');px(ctx,108+i*4,50,3,3,'#FFF')}
+      drawEye(ctx,104,42,5,P);px(ctx,120,46,3,2,P.outline);
+      // Flippers
+      fp(ctx,[[44,60],[38,68],[34,76],[32,78],[36,74],[42,66],[46,62]],P.body);
+      fp(ctx,[[70,60],[76,68],[80,76],[82,78],[78,74],[72,66],[68,62]],P.body);
+      break;
+    }
+    case 'shark':{
+      // Shark shape
+      fe(ctx,54,46,46,18,P.outline);fe(ctx,54,46,44,16,P.body);
+      fe(ctx,54,42,38,12,P.mid);dit(ctx,16,34,76,6,P.light);
+      fe(ctx,54,52,38,10,P.belly);
+      // Tail
+      fp(ctx,[[4,40],[8,34],[14,38],[14,48],[8,52],[4,48]],P.body);
+      fp(ctx,[[0,36],[4,30],[8,36]],P.dark);fp(ctx,[[0,50],[4,56],[8,50]],P.dark);
+      // Dorsal fin (large triangular)
+      fp(ctx,[[48,28],[54,10],[58,8],[62,12],[60,28]],P.body);
+      fp(ctx,[[50,26],[56,14],[60,12],[58,26]],P.mid);px(ctx,58,8,2,2,P.outline);
+      // Head
+      fe(ctx,96,44,14,12,P.outline);fe(ctx,96,44,12,10,P.body);fe(ctx,96,40,10,6,P.mid);
+      fe(ctx,110,46,8,5,P.body);fe(ctx,112,46,6,4,P.mid);
+      px(ctx,106,50,16,3,P.outline);
+      for(let i=0;i<5;i++){px(ctx,104+i*4,44,3,4,'#FFF');px(ctx,106+i*4,48,3,4,'#FFF')}
+      drawEye(ctx,100,40,4,P);px(ctx,118,44,2,2,P.outline);
+      // Pectoral fins
+      fp(ctx,[[44,58],[38,66],[34,74],[32,78],[36,72],[42,64],[46,60]],P.body);
+      fp(ctx,[[66,58],[72,66],[76,74],[78,78],[74,72],[68,64],[64,60]],P.body);
+      // Gill slits
+      for(let i=0;i<3;i++)px(ctx,86+i*4,40,1,8,P.outline);
+      break;
+    }
+    case 'snake':{
+      // Coiled snake body
+      // Main coil
+      ctx.lineWidth=2;ctx.strokeStyle=P.outline;
+      ctx.beginPath();ctx.arc(54,60,28,0,Math.PI*1.8);ctx.stroke();
+      fe(ctx,54,60,26,26,P.body);fe(ctx,54,56,22,18,P.mid);
+      dit(ctx,34,42,40,16,P.light);fe(ctx,54,66,22,14,P.belly);
+      // Body coil pattern
+      ctx.strokeStyle=P.dark;ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(54,60,18,Math.PI*0.3,Math.PI*1.5);ctx.stroke();
+      ctx.strokeStyle=P.mid;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(54,60,10,Math.PI*0.5,Math.PI*1.8);ctx.stroke();
+      // Scales pattern
+      for(let i=0;i<8;i++){const a=i*Math.PI/4;px(ctx,54+Math.cos(a)*22,60+Math.sin(a)*22,3,3,P.detail)}
+      for(let i=0;i<6;i++){const a=i*Math.PI/3;px(ctx,54+Math.cos(a)*14,60+Math.sin(a)*14,2,2,P.dark)}
+      // Head (extending from coil to the right)
+      fp(ctx,[[78,44],[84,40],[90,36],[96,34],[100,36],[100,42],[96,44],[90,46],[84,46]],P.body);
+      fp(ctx,[[80,42],[86,38],[92,36],[98,36],[98,40],[92,42],[86,44]],P.mid);
+      // Snout
+      fe(ctx,104,38,8,4,P.body);fe(ctx,106,38,6,3,P.mid);
+      px(ctx,100,40,14,2,P.outline);
+      // Forked tongue
+      px(ctx,112,38,6,1,'#FF4444');px(ctx,118,36,3,1,'#FF4444');px(ctx,118,40,3,1,'#FF4444');
+      drawEye(ctx,94,36,4,P);
+      // Belly scales (underside of visible coil)
+      for(let i=0;i<6;i++)px(ctx,36+i*6,78,4,2,P.belly);
+      break;
+    }
+    case 'spino':{
+      // Bipedal + sail (Spinosaurus)
+      // Tail
+      fp(ctx,[[2,62],[6,56],[14,54],[24,58],[24,66],[14,68],[6,66]],P.body);
+      fp(ctx,[[4,64],[10,58],[20,60],[20,64],[10,66]],P.mid);
+      // SAIL (large, behind neck/body)
+      fp(ctx,[[30,18],[36,10],[42,6],[48,4],[54,6],[60,10],[66,18],[66,44],[60,48],[54,50],[48,50],[42,48],[36,46],[30,44]],P.accent);
+      fp(ctx,[[34,22],[40,14],[48,8],[56,10],[62,18],[62,40],[56,44],[48,46],[40,44],[34,40]],P.light);
+      for(let i=0;i<6;i++){px(ctx,34+i*6,20+Math.abs(i-3)*4,2,20-Math.abs(i-3)*4,P.dark+'60')}
+      // Body
+      fe(ctx,48,56,24,16,P.outline);fe(ctx,48,56,22,14,P.body);
+      fe(ctx,48,52,18,9,P.mid);fe(ctx,48,62,18,8,P.belly);
+      // Back leg
+      frr(ctx,52,68,10,24,4,P.outline);frr(ctx,54,70,6,20,3,P.dark);
+      frr(ctx,48,92,16,8,4,P.outline);frr(ctx,50,94,12,6,3,P.dark);
+      fe(ctx,50,100,4,3,P.outline);fe(ctx,58,100,4,3,P.outline);
+      px(ctx,48,101,4,3,P.claw);px(ctx,57,101,4,3,P.claw);
+      // Front leg
+      frr(ctx,36,68,10,24,4,P.outline);frr(ctx,38,70,6,20,3,P.body);
+      frr(ctx,32,92,16,8,4,P.outline);frr(ctx,34,94,12,6,3,P.body);
+      fe(ctx,34,100,4,3,P.outline);fe(ctx,42,100,4,3,P.outline);
+      px(ctx,32,101,4,3,P.claw);px(ctx,41,101,4,3,P.claw);
+      // Neck
+      fp(ctx,[[64,46],[70,38],[76,32],[80,28],[82,32],[78,40],[72,48]],P.body);
+      fp(ctx,[[66,44],[72,38],[78,32],[80,32],[76,38],[70,44]],P.mid);
+      // Head (crocodile-like, long snout)
+      fe(ctx,86,26,12,8,P.outline);fe(ctx,86,26,10,6,P.body);fe(ctx,86,24,8,4,P.mid);
+      // Long croc snout
+      frr(ctx,96,24,22,10,3,P.outline);frr(ctx,98,26,18,6,2,P.body);frr(ctx,100,27,14,4,1,P.mid);
+      px(ctx,96,30,22,2,P.outline);
+      for(let i=0;i<6;i++){px(ctx,98+i*3,26,2,3,'#FFF');px(ctx,99+i*3,30,2,3,'#FFF')}
+      drawEye(ctx,90,24,4,P);px(ctx,116,26,2,2,P.outline);
+      // Small arms
+      frr(ctx,68,46,4,10,2,P.body);px(ctx,70,56,3,3,P.claw);
+      break;
+    }
+    case 'dodo':{
+      // Round flightless bird
+      // Body (very round)
+      fe(ctx,50,62,28,24,P.outline);fe(ctx,50,62,26,22,P.body);
+      fe(ctx,50,56,22,16,P.mid);dit(ctx,30,44,40,10,P.light);
+      fe(ctx,50,70,22,14,P.belly);dit(ctx,32,66,36,6,P.dark);
+      // Tail feathers
+      fp(ctx,[[22,54],[16,48],[12,44],[10,46],[14,52],[20,58]],P.accent);
+      fp(ctx,[[20,56],[14,50],[12,48],[14,54]],P.light);
+      // Stubby wings
+      fp(ctx,[[28,56],[22,62],[20,68],[22,72],[26,68],[30,60]],P.body);
+      fp(ctx,[[26,58],[22,64],[22,70],[24,66],[28,60]],P.mid);
+      fp(ctx,[[72,56],[78,62],[80,68],[78,72],[74,68],[70,60]],P.body);
+      fp(ctx,[[74,58],[78,64],[78,70],[76,66],[72,60]],P.mid);
+      // Legs
+      frr(ctx,40,82,6,16,2,P.dark);frr(ctx,56,82,6,16,2,P.dark);
+      frr(ctx,36,98,12,6,3,P.outline);frr(ctx,52,98,12,6,3,P.outline);
+      px(ctx,36,102,4,3,P.claw);px(ctx,44,102,4,3,P.claw);
+      px(ctx,52,102,4,3,P.claw);px(ctx,60,102,4,3,P.claw);
+      // Neck (short)
+      fp(ctx,[[66,50],[72,44],[76,40],[78,44],[74,50],[68,54]],P.body);
+      fp(ctx,[[68,48],[74,44],[76,42],[76,46],[72,50]],P.mid);
+      // Head
+      fe(ctx,82,36,14,12,P.outline);fe(ctx,82,36,12,10,P.body);
+      fe(ctx,82,32,10,6,P.mid);dit(ctx,74,28,16,6,P.light);
+      // Large hooked beak
+      fp(ctx,[[92,34],[100,36],[108,38],[110,42],[106,44],[100,42],[94,40]],P.dark);
+      fp(ctx,[[94,36],[102,38],[108,40],[106,42],[100,40],[94,38]],P.outline);
+      px(ctx,108,40,2,2,P.outline);px(ctx,96,40,12,2,P.detail);
+      drawEye(ctx,86,34,5,P);
+      break;
+    }
+  }
+}
+
+function drawPFeat(ctx,feat,pt,P){
+  switch(feat){
+    // === REX FEATURES ===
+    case 'big_head':
+      fe(ctx,98,28,24,18,P.outline);fe(ctx,98,28,22,16,P.body);
+      fe(ctx,98,22,18,10,P.mid);dit(ctx,82,16,32,6,P.light);
+      frr(ctx,86,14,20,6,2,P.dark);
+      fe(ctx,102,40,22,8,P.outline);fe(ctx,102,40,20,6,P.body);fe(ctx,104,41,18,5,P.dark);
+      for(let i=0;i<7;i++){px(ctx,90+i*4,30,3,6,'#FFF');px(ctx,90+i*4,35,3,1,'#DDD')}
+      for(let i=0;i<6;i++)px(ctx,92+i*4,40,3,5,'#FFF');
+      drawEye(ctx,104,24,6,P);fe(ctx,120,28,3,2,P.outline);
+      break;
+    case 'long_snout':
+      frr(ctx,114,24,14,12,3,P.body);frr(ctx,116,26,10,8,2,P.mid);
+      px(ctx,114,34,14,2,P.outline);
+      for(let i=0;i<4;i++){px(ctx,114+i*3,28,2,4,'#FFF');px(ctx,115+i*3,32,2,4,'#FFF')}
+      fe(ctx,126,28,2,1,P.outline);
+      break;
+    case 'bull_horns':
+      fp(ctx,[[92,16],[94,6],[96,4],[98,8],[96,16]],P.claw);
+      fp(ctx,[[93,14],[95,8],[97,6],[96,12]],P.light);
+      fp(ctx,[[106,16],[108,6],[110,4],[112,8],[110,16]],P.claw);
+      fp(ctx,[[107,14],[109,8],[111,6],[110,12]],P.light);
+      break;
+    case 'tiny_arms':
+      ctx.clearRect(76,52,10,24);
+      frr(ctx,78,56,4,8,2,P.body);frr(ctx,79,62,3,4,1,P.mid);px(ctx,80,66,3,2,P.claw);
+      break;
+    case 'sword_claws':
+      ctx.clearRect(76,52,10,24);
+      frr(ctx,76,52,6,16,2,P.body);frr(ctx,77,66,4,6,1,P.mid);
+      for(let i=0;i<3;i++){fp(ctx,[[78+i*2,72],[79+i*2,88],[80+i*2,72]],P.claw);px(ctx,79+i*2,74,1,12,'#DDD')}
+      break;
+    case 'feathers':
+      for(let i=0;i<8;i++){
+        const x=30+i*6,y=50+Math.sin(i)*4;
+        fp(ctx,[[x,y],[x+2,y-6],[x+4,y]],P.accent);
+      }
+      break;
+    case 'pot_belly':
+      fe(ctx,54,72,28,16,P.belly);fe(ctx,54,68,24,10,P.body);
+      break;
+    case 'hook_claw':
+      ctx.clearRect(76,52,10,24);
+      frr(ctx,76,52,6,14,2,P.body);frr(ctx,77,64,4,6,1,P.mid);
+      fp(ctx,[[78,70],[80,78],[84,80],[82,76],[78,72]],P.claw);
+      break;
+    case 'brow_ridge':
+      frr(ctx,88,14,18,6,2,P.dark);frr(ctx,90,13,14,4,2,P.outline);
+      break;
+    case 'narrow_skull':
+      break;
+
+    // === RAPTOR FEATURES ===
+    case 'sickle':
+      fe(ctx,34,104,5,4,P.outline);
+      fp(ctx,[[32,102],[30,96],[28,94],[30,98],[34,104]],P.claw);
+      px(ctx,29,95,2,4,'#DDD');
+      fe(ctx,54,104,5,4,P.outline);
+      fp(ctx,[[56,102],[58,96],[60,94],[58,98],[54,104]],P.claw);
+      break;
+    case 'twin_crests':
+      fp(ctx,[[78,18],[80,8],[82,4],[84,8],[84,18]],P.accent);
+      fp(ctx,[[79,16],[81,8],[83,6],[83,14]],P.light);
+      fp(ctx,[[84,18],[86,8],[88,4],[90,8],[90,18]],P.accent);
+      fp(ctx,[[85,16],[87,8],[89,6],[89,14]],P.light);
+      break;
+    case 'quad_wings':
+      fp(ctx,[[36,62],[30,68],[26,76],[24,80],[28,76],[34,68],[38,64]],P.accent);
+      fp(ctx,[[34,64],[30,70],[28,76],[30,72],[36,64]],P.light);
+      fp(ctx,[[50,62],[56,68],[60,76],[62,80],[58,76],[52,68],[48,64]],P.accent);
+      fp(ctx,[[52,64],[56,70],[58,76],[56,72],[50,64]],P.light);
+      fp(ctx,[[60,42],[64,36],[68,32],[70,34],[66,40],[62,44]],P.accent);
+      fp(ctx,[[62,42],[66,36],[68,34],[66,38]],P.light);
+      break;
+    case 'beak':
+      ctx.clearRect(82,28,20,8);
+      fe(ctx,88,28,8,4,P.dark);fe(ctx,88,28,7,3,P.outline);
+      px(ctx,94,28,2,1,P.outline);
+      break;
+    case 'sm_crest':
+      fp(ctx,[[76,18],[78,10],[80,8],[82,10],[82,18]],P.accent);
+      fp(ctx,[[77,16],[79,12],[81,10],[81,16]],P.light);
+      break;
+    case 'tiny':
+      break;
+    case 'slim':
+      break;
+    case 'heavy':
+      fe(ctx,46,50,24,16,P.outline);fe(ctx,46,50,22,14,P.body);
+      fe(ctx,46,46,18,9,P.mid);fe(ctx,46,54,18,8,P.belly);
+      break;
+
+    // === SAUROPOD FEATURES ===
+    case 'long_neck':
+      fp(ctx,[[56,58],[62,46],[68,34],[74,24],[80,16],[86,12],[90,10],[92,14],[88,20],[84,28],[78,38],[72,48],[66,56]],P.body);
+      fp(ctx,[[58,56],[66,42],[74,28],[82,18],[88,14],[90,14],[86,22],[80,32],[72,44],[66,52]],P.mid);
+      fe(ctx,96,8,10,6,P.outline);fe(ctx,96,8,8,4,P.body);fe(ctx,96,6,6,3,P.mid);
+      drawEye(ctx,100,6,3,P);frr(ctx,102,10,8,3,1,P.dark);px(ctx,108,12,2,1,P.outline);
+      break;
+    case 'whip_tail':
+      fp(ctx,[[0,66],[2,62],[4,66]],P.dark);
+      ctx.strokeStyle=P.body;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,64);ctx.quadraticCurveTo(-4,60,-8,56);ctx.stroke();
+      break;
+    case 'tall_front':
+      ctx.clearRect(22,84,16,34);
+      frr(ctx,22,78,12,30,4,P.outline);frr(ctx,24,80,8,26,3,P.body);
+      frr(ctx,18,108,18,8,4,P.outline);frr(ctx,20,110,14,6,3,P.dark);
+      fe(ctx,20,116,4,3,P.outline);fe(ctx,30,116,4,3,P.outline);
+      px(ctx,18,117,3,3,P.claw);px(ctx,29,117,3,3,P.claw);
+      break;
+    case 'high_head':
+      break;
+    case 'thumb_spike':
+      fp(ctx,[[24,108],[22,102],[20,100],[22,104],[26,108]],P.claw);
+      px(ctx,21,101,2,4,'#DDD');
+      break;
+    case 'stocky':
+      break;
+    case 'massive':
+      fe(ctx,40,68,28,22,P.outline);fe(ctx,40,68,26,20,P.body);
+      fe(ctx,40,62,22,14,P.mid);fe(ctx,40,76,22,14,P.belly);
+      break;
+
+    // === HORNED FEATURES ===
+    case 'sm_frill':
+      ctx.clearRect(56,18,36,42);
+      fe(ctx,72,38,16,16,P.outline);fe(ctx,72,38,14,14,P.body);fe(ctx,72,38,10,10,P.mid);
+      break;
+    case 'spike_frill':
+      for(let a=0;a<9;a++){
+        const ang=Math.PI*0.15+a*Math.PI*0.7/8;
+        const sx=72+Math.cos(ang)*24,sy=38-Math.sin(ang)*24;
+        fp(ctx,[[sx-2,sy+2],[sx,sy-6],[sx+2,sy+2]],P.claw);
+      }
+      break;
+    case 'tri_horns':
+      fp(ctx,[[86,48],[90,38],[92,36],[94,42],[90,48]],P.claw);
+      fp(ctx,[[87,46],[91,40],[93,38],[92,44]],P.light);
+      fp(ctx,[[74,36],[70,22],[68,18],[72,22],[76,36]],P.claw);
+      fp(ctx,[[75,34],[71,24],[70,20],[73,26]],P.light);
+      fp(ctx,[[82,36],[86,22],[88,18],[90,22],[86,36]],P.claw);
+      fp(ctx,[[83,34],[87,24],[89,20],[87,28]],P.light);
+      break;
+    case 'lg_frill':
+      ctx.clearRect(52,14,42,30);
+      fe(ctx,72,34,26,26,P.outline);fe(ctx,72,34,24,24,P.body);fe(ctx,72,34,20,20,P.mid);
+      for(let a=0;a<9;a++){const ang=Math.PI*0.2+a*Math.PI*0.6/8;fe(ctx,72+Math.cos(ang)*24,34-Math.sin(ang)*24,4,4,P.dark)}
+      fe(ctx,64,28,6,8,P.accent);fe(ctx,80,28,6,8,P.accent);fe(ctx,72,22,4,6,P.accent);
+      break;
+
+    // === ARMORED FEATURES ===
+    case 'sail':
+      fp(ctx,[[24,18],[30,8],[36,4],[42,2],[48,4],[54,8],[60,18],[60,44],[54,48],[48,48],[42,48],[36,46],[30,44],[24,44]],P.accent);
+      fp(ctx,[[28,22],[34,10],[42,6],[50,8],[56,18],[56,40],[50,44],[42,44],[34,42],[28,40]],P.light);
+      for(let i=0;i<6;i++)px(ctx,28+i*6,22+Math.abs(i-3)*4,2,16-Math.abs(i-3)*3,P.dark+'60');
+      break;
+    case 'dome':
+      fe(ctx,82,42,14,14,P.outline);fe(ctx,82,42,12,12,P.body);
+      fe(ctx,82,40,10,8,P.mid);fe(ctx,82,38,8,4,P.light);
+      for(let i=0;i<5;i++)px(ctx,76+i*3,36,2,2,P.detail);
+      break;
+    case 'body_spikes':
+      for(let i=0;i<8;i++){
+        const x=24+i*8,y=44+(i%2)*2;
+        fp(ctx,[[x,y],[x+2,y-8],[x+4,y]],P.claw);
+      }
+      for(let i=0;i<6;i++){
+        const x=28+i*8,y=62;
+        fp(ctx,[[x,y],[x+1,y+6],[x+2,y]],P.claw);
+      }
+      break;
+    case 'plates':
+      for(let i=0;i<7;i++){
+        const x=24+i*8,y=42,h=8+Math.sin((i-3)*0.8)*4;
+        fe(ctx,x+4,y-h/2,5,h/2+2,P.accent);fe(ctx,x+4,y-h/2,4,h/2,P.light);
+      }
+      break;
+    case 'thagomizer':
+      fp(ctx,[[6,46],[2,38],[0,34],[4,40],[8,46]],P.claw);
+      fp(ctx,[[8,48],[4,42],[2,38],[6,44],[10,50]],P.claw);
+      fp(ctx,[[4,58],[0,64],[2,68],[6,62],[6,56]],P.claw);
+      fp(ctx,[[6,56],[2,62],[0,66],[4,60]],P.claw);
+      break;
+    case 'armor':
+      for(let i=0;i<6;i++){
+        fe(ctx,26+i*10,48,5,4,P.dark);fe(ctx,26+i*10,47,4,3,P.mid);
+      }
+      for(let i=0;i<5;i++){
+        fe(ctx,30+i*10,56,4,3,P.dark);fe(ctx,30+i*10,55,3,2,P.mid);
+      }
+      break;
+    case 'tail_club':
+      fe(ctx,4,52,8,6,P.dark);fe(ctx,4,52,7,5,P.body);
+      fe(ctx,2,48,4,3,P.outline);fe(ctx,2,56,4,3,P.outline);
+      break;
+    case 'full_armor':
+      for(let i=0;i<6;i++){
+        fe(ctx,26+i*10,48,5,4,P.dark);fe(ctx,26+i*10,47,4,3,P.mid);fe(ctx,26+i*10,46,2,2,P.light);
+      }
+      for(let i=0;i<5;i++){
+        fe(ctx,30+i*10,56,4,3,P.dark);fe(ctx,30+i*10,55,3,2,P.mid);
+      }
+      break;
+
+    // === DUCK FEATURES ===
+    case 'tube_crest':
+      fp(ctx,[[74,18],[72,8],[70,2],[68,0],[66,2],[68,8],[72,16]],P.accent);
+      fp(ctx,[[73,16],[71,8],[70,4],[69,4],[70,10]],P.light);
+      break;
+    case 'helm_crest':
+      fe(ctx,76,14,12,8,P.accent);fe(ctx,76,14,10,6,P.light);fe(ctx,76,14,6,4,P.mid);
+      break;
+    case 'wide_bill':
+      ctx.clearRect(86,22,16,10);
+      fe(ctx,92,26,14,6,P.dark);fe(ctx,92,26,12,5,P.outline);
+      px(ctx,104,25,3,1,P.outline);px(ctx,84,24,16,2,P.detail);
+      break;
+    case 'long_legs':
+      ctx.clearRect(30,68,30,36);
+      frr(ctx,48,68,6,28,3,P.outline);frr(ctx,49,70,4,24,2,P.body);
+      frr(ctx,44,96,14,6,3,P.outline);frr(ctx,46,98,10,4,2,P.dark);
+      fe(ctx,44,102,4,3,P.outline);fe(ctx,54,102,4,3,P.outline);
+      px(ctx,42,103,4,3,P.claw);px(ctx,53,103,4,3,P.claw);
+      frr(ctx,34,68,6,28,3,P.outline);frr(ctx,35,70,4,24,2,P.body);
+      frr(ctx,30,96,14,6,3,P.outline);frr(ctx,32,98,10,4,2,P.dark);
+      fe(ctx,32,102,4,3,P.outline);fe(ctx,40,102,4,3,P.outline);
+      px(ctx,30,103,4,3,P.claw);px(ctx,39,103,4,3,P.claw);
+      break;
+    case 'flat_head':
+      break;
+
+    // === FLYER FEATURES ===
+    case 'big_head':
+      if(pt==='flyer'){
+        ctx.clearRect(82,16,28,24);
+        fe(ctx,92,26,16,14,P.outline);fe(ctx,92,26,14,12,P.body);fe(ctx,92,22,12,7,P.mid);
+        fp(ctx,[[104,24],[114,28],[122,30],[122,34],[114,34],[104,30]],P.dark);
+        fp(ctx,[[108,26],[116,30],[116,34],[108,30]],P.outline);
+        drawEye(ctx,96,22,5,P);
+        for(let i=0;i<4;i++)px(ctx,100+i*4,26,2,3,'#FFF');
+      }
+      break;
+    case 'teeth':
+      if(pt==='flyer'){
+        for(let i=0;i<4;i++){px(ctx,102+i*4,28,2,3,'#FFF');px(ctx,103+i*4,32,2,2,'#FFF')}
+      }
+      break;
+    case 'tail_vane':
+      fp(ctx,[[46,56],[42,60],[38,66],[36,70],[40,68],[44,62],[48,58]],P.accent);
+      fp(ctx,[[44,58],[40,64],[38,68],[42,64]],P.light);
+      break;
+    case 'back_crest':
+      fp(ctx,[[86,18],[82,4],[80,0],[84,2],[90,14]],P.accent);
+      fp(ctx,[[87,16],[83,6],[82,2],[86,8]],P.light);
+      break;
+    // long_neck for flyer (quetz)
+
+    // === MARINE SUB-TYPE FEATURES ===
+    case 'tiny_head':
+      break;
+
+    // === BEAST FEATURES ===
+    case 'saber':
+      fp(ctx,[[80,42],[81,54],[82,42]],P.claw);px(ctx,81,44,1,8,'#FFF');
+      fp(ctx,[[84,42],[85,52],[86,42]],P.claw);px(ctx,85,44,1,6,'#FFF');
+      break;
+    case 'tusks':
+      fp(ctx,[[78,40],[76,52],[74,58],[72,62],[74,56],[78,46]],P.claw);
+      fp(ctx,[[77,42],[75,54],[73,60],[75,54]],P.light);
+      fp(ctx,[[84,40],[86,52],[88,58],[90,62],[88,56],[84,46]],P.claw);
+      fp(ctx,[[85,42],[87,54],[89,60],[87,54]],P.light);
+      break;
+    case 'trunk':
+      fp(ctx,[[82,38],[86,42],[88,48],[90,56],[92,64],[90,68],[88,66],[86,58],[84,50],[80,44]],P.body);
+      fp(ctx,[[84,40],[86,46],[88,54],[90,62],[88,64],[86,58],[84,48],[82,42]],P.mid);
+      px(ctx,90,66,2,2,P.outline);
+      break;
+    case 'wool':
+      for(let y=0;y<8;y++){
+        for(let x=0;x<6;x++){
+          const wx=26+x*6+(y%2)*3,wy=44+y*5;
+          if(wx>22&&wx<64&&wy>42&&wy<78){
+            fe(ctx,wx,wy,3,2,P.dark);
+          }
+        }
+      }
+      fe(ctx,72,36,16,12,P.outline);fe(ctx,72,36,14,10,P.body);
+      fe(ctx,72,32,12,7,P.mid);dit(ctx,62,28,20,6,P.light);
+      fe(ctx,64,22,5,6,P.body);fe(ctx,64,22,4,5,P.mid);
+      fe(ctx,80,22,5,6,P.body);fe(ctx,80,22,4,5,P.mid);
+      drawEye(ctx,74,34,5,P);
+      break;
+  }
+}
+
+function getPortrait(specId, size, mutation) {
+  const key = 'p_' + specId + '_' + size + (mutation ? '_' + mutation : '');
+  if (spriteCache[key]) return spriteCache[key];
+
+  const def = SPECIES_DEF[specId];
+  if (!def) return '';
+
+  let pri = def.p, acc = def.a, iris = def.i;
+  let overlay = null;
+  const m2 = mutation ? resolveSpeciesMut(specId, mutation) : null;
+  if (m2) { if(m2.p)pri=m2.p; if(m2.a)acc=m2.a; if(m2.i)iris=m2.i; if(m2.overlay)overlay=m2.overlay; }
+
+  const pal = genPalette(pri, acc, iris);
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  drawPortrait(ctx, specId, pal);
+  if (overlay) drawOverlay(ctx, overlay, SPECIES_DEF[specId].t, pal);
+
+  const url = canvas.toDataURL();
+  spriteCache[key] = url;
+  return url;
+}
+
+function portraitImg(specId, size, cls, mutation) {
+  const url = getPortrait(specId, size, mutation);
+  return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
+}
+let state = { coins: 100, level: 1, xp: 0, park: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0 };
+let isStreamLive = false;
+let wasStreamLive = false;
+
+function save() { state.lastTick = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {} }
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) { state = { ...state, ...JSON.parse(raw) }; applyOfflineDecay(); }
+  } catch(e) {}
+}
+
+function applyOfflineDecay() {
+  const elapsed = (Date.now() - state.lastTick) / 1000;
+  const ticks = Math.floor(elapsed / DECAY_INTERVAL_SEC);
+  if (ticks > 0) {
+    state.park.forEach(d => {
+      d.hunger = Math.max(0, d.hunger - ticks * STAT_DECAY_RATE);
+      d.thirst = Math.max(0, d.thirst - ticks * STAT_DECAY_RATE);
+      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE);
+    });
+  }
+  // Eggs no longer progress offline — only while stream is live
+}
+
+function getLevel() {
+  const xp = state.park.reduce((s,d) => s + d.careCount, 0) + state.discovered.length * 10;
+  return Math.max(1, Math.floor(Math.sqrt(xp / 5)) + 1);
+}
+function getStage(d) { return d.careCount >= GROWTH_THRESHOLDS.adult ? 'adult' : d.careCount >= GROWTH_THRESHOLDS.juvenile ? 'juvenile' : 'hatchling'; }
+function getGrowthProgress(d) {
+  const s = getStage(d);
+  if (s === 'adult') return 1;
+  if (s === 'juvenile') return (d.careCount - GROWTH_THRESHOLDS.juvenile) / (GROWTH_THRESHOLDS.adult - GROWTH_THRESHOLDS.juvenile);
+  return d.careCount / GROWTH_THRESHOLDS.juvenile;
+}
+function getNextStageLabel(d) {
+  const s = getStage(d);
+  if (s === 'adult') return 'Fully Grown';
+  if (s === 'juvenile') return `Adult in ${GROWTH_THRESHOLDS.adult - d.careCount}`;
+  return `Juvenile in ${GROWTH_THRESHOLDS.juvenile - d.careCount}`;
+}
+function getRosterById(id) { return ROSTER.find(r => r.id === id); }
+function rollRarity(w) { const t = Object.values(w).reduce((s,v)=>s+v,0); let r = Math.random()*t; for (const [k,v] of Object.entries(w)) { r-=v; if(r<=0) return k; } return 'common'; }
+function rollSpecies(r) { const p = ROSTER.filter(x => x.rarity === r); return p[Math.floor(Math.random() * p.length)]; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+function updateTopBar() { state.level = getLevel(); document.getElementById('coinDisplay').textContent = state.coins; document.getElementById('dinoCountDisplay').textContent = state.park.length; document.getElementById('levelDisplay').textContent = state.level; }
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn')[['park','eggs','collection','market','dinodex'].indexOf(tab)].classList.add('active');
+  if (tab === 'park') initParkView();
+  if (tab === 'eggs') renderEggsTab();
+  if (tab === 'collection') renderCollection();
+  if (tab === 'market') renderMarketplace();
+  if (tab === 'dinodex') renderDinodex();
+}
+
+/* ======================== VISUAL PARK ======================== */
+let selectedDinoIdx = -1;
+let decorations = [];
+let parkReady = false;
+
+const POND = { x: 75, y: 72, w: 20, h: 18 };
+
+function generateDecorations() {
+  decorations = [];
+  const types = [
+    { e:'🌸', cls:'flower' }, { e:'🌼', cls:'flower' }, { e:'💐', cls:'flower' },
+    { e:'🌿', cls:'flower' }, { e:'🍄', cls:'flower' }, { e:'🌱', cls:'flower' },
+    { e:'🪨', cls:'rock' }, { e:'🪵', cls:'rock' },
+  ];
+  for (let i = 0; i < 30; i++) {
+    const t = types[Math.floor(Math.random() * types.length)];
+    const x = 6 + Math.random() * 88;
+    const y = 6 + Math.random() * 88;
+    if (Math.hypot(x - POND.x, y - POND.y) < 14) continue;
+    decorations.push({ emoji: t.e, cls: t.cls, x, y, rot: Math.random() * 30 - 15 });
+  }
+}
+
+function initDinoPosition(dino) {
+  const spec = getRosterById(dino.speciesId);
+  if (spec.habitat === 'Water') {
+    dino.px = POND.x + (Math.random() - 0.5) * POND.w * 0.6;
+    dino.py = POND.y + (Math.random() - 0.5) * POND.h * 0.6;
+  } else {
+    dino.px = 10 + Math.random() * 75;
+    dino.py = 10 + Math.random() * 75;
+    while (Math.hypot(dino.px - POND.x, dino.py - POND.y) < 14) {
+      dino.px = 10 + Math.random() * 75;
+      dino.py = 10 + Math.random() * 75;
+    }
+  }
+  dino.tx = dino.px;
+  dino.ty = dino.py;
+  dino.facing = Math.random() > 0.5 ? 1 : -1;
+}
+
+function pickNewTarget(dino) {
+  const spec = getRosterById(dino.speciesId);
+  if (spec.habitat === 'Water') {
+    dino.tx = POND.x + (Math.random() - 0.5) * POND.w * 0.7;
+    dino.ty = POND.y + (Math.random() - 0.5) * POND.h * 0.7;
+  } else if (spec.habitat === 'Sky') {
+    dino.tx = 8 + Math.random() * 82;
+    dino.ty = 8 + Math.random() * 82;
+  } else {
+    let nx, ny;
+    do {
+      nx = dino.px + (Math.random() - 0.5) * 25;
+      ny = dino.py + (Math.random() - 0.5) * 25;
+      nx = Math.max(8, Math.min(90, nx));
+      ny = Math.max(8, Math.min(90, ny));
+    } while (Math.hypot(nx - POND.x, ny - POND.y) < 12);
+    dino.tx = nx;
+    dino.ty = ny;
+  }
+  if (dino.tx !== dino.px) dino.facing = dino.tx > dino.px ? 1 : -1;
+}
+
+function initParkView() {
+  if (!parkReady) { generateDecorations(); parkReady = true; }
+  state.park.forEach(d => { if (d.px === undefined) initDinoPosition(d); });
+  if (state.debris && state.debris.length > 0) wasStreamLive = true;
+  renderParkWorld();
+  startAnimation();
+  window.addEventListener('resize', () => renderParkWorld());
+}
+
+function renderParkWorld() {
+  const world = document.getElementById('parkWorld');
+  const existing = world.querySelectorAll('.park-dirt, .park-pond, .park-deco, .park-dino, .park-empty-msg, .park-debris');
+  existing.forEach(el => el.remove());
+
+  // Sprite scaling based on viewport width
+  const vp = document.getElementById('parkViewport');
+  const parkScale = Math.min(2.2, Math.max(1, vp.clientWidth / 450));
+  world.style.setProperty('--park-scale', parkScale);
+
+  // Dirt patches
+  const dirts = [{ x:25, y:30, w:16, h:10 }, { x:55, y:50, w:12, h:8 }, { x:15, y:70, w:10, h:7 }];
+  dirts.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'park-dirt';
+    el.style.cssText = `left:${d.x}%;top:${d.y}%;width:${d.w}%;height:${d.h}%;`;
+    world.appendChild(el);
+  });
+
+  // Pond
+  const pond = document.createElement('div');
+  pond.className = 'park-pond';
+  pond.style.cssText = `left:${POND.x - POND.w/2}%;top:${POND.y - POND.h/2}%;width:${POND.w}%;height:${POND.h}%;`;
+  world.appendChild(pond);
+
+  // Decorations
+  decorations.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'park-deco ' + d.cls;
+    el.textContent = d.emoji;
+    el.style.cssText = `left:${d.x}%;top:${d.y}%;transform:rotate(${d.rot}deg);`;
+    world.appendChild(el);
+  });
+
+  // Debris
+  if (state.debris && state.debris.length > 0) {
+    state.debris.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'park-debris';
+      el.dataset.debris = d.id;
+      el.textContent = d.emoji;
+      el.style.cssText = `left:${d.x}%;top:${d.y}%;`;
+      el.onclick = (e) => { e.stopPropagation(); clearDebris(d.id); };
+      world.appendChild(el);
+    });
+  }
+
+  if (state.park.length === 0 && (!state.debris || state.debris.length === 0)) {
+    const msg = document.createElement('div');
+    msg.className = 'park-empty-msg';
+    msg.innerHTML = '<span class="big">🥚</span><div class="msg">No dinosaurs yet!<br>Head to Excavate to find your first egg.</div>';
+    world.appendChild(msg);
+  }
+
+  // Dinos
+  state.park.forEach((dino, i) => {
+    const spec = getRosterById(dino.speciesId);
+    const stage = getStage(dino);
+    const needsAttention = dino.hunger < 30 || dino.thirst < 30 || dino.happiness < 30;
+
+    const el = document.createElement('div');
+    el.className = 'park-dino' + (i === selectedDinoIdx ? ' selected' : '');
+    el.id = 'parkDino_' + i;
+    el.onclick = () => selectDino(i);
+    el.style.cssText = `left:${dino.px}%;top:${dino.py}%;`;
+
+    const sprSize = stage === 'hatchling' ? 24 : stage === 'juvenile' ? 32 : 40;
+    el.innerHTML = `
+      ${needsAttention ? '<div class="park-dino-alert"></div>' : ''}
+      <div class="park-dino-label">${dino.nickname || spec.name}</div>
+      <div class="park-dino-sprite habitat-${spec.habitat.toLowerCase()}"
+           style="transform: scaleX(${dino.facing || 1})">
+        ${spriteImg(spec.id, sprSize, 'sprite-img', dino.mutation)}
+      </div>
+      <div class="park-dino-shadow"></div>
+    `;
+    world.appendChild(el);
+  });
+
+  updateEnergyBar();
+}
+
+let animFrameId = null;
+let lastWanderTime = 0;
+
+function startAnimation() {
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  function animate(ts) {
+    if (ts - lastWanderTime > 3000) {
+      lastWanderTime = ts;
+      state.park.forEach(d => {
+        if (Math.random() < 0.6) pickNewTarget(d);
+      });
+    }
+
+    state.park.forEach((dino, i) => {
+      const dx = dino.tx - dino.px;
+      const dy = dino.ty - dino.py;
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        dino.px += dx * 0.015;
+        dino.py += dy * 0.015;
+        const el = document.getElementById('parkDino_' + i);
+        if (el) {
+          el.style.left = dino.px + '%';
+          el.style.top = dino.py + '%';
+        }
+      }
+    });
+
+    animFrameId = requestAnimationFrame(animate);
+  }
+  animFrameId = requestAnimationFrame(animate);
+}
+
+function selectDino(idx) {
+  selectedDinoIdx = (selectedDinoIdx === idx) ? -1 : idx;
+  // Update dino selected class
+  document.querySelectorAll('.park-dino').forEach((el, i) => {
+    el.classList.toggle('selected', i === selectedDinoIdx);
+  });
+  renderBottomPanel();
+}
+
+function renderBottomPanel() {
+  const panel = document.getElementById('parkPanel');
+  if (selectedDinoIdx < 0 || selectedDinoIdx >= state.park.length) {
+    panel.classList.remove('open');
+    return;
+  }
+
+  const dino = state.park[selectedDinoIdx];
+  const spec = getRosterById(dino.speciesId);
+  const stage = getStage(dino);
+  const now = Date.now();
+  const idx = selectedDinoIdx;
+  const cdFeed = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['feed_'+idx] || 0)));
+  const cdWater = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['water_'+idx] || 0)));
+  const cdPlay = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['play_'+idx] || 0)));
+
+  panel.innerHTML = `
+    <div class="panel-header">
+      <div class="panel-emoji">${spriteImg(spec.id, 40, 'sprite-img')}</div>
+      <div class="panel-info">
+        <div class="panel-name">${dino.nickname || spec.name}</div>
+        <div class="panel-meta">
+          <span class="panel-badge pbadge-${spec.rarity}">${spec.rarity}</span>
+          <span class="panel-badge pbadge-diet">${spec.diet}</span>
+          <span class="panel-badge pbadge-diet">${stage}</span>
+        </div>
+      </div>
+      <button class="panel-close" onclick="selectedDinoIdx=-1;renderBottomPanel();document.querySelectorAll('.park-dino').forEach(e=>e.classList.remove('selected'));">✕</button>
+    </div>
+    <div class="panel-stats">
+      <div class="panel-stat">
+        <span class="panel-stat-icon">🍖</span>
+        <div class="panel-stat-bar"><div class="panel-stat-fill hunger" style="width:${dino.hunger}%"></div></div>
+      </div>
+      <div class="panel-stat">
+        <span class="panel-stat-icon">💧</span>
+        <div class="panel-stat-bar"><div class="panel-stat-fill thirst" style="width:${dino.thirst}%"></div></div>
+      </div>
+      <div class="panel-stat">
+        <span class="panel-stat-icon">😊</span>
+        <div class="panel-stat-bar"><div class="panel-stat-fill happiness" style="width:${dino.happiness}%"></div></div>
+      </div>
+    </div>
+    <div class="panel-growth">
+      <span>↑ ${stage}</span>
+      <div class="panel-growth-bar"><div class="panel-growth-fill" style="width:${getGrowthProgress(dino)*100}%"></div></div>
+      <span>${getNextStageLabel(dino)}</span>
+    </div>
+    <div class="panel-actions">
+      <button class="panel-action" onclick="careAction(${idx},'feed')" ${cdFeed > 0 ? 'disabled' : ''}>
+        <span class="action-icon">🍖</span>Feed
+        ${cdFeed > 0 ? `<span class="action-cd">${Math.ceil(cdFeed/1000)}s</span>` : ''}
+      </button>
+      <button class="panel-action" onclick="careAction(${idx},'water')" ${cdWater > 0 ? 'disabled' : ''}>
+        <span class="action-icon">💧</span>Water
+        ${cdWater > 0 ? `<span class="action-cd">${Math.ceil(cdWater/1000)}s</span>` : ''}
+      </button>
+      <button class="panel-action" onclick="careAction(${idx},'play')" ${cdPlay > 0 ? 'disabled' : ''}>
+        <span class="action-icon">🎾</span>Play
+        ${cdPlay > 0 ? `<span class="action-cd">${Math.ceil(cdPlay/1000)}s</span>` : ''}
+      </button>
+      <button class="panel-action sell-action" onclick="sellDino(${idx})" title="Sell for ${getSellPrice(dino)} coins">💰 ${getSellPrice(dino)}</button>
+    </div>
+  `;
+  panel.classList.add('open');
+}
+
+function careAction(idx, type) {
+  const dino = state.park[idx];
+  const cdKey = type + '_' + idx;
+  const now = Date.now();
+  if (now - (state.cooldowns[cdKey] || 0) < CARE_COOLDOWN) return;
+  state.cooldowns[cdKey] = now;
+
+  if (type === 'feed') dino.hunger = Math.min(100, dino.hunger + CARE_AMOUNT);
+  if (type === 'water') dino.thirst = Math.min(100, dino.thirst + CARE_AMOUNT);
+  if (type === 'play') dino.happiness = Math.min(100, dino.happiness + CARE_AMOUNT);
+
+  const prevStage = getStage(dino);
+  dino.careCount++;
+  const newStage = getStage(dino);
+  state.coins += 2;
+
+  if (newStage !== prevStage) {
+    showToast(`${getRosterById(dino.speciesId).name} grew to ${newStage}! 🎉`);
+    state.coins += newStage === 'juvenile' ? 20 : 50;
+    // Update emoji size
+    const el = document.getElementById('parkDino_' + idx);
+    if (el) {
+      const emojiEl = el.querySelector('.park-dino-emoji');
+      if (emojiEl) { emojiEl.className = `park-dino-emoji stage-${newStage} habitat-${getRosterById(dino.speciesId).habitat.toLowerCase()}`; }
+    }
+  }
+
+  save();
+  renderBottomPanel();
+  updateTopBar();
+}
+
+const SELL_PRICES = { common: 10, uncommon: 25, rare: 50, epic: 100, legendary: 250 };
+function getSellPrice(dino) {
+  const spec = getRosterById(dino.speciesId);
+  let price = SELL_PRICES[spec.rarity] || 10;
+  if (dino.mutation) {
+    const m = resolveSpeciesMut(dino.speciesId, dino.mutation);
+    if (m) {
+      const muts = getMutationsForSpecies(dino.speciesId);
+      const found = muts.find(x => x.id === dino.mutation);
+      if (found) { price += found.tier === 'rare' ? 50 : found.tier === 'special' ? 25 : 5; }
+      else { price += 15; }
+    }
+  }
+  const stage = getStage(dino);
+  if (stage === 'juvenile') price = Math.round(price * 1.5);
+  if (stage === 'adult') price *= 2;
+  return price;
+}
+
+function sellDino(idx) {
+  const session = getPlayerSession();
+  if (!session) { showToast('Login with Twitch to sell on the marketplace.'); return; }
+  const dino = state.park[idx];
+  const spec = getRosterById(dino.speciesId);
+  const suggested = getSellPrice(dino);
+  const mutInfo = dino.mutation ? resolveSpeciesMut(dino.speciesId, dino.mutation) : null;
+  const overlay = document.createElement('div');
+  overlay.className = 'sell-overlay';
+  overlay.id = 'sellOverlay';
+  overlay.innerHTML = `
+    <div class="sell-dialog">
+      <div class="sell-dialog-title">List on Marketplace</div>
+      <div class="sell-dialog-sprite">${spriteImg(spec.id, 64, 'sprite-img', dino.mutation)}</div>
+      <div class="sell-dialog-info">
+        ${dino.nickname || spec.name} · ${spec.rarity}${mutInfo ? ' · ' + mutInfo.label : ''} · ${getStage(dino)}
+      </div>
+      <div class="sell-dialog-price-row">
+        <label>Price:</label>
+        <input type="number" class="sell-dialog-price-input" id="sellPriceInput" value="${suggested}" min="1" max="99999">
+        <span style="color:#ffaa00;font-size:11px;">coins</span>
+      </div>
+      <div class="sell-dialog-btns">
+        <button class="sell-cancel" onclick="closeSellDialog()">Cancel</button>
+        <button class="sell-confirm" onclick="confirmListDino(${idx})">List for Sale</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('sellPriceInput').focus();
+}
+
+function closeSellDialog() {
+  const overlay = document.getElementById('sellOverlay');
+  if (overlay) overlay.remove();
+}
+
+async function confirmListDino(idx) {
+  const priceInput = document.getElementById('sellPriceInput');
+  const price = parseInt(priceInput.value);
+  if (!price || price < 1) { showToast('Enter a valid price.'); return; }
+  const dino = state.park[idx];
+  const spec = getRosterById(dino.speciesId);
+  try {
+    const res = await fetch('/api/marketplace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list', dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation, careCount: dino.careCount }, price }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Failed to list.'); return; }
+    state.park.splice(idx, 1);
+    selectedDinoIdx = -1;
+    Object.keys(state.cooldowns).forEach(k => { if (k.endsWith('_' + idx)) delete state.cooldowns[k]; });
+    save();
+    closeSellDialog();
+    renderParkWorld();
+    renderBottomPanel();
+    updateTopBar();
+    showToast(`${spec.name} listed for ${price} coins!`);
+  } catch (e) {
+    showToast('Network error. Try again.');
+  }
+}
+
+/* ======================== CLEANING / DEBRIS SYSTEM ======================== */
+const DEBRIS_TYPES = [
+  { type: 'rock', emoji: '\u{1FAA8}' },
+  { type: 'weed', emoji: '\u{1F33F}' },
+  { type: 'bone', emoji: '\u{1F9B4}' }
+];
+
+function getMaxEnergy() { return 10 + (state.subTier || 0) * 2; }
+
+function spawnDebris() {
+  const count = 6 + Math.floor(Math.random() * 7);
+  state.debris = [];
+  for (let i = 0; i < count; i++) {
+    let x, y;
+    do {
+      x = 8 + Math.random() * 82;
+      y = 8 + Math.random() * 78;
+    } while (Math.hypot(x - POND.x, y - POND.y) < 14);
+    const dt = DEBRIS_TYPES[Math.floor(Math.random() * DEBRIS_TYPES.length)];
+    state.debris.push({ id: Date.now() + '_' + i, type: dt.type, emoji: dt.emoji, x, y });
+  }
+  state.energy = getMaxEnergy();
+  state.lastDebrisSpawn = Date.now();
+  save();
+}
+
+function clearDebris(debrisId) {
+  if (state.energy <= 0) { showToast('No energy! Refill for 25 coins.'); return; }
+  const idx = state.debris.findIndex(d => d.id === debrisId);
+  if (idx < 0) return;
+  const el = document.querySelector(`[data-debris="${debrisId}"]`);
+  if (el) { el.classList.add('clearing'); setTimeout(() => el.remove(), 200); }
+  state.debris.splice(idx, 1);
+  state.energy--;
+  state.coins += 2;
+  save();
+  updateTopBar();
+  updateEnergyBar();
+  showToast('+2 coins!');
+}
+
+function refillEnergy() {
+  if (state.coins < 25) { showToast('Not enough coins (need 25).'); return; }
+  state.coins -= 25;
+  state.energy = getMaxEnergy();
+  save();
+  updateTopBar();
+  updateEnergyBar();
+  showToast('Energy refilled!');
+}
+
+function updateEnergyBar() {
+  const bar = document.getElementById('parkEnergy');
+  const hasDebris = state.debris && state.debris.length > 0;
+  bar.style.display = hasDebris ? 'flex' : 'none';
+  if (!hasDebris) return;
+  const max = getMaxEnergy();
+  const pct = Math.round((state.energy / max) * 100);
+  document.getElementById('energyFill').style.width = pct + '%';
+  document.getElementById('energyText').textContent = state.energy + '/' + max;
+  const btn = document.getElementById('energyRefill');
+  btn.disabled = state.coins < 25 || state.energy >= max;
+}
+
+/* ======================== AUTH / SESSION ======================== */
+function getPlayerSession() {
+  try {
+    const match = document.cookie.match(/pham_session=([^;]+)/);
+    if (!match) return null;
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch { return null; }
+}
+
+function initAuth() {
+  const session = getPlayerSession();
+  if (session) {
+    if (session.role === 'sub_tier1') state.subTier = 1;
+    else if (session.role === 'sub_tier2') state.subTier = 2;
+    else if (session.role === 'sub_tier3') state.subTier = 3;
+    else state.subTier = 0;
+    claimEarnings();
+  }
+}
+
+async function claimEarnings() {
+  try {
+    const res = await fetch('/api/marketplace?action=earnings');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.coins > 0) {
+      state.coins += data.coins;
+      save();
+      updateTopBar();
+      showToast(`Marketplace earnings: +${data.coins} coins from ${data.sales.length} sale(s)!`);
+    }
+  } catch {}
+}
+
+/* ======================== MARKETPLACE TAB ======================== */
+let marketListings = [];
+let marketMyListings = [];
+
+async function fetchMarketplace() {
+  try {
+    const res = await fetch('/api/marketplace');
+    if (res.ok) marketListings = await res.json();
+  } catch { marketListings = []; }
+}
+
+async function fetchMyListings() {
+  try {
+    const res = await fetch('/api/marketplace?action=my-listings');
+    if (res.ok) marketMyListings = await res.json();
+  } catch { marketMyListings = []; }
+}
+
+async function renderMarketplace() {
+  const container = document.getElementById('marketContent');
+  const session = getPlayerSession();
+
+  if (!session) {
+    const returnTo = encodeURIComponent('/games/dino-park/');
+    container.innerHTML = `
+      <div class="market-login">
+        <div style="font-size:32px;margin-bottom:12px;">🏪</div>
+        <div style="font-size:14px;color:#fff;margin-bottom:6px;">Dino Marketplace</div>
+        <div style="font-size:11px;color:#666;margin-bottom:16px;">Buy and sell dinosaurs with other players.<br>Login with Twitch to get started.</div>
+        <a href="/api/auth/twitch?return_to=${returnTo}" class="market-login-btn">Login with Twitch</a>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = '<div class="market-empty">Loading marketplace...</div>';
+  await Promise.all([fetchMarketplace(), fetchMyListings()]);
+
+  const otherListings = marketListings.filter(l => l.seller.userId !== session.user_id);
+
+  let html = '';
+
+  if (marketMyListings.length > 0) {
+    html += '<div class="market-section-title">Your Listings</div><div class="market-grid">';
+    marketMyListings.forEach(l => {
+      const spec = getRosterById(l.dino.speciesId);
+      if (!spec) return;
+      const mutInfo = l.dino.mutation ? resolveSpeciesMut(l.dino.speciesId, l.dino.mutation) : null;
+      html += `
+        <div class="market-card">
+          <div class="market-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', l.dino.mutation)}</div>
+          <div class="market-card-name">${l.dino.nickname || spec.name}</div>
+          <div class="market-card-meta">
+            <span class="rarity-chip rarity-${spec.rarity}">${spec.rarity}</span>
+            ${mutInfo ? `<div class="market-mut-badge">✨ ${mutInfo.label}</div>` : ''}
+          </div>
+          <div class="market-card-price">${l.price} coins</div>
+          <button class="market-card-cancel" onclick="cancelListing('${l.id}')">Cancel Listing</button>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="market-section-title">Available Dinos</div>';
+  if (otherListings.length === 0) {
+    html += '<div class="market-empty">No dinos available right now. Check back later!</div>';
+  } else {
+    html += '<div class="market-grid">';
+    otherListings.forEach(l => {
+      const spec = getRosterById(l.dino.speciesId);
+      if (!spec) return;
+      const mutInfo = l.dino.mutation ? resolveSpeciesMut(l.dino.speciesId, l.dino.mutation) : null;
+      const canAfford = state.coins >= l.price;
+      const parkFull = state.park.length >= MAX_PARK_SIZE;
+      html += `
+        <div class="market-card">
+          <div class="market-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', l.dino.mutation)}</div>
+          <div class="market-card-name">${l.dino.nickname || spec.name}</div>
+          <div class="market-card-meta">
+            <span class="rarity-chip rarity-${spec.rarity}">${spec.rarity}</span>
+            ${mutInfo ? `<div class="market-mut-badge">✨ ${mutInfo.label}</div>` : ''}
+          </div>
+          <div class="market-card-seller">from ${l.seller.displayName}</div>
+          <div class="market-card-price">${l.price} coins</div>
+          <button class="market-card-buy" onclick="buyDino('${l.id}')" ${!canAfford || parkFull ? 'disabled' : ''}>
+            ${parkFull ? 'Park Full' : !canAfford ? 'Not Enough Coins' : 'Buy'}
+          </button>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+async function buyDino(listingId) {
+  const listing = marketListings.find(l => l.id === listingId);
+  if (!listing) return;
+  const spec = getRosterById(listing.dino.speciesId);
+  if (!spec) return;
+  if (state.coins < listing.price) { showToast('Not enough coins.'); return; }
+  if (state.park.length >= MAX_PARK_SIZE) { showToast('Park is full!'); return; }
+  if (!confirm(`Buy ${listing.dino.nickname || spec.name} for ${listing.price} coins?`)) return;
+
+  try {
+    const res = await fetch('/api/marketplace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'buy', listingId }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Purchase failed.'); return; }
+
+    state.coins -= data.price;
+    const newDino = {
+      speciesId: data.dino.speciesId,
+      nickname: data.dino.nickname || '',
+      mutation: data.dino.mutation || null,
+      careCount: data.dino.careCount || 0,
+      hunger: 80, thirst: 80, happiness: 80,
+    };
+    state.park.push(newDino);
+    initDinoPosition(newDino);
+    if (!state.discovered.includes(data.dino.speciesId)) state.discovered.push(data.dino.speciesId);
+    if (data.dino.mutation) {
+      const mk = data.dino.speciesId + '_' + data.dino.mutation;
+      if (!state.discoveredMutations.includes(mk)) state.discoveredMutations.push(mk);
+    }
+    save();
+    updateTopBar();
+    showToast(`Adopted ${spec.name}!`);
+    renderMarketplace();
+  } catch (e) {
+    showToast('Network error. Try again.');
+  }
+}
+
+async function cancelListing(listingId) {
+  if (!confirm('Cancel this listing? The dino will return to your park.')) return;
+  try {
+    const res = await fetch('/api/marketplace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel', listingId }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Cancel failed.'); return; }
+    if (state.park.length < MAX_PARK_SIZE) {
+      const newDino = {
+        speciesId: data.dino.speciesId,
+        nickname: data.dino.nickname || '',
+        mutation: data.dino.mutation || null,
+        careCount: data.dino.careCount || 0,
+        hunger: 80, thirst: 80, happiness: 80,
+      };
+      state.park.push(newDino);
+      initDinoPosition(newDino);
+      save();
+    }
+    updateTopBar();
+    showToast('Listing cancelled. Dino returned to park.');
+    renderMarketplace();
+  } catch (e) {
+    showToast('Network error. Try again.');
+  }
+}
+
+/* ======================== EGGS TAB ======================== */
+const DAILY_DIG_COOLDOWN = 24 * 60 * 60 * 1000;
+const EVENT_MIN_INTERVAL = 15 * 60 * 1000;
+const EVENT_MAX_INTERVAL = 45 * 60 * 1000;
+const EVENT_DURATION = 3 * 60 * 1000;
+
+const RANDOM_EVENTS = [
+  { id:'meteor', name:'Meteor Shower!', icon:'☄️', desc:'A meteor crashed nearby — a rare fossil is exposed!',
+    weights:{ common:20, uncommon:35, rare:30, epic:12, legendary:3 }},
+  { id:'tremor', name:'Ground Tremor!', icon:'🌋', desc:'An earthquake revealed a buried nest of eggs!',
+    weights:{ common:40, uncommon:30, rare:20, epic:8, legendary:2 }},
+  { id:'tide', name:'Ancient Tide Pool!', icon:'🌊', desc:'The tide receded, exposing a fossilized clutch!',
+    weights:{ common:30, uncommon:30, rare:25, epic:12, legendary:3 }},
+  { id:'amber', name:'Amber Discovery!', icon:'🟡', desc:'Perfectly preserved amber — something is inside...',
+    weights:{ common:10, uncommon:25, rare:35, epic:20, legendary:10 }},
+  { id:'aurora', name:'Prehistoric Aurora!', icon:'🌌', desc:'A strange aurora fills the sky... legendary energy!',
+    weights:{ common:5, uncommon:15, rare:30, epic:30, legendary:20 }},
+];
+
+const VALID_CODES = {
+  'PHAMFOSSIL': { weights:{ common:30, uncommon:35, rare:25, epic:8, legendary:2 }, uses: 1 },
+  'PHANTOMACE': { weights:{ common:20, uncommon:30, rare:30, epic:15, legendary:5 }, uses: 1 },
+  'DINOTIME': { weights:{ common:40, uncommon:30, rare:20, epic:8, legendary:2 }, uses: 1 },
+  'LEGENDARY': { weights:{ common:0, uncommon:10, rare:30, epic:35, legendary:25 }, uses: 1 },
+  'RAPTORPACK': { weights:{ common:15, uncommon:35, rare:30, epic:15, legendary:5 }, uses: 1 },
+};
+
+function initEggEvents() {
+  if (!state.usedCodes) state.usedCodes = [];
+  if (!state.lastDailyDig) state.lastDailyDig = 0;
+  if (!state.nextEventAt) scheduleNextEvent();
+  if (!state.activeEvent) state.activeEvent = null;
+}
+
+function scheduleNextEvent() {
+  const delay = EVENT_MIN_INTERVAL + Math.random() * (EVENT_MAX_INTERVAL - EVENT_MIN_INTERVAL);
+  state.nextEventAt = Date.now() + delay;
+}
+
+function checkForEvent() {
+  const now = Date.now();
+  if (state.activeEvent) {
+    if (now > state.activeEvent.expiresAt) {
+      state.activeEvent = null;
+      scheduleNextEvent();
+    }
+    return;
+  }
+  if (state.nextEventAt && now >= state.nextEventAt) {
+    const evt = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+    state.activeEvent = {
+      ...evt,
+      expiresAt: now + EVENT_DURATION,
+      claimed: false
+    };
+    state.nextEventAt = null;
+    showToast(`${evt.icon} ${evt.name} Check the Eggs tab!`);
+  }
+}
+
+function claimEvent() {
+  if (!state.activeEvent || state.activeEvent.claimed) return;
+  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); return; }
+  const rarity = rollRarity(state.activeEvent.weights);
+  const species = rollSpecies(rarity);
+  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  state.activeEvent.claimed = true;
+  save(); updateTopBar(); renderEggsTab();
+  showToast(`${state.activeEvent.icon} Found a ${rarity} egg from the event!`);
+}
+
+function dailyDig() {
+  const now = Date.now();
+  if (now - state.lastDailyDig < DAILY_DIG_COOLDOWN) return;
+  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); return; }
+  state.lastDailyDig = now;
+  const weights = { common:50, uncommon:30, rare:15, epic:4, legendary:1 };
+  const rarity = rollRarity(weights);
+  const species = rollSpecies(rarity);
+  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  save(); updateTopBar(); renderEggsTab();
+  showToast(`Daily dig found a ${rarity} egg! 🥚`);
+}
+
+function redeemCode() {
+  const input = document.getElementById('redeemInput');
+  const code = input.value.trim().toUpperCase();
+  if (!code) return;
+  if (state.usedCodes.includes(code)) { showToast('Code already redeemed!'); input.value = ''; return; }
+  const codeData = VALID_CODES[code];
+  if (!codeData) { showToast('Invalid code.'); input.value = ''; return; }
+  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); input.value = ''; return; }
+  state.usedCodes.push(code);
+  const rarity = rollRarity(codeData.weights);
+  const species = rollSpecies(rarity);
+  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  input.value = '';
+  save(); updateTopBar(); renderEggsTab();
+  showToast(`Code redeemed! Found a ${rarity} egg! 🎁`);
+}
+
+function renderEggsTab() { renderEventBanner(); renderIncubator(); renderEggSources(); }
+
+function renderEventBanner() {
+  const area = document.getElementById('eventBannerArea');
+  if (!state.activeEvent) { area.innerHTML = ''; return; }
+  const evt = state.activeEvent;
+  const now = Date.now();
+  const rem = Math.max(0, evt.expiresAt - now);
+  const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
+
+  if (evt.claimed) {
+    area.innerHTML = `<div class="event-banner expired">
+      <div class="event-banner-icon">${evt.icon}</div>
+      <div class="event-banner-title">${evt.name}</div>
+      <div class="event-banner-desc">Claimed! Next event coming soon...</div>
+    </div>`;
+  } else {
+    area.innerHTML = `<div class="event-banner">
+      <div class="event-banner-icon">${evt.icon}</div>
+      <div class="event-banner-title">${evt.name}</div>
+      <div class="event-banner-desc">${evt.desc}</div>
+      <div class="event-banner-timer">⏰ ${m}:${String(s).padStart(2,'0')} remaining</div>
+      <button class="event-banner-btn" onclick="claimEvent()" ${state.eggs.length >= 3 ? 'disabled' : ''}>Claim Egg!</button>
+    </div>`;
+  }
+}
+
+function renderEggSources() {
+  const now = Date.now();
+  const dailyReady = now - state.lastDailyDig >= DAILY_DIG_COOLDOWN;
+  const dailyRem = Math.max(0, DAILY_DIG_COOLDOWN - (now - state.lastDailyDig));
+  const dailyH = Math.floor(dailyRem / 3600000), dailyM = Math.floor((dailyRem % 3600000) / 60000);
+
+  let eventStatus, eventDesc;
+  if (state.activeEvent && !state.activeEvent.claimed) {
+    eventStatus = 'available';
+    eventDesc = 'An event is active now! Check the banner above.';
+  } else if (state.activeEvent && state.activeEvent.claimed) {
+    eventStatus = 'claimed';
+    eventDesc = 'Event claimed! Another will appear in 15-45 minutes.';
+  } else {
+    eventStatus = 'waiting';
+    eventDesc = 'Random events appear every 15-45 minutes. Stay on this page!';
+  }
+
+  document.getElementById('eggSources').innerHTML = `
+    <div class="egg-source ${dailyReady ? 'available' : 'claimed'}" onclick="${dailyReady ? 'dailyDig()' : ''}">
+      <div class="egg-source-icon">⛏️</div>
+      <div class="egg-source-info">
+        <div class="egg-source-name">Daily Dig</div>
+        <div class="egg-source-desc">One free fossil dig every 24 hours. Mostly common finds.</div>
+        ${!dailyReady ? `<div class="egg-source-timer">Next dig in ${dailyH}h ${dailyM}m</div>` : ''}
+      </div>
+      <span class="egg-source-badge ${dailyReady ? 'esbadge-ready' : 'esbadge-claimed'}">${dailyReady ? 'Ready' : 'Done'}</span>
+    </div>
+
+    <div class="egg-source ${eventStatus === 'available' ? 'available' : (eventStatus === 'claimed' ? 'claimed' : '')}">
+      <div class="egg-source-icon">☄️</div>
+      <div class="egg-source-info">
+        <div class="egg-source-name">Random Events</div>
+        <div class="egg-source-desc">${eventDesc}</div>
+      </div>
+      <span class="egg-source-badge ${eventStatus === 'available' ? 'esbadge-ready' : (eventStatus === 'claimed' ? 'esbadge-claimed' : 'esbadge-waiting')}">${eventStatus === 'available' ? 'Active!' : (eventStatus === 'claimed' ? 'Claimed' : 'Waiting')}</span>
+    </div>
+
+    <div class="egg-source ${inventoryEggs.length > 0 ? 'available' : ''}">
+      <div class="egg-source-icon">🎫</div>
+      <div class="egg-source-info">
+        <div class="egg-source-name">Phamily Time Rewards</div>
+        <div class="egg-source-desc">${inventoryEggs.length > 0 ? inventoryEggs.length + ' egg(s) from Phamily Time — click to use!' : 'Earn eggs by leveling up Phamily Time while watching stream.'}</div>
+      </div>
+      <span class="egg-source-badge ${inventoryEggs.length > 0 ? 'esbadge-ready' : 'esbadge-waiting'}">${inventoryEggs.length > 0 ? inventoryEggs.length + ' Eggs' : 'Earn'}</span>
+    </div>
+    ${renderInventoryEggSection()}
+
+    <div class="egg-source">
+      <div class="egg-source-icon">🎁</div>
+      <div class="egg-source-info">
+        <div class="egg-source-name">Broadcaster & Mod Drops</div>
+        <div class="egg-source-desc">Mods and PhantomACE drop exclusive egg codes during stream. Enter them above!</div>
+      </div>
+      <span class="egg-source-badge esbadge-waiting">Codes</span>
+    </div>
+
+    <div class="egg-source locked">
+      <div class="egg-source-icon">🏆</div>
+      <div class="egg-source-info">
+        <div class="egg-source-name">Channel Point Redemptions</div>
+        <div class="egg-source-desc">Redeem Twitch channel points for a chance at an egg. Coming soon!</div>
+      </div>
+      <span class="egg-source-badge esbadge-locked">Soon</span>
+    </div>
+  `;
+}
+
+function fmtTime(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function renderIncubator() {
+  const slots = [];
+  state.eggs.forEach((egg, i) => {
+    const spec = getRosterById(egg.speciesId);
+    const progress = Math.min(1, egg.elapsed / egg.hatchTime);
+    const ready = progress >= 1;
+    const rem = Math.max(0, egg.hatchTime - egg.elapsed);
+    const liveTag = isStreamLive
+      ? '<div style="font-size:8px;color:#2ecc71;margin-top:3px;">● LIVE — Incubating</div>'
+      : '<div style="font-size:8px;color:#666;margin-top:3px;">○ Stream offline — Paused</div>';
+    slots.push(`<div class="egg-slot"><div class="egg-emoji">${ready?'🐣':'🥚'}</div>
+      <div class="egg-name">${spec.rarity.charAt(0).toUpperCase()+spec.rarity.slice(1)} Egg</div>
+      ${ready?`<button class="egg-hatch-btn" onclick="hatchEgg(${i})">HATCH!</button>`
+      :`<div class="egg-timer">${fmtTime(rem)}</div>
+        <div class="egg-progress"><div class="egg-progress-fill" style="width:${progress*100}%"></div></div>
+        ${liveTag}`}
+    </div>`);
+  });
+  while (slots.length < 3) slots.push('<div class="egg-slot empty">Empty Slot</div>');
+  document.getElementById('incubatorGrid').innerHTML = slots.join('');
+}
+
+function hatchEgg(idx) {
+  if (idx >= state.eggs.length) return;
+  const egg = state.eggs[idx];
+  if (egg.elapsed < egg.hatchTime) return;
+  if (state.park.length >= MAX_PARK_SIZE) { showToast('Park is full! Release a dinosaur first.'); return; }
+  const spec = getRosterById(egg.speciesId);
+  const mut = rollMutation(spec.id);
+  const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, careCount:0, mutation: mut };
+  state.park.push(newDino);
+  initDinoPosition(newDino);
+  if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
+  if (mut) { const mk=spec.id+'_'+mut; if(!state.discoveredMutations)state.discoveredMutations=[]; if(!state.discoveredMutations.includes(mk))state.discoveredMutations.push(mk); }
+  state.eggs.splice(idx, 1);
+  save(); updateTopBar(); renderExcavate();
+
+  document.getElementById('hatchEmoji').innerHTML = spriteImg(spec.id, 96, 'sprite-img', newDino.mutation);
+  document.getElementById('hatchName').textContent = spec.name;
+  const mutInfo = newDino.mutation ? resolveSpeciesMut(spec.id, newDino.mutation) : null;
+  document.getElementById('hatchRarity').textContent = spec.rarity + (mutInfo ? ' · ' + mutInfo.label + ' Mutation' : '');
+  document.getElementById('hatchRarity').style.color = mutInfo ? '#ff0000' : RARITY_COLORS[spec.rarity];
+  document.getElementById('hatchDesc').textContent = spec.desc;
+  document.getElementById('hatchOverlay').classList.add('show');
+}
+
+function closeHatch() {
+  document.getElementById('hatchOverlay').classList.remove('show');
+  if (document.querySelector('.tab-content.active').id === 'tab-park') renderParkWorld();
+}
+
+/* ======================== COLLECTION ======================== */
+let collSelectedIdx = -1;
+
+function renderCollection() {
+  renderCollList();
+  renderCollDetail();
+}
+
+function renderCollList() {
+  const list = document.getElementById('collList');
+  if (state.park.length === 0) {
+    list.innerHTML = '<div style="color:#333;font-size:10px;text-align:center;padding:20px;">No dinosaurs yet</div>';
+    return;
+  }
+  list.innerHTML = state.park.map((dino, i) => {
+    const spec = getRosterById(dino.speciesId);
+    const stage = getStage(dino);
+    const hPct = Math.max(0, dino.hunger / 100);
+    const tPct = Math.max(0, dino.thirst / 100);
+    const hpPct = Math.max(0, dino.happiness / 100);
+    const hCol = hPct > 0.3 ? '#e67e22' : '#ff0000';
+    const tCol = tPct > 0.3 ? '#3498db' : '#ff0000';
+    const hpCol = hpPct > 0.3 ? '#2ecc71' : '#ff0000';
+    return `<div class="coll-card rarity-${spec.rarity} ${i===collSelectedIdx?'selected':''}" onclick="collSelectedIdx=${i};renderCollection();">
+      <div class="coll-card-sprite">${spriteImg(spec.id, 48, 'sprite-img')}</div>
+      <div class="coll-card-name">${dino.nickname || spec.name}</div>
+      <div class="coll-card-level">Lv ${getLevel()} · ${stage}</div>
+      <div class="coll-card-bars">
+        <div style="background:${hCol};opacity:${hPct}"></div>
+        <div style="background:${tCol};opacity:${tPct}"></div>
+        <div style="background:${hpCol};opacity:${hpPct}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCollDetail() {
+  const detail = document.getElementById('collDetail');
+  if (collSelectedIdx < 0 || collSelectedIdx >= state.park.length) {
+    detail.innerHTML = '<div class="coll-detail-empty">Select a dinosaur</div>';
+    return;
+  }
+
+  const dino = state.park[collSelectedIdx];
+  const spec = getRosterById(dino.speciesId);
+  const stage = getStage(dino);
+  const now = Date.now();
+  const idx = collSelectedIdx;
+  const cdFeed = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['feed_'+idx] || 0)));
+  const cdWater = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['water_'+idx] || 0)));
+  const cdPlay = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['play_'+idx] || 0)));
+
+  const hungerDots = makeDots(dino.hunger, 'hunger');
+  const thirstDots = makeDots(dino.thirst, 'thirst');
+  const happyDots = makeDots(dino.happiness, 'happiness');
+
+  const rarityBonus = spec.rarity === 'legendary' ? 50 : spec.rarity === 'epic' ? 35 : spec.rarity === 'rare' ? 25 : spec.rarity === 'uncommon' ? 15 : 5;
+  const power = Math.floor(dino.careCount * 0.8 + rarityBonus);
+  const guard = Math.floor(dino.careCount * 0.7 + rarityBonus * 0.9);
+  const speed = Math.floor(dino.careCount * 0.6 + rarityBonus * 0.85);
+
+  detail.innerHTML = `
+    <div class="coll-sprite-large">${portraitImg(spec.id, 128, 'sprite-img', dino.mutation)}</div>
+    <div class="coll-name">${dino.nickname || spec.name}</div>
+    <div class="coll-species">${spec.name} · ${spec.era}</div>
+    ${dino.mutation ? `<div style="font-size:11px;color:#ff0000;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em">✨ ${(resolveSpeciesMut(spec.id,dino.mutation)||{}).label||dino.mutation} Mutation</div>` : ''}
+    <div class="coll-badges">
+      <span class="coll-badge pbadge-${spec.rarity}">${spec.rarity}</span>
+      <span class="coll-badge pbadge-diet">${spec.diet}</span>
+      <span class="coll-badge pbadge-diet">${spec.habitat}</span>
+      <span class="coll-badge pbadge-diet">${stage}</span>
+    </div>
+    <div class="coll-stats">
+      <div class="coll-stat-row"><div class="coll-stat-label">Fullness</div><div class="coll-stat-dots">${hungerDots}</div></div>
+      <div class="coll-stat-row"><div class="coll-stat-label">Hydration</div><div class="coll-stat-dots">${thirstDots}</div></div>
+      <div class="coll-stat-row"><div class="coll-stat-label">Mood</div><div class="coll-stat-dots">${happyDots}</div></div>
+    </div>
+    <div class="coll-growth-section">
+      <div class="coll-growth-label"><span>↑ ${stage}</span><span>${getNextStageLabel(dino)}</span></div>
+      <div class="coll-growth-bar"><div class="coll-growth-fill" style="width:${getGrowthProgress(dino)*100}%"></div></div>
+    </div>
+    <div class="coll-attrs">
+      <div class="coll-attr"><div class="coll-attr-label">PWR</div><div class="coll-attr-val">${power}</div></div>
+      <div class="coll-attr"><div class="coll-attr-label">GRD</div><div class="coll-attr-val">${guard}</div></div>
+      <div class="coll-attr"><div class="coll-attr-label">SPD</div><div class="coll-attr-val">${speed}</div></div>
+      <div class="coll-attr"><div class="coll-attr-label">CARE</div><div class="coll-attr-val">${dino.careCount}</div></div>
+    </div>
+    <div class="coll-actions">
+      <button class="coll-action" onclick="careAction(${idx},'feed');renderCollection();" ${cdFeed > 0 ? 'disabled' : ''}>
+        <span class="ca-icon">🍖</span>Feed
+        ${cdFeed > 0 ? `<span class="ca-cd">${Math.ceil(cdFeed/1000)}s</span>` : ''}
+      </button>
+      <button class="coll-action" onclick="careAction(${idx},'water');renderCollection();" ${cdWater > 0 ? 'disabled' : ''}>
+        <span class="ca-icon">💧</span>Water
+        ${cdWater > 0 ? `<span class="ca-cd">${Math.ceil(cdWater/1000)}s</span>` : ''}
+      </button>
+      <button class="coll-action" onclick="careAction(${idx},'play');renderCollection();" ${cdPlay > 0 ? 'disabled' : ''}>
+        <span class="ca-icon">🎾</span>Play
+        ${cdPlay > 0 ? `<span class="ca-cd">${Math.ceil(cdPlay/1000)}s</span>` : ''}
+      </button>
+    </div>
+    <div class="coll-desc">"${spec.desc}"</div>
+  `;
+}
+
+function makeDots(val, cls) {
+  const filled = Math.ceil(val / 20);
+  let html = '';
+  for (let i = 0; i < 5; i++) {
+    html += `<div class="coll-dot ${i < filled ? 'filled ' + cls : ''}"></div>`;
+  }
+  return html;
+}
+
+/* ======================== DINODEX ======================== */
+let dexFilter = 'all';
+let dexSelectedSpec = null;
+
+function getDexMutationStats() {
+  if(!state.discoveredMutations)state.discoveredMutations=[];
+  const totalPossible = ROSTER.length * 5;
+  const totalFound = state.discoveredMutations.length;
+  const byRarity = {};
+  RARITY_ORDER.forEach(r => {
+    const species = ROSTER.filter(s => s.rarity === r);
+    byRarity[r] = { total: species.length, found: species.filter(s => state.discovered.includes(s.id)).length };
+  });
+  return { totalPossible, totalFound, byRarity };
+}
+
+function getSpecMutStatus(specId) {
+  if(!state.discoveredMutations)state.discoveredMutations=[];
+  const muts = getMutationsForSpecies(specId);
+  const globalMuts = Object.keys(MUTATIONS);
+  const allMuts = [...muts, ...globalMuts.map(k=>({id:k,label:MUTATIONS[k].label,tier:MUTATIONS[k].boost==='legendary'?'legendary':'global',p:MUTATIONS[k].p}))];
+  return allMuts.map(m => ({
+    ...m,
+    found: state.discoveredMutations.includes(specId+'_'+m.id)
+  }));
+}
+
+function renderDexDetail(specId) {
+  const panel = document.getElementById('dexDetailPanel');
+  if (!specId || !state.discovered.includes(specId)) { panel.innerHTML = ''; dexSelectedSpec = null; return; }
+  dexSelectedSpec = specId;
+  const spec = getRosterById(specId);
+  const owned = state.park.filter(d => d.speciesId === specId);
+  const mutStatus = getSpecMutStatus(specId);
+  const foundMuts = mutStatus.filter(m => m.found).length;
+  const totalMuts = mutStatus.length;
+  const tierLabels = {normal:'Normal',special:'Special',rare:'Rare',legendary:'Legendary',global:'Global'};
+  const tierColors = {normal:'#7a7a7a',special:'#3498db',rare:'#9b59b6',legendary:'#f39c12',global:'#2ecc71'};
+
+  panel.innerHTML = `<div class="dex-detail-panel">
+    <button class="dex-close-btn" onclick="renderDexDetail(null)">✕ Close</button>
+    <div class="dex-detail-header">
+      <div class="dex-detail-portrait">${portraitImg(specId, 96, 'sprite-img')}</div>
+      <div class="dex-detail-info">
+        <div class="dex-detail-name">${spec.name}</div>
+        <div class="dex-detail-species">${spec.era} · ${spec.habitat}</div>
+        <div class="dex-detail-badges">
+          <span class="dex-detail-badge" style="background:${RARITY_COLORS[spec.rarity]}22;color:${RARITY_COLORS[spec.rarity]};border:1px solid ${RARITY_COLORS[spec.rarity]}44">${spec.rarity}</span>
+          <span class="dex-detail-badge" style="background:#ffffff08;color:#888;border:1px solid #ffffff14">${spec.diet}</span>
+          <span class="dex-detail-badge" style="background:#ffffff08;color:#888;border:1px solid #ffffff14">${SPECIES_DEF[specId].t}</span>
+        </div>
+        <div style="font-size:10px;color:#555;margin-top:6px">Owned: ${owned.length} · Mutations: ${foundMuts}/${totalMuts}</div>
+      </div>
+    </div>
+    <div class="dex-detail-desc">"${spec.desc}"</div>
+    ${owned.length > 0 ? `<div class="dex-detail-section">
+      <div class="dex-detail-section-title">In Your Park (${owned.length})</div>
+      <div class="dex-owned-row">${owned.map(d => {
+        const ml = d.mutation ? resolveSpeciesMut(specId, d.mutation) : null;
+        return `<div class="dex-owned-chip">${spriteImg(specId, 20, '', d.mutation)} ${d.nickname || spec.name}${ml ? ' · <span style="color:#ff0000">' + ml.label + '</span>' : ''}</div>`;
+      }).join('')}</div>
+    </div>` : ''}
+    <div class="dex-detail-section">
+      <div class="dex-detail-section-title">Mutations (${foundMuts} / ${totalMuts} Discovered)</div>
+      <div class="dex-mut-grid">${mutStatus.map(m => {
+        const swatch = m.found ? `background:${m.p}` : 'background:#222';
+        const tier = tierLabels[m.tier] || m.tier;
+        const tc = tierColors[m.tier] || '#666';
+        return `<div class="dex-mut-card ${m.found ? 'found' : 'unfound'}">
+          <div class="mut-swatch" style="${swatch}"></div>
+          <div style="flex:1;min-width:0">
+            <div class="dex-mut-label">${m.found ? m.label : '???'}</div>
+            <div class="dex-mut-tier" style="color:${tc}">${tier}</div>
+          </div>
+        </div>`;
+      }).join('')}</div>
+    </div>
+  </div>`;
+}
+
+function renderDinodex() {
+  if(!state.discoveredMutations)state.discoveredMutations=[];
+  const discCount = ROSTER.filter(r=>state.discovered.includes(r.id)).length;
+  const mutCount = state.discoveredMutations.length;
+  const totalMutsPossible = ROSTER.length * 5 + Object.keys(MUTATIONS).length * ROSTER.length;
+  const uniqueMuts = new Set(state.park.map(d=>d.mutation).filter(Boolean)).size;
+
+  document.getElementById('dexStats').innerHTML = `
+    <div class="dex-stat-card"><div class="dex-stat-val">${discCount}<span style="font-size:11px;color:#666">/${ROSTER.length}</span></div><div class="dex-stat-lbl">Species</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${state.park.length}</div><div class="dex-stat-lbl">In Park</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${mutCount}</div><div class="dex-stat-lbl">Mutations</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${Math.floor(discCount/ROSTER.length*100)}%</div><div class="dex-stat-lbl">Complete</div></div>
+  `;
+
+  const stats = getDexMutationStats();
+  document.getElementById('dexRarityRow').innerHTML = RARITY_ORDER.map(r => {
+    const s = stats.byRarity[r];
+    const pct = s.total ? Math.floor(s.found/s.total*100) : 0;
+    return `<div class="dex-rarity-chip" style="border-color:${RARITY_COLORS[r]}44;color:${RARITY_COLORS[r]}">
+      <span style="font-weight:700">${s.found}/${s.total}</span> ${r}
+    </div>`;
+  }).join('');
+
+  const filterOpts = ['all', ...RARITY_ORDER, 'mutated', 'owned'];
+  document.getElementById('dexFilters').innerHTML = filterOpts.map(f =>
+    `<button class="dex-filter ${f===dexFilter?'active':''}" onclick="dexFilter='${f}';renderDinodex();">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`
+  ).join('');
+
+  let filtered;
+  if (dexFilter === 'all') filtered = ROSTER;
+  else if (dexFilter === 'mutated') filtered = ROSTER.filter(r => state.discoveredMutations.some(m => m.startsWith(r.id + '_')));
+  else if (dexFilter === 'owned') filtered = ROSTER.filter(r => state.park.some(d => d.speciesId === r.id));
+  else filtered = ROSTER.filter(r => r.rarity === dexFilter);
+
+  const filterLabel = dexFilter === 'all' ? '' : ` (${dexFilter})`;
+  document.getElementById('dexCounter').textContent = `Showing ${filtered.length} species${filterLabel}`;
+
+  if (dexSelectedSpec) renderDexDetail(dexSelectedSpec);
+
+  document.getElementById('dexGrid').innerHTML = filtered.map(spec => {
+    const f = state.discovered.includes(spec.id);
+    const ownedCount = state.park.filter(d => d.speciesId === spec.id).length;
+    const specMuts = getMutationsForSpecies(spec.id);
+    const foundMuts = specMuts.filter(m => state.discoveredMutations.includes(spec.id+'_'+m.id));
+    const mutDots = f ? specMuts.slice(0,5).map(m => {
+      const found = state.discoveredMutations.includes(spec.id+'_'+m.id);
+      const tc = m.tier==='rare'?'#9b59b6':m.tier==='special'?'#3498db':'#7a7a7a';
+      return `<div class="dex-mut-dot ${found?'found':''}" style="background:${found?m.p:'#222'};${found?'border-color:'+tc+';color:'+tc:''}"></div>`;
+    }).join('') : '';
+    return `<div class="dex-entry ${f?'discovered rarity-'+spec.rarity:'undiscovered'}" onclick="${f?`renderDexDetail('${spec.id}')`:''}" ${dexSelectedSpec===spec.id?'style="border-color:#ff0000"':''}>
+      <div class="dex-emoji">${f?spriteImg(spec.id,32,'sprite-img'):'❓'}</div><div class="dex-info">
+      <div class="dex-name">${f?spec.name:'???'}${ownedCount>0?' <span style="color:#555;font-weight:400">×'+ownedCount+'</span>':''}</div>
+      <div class="dex-sub">${f?spec.diet+' · '+spec.habitat:spec.rarity}</div>
+      ${mutDots?'<div class="dex-mut-dots">'+mutDots+'</div>':''}
+      </div></div>`;
+  }).join('');
+}
+
+/* ======================== GAME LOOP ======================== */
+function gameTick() {
+  const now = Date.now();
+  const deltaSec = (now - state.lastTick) / 1000;
+  if (deltaSec >= DECAY_INTERVAL_SEC) {
+    const ticks = Math.floor(deltaSec / DECAY_INTERVAL_SEC);
+    state.park.forEach(d => {
+      d.hunger = Math.max(0, d.hunger - ticks * STAT_DECAY_RATE);
+      d.thirst = Math.max(0, d.thirst - ticks * STAT_DECAY_RATE);
+      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE);
+    });
+    state.lastTick = now;
+  }
+  if (isStreamLive) {
+    state.eggs.forEach(e => { e.elapsed = Math.min(e.hatchTime, e.elapsed + deltaSec); });
+  }
+  const happy = state.park.filter(d => d.hunger>40 && d.thirst>40 && d.happiness>40).length;
+  if (happy > 0 && Math.random() < 0.1) state.coins += happy;
+  updateTopBar();
+  const active = document.querySelector('.tab-content.active');
+  if (active.id === 'tab-park') {
+    // Update alert indicators
+    state.park.forEach((dino, i) => {
+      const el = document.getElementById('parkDino_' + i);
+      if (!el) return;
+      const needs = dino.hunger < 30 || dino.thirst < 30 || dino.happiness < 30;
+      const alert = el.querySelector('.park-dino-alert');
+      if (needs && !alert) {
+        const a = document.createElement('div');
+        a.className = 'park-dino-alert';
+        el.appendChild(a);
+      } else if (!needs && alert) {
+        alert.remove();
+      }
+    });
+    if (selectedDinoIdx >= 0) renderBottomPanel();
+  }
+  checkForEvent();
+  if (active.id === 'tab-eggs') { renderIncubator(); renderEventBanner(); renderEggSources(); }
+}
+
+/* ======================== TWITCH LIVE CHECK ======================== */
+async function checkTwitchLive() {
+  try {
+    const res = await fetch('/api/twitch-status');
+    if (res.ok) {
+      const data = await res.json();
+      const nowLive = !!data.live;
+      if (nowLive && !wasStreamLive) {
+        spawnDebris();
+        renderParkWorld();
+      }
+      wasStreamLive = nowLive;
+      isStreamLive = nowLive;
+    }
+  } catch(e) {
+    isStreamLive = false;
+  }
+}
+
+/* ======================== INVENTORY EGGS ======================== */
+
+let inventoryEggs = [];
+
+async function loadInventoryEggs() {
+  try {
+    const res = await fetch('/api/inventory?game=dino-park');
+    if (!res.ok) return;
+    const data = await res.json();
+    inventoryEggs = (data.items || []).filter(i => i.type === 'egg' && (!i.consumable || (i.quantity || 0) > 0));
+    renderEggSources();
+  } catch {}
+}
+
+async function useInventoryEgg(itemId) {
+  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); return; }
+  const egg = inventoryEggs.find(e => e.id === itemId);
+  if (!egg) return;
+
+  const meta = egg.meta || {};
+  let rarity;
+  if (meta.guaranteed && meta.mutant) {
+    rarity = 'legendary';
+  } else if (meta.guaranteed) {
+    rarity = meta.rarity || 'rare';
+  } else {
+    const weights = { common:40, uncommon:30, rare:20, epic:8, legendary:2 };
+    if (meta.rarity === 'uncommon') { weights.common=20; weights.uncommon=40; weights.rare=30; weights.epic=8; weights.legendary=2; }
+    if (meta.rarity === 'rare') { weights.common=5; weights.uncommon=15; weights.rare=45; weights.epic=25; weights.legendary=10; }
+    if (meta.rarity === 'mythic') { weights.common=0; weights.uncommon=5; weights.rare=20; weights.epic=40; weights.legendary=35; }
+    rarity = rollRarity(weights);
+  }
+
+  let species;
+  if (meta.mutant) {
+    const mutations = ROSTER.filter(r => r.mutation);
+    species = mutations.length > 0 ? mutations[Math.floor(Math.random() * mutations.length)] : rollSpecies(rarity);
+  } else {
+    species = rollSpecies(rarity);
+  }
+
+  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  save(); updateTopBar(); renderEggsTab();
+  showToast(`Phamily Time egg hatching! Found a ${rarity} ${species.name}! 🎁`);
+
+  try {
+    await fetch('/api/inventory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'use', itemId }),
+    });
+  } catch {}
+
+  const idx = inventoryEggs.findIndex(e => e.id === itemId);
+  if (idx !== -1) {
+    if (inventoryEggs[idx].quantity > 1) inventoryEggs[idx].quantity--;
+    else inventoryEggs.splice(idx, 1);
+  }
+  renderEggSources();
+}
+
+const origRenderEggSources = typeof renderEggSources === 'function' ? renderEggSources : null;
+
+function renderInventoryEggSection() {
+  if (inventoryEggs.length === 0) return '';
+  let html = '<div class="section-title" style="margin-top:16px">Phamily Time Eggs</div>';
+  for (const egg of inventoryEggs) {
+    const qty = egg.quantity || 1;
+    const rarityLabel = (egg.rarity || 'common').charAt(0).toUpperCase() + (egg.rarity || 'common').slice(1);
+    const disabled = state.eggs.length >= 3 ? 'disabled style="opacity:0.4;cursor:default"' : '';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:#111;border:1px solid #ffffff14;border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="useInventoryEgg('${egg.id}')" ${disabled}>
+      <div style="font-size:24px">🥚</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:#fff">${egg.name || rarityLabel + ' Egg'}</div>
+        <div style="font-size:10px;color:#666">${egg.meta?.guaranteed ? 'Guaranteed ' : ''}${egg.meta?.mutant ? 'Mutant ' : ''}${rarityLabel} • x${qty}</div>
+      </div>
+      <div style="font-size:9px;color:#ff0000;text-transform:uppercase;letter-spacing:0.05em">Use</div>
+    </div>`;
+  }
+  return html;
+}
+
+/* ======================== INIT ======================== */
+load();
+initAuth();
+initEggEvents();
+loadInventoryEggs();
+updateTopBar();
+initParkView();
+checkTwitchLive();
+setInterval(checkTwitchLive, 60000);
+setInterval(() => { gameTick(); save(); }, 2000);
+</script>
+</body>
+</html>

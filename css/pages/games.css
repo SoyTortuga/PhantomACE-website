@@ -6,18 +6,6 @@
   padding: 32px 0 48px;
 }
 
-@media (min-width: 768px) {
-  .games-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .games-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
 /* Game Card */
 .game-card {
   position: relative;
@@ -33,29 +21,22 @@
 
 .game-card-thumb {
   width: 100%;
-  aspect-ratio: 16 / 10;
   background: var(--gray-lo);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
   border-bottom: 1px solid var(--border);
   position: relative;
+  line-height: 0;
 }
 
 .game-card-thumb img {
-  max-width: 55%;
-  max-height: 80%;
-  width: auto;
+  width: 100%;
   height: auto;
-  object-fit: contain;
-  opacity: 0.7;
+  display: block;
   transition: opacity 0.3s, transform 0.3s;
 }
 
 .game-card:hover .game-card-thumb img {
-  opacity: 1;
-  transform: scale(1.08);
+  transform: scale(1.03);
 }
 
 .game-card-thumb-overlay {
@@ -170,6 +151,47 @@
   width: 100%;
   height: 100%;
   background: var(--black);
+}
+
+/* Skull Clicker Leaderboard */
+.sc-leaderboard {
+  margin-bottom: 12px;
+}
+.sc-leaderboard .sc-lb-title {
+  font-family: var(--font-system);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.sc-lb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-family: var(--font-system);
+  font-size: 11px;
+}
+.sc-lb-rank {
+  width: 18px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+.sc-lb-rank.rank-1 { color: #ffcc00; }
+.sc-lb-rank.rank-2 { color: #aaaaaa; }
+.sc-lb-rank.rank-3 { color: #cc6633; }
+.sc-lb-name {
+  flex: 1;
+  color: var(--text-sec);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-lb-score {
+  color: var(--red);
+  font-weight: 600;
 }
 
 /* Coming Soon overlay on locked games */

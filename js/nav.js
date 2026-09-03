@@ -8,6 +8,20 @@ document.addEventListener('DOMContentLoaded', () => {
         link.classList.add('active');
       }
     });
+
+    const subWrappers = document.querySelectorAll('.nav-has-sub');
+    subWrappers.forEach(wrapper => {
+      if (wrapper.dataset.page === currentPage) {
+        wrapper.classList.add('active');
+        return;
+      }
+      const subLinks = wrapper.querySelectorAll('.nav-submenu a');
+      subLinks.forEach(sub => {
+        if (sub.getAttribute('href') === '/' + currentPage + '.html') {
+          wrapper.classList.add('active');
+        }
+      });
+    });
   }
 
   function initMobileNav() {

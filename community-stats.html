@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE Phamily Time - Watch time rewards, levels, and community stats.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Phamily Time | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/about.css">
+  <link rel="stylesheet" href="/css/pages/community.css">
+  <link rel="stylesheet" href="/css/pages/phamily-time.css">
+</head>
+<body data-page="community">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+    <h1 class="page-hero-title">Phamily Time</h1>
+    <p class="page-hero-subtitle">Your Time with the Phamily, Rewarded</p>
+  </section>
+
+  <!-- Sub-navigation -->
+  <nav class="community-subnav">
+    <div class="page-container">
+      <div class="subnav-links">
+        <a href="/community.html" class="subnav-link">Forums</a>
+        <a href="/community-stats.html" class="subnav-link active">Viewer Stats</a>
+        <a href="/community-leaderboards.html" class="subnav-link">Leaderboards</a>
+      </div>
+      <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="subnav-discord">Join Discord</a>
+    </div>
+  </nav>
+
+  <!-- Dashboard Overview -->
+  <section class="page-container">
+    <div class="section-header">This Month</div>
+    <div class="pt-dashboard">
+      <div class="pt-stats-row">
+        <div class="card pt-stat-block">
+          <div class="pt-stat-value" id="ptLevel">0</div>
+          <div class="pt-stat-label">Current Level</div>
+        </div>
+        <div class="card pt-stat-block">
+          <div class="pt-stat-value" id="ptHours">0h</div>
+          <div class="pt-stat-label">Hours Watched</div>
+        </div>
+        <div class="card pt-stat-block">
+          <div class="pt-stat-value" id="ptRewards">0</div>
+          <div class="pt-stat-label">Rewards Available</div>
+        </div>
+        <div class="card pt-stat-block">
+          <div class="pt-stat-value" id="ptDays">--</div>
+          <div class="pt-stat-label">Days Remaining</div>
+        </div>
+      </div>
+
+      <!-- Boost & Role Check -->
+      <div class="pt-boost-bar">
+        <div class="pt-boost-info">
+          <span class="pt-boost-rate" id="ptBoostRate">1.0x</span>
+          <span class="pt-boost-label" id="ptBoostLabel">No Boost</span>
+        </div>
+        <div class="pt-boost-actions">
+          <button class="pill-btn" id="ptRatesBtn" type="button">Rates</button>
+          <button class="pill-btn" id="ptRecheckBtn" type="button">Recheck Roles</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Rates Modal -->
+  <div class="pt-modal-backdrop" id="ptRatesModal" hidden>
+    <div class="pt-modal">
+      <div class="pt-modal-header">
+        <h3>Rates</h3>
+        <button class="pt-modal-close" id="ptRatesClose" type="button">&times;</button>
+      </div>
+      <p class="pt-modal-desc">Watch time turns into levels. Everyone earns at the base rate, and subscribers earn faster.</p>
+      <div class="pt-rates-table">
+        <div class="pt-rate-row">
+          <span class="pt-rate-tier">Non-sub</span>
+          <span class="pt-rate-mult">1x</span>
+          <span class="pt-rate-desc">an hour counts as an hour</span>
+        </div>
+        <div class="pt-rate-row">
+          <span class="pt-rate-tier">Tier 1</span>
+          <span class="pt-rate-mult pt-rate-highlight">1.33x</span>
+          <span class="pt-rate-desc">an hour counts as 80 minutes</span>
+        </div>
+        <div class="pt-rate-row">
+          <span class="pt-rate-tier">Tier 2</span>
+          <span class="pt-rate-mult pt-rate-highlight">1.67x</span>
+          <span class="pt-rate-desc">an hour counts as 100 minutes</span>
+        </div>
+        <div class="pt-rate-row">
+          <span class="pt-rate-tier">Tier 3</span>
+          <span class="pt-rate-mult pt-rate-highlight">2x</span>
+          <span class="pt-rate-desc">an hour counts as two hours</span>
+        </div>
+      </div>
+      <div class="pt-modal-note">
+        <strong>How subscribing changes your rate</strong>
+        <p>Subscribe and your boost starts from that moment. Anything you had already banked keeps its old rate, and every hour from your sub onward counts at your tier's rate.</p>
+        <p>If your sub ends, nothing you earned is taken back. You carry on from right where you are, now earning at the base rate again.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thermometer Pass -->
+  <section class="page-container">
+    <div class="section-header">Your Pass</div>
+
+    <!-- Legend -->
+    <div class="pt-legend">
+      <span class="pt-legend-item"><span class="pt-legend-dot pt-dot-claimed"></span> Claimed</span>
+      <span class="pt-legend-item"><span class="pt-legend-dot pt-dot-ready"></span> Ready</span>
+      <span class="pt-legend-item"><span class="pt-legend-dot pt-dot-locked"></span> Locked</span>
+    </div>
+
+    <!-- Track Labels -->
+    <div class="pt-track-labels">
+      <span class="pt-track-label pt-track-follower">Follower Track</span>
+      <span class="pt-track-label pt-track-phamily">Phamily Track</span>
+    </div>
+
+    <!-- Scrollable Thermometer -->
+    <div class="pt-thermometer-wrap" id="ptThermometerWrap">
+      <div class="pt-thermometer-inner" id="ptThermometer">
+        <!-- Follower rewards (above) -->
+        <div class="pt-reward-lane pt-lane-top" id="ptLaneTop"></div>
+
+        <!-- Thermometer bar -->
+        <div class="pt-thermo-track">
+          <div class="pt-thermo-bar">
+            <div class="pt-thermo-fill" id="ptThermoFill"></div>
+          </div>
+          <div class="pt-thermo-ticks" id="ptThermoTicks"></div>
+          <div class="pt-thermo-bulb">
+            <div class="pt-bulb-inner" id="ptBulbInner"></div>
+          </div>
+        </div>
+
+        <!-- Phamily rewards (below) -->
+        <div class="pt-reward-lane pt-lane-bottom" id="ptLaneBottom"></div>
+
+        <!-- Milestone markers -->
+        <div class="pt-milestone-lane" id="ptMilestoneLane"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reward Popover (positioned via JS) -->
+  <div class="pt-popover" id="ptPopover" hidden>
+    <div class="pt-popover-header">
+      <span class="pt-popover-rarity" id="ptPopRarity"></span>
+      <span class="pt-popover-level" id="ptPopLevel"></span>
+    </div>
+    <div class="pt-popover-title" id="ptPopTitle"></div>
+    <div class="pt-popover-desc" id="ptPopDesc"></div>
+    <button class="btn-primary pt-popover-claim" id="ptPopClaim" type="button" hidden>Claim</button>
+    <div class="pt-popover-status" id="ptPopStatus"></div>
+  </div>
+
+  <!-- Login Prompt (shown when not logged in) -->
+  <section class="page-container" id="ptLoginPrompt">
+    <div class="card pt-login-card">
+      <img src="/assets/images/phantomace-logo.png" alt="" class="pt-login-icon">
+      <h3>Track Your Phamily Time</h3>
+      <p>Log in with Twitch to start earning levels, unlock rewards, and see your personal stats.</p>
+      <button class="btn-primary" onclick="window.location.href='/api/auth/twitch'">Log In with Twitch</button>
+    </div>
+  </section>
+
+  <!-- Personal Stats (shown when logged in) -->
+  <section class="page-container" id="ptPersonalStats" hidden>
+
+    <!-- Watch Time Chart -->
+    <div class="section-header">This Month's Activity</div>
+    <div class="card pt-chart-card">
+      <canvas id="ptWatchChart" height="160"></canvas>
+    </div>
+
+    <!-- Stream Attendance Grid -->
+    <div class="section-header">Stream Attendance</div>
+    <div class="card pt-attendance-card">
+      <div class="pt-attendance-summary" id="ptAttendanceSummary">0 of 0 streams</div>
+      <div class="pt-attendance-grid" id="ptAttendanceGrid"></div>
+    </div>
+
+    <!-- Stat Rows -->
+    <div class="section-header">Your Stats</div>
+    <div class="pt-personal-grid">
+      <div class="card pt-personal-stat">
+        <div class="pt-ps-value" id="ptCurrentStreak">0</div>
+        <div class="pt-ps-label">Current Streak</div>
+      </div>
+      <div class="card pt-personal-stat">
+        <div class="pt-ps-value" id="ptLongestStreak">0</div>
+        <div class="pt-ps-label">Longest Streak</div>
+      </div>
+      <div class="card pt-personal-stat">
+        <div class="pt-ps-value" id="ptTotalHours">0h</div>
+        <div class="pt-ps-label">All-Time Hours</div>
+      </div>
+      <div class="card pt-personal-stat">
+        <div class="pt-ps-value" id="ptMonthsActive">0</div>
+        <div class="pt-ps-label">Months Participated</div>
+      </div>
+      <div class="card pt-personal-stat">
+        <div class="pt-ps-value" id="ptTotalRewards">0</div>
+        <div class="pt-ps-label">Total Rewards Claimed</div>
+      </div>
+      <div class="card pt-personal-stat">
+        <div class="pt-ps-value" id="ptBestLevel">0</div>
+        <div class="pt-ps-label">Highest Level Reached</div>
+      </div>
+    </div>
+
+    <!-- Subscriber Info -->
+    <div class="pt-sub-info" id="ptSubInfo" hidden>
+      <div class="card pt-sub-card">
+        <div class="pt-sub-badge" id="ptSubBadge"></div>
+        <div class="pt-sub-detail">
+          <div class="pt-sub-duration" id="ptSubDuration">Subscribed for 0 months</div>
+          <div class="pt-sub-tier" id="ptSubTier">Tier 1</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/phamily-time.js" defer></script>
+</body>
+</html>

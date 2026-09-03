@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mana Clash</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #000; color: #fff; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; user-select: none; }
+
+    .mana-W { background: #f9f5d7; color: #1a1a1a; }
+    .mana-U { background: #aad4f5; color: #1a1a1a; }
+    .mana-B { background: #c9b8d8; color: #1a1a1a; }
+    .mana-R { background: #f0a08a; color: #1a1a1a; }
+    .mana-G { background: #a8d8a0; color: #1a1a1a; }
+    .mana-C { background: #c8c0b8; color: #1a1a1a; }
+    .mana-text-W { color: #f9f5d7; } .mana-text-U { color: #aad4f5; } .mana-text-B { color: #c9b8d8; }
+    .mana-text-R { color: #f0a08a; } .mana-text-G { color: #a8d8a0; } .mana-text-C { color: #c8c0b8; }
+
+    .screen { display: none; } .screen.active { display: flex; }
+
+    /* ── SHARED UI ── */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #0a0a0a; border-bottom: 2px solid #ff0000; height: 42px; width: 100%; }
+    .top-bar-title { font-size: 16px; font-weight: 700; color: #ff0000; letter-spacing: 1px; }
+    .top-bar-stats { display: flex; gap: 14px; font-size: 12px; }
+    .stat-item { display: flex; align-items: center; gap: 4px; color: #999; }
+    .stat-item .val { color: #fff; font-weight: 600; }
+
+    .btn { padding: 10px 24px; border: none; border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; transition: background 0.2s, transform 0.1s; }
+    .btn:hover:not(:disabled) { transform: scale(1.04); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-red { background: #ff0000; color: #fff; } .btn-red:hover:not(:disabled) { background: #cc0000; }
+    .btn-dim { background: #333; color: #ccc; } .btn-dim:hover:not(:disabled) { background: #444; }
+    .btn-green { background: #00cc66; color: #fff; } .btn-green:hover:not(:disabled) { background: #00aa55; }
+
+    .input { padding: 8px 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #fff; font-size: 13px; outline: none; }
+    .input:focus { border-color: #ff0000; }
+    .input::placeholder { color: #555; }
+
+    .section-hdr { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #555; margin-bottom: 8px; }
+    .card-box { background: #111; border: 1px solid #ffffff14; border-top: 2px solid #ff0000; border-radius: 6px; padding: 14px; }
+    .feedback { min-height: 20px; font-size: 12px; color: #999; text-align: center; }
+    .feedback.error { color: #ff0000; } .feedback.success { color: #00cc66; } .feedback.warn { color: #ffaa00; }
+
+    .timer-bar { height: 6px; background: #111; position: relative; overflow: hidden; width: 100%; }
+    .timer-fill { height: 100%; background: #00cc66; transition: width 0.2s linear, background 0.3s; position: absolute; left: 0; top: 0; }
+    .timer-fill.warn { background: #ffaa00; } .timer-fill.danger { background: #ff0000; }
+
+    /* ── SPLASH ── */
+    #splashScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; }
+    .splash-title { font-size: 36px; font-weight: 800; color: #ff0000; text-shadow: 0 0 30px #ff000040; letter-spacing: 2px; }
+    .splash-sub { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.2em; }
+    .splash-mana { display: flex; gap: 8px; }
+    .splash-pip { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .splash-pip img { width: 28px; height: 28px; border-radius: 50%; }
+    .splash-sections { display: flex; gap: 12px; width: 100%; max-width: 560px; flex-wrap: wrap; }
+    .splash-sections > * { flex: 1; min-width: 240px; }
+    .splash-form { display: flex; flex-direction: column; gap: 8px; }
+    .splash-form .row { display: flex; gap: 6px; }
+    .splash-form .row .input { flex: 1; }
+    .guest-bar { display: flex; gap: 8px; align-items: center; width: 100%; max-width: 560px; }
+    .guest-bar .input { flex: 1; }
+    .guest-bar .val { color: #00cc66; font-size: 12px; font-weight: 600; }
+
+    .room-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 560px; }
+    .room-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 4px; }
+    .room-info { display: flex; flex-direction: column; gap: 2px; }
+    .room-code-tag { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+    .room-host { font-size: 11px; color: #666; }
+    .room-meta { display: flex; gap: 8px; align-items: center; font-size: 11px; color: #555; }
+
+    /* ── LOBBY ── */
+    #lobbyScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; }
+    .lobby-code { font-size: 48px; font-weight: 800; letter-spacing: 8px; color: #ff0000; text-shadow: 0 0 20px #ff000050; cursor: pointer; }
+    .lobby-code:hover { text-shadow: 0 0 30px #ff000080; }
+    .lobby-status { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.12em; }
+    .player-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 400px; }
+    .player-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 4px; }
+    .player-avatar { width: 32px; height: 32px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-size: 14px; overflow: hidden; }
+    .player-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .player-name { font-size: 13px; font-weight: 600; flex: 1; }
+    .player-host-tag { font-size: 9px; color: #ff0000; text-transform: uppercase; letter-spacing: 0.1em; background: #ff000020; padding: 2px 6px; border-radius: 3px; }
+    .lobby-actions { display: flex; gap: 8px; }
+
+    /* ── GAME ── */
+    #gameScreen { flex-direction: column; min-height: 100vh; }
+    .players-bar { display: flex; gap: 6px; padding: 6px 10px; background: #0a0a0a; border-bottom: 1px solid #ffffff14; overflow-x: auto; flex-shrink: 0; }
+    .pbar-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #151515; border-radius: 4px; white-space: nowrap; min-width: 0; }
+    .pbar-name { font-size: 11px; color: #999; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+    .pbar-score { font-size: 12px; font-weight: 700; color: #fff; }
+    .pbar-status { font-size: 12px; }
+    .pbar-item.me { border: 1px solid #ff000040; }
+    .pbar-item.busted { opacity: 0.4; }
+
+    .dice-area { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 14px; flex: 1; background: #0a0a0a; }
+    .round-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #555; }
+
+    .dice-tray { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .die-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .die { width: 64px; height: 64px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 3px solid transparent; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+    .die:hover { transform: scale(1.06); }
+    .die.locked { border-color: #ff0000 !important; box-shadow: 0 0 10px #ff000050; }
+    .die.unrolled { background: #1a1a1a; border-color: #282828; cursor: default; }
+    .die.unrolled .die-mana-icon { opacity: 0.12; }
+    .die.rolling { animation: dieRoll 0.1s ease-in-out infinite; }
+    @keyframes dieRoll { 0%{transform:rotate(-8deg) scale(0.95)} 50%{transform:rotate(8deg) scale(1.05)} 100%{transform:rotate(-8deg) scale(0.95)} }
+    .die-mana-icon { width: 44px; height: 44px; border-radius: 50%; pointer-events: none; }
+    .lock-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: #ff0000; font-weight: 700; height: 12px; }
+
+    .dice-controls { display: flex; gap: 8px; align-items: center; }
+    .rolls-left { font-size: 11px; color: #555; } .rolls-left .val { color: #fff; font-weight: 600; }
+
+    .waiting-msg { font-size: 14px; color: #ffaa00; text-align: center; padding: 20px; }
+    .busted-msg { font-size: 18px; color: #ff0000; font-weight: 800; text-align: center; padding: 30px; }
+
+    /* ── SCOREPAD ── */
+    .scorepad-panel { background: #111; border-top: 1px solid #ffffff14; padding: 10px 12px; flex-shrink: 0; }
+    .scorepad-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #555; padding-bottom: 6px; border-bottom: 1px solid #ffffff14; margin-bottom: 2px; }
+    .score-row { display: grid; grid-template-columns: 1fr 40px 50px; align-items: center; padding: 5px 4px; border-bottom: 1px solid #ffffff08; transition: background 0.15s; cursor: default; }
+    .score-row.clickable { cursor: pointer; } .score-row.clickable:hover { background: #ffffff0a; }
+    .score-row.valid { background: #00cc6610; } .score-row.valid:hover { background: #00cc6620; }
+    .score-row.clickable:not(.valid) .score-val { color: #ff000080; }
+    .score-row.filled { opacity: 0.45; } .score-row.filled .score-val { color: #00cc66; }
+    .score-name { font-size: 11px; font-weight: 600; color: #ccc; }
+    .score-rule { font-size: 8px; color: #444; display: block; margin-top: 1px; }
+    .score-max { font-size: 9px; color: #383838; text-align: center; }
+    .score-val { font-size: 13px; font-weight: 700; text-align: right; color: #444; }
+    .score-divider { height: 1px; background: #ffffff14; margin: 2px 0; }
+    .score-total-row { display: grid; grid-template-columns: 1fr 40px 50px; align-items: center; padding: 8px 4px; border-top: 2px solid #ff0000; margin-top: 2px; }
+    .score-total-label { font-size: 12px; font-weight: 700; color: #ff0000; text-transform: uppercase; letter-spacing: 0.1em; }
+    .score-total-val { font-size: 16px; font-weight: 800; color: #ff0000; text-align: right; }
+
+    /* ── RESULTS ── */
+    #resultsScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; }
+    .results-title { font-size: 32px; font-weight: 800; color: #00cc66; text-shadow: 0 0 20px #00cc6640; letter-spacing: 2px; }
+    .results-sub { font-size: 12px; color: #555; }
+    .results-table { width: 100%; max-width: 460px; }
+    .result-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 4px; margin-bottom: 6px; }
+    .result-rank { font-size: 20px; font-weight: 800; min-width: 32px; text-align: center; }
+    .result-rank.gold { color: #ffaa00; } .result-rank.silver { color: #c0c0c0; } .result-rank.bronze { color: #cd7f32; }
+    .result-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .result-score { font-size: 18px; font-weight: 800; color: #ff0000; }
+    .result-busted { font-size: 10px; color: #ff0000; text-transform: uppercase; }
+    .result-row.busted { opacity: 0.5; }
+
+    [hidden] { display: none !important; }
+
+    /* ── DICE PACK COSMETICS ── */
+    .dice-pack-bar {
+      display: flex; gap: 8px; align-items: center; width: 100%; max-width: 560px; flex-wrap: wrap;
+    }
+    .dice-pack-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.1em; }
+    .dice-pack-select {
+      background: #111; border: 1px solid #333; color: #fff; padding: 4px 10px;
+      border-radius: 3px; font-size: 11px; cursor: pointer; font-family: inherit; flex: 1; min-width: 140px;
+    }
+    .dice-pack-select option { background: #111; color: #fff; }
+    .dice-pack-preview { display: flex; gap: 4px; }
+    .dice-pack-preview .mini-die { width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+    .dice-pack-preview .mini-die img { width: 18px; height: 18px; border-radius: 50%; }
+  </style>
+</head>
+<body>
+
+
+<!-- ════════ SPLASH ════════ -->
+<div class="screen active" id="splashScreen">
+  <div class="splash-title">MANA CLASH</div>
+  <div class="splash-sub">Sudden Death Dice</div>
+  <div class="splash-mana">
+    <div class="splash-pip"><img src="assets/w.png" alt="White"></div>
+    <div class="splash-pip"><img src="assets/u.png" alt="Blue"></div>
+    <div class="splash-pip"><img src="assets/b.png" alt="Black"></div>
+    <div class="splash-pip"><img src="assets/r.png" alt="Red"></div>
+    <div class="splash-pip"><img src="assets/g.png" alt="Green"></div>
+    <div class="splash-pip"><img src="assets/c.png" alt="Colorless"></div>
+  </div>
+
+  <div class="guest-bar" id="guestBar">
+    <span style="font-size:11px;color:#555">NAME:</span>
+    <input class="input" id="guestNameInput" placeholder="Enter display name" maxlength="20">
+    <span class="val" id="authStatus"></span>
+  </div>
+
+  <div class="dice-pack-bar" id="dicePackBar" hidden>
+    <span class="dice-pack-label">Dice Pack:</span>
+    <select class="dice-pack-select" id="dicePackSelect" onchange="applyDicePack()">
+      <option value="default">Default Mana Symbols</option>
+    </select>
+  </div>
+
+  <div class="splash-sections">
+    <div class="card-box splash-form">
+      <div class="section-hdr">Create Room</div>
+      <input class="input" id="createPassword" placeholder="Password (optional)">
+      <button class="btn btn-red" id="createBtn" onclick="createRoom()">Create Room</button>
+    </div>
+    <div class="card-box splash-form">
+      <div class="section-hdr">Join Room</div>
+      <div class="row">
+        <input class="input" id="joinCode" placeholder="Room code" maxlength="4" style="text-transform:uppercase;letter-spacing:2px;font-weight:700;text-align:center">
+        <button class="btn btn-dim" onclick="joinByCode()">Join</button>
+      </div>
+      <input class="input" id="joinPassword" placeholder="Password (if required)" style="display:none">
+    </div>
+  </div>
+
+  <div class="feedback" id="splashFeedback"></div>
+
+  <div class="section-hdr" style="width:100%;max-width:560px">Open Rooms</div>
+  <div class="room-list" id="roomList"><div style="font-size:12px;color:#444;text-align:center">Loading...</div></div>
+</div>
+
+<!-- ════════ LOBBY ════════ -->
+<div class="screen" id="lobbyScreen">
+  <div class="splash-title" style="font-size:24px;margin-top:30px">ROOM</div>
+  <div class="lobby-code" id="lobbyCode" onclick="copyCode()" title="Click to copy">----</div>
+  <div class="lobby-status" id="lobbyStatus">Open</div>
+  <div class="feedback" id="lobbyFeedback"></div>
+
+  <div class="section-hdr">Players</div>
+  <div class="player-list" id="playerList"></div>
+
+  <div class="lobby-actions">
+    <button class="btn btn-red" id="startBtn" onclick="startGame()" style="display:none">Start Game</button>
+    <button class="btn btn-dim" onclick="leaveRoom()">Leave</button>
+  </div>
+</div>
+
+<!-- ════════ GAME ════════ -->
+<div class="screen" id="gameScreen">
+  <div class="top-bar">
+    <div class="top-bar-title">MANA CLASH</div>
+    <div class="top-bar-stats">
+      <div class="stat-item">Round <span class="val" id="roundNum">1</span>/12</div>
+      <div class="stat-item">⏱ <span class="val" id="timerText">30</span>s</div>
+    </div>
+  </div>
+  <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+  <div class="players-bar" id="playersBar"></div>
+
+  <div class="dice-area" id="diceArea">
+    <div class="round-label" id="phaseLabel">Waiting...</div>
+    <div class="dice-tray" id="diceTray"></div>
+    <div class="dice-controls" id="diceControls">
+      <button class="btn btn-red" id="rollBtn" onclick="rollDice()">Roll</button>
+      <button class="btn btn-dim" id="submitBtn" onclick="submitEarly()" style="display:none">Submit</button>
+      <div class="rolls-left">Rolls: <span class="val" id="rollsLeft">3</span>/3</div>
+    </div>
+    <div class="feedback" id="gameFeedback"></div>
+  </div>
+
+  <div class="scorepad-panel" id="scorepad"></div>
+</div>
+
+<!-- ════════ RESULTS ════════ -->
+<div class="screen" id="resultsScreen">
+  <div class="results-title" id="resultsTitle">GAME OVER</div>
+  <div class="results-sub" id="resultsSub"></div>
+  <div class="results-table" id="resultsTable"></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="btn btn-red" onclick="backToSplash()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const FACES = ['W','U','B','R','G','C'];
+const VALUES = { W:1, U:2, B:3, R:4, G:5, C:6 };
+
+const SLOTS = [
+  { id:'mono',     name:'Mono-Color',       rule:'All 6 same color',      maxPts:'50' },
+  { id:'guild',    name:'Guild',            rule:'2 colors, 3 each',     maxPts:'20' },
+  { id:'shard',    name:'Shard / Wedge',    rule:'3 colors, 2 each',     maxPts:'25' },
+  { id:'nephilim', name:'Nephilim',         rule:'4 distinct colors',    maxPts:'30' },
+  { id:'wubrgc',   name:'WUBRG+C',         rule:'All 6 faces present',  maxPts:'60' },
+  { id:'divider' },
+  { id:'white',    name:'White Out',        rule:'≥4 White',    color:'W', maxPts:'Σ' },
+  { id:'blue',     name:'Blue Wave',        rule:'≥4 Blue',     color:'U', maxPts:'Σ' },
+  { id:'black',    name:'Black Decay',      rule:'≥4 Black',    color:'B', maxPts:'Σ' },
+  { id:'red',      name:'Red Burn',         rule:'≥4 Red',      color:'R', maxPts:'Σ' },
+  { id:'green',    name:'Green Stompy',     rule:'≥4 Green',    color:'G', maxPts:'Σ' },
+  { id:'colorless',name:'Colorless Wastes', rule:'≥4 Colorless',color:'C', maxPts:'Σ' },
+  { id:'divider2' },
+  { id:'wild',     name:'Mana Clash',       rule:'Any (wild)',            maxPts:'Σ' },
+];
+
+let myId = null;
+let myName = null;
+let roomCode = null;
+let roomState = null;
+let pollTimer = null;
+let localTimerEnd = 0;
+let timerTick = null;
+
+let dice = ['W','W','W','W','W','W'];
+let locked = [false,false,false,false,false,false];
+let rollsLeft = 3;
+let hasRolled = false;
+let myPhase = 'idle';
+let myScores = {};
+let submitted = false;
+let lastSeenRound = 0;
+let prepTimer = null;
+
+function getSession() {
+  const cookie = document.cookie;
+  const m = cookie.match(/pham_session=([^;]+)/);
+  if (!m) return null;
+  try { return JSON.parse(decodeURIComponent(m[1])); } catch { return null; }
+}
+
+function initIdentity() {
+  const session = getSession();
+  const bar = document.getElementById('guestBar');
+  const status = document.getElementById('authStatus');
+  if (session) {
+    myId = session.user_id;
+    myName = session.display_name;
+    bar.innerHTML = `<span style="font-size:12px;color:#00cc66">✓ ${myName}</span>`;
+  } else {
+    const saved = localStorage.getItem('mc_guestName');
+    if (saved) document.getElementById('guestNameInput').value = saved;
+    myId = localStorage.getItem('mc_guestId');
+    if (!myId) { myId = 'g' + Math.random().toString(36).slice(2, 10); localStorage.setItem('mc_guestId', myId); }
+  }
+}
+
+function getGuestFields() {
+  const session = getSession();
+  if (session) return {};
+  const name = document.getElementById('guestNameInput')?.value?.trim();
+  if (!name) return null;
+  myName = name;
+  localStorage.setItem('mc_guestName', name);
+  return { guestId: myId, guestName: name };
+}
+
+async function api(method, params) {
+  const isGet = !params.action || ['list-rooms','get-state'].includes(params.action);
+  let url = '/api/mana-clash';
+  let opts = { credentials: 'same-origin' };
+  if (isGet) {
+    const sp = new URLSearchParams();
+    for (const [k,v] of Object.entries(params)) sp.set(k, v);
+    url += '?' + sp.toString();
+  } else {
+    const guest = getGuestFields();
+    if (guest === null) { showFeedback('splashFeedback', 'Enter a display name first.', 'error'); return null; }
+    opts.method = 'POST';
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify({ ...params, ...guest });
+  }
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showFeedback(elId, msg, type) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'feedback' + (type ? ' ' + type : '');
+}
+
+function manaSymbol(face) {
+  return `<img class="die-mana-icon" src="assets/${face.toLowerCase()}.png" alt="${face}">`;
+}
+
+function diceSum(d) { return d.reduce((s,f) => s + VALUES[f], 0); }
+function countFaces(d) { const c = {}; FACES.forEach(f => c[f]=0); d.forEach(f => c[f]++); return c; }
+
+function validateSlot(slotId, d) {
+  const counts = countFaces(d);
+  const colorDice = d.filter(f => f !== 'C');
+  const colorDistinct = new Set(colorDice).size;
+  const colorCounts = {};
+  ['W','U','B','R','G'].forEach(f => { if (counts[f] > 0) colorCounts[f] = counts[f]; });
+  const colorVals = Object.values(colorCounts).sort((a,b) => b-a);
+  switch(slotId) {
+    case 'mono': return colorDice.length===6 && colorDistinct===1;
+    case 'guild': return colorDice.length===6 && colorDistinct===2 && colorVals[0]===3 && colorVals[1]===3;
+    case 'shard': return colorDice.length===6 && colorDistinct===3 && colorVals.every(v => v===2);
+    case 'nephilim': return colorDistinct===4;
+    case 'wubrgc': return new Set(d).size===6;
+    case 'white': return counts.W>=4;
+    case 'blue': return counts.U>=4;
+    case 'black': return counts.B>=4;
+    case 'red': return counts.R>=4;
+    case 'green': return counts.G>=4;
+    case 'colorless': return counts.C>=4;
+    case 'wild': return true;
+    default: return false;
+  }
+}
+
+function scoreSlot(slotId, d) {
+  switch(slotId) {
+    case 'mono': return 50; case 'guild': return 20; case 'shard': return 25;
+    case 'nephilim': return 30; case 'wubrgc': return 60;
+    default: return diceSum(d);
+  }
+}
+
+function getValidSlots(d) {
+  return SLOTS.filter(s => !s.id.startsWith('divider') && !myScores.hasOwnProperty(s.id) && validateSlot(s.id, d));
+}
+
+function myTotalScore() { return Object.values(myScores).reduce((s,v)=>s+v, 0); }
+
+/* ═══════ SPLASH ═══════ */
+
+async function loadRooms() {
+  const data = await api('GET', { action: 'list-rooms' });
+  const el = document.getElementById('roomList');
+  if (data.error) { el.innerHTML = `<div style="font-size:12px;color:#ff0000">${data.error}</div>`; return; }
+  if (!data.length) { el.innerHTML = '<div style="font-size:12px;color:#444;text-align:center">No open rooms. Create one!</div>'; return; }
+  el.innerHTML = data.map(r => `
+    <div class="room-item">
+      <div class="room-info">
+        <span class="room-code-tag">${r.code}</span>
+        <span class="room-host">Host: ${esc(r.host)}</span>
+      </div>
+      <div class="room-meta">
+        <span>${r.playerCount}/${r.maxPlayers}</span>
+        ${r.hasPassword ? '🔒' : ''}
+        <button class="btn btn-dim" style="padding:4px 12px;font-size:11px" onclick="joinRoom('${r.code}',${r.hasPassword})">Join</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function createRoom() {
+  const pw = document.getElementById('createPassword').value.trim();
+  const data = await api('POST', { action: 'create-room', password: pw || null });
+  if (data.error) { showFeedback('splashFeedback', data.error, 'error'); return; }
+  roomCode = data.code;
+  enterLobby();
+}
+
+async function joinByCode() {
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!code) { showFeedback('splashFeedback', 'Enter a room code.', 'error'); return; }
+  const pw = document.getElementById('joinPassword').value.trim();
+  await joinRoom(code, false, pw);
+}
+
+async function joinRoom(code, hasPassword, pw) {
+  if (hasPassword && !pw) {
+    const p = prompt('Enter room password:');
+    if (!p) return;
+    pw = p;
+  }
+  const data = await api('POST', { action: 'join-room', code, password: pw || null });
+  if (data.error) { showFeedback('splashFeedback', data.error, 'error'); return; }
+  roomCode = code;
+  enterLobby();
+}
+
+/* ═══════ LOBBY ═══════ */
+
+function enterLobby() {
+  showScreen('lobbyScreen');
+  document.getElementById('lobbyCode').textContent = roomCode;
+  startPolling(2000);
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(roomCode).catch(()=>{});
+  showFeedback('lobbyFeedback', 'Room code copied!', 'success');
+  setTimeout(() => showFeedback('lobbyFeedback', '', ''), 1500);
+}
+
+function renderLobby(room) {
+  const isHost = room.host === myId || room.host === 'guest_' + myId;
+  document.getElementById('lobbyStatus').textContent = room.password ? '🔒 Password Protected' : '🔓 Open Room';
+  document.getElementById('startBtn').style.display = isHost ? '' : 'none';
+  document.getElementById('startBtn').disabled = Object.keys(room.players).length < 1;
+
+  const list = document.getElementById('playerList');
+  list.innerHTML = Object.entries(room.players).map(([id, p]) => `
+    <div class="player-item">
+      <div class="player-avatar">${p.profileImage ? `<img src="${esc(p.profileImage)}">` : '👤'}</div>
+      <div class="player-name">${esc(p.displayName)}</div>
+      ${id === room.host ? '<span class="player-host-tag">Host</span>' : ''}
+    </div>
+  `).join('');
+}
+
+async function startGame() {
+  const data = await api('POST', { action: 'start-game', code: roomCode });
+  if (data.error) { showFeedback('lobbyFeedback', data.error, 'error'); return; }
+}
+
+async function leaveRoom() {
+  stopPolling();
+  await api('POST', { action: 'leave-room', code: roomCode });
+  roomCode = null; roomState = null;
+  backToSplash();
+}
+
+/* ═══════ POLLING ═══════ */
+
+function startPolling(interval) {
+  stopPolling();
+  pollNow();
+  pollTimer = setInterval(pollNow, interval);
+}
+
+function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+async function pollNow() {
+  if (!roomCode) return;
+  const data = await api('GET', { action: 'get-state', code: roomCode });
+  if (data.error) { stopPolling(); showFeedback('splashFeedback', data.error, 'error'); backToSplash(); return; }
+  roomState = data;
+  onStateUpdate();
+}
+
+function onStateUpdate() {
+  const room = roomState;
+  if (!room) return;
+
+  if (room.status === 'lobby') {
+    if (!document.getElementById('lobbyScreen').classList.contains('active')) enterLobby();
+    renderLobby(room);
+  } else if (room.status === 'playing') {
+    if (!document.getElementById('gameScreen').classList.contains('active')) {
+      showScreen('gameScreen');
+      startPolling(2000);
+    }
+    handleGameState(room);
+  } else if (room.status === 'finished') {
+    stopPolling();
+    showResults(room);
+  }
+}
+
+/* ═══════ GAME LOGIC ═══════ */
+
+function handleGameState(room) {
+  const me = room.players[myId] || room.players['guest_' + myId];
+  if (!me) return;
+
+  if (room.round !== lastSeenRound) {
+    lastSeenRound = room.round;
+    if (!me.busted && !me.roundSubmitted && myPhase !== 'preparing') {
+      prepareRound(room);
+    }
+  }
+
+  localTimerEnd = Date.now() + (room.roundTimeLeft || 0);
+  startLocalTimer();
+
+  renderPlayersBar(room);
+  document.getElementById('roundNum').textContent = room.round;
+
+  if (me.busted) {
+    myPhase = 'busted';
+    renderBusted();
+  } else if (me.roundSubmitted || submitted) {
+    myPhase = 'waiting';
+    renderWaiting(room);
+  }
+
+  renderScorepad();
+}
+
+function prepareRound(room) {
+  myPhase = 'preparing';
+  submitted = false;
+  if (prepTimer) clearInterval(prepTimer);
+  document.getElementById('diceControls').style.display = 'none';
+  const tray = document.getElementById('diceTray');
+  let countdown = 3;
+  document.getElementById('phaseLabel').textContent = `Round ${room.round} starting...`;
+  tray.innerHTML = `<div style="text-align:center;padding:20px 0"><div style="font-size:32px;font-weight:800;color:#ff0000;margin-bottom:8px">ROUND ${room.round}</div><div style="font-size:48px;font-weight:800;color:#ffaa00" id="prepCount">${countdown}</div><div style="font-size:11px;color:#555;margin-top:6px;text-transform:uppercase;letter-spacing:0.1em">Get ready!</div></div>`;
+  showFeedback('gameFeedback', '', '');
+  prepTimer = setInterval(() => {
+    countdown--;
+    const el = document.getElementById('prepCount');
+    if (el) el.textContent = countdown;
+    if (countdown <= 0) {
+      clearInterval(prepTimer);
+      prepTimer = null;
+      newRound(room);
+    }
+  }, 1000);
+}
+
+function newRound(room) {
+  dice = ['W','W','W','W','W','W'];
+  locked = [false,false,false,false,false,false];
+  rollsLeft = 3;
+  hasRolled = false;
+  myPhase = 'rolling';
+  submitted = false;
+
+  const me = room.players[myId] || room.players['guest_' + myId];
+  if (me) myScores = { ...me.scores };
+
+  renderDice();
+  renderControls();
+  showFeedback('gameFeedback', 'Roll your dice!', '');
+  document.getElementById('phaseLabel').textContent = `Round ${room.round} — Roll your dice`;
+}
+
+function startLocalTimer() {
+  if (timerTick) clearInterval(timerTick);
+  timerTick = setInterval(() => {
+    const left = Math.max(0, localTimerEnd - Date.now());
+    const secs = Math.ceil(left / 1000);
+    const fill = document.getElementById('timerFill');
+    const text = document.getElementById('timerText');
+    fill.style.width = ((left / 30000) * 100) + '%';
+    fill.className = 'timer-fill' + (secs <= 5 ? ' danger' : secs <= 10 ? ' warn' : '');
+    text.textContent = secs;
+
+    if (left <= 0 && myPhase === 'rolling' && !submitted) {
+      if (!hasRolled) {
+        dice = dice.map(() => FACES[Math.floor(Math.random()*6)]);
+        hasRolled = true;
+      }
+      enterAssignPhase();
+      autoZero();
+    }
+    if (left <= 0 && myPhase === 'assigning' && !submitted) {
+      autoZero();
+    }
+  }, 200);
+}
+
+function rollDice() {
+  if (myPhase !== 'rolling' || rollsLeft <= 0 || submitted) return;
+  hasRolled = true;
+  dice = dice.map((f,i) => locked[i] ? f : FACES[Math.floor(Math.random()*6)]);
+  rollsLeft--;
+
+  animateRoll(() => {
+    renderDice();
+    renderControls();
+    if (rollsLeft === 0) enterAssignPhase();
+    else showFeedback('gameFeedback', 'Lock dice, then roll again.', '');
+  });
+}
+
+function animateRoll(cb) {
+  const slots = document.querySelectorAll('.die');
+  slots.forEach((el,i) => { if (!locked[i]) el.classList.add('rolling'); });
+  let ticks = 0;
+  const iv = setInterval(() => {
+    slots.forEach((el,i) => {
+      if (!locked[i]) { const rf = FACES[Math.floor(Math.random()*6)]; el.className = `die mana-${rf} rolling`; el.innerHTML = manaSymbolSkinned(rf); }
+    });
+    if (++ticks >= 8) { clearInterval(iv); slots.forEach(el => el.classList.remove('rolling')); cb(); }
+  }, 55);
+}
+
+function toggleLock(i) {
+  if (myPhase !== 'rolling' || !hasRolled || rollsLeft <= 0) return;
+  locked[i] = !locked[i];
+  renderDice();
+}
+
+function submitEarly() {
+  if (myPhase !== 'rolling' || !hasRolled) return;
+  enterAssignPhase();
+}
+
+function enterAssignPhase() {
+  myPhase = 'assigning';
+  locked = [true,true,true,true,true,true];
+  const valid = getValidSlots(dice);
+  if (valid.length > 0) {
+    showFeedback('gameFeedback', `Pick a slot! ${valid.length} available.`, 'warn');
+  } else {
+    showFeedback('gameFeedback', 'No matches — pick a slot to take a zero.', 'error');
+  }
+  document.getElementById('phaseLabel').textContent = 'Choose a scorepad slot';
+  renderDice();
+  renderControls();
+  renderScorepad();
+}
+
+async function assignSlot(slotId) {
+  if (myPhase !== 'assigning' || submitted) return;
+  if (myScores.hasOwnProperty(slotId)) return;
+
+  const valid = validateSlot(slotId, dice);
+  const pts = valid ? scoreSlot(slotId, dice) : 0;
+  myScores[slotId] = pts;
+  submitted = true;
+  myPhase = 'waiting';
+
+  showFeedback('gameFeedback', pts > 0 ? `Submitted! +${pts} pts` : 'Took a zero.', pts > 0 ? 'success' : 'warn');
+  renderWaiting(roomState);
+  renderScorepad();
+
+  await api('POST', { action: 'submit-round', code: roomCode, round: lastSeenRound, slotId, dice, score: pts });
+}
+
+function getBottomSlot() {
+  const order = SLOTS.filter(s => !s.id.startsWith('divider'));
+  for (let i = order.length - 1; i >= 0; i--) {
+    if (!myScores.hasOwnProperty(order[i].id)) return order[i].id;
+  }
+  return null;
+}
+
+async function autoZero() {
+  if (submitted) return;
+  const slotId = getBottomSlot();
+  if (!slotId) return;
+  myScores[slotId] = 0;
+  submitted = true;
+  myPhase = 'waiting';
+  showFeedback('gameFeedback', `Time's up! Took a zero on ${SLOTS.find(s=>s.id===slotId)?.name || slotId}.`, 'error');
+  renderWaiting(roomState);
+  renderScorepad();
+  await api('POST', { action: 'submit-round', code: roomCode, round: lastSeenRound, slotId, dice, score: 0 });
+}
+
+/* ═══════ RENDER ═══════ */
+
+function renderDice() {
+  const tray = document.getElementById('diceTray');
+  if (!hasRolled) {
+    tray.innerHTML = dice.map(() => `<div class="die-slot"><div class="die unrolled">${manaSymbolSkinned('W')}</div><div class="lock-label"></div></div>`).join('');
+    return;
+  }
+  tray.innerHTML = dice.map((f,i) => `
+    <div class="die-slot">
+      <div class="die mana-${f}${locked[i]?' locked':''}" onclick="toggleLock(${i})">${manaSymbolSkinned(f)}</div>
+      <div class="lock-label">${locked[i] && myPhase==='rolling' ? '🔒' : ''}</div>
+    </div>
+  `).join('');
+}
+
+function renderControls() {
+  const area = document.getElementById('diceControls');
+  area.style.display = (myPhase === 'rolling') ? '' : 'none';
+  document.getElementById('rollBtn').disabled = rollsLeft <= 0;
+  document.getElementById('rollBtn').textContent = hasRolled ? (rollsLeft > 0 ? 'Re-Roll' : 'Done') : 'Roll';
+  document.getElementById('submitBtn').style.display = (hasRolled && rollsLeft > 0) ? '' : 'none';
+  document.getElementById('rollsLeft').textContent = rollsLeft;
+}
+
+function renderWaiting(room) {
+  document.getElementById('diceControls').style.display = 'none';
+  document.getElementById('phaseLabel').textContent = 'Waiting for other players...';
+  showFeedback('gameFeedback', 'Waiting for everyone to finish this round.', 'warn');
+}
+
+function renderBusted() {
+  document.getElementById('diceControls').style.display = 'none';
+  document.getElementById('phaseLabel').textContent = 'BUSTED';
+  showFeedback('gameFeedback', 'You busted! Watching the rest of the game.', 'error');
+}
+
+function renderPlayersBar(room) {
+  const bar = document.getElementById('playersBar');
+  bar.innerHTML = Object.entries(room.players).map(([id, p]) => {
+    const isMe = id === myId || id === 'guest_' + myId;
+    const status = p.busted ? '💀' : p.roundSubmitted ? '✅' : '🎲';
+    return `<div class="pbar-item${isMe?' me':''}${p.busted?' busted':''}">
+      <span class="pbar-name">${esc(p.displayName)}</span>
+      <span class="pbar-score">${p.totalScore}</span>
+      <span class="pbar-status">${status}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderScorepad() {
+  const pad = document.getElementById('scorepad');
+  const validIds = myPhase === 'assigning' ? getValidSlots(dice).map(s => s.id) : [];
+  let html = '<div class="scorepad-title">Your Scorepad</div>';
+
+  for (const slot of SLOTS) {
+    if (slot.id.startsWith('divider')) { html += '<div class="score-divider"></div>'; continue; }
+    const filled = myScores.hasOwnProperty(slot.id);
+    const valid = validIds.includes(slot.id);
+    const clickable = !filled && myPhase === 'assigning';
+    let cls = 'score-row';
+    if (filled) cls += ' filled';
+    if (valid) cls += ' valid';
+    if (clickable) cls += ' clickable';
+    let scoreDisplay;
+    if (filled) scoreDisplay = myScores[slot.id];
+    else if (valid) scoreDisplay = scoreSlot(slot.id, dice);
+    else if (clickable) scoreDisplay = '0';
+    else scoreDisplay = '—';
+    const onclick = clickable ? `onclick="assignSlot('${slot.id}')"` : '';
+    const nameClass = slot.color ? ` mana-text-${slot.color}` : '';
+    html += `<div class="${cls}" ${onclick}><div><span class="score-name${nameClass}">${slot.name}</span><span class="score-rule">${slot.rule}</span></div><div class="score-max">${slot.maxPts}</div><div class="score-val">${scoreDisplay}</div></div>`;
+  }
+  html += `<div class="score-total-row"><div class="score-total-label">Total</div><div></div><div class="score-total-val">${myTotalScore()}</div></div>`;
+  pad.innerHTML = html;
+}
+
+/* ═══════ RESULTS ═══════ */
+
+function showResults(room) {
+  showScreen('resultsScreen');
+  if (timerTick) clearInterval(timerTick);
+
+  const players = Object.entries(room.players).map(([id, p]) => ({ id, ...p })).sort((a, b) => b.totalScore - a.totalScore);
+  const allBusted = players.every(p => p.busted);
+
+  document.getElementById('resultsTitle').textContent = allBusted ? 'ALL BUSTED!' : 'GAME OVER';
+  document.getElementById('resultsTitle').style.color = allBusted ? '#ff0000' : '#00cc66';
+  document.getElementById('resultsSub').textContent = `${room.round >= 12 ? 'All 12 rounds complete' : `Ended on round ${room.round}`}`;
+
+  const rankColors = ['gold', 'silver', 'bronze'];
+  const medals = ['🥇', '🥈', '🥉'];
+  document.getElementById('resultsTable').innerHTML = players.map((p, i) => `
+    <div class="result-row${p.busted ? ' busted' : ''}">
+      <div class="result-rank ${rankColors[i] || ''}">${i < 3 ? medals[i] : '#' + (i+1)}</div>
+      <div style="flex:1">
+        <div class="result-name">${esc(p.displayName)}</div>
+        ${p.busted ? `<div class="result-busted">Busted R${p.bustedRound || '?'}</div>` : ''}
+      </div>
+      <div class="result-score">${p.totalScore}</div>
+    </div>
+  `).join('');
+
+  const me = players.find(p => p.id === myId || p.id === 'guest_' + myId);
+  if (me && me.totalScore > 0) {
+    fetch('/api/leaderboards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ game: 'mana-clash', score: me.totalScore }),
+    }).catch(function () {});
+  }
+}
+
+/* ═══════ NAV ═══════ */
+
+function backToSplash() {
+  stopPolling();
+  if (timerTick) clearInterval(timerTick);
+  if (prepTimer) { clearInterval(prepTimer); prepTimer = null; }
+  roomCode = null; roomState = null; lastSeenRound = 0; submitted = false; myScores = {};
+  showScreen('splashScreen');
+  loadRooms();
+}
+
+/* ═══════ DICE PACK INVENTORY ═══════ */
+
+const DICE_PACKS = {
+  default: { name: 'Default Mana Symbols', assetPrefix: 'assets/' },
+  phamily: { name: 'Phamily Dice', assetPrefix: 'assets/packs/phamily/' },
+  legendary: { name: 'Legendary Dice', assetPrefix: 'assets/packs/legendary/' },
+  mythic: { name: 'Mythic Dice', assetPrefix: 'assets/packs/mythic/' },
+};
+
+let activeDicePack = 'default';
+let ownedDicePacks = [];
+
+function getDiceAsset(face) {
+  const pack = DICE_PACKS[activeDicePack] || DICE_PACKS.default;
+  return pack.assetPrefix + face.toLowerCase() + '.png';
+}
+
+function manaSymbolSkinned(face) {
+  return `<img class="die-mana-icon" src="${getDiceAsset(face)}" alt="${face}" onerror="this.src='assets/${face.toLowerCase()}.png'">`;
+}
+
+async function loadMCCosmetics() {
+  try {
+    const res = await fetch('/api/inventory?game=mana-clash');
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = data.items || [];
+    ownedDicePacks = items.filter(i => i.type === 'dice-pack');
+    if (data.equips && data.equips['dice-pack']) {
+      const equipped = data.equips['dice-pack'];
+      if (DICE_PACKS[equipped] || ownedDicePacks.find(i => getPackId(i) === equipped)) {
+        activeDicePack = equipped;
+      }
+    }
+    populateDicePackSelect();
+  } catch {}
+}
+
+function getPackId(item) {
+  const n = (item.name || '').toLowerCase();
+  if (n.includes('phamily')) return 'phamily';
+  if (n.includes('legendary')) return 'legendary';
+  if (n.includes('mythic')) return 'mythic';
+  return 'pack_' + (item.id || '').replace(/[^a-z0-9]/g, '').slice(0, 12);
+}
+
+function populateDicePackSelect() {
+  if (ownedDicePacks.length === 0) return;
+  document.getElementById('dicePackBar').hidden = false;
+
+  const sel = document.getElementById('dicePackSelect');
+  for (const item of ownedDicePacks) {
+    const id = getPackId(item);
+    if (!DICE_PACKS[id]) {
+      DICE_PACKS[id] = { name: item.name, assetPrefix: 'assets/packs/' + id + '/' };
+    }
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = item.name || id;
+    if (id === activeDicePack) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function applyDicePack() {
+  activeDicePack = document.getElementById('dicePackSelect').value;
+  fetch('/api/inventory', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'equip', game: 'mana-clash', slot: 'dice-pack', itemId: activeDicePack === 'default' ? 'none' : activeDicePack }),
+  }).catch(() => {});
+}
+
+/* ═══════ INIT ═══════ */
+initIdentity();
+loadMCCosmetics();
+loadRooms();
+setInterval(loadRooms, 8000);
+</script>
+</body>
+</html>

@@ -408,6 +408,73 @@
 
     .results-actions { margin-top: 20px; }
 
+    [hidden] { display: none !important; }
+
+    /* ── INVENTORY BAR ────────────────────── */
+    .inv-bar {
+      width: 100%;
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .inv-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 8px 12px;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      border-radius: 3px;
+      color: #555;
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .inv-btn:hover:not(:disabled) { border-color: #ff0000; color: #fff; }
+    .inv-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .inv-btn .inv-count {
+      background: #ff0000;
+      color: #fff;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 1px 5px;
+      border-radius: 8px;
+      min-width: 16px;
+      text-align: center;
+    }
+
+    .inv-btn.wildcard-active {
+      border-color: #ffaa00;
+      color: #ffaa00;
+      background: rgba(255, 170, 0, 0.06);
+      animation: wildcard-glow 1.5s ease-in-out infinite;
+    }
+
+    @keyframes wildcard-glow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255, 170, 0, 0.15); }
+      50% { box-shadow: 0 0 16px rgba(255, 170, 0, 0.3); }
+    }
+
+    .bingo-cell.wildcard-target:not(.marked) {
+      cursor: pointer;
+      border-color: rgba(255, 170, 0, 0.5);
+      background: rgba(255, 170, 0, 0.05);
+    }
+
+    .bingo-cell.wildcard-target:not(.marked):hover {
+      border-color: #ffaa00;
+      background: rgba(255, 170, 0, 0.1);
+      color: #ffaa00;
+    }
+
     @media (min-width: 420px) {
       .bingo-cell { font-size: clamp(8px, 2vw, 10px); padding: 4px; }
       .bingo-letter { font-size: 20px; }
@@ -453,6 +520,15 @@
     <div class="score-bar">
       <div class="score-item">Marked: <span id="markedCount">1</span>/25</div>
       <div class="score-item bingo-count">Bingos: <span id="bingoCount">0</span></div>
+    </div>
+
+    <div class="inv-bar" id="bingoInvBar" hidden>
+      <button class="inv-btn" id="wildcardBtn" onclick="toggleWildcard()" disabled>
+        Wildcard Stamp <span class="inv-count" id="wildcardCount">0</span>
+      </button>
+      <button class="inv-btn" id="bonusCardBtn" onclick="useBonusCard()" disabled>
+        Bonus Card <span class="inv-count" id="bonusCardCount">0</span>
+      </button>
     </div>
 
     <div class="card-actions" id="cardActions"></div>
@@ -687,16 +763,20 @@
         if (isFree) classes.push('free');
         if (gameMode === 'practice') classes.push('practice');
 
-        const click = (gameMode === 'practice' && !isFree)
-          ? ' onclick="toggleCell(' + i + ')"' : '';
+        const click = (!isFree)
+          ? ' onclick="cellClick(' + i + ')"' : '';
 
         return '<div class="' + classes.join(' ') + '" data-index="' + i +
                '" data-id="' + evt.id + '"' + click + '>' + evt.text + '</div>';
       }).join('');
     }
 
+    function cellClick(index) {
+      if (wildcardMode) { useWildcardOnCell(index); return; }
+      if (gameMode === 'practice') toggleCell(index);
+    }
+
     function toggleCell(index) {
-      if (gameMode !== 'practice') return;
       const evt = card[index];
       if (evt.id === 'free') return;
 
@@ -801,6 +881,15 @@
         markedSet.size + ' squares marked';
 
       showScreen('resultsScreen');
+
+      if (patterns.length > 0) {
+        fetch('/api/leaderboards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ game: 'commander-bingo', score: patterns.length }),
+        }).catch(function () {});
+      }
     }
 
     /* ── Navigation ──────────────────────── */
@@ -836,6 +925,121 @@
       setTimeout(() => { el.style.animation = ''; el.style.borderColor = ''; }, 300);
     }
 
+    /* ── Inventory: wildcards + bonus cards ─ */
+    let wildcardItems = [];
+    let bonusCardItems = [];
+    let wildcardMode = false;
+
+    async function loadBingoInventory() {
+      try {
+        const res = await fetch('/api/inventory?game=commander-bingo');
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = data.items || [];
+        wildcardItems = items.filter(i => i.type === 'wildcard');
+        bonusCardItems = items.filter(i => i.type === 'bonus-card');
+        renderBingoInventory();
+      } catch {}
+    }
+
+    function renderBingoInventory() {
+      const wcTotal = wildcardItems.reduce((s, i) => s + (i.quantity || 1), 0);
+      const bcTotal = bonusCardItems.reduce((s, i) => s + (i.quantity || 1), 0);
+      if (wcTotal === 0 && bcTotal === 0) return;
+
+      document.getElementById('bingoInvBar').hidden = false;
+
+      const wcBtn = document.getElementById('wildcardBtn');
+      document.getElementById('wildcardCount').textContent = wcTotal;
+      wcBtn.disabled = wcTotal === 0;
+
+      const bcBtn = document.getElementById('bonusCardBtn');
+      document.getElementById('bonusCardCount').textContent = bcTotal;
+      bcBtn.disabled = bcTotal === 0;
+    }
+
+    function toggleWildcard() {
+      const wcTotal = wildcardItems.reduce((s, i) => s + (i.quantity || 1), 0);
+      if (wcTotal === 0) return;
+
+      wildcardMode = !wildcardMode;
+      const btn = document.getElementById('wildcardBtn');
+
+      if (wildcardMode) {
+        btn.classList.add('wildcard-active');
+        document.querySelectorAll('.bingo-cell').forEach(c => {
+          const id = c.getAttribute('data-id');
+          if (id !== 'free' && !markedSet.has(id)) c.classList.add('wildcard-target');
+        });
+      } else {
+        exitWildcardMode();
+      }
+    }
+
+    function exitWildcardMode() {
+      wildcardMode = false;
+      document.getElementById('wildcardBtn').classList.remove('wildcard-active');
+      document.querySelectorAll('.bingo-cell.wildcard-target').forEach(c => {
+        c.classList.remove('wildcard-target');
+      });
+    }
+
+    async function useWildcardOnCell(index) {
+      if (!wildcardMode) return;
+      const evt = card[index];
+      if (evt.id === 'free' || markedSet.has(evt.id)) return;
+
+      const item = wildcardItems.find(i => (i.quantity || 1) > 0);
+      if (!item) return;
+
+      markedSet.add(evt.id);
+      const cell = document.querySelector('.bingo-cell[data-index="' + index + '"]');
+      if (cell) {
+        cell.classList.add('marked', 'just-marked');
+        setTimeout(() => cell.classList.remove('just-marked'), 500);
+      }
+
+      if (item.quantity > 1) item.quantity--;
+      else wildcardItems = wildcardItems.filter(i => i !== item);
+
+      exitWildcardMode();
+      renderBingoInventory();
+      updateScore();
+
+      try {
+        await fetch('/api/inventory', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'use', itemId: item.id }),
+        });
+      } catch {}
+    }
+
+    async function useBonusCard() {
+      const bcTotal = bonusCardItems.reduce((s, i) => s + (i.quantity || 1), 0);
+      if (bcTotal === 0) return;
+
+      const item = bonusCardItems.find(i => (i.quantity || 1) > 0);
+      if (!item) return;
+
+      card = generateCard();
+      markedSet = new Set(['free']);
+      previousBingos = 0;
+      exitWildcardMode();
+      renderCard();
+      updateScore();
+
+      if (item.quantity > 1) item.quantity--;
+      else bonusCardItems = bonusCardItems.filter(i => i !== item);
+      renderBingoInventory();
+
+      try {
+        await fetch('/api/inventory', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'use', itemId: item.id }),
+        });
+      } catch {}
+    }
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && window.parent !== window) {
         window.parent.postMessage('close-game', '*');
@@ -845,6 +1049,8 @@
     document.getElementById('codeInput').addEventListener('input', function() {
       this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     });
+
+    loadBingoInventory();
   </script>
 </body>
 </html>

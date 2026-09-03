@@ -69,10 +69,51 @@ function updateLiveIndicators(status) {
 async function pollTwitchStatus() {
   const status = await fetchTwitchStatus();
   updateLiveIndicators(status);
+  if (typeof handleTwitchStatusForNotifications === 'function') {
+    handleTwitchStatusForNotifications(status);
+  }
 }
 
 function startTwitchPolling() {
   pollTwitchStatus();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(pollTwitchStatus, STATUS_POLL_INTERVAL);
+  pollHypeTrain();
+  setInterval(pollHypeTrain, 15000);
+}
+
+async function pollHypeTrain() {
+  try {
+    var res = await fetch('/api/hype-train?action=status');
+    if (!res.ok) return;
+    var data = await res.json();
+    updateHypeTrainBanner(data);
+  } catch (e) {}
+}
+
+function updateHypeTrainBanner(data) {
+  var banner = document.getElementById('hypeTrainBanner');
+  if (!data || !data.active) {
+    if (banner) banner.remove();
+    return;
+  }
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'hypeTrainBanner';
+    banner.className = 'hype-train-banner';
+    var header = document.querySelector('.site-header');
+    if (header && header.parentNode) {
+      header.parentNode.insertBefore(banner, header.nextSibling);
+    } else {
+      document.body.prepend(banner);
+    }
+  }
+  var pct = data.goal > 0 ? Math.min(100, Math.round((data.total / data.goal) * 100)) : 0;
+  banner.innerHTML =
+    '<div class="hype-train-inner">' +
+      '<span class="hype-train-icon">🚂</span>' +
+      '<span class="hype-train-text">HYPE TRAIN Level ' + (data.level || 1) + '</span>' +
+      '<div class="hype-train-bar"><div class="hype-train-fill" style="width:' + pct + '%"></div></div>' +
+      '<span class="hype-train-pct">' + pct + '%</span>' +
+    '</div>';
 }

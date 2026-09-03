@@ -40,7 +40,7 @@
       <!-- Memory Match -->
       <div class="card game-card">
         <div class="game-card-thumb">
-          <img src="/assets/images/phantomace-logo.png" alt="Memory Match">
+          <img src="/assets/images/game-memory-match.png" alt="Memory Match">
           <div class="game-card-thumb-overlay"></div>
         </div>
         <div class="game-card-body">
@@ -50,7 +50,7 @@
             <div class="game-card-tags">
               <span class="game-tag game-tag-puzzle">Puzzle</span>
             </div>
-            <button class="btn-primary game-play-btn" onclick="launchGame('Memory Match', '/games/memory-match/index.html')">Play</button>
+            <button class="btn-primary game-play-btn" onclick="launchGame('Memory Match', '/games/memory-match/')">Play</button>
           </div>
         </div>
       </div>
@@ -58,17 +58,18 @@
       <!-- Skull Clicker -->
       <div class="card game-card">
         <div class="game-card-thumb">
-          <img src="/assets/images/skull.png" alt="Skull Clicker">
+          <img src="/assets/images/game-skull-clicker.png" alt="Skull Clicker">
           <div class="game-card-thumb-overlay"></div>
         </div>
         <div class="game-card-body">
           <div class="game-card-title">Skull Clicker</div>
           <div class="game-card-desc">Click the skull, earn points, buy upgrades. How high can you go? Embrace the chaos.</div>
+          <div class="sc-leaderboard" id="scLeaderboard"></div>
           <div class="game-card-footer">
             <div class="game-card-tags">
               <span class="game-tag game-tag-clicker">Clicker</span>
             </div>
-            <button class="btn-primary game-play-btn" onclick="launchGame('Skull Clicker', '/games/skull-clicker/index.html')">Play</button>
+            <button class="btn-primary game-play-btn" onclick="launchGame('Skull Clicker', '/games/skull-clicker/')">Play</button>
           </div>
         </div>
       </div>
@@ -76,7 +77,7 @@
       <!-- Commander Bingo -->
       <div class="card game-card">
         <div class="game-card-thumb">
-          <img src="/assets/images/phantomace-logo.png" alt="Commander Bingo">
+          <img src="/assets/images/game-commander-bingo.png" alt="Commander Bingo">
           <div class="game-card-thumb-overlay"></div>
         </div>
         <div class="game-card-body">
@@ -87,20 +88,65 @@
               <span class="game-tag game-tag-multiplayer">Live</span>
             </div>
             <div style="display: flex; gap: 6px;">
-              <button class="btn-primary game-play-btn" onclick="launchGame('Commander Bingo', '/games/commander-bingo/index.html')">Join</button>
-              <button class="btn-primary game-play-btn role-moderator" onclick="launchGame('Bingo Host', '/games/commander-bingo/host.html')">Host</button>
+              <button class="btn-primary game-play-btn" onclick="launchGame('Commander Bingo', '/games/commander-bingo/')">Join</button>
+              <button class="btn-primary game-play-btn role-moderator" onclick="launchGame('Bingo Host', '/games/commander-bingo/host')">Host</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Coming Soon placeholder -->
-      <div class="card game-card" style="opacity: 0.5;">
+      <!-- Dino Park -->
+      <div class="card game-card">
         <div class="game-card-thumb">
-          <img src="/assets/images/phantomace-logo-mythic.png" alt="Coming Soon">
+          <img src="/assets/images/game-dino-park.png" alt="Dino Park">
           <div class="game-card-thumb-overlay"></div>
-          <div class="game-card-locked"><span>Coming Soon</span></div>
         </div>
+        <div class="game-card-body">
+          <div class="game-card-title">Dino Park</div>
+          <div class="game-card-desc">Collect eggs, hatch dinosaurs, and care for your prehistoric park. Feed, water, and play with 50 species!</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-clicker">Virtual Pet</span>
+            </div>
+            <button class="btn-primary game-play-btn" onclick="launchGame('Dino Park', '/games/dino-park/')">Play</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mana Clash -->
+      <div class="card game-card">
+        <div class="game-card-thumb">
+          <img src="/assets/images/game-mana-clash.png" alt="Mana Clash">
+          <div class="game-card-thumb-overlay"></div>
+        </div>
+        <div class="game-card-body">
+          <div class="game-card-title">Mana Clash</div>
+          <div class="game-card-desc">Roll 6 mana dice across 12 rounds and fill your scorepad. Lock dice, chase combos, and avoid busting!</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-puzzle">Dice</span>
+            </div>
+            <button class="btn-primary game-play-btn" onclick="launchGame('Mana Clash', '/games/mana-clash/')">Play</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crack-A-Box Bingo -->
+      <div class="card game-card" style="opacity: 0.5;">
+        <div class="game-card-body">
+          <div class="game-card-title">Crack-A-Box Bingo</div>
+          <div class="game-card-desc">Crack open boxes and mark your bingo card! A chaotic twist on classic bingo with surprise reveals.</div>
+          <div class="game-card-footer">
+            <div class="game-card-tags">
+              <span class="game-tag game-tag-multiplayer">Live</span>
+            </div>
+            <button class="btn-primary game-play-btn" disabled>Coming Soon</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chaos Trivia -->
+      <div class="card game-card" style="opacity: 0.5;">
         <div class="game-card-body">
           <div class="game-card-title">Chaos Trivia</div>
           <div class="game-card-desc">Test your knowledge of PhantomACE lore, stream history, and community memes.</div>
@@ -108,7 +154,7 @@
             <div class="game-card-tags">
               <span class="game-tag game-tag-multiplayer">Multiplayer</span>
             </div>
-            <button class="btn-primary game-play-btn" disabled>Soon</button>
+            <button class="btn-primary game-play-btn" disabled>Coming Soon</button>
           </div>
         </div>
       </div>
@@ -130,6 +176,7 @@
   <script src="/js/auth.js" defer></script>
   <script src="/js/components.js" defer></script>
   <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
   <script>
     function launchGame(title, src) {
@@ -159,6 +206,25 @@
     window.addEventListener('message', (e) => {
       if (e.data === 'close-game') closeLauncher();
     });
+
+    (async function loadLeaderboard() {
+      try {
+        const res = await fetch('/api/skull-clicker');
+        const lb = await res.json();
+        const el = document.getElementById('scLeaderboard');
+        if (!lb.length) return;
+        const units = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
+        function fmt(n) {
+          if (n < 1000) return n.toLocaleString();
+          const t = Math.min(Math.floor(Math.log10(n)/3), units.length-1);
+          const s = n / Math.pow(10, t*3);
+          return (s < 10 ? s.toFixed(1) : Math.floor(s)) + units[t];
+        }
+        const top3 = lb.slice(0, 3);
+        el.innerHTML = '<div class="sc-lb-title">Top Players</div>' +
+          top3.map((e, i) => `<div class="sc-lb-row"><span class="sc-lb-rank rank-${i+1}">${i+1}</span><span class="sc-lb-name">${e.name}</span><span class="sc-lb-score">${fmt(e.score)}</span></div>`).join('');
+      } catch(e) {}
+    })();
   </script>
 </body>
 </html>

@@ -1,0 +1,166 @@
+/* ══════════════════════════════════════════════
+   CHANNEL POINTS API
+   Twitch EventSub webhook for point redemptions
+   + GET endpoint for pending redemptions
+   ══════════════════════════════════════════════ */
+
+const HMAC_PREFIX = 'sha256=';
+const TWITCH_MESSAGE_ID = 'twitch-eventsub-message-id';
+const TWITCH_MESSAGE_TIMESTAMP = 'twitch-eventsub-message-timestamp';
+const TWITCH_MESSAGE_SIGNATURE = 'twitch-eventsub-message-signature';
+const TWITCH_MESSAGE_TYPE = 'twitch-eventsub-message-type';
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+function getSession(request) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(/pham_session=([^;]+)/);
+  if (!match) return null;
+  try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
+}
+
+async function verifySignature(secret, request, body) {
+  const msgId = request.headers.get(TWITCH_MESSAGE_ID) || '';
+  const timestamp = request.headers.get(TWITCH_MESSAGE_TIMESTAMP) || '';
+  const expected = request.headers.get(TWITCH_MESSAGE_SIGNATURE) || '';
+
+  const message = msgId + timestamp + body;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return expected === HMAC_PREFIX + hex;
+}
+
+const REWARD_HANDLERS = {
+  'skull-boost': async (env, userId, redemption) => {
+    const key = `cp_skull_boost_${userId}`;
+    const boost = { multiplier: 2, expiresAt: Date.now() + 300000, rewardTitle: redemption.reward.title };
+    await env.MARKETPLACE.put(key, JSON.stringify(boost), { expirationTtl: 600 });
+    await queueRedemption(env, userId, 'skull-boost', redemption);
+  },
+  'theme-unlock': async (env, userId, redemption) => {
+    const inv = await getInventory(env, userId);
+    const themeId = 'theme_' + redemption.reward.title.toLowerCase().replace(/\s+/g, '_');
+    if (!inv.items.find(i => i.id === themeId)) {
+      inv.items.push({
+        id: themeId, game: 'profile', type: 'theme', name: redemption.reward.title,
+        rarity: 'rare', consumable: false, grantedAt: Date.now(), source: 'channel-points',
+      });
+      await saveInventory(env, userId, inv);
+    }
+    await queueRedemption(env, userId, 'theme-unlock', redemption);
+  },
+  'spin-the-wheel': async (env, userId, redemption) => {
+    await queueRedemption(env, userId, 'spin-the-wheel', redemption);
+  },
+  'community-shoutout': async (env, userId, redemption) => {
+    await queueRedemption(env, userId, 'community-shoutout', redemption);
+  },
+};
+
+function inventoryKey(userId) { return `inv_${userId}`; }
+async function getInventory(env, userId) {
+  return await env.MARKETPLACE.get(inventoryKey(userId), 'json') || { userId, items: [], equips: {} };
+}
+async function saveInventory(env, userId, inv) {
+  await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
+}
+
+async function queueRedemption(env, userId, type, redemption) {
+  const key = `cp_queue_${userId}`;
+  const queue = await env.MARKETPLACE.get(key, 'json') || [];
+  queue.push({
+    id: redemption.id,
+    type,
+    rewardTitle: redemption.reward.title,
+    userInput: redemption.user_input || '',
+    redeemedAt: Date.now(),
+  });
+  if (queue.length > 20) queue.shift();
+  await env.MARKETPLACE.put(key, JSON.stringify(queue), { expirationTtl: 86400 });
+}
+
+function mapRewardTitle(title) {
+  const lower = title.toLowerCase();
+  if (lower.includes('skull') && lower.includes('boost')) return 'skull-boost';
+  if (lower.includes('theme')) return 'theme-unlock';
+  if (lower.includes('wheel') || lower.includes('spin')) return 'spin-the-wheel';
+  if (lower.includes('shoutout')) return 'community-shoutout';
+  return null;
+}
+
+/* ── GET — poll for pending redemptions ──────── */
+
+export async function onRequestGet(context) {
+  const { env, request } = context;
+  const session = getSession(request);
+  if (!session) return json({ error: 'Not logged in' }, 401);
+
+  const url = new URL(request.url);
+  const action = url.searchParams.get('action');
+
+  if (action === 'poll') {
+    const key = `cp_queue_${session.user_id}`;
+    const queue = await env.MARKETPLACE.get(key, 'json') || [];
+    if (queue.length > 0) {
+      await env.MARKETPLACE.delete(key);
+    }
+    return json({ redemptions: queue });
+  }
+
+  if (action === 'skull-boost') {
+    const key = `cp_skull_boost_${session.user_id}`;
+    const boost = await env.MARKETPLACE.get(key, 'json');
+    if (boost && boost.expiresAt > Date.now()) {
+      return json({ active: true, multiplier: boost.multiplier, expiresAt: boost.expiresAt });
+    }
+    return json({ active: false });
+  }
+
+  return json({ error: 'Invalid action' }, 400);
+}
+
+/* ── POST — Twitch EventSub webhook ─────────── */
+
+export async function onRequestPost(context) {
+  const { env, request } = context;
+
+  const bodyText = await request.text();
+  const messageType = request.headers.get(TWITCH_MESSAGE_TYPE);
+
+  const secret = env.TWITCH_EVENTSUB_SECRET;
+  if (secret) {
+    const valid = await verifySignature(secret, request, bodyText);
+    if (!valid) return new Response('Invalid signature', { status: 403 });
+  }
+
+  let body;
+  try { body = JSON.parse(bodyText); } catch { return json({ error: 'Invalid JSON' }, 400); }
+
+  if (messageType === 'webhook_callback_verification') {
+    return new Response(body.challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+  }
+
+  if (messageType === 'notification') {
+    const event = body.event;
+    if (!event) return json({ ok: true });
+
+    const twitchUserId = event.user_id;
+    const rewardTitle = event.reward ? event.reward.title : '';
+    const handlerKey = mapRewardTitle(rewardTitle);
+
+    if (handlerKey && REWARD_HANDLERS[handlerKey]) {
+      await REWARD_HANDLERS[handlerKey](env, twitchUserId, event);
+    }
+
+    return json({ ok: true });
+  }
+
+  if (messageType === 'revocation') {
+    return json({ ok: true });
+  }
+
+  return json({ ok: true });
+}

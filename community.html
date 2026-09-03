@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="PhantomACE Community - Join the Discord and connect with fellow viewers.">
+  <meta name="description" content="PhantomACE Community Forums - Discuss streams, games, and community topics.">
   <link rel="icon" href="/assets/images/favicon.ico">
-  <title>Community | PhantomACE</title>
+  <title>Forums | PhantomACE</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/roles.css">
   <link rel="stylesheet" href="/css/pages/about.css">
+  <link rel="stylesheet" href="/css/pages/community.css">
 </head>
 <body data-page="community">
 
@@ -30,12 +31,29 @@
     <p class="page-hero-subtitle">Where the chaos lives</p>
   </section>
 
-  <section class="page-container" style="padding: 80px 24px; text-align: center;">
-    <div class="card" style="padding: 60px 24px; max-width: 500px; margin: 0 auto;">
-      <h3 style="margin-bottom: 12px;">Join the Discord</h3>
-      <p style="font-size: 14px; max-width: 360px; margin: 0 auto 24px;">The PhantomACE community lives on Discord. Share clips, chat between streams, and be the first to know about events.</p>
-      <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="btn-primary">Join Discord</a>
+  <!-- Sub-navigation -->
+  <nav class="community-subnav">
+    <div class="page-container">
+      <div class="subnav-links">
+        <a href="/community.html" class="subnav-link active">Forums</a>
+        <a href="/community-stats.html" class="subnav-link">Viewer Stats</a>
+        <a href="/community-leaderboards.html" class="subnav-link">Leaderboards</a>
+      </div>
+      <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="subnav-discord">Join Discord</a>
     </div>
+  </nav>
+
+  <!-- Forum Content -->
+  <section class="page-container">
+
+    <!-- Breadcrumb -->
+    <div class="forum-breadcrumb" id="forumBreadcrumb">
+      <a href="#" onclick="forumNav('home'); return false;">Forums</a>
+    </div>
+
+    <!-- Forum Views (swapped by JS) -->
+    <div id="forumView"></div>
+
   </section>
 
   <div id="site-footer"></div>
@@ -43,6 +61,8 @@
   <script src="/js/auth.js" defer></script>
   <script src="/js/components.js" defer></script>
   <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/community-forums.js" defer></script>
 </body>
 </html>

@@ -137,6 +137,25 @@
     }
 
     .restart-btn:hover { background: #cc0000; }
+
+    [hidden] { display: none !important; }
+
+    .cosmetics-bar {
+      display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center;
+    }
+    .cosmetic-select {
+      background: #111; border: 1px solid #333; color: #fff; padding: 4px 10px;
+      border-radius: 3px; font-size: 11px; cursor: pointer; font-family: inherit;
+    }
+    .cosmetic-select option { background: #111; color: #fff; }
+    .cosmetic-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .card-front.cb-phamily { background: linear-gradient(135deg, #1a0000, #111); border-color: #cc0000; }
+    .card-front.cb-phamily::after { content: '💀'; color: #ff0000; opacity: 0.6; }
+    .card-front.cb-rare { background: linear-gradient(135deg, #0a0a1e, #111); border-color: #3344aa; }
+    .card-front.cb-rare::after { content: '🃏'; color: #4466ee; opacity: 0.6; }
+    .card-front.cb-legendary { background: linear-gradient(135deg, #1a0a1a, #111); border-color: #8833cc; }
+    .card-front.cb-legendary::after { content: '✨'; color: #aa44ff; opacity: 0.6; }
   </style>
 </head>
 <body>
@@ -146,6 +165,20 @@
     &nbsp;&middot;&nbsp;
     Pairs: <span id="pairCount">0</span> / <span id="totalPairs">4</span>
   </div>
+  <div class="cosmetics-bar" id="cosmeticsBar" hidden>
+    <div>
+      <div class="cosmetic-label">Card Back</div>
+      <select class="cosmetic-select" id="cardBackSelect" onchange="applyCardBack()">
+        <option value="default">Default</option>
+      </select>
+    </div>
+    <div>
+      <div class="cosmetic-label">Card Set</div>
+      <select class="cosmetic-select" id="emoteSelect" onchange="applyEmoteSet()">
+        <option value="default">Default</option>
+      </select>
+    </div>
+  </div>
   <div class="board" id="board"></div>
   <div class="win-message" id="winMessage">
     <h2>You Win!</h2>
@@ -154,22 +187,121 @@
   </div>
 
   <script>
-    const CARD_IMAGES = [
-      '/assets/images/phantomace-logo.png',
-      '/assets/images/phantomace-logo-mythic.png',
-      '/assets/images/skull.png',
-      '/assets/images/logo.png',
+    const DEFAULT_IMAGES = [
       '/assets/images/phantomace-logo.png',
       '/assets/images/phantomace-logo-mythic.png',
       '/assets/images/skull.png',
       '/assets/images/logo.png',
     ];
 
+    const EMOTE_SETS = {
+      default: { name: 'Default', images: DEFAULT_IMAGES },
+      emote1: { name: 'Emote Pack', images: [
+        '/assets/images/phantomace-logo.png', '/assets/images/skull.png',
+        '/assets/images/logo.png', '/assets/images/phantomace-logo-mythic.png',
+      ]},
+      premium1: { name: 'Premium Emotes', images: [
+        '/assets/images/phantomace-logo-mythic.png', '/assets/images/skull.png',
+        '/assets/images/logo.png', '/assets/images/phantomace-logo.png',
+      ]},
+    };
+
+    const CARD_BACKS = {
+      default: { name: 'Default', cssClass: '' },
+      phamily: { name: 'Phamily Card Back', cssClass: 'cb-phamily' },
+      rare: { name: 'Rare Card Back', cssClass: 'cb-rare' },
+      legendary: { name: 'Legendary Card Back', cssClass: 'cb-legendary' },
+    };
+
+    let activeCardBack = 'default';
+    let activeEmoteSet = 'default';
+    let ownedCardBacks = [];
+    let ownedEmoteSets = [];
+
     let cards = [];
     let flipped = [];
     let matched = 0;
     let moves = 0;
     let locked = false;
+
+    function getActiveImages() {
+      const set = EMOTE_SETS[activeEmoteSet] || EMOTE_SETS.default;
+      return [...set.images, ...set.images];
+    }
+
+    async function loadMMCosmetics() {
+      try {
+        const res = await fetch('/api/inventory?game=memory-match');
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = data.items || [];
+        ownedCardBacks = items.filter(i => i.type === 'cardback');
+        ownedEmoteSets = items.filter(i => i.type === 'emote-pack');
+        if (data.equips) {
+          if (data.equips['card-back'] && CARD_BACKS[data.equips['card-back']]) activeCardBack = data.equips['card-back'];
+          if (data.equips['emote-set'] && EMOTE_SETS[data.equips['emote-set']]) activeEmoteSet = data.equips['emote-set'];
+        }
+        populateCosmeticSelects();
+        if (ownedCardBacks.length > 0 || ownedEmoteSets.length > 0) {
+          document.getElementById('cosmeticsBar').hidden = false;
+        }
+      } catch {}
+    }
+
+    function populateCosmeticSelects() {
+      const cbSel = document.getElementById('cardBackSelect');
+      for (const item of ownedCardBacks) {
+        const id = getCosmeticId(item, 'cb');
+        if (!CARD_BACKS[id]) {
+          CARD_BACKS[id] = { name: item.name, cssClass: 'cb-' + id };
+        }
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = item.name || id;
+        if (id === activeCardBack) opt.selected = true;
+        cbSel.appendChild(opt);
+      }
+
+      const eSel = document.getElementById('emoteSelect');
+      for (const item of ownedEmoteSets) {
+        const id = getCosmeticId(item, 'emote');
+        if (!EMOTE_SETS[id]) {
+          EMOTE_SETS[id] = { name: item.name, images: DEFAULT_IMAGES };
+        }
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = item.name || id;
+        if (id === activeEmoteSet) opt.selected = true;
+        eSel.appendChild(opt);
+      }
+    }
+
+    function getCosmeticId(item, prefix) {
+      const n = (item.name || '').toLowerCase();
+      if (n.includes('phamily')) return 'phamily';
+      if (n.includes('legendary')) return 'legendary';
+      if (n.includes('rare')) return 'rare';
+      if (n.includes('premium')) return 'premium1';
+      return prefix + '_' + (item.id || '').replace(/[^a-z0-9]/g, '').slice(0, 12);
+    }
+
+    function applyCardBack() {
+      activeCardBack = document.getElementById('cardBackSelect').value;
+      startGame();
+      fetch('/api/inventory', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'equip', game: 'memory-match', slot: 'card-back', itemId: activeCardBack === 'default' ? 'none' : activeCardBack }),
+      }).catch(() => {});
+    }
+
+    function applyEmoteSet() {
+      activeEmoteSet = document.getElementById('emoteSelect').value;
+      startGame();
+      fetch('/api/inventory', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'equip', game: 'memory-match', slot: 'emote-set', itemId: activeEmoteSet === 'default' ? 'none' : activeEmoteSet }),
+      }).catch(() => {});
+    }
 
     function shuffle(arr) {
       const a = [...arr];
@@ -191,17 +323,20 @@
       document.getElementById('pairCount').textContent = '0';
       document.getElementById('winMessage').classList.remove('show');
 
+      const images = getActiveImages();
       const pairs = [];
-      CARD_IMAGES.forEach((src, i) => {
-        pairs.push({ id: i, pairId: i % 4, src });
+      images.forEach((src, i) => {
+        pairs.push({ id: i, pairId: i % (images.length / 2), src });
       });
 
       cards = shuffle(pairs);
 
+      const cbClass = CARD_BACKS[activeCardBack]?.cssClass || '';
+
       board.innerHTML = cards.map((card, index) => `
         <div class="card" data-index="${index}" data-pair="${card.pairId}" onclick="flipCard(this)">
           <div class="card-inner">
-            <div class="card-front"></div>
+            <div class="card-front ${cbClass}"></div>
             <div class="card-back">
               <img src="${card.src}" alt="card">
             </div>
@@ -238,6 +373,7 @@
             setTimeout(() => {
               document.getElementById('finalMoves').textContent = moves;
               document.getElementById('winMessage').classList.add('show');
+              submitMMScore(moves);
             }, 500);
           }
         } else {
@@ -257,6 +393,16 @@
       }
     });
 
+    function submitMMScore(moveCount) {
+      fetch('/api/leaderboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ game: 'memory-match', score: moveCount }),
+      }).catch(function () {});
+    }
+
+    loadMMCosmetics();
     startGame();
   </script>
 </body>

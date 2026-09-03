@@ -3,3 +3,25 @@ compatibility_date = "2024-01-01"
 
 [vars]
 TWITCH_CLIENT_ID = ""
+# Set in Cloudflare dashboard as encrypted secrets:
+# TWITCH_CLIENT_SECRET — from Twitch dev console
+# TWITCH_EVENTSUB_SECRET — random string for webhook signature verification
+# TWITCH_BROADCASTER_ID — your Twitch user ID
+# TWITCH_BOT_REFRESH_TOKEN — OAuth refresh token for chat bot (user:write:chat scope)
+# TWITCH_BOT_USER_ID — the bot account's Twitch user ID (defaults to broadcaster if omitted)
+
+# For production: run these commands and paste the real IDs below:
+#   npx wrangler kv:namespace create MARKETPLACE
+#   npx wrangler kv:namespace create MARKETPLACE --preview
+# Used by: Dino Park marketplace, Mana Clash rooms
+[[kv_namespaces]]
+binding = "MARKETPLACE"
+id = "placeholder-create-namespace-for-prod"
+preview_id = "placeholder-create-namespace-for-prod"
+
+# For production: run these commands and paste the real name below:
+#   npx wrangler r2 bucket create phantomace-media
+# Used by: Media gallery uploads
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "phantomace-media"

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE Monthly Giveaways - Enter for a chance to win prizes every month.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Giveaway | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/about.css">
+  <link rel="stylesheet" href="/css/pages/giveaway.css">
+</head>
+<body data-page="giveaway">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+    <h1 class="page-hero-title">Giveaway</h1>
+    <p class="page-hero-subtitle">Monthly prizes for the Phamily</p>
+  </section>
+
+  <!-- Current Giveaway -->
+  <section class="page-container giveaway-current">
+    <div class="giveaway-banner">
+      <div class="giveaway-month" id="giveawayMonth">September 2026</div>
+      <h2 class="giveaway-title" id="giveawayTitle">Monthly Giveaway</h2>
+      <p class="giveaway-prize" id="giveawayPrize">Prize details coming soon — check back or follow on Twitch for announcements.</p>
+      <div class="giveaway-countdown" id="giveawayCountdown"></div>
+      <div>
+        <span class="giveaway-status active" id="giveawayStatus">Entries Open</span>
+      </div>
+    </div>
+
+    <!-- Gleam.io Embed -->
+    <div class="gleam-embed" id="gleamEmbed">
+      <div class="gleam-placeholder" id="gleamPlaceholder">
+        <p>The giveaway widget will appear here once the monthly competition is set up.</p>
+        <p style="font-size: 11px; color: var(--text-dim);">Powered by Gleam.io</p>
+      </div>
+      <!--
+        Replace the placeholder above with your Gleam.io embed code:
+
+        <a class="e-widget no-button" href="https://gleam.io/YOUR_CODE/your-giveaway-name" rel="nofollow">Your Giveaway Name</a>
+        <script type="text/javascript" src="https://widget.gleam.io/e.js" async="true"></script>
+      -->
+    </div>
+  </section>
+
+  <!-- Hype Train Code Drops -->
+  <section class="page-container" id="hypeDropsSection" style="display:none;">
+    <div class="section-header">Hype Train Code Drops</div>
+    <div class="card" id="hypeDropsPanel"></div>
+  </section>
+
+  <!-- Bonus Entries -->
+  <section class="page-container bonus-entries-section">
+    <div class="section-header">Your Bonus Entries</div>
+    <div class="card" id="bonusEntriesPanel">
+      <div class="entries-login"><p>Loading...</p></div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="page-container giveaway-info">
+    <div class="section-header">How It Works</div>
+    <div class="giveaway-steps">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-title">Follow & Subscribe</div>
+        <div class="step-desc">Follow PhantomACE on Twitch for a free entry. Subscribers get bonus entries every month.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-title">Complete Actions</div>
+        <div class="step-desc">Earn extra entries by completing actions in the Gleam widget — follow socials, join Discord, share, and more.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-title">Watch & Earn</div>
+        <div class="step-desc">Tune into streams for additional entries. The more you watch, the better your chances.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-title">Winner Drawn</div>
+        <div class="step-desc">At the end of each month, a winner is drawn live on stream. Must be present or respond within 48 hours.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Rules -->
+  <section class="page-container giveaway-rules">
+    <div class="divider"></div>
+    <div class="section-header">Rules</div>
+    <ul class="rules-list">
+      <li>Must be 18 years or older (or have parental consent) to enter.</li>
+      <li>One entry per person per method. Duplicate or fraudulent entries will be disqualified.</li>
+      <li>Winners are selected randomly via Gleam.io at the end of each month.</li>
+      <li>Winners will be announced live on stream and contacted via Twitch or Discord DM.</li>
+      <li>Winners must respond within 48 hours or a new winner will be drawn.</li>
+      <li>Prizes may vary month to month. Physical prizes ship to US addresses only unless otherwise stated.</li>
+      <li>PhantomACE reserves the right to modify or cancel giveaways at any time.</li>
+      <li>No purchase necessary. Subscribing provides bonus entries but is not required.</li>
+    </ul>
+  </section>
+
+  <!-- Past Winners -->
+  <section class="page-container past-winners">
+    <div class="divider"></div>
+    <div class="section-header">Past Winners</div>
+    <div class="winners-grid" id="winnersGrid">
+      <div class="winner-card">
+        <div class="winner-icon">🏆</div>
+        <div class="winner-info">
+          <div class="winner-month">Coming Soon</div>
+          <div class="winner-name">First giveaway launching soon</div>
+          <div class="winner-prize">Stay tuned for prize announcements</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="page-container" style="padding-bottom: 48px;">
+    <div class="divider"></div>
+    <div class="card" style="text-align: center; padding: 48px 24px;">
+      <h3>Don't Miss Out</h3>
+      <p style="max-width: 400px; margin: 12px auto 24px; font-size: 14px;">Follow on Twitch and join the Discord to stay updated on monthly giveaways and prize reveals.</p>
+      <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+        <a href="https://twitch.tv/phantomace" target="_blank" rel="noopener" class="btn-primary">Follow on Twitch</a>
+        <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="btn-secondary">Join Discord</a>
+      </div>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/giveaway.js" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const monthEl = document.getElementById('giveawayMonth');
+      if (monthEl) {
+        const now = new Date();
+        monthEl.textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+
+      const countdownEl = document.getElementById('giveawayCountdown');
+      if (countdownEl) {
+        function updateCountdown() {
+          const now = new Date();
+          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+          const diff = endOfMonth - now;
+
+          if (diff <= 0) {
+            countdownEl.innerHTML = '<span style="color: var(--red); font-family: var(--font-system); font-size: 14px;">Drawing soon!</span>';
+            return;
+          }
+
+          const days = Math.floor(diff / 86400000);
+          const hours = Math.floor((diff % 86400000) / 3600000);
+          const mins = Math.floor((diff % 3600000) / 60000);
+
+          countdownEl.innerHTML = `
+            <div class="countdown-unit">
+              <span class="countdown-num">${days}</span>
+              <span class="countdown-label">Days</span>
+            </div>
+            <div class="countdown-unit">
+              <span class="countdown-num">${hours}</span>
+              <span class="countdown-label">Hours</span>
+            </div>
+            <div class="countdown-unit">
+              <span class="countdown-num">${mins}</span>
+              <span class="countdown-label">Min</span>
+            </div>
+          `;
+        }
+
+        updateCountdown();
+        setInterval(updateCountdown, 60000);
+      }
+    });
+  </script>
+</body>
+</html>

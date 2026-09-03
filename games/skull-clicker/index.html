@@ -10,44 +10,39 @@
       background: #000;
       color: #fff;
       font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      user-select: none;
+      overflow-x: hidden;
+    }
+
+    .game-wrap {
       display: flex;
       flex-direction: column;
-      align-items: center;
+      max-width: 480px;
+      margin: 0 auto;
       min-height: 100vh;
-      padding: 20px;
-      user-select: none;
     }
 
-    h1 {
-      font-size: 24px;
-      color: #ff0000;
-      margin-bottom: 4px;
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 16px 12px 8px;
+      border-bottom: 1px solid #1a1a1a;
     }
+    .header h1 { font-size: 22px; color: #ff0000; margin-bottom: 2px; }
+    .score-display { font-size: 32px; font-weight: 800; color: #fff; line-height: 1.2; }
+    .per-sec { font-size: 11px; color: #666; margin-top: 2px; }
 
-    .subtitle {
-      font-size: 11px;
-      color: #444;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 20px;
+    /* Skull Button */
+    .skull-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 0;
+      flex-shrink: 0;
     }
-
-    .score-display {
-      font-size: 36px;
-      font-weight: bold;
-      color: #fff;
-      margin-bottom: 4px;
-    }
-
-    .per-sec {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 24px;
-    }
-
     .skull-btn {
-      width: 160px;
-      height: 160px;
+      width: 140px; height: 140px;
       border-radius: 50%;
       background: radial-gradient(circle at 40% 35%, #222, #111, #000);
       border: 2px solid #333;
@@ -55,242 +50,813 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.1s, box-shadow 0.1s, border-color 0.2s;
+      transition: transform 0.08s, box-shadow 0.2s, border-color 0.2s;
       position: relative;
-      margin-bottom: 32px;
     }
-
-    .skull-btn:hover {
-      border-color: #ff0000;
-      box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
-    }
-
-    .skull-btn:active {
-      transform: scale(0.95);
-    }
-
-    .skull-btn img {
-      width: 70%;
-      height: auto;
-      pointer-events: none;
-    }
-
+    .skull-btn:hover { border-color: #ff0000; box-shadow: 0 0 30px rgba(255,0,0,0.2); }
+    .skull-btn:active { transform: scale(0.93); }
+    .skull-btn img { width: 65%; height: auto; pointer-events: none; }
     .click-pop {
       position: absolute;
-      font-size: 16px;
-      font-weight: bold;
+      font-size: 15px; font-weight: 800;
       color: #ff0000;
       pointer-events: none;
-      animation: pop-up 0.6s ease-out forwards;
+      animation: pop-up 0.5s ease-out forwards;
     }
-
     @keyframes pop-up {
       0% { opacity: 1; transform: translateY(0) scale(1); }
-      100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
+      100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
     }
 
-    .upgrades {
-      width: 100%;
-      max-width: 360px;
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid #1a1a1a;
+      flex-shrink: 0;
     }
-
-    .upgrades h2 {
-      font-size: 12px;
+    .tab-btn {
+      flex: 1;
+      padding: 10px 0;
+      background: none;
+      border: none;
+      color: #555;
+      font-size: 11px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #444;
-      margin-bottom: 12px;
-      text-align: center;
-    }
-
-    .upgrade-btn {
-      width: 100%;
-      padding: 12px 16px;
-      background: #111;
-      border: 1px solid #222;
-      border-radius: 4px;
-      color: #fff;
+      letter-spacing: 0.08em;
       cursor: pointer;
-      margin-bottom: 8px;
+      border-bottom: 2px solid transparent;
+      font-family: inherit;
+    }
+    .tab-btn.active { color: #ff0000; border-bottom-color: #ff0000; }
+    .tab-btn:hover { color: #ff4444; }
+
+    /* Content panels */
+    .tab-content { display: none; flex: 1; overflow-y: auto; padding: 8px 12px 80px; }
+    .tab-content.active { display: block; }
+
+    /* Building rows */
+    .building-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .building-row:hover:not(.locked) { border-color: #ff0000; background: #110000; }
+    .building-row.locked { opacity: 0.25; cursor: not-allowed; }
+    .building-row.affordable { border-color: #331111; }
+    .building-icon {
+      width: 36px; height: 36px;
+      border-radius: 4px;
+      background: #151515;
+      border: 1px solid #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #ff0000;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .building-info { flex: 1; min-width: 0; }
+    .building-name { font-size: 13px; font-weight: 600; color: #ddd; }
+    .building-desc { font-size: 9px; color: #555; margin-top: 1px; }
+    .building-cps { font-size: 9px; color: #444; margin-top: 1px; }
+    .building-right { text-align: right; flex-shrink: 0; }
+    .building-cost { font-size: 12px; color: #ff0000; font-weight: 600; }
+    .building-owned { font-size: 18px; font-weight: 800; color: #333; }
+
+    /* Upgrade rows */
+    .upgrade-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upgrade-row:hover:not(.locked):not(.bought) { border-color: #ff0000; background: #110000; }
+    .upgrade-row.locked { opacity: 0.25; cursor: not-allowed; }
+    .upgrade-row.bought { opacity: 0.4; cursor: default; border-color: #1a1a1a; }
+    .upgrade-row.bought .building-cost { color: #0a0; }
+    .upgrade-tag {
+      font-size: 8px; font-weight: 700;
+      padding: 2px 6px; border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .tag-click { background: #220000; color: #ff4444; }
+    .tag-cps { background: #001122; color: #4488ff; }
+    .tag-mult { background: #112200; color: #88cc44; }
+
+    /* Stats */
+    .stat-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      transition: border-color 0.2s, background 0.2s;
-      font-family: system-ui, sans-serif;
-    }
-
-    .upgrade-btn:hover:not(:disabled) {
-      border-color: #ff0000;
-      background: #1a0000;
-    }
-
-    .upgrade-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    .upgrade-name {
-      font-size: 13px;
-    }
-
-    .upgrade-detail {
-      font-size: 10px;
-      color: #666;
-      margin-top: 2px;
-    }
-
-    .upgrade-cost {
+      padding: 8px 0;
+      border-bottom: 1px solid #111;
       font-size: 12px;
-      color: #ff0000;
-      white-space: nowrap;
     }
+    .stat-label { color: #666; }
+    .stat-val { color: #ccc; font-weight: 600; }
 
+    /* Milestone popup */
     .milestone {
       position: fixed;
-      top: 50%;
-      left: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%) scale(0);
       background: #111;
       border: 1px solid #ff0000;
       border-radius: 8px;
-      padding: 24px 40px;
+      padding: 20px 36px;
       text-align: center;
       z-index: 100;
-      animation: milestone-pop 2s ease-out forwards;
+      animation: ms-pop 2s ease-out forwards;
     }
-
-    .milestone h3 { font-size: 18px; color: #ff0000; margin-bottom: 4px; }
-    .milestone p { font-size: 12px; color: #999; }
-
-    @keyframes milestone-pop {
-      0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-      15% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-      25% { transform: translate(-50%, -50%) scale(1); }
+    .milestone h3 { font-size: 16px; color: #ff0000; margin-bottom: 4px; }
+    .milestone p { font-size: 11px; color: #888; }
+    @keyframes ms-pop {
+      0% { transform: translate(-50%,-50%) scale(0); opacity: 0; }
+      12% { transform: translate(-50%,-50%) scale(1.1); opacity: 1; }
+      22% { transform: translate(-50%,-50%) scale(1); }
       80% { opacity: 1; }
-      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+      100% { opacity: 0; transform: translate(-50%,-50%) scale(0.9); }
     }
+
+    /* Save indicator */
+    .save-msg {
+      position: fixed; bottom: 12px; right: 12px;
+      font-size: 10px; color: #333;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .save-msg.show { opacity: 1; }
+
+    /* Offline earnings banner */
+    .offline-banner {
+      text-align: center;
+      padding: 10px;
+      background: #0a0a00;
+      border: 1px solid #332200;
+      border-radius: 4px;
+      margin: 8px 12px;
+      font-size: 12px;
+      color: #ffaa00;
+      cursor: pointer;
+    }
+    .offline-banner:hover { background: #111100; }
+
+    .boost-banner {
+      text-align: center;
+      padding: 8px 12px;
+      background: linear-gradient(90deg, #1a0000, #330000, #1a0000);
+      border: 1px solid #ff0000;
+      border-radius: 4px;
+      margin: 8px 12px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #ff0000;
+      animation: boost-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes boost-pulse {
+      0%, 100% { box-shadow: 0 0 6px rgba(255,0,0,0.3); }
+      50% { box-shadow: 0 0 16px rgba(255,0,0,0.6); }
+    }
+
+    .section-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #333;
+      margin: 12px 0 6px;
+    }
+
+    /* Cosmetics */
+    .cosmetic-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px; border: 1px solid #1a1a1a; border-radius: 4px;
+      margin-bottom: 6px; cursor: pointer; transition: border-color 0.2s;
+    }
+    .cosmetic-row:hover { border-color: #333; }
+    .cosmetic-row.equipped { border-color: #ff0000; background: rgba(255,0,0,0.05); }
+    .cosmetic-icon { width: 36px; height: 36px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0; }
+    .cosmetic-info { flex: 1; }
+    .cosmetic-name { font-size: 12px; font-weight: 600; color: #fff; }
+    .cosmetic-desc { font-size: 10px; color: #666; margin-top: 2px; }
+    .cosmetic-badge { font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 1px 6px; border-radius: 2px; font-weight: 700; }
+    .badge-common { background: #1a1a1a; color: #888; }
+    .badge-uncommon { background: #0a1a0a; color: #44bb44; }
+    .badge-rare { background: #0a0a1e; color: #4466ee; }
+    .badge-mythic { background: #1a0a1a; color: #aa44ff; }
+    .cosmetic-equipped-tag { font-size: 9px; color: #ff0000; font-weight: 700; }
+    .cosmetic-empty { text-align: center; color: #333; padding: 30px 16px; font-size: 12px; line-height: 1.6; }
+
+    .skull-btn.theme-blood { border-color: #cc0000; box-shadow: 0 0 20px rgba(255,0,0,0.3); }
+    .skull-btn.theme-void { border-color: #6600cc; box-shadow: 0 0 20px rgba(102,0,204,0.3); }
+    .skull-btn.theme-chaos { border-color: #ff6600; box-shadow: 0 0 20px rgba(255,102,0,0.3); }
+    .skull-btn.theme-eternal { border-color: #aa44ff; box-shadow: 0 0 30px rgba(170,68,255,0.4);
+      animation: eternal-pulse 2s ease-in-out infinite; }
+    @keyframes eternal-pulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(170,68,255,0.3); }
+      50% { box-shadow: 0 0 40px rgba(170,68,255,0.6); }
+    }
+    .click-effect-blood .click-pop { color: #ff3333 !important; }
+    .click-effect-void .click-pop { color: #aa66ff !important; }
+    .click-effect-chaos .click-pop { color: #ffaa00 !important; }
+    .click-effect-eternal .click-pop { color: #ff00ff !important; text-shadow: 0 0 6px rgba(255,0,255,0.5); }
   </style>
 </head>
 <body>
-  <h1>Skull Clicker</h1>
-  <p class="subtitle">Click the skull. Embrace the chaos.</p>
+  <div class="game-wrap">
+    <div class="header">
+      <h1>Skull Clicker</h1>
+      <div class="score-display" id="score">0</div>
+      <div class="per-sec" id="perSec">0 per second</div>
+    </div>
 
-  <div class="score-display" id="score">0</div>
-  <div class="per-sec" id="perSec">0 per second</div>
+    <div class="skull-area">
+      <div class="skull-btn" id="skullBtn">
+        <img src="/assets/images/skull.png" alt="Click">
+      </div>
+    </div>
 
-  <div class="skull-btn" id="skullBtn" onclick="handleClick(event)">
-    <img src="/assets/images/skull.png" alt="Click me">
+    <div id="offlineBanner"></div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('buildings')">Buildings</button>
+      <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
+      <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
+      <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
+    </div>
+
+    <div class="tab-content active" id="tab-buildings"></div>
+    <div class="tab-content" id="tab-upgrades"></div>
+    <div class="tab-content" id="tab-cosmetics"></div>
+    <div class="tab-content" id="tab-stats"></div>
   </div>
 
-  <div class="upgrades">
-    <h2>Upgrades</h2>
-    <div id="upgradeList"></div>
-  </div>
+  <div class="save-msg" id="saveMsg">Saved</div>
 
   <script>
-    let score = 0;
-    let clickPower = 1;
-    let autoClicks = 0;
+    /* ═══════ CONSTANTS ═══════ */
 
-    const UPGRADES = [
-      { id: 'power1', name: 'Sharper Bones', desc: '+1 per click', cost: 10, type: 'click', value: 1, bought: false },
-      { id: 'auto1', name: 'Ghost Hand', desc: '+1 per second', cost: 25, type: 'auto', value: 1, bought: false },
-      { id: 'power2', name: 'Crimson Edge', desc: '+3 per click', cost: 75, type: 'click', value: 3, bought: false },
-      { id: 'auto2', name: 'Phantom Army', desc: '+5 per second', cost: 200, type: 'auto', value: 5, bought: false },
-      { id: 'power3', name: 'Chaos Multiplier', desc: '+10 per click', cost: 500, type: 'click', value: 10, bought: false },
-      { id: 'auto3', name: 'Undead Legion', desc: '+20 per second', cost: 1000, type: 'auto', value: 20, bought: false },
-      { id: 'power4', name: 'Digital Devastation', desc: '+50 per click', cost: 5000, type: 'click', value: 50, bought: false },
-      { id: 'auto4', name: 'Eternal Engine', desc: '+100 per second', cost: 10000, type: 'auto', value: 100, bought: false },
+    const BUILDINGS = [
+      { id:'shard',     name:'Bone Shard',       baseCost:15,           baseCps:0.1,      desc:'Tiny bone fragments click for you' },
+      { id:'ghost',     name:'Ghost Hand',        baseCost:100,          baseCps:1,        desc:'Spectral hands from beyond' },
+      { id:'crypt',     name:'Crypt Keeper',      baseCost:1100,         baseCps:8,        desc:'Undead servants guard your hoard' },
+      { id:'altar',     name:'Dark Altar',        baseCost:12000,        baseCps:47,       desc:'Blood sacrifices fuel the chaos' },
+      { id:'army',      name:'Phantom Army',      baseCost:130000,       baseCps:260,      desc:'Legions of the damned march for you' },
+      { id:'necro',     name:'Necropolis',         baseCost:1400000,      baseCps:1400,     desc:'A city of the dead, endlessly producing' },
+      { id:'shadow',    name:'Shadow Realm',       baseCost:20000000,     baseCps:7800,     desc:'An entire dimension of darkness' },
+      { id:'engine',    name:'Chaos Engine',       baseCost:330000000,    baseCps:44000,    desc:'Reality-bending machine of doom' },
+      { id:'portal',    name:'Void Portal',        baseCost:5.1e9,        baseCps:260000,   desc:'Gateway to infinite skull dimensions' },
+      { id:'horror',    name:'Eldritch Horror',    baseCost:75e9,         baseCps:1600000,  desc:'Cosmic entity that devours reality' },
+      { id:'fracture',  name:'Reality Fracture',   baseCost:1e12,         baseCps:10000000, desc:'The fabric of existence, torn asunder' },
+      { id:'darkness',  name:'Eternal Darkness',   baseCost:14e12,        baseCps:65000000, desc:'The end of all light, the birth of skulls' },
     ];
 
-    const MILESTONES = [100, 500, 1000, 5000, 10000, 50000, 100000];
+    const UPGRADES = [
+      { id:'c1', name:'Iron Fingers',        cost:100,        desc:'+1 click power',      tag:'click',  apply:() => { clickBonus += 1; } },
+      { id:'c2', name:'Crimson Touch',       cost:500,        desc:'x2 click power',      tag:'click',  apply:() => { clickMulti *= 2; } },
+      { id:'c3', name:'Skull Crusher',       cost:5000,       desc:'x2 click power',      tag:'click',  apply:() => { clickMulti *= 2; } },
+      { id:'c4', name:'Chaos Multiplier',    cost:50000,      desc:'x2 click power',      tag:'click',  apply:() => { clickMulti *= 2; } },
+      { id:'c5', name:'Digital Devastation', cost:500000,     desc:'x2 click power',      tag:'click',  apply:() => { clickMulti *= 2; } },
+      { id:'c6', name:'Phantom Strike',      cost:5e6,        desc:'x2 click power',      tag:'click',  apply:() => { clickMulti *= 2; } },
+      { id:'c7', name:'Void Touch',          cost:50e6,       desc:'+5% of CPS per click',tag:'click',  apply:() => { cpsClickPct += 5; } },
+      { id:'c8', name:'Reality Shatter',     cost:500e6,      desc:'+5% of CPS per click',tag:'click',  apply:() => { cpsClickPct += 5; } },
+      { id:'m1', name:'Dark Blessing',       cost:1000,       desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
+      { id:'m2', name:'Unholy Pact',         cost:100000,     desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
+      { id:'m3', name:'Eternal Curse',       cost:10e6,       desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
+      { id:'m4', name:'Cosmic Horror',       cost:1e9,        desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
+    ];
+
+    const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12];
+    const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One'];
+
+    /* ═══════ STATE ═══════ */
+
+    let skulls = 0;
+    let totalSkulls = 0;
+    let totalClicks = 0;
+    let clickBonus = 0;
+    let clickMulti = 1;
+    let cpsClickPct = 0;
+    let globalCpsMult = 1;
+    let cpBoostMult = 1;
+    let cpBoostExpires = 0;
+    let owned = {};
+    let boughtUpgrades = new Set();
     let hitMilestones = new Set();
+    let startTime = Date.now();
+    let lastTick = Date.now();
+    let lastSave = Date.now();
+    let activeTab = 'buildings';
+    let playerName = null;
+
+    BUILDINGS.forEach(b => owned[b.id] = 0);
+
+    /* ═══════ COMPUTED ═══════ */
+
+    function getBuildingCost(b) {
+      return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]));
+    }
+
+    function getCPS() {
+      let cps = 0;
+      for (const b of BUILDINGS) {
+        cps += b.baseCps * owned[b.id];
+      }
+      return cps * globalCpsMult * cpBoostMult;
+    }
+
+    function getClickPower() {
+      return (1 + clickBonus) * clickMulti + (getCPS() * cpsClickPct / 100);
+    }
+
+    /* ═══════ ACTIONS ═══════ */
 
     function handleClick(e) {
-      score += clickPower;
-      updateDisplay();
-      spawnPopup(e);
+      const power = getClickPower();
+      skulls += power;
+      totalSkulls += power;
+      totalClicks++;
+      spawnPop(e, power);
       checkMilestones();
+      render();
     }
 
-    function spawnPopup(e) {
-      const btn = document.getElementById('skullBtn');
-      const rect = btn.getBoundingClientRect();
-      const pop = document.createElement('div');
-      pop.className = 'click-pop';
-      pop.textContent = `+${clickPower}`;
-      pop.style.left = (e.clientX - rect.left) + 'px';
-      pop.style.top = (e.clientY - rect.top - 10) + 'px';
-      btn.appendChild(pop);
-      setTimeout(() => pop.remove(), 600);
-    }
-
-    function updateDisplay() {
-      document.getElementById('score').textContent = formatNum(Math.floor(score));
-      document.getElementById('perSec').textContent = `${formatNum(autoClicks)} per second`;
-      renderUpgrades();
-    }
-
-    function formatNum(n) {
-      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-      return n.toString();
-    }
-
-    function renderUpgrades() {
-      const list = document.getElementById('upgradeList');
-      list.innerHTML = UPGRADES.map(u => {
-        if (u.bought) return '';
-        const canBuy = score >= u.cost;
-        return `
-          <button class="upgrade-btn" ${canBuy ? '' : 'disabled'} onclick="buyUpgrade('${u.id}')">
-            <div>
-              <div class="upgrade-name">${u.name}</div>
-              <div class="upgrade-detail">${u.desc}</div>
-            </div>
-            <div class="upgrade-cost">${formatNum(u.cost)} skulls</div>
-          </button>
-        `;
-      }).join('');
+    function buyBuilding(id) {
+      const b = BUILDINGS.find(x => x.id === id);
+      if (!b) return;
+      const cost = getBuildingCost(b);
+      if (skulls < cost) return;
+      skulls -= cost;
+      owned[b.id]++;
+      render();
     }
 
     function buyUpgrade(id) {
       const u = UPGRADES.find(x => x.id === id);
-      if (!u || u.bought || score < u.cost) return;
+      if (!u || boughtUpgrades.has(id) || skulls < u.cost) return;
+      skulls -= u.cost;
+      boughtUpgrades.add(id);
+      u.apply();
+      render();
+    }
 
-      score -= u.cost;
-      u.bought = true;
+    /* ═══════ POPUPS ═══════ */
 
-      if (u.type === 'click') clickPower += u.value;
-      if (u.type === 'auto') autoClicks += u.value;
-
-      updateDisplay();
+    function spawnPop(e, val) {
+      const btn = document.getElementById('skullBtn');
+      const rect = btn.getBoundingClientRect();
+      const pop = document.createElement('div');
+      pop.className = 'click-pop';
+      pop.textContent = `+${formatNum(Math.floor(val))}`;
+      pop.style.left = (e.clientX - rect.left) + 'px';
+      pop.style.top = (e.clientY - rect.top - 10) + 'px';
+      btn.appendChild(pop);
+      setTimeout(() => pop.remove(), 500);
     }
 
     function checkMilestones() {
-      for (const m of MILESTONES) {
-        if (score >= m && !hitMilestones.has(m)) {
+      for (let i = 0; i < MILESTONES.length; i++) {
+        const m = MILESTONES[i];
+        if (totalSkulls >= m && !hitMilestones.has(m)) {
           hitMilestones.add(m);
-          showMilestone(m);
+          showMilestone(m, MS_NAMES[i] || 'Unknown');
         }
       }
     }
 
-    function showMilestone(n) {
+    function showMilestone(n, title) {
       const el = document.createElement('div');
       el.className = 'milestone';
-      el.innerHTML = `<h3>${formatNum(n)} Skulls!</h3><p>The chaos grows stronger</p>`;
+      el.innerHTML = `<h3>${title}</h3><p>${formatNum(n)} skulls earned</p>`;
       document.body.appendChild(el);
-      setTimeout(() => el.remove(), 2100);
+      setTimeout(() => el.remove(), 2200);
     }
 
-    setInterval(() => {
-      if (autoClicks > 0) {
-        score += autoClicks;
-        updateDisplay();
+    /* ═══════ FORMATTING ═══════ */
+
+    function formatNum(n) {
+      if (n < 0) return '-' + formatNum(-n);
+      if (n < 1000) return Math.floor(n).toLocaleString();
+      const units = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
+      const tier = Math.min(Math.floor(Math.log10(n) / 3), units.length - 1);
+      const scaled = n / Math.pow(10, tier * 3);
+      const str = scaled < 10 ? scaled.toFixed(2) : scaled < 100 ? scaled.toFixed(1) : scaled.toFixed(0);
+      return str + ' ' + units[tier];
+    }
+
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+      const h = Math.floor(s/3600);
+      return h + 'h ' + Math.floor((s%3600)/60) + 'm';
+    }
+
+    /* ═══════ RENDER ═══════ */
+
+    function render() {
+      document.getElementById('score').textContent = formatNum(Math.floor(skulls));
+      document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
+      if (activeTab === 'buildings') renderBuildings();
+      else if (activeTab === 'upgrades') renderUpgrades();
+      else if (activeTab === 'cosmetics') renderCosmetics();
+      else if (activeTab === 'stats') renderStats();
+    }
+
+    function renderBuildings() {
+      const el = document.getElementById('tab-buildings');
+      let html = '';
+      for (const b of BUILDINGS) {
+        const cost = getBuildingCost(b);
+        const can = skulls >= cost;
+        const cnt = owned[b.id];
+        const revealed = totalSkulls >= b.baseCost * 0.5 || cnt > 0;
+        if (!revealed) continue;
+        const cps = (b.baseCps * cnt * globalCpsMult);
+        html += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}')">
+          <div class="building-icon">${cnt}</div>
+          <div class="building-info">
+            <div class="building-name">${b.name}</div>
+            <div class="building-desc">${b.desc}</div>
+            ${cnt > 0 ? `<div class="building-cps">${formatNum(cps)}/s total</div>` : ''}
+          </div>
+          <div class="building-right">
+            <div class="building-cost">${formatNum(cost)}</div>
+          </div>
+        </div>`;
+      }
+      if (!html) html = '<div style="text-align:center;color:#333;padding:20px;font-size:12px">Keep clicking to unlock buildings!</div>';
+      el.innerHTML = html;
+    }
+
+    function renderUpgrades() {
+      const el = document.getElementById('tab-upgrades');
+      let html = '<div class="section-label">Click Power</div>';
+      for (const u of UPGRADES.filter(u => u.tag === 'click')) {
+        html += upgradeRow(u);
+      }
+      html += '<div class="section-label">CPS Multipliers</div>';
+      for (const u of UPGRADES.filter(u => u.tag === 'mult')) {
+        html += upgradeRow(u);
+      }
+      el.innerHTML = html;
+    }
+
+    function upgradeRow(u) {
+      const bought = boughtUpgrades.has(u.id);
+      const can = skulls >= u.cost;
+      const tagClass = u.tag === 'click' ? 'tag-click' : u.tag === 'cps' ? 'tag-cps' : 'tag-mult';
+      return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyUpgrade('${u.id}')`}">
+        <div class="building-info">
+          <div class="building-name">${u.name} <span class="upgrade-tag ${tagClass}">${u.tag}</span></div>
+          <div class="building-desc">${u.desc}</div>
+        </div>
+        <div class="building-right">
+          <div class="building-cost">${bought ? 'Owned' : formatNum(u.cost)}</div>
+        </div>
+      </div>`;
+    }
+
+    function renderStats() {
+      const cps = getCPS();
+      const cp = getClickPower();
+      const elapsed = Date.now() - startTime;
+      let bldgTotal = 0;
+      let bldgBreakdown = '';
+      for (const b of BUILDINGS) {
+        if (owned[b.id] > 0) {
+          const c = b.baseCps * owned[b.id] * globalCpsMult;
+          bldgTotal += owned[b.id];
+          bldgBreakdown += `<div class="stat-row"><span class="stat-label">${b.name}</span><span class="stat-val">x${owned[b.id]} (${formatNum(c)}/s)</span></div>`;
+        }
+      }
+      document.getElementById('tab-stats').innerHTML = `
+        <div class="section-label">Overview</div>
+        <div class="stat-row"><span class="stat-label">Total skulls earned</span><span class="stat-val">${formatNum(totalSkulls)}</span></div>
+        <div class="stat-row"><span class="stat-label">Current skulls</span><span class="stat-val">${formatNum(skulls)}</span></div>
+        <div class="stat-row"><span class="stat-label">Total clicks</span><span class="stat-val">${totalClicks.toLocaleString()}</span></div>
+        <div class="stat-row"><span class="stat-label">Time played</span><span class="stat-val">${formatTime(elapsed)}</span></div>
+        <div class="section-label">Production</div>
+        <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
+        <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
+        <div class="stat-row"><span class="stat-label">CPS multiplier</span><span class="stat-val">x${globalCpsMult}</span></div>
+        <div class="stat-row"><span class="stat-label">Buildings owned</span><span class="stat-val">${bldgTotal}</span></div>
+        <div class="stat-row"><span class="stat-label">Upgrades bought</span><span class="stat-val">${boughtUpgrades.size}/${UPGRADES.length}</span></div>
+        ${bldgBreakdown ? '<div class="section-label">Buildings Breakdown</div>' + bldgBreakdown : ''}
+        <div style="margin-top:20px;text-align:center">
+          <button style="background:#1a0000;border:1px solid #330000;color:#ff4444;padding:8px 20px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px" onclick="hardReset()">Reset All Progress</button>
+        </div>
+      `;
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      const tabs = ['buildings','upgrades','cosmetics','stats'];
+      document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', tabs[i] === tab);
+      });
+      document.querySelectorAll('.tab-content').forEach((el, i) => {
+        el.classList.toggle('active', tabs[i] === tab);
+      });
+      render();
+    }
+
+    /* ═══════ GAME LOOP ═══════ */
+
+    function tick() {
+      const now = Date.now();
+      const dt = (now - lastTick) / 1000;
+      lastTick = now;
+      const earned = getCPS() * dt;
+      if (earned > 0) {
+        skulls += earned;
+        totalSkulls += earned;
         checkMilestones();
       }
-    }, 1000);
+      document.getElementById('score').textContent = formatNum(Math.floor(skulls));
+      document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
+
+      if (now - lastSave > 30000) {
+        save();
+        lastSave = now;
+      }
+    }
+
+    setInterval(tick, 100);
+
+    /* ═══════ CHANNEL POINT BOOST ═══════ */
+
+    function checkSkullBoost() {
+      if (cpBoostExpires > 0 && Date.now() >= cpBoostExpires) {
+        cpBoostMult = 1;
+        cpBoostExpires = 0;
+        const el = document.getElementById('boostBanner');
+        if (el) el.remove();
+        render();
+      }
+      fetch('/api/channel-points?action=skull-boost', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.active) return;
+          cpBoostMult = d.multiplier || 2;
+          cpBoostExpires = d.expiresAt || 0;
+          var el = document.getElementById('boostBanner');
+          if (!el) {
+            el = document.createElement('div');
+            el.id = 'boostBanner';
+            el.className = 'boost-banner';
+            document.querySelector('.game-area').prepend(el);
+          }
+          var secs = Math.max(0, Math.ceil((cpBoostExpires - Date.now()) / 1000));
+          el.textContent = 'SKULL BOOST x' + cpBoostMult + ' — ' + secs + 's remaining';
+          render();
+        })
+        .catch(function () {});
+    }
+    setInterval(checkSkullBoost, 15000);
+
+    /* ═══════ SAVE / LOAD ═══════ */
+
+    function save() {
+      const data = {
+        skulls, totalSkulls, totalClicks, clickBonus, clickMulti,
+        cpsClickPct, globalCpsMult, owned, startTime,
+        boughtUpgrades: [...boughtUpgrades],
+        hitMilestones: [...hitMilestones],
+        savedAt: Date.now(),
+        version: 2
+      };
+      try {
+        localStorage.setItem('sc_save', JSON.stringify(data));
+        const msg = document.getElementById('saveMsg');
+        msg.classList.add('show');
+        setTimeout(() => msg.classList.remove('show'), 1500);
+      } catch(e) {}
+      submitScore();
+    }
+
+    function load() {
+      try {
+        const raw = localStorage.getItem('sc_save');
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        skulls = d.skulls || 0;
+        totalSkulls = d.totalSkulls || 0;
+        totalClicks = d.totalClicks || 0;
+        clickBonus = d.clickBonus || 0;
+        clickMulti = d.clickMulti || 1;
+        cpsClickPct = d.cpsClickPct || 0;
+        globalCpsMult = d.globalCpsMult || 1;
+        owned = d.owned || {};
+        startTime = d.startTime || Date.now();
+        boughtUpgrades = new Set(d.boughtUpgrades || []);
+        hitMilestones = new Set(d.hitMilestones || []);
+        BUILDINGS.forEach(b => { if (!(b.id in owned)) owned[b.id] = 0; });
+
+        if (d.savedAt) {
+          const away = (Date.now() - d.savedAt) / 1000;
+          if (away > 10) {
+            const cps = getCPS();
+            if (cps > 0) {
+              const earned = cps * away * 0.5;
+              skulls += earned;
+              totalSkulls += earned;
+              const banner = document.getElementById('offlineBanner');
+              banner.innerHTML = `<div class="offline-banner" onclick="this.remove()">Welcome back! You earned <b>${formatNum(earned)}</b> skulls while away (${formatTime(away * 1000)}). Click to dismiss.</div>`;
+            }
+          }
+        }
+      } catch(e) {}
+    }
+
+    function hardReset() {
+      if (!confirm('This will permanently erase all progress. Are you sure?')) return;
+      localStorage.removeItem('sc_save');
+      location.reload();
+    }
+
+    /* ═══════ LEADERBOARD ═══════ */
+
+    function getPlayerId() {
+      const cookie = document.cookie.match(/pham_session=([^;]+)/);
+      if (cookie) {
+        try {
+          const s = JSON.parse(decodeURIComponent(cookie[1]));
+          playerName = s.display_name;
+          return { userId: s.user_id, displayName: s.display_name };
+        } catch(e) {}
+      }
+      let gid = null;
+      try { gid = localStorage.getItem('sc_guestId'); } catch(e) {}
+      if (!gid) {
+        gid = 'g_' + Math.random().toString(36).slice(2, 10);
+        try { localStorage.setItem('sc_guestId', gid); } catch(e) {}
+      }
+      let gname = null;
+      try { gname = localStorage.getItem('sc_guestName'); } catch(e) {}
+      if (!gname) {
+        gname = 'Skull#' + gid.slice(2, 6).toUpperCase();
+        try { localStorage.setItem('sc_guestName', gname); } catch(e) {}
+      }
+      playerName = gname;
+      return { guestId: gid, guestName: gname };
+    }
+
+    async function submitScore() {
+      if (totalSkulls < 100) return;
+      const player = getPlayerId();
+      try {
+        await fetch('/api/skull-clicker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'submit-score', score: Math.floor(totalSkulls), ...player })
+        });
+        fetch('/api/leaderboards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ game: 'skull-clicker', score: Math.floor(totalSkulls) }),
+        }).catch(function () {});
+      } catch(e) {}
+    }
+
+    /* ═══════ COSMETICS ═══════ */
+
+    const COSMETIC_DEFS = {
+      'skull-skin': { slot: 'skull-theme', icon: '💀', category: 'Skull Themes' },
+      'click-effect': { slot: 'click-effect', icon: '✨', category: 'Click Effects' },
+      'building-skin': { slot: 'building-skin', icon: '🏰', category: 'Building Skins' },
+    };
+
+    const SKULL_THEMES = {
+      'default': { name: 'Default', desc: 'The classic bone skull', cssClass: '' },
+      'blood': { name: 'Blood Skull', desc: 'A crimson-stained skull with dripping aura', cssClass: 'theme-blood' },
+      'void': { name: 'Void Skull', desc: 'A skull from beyond the cosmic veil', cssClass: 'theme-void' },
+      'chaos': { name: 'Chaos Skull', desc: 'Burning with chaotic energy', cssClass: 'theme-chaos' },
+      'eternal': { name: 'Eternal Darkness', desc: 'A mythic skull pulsing with dark power', cssClass: 'theme-eternal' },
+    };
+
+    const CLICK_EFFECTS = {
+      'default': { name: 'Default', desc: 'Standard white click numbers', cssClass: '' },
+      'blood': { name: 'Blood Splash', desc: 'Crimson damage numbers', cssClass: 'click-effect-blood' },
+      'void': { name: 'Void Click', desc: 'Purple ethereal numbers', cssClass: 'click-effect-void' },
+      'chaos': { name: 'Chaos Strike', desc: 'Fiery orange numbers', cssClass: 'click-effect-chaos' },
+      'eternal': { name: 'Eternal Darkness', desc: 'Mythic glowing magenta numbers', cssClass: 'click-effect-eternal' },
+    };
+
+    let ownedCosmetics = [];
+    let equippedCosmetics = { 'skull-theme': 'default', 'click-effect': 'default' };
+
+    async function loadCosmetics() {
+      try {
+        const res = await fetch('/api/inventory?game=skull-clicker');
+        if (!res.ok) return;
+        const data = await res.json();
+        ownedCosmetics = data.items || [];
+        if (data.equips) {
+          if (data.equips['skull-theme']) equippedCosmetics['skull-theme'] = data.equips['skull-theme'];
+          if (data.equips['click-effect']) equippedCosmetics['click-effect'] = data.equips['click-effect'];
+        }
+        applyCosmetics();
+      } catch {}
+    }
+
+    function applyCosmetics() {
+      const btn = document.getElementById('skullBtn');
+      btn.className = 'skull-btn';
+      const themeId = equippedCosmetics['skull-theme'] || 'default';
+      const theme = SKULL_THEMES[themeId];
+      if (theme && theme.cssClass) btn.classList.add(theme.cssClass);
+
+      const area = document.querySelector('.skull-area');
+      area.className = 'skull-area';
+      const effectId = equippedCosmetics['click-effect'] || 'default';
+      const effect = CLICK_EFFECTS[effectId];
+      if (effect && effect.cssClass) area.classList.add(effect.cssClass);
+    }
+
+    async function equipCosmetic(slot, itemId) {
+      equippedCosmetics[slot] = itemId;
+      applyCosmetics();
+      render();
+      try {
+        await fetch('/api/inventory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'equip', game: 'skull-clicker', slot, itemId: itemId === 'default' ? 'none' : itemId }),
+        });
+      } catch {}
+    }
+
+    function getCosmeticThemeId(item) {
+      const n = (item.name || '').toLowerCase();
+      if (n.includes('blood') || n.includes('crimson')) return 'blood';
+      if (n.includes('void')) return 'void';
+      if (n.includes('chaos')) return 'chaos';
+      if (n.includes('eternal') || n.includes('darkness')) return 'eternal';
+      return item.id;
+    }
+
+    function renderCosmetics() {
+      const el = document.getElementById('tab-cosmetics');
+
+      const themes = ownedCosmetics.filter(i => i.name && (i.name.toLowerCase().includes('skin') || i.name.toLowerCase().includes('skull') || i.name.toLowerCase().includes('theme')));
+      const effects = ownedCosmetics.filter(i => i.name && (i.name.toLowerCase().includes('effect') || i.name.toLowerCase().includes('click')));
+
+      let html = '<div class="section-label">Skull Themes</div>';
+      html += cosmeticOptionRow('skull-theme', 'default', SKULL_THEMES['default'], 'common');
+      for (const item of themes) {
+        const tid = getCosmeticThemeId(item);
+        const def = SKULL_THEMES[tid] || { name: item.name, desc: item.name };
+        html += cosmeticOptionRow('skull-theme', tid, def, item.rarity || 'common');
+      }
+
+      html += '<div class="section-label">Click Effects</div>';
+      html += cosmeticOptionRow('click-effect', 'default', CLICK_EFFECTS['default'], 'common');
+      for (const item of effects) {
+        const eid = getCosmeticThemeId(item);
+        const def = CLICK_EFFECTS[eid] || { name: item.name, desc: item.name };
+        html += cosmeticOptionRow('click-effect', eid, def, item.rarity || 'common');
+      }
+
+      if (themes.length === 0 && effects.length === 0) {
+        html += '<div class="cosmetic-empty">No cosmetics unlocked yet.<br>Earn them through Phamily Time rewards!</div>';
+      }
+
+      el.innerHTML = html;
+    }
+
+    function cosmeticOptionRow(slot, id, def, rarity) {
+      const isEquipped = equippedCosmetics[slot] === id;
+      return `<div class="cosmetic-row ${isEquipped ? 'equipped' : ''}" onclick="equipCosmetic('${slot}','${id}')">
+        <div class="cosmetic-icon">${slot === 'skull-theme' ? '💀' : '✨'}</div>
+        <div class="cosmetic-info">
+          <div class="cosmetic-name">${def.name} ${id !== 'default' ? `<span class="cosmetic-badge badge-${rarity}">${rarity}</span>` : ''}</div>
+          <div class="cosmetic-desc">${def.desc}</div>
+        </div>
+        ${isEquipped ? '<span class="cosmetic-equipped-tag">EQUIPPED</span>' : ''}
+      </div>`;
+    }
+
+    /* ═══════ INIT ═══════ */
+
+    document.getElementById('skullBtn').addEventListener('click', handleClick);
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && window.parent !== window) {
@@ -298,7 +864,12 @@
       }
     });
 
-    updateDisplay();
+    window.addEventListener('beforeunload', save);
+
+    load();
+    loadCosmetics();
+    lastTick = Date.now();
+    render();
   </script>
 </body>
 </html>

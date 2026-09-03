@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE Leaderboards - Game high scores and community rankings.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Leaderboards | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/about.css">
+  <link rel="stylesheet" href="/css/pages/community.css">
+</head>
+<body data-page="community">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+    <h1 class="page-hero-title">Community</h1>
+    <p class="page-hero-subtitle">Where the chaos lives</p>
+  </section>
+
+  <!-- Sub-navigation -->
+  <nav class="community-subnav">
+    <div class="page-container">
+      <div class="subnav-links">
+        <a href="/community.html" class="subnav-link">Forums</a>
+        <a href="/community-stats.html" class="subnav-link">Viewer Stats</a>
+        <a href="/community-leaderboards.html" class="subnav-link active">Leaderboards</a>
+      </div>
+      <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="subnav-discord">Join Discord</a>
+    </div>
+  </nav>
+
+  <section class="page-container">
+
+    <div class="leaderboard-tabs">
+      <button class="leaderboard-tab active" data-board="skull-clicker">Skull Clicker</button>
+      <button class="leaderboard-tab" data-board="memory-match">Memory Match</button>
+      <button class="leaderboard-tab" data-board="commander-bingo">Commander Bingo</button>
+      <button class="leaderboard-tab" data-board="mana-clash">Mana Clash</button>
+    </div>
+
+    <div class="leaderboard-panels">
+
+      <div class="leaderboard-panel active" id="board-skull-clicker">
+        <div class="card leaderboard-table">
+          <div class="lb-header">
+            <span class="lb-col-rank">Rank</span>
+            <span class="lb-col-name">Player</span>
+            <span class="lb-col-score">High Score</span>
+          </div>
+          <div class="lb-row lb-gold"><span class="lb-col-rank">1</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-silver"><span class="lb-col-rank">2</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-bronze"><span class="lb-col-rank">3</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">4</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">5</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">6</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">7</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">8</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">9</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">10</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-empty">Leaderboard data coming soon</div>
+        </div>
+      </div>
+
+      <div class="leaderboard-panel" id="board-memory-match">
+        <div class="card leaderboard-table">
+          <div class="lb-header">
+            <span class="lb-col-rank">Rank</span>
+            <span class="lb-col-name">Player</span>
+            <span class="lb-col-score">Fewest Moves</span>
+          </div>
+          <div class="lb-row lb-gold"><span class="lb-col-rank">1</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-silver"><span class="lb-col-rank">2</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-bronze"><span class="lb-col-rank">3</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">4</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">5</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">6</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">7</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">8</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">9</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">10</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-empty">Leaderboard data coming soon</div>
+        </div>
+      </div>
+
+      <div class="leaderboard-panel" id="board-commander-bingo">
+        <div class="card leaderboard-table">
+          <div class="lb-header">
+            <span class="lb-col-rank">Rank</span>
+            <span class="lb-col-name">Player</span>
+            <span class="lb-col-score">Bingos</span>
+          </div>
+          <div class="lb-row lb-gold"><span class="lb-col-rank">1</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-silver"><span class="lb-col-rank">2</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-bronze"><span class="lb-col-rank">3</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">4</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">5</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">6</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">7</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">8</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">9</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">10</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-empty">Leaderboard data coming soon</div>
+        </div>
+      </div>
+
+      <div class="leaderboard-panel" id="board-mana-clash">
+        <div class="card leaderboard-table">
+          <div class="lb-header">
+            <span class="lb-col-rank">Rank</span>
+            <span class="lb-col-name">Player</span>
+            <span class="lb-col-score">High Score</span>
+          </div>
+          <div class="lb-row lb-gold"><span class="lb-col-rank">1</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-silver"><span class="lb-col-rank">2</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row lb-bronze"><span class="lb-col-rank">3</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">4</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">5</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">6</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">7</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">8</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">9</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-row"><span class="lb-col-rank">10</span><span class="lb-col-name">---</span><span class="lb-col-score">--</span></div>
+          <div class="lb-empty">Leaderboard data coming soon</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/leaderboards.js" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabs = document.querySelectorAll('.leaderboard-tab');
+      const panels = document.querySelectorAll('.leaderboard-panel');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          panels.forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById('board-' + tab.dataset.board).classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
