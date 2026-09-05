@@ -60,75 +60,17 @@
       position: relative;
       width: 100%;
       height: 100%;
-      background-color: #4a8a3a;
-      background-image:
-        radial-gradient(circle 1.5px at 30% 40%, #3f7a32 100%, transparent 100%),
-        radial-gradient(circle 1px at 70% 20%, #55994a 100%, transparent 100%),
-        radial-gradient(circle 1px at 50% 80%, #3f7a32 100%, transparent 100%);
-      background-size: 24px 24px;
       overflow: hidden;
+      background: #2d5a1e;
     }
-
-    /* Fence */
-    .park-fence {
+    .dino-ground, .dino-over {
       position: absolute;
-      pointer-events: none;
-      z-index: 10;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      image-rendering: pixelated;
     }
-    .fence-h {
-      left: 4px; right: 4px; height: 14px;
-      background: repeating-linear-gradient(90deg,
-        #8B5E3C 0px, #8B5E3C 3px,
-        #a0704d 3px, #a0704d 10px,
-        #8B5E3C 10px, #8B5E3C 13px,
-        #6B4226 13px, #6B4226 14px
-      );
-      border-top: 2px solid #5a3a1e;
-      border-bottom: 2px solid #5a3a1e;
-    }
-    .fence-h.top { top: 4px; }
-    .fence-h.bottom { bottom: 4px; }
-    .fence-v {
-      top: 4px; bottom: 4px; width: 14px;
-      background: repeating-linear-gradient(180deg,
-        #8B5E3C 0px, #8B5E3C 3px,
-        #a0704d 3px, #a0704d 10px,
-        #8B5E3C 10px, #8B5E3C 13px,
-        #6B4226 13px, #6B4226 14px
-      );
-      border-left: 2px solid #5a3a1e;
-      border-right: 2px solid #5a3a1e;
-    }
-    .fence-v.left { left: 4px; }
-    .fence-v.right { right: 4px; }
-
-    /* Pond */
-    .park-pond {
-      position: absolute;
-      border-radius: 50%;
-      background: radial-gradient(ellipse at 40% 40%, #4a9ecc, #2980b9, #1a6090);
-      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3), 0 0 6px rgba(41,128,185,0.3);
-      z-index: 2;
-      opacity: 0.85;
-    }
-    .park-pond::after {
-      content: '';
-      position: absolute;
-      top: 20%; left: 25%;
-      width: 30%; height: 15%;
-      background: rgba(255,255,255,0.15);
-      border-radius: 50%;
-      transform: rotate(-20deg);
-    }
-
-    /* Dirt patches */
-    .park-dirt {
-      position: absolute;
-      border-radius: 50%;
-      background: radial-gradient(ellipse at 50% 50%, #8a6b4a, #6d5438);
-      z-index: 1;
-      opacity: 0.6;
-    }
+    .dino-ground { z-index: 0; }
+    .dino-over   { z-index: 1; }
 
     /* Decorations */
     .park-deco {
@@ -208,6 +150,99 @@
     }
     .park-debris:hover { transform: scale(1.3); filter: brightness(1.3) drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); }
     .park-debris.clearing { transform: scale(0); opacity: 0; }
+
+    /* Yard items */
+    .park-yard-item {
+      position: absolute; z-index: 3; pointer-events: none;
+      transform: translate(-50%, -85%);
+      transition: transform 0.15s, opacity 0.2s;
+      filter: drop-shadow(1px 2px 1px rgba(0,0,0,0.45));
+    }
+    .park-yard-item img { image-rendering: pixelated; display: block; }
+    body.decorating .park-yard-item { pointer-events: auto; cursor: pointer; }
+    body.decorating .park-yard-item:hover {
+      transform: translate(-50%, -85%) scale(1.15);
+      filter: brightness(1.25) drop-shadow(0 0 4px #FF0000);
+    }
+    .park-yard-item.placing { animation: yardPop 0.25s ease-out; }
+    .park-yard-item.removing { transform: translate(-50%, -85%) scale(0); opacity: 0; }
+    @keyframes yardPop {
+      0% { transform: translate(-50%, -85%) scale(0.2); opacity: 0; }
+      70% { transform: translate(-50%, -85%) scale(1.12); opacity: 1; }
+      100% { transform: translate(-50%, -85%) scale(1); opacity: 1; }
+    }
+
+    /* Stream time-of-day */
+    .park-daylight {
+      position: absolute; inset: 0; z-index: 6; pointer-events: none;
+      mix-blend-mode: multiply; opacity: 0;
+      transition: background 2s linear, opacity 2s linear;
+    }
+    .park-daylight.tinted { opacity: 1; }
+
+    .park-clock {
+      position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+      z-index: 12; display: flex; align-items: center; gap: 7px;
+      background: rgba(0,0,0,0.75); padding: 4px 10px; border-radius: 4px;
+      border: 1px solid #ffffff14; white-space: nowrap;
+    }
+    .clock-phase { font-size: 12px; line-height: 1; }
+    .clock-text { display: flex; flex-direction: column; gap: 1px; }
+    .clock-name {
+      font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #ccc; line-height: 1;
+    }
+    .clock-sub { font-size: 8px; color: #666; line-height: 1; }
+    .park-clock.live { border-color: #FF000045; }
+    .park-clock.live .clock-name { color: #FF3333; }
+    .clock-live-dot {
+      width: 5px; height: 5px; border-radius: 50%; background: #FF0000;
+      animation: clockPulse 2s ease-in-out infinite;
+    }
+    @keyframes clockPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @media (prefers-reduced-motion: reduce) {
+      .clock-live-dot { animation: none; }
+      .park-daylight { transition: none; }
+    }
+
+    /* Decorate mode */
+    .park-decorate-btn {
+      position: absolute; top: 22px; left: 22px; z-index: 12;
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(0,0,0,0.75); padding: 5px 9px; border-radius: 4px;
+      border: 1px solid #ffffff14; color: #bbb; cursor: pointer;
+      font-family: inherit; font-size: 10px; letter-spacing: 0.06em;
+      text-transform: uppercase; transition: border-color 0.15s, color 0.15s;
+    }
+    .park-decorate-btn:hover { border-color: #FF000060; color: #fff; }
+    .park-decorate-btn.active { border-color: #FF0000; color: #FF0000; background: rgba(40,0,0,0.85); }
+
+    .yard-tray {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 13;
+      background: rgba(0,0,0,0.92); border-top: 1px solid #FF000040;
+      padding: 8px 10px; display: none;
+    }
+    .yard-tray.open { display: block; }
+    .yard-tray-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 7px; font-size: 9px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #666;
+    }
+    .yard-tray-hint { color: #555; text-transform: none; letter-spacing: 0; font-size: 9px; }
+    .yard-tray-items { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+    .yard-item-btn {
+      flex: 0 0 auto; width: 62px; padding: 6px 3px 5px;
+      background: #0a0a0a; border: 1px solid #ffffff12; border-radius: 3px;
+      cursor: pointer; text-align: center; font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .yard-item-btn:hover:not(:disabled) { border-color: #FF000060; background: #140505; }
+    .yard-item-btn.selected { border-color: #FF0000; background: #1e0505; }
+    .yard-item-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .yard-item-btn img { image-rendering: pixelated; display: block; margin: 0 auto 3px; }
+    .yard-item-name { font-size: 8px; color: #999; letter-spacing: 0.04em; display: block; }
+    .yard-item-cost { font-size: 9px; color: #d4a017; display: block; margin-top: 1px; }
+    .yard-item-btn.selected .yard-item-name { color: #fff; }
 
     /* Energy bar */
     .park-energy-bar {
@@ -335,6 +370,8 @@
     .panel-stat-fill.hunger { background: linear-gradient(90deg, #c0392b, #e67e22); }
     .panel-stat-fill.thirst { background: linear-gradient(90deg, #2980b9, #3498db); }
     .panel-stat-fill.happiness { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+    .panel-stat-fill.hygiene { background: linear-gradient(90deg, #8e44ad, #9b59b6); }
+    .panel-stat-fill.stamina { background: linear-gradient(90deg, #d35400, #e67e22); }
 
     /* Growth row */
     .panel-growth {
@@ -633,6 +670,8 @@
     .coll-dot.filled.hunger { background: #e67e22; }
     .coll-dot.filled.thirst { background: #3498db; }
     .coll-dot.filled.happiness { background: #2ecc71; }
+    .coll-dot.filled.hygiene { background: #9b59b6; }
+    .coll-dot.filled.stamina { background: #e67e22; }
 
     .coll-attrs {
       display: flex; gap: 12px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap;
@@ -802,13 +841,26 @@
       <span class="energy-text" id="energyText">10/10</span>
       <button class="energy-refill" id="energyRefill" onclick="refillEnergy()">🔋 25</button>
     </div>
+    <button class="park-decorate-btn" id="decorateBtn" onclick="toggleDecorateMode()">🌿 Decorate</button>
+    <div class="park-clock" id="parkClock">
+      <span class="clock-phase" id="clockPhase">🌙</span>
+      <span class="clock-text">
+        <span class="clock-name" id="clockName">Night</span>
+        <span class="clock-sub" id="clockSub">Stream offline</span>
+      </span>
+    </div>
     <div class="park-world" id="parkWorld">
-      <!-- Fence -->
-      <div class="park-fence fence-h top"></div>
-      <div class="park-fence fence-h bottom"></div>
-      <div class="park-fence fence-v left"></div>
-      <div class="park-fence fence-v right"></div>
-      <!-- Dynamic content rendered by JS -->
+      <canvas id="dinoGround" class="dino-ground" aria-hidden="true"></canvas>
+      <canvas id="dinoOver" class="dino-over" aria-hidden="true"></canvas>
+      <div class="park-daylight" id="parkDaylight" aria-hidden="true"></div>
+      <!-- Dinos, yard items, and UI rendered as DOM by JS -->
+    </div>
+    <div class="yard-tray" id="yardTray">
+      <div class="yard-tray-head">
+        <span>Yard Decor</span>
+        <span class="yard-tray-hint" id="yardTrayHint">Pick an item, then tap the ground to place it.</span>
+      </div>
+      <div class="yard-tray-items" id="yardTrayItems"></div>
     </div>
     <div class="park-panel" id="parkPanel"></div>
   </div>
@@ -934,8 +986,235 @@ const ROSTER = [
   { id:'megashark', name:'Megalodon', emoji:'🦈', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Miocene', desc:'A 60-foot shark. The ocean\'s ultimate nightmare, now in your park.' },
   { id:'quetz', name:'Quetzalcoatlus', emoji:'🦅', rarity:'legendary', diet:'Carnivore', habitat:'Sky', era:'Cretaceous', desc:'Giraffe-sized pterosaur. The largest creature to ever fly.' },
   { id:'liopl', name:'Liopleurodon', emoji:'🐋', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Jurassic', desc:'Massive marine predator with jaws built like a bear trap.' },
-  { id:'titano', name:'Titanoboa', emoji:'🐍', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Paleocene', desc:'50-foot snake. The undisputed ruler of the post-dino swamps.' },
+  { id:'anomal', name:'Anomalocaris', emoji:'🦑', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Cambrian', desc:'The first apex predator. Half a billion years old and still terrifying.' },
+  { id:'cerato', name:'Ceratosaurus', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'Horn-nosed hunter with blade-like teeth. A Jurassic ambush specialist.' },
+  { id:'ornitho', name:'Ornithomimus', emoji:'🐔', rarity:'common', diet:'Omnivore', habitat:'Land', era:'Cretaceous', desc:'Bird mimic built for speed. Sprints at 40 mph on long legs.' },
+  { id:'trood', name:'Troodon', emoji:'🦎', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Biggest brain-to-body ratio of any dinosaur. Nocturnal genius.' },
+  { id:'amarg', name:'Amargasaurus', emoji:'🦕', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Double row of neck spines. A sauropod punk rocker.' },
+  { id:'concav', name:'Concavenator', emoji:'🦖', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Hump-backed hunter from Spain. That sail is still a mystery.' },
+  { id:'cryo', name:'Cryolophosaurus', emoji:'🦖', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'Antarctica\'s frozen king. Crested predator from a lost continent.' },
+  { id:'deinoch', name:'Deinocheirus', emoji:'🦖', rarity:'rare', diet:'Omnivore', habitat:'Land', era:'Cretaceous', desc:'8-foot arms on a hump-backed giant. The weirdest dinosaur ever found.' },
+  { id:'guanl', name:'Guanlong', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'Crested ancestor of T. rex. Small now, but royalty runs in the blood.' },
+  { id:'hetero', name:'Heterodontosaurus', emoji:'🦎', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Tiny fanged herbivore. Those tusks are for display, not dinner.' },
+  { id:'mamen', name:'Mamenchisaurus', emoji:'🦕', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Neck longer than a school bus. China\'s most extreme sauropod.' },
+  { id:'niger', name:'Nigersaurus', emoji:'🦕', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'500 teeth in a vacuum-cleaner mouth. The lawn mower of the Cretaceous.' },
+  { id:'plat', name:'Plateosaurus', emoji:'🦕', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Triassic', desc:'One of the first giant plant-eaters. Triassic trailblazer.' },
+  { id:'psitt', name:'Psittacosaurus', emoji:'🐦', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Parrot-beaked with quill-like tail bristles. Adorably weird.' },
+  { id:'sinosaur', name:'Sinosauropteryx', emoji:'🐦', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'First dinosaur found with feathers. A fluffy little predator.' },
+  { id:'stygi', name:'Stygimoloch', emoji:'🐏', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Horned dome-head from the river Styx. Headbutts first, asks later.' },
+  { id:'yuty', name:'Yutyrannus', emoji:'🦖', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'30-foot feathered tyrannosaur. Proof that fluffy can be terrifying.' },
+  { id:'anhan', name:'Anhanguera', emoji:'🦅', rarity:'uncommon', diet:'Piscivore', habitat:'Sky', era:'Cretaceous', desc:'Crested pterosaur with a 15-foot wingspan. Fish never stood a chance.' },
+  { id:'hatz', name:'Hatzegopteryx', emoji:'🦅', rarity:'epic', diet:'Carnivore', habitat:'Sky', era:'Cretaceous', desc:'Island giant with a skull like a battering ram. Ate small dinosaurs.' },
+  { id:'ptdac', name:'Pterodactylus', emoji:'🦇', rarity:'common', diet:'Piscivore', habitat:'Sky', era:'Jurassic', desc:'The original pterosaur. Small, nimble, and endlessly curious.' },
+  { id:'tape', name:'Tapejara', emoji:'🦅', rarity:'uncommon', diet:'Omnivore', habitat:'Sky', era:'Cretaceous', desc:'Spectacular sail-crest for display. The peacock of the pterosaurs.' },
+  { id:'nycto', name:'Nyctosaurus', emoji:'🦇', rarity:'uncommon', diet:'Piscivore', habitat:'Sky', era:'Cretaceous', desc:'Antler-crested ocean glider. That crest was taller than its body.' },
+  { id:'dunky', name:'Dunkleosteus', emoji:'🐟', rarity:'epic', diet:'Carnivore', habitat:'Water', era:'Devonian', desc:'30-foot armored fish with self-sharpening bone blades for jaws.' },
+  { id:'krono', name:'Kronosaurus', emoji:'🐋', rarity:'epic', diet:'Carnivore', habitat:'Water', era:'Cretaceous', desc:'Named after the titan Kronos. 30-foot marine predator with 10-inch teeth.' },
+  { id:'tylo', name:'Tylosaurus', emoji:'🐉', rarity:'rare', diet:'Carnivore', habitat:'Water', era:'Cretaceous', desc:'45-foot mosasaur that ruled the Western Interior Seaway.' },
+  { id:'notho', name:'Nothosaurus', emoji:'🦎', rarity:'uncommon', diet:'Piscivore', habitat:'Water', era:'Triassic', desc:'Semi-aquatic reptile. Half on land, half in the sea, fully deadly.' },
+  { id:'shoni', name:'Shonisaurus', emoji:'🐋', rarity:'rare', diet:'Piscivore', habitat:'Water', era:'Triassic', desc:'School-bus-sized ichthyosaur. The gentle giant of ancient oceans.' },
+  { id:'archel', name:'Archelon', emoji:'🐢', rarity:'uncommon', diet:'Herbivore', habitat:'Water', era:'Cretaceous', desc:'13-foot sea turtle. Slow, ancient, and impossibly serene.' },
+  { id:'heli', name:'Helicoprion', emoji:'🦈', rarity:'rare', diet:'Carnivore', habitat:'Water', era:'Permian', desc:'Buzz-saw jaw shark. That spiral of teeth haunts paleontologists.' },
+  { id:'megarach', name:'Megarachne', emoji:'🕷️', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Carboniferous', desc:'Giant Carboniferous spider. Oxygen-rich air grew them terrifyingly big.' },
+  { id:'tbird', name:'Terror Bird', emoji:'🦅', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Cenozoic', desc:'Flightless apex predator. 10 feet of beak, fury, and speed.' },
+  { id:'wrhino', name:'Woolly Rhino', emoji:'🦏', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Pleistocene', desc:'Ice Age tank with a 3-foot horn. Built for blizzards and brawls.' },
+  { id:'cbear', name:'Cave Bear', emoji:'🐻', rarity:'uncommon', diet:'Omnivore', habitat:'Land', era:'Pleistocene', desc:'Twice the size of a grizzly. Ruled Europe\'s caves for millennia.' },
+  { id:'clion', name:'Cave Lion', emoji:'🦁', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Pleistocene', desc:'Largest cat that ever lived. Even mammoths watched their backs.' },
+  { id:'dwolf', name:'Dire Wolf', emoji:'🐺', rarity:'uncommon', diet:'Carnivore', habitat:'Land', era:'Pleistocene', desc:'Heavier and stronger than modern wolves. Hunted in massive packs.' },
+  { id:'gsloth', name:'Giant Ground Sloth', emoji:'🦥', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Pleistocene', desc:'20-foot sloth with claws like machetes. Slow but unstoppable.' },
+  { id:'glypto', name:'Glyptodon', emoji:'🐢', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Pleistocene', desc:'Car-sized armadillo with a spiked tail club. Nature\'s bowling ball.' },
+  { id:'masto', name:'Mastodon', emoji:'🦣', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Miocene', desc:'Forest-dwelling cousin of the mammoth. Shorter tusks, thicker build.' },
+  { id:'andrew', name:'Andrewsarchus', emoji:'🐗', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Eocene', desc:'Largest land predatory mammal ever. A wolf-shaped nightmare at 6 feet tall.' },
+  { id:'entelo', name:'Entelodont', emoji:'🐗', rarity:'uncommon', diet:'Omnivore', habitat:'Land', era:'Eocene', desc:'Hell pig. Bone-crushing jaws on a body built for bad decisions.' },
 ];
+
+/* ======================== ASSET SYSTEM ======================== */
+const AB = 'assets/dino-assets/';
+const IC = AB + 'jurassic-dino-320/icons/';
+const EX = AB + 'jurassic-dino-320-expansion160/icons/';
+const BP = AB + 'AncientBeastsPack/';
+
+const ASSET_MAP = {
+  compy:    { icon: IC+'dinosaurs/compsognathus.png' },
+  proto:    { icon: IC+'dinosaurs/protoceratops.png' },
+  galli:    { icon: IC+'dinosaurs/gallimimus.png' },
+  coelo:    { icon: EX+'more_named_species/coelophysis.png' },
+  dimetro:  { icon: IC+'dinosaurs/dimetrodon.png' },
+  iguan:    { icon: IC+'dinosaurs/iguanodon.png' },
+  edmont:   { icon: IC+'dinosaurs/hadrosaur.png' },
+  maia:     { icon: EX+'more_named_species/lambeosaurus.png' },
+  dimor:    { icon: EX+'flying_marine_reptiles/dimorphodon.png' },
+  pachy:    { icon: IC+'dinosaurs/pachycephalosaurus.png' },
+  kentro:   { icon: IC+'dinosaurs/kentrosaurus.png' },
+  ovira:    { icon: IC+'dinosaurs/oviraptor.png' },
+  micro:    { icon: IC+'dinosaurs/microraptor.png' },
+  archae:   { icon: IC+'dinosaurs/archaeopteryx.png' },
+  dodo:     { icon: IC+'prehistoric_mammals/dodo_bird.png' },
+  raptor:   { icon: IC+'dinosaurs/velociraptor.png', portrait: BP+'Raptor-72x72.png', baby: IC+'baby_eggs/baby_raptor.png', ic:'saturate(1.7) brightness(1.2)' },
+  dilopho:  { icon: IC+'dinosaurs/dilophosaurus.png', portrait: BP+'Dilophosaurus-72x72.png', ic:'hue-rotate(54deg) saturate(0.6) brightness(1.3)' },
+  stego:    { icon: IC+'dinosaurs/stegosaurus.png', portrait: BP+'Stegosaurus-72x72.png', baby: IC+'baby_eggs/baby_stegosaurus.png', ic:'hue-rotate(102deg) saturate(0.7) brightness(1.3)' },
+  para:     { icon: IC+'dinosaurs/parasaurolophus.png', portrait: BP+'Parasaurolophus-72x72.png' },
+  baryo:    { icon: IC+'dinosaurs/baryonyx.png' },
+  cory:     { icon: IC+'dinosaurs/corythosaurus.png' },
+  styra:    { icon: IC+'dinosaurs/styracosaurus.png' },
+  rhamph:   { icon: EX+'flying_marine_reptiles/rhamphorhynchus.png' },
+  ichthy:   { icon: IC+'dinosaurs/ichthyosaur.png', portrait: BP+'Ichthyosaurus-72x72.png', ic:'hue-rotate(-70deg) saturate(2.5) brightness(1.2)' },
+  megalo:   { icon: IC+'dinosaurs/megalosaurus.png' },
+  utah:     { icon: IC+'dinosaurs/utahraptor.png' },
+  deino:    { icon: IC+'dinosaurs/deinonychus.png' },
+  trike:    { icon: IC+'dinosaurs/triceratops.png', portrait: BP+'Triceratops-72x72.png', baby: IC+'baby_eggs/baby_triceratops.png', ic:'saturate(2.2) brightness(1.2)' },
+  allo:     { icon: IC+'dinosaurs/allosaurus.png' },
+  anky:     { icon: IC+'dinosaurs/ankylosaurus.png', portrait: BP+'Ankylosaurus-72x72.png', baby: IC+'baby_eggs/baby_ankylosaur.png', ic:'hue-rotate(-23deg) saturate(0.75) brightness(1.2)' },
+  diplo:    { icon: IC+'dinosaurs/diplodocus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  carno:    { icon: IC+'dinosaurs/carnotaurus.png' },
+  plesio:   { icon: IC+'dinosaurs/plesiosaurus.png', portrait: BP+'Plesiosaurus-72x72.png', ic:'hue-rotate(-14deg) saturate(6) brightness(1.3)' },
+  pterano:  { icon: IC+'dinosaurs/pteranodon.png', portrait: BP+'Pteranodon-72x72.png', baby: IC+'baby_eggs/baby_pteranodon.png' },
+  brachio:  { icon: IC+'dinosaurs/brachiosaurus.png', portrait: BP+'Brachiosaurus-72x72.png', baby: IC+'baby_eggs/baby_brachiosaurus.png', ic:'hue-rotate(81deg) saturate(1.2) brightness(1.1)' },
+  smilo:    { icon: IC+'prehistoric_mammals/smilodon.png', portrait: BP+'Smilodon-72x72.png', ic:'saturate(0.8) brightness(1.2)' },
+  therizo:  { icon: IC+'dinosaurs/therizinosaurus.png' },
+  trex:     { icon: IC+'dinosaurs/tyrannosaurus_rex.png', portrait: BP+'T-Rex-72x72.png', baby: IC+'baby_eggs/baby_t_rex.png', ic:'hue-rotate(-160deg) saturate(0.6) brightness(1.15)' },
+  spino:    { icon: IC+'dinosaurs/spinosaurus.png', portrait: BP+'Spinosaurus-72x72.png', ic:'hue-rotate(185deg) saturate(1.3) brightness(1.15)' },
+  apato:    { icon: IC+'dinosaurs/apatosaurus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  gigano:   { icon: IC+'dinosaurs/giganotosaurus.png' },
+  mosa:     { icon: IC+'dinosaurs/mosasaurus.png' },
+  bronto:   { icon: IC+'dinosaurs/brontosaurus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  mammoth:  { icon: IC+'prehistoric_mammals/woolly_mammoth.png' },
+  elasmo:   { icon: EX+'flying_marine_reptiles/elasmosaurus.png' },
+  argent:   { icon: IC+'dinosaurs/long_neck_dinosaur.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  megashark:{ icon: EX+'flying_marine_reptiles/megalodon.png' },
+  quetz:    { icon: IC+'dinosaurs/quetzalcoatlus.png' },
+  liopl:    { icon: EX+'flying_marine_reptiles/liopleurodon.png' },
+  anomal:   { icon: EX+'flying_marine_reptiles/anomalocaris.png' },
+  cerato:   { icon: IC+'dinosaurs/ceratosaurus.png' },
+  ornitho:  { icon: IC+'dinosaurs/ornithomimus.png' },
+  trood:    { icon: IC+'dinosaurs/troodon.png' },
+  amarg:    { icon: EX+'more_named_species/amargasaurus.png' },
+  concav:   { icon: EX+'more_named_species/concavenator.png' },
+  cryo:     { icon: EX+'more_named_species/cryolophosaurus.png' },
+  deinoch:  { icon: EX+'more_named_species/deinocheirus.png' },
+  guanl:    { icon: EX+'more_named_species/guanlong.png' },
+  hetero:   { icon: EX+'more_named_species/heterodontosaurus.png' },
+  mamen:    { icon: EX+'more_named_species/mamenchisaurus.png' },
+  niger:    { icon: EX+'more_named_species/nigersaurus.png' },
+  plat:     { icon: EX+'more_named_species/plateosaurus.png' },
+  psitt:    { icon: EX+'more_named_species/psittacosaurus.png' },
+  sinosaur: { icon: EX+'more_named_species/sinosauropteryx.png' },
+  stygi:    { icon: EX+'more_named_species/stygimoloch.png' },
+  yuty:     { icon: EX+'more_named_species/yutyrannus.png' },
+  anhan:    { icon: EX+'flying_marine_reptiles/anhanguera.png' },
+  hatz:     { icon: EX+'flying_marine_reptiles/hatzegopteryx.png' },
+  ptdac:    { icon: EX+'flying_marine_reptiles/pterodactylus.png' },
+  tape:     { icon: EX+'flying_marine_reptiles/tapejara.png' },
+  nycto:    { icon: EX+'flying_marine_reptiles/nyctosaurus.png' },
+  dunky:    { icon: EX+'flying_marine_reptiles/dunkleosteus.png' },
+  krono:    { icon: EX+'flying_marine_reptiles/kronosaurus.png' },
+  tylo:     { icon: EX+'flying_marine_reptiles/tylosaurus.png' },
+  notho:    { icon: EX+'flying_marine_reptiles/nothosaurus.png' },
+  shoni:    { icon: EX+'flying_marine_reptiles/shonisaurus.png' },
+  archel:   { icon: EX+'flying_marine_reptiles/archelon_sea_turtle.png' },
+  heli:     { icon: EX+'flying_marine_reptiles/helicoprion.png' },
+  megarach: { icon: BP+'Megarachne-72x72.png', portrait: BP+'Megarachne-72x72.png' },
+  tbird:    { icon: IC+'prehistoric_mammals/terror_bird.png' },
+  wrhino:   { icon: IC+'prehistoric_mammals/woolly_rhino.png' },
+  cbear:    { icon: IC+'prehistoric_mammals/cave_bear.png' },
+  clion:    { icon: IC+'prehistoric_mammals/cave_lion.png' },
+  dwolf:    { icon: IC+'prehistoric_mammals/prehistoric_dire_wolf.png' },
+  gsloth:   { icon: IC+'prehistoric_mammals/giant_ground_sloth.png' },
+  glypto:   { icon: IC+'prehistoric_mammals/glyptodon.png' },
+  masto:    { icon: IC+'prehistoric_mammals/mastodon.png' },
+  andrew:   { icon: IC+'prehistoric_mammals/andrewsarchus.png' },
+  entelo:   { icon: IC+'prehistoric_mammals/entelodont.png' },
+};
+
+const EGG_ASSETS = {
+  common:    IC+'baby_eggs/green_dino_egg.png',
+  uncommon:  IC+'baby_eggs/blue_dino_egg.png',
+  rare:      IC+'baby_eggs/spotted_dino_egg.png',
+  epic:      IC+'baby_eggs/rare_dino_egg.png',
+  legendary: IC+'baby_eggs/golden_dino_egg.png',
+  hatching:  IC+'baby_eggs/hatching_egg.png',
+  nest:      IC+'baby_eggs/egg_in_nest.png',
+  clutch:    IC+'baby_eggs/egg_clutch.png',
+};
+
+const DECO_ASSETS = [
+  { src: IC+'prehistoric_plants/tropical_fern.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/prehistoric_palm.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/giant_fern.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/cycad.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/horsetail_plant.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/moss_mound.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/giant_prehistoric_mushroom.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/prehistoric_bush.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/tree_fern.png', cls:'plant' },
+  { src: IC+'prehistoric_plants/ginkgo_tree.png', cls:'plant' },
+  { src: IC+'environment_terrain/rock_formation.png', cls:'rock' },
+  { src: IC+'environment_terrain/rocky_cliff.png', cls:'rock' },
+  { src: IC+'prehistoric_plants/mossy_log.png', cls:'rock' },
+  { src: IC+'environment_terrain/muddy_ground.png', cls:'rock' },
+  { src: IC+'environment_terrain/dino_nest_ground.png', cls:'rock' },
+  { src: IC+'prehistoric_plants/giant_grass_tuft.png', cls:'plant' },
+];
+
+const FOSSIL_ASSETS = [
+  IC+'fossils_bones/dinosaur_skull.png',
+  IC+'fossils_bones/rib_cage.png',
+  IC+'fossils_bones/claw_fossil.png',
+  IC+'fossils_bones/tooth_fossil.png',
+  IC+'fossils_bones/dino_skeleton.png',
+  IC+'fossils_bones/amber_with_insect.png',
+  IC+'fossils_bones/footprint_fossil.png',
+  IC+'fossils_bones/bone_fragment.png',
+  IC+'fossils_bones/t_rex_skull.png',
+  IC+'fossils_bones/triceratops_skull.png',
+  IC+'fossils_bones/raptor_skull.png',
+  IC+'fossils_bones/fossilized_egg.png',
+  IC+'fossils_bones/trilobite_fossil.png',
+  IC+'fossils_bones/ammonite_fossil.png',
+];
+
+const MUTATION_FILTERS = {
+  albino:     'brightness(2) saturate(0)',
+  melanistic: 'brightness(0.25) saturate(0.4)',
+  golden:     'sepia(1) brightness(1.3) saturate(2.5)',
+  crystal:    'brightness(1.4) saturate(0.3) hue-rotate(180deg)',
+  volcanic:   'brightness(0.7) sepia(0.6) hue-rotate(-15deg) saturate(3)',
+  phantomace: 'brightness(0.8) saturate(2.5) hue-rotate(0deg) contrast(1.2)',
+  spectral:   'brightness(1.4) saturate(0.15) opacity(0.65)',
+  toxic:      'hue-rotate(90deg) saturate(2.2) brightness(0.95)',
+};
+
+const COLOR_SWAP_FILTERS = {
+  crimson:   'hue-rotate(-10deg) saturate(2.5) brightness(0.85)',
+  azure:     'hue-rotate(200deg) saturate(1.5)',
+  jade:      'hue-rotate(120deg) saturate(1.8)',
+  violet:    'hue-rotate(270deg) saturate(1.6)',
+  amber:     'hue-rotate(40deg) saturate(2) brightness(1.1)',
+  obsidian:  'brightness(0.3) saturate(0.3)',
+  ivory:     'brightness(1.6) saturate(0.2)',
+  rust:      'hue-rotate(15deg) saturate(1.8) brightness(0.75)',
+  teal:      'hue-rotate(160deg) saturate(1.5)',
+  rose:      'hue-rotate(330deg) saturate(1.8) brightness(1.1)',
+  slate:     'saturate(0.2) brightness(0.7)',
+  copper:    'hue-rotate(25deg) sepia(0.5) saturate(2)',
+};
+
+function getMutFilter(specId, mutation) {
+  if (!mutation) return '';
+  if (MUTATION_FILTERS[mutation]) return MUTATION_FILTERS[mutation];
+  const swapKey = Object.keys(COLOR_SWAPS||{}).find(k => COLOR_SWAPS[k].id === mutation || k === mutation);
+  if (swapKey && COLOR_SWAP_FILTERS[swapKey]) return COLOR_SWAP_FILTERS[swapKey];
+  if (COLOR_SWAP_FILTERS[mutation]) return COLOR_SWAP_FILTERS[mutation];
+  return 'hue-rotate(30deg) saturate(1.3)';
+}
+
+function preloadAssets() {
+  const urls = new Set();
+  Object.values(ASSET_MAP).forEach(a => { if(a.icon) urls.add(a.icon); if(a.portrait) urls.add(a.portrait); if(a.baby) urls.add(a.baby); });
+  Object.values(EGG_ASSETS).forEach(u => urls.add(u));
+  DECO_ASSETS.forEach(d => urls.add(d.src));
+  urls.forEach(u => { const img = new Image(); img.src = u; });
+}
 
 /* ======================== PIXEL ART SPRITES ======================== */
 // ==================== SPRITE SYSTEM v3 — HD ====================
@@ -1001,7 +1280,46 @@ const SPECIES_DEF = {
   megashark:{t:'marine',p:'#4A5568',a:'#788898',i:'#B0C4DE'},
   quetz:{t:'flyer',p:'#FF6347',a:'#FF9878',i:'#FFD700'},
   liopl:{t:'marine',p:'#1E3A5F',a:'#486898',i:'#4169E1'},
-  titano:{t:'marine',p:'#556B2F',a:'#88A848',i:'#ADFF2F'},
+  anomal:{t:'marine',p:'#6A3A3A',a:'#984848',i:'#FF0000'},
+  cerato:{t:'rex',p:'#B84040',a:'#E07060',i:'#FFD700'},
+  ornitho:{t:'raptor',p:'#A69050',a:'#D0B870',i:'#8B4513'},
+  trood:{t:'raptor',p:'#6A7B50',a:'#98B068',i:'#7FFF00'},
+  amarg:{t:'sauropod',p:'#7A6B8E',a:'#A898C0',i:'#DDA0DD'},
+  concav:{t:'rex',p:'#8B4A4A',a:'#C07868',i:'#FF6347'},
+  cryo:{t:'rex',p:'#3A6A8A',a:'#68A8D0',i:'#00BFFF'},
+  deinoch:{t:'rex',p:'#8B7040',a:'#C0A060',i:'#DAA520'},
+  guanl:{t:'raptor',p:'#B87830',a:'#E0A050',i:'#FF8C00'},
+  hetero:{t:'raptor',p:'#6A8860',a:'#98B888',i:'#32CD32'},
+  mamen:{t:'sauropod',p:'#8A7A60',a:'#B8A888',i:'#BDB76B'},
+  niger:{t:'sauropod',p:'#708060',a:'#98A888',i:'#6B8E23'},
+  plat:{t:'sauropod',p:'#A08868',a:'#C8B090',i:'#DAA520'},
+  psitt:{t:'horned',p:'#C87838',a:'#F0A060',i:'#FF8C00'},
+  sinosaur:{t:'raptor',p:'#B06040',a:'#D89068',i:'#FF4500'},
+  stygi:{t:'armored',p:'#6A5050',a:'#988080',i:'#CD5C5C'},
+  yuty:{t:'rex',p:'#4A4A40',a:'#787868',i:'#FFD700'},
+  anhan:{t:'flyer',p:'#7A8890',a:'#A8B8C0',i:'#87CEEB'},
+  hatz:{t:'flyer',p:'#8B6940',a:'#C0A068',i:'#FF8C00'},
+  ptdac:{t:'flyer',p:'#90A878',a:'#B8D0A0',i:'#ADFF2F'},
+  tape:{t:'flyer',p:'#C86838',a:'#F09060',i:'#FF6347'},
+  nycto:{t:'flyer',p:'#506878',a:'#7898A8',i:'#B0C4DE'},
+  dunky:{t:'marine',p:'#4A5A5A',a:'#78888A',i:'#20B2AA'},
+  krono:{t:'marine',p:'#3A4A5A',a:'#607888',i:'#4169E1'},
+  tylo:{t:'marine',p:'#3A5A4A',a:'#608878',i:'#00CED1'},
+  notho:{t:'marine',p:'#5A8070',a:'#88B0A0',i:'#48D1CC'},
+  shoni:{t:'marine',p:'#5A6A7A',a:'#889AA8',i:'#87CEEB'},
+  archel:{t:'marine',p:'#5A7A5A',a:'#88A888',i:'#2E8B57'},
+  heli:{t:'marine',p:'#5A5A6A',a:'#808098',i:'#B0C4DE'},
+  megarach:{t:'raptor',p:'#3A3A3A',a:'#5A5A5A',i:'#FF0000'},
+  tbird:{t:'raptor',p:'#8B5A3A',a:'#C08858',i:'#FF6347'},
+  wrhino:{t:'beast',p:'#8A7A6A',a:'#B0A898',i:'#BDB76B'},
+  cbear:{t:'beast',p:'#7A5A40',a:'#A88060',i:'#DAA520'},
+  clion:{t:'beast',p:'#C0A060',a:'#E0C888',i:'#FFD700'},
+  dwolf:{t:'beast',p:'#5A5A5A',a:'#888888',i:'#B0C4DE'},
+  gsloth:{t:'beast',p:'#7A6A50',a:'#A89878',i:'#DAA520'},
+  glypto:{t:'armored',p:'#6A7A6A',a:'#98A898',i:'#2E8B57'},
+  masto:{t:'beast',p:'#6A5040',a:'#987868',i:'#CD853F'},
+  andrew:{t:'beast',p:'#8B5A30',a:'#C08450',i:'#FF4500'},
+  entelo:{t:'beast',p:'#8A6A5A',a:'#B89888',i:'#8B4513'},
 };
 
 const MUTATIONS = {
@@ -1083,9 +1401,48 @@ const SPECIAL_MUTS={
   elasmo:['Spectral','#6A7A8A','#A0B0C0','#E0E8FF','frost'],
   megashark:['Blood Water','#3A0A0A','#8B0000','#FF0000','ember'],
   liopl:['Abyss','#0A0A1A','#1A2A4A','#4169E1','shadow'],
-  titano:['Venomous','#1A3A1A','#00FF00','#ADFF2F','bloom'],
   smilo:['Frost Fang','#8AA8C8','#C0D8F0','#00BFFF','frost'],
   mammoth:['Elder Sage','#4A3A3A','#7A5A4A','#DAA520','stellar'],
+  anomal:['Primordial','#2A0A2A','#8A2BE2','#FF00FF','shadow'],
+  cerato:['Blood Horn','#5A0A0A','#DC143C','#FF4500','ember'],
+  ornitho:['Roadrunner','#8B7A2A','#FFD700','#FF8C00','volt'],
+  trood:['Night Vision','#0A1A0A','#00FF00','#ADFF2F','volt'],
+  amarg:['Spine Lord','#4A2A5A','#9A68C8','#DDA0DD','crystal'],
+  concav:['Apex Sail','#6A2A1A','#CC4400','#FFD700','ember'],
+  cryo:['Frozen Crown','#3A5A8A','#88C8E8','#FFFFFF','frost'],
+  deinoch:['Excavator','#5A4A2A','#C4A060','#FFD700','crystal'],
+  guanl:['Crown Prince','#8B5A0A','#FFB347','#FFD700','royal'],
+  hetero:['Twilight Fang','#3A2A4A','#7A58A8','#DDA0DD','shadow'],
+  mamen:['Sky Reach','#6A6A8A','#A0A0C8','#87CEEB','stellar'],
+  niger:['Lawnmower','#4A6A2A','#88C838','#ADFF2F','bloom'],
+  plat:['Pioneer','#7A5A3A','#B88858','#DAA520','bloom'],
+  psitt:['Parrot','#C84A0A','#FF8C00','#FF1493','prism'],
+  sinosaur:['Flame Feather','#8B2A0A','#FF4500','#FFD700','ember'],
+  stygi:['Demon Horn','#3A0A0A','#8B0000','#FF0000','tribal'],
+  yuty:['Blizzard','#4A5A6A','#88B8D8','#FFFFFF','frost'],
+  anhan:['Ocean Wind','#2A4A6A','#4A98D0','#00BFFF','aqua'],
+  hatz:['Bone Breaker','#5A3A2A','#B87838','#FF4500','tribal'],
+  ptdac:['Curious One','#4A7A4A','#88C888','#ADFF2F','bloom'],
+  tape:['Carnival Crest','#C82A5A','#FF69B4','#FFD700','prism'],
+  nycto:['Storm Sail','#2A3A5A','#5A88B8','#00BFFF','volt'],
+  dunky:['Iron Jaw','#3A3A4A','#808098','#B0C4DE','mech'],
+  krono:['Time Eater','#1A1A3A','#4A2E8A','#9370DB','shadow'],
+  tylo:['Sea Serpent','#1A3A3A','#20B2AA','#48D1CC','aqua'],
+  notho:['Tide Walker','#2A5A5A','#48B8A8','#7FFFD4','aqua'],
+  shoni:['Deep Diver','#3A4A6A','#6888B8','#87CEEB','frost'],
+  archel:['Ancient Mariner','#3A5A3A','#68A868','#98FB98','bloom'],
+  heli:['Buzz Saw','#4A3A3A','#A87838','#FF4500','mech'],
+  megarach:['Widow','#1A0A0A','#8B0000','#FF0000','shadow'],
+  tbird:['Apex Runner','#6A2A0A','#E04820','#FFD700','ember'],
+  wrhino:['Glacier','#7A8A9A','#B0C8D8','#E0F0FF','frost'],
+  cbear:['Hibernator','#4A3A2A','#8B6838','#FFD700','bloom'],
+  clion:['Shadow Stalker','#2A1A0A','#8B6914','#FF4500','shadow'],
+  dwolf:['Pack Alpha','#3A3A4A','#708090','#FF0000','tribal'],
+  gsloth:['Ancient One','#5A4A2A','#A89060','#ADFF2F','bloom'],
+  glypto:['Rolling Stone','#4A5A4A','#88A888','#48D1CC','crystal'],
+  masto:['Woodland King','#4A3A2A','#7A6848','#DAA520','royal'],
+  andrew:['Apex Beast','#6A3A0A','#C06830','#FF4500','ember'],
+  entelo:['Hell Pig','#5A2A2A','#B84A3A','#FF0000','tribal'],
 };
 const RARE_MUTS={
   trex:['Mech Rex','#4A4A4A','#C0C0C0','#00FF00','mech'],
@@ -1135,9 +1492,48 @@ const RARE_MUTS={
   elasmo:['Ghost Ship','#C8C8D8','#E8E8F0','#FF69B4','frost'],
   megashark:['Apex Predator','#1A0A0A','#8B0000','#FF0000','tribal'],
   liopl:['Abyssal Lord','#0A0A0A','#191970','#4169E1','shadow'],
-  titano:['World Serpent','#0A0A2E','#4A2A8A','#FFD700','stellar'],
   smilo:['Ice King','#4A6A8A','#88C8E8','#FFFFFF','frost'],
   mammoth:['Woolly Emperor','#3A1A4A','#8A68B8','#FFD700','royal'],
+  anomal:['Cambrian God','#0A0A2E','#FF00FF','#00FFFF','stellar'],
+  cerato:['Magma Horn','#3A0A0A','#FF4500','#FFD700','ember'],
+  ornitho:['Speed Demon','#1A1A2E','#00FF88','#FFD700','volt'],
+  trood:['Predator X','#0A0A0A','#00FF00','#FF0000','mech'],
+  amarg:['Crystal Spine','#3A2A5A','#B878FF','#FF69B4','crystal'],
+  concav:['Fire Back','#4A0A0A','#FF4500','#FFD700','ember'],
+  cryo:['Absolute Zero','#C8D8E8','#E8F0FF','#00BFFF','frost'],
+  deinoch:['Grave Digger','#2A2A1A','#B87838','#FFD700','mech'],
+  guanl:['Dynasty','#6A3A0A','#FFD700','#FF4500','royal'],
+  hetero:['Moon Dancer','#1A1A3A','#9370DB','#FF69B4','stellar'],
+  mamen:['Cloud Walker','#6A7A9A','#A0B8D8','#E0F0FF','stellar'],
+  niger:['Garden King','#2A5A1A','#7FFF00','#FFD700','royal'],
+  plat:['Ancestor','#8B7D5A','#C4A870','#FFD700','bloom'],
+  psitt:['Rainbow','#FF1493','#00FFFF','#FFD700','prism'],
+  sinosaur:['Phoenix Down','#8B2500','#FF6347','#FFD700','ember'],
+  stygi:['River Devil','#2A0A1A','#8B0000','#FF00FF','shadow'],
+  yuty:['Arctic Storm','#2A3A4A','#88C8E8','#FFFFFF','frost'],
+  anhan:['Typhoon','#1A2A4A','#4A78C4','#FFFFFF','volt'],
+  hatz:['Colossus','#5A2A0A','#DAA520','#FF4500','royal'],
+  ptdac:['Zephyr','#2A6A2A','#88D888','#ADFF2F','bloom'],
+  tape:['Disco Crest','#FF1493','#00FFFF','#FFD700','prism'],
+  nycto:['Lightning Rod','#1A1A3A','#4A78C4','#FFFF00','volt'],
+  dunky:['Dreadnought','#2A2A3A','#C0C0C0','#00FF00','mech'],
+  krono:['Abyssal King','#0A0A1A','#4A2A8A','#FFD700','royal'],
+  tylo:['Leviathan','#0A1A2A','#1E90FF','#00CED1','aqua'],
+  notho:['Coral Ghost','#4A6A6A','#A0D8C8','#FF69B4','frost'],
+  shoni:['Whale Lord','#1A2A4A','#4A6AB4','#87CEEB','frost'],
+  archel:['World Shell','#2A4A2A','#5A9A5A','#FFD700','crystal'],
+  heli:['Phantom Saw','#1A1A1A','#C0C0C0','#FF0000','mech'],
+  megarach:['Black Widow','#0A0A0A','#8B0000','#FF00FF','shadow'],
+  tbird:['Warlord','#4A0A0A','#DC143C','#FFD700','tribal'],
+  wrhino:['Permafrost','#8AA8C8','#D0E8F0','#FFFFFF','frost'],
+  cbear:['Berserker','#3A1A0A','#8B4513','#FF4500','tribal'],
+  clion:['Savanna King','#8B6914','#FFD700','#FF4500','royal'],
+  dwolf:['Moon Howler','#1A1A2E','#4A6AB4','#FFFFFF','shadow'],
+  gsloth:['Titan','#4A3A1A','#B89850','#FFD700','crystal'],
+  glypto:['Jade Fortress','#2A5A4A','#4ABA8A','#7FFFD4','crystal'],
+  masto:['Primal Elder','#3A2A1A','#7A5A38','#FFD700','royal'],
+  andrew:['Apex Alpha','#3A0A0A','#DC143C','#FF4500','tribal'],
+  entelo:['Infernal Pig','#2A0A0A','#FF4500','#ADFF2F','ember'],
 };
 function getMutationsForSpecies(specId){
   const def=SPECIES_DEF[specId];if(!def)return[];
@@ -1694,6 +2090,18 @@ function getSprite(specId, size, mutation) {
 }
 
 function spriteImg(specId, size, cls, mutation) {
+  const asset = ASSET_MAP[specId];
+  if (asset) {
+    const useBaby = size <= 24 && asset.baby;
+    const src = useBaby ? asset.baby : asset.icon;
+    if (src) {
+      const mut = mutation ? getMutFilter(specId, mutation) : '';
+      const corr = (!mut && asset.ic && asset.portrait) ? asset.ic : '';
+      const filt = corr || mut;
+      const filtStyle = filt ? `filter:${filt};` : '';
+      return `<img src="${src}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+    }
+  }
   const url = getSprite(specId, size, mutation);
   return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
 }
@@ -1718,8 +2126,25 @@ const PFEAT={
   rhamph:{f:['tail_vane','teeth']},pterano:{f:['back_crest']},quetz:{f:['long_neck']},
   ichthy:{pt:'dolphin'},plesio:{pt:'plesio'},spino:{pt:'spino'},
   mosa:{pt:'mosasaur'},elasmo:{pt:'plesio',f:['long_neck','tiny_head']},
-  megashark:{pt:'shark'},liopl:{pt:'mosasaur',f:['big_head']},titano:{pt:'snake'},
+  megashark:{pt:'shark'},liopl:{pt:'mosasaur',f:['big_head']},
+  anomal:{pt:'marine',f:['big_head']},
   smilo:{f:['saber']},mammoth:{f:['tusks','trunk','wool']},
+  cerato:{f:['horn']},ornitho:{f:['long_legs']},trood:{f:[]},
+  amarg:{f:['body_spikes','long_neck']},concav:{f:['sail']},cryo:{f:['crest']},
+  deinoch:{f:['long_legs']},guanl:{f:['crest']},hetero:{f:[]},
+  mamen:{f:['long_neck']},niger:{f:['wide_bill']},plat:{f:['stocky']},
+  psitt:{f:['sm_frill']},sinosaur:{f:['feathers']},stygi:{f:['dome','body_spikes']},
+  yuty:{f:['feathers']},
+  anhan:{f:['crest']},hatz:{f:['big_head']},ptdac:{f:[]},
+  tape:{f:['crest']},nycto:{f:['crest']},
+  dunky:{pt:'shark',f:['armor']},krono:{pt:'mosasaur',f:['big_head']},
+  tylo:{pt:'mosasaur'},notho:{pt:'plesio'},
+  shoni:{pt:'dolphin',f:['massive']},archel:{pt:'marine'},
+  heli:{pt:'shark'},
+  megarach:{f:[]},tbird:{pt:'dodo',f:['long_legs']},
+  wrhino:{f:['horn']},cbear:{f:[]},clion:{f:['saber']},
+  dwolf:{f:[]},gsloth:{f:['long_legs']},glypto:{f:['armor','tail_club']},
+  masto:{f:['tusks','trunk']},andrew:{f:['big_head']},entelo:{f:['big_head']},
 };
 
 function drawPortrait(ctx,specId,P){
@@ -2544,10 +2969,21 @@ function getPortrait(specId, size, mutation) {
 }
 
 function portraitImg(specId, size, cls, mutation) {
+  const asset = ASSET_MAP[specId];
+  if (asset && asset.portrait) {
+    const filt = mutation ? getMutFilter(specId, mutation) : '';
+    const filtStyle = filt ? `filter:${filt};` : '';
+    return `<img src="${asset.portrait}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+  }
+  if (asset && asset.icon) {
+    const filt = mutation ? getMutFilter(specId, mutation) : '';
+    const filtStyle = filt ? `filter:${filt};` : '';
+    return `<img src="${asset.icon}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+  }
   const url = getPortrait(specId, size, mutation);
   return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
 }
-let state = { coins: 100, level: 1, xp: 0, park: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0 };
+let state = { coins: 100, level: 1, xp: 0, park: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0 };
 let isStreamLive = false;
 let wasStreamLive = false;
 
@@ -2559,17 +2995,31 @@ function load() {
   } catch(e) {}
 }
 
+function ensureDinoStats(d) {
+  if (d.hygiene === undefined) d.hygiene = 80;
+  if (d.stamina === undefined) d.stamina = 80;
+}
+
 function applyOfflineDecay() {
   const elapsed = (Date.now() - state.lastTick) / 1000;
   const ticks = Math.floor(elapsed / DECAY_INTERVAL_SEC);
   if (ticks > 0) {
+    const yardBonus = getYardMoodBonus();
+    // Time away is treated as night: the herd rests and stamina recovers
     state.park.forEach(d => {
+      ensureDinoStats(d);
       d.hunger = Math.max(0, d.hunger - ticks * STAT_DECAY_RATE);
       d.thirst = Math.max(0, d.thirst - ticks * STAT_DECAY_RATE);
-      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE);
+      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE * (1 - yardBonus));
+      d.hygiene = Math.max(0, d.hygiene - ticks * STAT_DECAY_RATE * 0.7);
+      d.stamina = Math.min(100, d.stamina + ticks * NIGHT_STAMINA_REGEN);
     });
   }
-  // Eggs no longer progress offline — only while stream is live
+  state.park.forEach(ensureDinoStats);
+  if (!state.yardItems) state.yardItems = [];
+  if (!state.debris) state.debris = [];
+  if (!state.lastOvergrowth) state.lastOvergrowth = Date.now();
+  if (!state.parkDay) state.parkDay = 1;
 }
 
 function getLevel() {
@@ -2609,25 +3059,377 @@ function switchTab(tab) {
 
 /* ======================== VISUAL PARK ======================== */
 let selectedDinoIdx = -1;
-let decorations = [];
 let parkReady = false;
 
-const POND = { x: 75, y: 72, w: 20, h: 18 };
+// Tile map configuration
+const PARK_GRID = { COLS: 32, ROWS: 24 };
+const FENCE = { L: 3, R: 28, T: 2, B: 21 };
+const FENCE_PCT = { minX: 14, maxX: 84, minY: 13, maxY: 83 };
+const POND = { x: 70, y: 68, w: 14, h: 13 };
+const POND_GRID = { x: 21, y: 15, w: 4, h: 3 };
 
-function generateDecorations() {
-  decorations = [];
-  const types = [
-    { e:'🌸', cls:'flower' }, { e:'🌼', cls:'flower' }, { e:'💐', cls:'flower' },
-    { e:'🌿', cls:'flower' }, { e:'🍄', cls:'flower' }, { e:'🌱', cls:'flower' },
-    { e:'🪨', cls:'rock' }, { e:'🪵', cls:'rock' },
-  ];
-  for (let i = 0; i < 30; i++) {
-    const t = types[Math.floor(Math.random() * types.length)];
-    const x = 6 + Math.random() * 88;
-    const y = 6 + Math.random() * 88;
-    if (Math.hypot(x - POND.x, y - POND.y) < 14) continue;
-    decorations.push({ emoji: t.e, cls: t.cls, x, y, rot: Math.random() * 30 - 15 });
+let parkTileMap = null;
+let parkAssetsLoaded = false;
+const parkImgs = {};
+let resizeHandler = null;
+let yardClickHandler = null;
+
+const PARK_ASSET_URLS = {
+  atlas: AB + 'park-atlas.png',
+  fenceH: AB + 'fence-h.png',
+  fenceH2: AB + 'fence-h2.png',
+  fenceGate: AB + 'fence-gate.png',
+  fencePost: AB + 'fence-post.png',
+  palm1: AB + 'tree-palm1.png',
+  palm2: AB + 'tree-palm2.png',
+  palm3: AB + 'tree-palm3.png',
+  palm4: AB + 'tree-palm4.png',
+  treeBig: AB + 'tree-big.png',
+  treeBig2: AB + 'tree-big2.png',
+  fern1: AB + 'fern1.png',
+  fern2: AB + 'fern2.png',
+  fern3: AB + 'fern3.png',
+  flower1: AB + 'flower1.png',
+  flower2: AB + 'flower2.png',
+};
+
+function loadParkAssets() {
+  if (parkAssetsLoaded) return Promise.resolve();
+  return new Promise(resolve => {
+    const entries = Object.entries(PARK_ASSET_URLS);
+    let loaded = 0;
+    entries.forEach(([key, src]) => {
+      const img = new Image();
+      img.onload = img.onerror = () => {
+        if (img.complete && img.naturalWidth > 0) parkImgs[key] = img;
+        if (++loaded === entries.length) { parkAssetsLoaded = true; resolve(); }
+      };
+      img.src = src;
+    });
+  });
+}
+
+function seededRand(seed) {
+  return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return ((seed >>> 16) & 0x7fff) / 32768; };
+}
+
+function buildTileMap() {
+  if (parkTileMap) return parkTileMap;
+  const { COLS, ROWS } = PARK_GRID;
+  const { L, R, T, B } = FENCE;
+  const pg = POND_GRID;
+  const rand = seededRand(54321);
+
+  parkTileMap = [];
+  for (let r = 0; r < ROWS; r++) {
+    const row = new Uint8Array(COLS);
+    for (let c = 0; c < COLS; c++) {
+      const inside = c > L && c < R && r > T && r < B;
+      const inPond = inside && c >= pg.x && c < pg.x + pg.w && r >= pg.y && r < pg.y + pg.h;
+      const pondBank = inside && !inPond &&
+        c >= pg.x - 1 && c < pg.x + pg.w + 1 && r >= pg.y - 1 && r < pg.y + pg.h + 1;
+      const nearFence = inside && (c <= L + 1 || c >= R - 1 || r <= T + 1 || r >= B - 1);
+
+      if (inPond) {
+        row[c] = rand() < 0.7 ? 20 : 21;
+      } else if (pondBank) {
+        row[c] = 3;
+      } else if (nearFence) {
+        row[c] = rand() < 0.5 ? 4 : 5;
+      } else if (inside) {
+        const v = rand();
+        if (v < 0.7) row[c] = rand() < 0.5 ? 0 : 1;
+        else row[c] = rand() < 0.5 ? 4 : 5;
+      } else {
+        row[c] = rand() < 0.5 ? 8 : 9;
+      }
+    }
+    parkTileMap.push(row);
   }
+  return parkTileMap;
+}
+
+const TREE_PLACEMENTS = [
+  {c:1,r:0,k:'palm3',s:1.2},{c:6,r:0,k:'treeBig',s:1.0},{c:11,r:0,k:'palm4',s:1.1},
+  {c:16,r:0,k:'treeBig2',s:1.0},{c:21,r:0,k:'palm3',s:1.3},{c:26,r:0,k:'palm4',s:1.0},
+  {c:31,r:0,k:'treeBig',s:1.1},{c:4,r:1,k:'palm1',s:0.8},{c:13,r:1,k:'palm2',s:0.9},
+  {c:24,r:1,k:'palm1',s:0.8},{c:29,r:1,k:'palm2',s:0.9},
+  {c:2,r:22,k:'palm4',s:1.1},{c:8,r:22,k:'treeBig',s:1.0},{c:14,r:22,k:'palm3',s:1.2},
+  {c:20,r:22,k:'treeBig2',s:1.0},{c:26,r:22,k:'palm4',s:1.1},{c:31,r:22,k:'palm3',s:1.0},
+  {c:5,r:23,k:'palm2',s:0.9},{c:17,r:23,k:'palm1',s:0.8},{c:29,r:23,k:'palm2',s:0.9},
+  {c:0,r:4,k:'palm3',s:1.1},{c:1,r:9,k:'treeBig',s:1.0},{c:0,r:14,k:'palm4',s:1.2},
+  {c:1,r:19,k:'treeBig2',s:1.0},{c:2,r:7,k:'palm1',s:0.8},{c:2,r:17,k:'palm2',s:0.9},
+  {c:29,r:5,k:'treeBig2',s:1.0},{c:30,r:10,k:'palm3',s:1.1},{c:29,r:15,k:'palm4',s:1.2},
+  {c:30,r:19,k:'treeBig',s:1.0},{c:30,r:7,k:'palm2',s:0.9},{c:29,r:13,k:'palm1',s:0.8},
+];
+
+let groundCache = null;
+let overCache = null;
+
+const TSIZE = 96;
+const ACOLS = 8;
+const CELL = 98;
+
+function renderLayer(canvas, tiles, w, h) {
+  if (!canvas) return;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, w, h);
+  for (const t of tiles) {
+    const img = parkImgs[t.file];
+    if (!img) continue;
+    if (t.sx !== undefined) {
+      ctx.drawImage(img, t.sx, t.sy, t.sw, t.sh, t.dx, t.dy, t.dw, t.dh);
+    } else {
+      const sr = (t.tile / ACOLS) | 0;
+      const sc = t.tile % ACOLS;
+      ctx.drawImage(img,
+        sc * CELL, sr * CELL, CELL, CELL,
+        (t.dc * TSIZE - 1) | 0, (t.dr * TSIZE - 1) | 0, TSIZE + 2, TSIZE + 2
+      );
+    }
+  }
+  return ctx;
+}
+
+function buildGroundTiles() {
+  const map = buildTileMap();
+  const { COLS, ROWS } = PARK_GRID;
+  const tiles = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      tiles.push({ file: 'atlas', tile: map[r][c], dc: c, dr: r });
+    }
+  }
+  return tiles;
+}
+
+function blendSeams(ctx, w, h) {
+  const { COLS, ROWS } = PARK_GRID;
+  const BLEND = 6;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  const px4 = (x, y) => (y * w + x) << 2;
+
+  for (let c = 1; c < COLS; c++) {
+    const sx = c * TSIZE;
+    for (let y = 0; y < h; y++) {
+      for (let b = 0; b < BLEND; b++) {
+        const xl = sx - 1 - b, xr = sx + b;
+        if (xl < 0 || xr >= w) continue;
+        const il = px4(xl, y), ir = px4(xr, y);
+        const t = (BLEND - b) / (BLEND + 1);
+        for (let ch = 0; ch < 3; ch++) {
+          const vl = d[il + ch], vr = d[ir + ch];
+          const avg = (vl + vr) >> 1;
+          d[il + ch] = (vl + (avg - vl) * t * 0.7) | 0;
+          d[ir + ch] = (vr + (avg - vr) * t * 0.7) | 0;
+        }
+      }
+    }
+  }
+  for (let r = 1; r < ROWS; r++) {
+    const sy = r * TSIZE;
+    for (let x = 0; x < w; x++) {
+      for (let b = 0; b < BLEND; b++) {
+        const yt = sy - 1 - b, yb = sy + b;
+        if (yt < 0 || yb >= h) continue;
+        const it = px4(x, yt), ib = px4(x, yb);
+        const t = (BLEND - b) / (BLEND + 1);
+        for (let ch = 0; ch < 3; ch++) {
+          const vt = d[it + ch], vb = d[ib + ch];
+          const avg = (vt + vb) >> 1;
+          d[it + ch] = (vt + (avg - vt) * t * 0.7) | 0;
+          d[ib + ch] = (vb + (avg - vb) * t * 0.7) | 0;
+        }
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function buildOverTiles() {
+  const { COLS, ROWS } = PARK_GRID;
+  const tiles = [];
+  const rand2 = seededRand(777);
+  const fernKeys = ['fern1','fern2','fern3','flower1','flower2'];
+
+  for (let i = 0; i < 60; i++) {
+    const fc = rand2() * COLS;
+    const fr = rand2() * ROWS;
+    if (fc > FENCE.L && fc < FENCE.R && fr > FENCE.T && fr < FENCE.B) continue;
+    const key = fernKeys[(rand2() * fernKeys.length) | 0];
+    const s = 0.5 + rand2() * 0.5;
+    const fw = (TSIZE * s * 2.2) | 0;
+    tiles.push({
+      file: key, sx: 0, sy: 0, sw: -1, sh: -1,
+      dx: (fc * TSIZE - fw * 0.3) | 0,
+      dy: (fr * TSIZE) | 0,
+      dw: fw, dh: -1,
+      _autoSize: true
+    });
+  }
+
+  const fh1 = parkImgs.fenceH;
+  if (fh1) {
+    const hFenceH = (TSIZE * 1.6) | 0;
+    const hFenceW = (hFenceH * fh1.naturalWidth / fh1.naturalHeight) | 0;
+    const yOff = (-hFenceH * 0.25) | 0;
+    const gateCol = ((FENCE.L + FENCE.R) / 2) | 0;
+    const hStep = hFenceW - 8;
+
+    for (let x = FENCE.L * TSIZE - 4; x < (FENCE.R + 1) * TSIZE; x += hStep) {
+      const isGate = parkImgs.fenceGate && Math.abs(x + hFenceW / 2 - gateCol * TSIZE - TSIZE / 2) < hFenceW * 0.4;
+      const fKey = isGate ? 'fenceGate' : ((x / hStep | 0) % 2 === 0 ? 'fenceH' : 'fenceH2');
+      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: x | 0, dy: FENCE.T * TSIZE + yOff, dw: hFenceW, dh: hFenceH, _autoSize: true });
+      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: x | 0, dy: FENCE.B * TSIZE + yOff, dw: hFenceW, dh: hFenceH, _autoSize: true });
+    }
+
+    const vFenceW = (TSIZE * 1.1) | 0;
+    const vFenceH = (vFenceW * fh1.naturalHeight / fh1.naturalWidth) | 0;
+    const vStep = vFenceH - 4;
+    const lx = (FENCE.L * TSIZE - vFenceW * 0.05) | 0;
+    const rx = (FENCE.R * TSIZE - vFenceW * 0.05) | 0;
+
+    for (let y = FENCE.T * TSIZE + yOff; y < (FENCE.B + 1) * TSIZE; y += vStep) {
+      const fKey = ((y / vStep | 0) % 2 === 0) ? 'fenceH' : 'fenceH2';
+      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: lx, dy: y | 0, dw: vFenceW, dh: vFenceH, _autoSize: true });
+      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: rx, dy: y | 0, dw: vFenceW, dh: vFenceH, _autoSize: true });
+    }
+  }
+
+  // Painter's order: trees whose trunk sits lower on screen draw last, so a
+  // nearer tree always overlaps one behind it rather than the array order winning.
+  TREE_PLACEMENTS
+    .map(({ c, r, k, s }) => {
+      const img = parkImgs[k];
+      const treeW = (TSIZE * s * 3.5) | 0;
+      const treeH = img ? (treeW * img.naturalHeight / img.naturalWidth) | 0 : treeW;
+      const top = Math.max(((r * TSIZE) - treeH * 0.55) | 0, -(treeH * 0.12) | 0);
+      return {
+        base: top + treeH,
+        tile: {
+          file: k, sx: 0, sy: 0, sw: -1, sh: -1,
+          dx: (c * TSIZE - treeW * 0.25) | 0,
+          dy: (r * TSIZE) | 0,
+          dw: treeW, dh: -1,
+          _autoSize: true, _treeYOff: true
+        }
+      };
+    })
+    .sort((a, b) => a.base - b.base)
+    .forEach(t => tiles.push(t.tile));
+
+  const rand3 = seededRand(999);
+  const insideFerns = ['fern1','fern2','fern3'];
+  for (let i = 0; i < 12; i++) {
+    const fc = FENCE.L + 2 + rand3() * (FENCE.R - FENCE.L - 4);
+    const fr = FENCE.T + 2 + rand3() * (FENCE.B - FENCE.T - 4);
+    const pg = POND_GRID;
+    if (fc >= pg.x - 1 && fc <= pg.x + pg.w && fr >= pg.y - 1 && fr <= pg.y + pg.h) continue;
+    const key = insideFerns[(rand3() * insideFerns.length) | 0];
+    const s = 0.4 + rand3() * 0.3;
+    const fw = (TSIZE * s * 1.8) | 0;
+    tiles.push({
+      file: key, sx: 0, sy: 0, sw: -1, sh: -1,
+      dx: (fc * TSIZE) | 0, dy: (fr * TSIZE) | 0,
+      dw: fw, dh: -1,
+      _autoSize: true, _alpha: 0.6
+    });
+  }
+
+  return tiles;
+}
+
+function renderOverCanvas(canvas, tiles, w, h) {
+  if (!canvas) return;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, w, h);
+
+  for (const t of tiles) {
+    const img = parkImgs[t.file];
+    if (!img) continue;
+    const sw = t.sw === -1 ? img.naturalWidth : t.sw;
+    const sh = t.sh === -1 ? img.naturalHeight : t.sh;
+    let dh = t.dh === -1 ? (t.dw * img.naturalHeight / img.naturalWidth) | 0 : t.dh;
+    let dy = t.dy;
+    // Trees anchor by their trunk, but never so high that the canvas edge
+    // shears the crown off — the top row would otherwise render as bare trunks.
+    if (t._treeYOff) dy = Math.max((dy - dh * 0.55) | 0, -(dh * 0.12) | 0);
+    else if (t._autoSize && t.dh === -1) dy = (dy - dh * 0.4) | 0;
+    if (t._alpha) ctx.globalAlpha = t._alpha;
+    ctx.drawImage(img, 0, 0, sw, sh, t.dx, dy, t.dw, dh);
+    if (t._alpha) ctx.globalAlpha = 1;
+  }
+}
+
+function buildGroundCache() {
+  const { COLS, ROWS } = PARK_GRID;
+  const w = COLS * TSIZE;
+  const h = ROWS * TSIZE;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = w;
+  offscreen.height = h;
+  const ctx = offscreen.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#3a6e28';
+  ctx.fillRect(0, 0, w, h);
+
+  const groundTiles = buildGroundTiles();
+  for (const t of groundTiles) {
+    const sr = (t.tile / ACOLS) | 0;
+    const sc = t.tile % ACOLS;
+    const img = parkImgs[t.file];
+    if (!img) continue;
+    ctx.drawImage(img,
+      sc * CELL, sr * CELL, CELL, CELL,
+      (t.dc * TSIZE - 1) | 0, (t.dr * TSIZE - 1) | 0, TSIZE + 2, TSIZE + 2
+    );
+  }
+
+  blendSeams(ctx, w, h);
+  return offscreen;
+}
+
+function buildOverCache() {
+  const { COLS, ROWS } = PARK_GRID;
+  const w = COLS * TSIZE;
+  const h = ROWS * TSIZE;
+  const offscreen = document.createElement('canvas');
+  const tiles = buildOverTiles();
+  renderOverCanvas(offscreen, tiles, w, h);
+  return offscreen;
+}
+
+function renderTileCanvas() {
+  const gCanvas = document.getElementById('dinoGround');
+  const oCanvas = document.getElementById('dinoOver');
+  if (!gCanvas || !parkImgs.atlas) return;
+
+  const world = document.getElementById('parkWorld');
+  const dpr = window.devicePixelRatio || 1;
+  const cw = world.clientWidth;
+  const ch = world.clientHeight;
+
+  if (!groundCache) groundCache = buildGroundCache();
+  if (!overCache) overCache = buildOverCache();
+
+  gCanvas.width = cw * dpr;
+  gCanvas.height = ch * dpr;
+  const gCtx = gCanvas.getContext('2d');
+  gCtx.imageSmoothingEnabled = false;
+  gCtx.drawImage(groundCache, 0, 0, gCanvas.width, gCanvas.height);
+
+  oCanvas.width = cw * dpr;
+  oCanvas.height = ch * dpr;
+  const oCtx = oCanvas.getContext('2d');
+  oCtx.imageSmoothingEnabled = false;
+  oCtx.drawImage(overCache, 0, 0, oCanvas.width, oCanvas.height);
 }
 
 function initDinoPosition(dino) {
@@ -2636,11 +3438,11 @@ function initDinoPosition(dino) {
     dino.px = POND.x + (Math.random() - 0.5) * POND.w * 0.6;
     dino.py = POND.y + (Math.random() - 0.5) * POND.h * 0.6;
   } else {
-    dino.px = 10 + Math.random() * 75;
-    dino.py = 10 + Math.random() * 75;
-    while (Math.hypot(dino.px - POND.x, dino.py - POND.y) < 14) {
-      dino.px = 10 + Math.random() * 75;
-      dino.py = 10 + Math.random() * 75;
+    dino.px = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX - 4);
+    dino.py = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY - 4);
+    while (Math.hypot(dino.px - POND.x, dino.py - POND.y) < 12) {
+      dino.px = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX - 4);
+      dino.py = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY - 4);
     }
   }
   dino.tx = dino.px;
@@ -2654,16 +3456,19 @@ function pickNewTarget(dino) {
     dino.tx = POND.x + (Math.random() - 0.5) * POND.w * 0.7;
     dino.ty = POND.y + (Math.random() - 0.5) * POND.h * 0.7;
   } else if (spec.habitat === 'Sky') {
-    dino.tx = 8 + Math.random() * 82;
-    dino.ty = 8 + Math.random() * 82;
+    dino.tx = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX);
+    dino.ty = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY);
   } else {
-    let nx, ny;
-    do {
-      nx = dino.px + (Math.random() - 0.5) * 25;
-      ny = dino.py + (Math.random() - 0.5) * 25;
-      nx = Math.max(8, Math.min(90, nx));
-      ny = Math.max(8, Math.min(90, ny));
-    } while (Math.hypot(nx - POND.x, ny - POND.y) < 12);
+    // Ground dinos wander, steering clear of the pond and any solid yard decor
+    let nx = dino.px, ny = dino.py;
+    for (let i = 0; i < 12; i++) {
+      const cx = Math.max(FENCE_PCT.minX, Math.min(FENCE_PCT.maxX, dino.px + (Math.random() - 0.5) * 22));
+      const cy = Math.max(FENCE_PCT.minY, Math.min(FENCE_PCT.maxY, dino.py + (Math.random() - 0.5) * 22));
+      if (Math.hypot(cx - POND.x, cy - POND.y) < 10) continue;
+      if (isBlockedByYard(cx, cy, 1.5)) continue;
+      nx = cx; ny = cy;
+      break;
+    }
     dino.tx = nx;
     dino.ty = ny;
   }
@@ -2671,47 +3476,66 @@ function pickNewTarget(dino) {
 }
 
 function initParkView() {
-  if (!parkReady) { generateDecorations(); parkReady = true; }
   state.park.forEach(d => { if (d.px === undefined) initDinoPosition(d); });
   if (state.debris && state.debris.length > 0) wasStreamLive = true;
-  renderParkWorld();
-  startAnimation();
-  window.addEventListener('resize', () => renderParkWorld());
+  renderStreamClock();
+
+  if (!parkAssetsLoaded) {
+    loadParkAssets().then(() => {
+      renderTileCanvas();
+      renderParkWorld();
+      startAnimation();
+    });
+  } else {
+    renderTileCanvas();
+    renderParkWorld();
+    startAnimation();
+  }
+
+  if (!resizeHandler) {
+    resizeHandler = () => { renderTileCanvas(); renderParkWorld(); };
+    window.addEventListener('resize', resizeHandler);
+  }
+
+  if (!yardClickHandler) {
+    const world = document.getElementById('parkWorld');
+    yardClickHandler = (e) => {
+      if (!decorateMode) return;
+      if (e.target.closest('.park-yard-item, .park-debris')) return;
+      const r = world.getBoundingClientRect();
+      placeYardItem(((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
+    };
+    world.addEventListener('click', yardClickHandler);
+  }
 }
 
 function renderParkWorld() {
   const world = document.getElementById('parkWorld');
-  const existing = world.querySelectorAll('.park-dirt, .park-pond, .park-deco, .park-dino, .park-empty-msg, .park-debris');
+  const existing = world.querySelectorAll('.park-dino, .park-empty-msg, .park-debris, .park-yard-item');
   existing.forEach(el => el.remove());
 
-  // Sprite scaling based on viewport width
   const vp = document.getElementById('parkViewport');
   const parkScale = Math.min(2.2, Math.max(1, vp.clientWidth / 450));
   world.style.setProperty('--park-scale', parkScale);
 
-  // Dirt patches
-  const dirts = [{ x:25, y:30, w:16, h:10 }, { x:55, y:50, w:12, h:8 }, { x:15, y:70, w:10, h:7 }];
-  dirts.forEach(d => {
-    const el = document.createElement('div');
-    el.className = 'park-dirt';
-    el.style.cssText = `left:${d.x}%;top:${d.y}%;width:${d.w}%;height:${d.h}%;`;
-    world.appendChild(el);
-  });
-
-  // Pond
-  const pond = document.createElement('div');
-  pond.className = 'park-pond';
-  pond.style.cssText = `left:${POND.x - POND.w/2}%;top:${POND.y - POND.h/2}%;width:${POND.w}%;height:${POND.h}%;`;
-  world.appendChild(pond);
-
-  // Decorations
-  decorations.forEach(d => {
-    const el = document.createElement('div');
-    el.className = 'park-deco ' + d.cls;
-    el.textContent = d.emoji;
-    el.style.cssText = `left:${d.x}%;top:${d.y}%;transform:rotate(${d.rot}deg);`;
-    world.appendChild(el);
-  });
+  // Yard items (behind dinos, sorted by depth so lower items overlap higher ones)
+  if (state.yardItems && state.yardItems.length > 0) {
+    [...state.yardItems].sort((a, b) => a.y - b.y).forEach(it => {
+      const t = getYardType(it.type);
+      if (!t) return;
+      const el = document.createElement('div');
+      el.className = 'park-yard-item';
+      el.dataset.yard = it.id;
+      el.style.cssText = `left:${it.x}%;top:${it.y}%;z-index:${3 + Math.round(it.y / 10)};`;
+      const px = Math.round(t.size * parkScale * 0.62);
+      el.innerHTML = `<img src="${t.src}" width="${px}" height="${px}" alt="">`;
+      if (decorateMode) {
+        el.title = `${t.name} — tap to sell for ${Math.floor(t.cost * YARD_REFUND_PCT)} coins`;
+        el.onclick = (e) => { e.stopPropagation(); sellYardItem(it.id); };
+      }
+      world.appendChild(el);
+    });
+  }
 
   // Debris
   if (state.debris && state.debris.length > 0) {
@@ -2719,7 +3543,7 @@ function renderParkWorld() {
       const el = document.createElement('div');
       el.className = 'park-debris';
       el.dataset.debris = d.id;
-      el.textContent = d.emoji;
+      el.innerHTML = `<img src="${d.src || IC+'environment_terrain/boulder.png'}" width="28" height="28" style="image-rendering:pixelated;" alt="">`;
       el.style.cssText = `left:${d.x}%;top:${d.y}%;`;
       el.onclick = (e) => { e.stopPropagation(); clearDebris(d.id); };
       world.appendChild(el);
@@ -2729,7 +3553,7 @@ function renderParkWorld() {
   if (state.park.length === 0 && (!state.debris || state.debris.length === 0)) {
     const msg = document.createElement('div');
     msg.className = 'park-empty-msg';
-    msg.innerHTML = '<span class="big">🥚</span><div class="msg">No dinosaurs yet!<br>Head to Excavate to find your first egg.</div>';
+    msg.innerHTML = `<img src="${IC}baby_eggs/egg_in_nest.png" width="64" height="64" style="image-rendering:pixelated;" alt=""><div class="msg">No dinosaurs yet!<br>Head to Excavate to find your first egg.</div>`;
     world.appendChild(msg);
   }
 
@@ -2737,7 +3561,7 @@ function renderParkWorld() {
   state.park.forEach((dino, i) => {
     const spec = getRosterById(dino.speciesId);
     const stage = getStage(dino);
-    const needsAttention = dino.hunger < 30 || dino.thirst < 30 || dino.happiness < 30;
+    const needsAttention = dino.hunger < 30 || dino.thirst < 30 || dino.happiness < 30 || (dino.hygiene||80) < 30 || (dino.stamina||80) < 30;
 
     const el = document.createElement('div');
     el.className = 'park-dino' + (i === selectedDinoIdx ? ' selected' : '');
@@ -2794,6 +3618,7 @@ function startAnimation() {
 }
 
 function selectDino(idx) {
+  if (decorateMode) return;
   selectedDinoIdx = (selectedDinoIdx === idx) ? -1 : idx;
   // Update dino selected class
   document.querySelectorAll('.park-dino').forEach((el, i) => {
@@ -2814,9 +3639,12 @@ function renderBottomPanel() {
   const stage = getStage(dino);
   const now = Date.now();
   const idx = selectedDinoIdx;
+  ensureDinoStats(dino);
   const cdFeed = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['feed_'+idx] || 0)));
   const cdWater = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['water_'+idx] || 0)));
   const cdPlay = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['play_'+idx] || 0)));
+  const cdWash = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['wash_'+idx] || 0)));
+  const cdGraze = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['graze_'+idx] || 0)));
 
   panel.innerHTML = `
     <div class="panel-header">
@@ -2844,6 +3672,14 @@ function renderBottomPanel() {
         <span class="panel-stat-icon">😊</span>
         <div class="panel-stat-bar"><div class="panel-stat-fill happiness" style="width:${dino.happiness}%"></div></div>
       </div>
+      <div class="panel-stat">
+        <span class="panel-stat-icon">🧼</span>
+        <div class="panel-stat-bar"><div class="panel-stat-fill hygiene" style="width:${dino.hygiene}%"></div></div>
+      </div>
+      <div class="panel-stat">
+        <span class="panel-stat-icon">🌿</span>
+        <div class="panel-stat-bar"><div class="panel-stat-fill stamina" style="width:${dino.stamina}%"></div></div>
+      </div>
     </div>
     <div class="panel-growth">
       <span>↑ ${stage}</span>
@@ -2863,6 +3699,14 @@ function renderBottomPanel() {
         <span class="action-icon">🎾</span>Play
         ${cdPlay > 0 ? `<span class="action-cd">${Math.ceil(cdPlay/1000)}s</span>` : ''}
       </button>
+      <button class="panel-action" onclick="careAction(${idx},'wash')" ${cdWash > 0 ? 'disabled' : ''}>
+        <span class="action-icon">🧼</span>Wash
+        ${cdWash > 0 ? `<span class="action-cd">${Math.ceil(cdWash/1000)}s</span>` : ''}
+      </button>
+      <button class="panel-action" onclick="careAction(${idx},'graze')" ${cdGraze > 0 ? 'disabled' : ''}>
+        <span class="action-icon">🌿</span>Graze
+        ${cdGraze > 0 ? `<span class="action-cd">${Math.ceil(cdGraze/1000)}s</span>` : ''}
+      </button>
       <button class="panel-action sell-action" onclick="sellDino(${idx})" title="Sell for ${getSellPrice(dino)} coins">💰 ${getSellPrice(dino)}</button>
     </div>
   `;
@@ -2879,6 +3723,8 @@ function careAction(idx, type) {
   if (type === 'feed') dino.hunger = Math.min(100, dino.hunger + CARE_AMOUNT);
   if (type === 'water') dino.thirst = Math.min(100, dino.thirst + CARE_AMOUNT);
   if (type === 'play') dino.happiness = Math.min(100, dino.happiness + CARE_AMOUNT);
+  if (type === 'wash') dino.hygiene = Math.min(100, (dino.hygiene || 0) + CARE_AMOUNT);
+  if (type === 'graze') dino.stamina = Math.min(100, (dino.stamina || 0) + CARE_AMOUNT);
 
   const prevStage = getStage(dino);
   dino.careCount++;
@@ -2985,30 +3831,185 @@ async function confirmListDino(idx) {
   }
 }
 
+/* ======================== YARD ITEMS ======================== */
+const YARD_ITEM_TYPES = [
+  { id: 'sprig',   name: 'Sprig',   src: IC+'prehistoric_plants/curled_fern_frond.png',        cost: 15,  mood: 1, size: 20, blocks: false, radius: 0 },
+  { id: 'bloom',   name: 'Bloom',   src: IC+'prehistoric_plants/prehistoric_bloom.png',        cost: 25,  mood: 2, size: 22, blocks: false, radius: 0 },
+  { id: 'pebble',  name: 'Pebble',  src: IC+'environment_terrain/rock_formation.png',          cost: 20,  mood: 1, size: 24, blocks: false, radius: 0 },
+  { id: 'shroom',  name: 'Shroom',  src: IC+'prehistoric_plants/giant_prehistoric_mushroom.png', cost: 40, mood: 3, size: 28, blocks: false, radius: 0 },
+  { id: 'cycad',   name: 'Cycad',   src: IC+'prehistoric_plants/cycad.png',                    cost: 60,  mood: 4, size: 32, blocks: true,  radius: 4 },
+  { id: 'thicket', name: 'Thicket', src: IC+'prehistoric_plants/prehistoric_bush.png',         cost: 75,  mood: 5, size: 34, blocks: true,  radius: 4.5 },
+  { id: 'log',     name: 'Log',     src: IC+'prehistoric_plants/mossy_log.png',                cost: 90,  mood: 6, size: 36, blocks: true,  radius: 5 },
+  { id: 'stone',   name: 'Stone',   src: IC+'environment_terrain/rocky_cliff.png',             cost: 120, mood: 8, size: 40, blocks: true,  radius: 5.5 },
+];
+const MAX_YARD_ITEMS = 14;
+const YARD_REFUND_PCT = 0.6;
+
+let decorateMode = false;
+let selectedYardType = null;
+
+function getYardType(id) { return YARD_ITEM_TYPES.find(t => t.id === id); }
+
+function getYardMoodBonus() {
+  if (!state.yardItems || !state.yardItems.length) return 0;
+  const raw = state.yardItems.reduce((s, it) => {
+    const t = getYardType(it.type);
+    return s + (t ? t.mood : 0);
+  }, 0);
+  // Diminishing returns so stacking cheap decor never trivialises care
+  return Math.min(0.5, Math.sqrt(raw) * 0.055);
+}
+
+function isBlockedByYard(x, y, pad) {
+  if (!state.yardItems) return false;
+  return state.yardItems.some(it => {
+    const t = getYardType(it.type);
+    if (!t || !t.blocks) return false;
+    return Math.hypot(x - it.x, y - it.y) < t.radius + (pad || 0);
+  });
+}
+
+function toggleDecorateMode() {
+  decorateMode = !decorateMode;
+  if (!decorateMode) selectedYardType = null;
+  document.body.classList.toggle('decorating', decorateMode);
+  document.getElementById('decorateBtn').classList.toggle('active', decorateMode);
+  document.getElementById('yardTray').classList.toggle('open', decorateMode);
+  if (decorateMode) { selectedDinoIdx = -1; renderBottomPanel(); renderYardTray(); }
+  renderParkWorld();
+}
+
+function renderYardTray() {
+  const wrap = document.getElementById('yardTrayItems');
+  const count = (state.yardItems || []).length;
+  const full = count >= MAX_YARD_ITEMS;
+  wrap.innerHTML = YARD_ITEM_TYPES.map(t => {
+    const afford = state.coins >= t.cost;
+    const dis = !afford || full;
+    return `<button class="yard-item-btn${selectedYardType === t.id ? ' selected' : ''}" ${dis ? 'disabled' : ''}
+        onclick="selectYardType('${t.id}')" title="${t.blocks ? 'Dinos walk around this' : 'Dinos can walk over this'} · +${t.mood} mood">
+      <img src="${t.src}" width="26" height="26" alt="">
+      <span class="yard-item-name">${t.name}</span>
+      <span class="yard-item-cost">🪙 ${t.cost}</span>
+    </button>`;
+  }).join('');
+  const hint = document.getElementById('yardTrayHint');
+  hint.textContent = full
+    ? `Yard full (${count}/${MAX_YARD_ITEMS}) — tap an item to sell it.`
+    : selectedYardType
+      ? `Tap the ground to place. Tap a placed item to sell it.`
+      : `${count}/${MAX_YARD_ITEMS} placed · Pick an item, then tap the ground.`;
+}
+
+function selectYardType(id) {
+  selectedYardType = selectedYardType === id ? null : id;
+  renderYardTray();
+}
+
+function placeYardItem(x, y) {
+  if (!selectedYardType) { showToast('Pick an item from the tray first.'); return; }
+  const t = getYardType(selectedYardType);
+  if (!t) return;
+  if (!state.yardItems) state.yardItems = [];
+  if (state.yardItems.length >= MAX_YARD_ITEMS) { showToast(`Yard is full (${MAX_YARD_ITEMS} items).`); return; }
+  if (state.coins < t.cost) { showToast(`Not enough coins (need ${t.cost}).`); return; }
+  if (x < FENCE_PCT.minX || x > FENCE_PCT.maxX || y < FENCE_PCT.minY || y > FENCE_PCT.maxY) {
+    showToast('Place items inside the fence.'); return;
+  }
+  if (Math.hypot(x - POND.x, y - POND.y) < 11) { showToast("Can't build on the pond."); return; }
+  if (state.yardItems.some(it => Math.hypot(x - it.x, y - it.y) < 5)) { showToast('Too close to another item.'); return; }
+
+  state.coins -= t.cost;
+  state.yardItems.push({ id: 'y' + Date.now() + '_' + Math.floor(Math.random() * 1000), type: t.id, x, y });
+  save();
+  updateTopBar();
+  renderYardTray();
+  renderParkWorld();
+  showToast(`${t.name} placed! +${t.mood} mood`);
+}
+
+function sellYardItem(itemId) {
+  const idx = (state.yardItems || []).findIndex(it => it.id === itemId);
+  if (idx < 0) return;
+  const t = getYardType(state.yardItems[idx].type);
+  const refund = t ? Math.floor(t.cost * YARD_REFUND_PCT) : 0;
+  const el = document.querySelector(`[data-yard="${itemId}"]`);
+  if (el) { el.classList.add('removing'); setTimeout(() => el.remove(), 200); }
+  state.yardItems.splice(idx, 1);
+  state.coins += refund;
+  save();
+  updateTopBar();
+  renderYardTray();
+  setTimeout(() => renderParkWorld(), 210);
+  showToast(`Sold for ${refund} coins.`);
+}
+
 /* ======================== CLEANING / DEBRIS SYSTEM ======================== */
 const DEBRIS_TYPES = [
-  { type: 'rock', emoji: '\u{1FAA8}' },
-  { type: 'weed', emoji: '\u{1F33F}' },
-  { type: 'bone', emoji: '\u{1F9B4}' }
+  { type: 'rock', src: IC+'environment_terrain/rock_formation.png' },
+  { type: 'weed', src: IC+'prehistoric_plants/giant_fern.png' },
+  { type: 'bone', src: IC+'fossils_bones/bone_fragment.png' },
+  { type: 'rock', src: IC+'environment_terrain/rocky_cliff.png' },
+  { type: 'weed', src: IC+'prehistoric_plants/moss_mound.png' },
+  { type: 'bone', src: IC+'fossils_bones/dinosaur_skull.png' },
 ];
 
 function getMaxEnergy() { return 10 + (state.subTier || 0) * 2; }
 
-function spawnDebris() {
-  const count = 6 + Math.floor(Math.random() * 7);
-  state.debris = [];
-  for (let i = 0; i < count; i++) {
-    let x, y;
-    do {
-      x = 8 + Math.random() * 82;
-      y = 8 + Math.random() * 78;
-    } while (Math.hypot(x - POND.x, y - POND.y) < 14);
-    const dt = DEBRIS_TYPES[Math.floor(Math.random() * DEBRIS_TYPES.length)];
-    state.debris.push({ id: Date.now() + '_' + i, type: dt.type, emoji: dt.emoji, x, y });
+const MAX_DEBRIS = 14;
+const OVERGROWTH_INTERVAL_SEC = 420; // one new patch roughly every 7 minutes
+
+// Find a clear spot inside the fence, away from the pond and placed decor
+function findOpenSpot(minGap) {
+  for (let i = 0; i < 24; i++) {
+    const x = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX);
+    const y = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY);
+    if (Math.hypot(x - POND.x, y - POND.y) < 12) continue;
+    if (isBlockedByYard(x, y, 2)) continue;
+    if ((state.debris || []).some(d => Math.hypot(x - d.x, y - d.y) < (minGap || 5))) continue;
+    return { x, y };
   }
+  return null;
+}
+
+function addDebris(n) {
+  if (!state.debris) state.debris = [];
+  let added = 0;
+  for (let i = 0; i < n && state.debris.length < MAX_DEBRIS; i++) {
+    const spot = findOpenSpot(5);
+    if (!spot) break;
+    const dt = DEBRIS_TYPES[Math.floor(Math.random() * DEBRIS_TYPES.length)];
+    state.debris.push({ id: Date.now() + '_' + Math.floor(Math.random()*1e4), type: dt.type, src: dt.src, x: spot.x, y: spot.y });
+    added++;
+  }
+  return added;
+}
+
+// Stream events dump a big batch of overgrowth and refill energy
+function spawnDebris() {
+  state.debris = [];
+  addDebris(6 + Math.floor(Math.random() * 7));
   state.energy = getMaxEnergy();
   state.lastDebrisSpawn = Date.now();
   save();
+}
+
+// Between events the yard slowly reclaims itself, one patch at a time
+function growOvergrowth() {
+  if (!state.lastOvergrowth) { state.lastOvergrowth = Date.now(); return; }
+  const elapsed = (Date.now() - state.lastOvergrowth) / 1000;
+  if (elapsed < OVERGROWTH_INTERVAL_SEC) return;
+  const due = Math.min(4, Math.floor(elapsed / OVERGROWTH_INTERVAL_SEC));
+  state.lastOvergrowth = Date.now();
+  if ((state.debris || []).length >= MAX_DEBRIS) return;
+  const added = addDebris(due);
+  if (!added) return;
+  // A neglected yard costs the herd some mood
+  state.park.forEach(d => { ensureDinoStats(d); d.happiness = Math.max(0, d.happiness - added * 0.5); });
+  state.energy = Math.max(state.energy, Math.min(getMaxEnergy(), state.energy + added));
+  save();
+  const active = document.querySelector('.tab-content.active');
+  if (active && active.id === 'tab-park') { renderParkWorld(); updateEnergyBar(); }
 }
 
 function clearDebris(debrisId) {
@@ -3201,7 +4202,7 @@ async function buyDino(listingId) {
       nickname: data.dino.nickname || '',
       mutation: data.dino.mutation || null,
       careCount: data.dino.careCount || 0,
-      hunger: 80, thirst: 80, happiness: 80,
+      hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
     };
     state.park.push(newDino);
     initDinoPosition(newDino);
@@ -3235,7 +4236,7 @@ async function cancelListing(listingId) {
         nickname: data.dino.nickname || '',
         mutation: data.dino.mutation || null,
         careCount: data.dino.careCount || 0,
-        hunger: 80, thirst: 80, happiness: 80,
+        hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
       };
       state.park.push(newDino);
       initDinoPosition(newDino);
@@ -3397,7 +4398,7 @@ function renderEggSources() {
 
   document.getElementById('eggSources').innerHTML = `
     <div class="egg-source ${dailyReady ? 'available' : 'claimed'}" onclick="${dailyReady ? 'dailyDig()' : ''}">
-      <div class="egg-source-icon">⛏️</div>
+      <div class="egg-source-icon"><img src="${IC}fossils_bones/claw_fossil.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Daily Dig</div>
         <div class="egg-source-desc">One free fossil dig every 24 hours. Mostly common finds.</div>
@@ -3407,7 +4408,7 @@ function renderEggSources() {
     </div>
 
     <div class="egg-source ${eventStatus === 'available' ? 'available' : (eventStatus === 'claimed' ? 'claimed' : '')}">
-      <div class="egg-source-icon">☄️</div>
+      <div class="egg-source-icon"><img src="${IC}fossils_bones/amber_with_insect.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Random Events</div>
         <div class="egg-source-desc">${eventDesc}</div>
@@ -3416,7 +4417,7 @@ function renderEggSources() {
     </div>
 
     <div class="egg-source ${inventoryEggs.length > 0 ? 'available' : ''}">
-      <div class="egg-source-icon">🎫</div>
+      <div class="egg-source-icon"><img src="${IC}baby_eggs/egg_clutch.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Phamily Time Rewards</div>
         <div class="egg-source-desc">${inventoryEggs.length > 0 ? inventoryEggs.length + ' egg(s) from Phamily Time — click to use!' : 'Earn eggs by leveling up Phamily Time while watching stream.'}</div>
@@ -3426,7 +4427,7 @@ function renderEggSources() {
     ${renderInventoryEggSection()}
 
     <div class="egg-source">
-      <div class="egg-source-icon">🎁</div>
+      <div class="egg-source-icon"><img src="${IC}baby_eggs/rare_dino_egg.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Broadcaster & Mod Drops</div>
         <div class="egg-source-desc">Mods and PhantomACE drop exclusive egg codes during stream. Enter them above!</div>
@@ -3435,7 +4436,7 @@ function renderEggSources() {
     </div>
 
     <div class="egg-source locked">
-      <div class="egg-source-icon">🏆</div>
+      <div class="egg-source-icon"><img src="${IC}baby_eggs/golden_dino_egg.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Channel Point Redemptions</div>
         <div class="egg-source-desc">Redeem Twitch channel points for a chance at an egg. Coming soon!</div>
@@ -3461,7 +4462,8 @@ function renderIncubator() {
     const liveTag = isStreamLive
       ? '<div style="font-size:8px;color:#2ecc71;margin-top:3px;">● LIVE — Incubating</div>'
       : '<div style="font-size:8px;color:#666;margin-top:3px;">○ Stream offline — Paused</div>';
-    slots.push(`<div class="egg-slot"><div class="egg-emoji">${ready?'🐣':'🥚'}</div>
+    const eggSrc = ready ? EGG_ASSETS.hatching : (EGG_ASSETS[spec.rarity] || EGG_ASSETS.common);
+    slots.push(`<div class="egg-slot"><div class="egg-emoji"><img src="${eggSrc}" width="40" height="40" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-name">${spec.rarity.charAt(0).toUpperCase()+spec.rarity.slice(1)} Egg</div>
       ${ready?`<button class="egg-hatch-btn" onclick="hatchEgg(${i})">HATCH!</button>`
       :`<div class="egg-timer">${fmtTime(rem)}</div>
@@ -3469,7 +4471,7 @@ function renderIncubator() {
         ${liveTag}`}
     </div>`);
   });
-  while (slots.length < 3) slots.push('<div class="egg-slot empty">Empty Slot</div>');
+  while (slots.length < 3) slots.push('<div class="egg-slot empty"><img src="'+IC+'baby_eggs/empty_egg_shell.png" width="32" height="32" style="image-rendering:pixelated;opacity:0.3;" alt=""><div style="margin-top:4px;">Empty Slot</div></div>');
   document.getElementById('incubatorGrid').innerHTML = slots.join('');
 }
 
@@ -3480,13 +4482,13 @@ function hatchEgg(idx) {
   if (state.park.length >= MAX_PARK_SIZE) { showToast('Park is full! Release a dinosaur first.'); return; }
   const spec = getRosterById(egg.speciesId);
   const mut = rollMutation(spec.id);
-  const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, careCount:0, mutation: mut };
+  const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, hygiene:80, stamina:80, careCount:0, mutation: mut };
   state.park.push(newDino);
   initDinoPosition(newDino);
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
   if (mut) { const mk=spec.id+'_'+mut; if(!state.discoveredMutations)state.discoveredMutations=[]; if(!state.discoveredMutations.includes(mk))state.discoveredMutations.push(mk); }
   state.eggs.splice(idx, 1);
-  save(); updateTopBar(); renderExcavate();
+  save(); updateTopBar(); renderEggsTab();
 
   document.getElementById('hatchEmoji').innerHTML = spriteImg(spec.id, 96, 'sprite-img', newDino.mutation);
   document.getElementById('hatchName').textContent = spec.name;
@@ -3550,13 +4552,18 @@ function renderCollDetail() {
   const stage = getStage(dino);
   const now = Date.now();
   const idx = collSelectedIdx;
+  ensureDinoStats(dino);
   const cdFeed = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['feed_'+idx] || 0)));
   const cdWater = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['water_'+idx] || 0)));
   const cdPlay = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['play_'+idx] || 0)));
+  const cdWash = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['wash_'+idx] || 0)));
+  const cdGraze = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['graze_'+idx] || 0)));
 
   const hungerDots = makeDots(dino.hunger, 'hunger');
   const thirstDots = makeDots(dino.thirst, 'thirst');
   const happyDots = makeDots(dino.happiness, 'happiness');
+  const hygieneDots = makeDots(dino.hygiene, 'hygiene');
+  const staminaDots = makeDots(dino.stamina, 'stamina');
 
   const rarityBonus = spec.rarity === 'legendary' ? 50 : spec.rarity === 'epic' ? 35 : spec.rarity === 'rare' ? 25 : spec.rarity === 'uncommon' ? 15 : 5;
   const power = Math.floor(dino.careCount * 0.8 + rarityBonus);
@@ -3578,6 +4585,8 @@ function renderCollDetail() {
       <div class="coll-stat-row"><div class="coll-stat-label">Fullness</div><div class="coll-stat-dots">${hungerDots}</div></div>
       <div class="coll-stat-row"><div class="coll-stat-label">Hydration</div><div class="coll-stat-dots">${thirstDots}</div></div>
       <div class="coll-stat-row"><div class="coll-stat-label">Mood</div><div class="coll-stat-dots">${happyDots}</div></div>
+      <div class="coll-stat-row"><div class="coll-stat-label">Hygiene</div><div class="coll-stat-dots">${hygieneDots}</div></div>
+      <div class="coll-stat-row"><div class="coll-stat-label">Stamina</div><div class="coll-stat-dots">${staminaDots}</div></div>
     </div>
     <div class="coll-growth-section">
       <div class="coll-growth-label"><span>↑ ${stage}</span><span>${getNextStageLabel(dino)}</span></div>
@@ -3601,6 +4610,14 @@ function renderCollDetail() {
       <button class="coll-action" onclick="careAction(${idx},'play');renderCollection();" ${cdPlay > 0 ? 'disabled' : ''}>
         <span class="ca-icon">🎾</span>Play
         ${cdPlay > 0 ? `<span class="ca-cd">${Math.ceil(cdPlay/1000)}s</span>` : ''}
+      </button>
+      <button class="coll-action" onclick="careAction(${idx},'wash');renderCollection();" ${cdWash > 0 ? 'disabled' : ''}>
+        <span class="ca-icon">🧼</span>Wash
+        ${cdWash > 0 ? `<span class="ca-cd">${Math.ceil(cdWash/1000)}s</span>` : ''}
+      </button>
+      <button class="coll-action" onclick="careAction(${idx},'graze');renderCollection();" ${cdGraze > 0 ? 'disabled' : ''}>
+        <span class="ca-icon">🌿</span>Graze
+        ${cdGraze > 0 ? `<span class="ca-cd">${Math.ceil(cdGraze/1000)}s</span>` : ''}
       </button>
     </div>
     <div class="coll-desc">"${spec.desc}"</div>
@@ -3760,17 +4777,24 @@ function gameTick() {
   const deltaSec = (now - state.lastTick) / 1000;
   if (deltaSec >= DECAY_INTERVAL_SEC) {
     const ticks = Math.floor(deltaSec / DECAY_INTERVAL_SEC);
+    const yardBonus = getYardMoodBonus();
+    const resting = !isStreamLive; // night: the park sleeps and recovers
     state.park.forEach(d => {
+      ensureDinoStats(d);
       d.hunger = Math.max(0, d.hunger - ticks * STAT_DECAY_RATE);
       d.thirst = Math.max(0, d.thirst - ticks * STAT_DECAY_RATE);
-      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE);
+      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE * (1 - yardBonus));
+      d.hygiene = Math.max(0, d.hygiene - ticks * STAT_DECAY_RATE * 0.7);
+      d.stamina = resting
+        ? Math.min(100, d.stamina + ticks * NIGHT_STAMINA_REGEN)
+        : Math.max(0, d.stamina - ticks * STAT_DECAY_RATE * 0.8 * (1 - yardBonus * 0.5));
     });
     state.lastTick = now;
   }
   if (isStreamLive) {
     state.eggs.forEach(e => { e.elapsed = Math.min(e.hatchTime, e.elapsed + deltaSec); });
   }
-  const happy = state.park.filter(d => d.hunger>40 && d.thirst>40 && d.happiness>40).length;
+  const happy = state.park.filter(d => d.hunger>40 && d.thirst>40 && d.happiness>40 && (d.hygiene||80)>40 && (d.stamina||80)>40).length;
   if (happy > 0 && Math.random() < 0.1) state.coins += happy;
   updateTopBar();
   const active = document.querySelector('.tab-content.active');
@@ -3779,7 +4803,7 @@ function gameTick() {
     state.park.forEach((dino, i) => {
       const el = document.getElementById('parkDino_' + i);
       if (!el) return;
-      const needs = dino.hunger < 30 || dino.thirst < 30 || dino.happiness < 30;
+      const needs = dino.hunger < 30 || dino.thirst < 30 || dino.happiness < 30 || dino.hygiene < 30 || dino.stamina < 30;
       const alert = el.querySelector('.park-dino-alert');
       if (needs && !alert) {
         const a = document.createElement('div');
@@ -3790,9 +4814,79 @@ function gameTick() {
       }
     });
     if (selectedDinoIdx >= 0) renderBottomPanel();
+    if (decorateMode) renderYardTray();
+    renderStreamClock();
   }
+  growOvergrowth();
   checkForEvent();
   if (active.id === 'tab-eggs') { renderIncubator(); renderEventBanner(); renderEggSources(); }
+}
+
+/* ======================== STREAM TIME (a stream is a day) ======================== */
+// The park lives on PhantomACE's schedule: while the stream runs the day advances
+// dawn -> midday -> dusk; when the stream ends the park falls to night.
+const STREAM_PHASES = [
+  { id: 'dawn',   name: 'Dawn',   icon: '🌅', until: 60,       tint: 'rgba(255,178,122,0.30)' },
+  { id: 'midday', name: 'Midday', icon: '☀️', until: 180,      tint: 'rgba(255,255,255,0)'    },
+  { id: 'dusk',   name: 'Dusk',   icon: '🌇', until: Infinity, tint: 'rgba(255,132,80,0.34)'  },
+];
+const NIGHT_PHASE = { id: 'night', name: 'Night', icon: '🌙', tint: 'rgba(40,58,120,0.55)' };
+const NIGHT_STAMINA_REGEN = 0.35; // dinos rest while the park sleeps
+
+let streamStartedAt = null;
+
+function getStreamUptimeMin() {
+  if (!isStreamLive || !streamStartedAt) return 0;
+  return Math.max(0, (Date.now() - streamStartedAt) / 60000);
+}
+
+function getStreamPhase() {
+  if (!isStreamLive) return NIGHT_PHASE;
+  const up = getStreamUptimeMin();
+  return STREAM_PHASES.find(p => up < p.until) || STREAM_PHASES[STREAM_PHASES.length - 1];
+}
+
+function fmtUptime(min) {
+  const h = Math.floor(min / 60), m = Math.floor(min % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function renderStreamClock() {
+  const phase = getStreamPhase();
+  const clock = document.getElementById('parkClock');
+  if (!clock) return;
+
+  document.getElementById('clockPhase').textContent = phase.icon;
+  document.getElementById('clockName').textContent = phase.name;
+
+  const day = state.parkDay || 1;
+  document.getElementById('clockSub').textContent = isStreamLive
+    ? `Day ${day} · live ${fmtUptime(getStreamUptimeMin())}`
+    : `Day ${day} · stream offline`;
+
+  clock.classList.toggle('live', isStreamLive);
+  let dot = clock.querySelector('.clock-live-dot');
+  if (isStreamLive && !dot) {
+    dot = document.createElement('span');
+    dot.className = 'clock-live-dot';
+    clock.appendChild(dot);
+  } else if (!isStreamLive && dot) {
+    dot.remove();
+  }
+
+  const tint = document.getElementById('parkDaylight');
+  if (tint) {
+    tint.style.background = phase.tint;
+    tint.classList.toggle('tinted', phase.id !== 'midday');
+  }
+}
+
+// Each new stream is a new day in the park
+function startNewParkDay() {
+  state.parkDay = (state.parkDay || 0) + 1;
+  state.lastStreamStart = Date.now();
+  save();
+  showToast(`Day ${state.parkDay} — PhantomACE is live! ☀️`);
 }
 
 /* ======================== TWITCH LIVE CHECK ======================== */
@@ -3802,7 +4896,9 @@ async function checkTwitchLive() {
     if (res.ok) {
       const data = await res.json();
       const nowLive = !!data.live;
+      streamStartedAt = nowLive && data.started_at ? new Date(data.started_at).getTime() : (nowLive ? Date.now() : null);
       if (nowLive && !wasStreamLive) {
+        startNewParkDay();
         spawnDebris();
         renderParkWorld();
       }
@@ -3811,7 +4907,9 @@ async function checkTwitchLive() {
     }
   } catch(e) {
     isStreamLive = false;
+    streamStartedAt = null;
   }
+  renderStreamClock();
 }
 
 /* ======================== INVENTORY EGGS ======================== */
@@ -3884,8 +4982,9 @@ function renderInventoryEggSection() {
     const qty = egg.quantity || 1;
     const rarityLabel = (egg.rarity || 'common').charAt(0).toUpperCase() + (egg.rarity || 'common').slice(1);
     const disabled = state.eggs.length >= 3 ? 'disabled style="opacity:0.4;cursor:default"' : '';
+    const eggIcon = EGG_ASSETS[egg.rarity] || EGG_ASSETS.common;
     html += `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:#111;border:1px solid #ffffff14;border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="useInventoryEgg('${egg.id}')" ${disabled}>
-      <div style="font-size:24px">🥚</div>
+      <div><img src="${eggIcon}" width="32" height="32" style="image-rendering:pixelated;" alt=""></div>
       <div style="flex:1">
         <div style="font-size:12px;font-weight:600;color:#fff">${egg.name || rarityLabel + ' Egg'}</div>
         <div style="font-size:10px;color:#666">${egg.meta?.guaranteed ? 'Guaranteed ' : ''}${egg.meta?.mutant ? 'Mutant ' : ''}${rarityLabel} • x${qty}</div>
@@ -3897,6 +4996,7 @@ function renderInventoryEggSection() {
 }
 
 /* ======================== INIT ======================== */
+preloadAssets();
 load();
 initAuth();
 initEggEvents();
