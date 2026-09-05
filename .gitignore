@@ -4,3 +4,19 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# Purchased asset packs (pack-forge / Game Paradise) are NOT tracked.
+# Their licence permits shipping them inside the game but forbids redistributing
+# them "as assets" — and this repo is public, so committing them would do exactly
+# that. They reach production through `npm run deploy`, which uploads the local
+# directory to Cloudflare Pages directly rather than building from git.
+# Regenerate derived sprites with games/dino-park/_build-*.js.
+games/dino-park/assets/dino-assets/
+
+# Scratch output from asset extraction runs
+_tile_*.png
+_test_*.png
+_fence_crop.png
+_vfence-*.png
+games/dino-park/assets/dino-assets/_*.png
+PhantomACE-Demo.zip

@@ -3074,24 +3074,32 @@ const parkImgs = {};
 let resizeHandler = null;
 let yardClickHandler = null;
 
-const PARK_ASSET_URLS = {
-  atlas: AB + 'park-atlas.png',
-  fenceH: AB + 'fence-h.png',
-  fenceH2: AB + 'fence-h2.png',
-  fenceGate: AB + 'fence-gate.png',
-  fencePost: AB + 'fence-post.png',
-  palm1: AB + 'tree-palm1.png',
-  palm2: AB + 'tree-palm2.png',
-  palm3: AB + 'tree-palm3.png',
-  palm4: AB + 'tree-palm4.png',
-  treeBig: AB + 'tree-big.png',
-  treeBig2: AB + 'tree-big2.png',
-  fern1: AB + 'fern1.png',
-  fern2: AB + 'fern2.png',
-  fern3: AB + 'fern3.png',
-  flower1: AB + 'flower1.png',
-  flower2: AB + 'flower2.png',
+const FL = AB + 'flora/';
+const floraTile = n => FL + 'tile_' + String(n).padStart(3, '0') + '.png';
+
+// Trees 1-20, ferns 21-56. Each tree's canopy gives way to trunk at this
+// percentage of its height — measured per sprite, used to split it across
+// the fence so the trunk passes behind and the crown drapes over.
+const TREE_SPLIT = {
+  1:52, 2:49, 3:50, 4:60, 5:68, 6:64, 7:58, 8:51, 9:64, 10:68,
+  11:55, 12:60, 13:58, 14:66, 15:66, 16:66, 17:68, 18:58, 19:62, 20:65,
 };
+const TREE_KINDS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20];
+const FERN_PLAIN = [21,22,23,24,25,28,29,30,38,40,42,43,44,45,46,47,48,49,50,51,53,54,55,56];
+const FERN_FLOWER = [26,27,31,35,36,37,39];
+
+const PARK_ASSET_URLS = (() => {
+  const u = {
+    atlas: AB + 'park-atlas.png',
+    fenceH: AB + 'fence-h.png',
+    fenceH2: AB + 'fence-h2.png',
+    fenceGate: AB + 'fence-gate.png',
+    fencePost: AB + 'fence-post.png',
+  };
+  TREE_KINDS.forEach(n => { u['t' + n] = floraTile(n); });
+  [...FERN_PLAIN, ...FERN_FLOWER].forEach(n => { u['f' + n] = floraTile(n); });
+  return u;
+})();
 
 function loadParkAssets() {
   if (parkAssetsLoaded) return Promise.resolve();
@@ -3149,19 +3157,58 @@ function buildTileMap() {
   return parkTileMap;
 }
 
-const TREE_PLACEMENTS = [
-  {c:1,r:0,k:'palm3',s:1.2},{c:6,r:0,k:'treeBig',s:1.0},{c:11,r:0,k:'palm4',s:1.1},
-  {c:16,r:0,k:'treeBig2',s:1.0},{c:21,r:0,k:'palm3',s:1.3},{c:26,r:0,k:'palm4',s:1.0},
-  {c:31,r:0,k:'treeBig',s:1.1},{c:4,r:1,k:'palm1',s:0.8},{c:13,r:1,k:'palm2',s:0.9},
-  {c:24,r:1,k:'palm1',s:0.8},{c:29,r:1,k:'palm2',s:0.9},
-  {c:2,r:22,k:'palm4',s:1.1},{c:8,r:22,k:'treeBig',s:1.0},{c:14,r:22,k:'palm3',s:1.2},
-  {c:20,r:22,k:'treeBig2',s:1.0},{c:26,r:22,k:'palm4',s:1.1},{c:31,r:22,k:'palm3',s:1.0},
-  {c:5,r:23,k:'palm2',s:0.9},{c:17,r:23,k:'palm1',s:0.8},{c:29,r:23,k:'palm2',s:0.9},
-  {c:0,r:4,k:'palm3',s:1.1},{c:1,r:9,k:'treeBig',s:1.0},{c:0,r:14,k:'palm4',s:1.2},
-  {c:1,r:19,k:'treeBig2',s:1.0},{c:2,r:7,k:'palm1',s:0.8},{c:2,r:17,k:'palm2',s:0.9},
-  {c:29,r:5,k:'treeBig2',s:1.0},{c:30,r:10,k:'palm3',s:1.1},{c:29,r:15,k:'palm4',s:1.2},
-  {c:30,r:19,k:'treeBig',s:1.0},{c:30,r:7,k:'palm2',s:0.9},{c:29,r:13,k:'palm1',s:0.8},
-];
+// The top fence occupies y 154-306; park dirt begins below it. Trees along the
+// top stand behind the fence, so their trunks stop inside that band and never
+// reach the pen floor.
+const TOP_FENCE_BOT = 306;
+const TOP_TREE_BASE = 288;
+const TOP_TREE_SCALE = 0.78;
+const TREE_WIDTH_TILES = 2.6;
+
+// Perimeter flora, generated from a fixed seed so the layout is stable across
+// reloads while staying irregular enough to read as jungle rather than a row.
+function buildFloraPlacements() {
+  const rnd = seededRand(77);
+  const pick = a => a[(rnd() * a.length) | 0];
+  const trees = [], ferns = [];
+  const belowFence = (FENCE.B + 1) * TSIZE;
+
+  for (let c = 0; c <= 32; c += 2.9) trees.push({ c: c + rnd(), k: pick(TREE_KINDS), s: (1.05 + rnd() * 0.3) * TOP_TREE_SCALE, top: true, depth: 0 });
+  for (let c = 1; c <= 31; c += 3.1) trees.push({ c: c + rnd() * 1.1, k: pick(TREE_KINDS), s: (0.85 + rnd() * 0.2) * TOP_TREE_SCALE, top: true, depth: 1 });
+  for (let c = 0; c <= 32; c += 3.4) trees.push({ c: c + rnd() * 1.2, y: belowFence + 120, k: pick(TREE_KINDS), s: 1.2 + rnd() * 0.35 });
+  for (let c = 1; c <= 31; c += 3.8) trees.push({ c: c + rnd() * 1.4, y: belowFence + 48, k: pick(TREE_KINDS), s: 0.9 + rnd() * 0.25 });
+  for (let r = 3; r <= 21; r += 2.6) {
+    trees.push({ c: 0.4 + rnd() * 1.6, y: r * TSIZE, k: pick(TREE_KINDS), s: 1.0 + rnd() * 0.35 });
+    trees.push({ c: 29.8 + rnd() * 1.8, y: r * TSIZE, k: pick(TREE_KINDS), s: 1.0 + rnd() * 0.35 });
+  }
+
+  for (let i = 0; i < 120; i++) {
+    const side = (rnd() * 4) | 0;
+    let c, r;
+    if (side === 0) { c = rnd() * 32; r = rnd() * 1.5; }
+    else if (side === 1) { c = rnd() * 32; r = 21.6 + rnd() * 2.4; }
+    else if (side === 2) { c = rnd() * 3.2; r = rnd() * 24; }
+    else { c = 28.8 + rnd() * 3.2; r = rnd() * 24; }
+    ferns.push({ c, r, k: pick(rnd() < 0.18 ? FERN_FLOWER : FERN_PLAIN), s: 0.5 + rnd() * 0.4, outside: true });
+  }
+  for (let i = 0; i < 16; i++) {
+    const c = FENCE.L + 1 + rnd() * (FENCE.R - FENCE.L - 2);
+    const r = FENCE.T + 1 + rnd() * (FENCE.B - FENCE.T - 2);
+    if (c >= POND_GRID.x - 1 && c <= POND_GRID.x + POND_GRID.w && r >= POND_GRID.y - 1 && r <= POND_GRID.y + POND_GRID.h) continue;
+    ferns.push({ c, r, k: pick(FERN_PLAIN), s: 0.34 + rnd() * 0.16, outside: false });
+  }
+  return { trees, ferns };
+}
+
+// Resolve a placement into its on-canvas box plus the y where crown meets trunk.
+function treeBox(o) {
+  const img = parkImgs['t' + o.k];
+  const dw = (TSIZE * o.s * TREE_WIDTH_TILES) | 0;
+  const dh = img ? (dw * img.naturalHeight / img.naturalWidth) | 0 : dw;
+  const split = Math.round(dh * (TREE_SPLIT[o.k] || 60) / 100);
+  const base = o.top ? Math.min(TOP_TREE_BASE - (o.depth ? 18 : 0), TOP_FENCE_BOT - 8) : o.y + 40;
+  return { img, dx: (o.c * TSIZE - dw * 0.5) | 0, dy: base - dh, dw, dh, split, base };
+}
 
 let groundCache = null;
 let overCache = null;
@@ -3250,27 +3297,10 @@ function blendSeams(ctx, w, h) {
   ctx.putImageData(imgData, 0, 0);
 }
 
+// Fence only — undergrowth and trees are emitted by buildOverPasses, which
+// interleaves them around this layer.
 function buildOverTiles() {
-  const { COLS, ROWS } = PARK_GRID;
   const tiles = [];
-  const rand2 = seededRand(777);
-  const fernKeys = ['fern1','fern2','fern3','flower1','flower2'];
-
-  for (let i = 0; i < 60; i++) {
-    const fc = rand2() * COLS;
-    const fr = rand2() * ROWS;
-    if (fc > FENCE.L && fc < FENCE.R && fr > FENCE.T && fr < FENCE.B) continue;
-    const key = fernKeys[(rand2() * fernKeys.length) | 0];
-    const s = 0.5 + rand2() * 0.5;
-    const fw = (TSIZE * s * 2.2) | 0;
-    tiles.push({
-      file: key, sx: 0, sy: 0, sw: -1, sh: -1,
-      dx: (fc * TSIZE - fw * 0.3) | 0,
-      dy: (fr * TSIZE) | 0,
-      dw: fw, dh: -1,
-      _autoSize: true
-    });
-  }
 
   const fh1 = parkImgs.fenceH;
   if (fh1) {
@@ -3300,72 +3330,80 @@ function buildOverTiles() {
     }
   }
 
-  // Painter's order: trees whose trunk sits lower on screen draw last, so a
-  // nearer tree always overlaps one behind it rather than the array order winning.
-  TREE_PLACEMENTS
-    .map(({ c, r, k, s }) => {
-      const img = parkImgs[k];
-      const treeW = (TSIZE * s * 3.5) | 0;
-      const treeH = img ? (treeW * img.naturalHeight / img.naturalWidth) | 0 : treeW;
-      const top = Math.max(((r * TSIZE) - treeH * 0.55) | 0, -(treeH * 0.12) | 0);
-      return {
-        base: top + treeH,
-        tile: {
-          file: k, sx: 0, sy: 0, sw: -1, sh: -1,
-          dx: (c * TSIZE - treeW * 0.25) | 0,
-          dy: (r * TSIZE) | 0,
-          dw: treeW, dh: -1,
-          _autoSize: true, _treeYOff: true
-        }
-      };
-    })
-    .sort((a, b) => a.base - b.base)
-    .forEach(t => tiles.push(t.tile));
-
-  const rand3 = seededRand(999);
-  const insideFerns = ['fern1','fern2','fern3'];
-  for (let i = 0; i < 12; i++) {
-    const fc = FENCE.L + 2 + rand3() * (FENCE.R - FENCE.L - 4);
-    const fr = FENCE.T + 2 + rand3() * (FENCE.B - FENCE.T - 4);
-    const pg = POND_GRID;
-    if (fc >= pg.x - 1 && fc <= pg.x + pg.w && fr >= pg.y - 1 && fr <= pg.y + pg.h) continue;
-    const key = insideFerns[(rand3() * insideFerns.length) | 0];
-    const s = 0.4 + rand3() * 0.3;
-    const fw = (TSIZE * s * 1.8) | 0;
-    tiles.push({
-      file: key, sx: 0, sy: 0, sw: -1, sh: -1,
-      dx: (fc * TSIZE) | 0, dy: (fr * TSIZE) | 0,
-      dw: fw, dh: -1,
-      _autoSize: true, _alpha: 0.6
-    });
-  }
-
   return tiles;
 }
 
-function renderOverCanvas(canvas, tiles, w, h) {
+// The overlay paints in four passes so the fence reads as a real barrier:
+// undergrowth, then tree trunks, then the fence, then the crowns that drape
+// over it. Trees within a pass sort by trunk base, so nearer ones overlap.
+function buildOverPasses() {
+  const { trees, ferns } = buildFloraPlacements();
+  const boxes = trees.map(treeBox).sort((a, b) => a.base - b.base);
+  const fernTile = f => {
+    const img = parkImgs['f' + f.k];
+    const dw = (TSIZE * f.s * 1.5) | 0;
+    const dh = img ? (dw * img.naturalHeight / img.naturalWidth) | 0 : dw;
+    return { file: 'f' + f.k, dx: (f.c * TSIZE - dw / 2) | 0, dy: (f.r * TSIZE - dh * 0.8) | 0, dw, dh, alpha: f.outside ? 1 : 0.9 };
+  };
+  return {
+    under: ferns.filter(f => f.outside).map(fernTile),
+    trunks: boxes,
+    fence: buildOverTiles(),
+    crowns: boxes,
+    over: ferns.filter(f => !f.outside).map(fernTile),
+  };
+}
+
+function renderOverPasses(ctx, w, h) {
+  const p = buildOverPasses();
+  const blit = t => {
+    const img = parkImgs[t.file];
+    if (!img) return;
+    if (t.alpha !== undefined) ctx.globalAlpha = t.alpha;
+    ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
+    ctx.globalAlpha = 1;
+  };
+  // A tree is drawn twice, clipped either side of its crown/trunk split.
+  const slice = (b, y, sh) => {
+    if (!b.img || sh <= 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(b.dx, y, b.dw, sh);
+    ctx.clip();
+    ctx.drawImage(b.img, b.dx, b.dy, b.dw, b.dh);
+    ctx.restore();
+  };
+
+  p.under.forEach(blit);
+  p.trunks.forEach(b => slice(b, b.dy + b.split, b.dh - b.split));
+  renderOverCanvasTiles(ctx, p.fence);
+  p.crowns.forEach(b => slice(b, b.dy, b.split));
+  p.over.forEach(blit);
+}
+
+function renderOverCanvasTiles(ctx, tiles) {
+  for (const t of tiles) {
+    const img = parkImgs[t.file];
+    if (!img) continue;
+    const sw = t.sw === -1 ? img.naturalWidth : t.sw;
+    const sh = t.sh === -1 ? img.naturalHeight : t.sh;
+    const dh = t.dh === -1 ? (t.dw * img.naturalHeight / img.naturalWidth) | 0 : t.dh;
+    let dy = t.dy;
+    if (t._autoSize && t.dh === -1) dy = (dy - dh * 0.4) | 0;
+    if (t._alpha) ctx.globalAlpha = t._alpha;
+    ctx.drawImage(img, 0, 0, sw, sh, t.dx, dy, t.dw, dh);
+    if (t._alpha) ctx.globalAlpha = 1;
+  }
+}
+
+function renderOverCanvas(canvas, w, h) {
   if (!canvas) return;
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, w, h);
-
-  for (const t of tiles) {
-    const img = parkImgs[t.file];
-    if (!img) continue;
-    const sw = t.sw === -1 ? img.naturalWidth : t.sw;
-    const sh = t.sh === -1 ? img.naturalHeight : t.sh;
-    let dh = t.dh === -1 ? (t.dw * img.naturalHeight / img.naturalWidth) | 0 : t.dh;
-    let dy = t.dy;
-    // Trees anchor by their trunk, but never so high that the canvas edge
-    // shears the crown off — the top row would otherwise render as bare trunks.
-    if (t._treeYOff) dy = Math.max((dy - dh * 0.55) | 0, -(dh * 0.12) | 0);
-    else if (t._autoSize && t.dh === -1) dy = (dy - dh * 0.4) | 0;
-    if (t._alpha) ctx.globalAlpha = t._alpha;
-    ctx.drawImage(img, 0, 0, sw, sh, t.dx, dy, t.dw, dh);
-    if (t._alpha) ctx.globalAlpha = 1;
-  }
+  renderOverPasses(ctx, w, h);
 }
 
 function buildGroundCache() {
@@ -3401,8 +3439,7 @@ function buildOverCache() {
   const w = COLS * TSIZE;
   const h = ROWS * TSIZE;
   const offscreen = document.createElement('canvas');
-  const tiles = buildOverTiles();
-  renderOverCanvas(offscreen, tiles, w, h);
+  renderOverCanvas(offscreen, w, h);
   return offscreen;
 }
 
