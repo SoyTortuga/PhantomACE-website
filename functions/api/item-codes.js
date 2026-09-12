@@ -21,6 +21,38 @@ function generateCode() {
   return code;
 }
 
+/* ── Dino Park egg items ───────────────────────────
+   Site-wide rarity (stored on the item, shown on the
+   redemption UI's border/color) maps deterministically
+   onto Dino Park's own 5-tier scale. Dino Park has no
+   "mythic" tier, so a mythic code coin-flips between its
+   two top tiers at redeem time — the flip result is what
+   actually gets granted and what the player is told. ── */
+
+const SITE_RARITIES = ['mythic', 'rare', 'uncommon', 'common'];
+const DINO_TIER_MAP = { common: 'common', uncommon: 'uncommon', rare: 'rare' };
+
+function rollDinoEggTier(siteRarity) {
+  if (siteRarity === 'mythic') {
+    return Math.random() < 0.5 ? 'epic' : 'legendary';
+  }
+  return DINO_TIER_MAP[siteRarity] || 'common';
+}
+
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function validateItemShape(item) {
+  if (!item || !item.id || !item.game || !item.type || !item.name) {
+    return 'Invalid item — requires id, game, type, name';
+  }
+  if (item.game === 'dino-park' && item.type === 'egg' && !SITE_RARITIES.includes(item.rarity)) {
+    return `Dino Park egg items require rarity to be one of: ${SITE_RARITIES.join(', ')}`;
+  }
+  return null;
+}
+
 function inventoryKey(userId) {
   return `inv_${userId}`;
 }
@@ -139,9 +171,8 @@ export async function onRequestPost(context) {
    awards in leaderboards.js) — bypasses the HTTP session/role check
    since the caller already knows it's an authorized, internal grant. ── */
 export async function createItemCode(env, item) {
-  if (!item || !item.id || !item.game || !item.type || !item.name) {
-    throw new Error('Invalid item — requires id, game, type, name');
-  }
+  const invalidReason = validateItemShape(item);
+  if (invalidReason) throw new Error(invalidReason);
 
   const code = generateCode();
   const record = {
@@ -172,9 +203,8 @@ async function handleCreate(env, session, body) {
   }
 
   const item = body.item;
-  if (!item || !item.id || !item.game || !item.type || !item.name) {
-    return json({ error: 'Invalid item — requires id, game, type, name' }, 400);
-  }
+  const invalidReason = validateItemShape(item);
+  if (invalidReason) return json({ error: invalidReason }, 400);
 
   const record = await createItemCode(env, item);
 
@@ -203,6 +233,10 @@ async function handleRedeem(env, session, body) {
     return json({ error: 'Already redeemed' }, 409);
   }
 
+  if (record.item.game === 'dino-park' && record.item.type === 'egg') {
+    return await redeemDinoEgg(env, record, code, userId);
+  }
+
   record.redeemedBy.push(userId);
   await saveCodeRecord(env, code, record);
 
@@ -224,4 +258,61 @@ async function handleRedeem(env, session, body) {
   }
 
   return json({ success: true, item: record.item });
+}
+
+/* Dino Park eggs bypass the generic inventory grant path entirely — the
+   item is granted straight through game-dino-park's own grantEgg(),
+   using only the rarity stored server-side on the code record (never
+   anything from the request body). A mythic code coin-flips epic vs.
+   legendary here, at grant time, so the player is told the real tier
+   that landed rather than the generic "mythic" label. Loaded via a
+   dynamic import so a not-yet-deployed dino-park.js (this is a
+   coordinated cross-agent feature) fails soft instead of breaking the
+   rest of this module. */
+async function redeemDinoEgg(env, record, code, userId) {
+  const siteRarity = record.item.rarity || 'common';
+  const dinoTier = rollDinoEggTier(siteRarity);
+
+  let grantEgg;
+  try {
+    ({ grantEgg } = await import('./dino-park.js'));
+  } catch {
+    grantEgg = null;
+  }
+
+  if (typeof grantEgg !== 'function') {
+    return json({ error: 'Dino Park egg redemption is not available right now. Try again later.' }, 503);
+  }
+
+  let result;
+  try {
+    result = await grantEgg(env, userId, dinoTier);
+  } catch {
+    return json({ error: 'Something went wrong granting your egg. Try again.' }, 500);
+  }
+
+  if (!result || !result.success) {
+    /* Do NOT mark the code redeemed for this user — e.g. an incubator-full
+       failure should let them free up space and retry the same code.
+       Status 400 (not 409) so the redemption page shows this real error
+       instead of the generic "already redeemed" message it shows for 409. */
+    return json({ error: (result && result.error) || 'Could not grant your egg right now.' }, 400);
+  }
+
+  record.redeemedBy.push(userId);
+  await saveCodeRecord(env, code, record);
+
+  return json({
+    success: true,
+    item: {
+      id: record.item.id,
+      game: 'dino-park',
+      type: 'egg',
+      name: `${capitalize(dinoTier)} Dino Park Egg`,
+      rarity: siteRarity,
+      dinoTier,
+      speciesId: result.egg && result.egg.speciesId,
+      hatchTime: result.egg && result.egg.hatchTime,
+    },
+  });
 }

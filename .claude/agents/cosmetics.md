@@ -15,18 +15,19 @@ You are the specialist agent for the profile cosmetics system on the PhantomACE 
 
 ## Your Scope
 You own these files exclusively:
-- `membership.html` — Phamily membership page (profile cosmetics section)
+- `inventory.html` — Dedicated inventory/collection landing page
+- `css/pages/inventory.css` — Inventory page styles
+- `js/pages/inventory.js` — Inventory page client logic (tabs, equip/unequip, Badge Showcase selection)
+- `membership.html` — Phamily membership tier info page (no longer includes the cosmetics collection section — that moved to `inventory.html`)
 - `css/pages/membership.css` — Membership page styles
-- `css/pages/profile-cosmetics.css` — Cosmetic collection UI styles
-- `js/pages/profile-cosmetics.js` — Cosmetic collection client logic
 - `functions/api/inventory.js` — Shared inventory API (get/grant/equip items)
 - `functions/api/marketplace.js` — Item marketplace/shop API
 - `functions/api/channel-points.js` — Twitch channel point redemption webhooks
 - `functions/api/import-badges.js` — Badge import utility
-- `functions/api/item-codes.js` — **Create this.** Item code generation, activation, and redemption (see "Item Code Redemption" below).
-- `redeem.html` — **Create this.** Public code redemption page.
-- `css/pages/redeem.css` — **Create this.**
-- `js/pages/redeem.js` — **Create this.**
+- `functions/api/item-codes.js` — Item code generation, activation, and redemption (see "Item Code Redemption" below).
+- `redeem.html` — Public code redemption page.
+- `css/pages/redeem.css`
+- `js/pages/redeem.js`
 
 You may read but not modify:
 - `css/components.css`, `css/layout.css` — Shared component styles
@@ -50,7 +51,7 @@ Four equippable cosmetic slots defined in `PROFILE_SLOTS`:
 ### Badge Showcase (distinct from the single equipped Badge slot above)
 A user can additionally select **up to 5 badges** (`inv.equips.profile.badgeShowcase`, an array of item IDs, all must be `type: 'badge'`) to display to *other* people wherever member interaction happens — leaderboards, game lobbies, eventually forums. This is separate from the single "Badge" slot in `PROFILE_SLOTS` (which only affects your own header avatar) — the showcase is about what others see of you elsewhere on the site.
 
-- **Selection UI**: `js/pages/profile-cosmetics.js`'s `renderShowcaseSection()` — pick/remove up to 5 badges, `saveShowcase()` posts the selection.
+- **Selection UI**: `js/pages/inventory.js`'s `renderShowcaseSection()` — pick/remove up to 5 badges, `saveShowcase()` posts the selection.
 - **Set it**: `POST /api/inventory {action:'set-showcase', badgeIds:[...]}` — validates max 5 and that every ID is a badge you actually own.
 - **Read it (public, no auth)**: `GET /api/inventory?action=showcase&userIds=id1,id2,...` — batched, returns only `{id, name, rarity}` per badge for each requested user, never their full inventory. This is the endpoint any other system (a game's lobby, the leaderboards page, future forums) calls to show badges next to someone else's name.
 - **Already wired in**: `community-leaderboards.html` / `js/pages/leaderboards.js` shows showcase badges next to leaderboard entries as small rarity-colored icon tags (`.lb-badge`), fetched in one batched call after the scores render.
@@ -80,13 +81,14 @@ Items have rarities: `{mythic: 0, rare: 1, uncommon: 2, common: 3}` (lower = rar
 ### Badge Import (`/api/import-badges`)
 - Utility for bulk importing badge definitions
 
-## Client-Side Architecture (profile-cosmetics.js)
-- `loadProfileCosmetics()` — Fetches inventory, renders collection
+## Client-Side Architecture (inventory.js)
+- `loadInventory()` — Fetches inventory, renders collection (note: distinct from `js/auth.js`'s own unrelated `loadProfileCosmetics()`, which populates the small header badge/title next to your name — don't confuse the two)
 - `profileItems` — Array of user's owned items
 - `profileEquips` — Object mapping slot → equipped item ID
 - Requires Twitch login (`getSession()`) to view collection
-- Items displayed in a grid, filterable by slot type
-- Equip/unequip actions via API calls
+- Items displayed in a grid behind `PROFILE_SLOTS` tabs (each tab shows a live owned-count), filterable by slot type
+- Equipped item shows a "WEARING" pill; equip/unequip actions via API calls
+- Per-tab empty state links out to Phamily Time / Redeem Code so an empty inventory isn't a dead end
 
 ## Item Code Redemption (new system)
 When an item is created (any rarity, any game), it gets a redemption code tied to it. That code sits inactive in a queue until `twitch-bot` drops it into chat — at which point it becomes active for a limited time, and deactivates again once that timer runs out, not once someone redeems it. Anyone with the code can use it on the redemption page while it's active; multiple viewers can successfully redeem the same drop before it expires. This mirrors the giveaway hype-train code drop pattern (`gc_{tier}`/`gc_ptr_{tier}` in `hype-train.js`) but grants a specific item instead of giveaway entries — read that file for the shape of the existing pattern before building this.
@@ -110,12 +112,15 @@ When an item is created (any rarity, any game), it gets a redemption code tied t
 - Single input for the code + submit button, success/error states (already-redeemed, expired, invalid code).
 - On success, show what was claimed (name, rarity, icon) — same visual language as a marketplace/inventory item card.
 
-## CSS Structure (profile-cosmetics.css)
-- `.collection-section` — Hidden by default, shown when JS loads
+## CSS Structure (inventory.css)
+- `.inv-eyebrow` — Small tag above the page title ("YOUR STUFF"-style)
 - `.equipped-row` — Grid of current equipped items per slot
 - `.equipped-slot` — Individual slot display
+- `.inv-tabs` / `.inv-tab` / `.inv-tab-count` — Category tabs with owned-count badges
+- `.wearing-pill` — Equipped-state indicator on a card
+- `.item-desc` — Per-item description text
+- `.inv-tab-empty` / `.inv-footer-tip` — Empty state and the "how to earn more" footer note
 - Login prompt for unauthenticated users
-- Empty state with link to earn items
 
 ## Tech Context
 - Auth: `pham_session` cookie via Twitch OAuth (required for all cosmetic actions)

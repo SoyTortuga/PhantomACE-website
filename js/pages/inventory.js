@@ -1,14 +1,15 @@
 /* ══════════════════════════════════════════
-   PROFILE COSMETICS
+   INVENTORY
    View and equip badges, titles, banners,
-   name effects from inventory
+   name effects from inventory. Also home of
+   the public Badge Showcase picker.
    ══════════════════════════════════════════ */
 
 const PROFILE_SLOTS = [
-  { slot: 'badge',       label: 'Badge',       type: 'badge' },
-  { slot: 'title',       label: 'Title',       type: 'title' },
-  { slot: 'banner',      label: 'Banner',      type: 'banner' },
-  { slot: 'name-effect', label: 'Name Effect', type: 'name-effect' },
+  { slot: 'badge',       label: 'Badge',       type: 'badge',       icon: '\u{1F396}\uFE0F' },
+  { slot: 'title',       label: 'Title',       type: 'title',       icon: '\u{1F3F7}\uFE0F' },
+  { slot: 'banner',      label: 'Banner',      type: 'banner',      icon: '\u{1F5BC}\uFE0F' },
+  { slot: 'name-effect', label: 'Name Effect', type: 'name-effect', icon: '\u2728' },
 ];
 
 const RARITY_ORDER = { mythic: 0, rare: 1, uncommon: 2, common: 3 };
@@ -17,19 +18,19 @@ const SHOWCASE_MAX = 5;
 let profileItems = [];
 let profileEquips = {};
 let showcaseSelection = [];
+let activeSlot = PROFILE_SLOTS[0].slot;
 
-async function loadProfileCosmetics() {
-  const container = document.getElementById('profileCollection');
+async function loadInventory() {
+  const container = document.getElementById('inventoryCollection');
   if (!container) return;
 
   const session = getSession();
   if (!session) {
     container.innerHTML = `
       <div class="collection-login">
-        <p>Log in with Twitch to view your collection.</p>
+        <p>Log in with Twitch to view your inventory.</p>
         <button class="btn-primary" onclick="loginWithTwitch()">Log In with Twitch</button>
       </div>`;
-    container.closest('.collection-section').style.display = '';
     return;
   }
 
@@ -49,14 +50,12 @@ async function loadProfileCosmetics() {
   if (profileItems.length === 0) {
     container.innerHTML = `
       <div class="collection-empty">
-        <p>No profile items yet. Earn them through <a href="/community-stats.html">Phamily Time</a> rewards!</p>
+        <p>No cosmetics yet. Earn them through <a href="/community-stats.html">Phamily Time</a>, or redeem a code dropped in chat on the <a href="/redeem.html">Redeem</a> page!</p>
       </div>`;
-    container.closest('.collection-section').style.display = '';
     return;
   }
 
   renderCollection(container);
-  container.closest('.collection-section').style.display = '';
 }
 
 function renderCollection(container) {
@@ -91,36 +90,75 @@ function renderCollection(container) {
   }
   html += '</div></div>';
 
+  html += renderTabs();
+  html += renderActiveTabGrid();
   html += renderShowcaseSection();
-
-  for (const slot of PROFILE_SLOTS) {
-    const items = profileItems
-      .filter(i => i.type === slot.type)
-      .sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9));
-
-    if (items.length === 0) continue;
-
-    html += `<div class="collection-category">`;
-    html += `<div class="section-header">${slot.label}s <span class="collection-count">${items.length}</span></div>`;
-    html += `<div class="collection-grid">`;
-
-    for (const item of items) {
-      const isEquipped = profileEquips[slot.slot] === item.id;
-      html += `
-        <div class="collection-item ${isEquipped ? 'equipped' : ''} rarity-${item.rarity || 'common'}" data-id="${escAttr(item.id)}" data-slot="${slot.slot}">
-          <div class="item-rarity-tag">${item.rarity || 'common'}</div>
-          <div class="item-name">${escName(item.name)}</div>
-          <div class="item-source">${item.source || 'Phamily Time'}</div>
-          <button class="pill-btn item-equip-btn" onclick="toggleProfileEquip('${slot.slot}', '${escAttr(item.id)}', ${isEquipped})">
-            ${isEquipped ? 'Unequip' : 'Equip'}
-          </button>
-        </div>`;
-    }
-
-    html += '</div></div>';
-  }
+  html += renderFooterTip();
 
   container.innerHTML = html;
+}
+
+function renderTabs() {
+  let html = '<div class="inv-tabs">';
+  for (const slot of PROFILE_SLOTS) {
+    const count = profileItems.filter(i => i.type === slot.type).length;
+    const isActive = activeSlot === slot.slot;
+    html += `
+      <button class="pill-btn inv-tab ${isActive ? 'active' : ''}" onclick="setActiveSlot('${slot.slot}')">
+        ${slot.icon} ${slot.label} <span class="inv-tab-count">${count}</span>
+      </button>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function setActiveSlot(slot) {
+  activeSlot = slot;
+  const container = document.getElementById('inventoryCollection');
+  if (container) renderCollection(container);
+}
+
+function renderActiveTabGrid() {
+  const slot = PROFILE_SLOTS.find(s => s.slot === activeSlot) || PROFILE_SLOTS[0];
+  const items = profileItems
+    .filter(i => i.type === slot.type)
+    .sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9));
+
+  let html = '<div class="collection-category">';
+
+  if (items.length === 0) {
+    html += `
+      <div class="inv-tab-empty">
+        <p>No ${slot.label.toLowerCase()}s yet. Earn one through <a href="/community-stats.html">Phamily Time</a>, a channel point redemption, or a code drop on the <a href="/redeem.html">Redeem</a> page.</p>
+      </div>`;
+    html += '</div>';
+    return html;
+  }
+
+  html += '<div class="collection-grid">';
+  for (const item of items) {
+    const isEquipped = profileEquips[slot.slot] === item.id;
+    html += `
+      <div class="collection-item ${isEquipped ? 'equipped' : ''} rarity-${item.rarity || 'common'}" data-id="${escAttr(item.id)}" data-slot="${slot.slot}">
+        ${isEquipped ? '<div class="wearing-pill">Wearing</div>' : ''}
+        <div class="item-icon-swatch">${slot.icon}</div>
+        <div class="item-rarity-tag">${item.rarity || 'common'}</div>
+        <div class="item-name">${escName(item.name)}</div>
+        <div class="item-desc">${escName(itemDescription(item, slot))}</div>
+        <button class="pill-btn item-equip-btn" onclick="toggleProfileEquip('${slot.slot}', '${escAttr(item.id)}', ${isEquipped})">
+          ${isEquipped ? 'Unequip' : 'Equip'}
+        </button>
+      </div>`;
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function itemDescription(item, slot) {
+  if (item.description) return item.description;
+  const rarity = item.rarity || 'common';
+  const rarityLabel = rarity.charAt(0).toUpperCase() + rarity.slice(1);
+  return `${rarityLabel} ${slot.label.toLowerCase()} \u2014 earned via ${item.source || 'Phamily Time'}`;
 }
 
 function renderShowcaseSection() {
@@ -132,7 +170,7 @@ function renderShowcaseSection() {
 
   let html = '<div class="collection-category showcase-section">';
   html += `<div class="section-header">Badge Showcase <span class="collection-count">${showcaseSelection.length} / ${SHOWCASE_MAX}</span></div>`;
-  html += `<p class="showcase-desc">Pick up to ${SHOWCASE_MAX} badges to show off in games and community areas — anyone who sees your name there sees these.</p>`;
+  html += `<p class="showcase-desc">Pick up to ${SHOWCASE_MAX} badges to show off wherever member interaction happens — leaderboards, game lobbies, and beyond. Anyone who sees your name there sees these.</p>`;
   html += '<div class="collection-grid">';
 
   for (const item of badges) {
@@ -140,6 +178,7 @@ function renderShowcaseSection() {
     const atMax = showcaseSelection.length >= SHOWCASE_MAX && !isSelected;
     html += `
       <div class="collection-item showcase-item ${isSelected ? 'equipped' : ''} rarity-${item.rarity || 'common'}">
+        ${isSelected ? '<div class="wearing-pill">Showing</div>' : ''}
         <div class="item-rarity-tag">${item.rarity || 'common'}</div>
         <div class="item-name">${escName(item.name)}</div>
         <button class="pill-btn item-equip-btn" ${atMax ? 'disabled' : ''} onclick="toggleShowcaseBadge('${escAttr(item.id)}')">
@@ -154,6 +193,13 @@ function renderShowcaseSection() {
   return html;
 }
 
+function renderFooterTip() {
+  return `
+    <div class="inv-footer-tip">
+      <p>Earn more cosmetics by climbing the <a href="/community-stats.html">Phamily Time</a> leaderboard, catching a channel point drop, or redeeming a code the moment it's dropped in chat on the <a href="/redeem.html">Redeem</a> page. Once they're yours, they're yours to keep.</p>
+    </div>`;
+}
+
 async function toggleShowcaseBadge(itemId) {
   const idx = showcaseSelection.indexOf(itemId);
   if (idx !== -1) {
@@ -162,7 +208,7 @@ async function toggleShowcaseBadge(itemId) {
     showcaseSelection.push(itemId);
   }
 
-  const container = document.getElementById('profileCollection');
+  const container = document.getElementById('inventoryCollection');
   renderCollection(container);
 }
 
@@ -194,7 +240,7 @@ async function toggleProfileEquip(slot, itemId, isEquipped) {
     profileEquips[slot] = itemId;
   }
 
-  const container = document.getElementById('profileCollection');
+  const container = document.getElementById('inventoryCollection');
   renderCollection(container);
 
   try {
@@ -232,7 +278,7 @@ async function importTwitchBadges() {
     const data = await res.json();
 
     if (data.imported > 0) {
-      await loadProfileCosmetics();
+      await loadInventory();
     } else if (btn) {
       btn.textContent = 'No new badges found';
     }
@@ -244,4 +290,4 @@ async function importTwitchBadges() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadProfileCosmetics);
+document.addEventListener('DOMContentLoaded', loadInventory);

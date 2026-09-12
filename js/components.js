@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="account-menu-header" id="accountMenuName"></div>
                 <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Profile <span class="account-menu-soon">Soon</span></a>
                 <a href="/redeem.html" class="account-menu-item">Redeems</a>
-                <a href="/membership.html" class="account-menu-item">Inventory</a>
+                <a href="/inventory.html" class="account-menu-item">Inventory</a>
                 <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Settings <span class="account-menu-soon">Soon</span></a>
                 <button class="account-menu-item account-menu-item-danger" onclick="logout()">Logout</button>
               </div>

@@ -1,7 +1,25 @@
-/* ── PROFILE COSMETICS COLLECTION ── */
+/* ══════════════════════════════════════════
+   INVENTORY PAGE
+   ══════════════════════════════════════════ */
 
-.collection-section {
-  display: none;
+.inv-eyebrow {
+  display: inline-block;
+  font-family: var(--font-system);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--red);
+  padding: 4px 14px;
+  border: 1px solid rgba(255, 0, 0, 0.35);
+  border-radius: 999px;
+  background: var(--red-glow);
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.inv-section {
+  padding-top: 8px;
 }
 
 .collection-login,
@@ -17,7 +35,9 @@
   margin-top: 16px;
 }
 
-.collection-empty a {
+.collection-empty a,
+.inv-tab-empty a,
+.inv-footer-tip a {
   color: var(--red);
 }
 
@@ -26,7 +46,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .equipped-slot {
@@ -63,9 +83,32 @@
 .equipped-item.rarity-uncommon { color: var(--green); }
 .equipped-item.rarity-common { color: var(--text-sec); }
 
+/* ── Category tabs ── */
+.inv-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.inv-tab {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 8px 18px;
+}
+
+.inv-tab-count {
+  display: inline-block;
+  font-family: var(--font-system);
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+
 /* ── Category grid ── */
 .collection-category {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .collection-count {
@@ -76,15 +119,16 @@
 
 .collection-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
 }
 
 .collection-item {
+  position: relative;
   background: var(--gray-lo);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -106,6 +150,27 @@
 .collection-item.rarity-uncommon { border-left: 3px solid var(--green); }
 .collection-item.rarity-common { border-left: 3px solid var(--text-dim); }
 
+.item-icon-swatch {
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.wearing-pill {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: var(--font-system);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--white);
+  background: var(--red);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
 .item-rarity-tag {
   font-size: 8px;
   text-transform: uppercase;
@@ -120,19 +185,20 @@
 
 .item-name {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-pri);
   font-weight: 600;
 }
 
-.item-source {
-  font-size: 10px;
+.item-desc {
+  font-size: 11px;
   color: var(--text-dim);
   font-family: var(--font-system);
+  line-height: 1.4;
 }
 
 .item-equip-btn {
-  margin-top: 6px;
+  margin-top: 8px;
   align-self: flex-start;
   font-size: 11px;
   padding: 4px 12px;
@@ -143,7 +209,22 @@
   color: var(--red);
 }
 
+.inv-tab-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  border: 1px dashed var(--border-mid);
+  border-radius: 4px;
+}
+
 /* ── Badge Showcase ── */
+.showcase-section {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
 .showcase-desc {
   font-family: var(--font-ui);
   font-size: 13px;
@@ -161,7 +242,7 @@
 /* ── Import badges bar ── */
 .import-badges-bar {
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   padding: 12px;
   background: var(--gray-lo);
   border: 1px dashed var(--border-mid);
@@ -176,4 +257,21 @@
 .import-badges-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ── Footer tip ── */
+.inv-footer-tip {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.inv-footer-tip p {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 62ch;
+  margin: 0 auto;
+  line-height: 1.6;
 }
