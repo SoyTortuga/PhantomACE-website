@@ -32,6 +32,16 @@
     <p class="page-hero-subtitle">Community games and interactive chaos</p>
   </section>
 
+  <!-- Being Played Now -->
+  <section class="page-container games-scroller-section">
+    <div class="section-header">Being Played Now</div>
+    <div class="games-scroller">
+      <button class="games-scroller-btn games-scroller-btn-left" id="gamesScrollerLeft" aria-label="Scroll left">&lsaquo;</button>
+      <div class="games-scroller-track" id="gamesScrollerTrack"></div>
+      <button class="games-scroller-btn games-scroller-btn-right" id="gamesScrollerRight" aria-label="Scroll right">&rsaquo;</button>
+    </div>
+  </section>
+
   <!-- Game Cards -->
   <section class="page-container">
     <div class="section-header">Play Now</div>
@@ -86,6 +96,7 @@
           <div class="game-card-footer">
             <div class="game-card-tags">
               <span class="game-tag game-tag-multiplayer">Live</span>
+              <span class="game-live-badge" data-live="commander-bingo" hidden></span>
             </div>
             <div style="display: flex; gap: 6px;">
               <button class="btn-primary game-play-btn" onclick="launchGame('Commander Bingo', '/games/commander-bingo/')">Join</button>
@@ -125,6 +136,7 @@
           <div class="game-card-footer">
             <div class="game-card-tags">
               <span class="game-tag game-tag-puzzle">Dice</span>
+              <span class="game-live-badge" data-live="mana-clash" hidden></span>
             </div>
             <button class="btn-primary game-play-btn" onclick="launchGame('Mana Clash', '/games/mana-clash/')">Play</button>
           </div>
@@ -143,6 +155,7 @@
           <div class="game-card-footer">
             <div class="game-card-tags">
               <span class="game-tag game-tag-puzzle">Artillery</span>
+              <span class="game-live-badge" data-live="pham-shock" hidden></span>
             </div>
             <button class="btn-primary game-play-btn" onclick="launchGame('PhamShock', '/games/shell-shock/')">Play</button>
           </div>
@@ -196,53 +209,6 @@
   <script src="/js/nav.js" defer></script>
   <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
-  <script>
-    function launchGame(title, src) {
-      const launcher = document.getElementById('gameLauncher');
-      const frame = document.getElementById('gameLauncherFrame');
-      const titleEl = document.getElementById('gameLauncherTitle');
-
-      titleEl.textContent = title;
-      frame.src = src;
-      launcher.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeLauncher() {
-      const launcher = document.getElementById('gameLauncher');
-      const frame = document.getElementById('gameLauncherFrame');
-
-      launcher.classList.remove('open');
-      frame.src = 'about:blank';
-      document.body.style.overflow = '';
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeLauncher();
-    });
-
-    window.addEventListener('message', (e) => {
-      if (e.data === 'close-game') closeLauncher();
-    });
-
-    (async function loadLeaderboard() {
-      try {
-        const res = await fetch('/api/skull-clicker');
-        const lb = await res.json();
-        const el = document.getElementById('scLeaderboard');
-        if (!lb.length) return;
-        const units = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
-        function fmt(n) {
-          if (n < 1000) return n.toLocaleString();
-          const t = Math.min(Math.floor(Math.log10(n)/3), units.length-1);
-          const s = n / Math.pow(10, t*3);
-          return (s < 10 ? s.toFixed(1) : Math.floor(s)) + units[t];
-        }
-        const top3 = lb.slice(0, 3);
-        el.innerHTML = '<div class="sc-lb-title">Top Players</div>' +
-          top3.map((e, i) => `<div class="sc-lb-row"><span class="sc-lb-rank rank-${i+1}">${i+1}</span><span class="sc-lb-name">${e.name}</span><span class="sc-lb-score">${fmt(e.score)}</span></div>`).join('');
-      } catch(e) {}
-    })();
-  </script>
+  <script src="/js/pages/games.js" defer></script>
 </body>
 </html>

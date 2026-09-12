@@ -1,9 +1,135 @@
+/* Being Played Now — horizontal scroller */
+.games-scroller-section {
+  padding-top: 32px;
+}
+
+.games-scroller {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.games-scroller-track {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 4px 2px 16px;
+  scrollbar-width: none;
+}
+
+.games-scroller-track::-webkit-scrollbar {
+  display: none;
+}
+
+.games-scroller-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-mid);
+  background: var(--gray-mid);
+  color: var(--text-sec);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.games-scroller-btn:hover {
+  border-color: var(--red);
+  color: var(--white);
+}
+
+.game-mini-card {
+  flex: 0 0 180px;
+  display: block;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.game-mini-card:hover {
+  border-color: rgba(152, 9, 10, 0.4);
+  transform: translateY(-2px);
+}
+
+.game-mini-card img {
+  width: 100%;
+  aspect-ratio: 940 / 330;
+  object-fit: cover;
+  display: block;
+}
+
+.game-mini-title {
+  display: block;
+  padding: 8px 10px 2px;
+  font-family: var(--font-gothic);
+  font-size: 12px;
+  color: var(--text-pri);
+}
+
+.game-mini-live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 8px;
+  font-family: var(--font-system);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.game-mini-live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+
+/* Live-count badge on the full game cards below */
+.game-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-system);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.game-live-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+
 /* Game Card Grid */
 .games-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 20px;
   padding: 32px 0 48px;
+}
+
+@media (min-width: 768px) {
+  .games-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 /* Game Card */

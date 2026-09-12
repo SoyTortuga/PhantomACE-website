@@ -64,7 +64,25 @@
       height: 100%;
       overflow: hidden;
       background: #2d5a1e;
+      transform-origin: 0 0;
+      touch-action: none;
+      cursor: grab;
     }
+    .park-world.panning { cursor: grabbing; }
+    .park-zoom-controls {
+      position: absolute; bottom: 14px; right: 14px; z-index: 12;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .park-zoom-controls button {
+      width: 28px; height: 28px;
+      background: rgba(0,0,0,0.75); color: #bbb;
+      border: 1px solid #ffffff14; border-radius: 4px;
+      font-family: inherit; font-size: 14px; font-weight: 700;
+      cursor: pointer; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .park-zoom-controls button:hover { border-color: #FF000060; color: #fff; }
+    .park-zoom-controls button:active { background: rgba(255,0,0,0.15); }
     .dino-ground, .dino-over {
       position: absolute;
       top: 0; left: 0;
@@ -100,13 +118,6 @@
     }
     .park-dino:hover { filter: brightness(1.2); z-index: 6; }
     .park-dino.selected { z-index: 7; filter: brightness(1.3) drop-shadow(0 0 6px rgba(255,255,255,0.5)); }
-    .park-dino-shadow {
-      width: 20px;
-      height: 6px;
-      background: radial-gradient(ellipse, rgba(0,0,0,0.3), transparent);
-      border-radius: 50%;
-      margin-top: -2px;
-    }
     .park-dino-sprite {
       line-height: 0;
       transition: transform 0.3s;
@@ -891,6 +902,11 @@
 <!-- Park Tab -->
 <div class="tab-content active" id="tab-park">
   <div class="park-viewport" id="parkViewport">
+    <div class="park-zoom-controls">
+      <button onclick="zoomParkBy(1.3)" title="Zoom in">+</button>
+      <button onclick="zoomParkBy(1/1.3)" title="Zoom out">&minus;</button>
+      <button onclick="resetParkView()" title="Reset view">&#8634;</button>
+    </div>
     <div class="park-energy-bar" id="parkEnergy" style="display:none;">
       <span class="energy-icon">⚡</span>
       <div class="energy-fill-ctr"><div class="energy-fill" id="energyFill"></div></div>
@@ -3110,6 +3126,7 @@ async function syncCloudSave() {
 
     if (data && data.hasSave && data.state) {
       state = { ...state, ...data.state };
+      applySubTierFromSession(session);
       applyOfflineDecay();
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
       updateTopBar();
@@ -3378,15 +3395,16 @@ function addNewDino(newDino) {
 function pickNewTarget(dino) {
   const spec = getRosterById(dino.speciesId);
   if (spec.habitat === 'Sky') {
-    // Sky dinos fly over everything — land, river, and ocean alike.
-    dino.tx = Math.random() * 100;
-    dino.ty = Math.random() * 100;
+    // Sky dinos fly over everything — land, river, and ocean alike —
+    // but still wander locally rather than teleporting across the map.
+    dino.tx = Math.max(0, Math.min(100, dino.px + (Math.random() - 0.5) * 24));
+    dino.ty = Math.max(0, Math.min(100, dino.py + (Math.random() - 0.5) * 24));
   } else {
     const zoneOk = spec.habitat === 'Water' ? isWaterWalkable : isLandWalkable;
     let nx = dino.px, ny = dino.py;
     for (let i = 0; i < 12; i++) {
-      const cx = Math.max(0, Math.min(100, dino.px + (Math.random() - 0.5) * 22));
-      const cy = Math.max(0, Math.min(100, dino.py + (Math.random() - 0.5) * 22));
+      const cx = Math.max(0, Math.min(100, dino.px + (Math.random() - 0.5) * 10));
+      const cy = Math.max(0, Math.min(100, dino.py + (Math.random() - 0.5) * 10));
       if (!zoneOk(cx, cy)) continue;
       if (spec.habitat !== 'Water' && isBlockedByYard(cx, cy, 1.5)) continue;
       nx = cx; ny = cy;
@@ -3416,7 +3434,7 @@ function initParkView() {
   }
 
   if (!resizeHandler) {
-    resizeHandler = () => { renderTileCanvas(); renderParkWorld(); };
+    resizeHandler = () => { renderTileCanvas(); renderParkWorld(); clampParkView(); applyParkTransform(); };
     window.addEventListener('resize', resizeHandler);
   }
 
@@ -3430,6 +3448,139 @@ function initParkView() {
     };
     world.addEventListener('click', yardClickHandler);
   }
+
+  initParkPanZoom();
+}
+
+/* ======================== PARK PAN & ZOOM ======================== */
+const PARK_MIN_ZOOM = 1;
+const PARK_MAX_ZOOM = 4;
+const parkView = { zoom: 1, panX: 0, panY: 0 };
+let parkPanZoomInit = false;
+
+function clampParkView() {
+  const vp = document.getElementById('parkViewport');
+  const vw = vp.clientWidth, vh = vp.clientHeight;
+  parkView.zoom = Math.max(PARK_MIN_ZOOM, Math.min(PARK_MAX_ZOOM, parkView.zoom));
+  const minX = vw * (1 - parkView.zoom), minY = vh * (1 - parkView.zoom);
+  parkView.panX = Math.max(minX, Math.min(0, parkView.panX));
+  parkView.panY = Math.max(minY, Math.min(0, parkView.panY));
+}
+
+function applyParkTransform() {
+  const world = document.getElementById('parkWorld');
+  world.style.transform = `translate(${parkView.panX}px, ${parkView.panY}px) scale(${parkView.zoom})`;
+}
+
+function zoomParkAt(factor, anchorX, anchorY) {
+  const vp = document.getElementById('parkViewport');
+  const vw = vp.clientWidth, vh = vp.clientHeight;
+  const ax = anchorX === undefined ? vw / 2 : anchorX;
+  const ay = anchorY === undefined ? vh / 2 : anchorY;
+  const oldZoom = parkView.zoom;
+  const newZoom = Math.max(PARK_MIN_ZOOM, Math.min(PARK_MAX_ZOOM, oldZoom * factor));
+  const worldX = (ax - parkView.panX) / oldZoom;
+  const worldY = (ay - parkView.panY) / oldZoom;
+  parkView.zoom = newZoom;
+  parkView.panX = ax - worldX * newZoom;
+  parkView.panY = ay - worldY * newZoom;
+  clampParkView();
+  applyParkTransform();
+}
+
+function zoomParkBy(factor) { zoomParkAt(factor); }
+
+function resetParkView() {
+  parkView.zoom = 1;
+  parkView.panX = 0;
+  parkView.panY = 0;
+  applyParkTransform();
+}
+
+function initParkPanZoom() {
+  if (parkPanZoomInit) return;
+  parkPanZoomInit = true;
+  const vp = document.getElementById('parkViewport');
+  const world = document.getElementById('parkWorld');
+
+  vp.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = vp.getBoundingClientRect();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    zoomParkAt(factor, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  const pointers = new Map();
+  let dragMoved = false;
+  let dragLast = null;
+  let pinchStartDist = null;
+  let pinchStartZoom = null;
+
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+  let dragStart = null;
+
+  vp.addEventListener('pointerdown', (e) => {
+    if (decorateMode) return;
+    if (e.target.closest('.park-zoom-controls, .park-decorate-btn, .park-energy-bar, .park-clock, .yard-tray')) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) {
+      // Don't capture the pointer (or mark this a drag) yet — a plain tap
+      // must still reach the dino/decor click handler underneath untouched.
+      dragMoved = false;
+      dragStart = { x: e.clientX, y: e.clientY };
+      dragLast = dragStart;
+    } else if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      pinchStartDist = dist(pts[0], pts[1]);
+      pinchStartZoom = parkView.zoom;
+      dragLast = null;
+      for (const id of pointers.keys()) { try { vp.setPointerCapture(id); } catch {} }
+    }
+  });
+
+  vp.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 2 && pinchStartDist) {
+      const pts = [...pointers.values()];
+      const newDist = dist(pts[0], pts[1]);
+      const mid = midpoint(pts[0], pts[1]);
+      const r = vp.getBoundingClientRect();
+      const targetZoom = pinchStartZoom * (newDist / pinchStartDist);
+      zoomParkAt(targetZoom / parkView.zoom, mid.x - r.left, mid.y - r.top);
+      dragMoved = true;
+    } else if (pointers.size === 1 && dragStart) {
+      if (!dragMoved) {
+        if (Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) <= 3) return;
+        dragMoved = true;
+        world.classList.add('panning');
+        try { vp.setPointerCapture(e.pointerId); } catch {}
+      }
+      const dx = e.clientX - dragLast.x, dy = e.clientY - dragLast.y;
+      parkView.panX += dx;
+      parkView.panY += dy;
+      dragLast = { x: e.clientX, y: e.clientY };
+      clampParkView();
+      applyParkTransform();
+    }
+  });
+
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) { pinchStartDist = null; }
+    if (pointers.size === 0) { dragLast = null; dragStart = null; world.classList.remove('panning'); }
+  }
+  vp.addEventListener('pointerup', endPointer);
+  vp.addEventListener('pointercancel', endPointer);
+
+  // Suppress the click (dino selection / decor placement) that would
+  // otherwise fire right after a drag or pinch gesture.
+  vp.addEventListener('click', (e) => {
+    if (dragMoved) { e.stopPropagation(); dragMoved = false; }
+  }, true);
 }
 
 function renderParkWorld() {
@@ -3492,7 +3643,7 @@ function renderParkWorld() {
     el.onclick = () => selectDino(i);
     el.style.cssText = `left:${dino.px}%;top:${dino.py}%;`;
 
-    const sprSize = stage === 'hatchling' ? 24 : stage === 'juvenile' ? 32 : 40;
+    const sprSize = stage === 'hatchling' ? 20 : stage === 'juvenile' ? 26 : 32;
     el.innerHTML = `
       ${needsAttention ? '<div class="park-dino-alert"></div>' : ''}
       <div class="park-dino-label">${dino.nickname || spec.name}</div>
@@ -3500,7 +3651,6 @@ function renderParkWorld() {
            style="transform: scaleX(${dino.facing || 1})">
         ${spriteImg(spec.id, sprSize, 'sprite-img', dino.mutation)}
       </div>
-      <div class="park-dino-shadow"></div>
     `;
     world.appendChild(el);
   });
@@ -3750,6 +3900,13 @@ async function confirmListDino(idx, source) {
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.error || 'Failed to list.'); return; }
+    const session = getPlayerSession();
+    marketPendingAdds.set(data.id, {
+      id: data.id,
+      seller: { userId: session.user_id, displayName: session.display_name, profileImage: session.profile_image },
+      dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation || null, careCount: dino.careCount || 0 },
+      price, listedAt: Date.now(),
+    });
     arr.splice(idx, 1);
     if (source === 'park') {
       selectedDinoIdx = -1;
@@ -3995,15 +4152,17 @@ function getPlayerSession() {
   } catch { return null; }
 }
 
+function applySubTierFromSession(session) {
+  if (session?.role === 'sub_tier1') state.subTier = 1;
+  else if (session?.role === 'sub_tier2') state.subTier = 2;
+  else if (session?.role === 'sub_tier3') state.subTier = 3;
+  else state.subTier = 0;
+}
+
 function initAuth() {
   const session = getPlayerSession();
-  if (session) {
-    if (session.role === 'sub_tier1') state.subTier = 1;
-    else if (session.role === 'sub_tier2') state.subTier = 2;
-    else if (session.role === 'sub_tier3') state.subTier = 3;
-    else state.subTier = 0;
-    claimEarnings();
-  }
+  applySubTierFromSession(session);
+  if (session) claimEarnings();
 }
 
 async function claimEarnings() {
@@ -4024,18 +4183,39 @@ async function claimEarnings() {
 let marketListings = [];
 let marketMyListings = [];
 
+// Cloudflare KV's list() (which /api/marketplace's GET is built on) is only
+// eventually consistent — a listing just created/bought/cancelled can take
+// up to ~60s to be reflected in a fresh list() call. These two maps patch
+// the locally-known truth over whatever the server returns in the meantime,
+// so the player's own actions never appear to silently fail or not "stick".
+let marketPendingAdds = new Map();    // listingId -> listing object (mine, just created)
+let marketPendingRemoves = new Set(); // listingId -> just bought/cancelled, hide even if server still lists it
+
+function reconcileListings(freshList) {
+  let list = freshList.filter(l => !marketPendingRemoves.has(l.id));
+  for (const id of Array.from(marketPendingRemoves)) {
+    if (!freshList.some(l => l.id === id)) marketPendingRemoves.delete(id); // server caught up
+  }
+  for (const [id, listing] of Array.from(marketPendingAdds)) {
+    if (freshList.some(l => l.id === id)) marketPendingAdds.delete(id); // server caught up
+    else list = [listing, ...list];
+  }
+  return list;
+}
+
 async function fetchMarketplace() {
   try {
     const res = await fetch('/api/marketplace');
-    if (res.ok) marketListings = await res.json();
-  } catch { marketListings = []; }
+    if (res.ok) marketListings = reconcileListings(await res.json());
+    // non-ok: keep the last-known-good list rather than blanking the market
+  } catch { /* network hiccup — keep showing the last-known-good list */ }
 }
 
 async function fetchMyListings() {
   try {
     const res = await fetch('/api/marketplace?action=my-listings');
-    if (res.ok) marketMyListings = await res.json();
-  } catch { marketMyListings = []; }
+    if (res.ok) marketMyListings = reconcileListings(await res.json());
+  } catch { /* network hiccup — keep showing the last-known-good list */ }
 }
 
 async function renderMarketplace() {
@@ -4133,6 +4313,7 @@ async function buyDino(listingId) {
     const data = await res.json();
     if (!res.ok) { showToast(data.error || 'Purchase failed.'); return; }
 
+    marketPendingRemoves.add(listingId);
     state.coins -= data.price;
     const newDino = {
       speciesId: data.dino.speciesId,
@@ -4166,6 +4347,8 @@ async function cancelListing(listingId) {
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.error || 'Cancel failed.'); return; }
+    marketPendingRemoves.add(listingId);
+    marketPendingAdds.delete(listingId);
     const newDino = {
       speciesId: data.dino.speciesId,
       nickname: data.dino.nickname || '',

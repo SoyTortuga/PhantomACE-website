@@ -58,11 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <button class="auth-login-btn" id="authLoginBtn" onclick="loginWithTwitch()">Log In</button>
             <div class="auth-user-info" id="authUserInfo">
-              <img class="auth-user-avatar" id="authUserAvatar" src="" alt="" width="24" height="24">
-              <img class="auth-user-badge" id="authUserBadge" src="" alt="" width="16" height="16" hidden>
-              <span class="auth-user-name" id="authUserName"></span>
-              <span class="auth-user-title" id="authUserTitle" hidden></span>
-              <button class="auth-logout-btn" onclick="logout()" title="Log Out">✕</button>
+              <button class="auth-user-trigger" id="authUserTrigger" aria-haspopup="true" aria-expanded="false">
+                <img class="auth-user-avatar" id="authUserAvatar" src="" alt="" width="24" height="24">
+                <img class="auth-user-badge" id="authUserBadge" src="" alt="" width="16" height="16" hidden>
+                <span class="auth-user-name" id="authUserName"></span>
+                <span class="auth-user-title" id="authUserTitle" hidden></span>
+              </button>
+              <div class="account-menu" id="accountMenu">
+                <div class="account-menu-header" id="accountMenuName"></div>
+                <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Profile <span class="account-menu-soon">Soon</span></a>
+                <a href="/redeem.html" class="account-menu-item">Redeems</a>
+                <a href="/membership.html" class="account-menu-item">Inventory</a>
+                <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Settings <span class="account-menu-soon">Soon</span></a>
+                <button class="account-menu-item account-menu-item-danger" onclick="logout()">Logout</button>
+              </div>
             </div>
             <button class="hamburger" id="hamburgerBtn" aria-label="Toggle navigation">
               <span></span>
@@ -124,4 +133,32 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof applyRole === 'function') {
     applyRole();
   }
+
+  initAccountMenu();
 });
+
+function initAccountMenu() {
+  const trigger = document.getElementById('authUserTrigger');
+  const menu = document.getElementById('accountMenu');
+  if (!trigger || !menu) return;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = menu.classList.toggle('open');
+    trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (menu.classList.contains('open') && !menu.contains(e.target) && e.target !== trigger) {
+      menu.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && menu.classList.contains('open')) {
+      menu.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}

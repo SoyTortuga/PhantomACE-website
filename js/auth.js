@@ -44,11 +44,13 @@ function applyRole() {
   const userInfo = document.getElementById('authUserInfo');
   const userName = document.getElementById('authUserName');
   const userAvatar = document.getElementById('authUserAvatar');
+  const menuName = document.getElementById('accountMenuName');
 
   if (session && session.display_name) {
     if (loginBtn) loginBtn.style.display = 'none';
     if (userInfo) userInfo.style.display = 'flex';
     if (userName) userName.textContent = session.display_name;
+    if (menuName) menuName.textContent = session.display_name;
     if (userAvatar && session.profile_image) {
       userAvatar.src = session.profile_image;
       userAvatar.alt = session.display_name;

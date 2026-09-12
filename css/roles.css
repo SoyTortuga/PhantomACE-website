@@ -150,6 +150,7 @@ body[data-role="broadcaster"] .role-broadcaster-inline { display: inline; }
 
 .auth-user-info {
   display: none;
+  position: relative;
   align-items: center;
   gap: 8px;
   font-family: var(--font-system);
