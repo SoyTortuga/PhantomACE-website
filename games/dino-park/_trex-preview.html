@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>T-Rex Reskin Preview</title>
+<style>
+  body { margin:0; background:#0a0a0a; color:#e0e0e0; font-family:system-ui,sans-serif; padding:20px; }
+  h1 { font-size:18px; color:#ff0000; margin:0 0 4px; }
+  .sub { font-size:11px; color:#666; margin-bottom:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+  .card { background:#111; border:1px solid #222; border-radius:6px; padding:10px; text-align:center; }
+  .card:hover { border-color:#ff0000; }
+  .imgs { display:flex; justify-content:center; gap:8px; margin-bottom:8px; align-items:flex-end; }
+  .imgs img { image-rendering:pixelated; }
+  .icon { width:48px; height:48px; }
+  .portrait { width:72px; height:72px; }
+  .label { font-size:11px; font-weight:600; color:#ccc; }
+  .tier { font-size:9px; text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
+  .tier.base { color:#7a7a7a; }
+  .tier.normal { color:#7a7a7a; }
+  .tier.global { color:#f0a830; }
+  .tier.special { color:#9b59b6; }
+  .tier.rare { color:#f39c12; }
+  .filter-val { font-family:monospace; font-size:8px; color:#444; margin-top:4px; word-break:break-all; }
+  .swatches { display:flex; gap:3px; justify-content:center; margin-top:4px; }
+  .sw { width:14px; height:14px; border-radius:2px; border:1px solid #333; }
+  .section { font-size:10px; color:#ff0000; text-transform:uppercase; letter-spacing:0.1em; font-weight:700; margin:16px 0 8px; border-bottom:1px solid #222; padding-bottom:4px; }
+  #export-btn { position:fixed; top:10px; right:10px; background:#ff0000; color:#fff; border:none; padding:8px 16px; cursor:pointer; font-size:12px; font-weight:700; border-radius:4px; z-index:10; }
+  #export-btn:hover { background:#cc0000; }
+  #preview-area { background:#0a0a0a; }
+</style></head><body>
+<button id="export-btn" onclick="exportPNG()">EXPORT PNG</button>
+<div id="preview-area">
+<h1>TYRANNOSAURUS REX &mdash; All Reskins</h1>
+<div class="sub">Base color: #5D4037 &bull; 13 mutations rendered via CSS filter on pixel art PNG &bull; Icon correction: hue-rotate(-160deg) saturate(0.6) brightness(1.15)</div>
+
+<div class="section">BASE (No Mutation)</div>
+<div class="grid">
+  <div class="card">
+    <div class="imgs">
+      <img class="icon" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/tyrannosaurus_rex.png" style="filter:hue-rotate(-160deg) saturate(0.6) brightness(1.15)">
+      <img class="portrait" src="assets/dino-assets/AncientBeastsPack/T-Rex-72x72.png">
+    </div>
+    <div class="label">Original</div>
+    <div class="tier base">base</div>
+    <div class="swatches"><div class="sw" style="background:#5D4037"></div><div class="sw" style="background:#8B6E58"></div></div>
+  </div>
+</div>
+
+<div class="section">Normal Color Swaps (3)</div>
+<div class="grid" id="swaps"></div>
+
+<div class="section">Global Mutations (8)</div>
+<div class="grid" id="globals"></div>
+
+<div class="section">Special Mutation (1)</div>
+<div class="grid" id="specials"></div>
+
+<div class="section">Rare Mutation (1)</div>
+<div class="grid" id="rares"></div>
+</div>
+
+<script>
+const IC_CORRECT = 'hue-rotate(-160deg) saturate(0.6) brightness(1.15)';
+const ICON = 'assets/dino-assets/jurassic-dino-320/icons/dinosaurs/tyrannosaurus_rex.png';
+const PORT = 'assets/dino-assets/AncientBeastsPack/T-Rex-72x72.png';
+
+function card(name, tierCls, tierLabel, filter, swatches) {
+  const icFilt = filter ? filter : IC_CORRECT;
+  const ptFilt = filter || '';
+  const sw = swatches.map(c => `<div class="sw" style="background:${c}"></div>`).join('');
+  return `<div class="card">
+    <div class="imgs">
+      <img class="icon" src="${ICON}" style="filter:${icFilt}">
+      <img class="portrait" src="${PORT}" style="filter:${ptFilt || 'none'}">
+    </div>
+    <div class="label">${name}</div>
+    <div class="tier ${tierCls}">${tierLabel}</div>
+    <div class="swatches">${sw}</div>
+    <div class="filter-val">${filter || 'none'}</div>
+  </div>`;
+}
+
+// Normal swaps
+document.getElementById('swaps').innerHTML = [
+  card('Arctic','normal','normal','brightness(1.6) saturate(0.2)',['#B8C8D8','#D8E8F0']),
+  card('Ivory','normal','normal','brightness(1.6) saturate(0.2)',['#C8BFA0','#E8DCC0']),
+  card('Teal','normal','normal','hue-rotate(160deg) saturate(1.5)',['#006B6B','#20B2AA']),
+].join('');
+
+// Global mutations
+document.getElementById('globals').innerHTML = [
+  card('Albino','global','global','brightness(2) saturate(0)',['#F0EDE6','#FFD0D0']),
+  card('Melanistic','global','global','brightness(0.25) saturate(0.4)',['#1A1A1A','#333333']),
+  card('Golden','global','global','sepia(1) brightness(1.3) saturate(2.5)',['#DAA520','#FFD700']),
+  card('Crystal','global','global','brightness(1.4) saturate(0.3) hue-rotate(180deg)',['#B0E0E6','#E0F0FF']),
+  card('Volcanic','global','global','brightness(0.7) sepia(0.6) hue-rotate(-15deg) saturate(3)',['#2D1F1F','#FF4500']),
+  card('PhantomACE','global','global','brightness(0.8) saturate(2.5) hue-rotate(0deg) contrast(1.2)',['#0A0A0A','#FF0000']),
+  card('Spectral','global','global','brightness(1.4) saturate(0.15) opacity(0.65)',['#8878B0','#C0A8F0']),
+  card('Toxic','global','global','hue-rotate(90deg) saturate(2.2) brightness(0.95)',['#2D5A1E','#7FFF00']),
+].join('');
+
+// Special
+document.getElementById('specials').innerHTML = card('Inferno','special','special','hue-rotate(15deg) sepia(0.4) saturate(3) brightness(0.8)',['#1A0A00','#FF4500','#FFD700']);
+
+// Rare
+document.getElementById('rares').innerHTML = card('Mech Rex','rare','rare','saturate(0.15) brightness(1.2) contrast(1.1)',['#4A4A4A','#C0C0C0','#00FF00']);
+
+// PNG export via html2canvas-style approach
+async function exportPNG() {
+  const btn = document.getElementById('export-btn');
+  btn.style.display = 'none';
+
+  const area = document.getElementById('preview-area');
+  const w = area.scrollWidth;
+  const h = area.scrollHeight;
+
+  // Use foreignObject in SVG to render HTML to canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, w, h);
+
+  // Wait for all images to load, then draw each one manually
+  const imgs = area.querySelectorAll('img');
+  const allLoaded = Array.from(imgs).every(i => i.complete);
+  if (!allLoaded) await new Promise(r => setTimeout(r, 1000));
+
+  // Serialize to SVG foreignObject
+  const html = area.outerHTML;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <foreignObject width="100%" height="100%">
+      <div xmlns="http://www.w3.org/1999/xhtml">${html}</div>
+    </foreignObject>
+  </svg>`;
+
+  const blob = new Blob([svg], {type: 'image/svg+xml'});
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(b => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = 'trex-reskin-preview.png';
+      a.click();
+    }, 'image/png');
+    btn.style.display = '';
+  };
+  img.onerror = () => { alert('Export failed - use screenshot instead'); btn.style.display = ''; };
+  img.src = url;
+}
+</script>
+</body></html>

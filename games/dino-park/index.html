@@ -50,8 +50,10 @@
     /* ======================== VISUAL PARK ======================== */
     .park-viewport {
       position: relative;
-      width: 100%;
-      height: calc(100vh - 80px);
+      aspect-ratio: 1 / 1;
+      width: min(100%, calc(100vh - 80px));
+      max-height: calc(100vh - 80px);
+      margin: 0 auto;
       overflow: hidden;
       background: #2d5a1e;
     }
@@ -528,6 +530,13 @@
       border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
       animation: pulse 1s infinite;
     }
+    .egg-speedup-btn {
+      margin-top: 6px; padding: 4px 10px; background: #ffffff08;
+      border: 1px solid #d4a01744; border-radius: 4px; color: #d4a017;
+      font-size: 10px; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .egg-speedup-btn:hover:not(:disabled) { border-color: #d4a017; color: #ffc84a; }
+    .egg-speedup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
     /* Egg source cards */
     .egg-sources { display: flex; flex-direction: column; gap: 10px; }
@@ -607,6 +616,31 @@
       padding: 8px;
       flex-shrink: 0;
     }
+    .coll-view-toggle {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .coll-view-toggle button {
+      flex: 1;
+      background: #ffffff08;
+      border: 1px solid #ffffff14;
+      color: #888;
+      font-family: inherit;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 6px 4px;
+      border-radius: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .coll-view-toggle button.active {
+      background: #ffaa0018;
+      border-color: #ffaa0055;
+      color: #ffaa00;
+    }
+    .coll-view-toggle button:hover:not(.active) { color: #ccc; border-color: #ffffff2a; }
     .coll-card {
       background: #111;
       border: 2px solid #ffffff14;
@@ -636,12 +670,34 @@
     .coll-card-bars > div { flex: 1; border-radius: 1px; }
 
     .coll-detail {
+      position: relative;
       flex: 1;
       overflow-y: auto;
       padding: 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
+    }
+    .coll-sell-btn {
+      position: absolute; top: 12px; right: 12px; z-index: 2;
+      background: #ffffff08; border: 1px solid #ffaa0044; color: #ffaa00;
+      font-family: inherit; font-size: 10px; font-weight: 700;
+      padding: 5px 10px; border-radius: 3px; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .coll-sell-btn:hover { color: #ff6600; border-color: #ff6600; }
+    .coll-move-btn {
+      position: absolute; top: 12px; left: 12px; z-index: 2;
+      background: #ffffff08; border: 1px solid #4a9eff44; color: #4a9eff;
+      font-family: inherit; font-size: 10px; font-weight: 700;
+      padding: 5px 10px; border-radius: 3px; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .coll-move-btn:hover { color: #7fbaff; border-color: #7fbaff; }
+    .coll-vault-note {
+      margin-top: 12px; padding: 10px 14px; width: 100%;
+      background: #ffffff06; border: 1px solid #ffffff14; border-radius: 4px;
+      color: #888; font-size: 11px; text-align: center;
     }
     .coll-detail-empty {
       flex: 1; display: flex; align-items: center; justify-content: center;
@@ -925,15 +981,26 @@
 
 <script>
 const SAVE_KEY = 'pham_dino_park';
+const CLOUD_SAVE_URL = '/api/dino-park';
+const SERVER_SAVE_INTERVAL_MS = 20000;
 const RARITY_ORDER = ['common','uncommon','rare','epic','legendary'];
 const RARITY_COLORS = { common:'#7a7a7a', uncommon:'#2ecc71', rare:'#3498db', epic:'#9b59b6', legendary:'#f39c12' };
 const GROWTH_THRESHOLDS = { juvenile: 20, adult: 60 };
 const STAT_DECAY_RATE = 1;
-const DECAY_INTERVAL_SEC = 600;
+// Decay and care cooldowns are measured in accumulated LIVE stream seconds
+// (state.liveSecAccum), not wall-clock time — both are frozen while
+// PhantomACE is offline, so care is paced to the show, not the clock.
+const DECAY_INTERVAL_LIVE_SEC = 4 * 3600;
 const CARE_AMOUNT = 25;
-const CARE_COOLDOWN = 10000;
-const MAX_PARK_SIZE = 20;
+const CARE_COOLDOWN_LIVE_SEC = 1 * 3600;
+// The park (state.park) holds only ACTIVE dinos — the ones that grow and
+// have their needs decay. Everything else sits in state.vault, frozen in
+// whatever state it was in when it left the park. Both arrays store the
+// same dino object shape; only membership differs.
+const MAX_ACTIVE_PARK = 10;
+const MAX_VAULT_SIZE = 50;
 const HATCH_TIMES = { common: 1800, uncommon: 3600, rare: 7200, epic: 14400, legendary: 28800 };
+const EGG_SPEEDUP_COST = 50;
 
 
 const ROSTER = [
@@ -943,8 +1010,6 @@ const ROSTER = [
   { id:'coelo', name:'Coelophysis', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Triassic', desc:'One of the earliest predators. Lean, fast, and hungry.' },
   { id:'dimetro', name:'Dimetrodon', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Permian', desc:'Not technically a dinosaur, but that sail-back is iconic.' },
   { id:'iguan', name:'Iguanodon', emoji:'🦕', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Famous for its thumb spikes. A gentle giant with attitude.' },
-  { id:'edmont', name:'Edmontosaurus', emoji:'🦆', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A massive duck-billed dinosaur that roamed in huge herds.' },
-  { id:'maia', name:'Maiasaura', emoji:'🦕', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'"Good mother lizard" — known for nurturing its young.' },
   { id:'dimor', name:'Dimorphodon', emoji:'🦇', rarity:'common', diet:'Piscivore', habitat:'Sky', era:'Jurassic', desc:'A small pterosaur with a head too big for its body. Adorable chaos.' },
   { id:'pachy', name:'Pachycephalosaurus', emoji:'🐏', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A dome-headed headbutter. Don\'t stand too close.' },
   { id:'kentro', name:'Kentrosaurus', emoji:'🦔', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Covered in spikes from head to tail. Nature\'s pincushion.' },
@@ -997,12 +1062,10 @@ const ROSTER = [
   { id:'guanl', name:'Guanlong', emoji:'🦎', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Jurassic', desc:'Crested ancestor of T. rex. Small now, but royalty runs in the blood.' },
   { id:'hetero', name:'Heterodontosaurus', emoji:'🦎', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Tiny fanged herbivore. Those tusks are for display, not dinner.' },
   { id:'mamen', name:'Mamenchisaurus', emoji:'🦕', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Jurassic', desc:'Neck longer than a school bus. China\'s most extreme sauropod.' },
-  { id:'niger', name:'Nigersaurus', emoji:'🦕', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'500 teeth in a vacuum-cleaner mouth. The lawn mower of the Cretaceous.' },
   { id:'plat', name:'Plateosaurus', emoji:'🦕', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Triassic', desc:'One of the first giant plant-eaters. Triassic trailblazer.' },
   { id:'psitt', name:'Psittacosaurus', emoji:'🐦', rarity:'common', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Parrot-beaked with quill-like tail bristles. Adorably weird.' },
   { id:'sinosaur', name:'Sinosauropteryx', emoji:'🐦', rarity:'common', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'First dinosaur found with feathers. A fluffy little predator.' },
   { id:'stygi', name:'Stygimoloch', emoji:'🐏', rarity:'uncommon', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'Horned dome-head from the river Styx. Headbutts first, asks later.' },
-  { id:'yuty', name:'Yutyrannus', emoji:'🦖', rarity:'rare', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'30-foot feathered tyrannosaur. Proof that fluffy can be terrifying.' },
   { id:'anhan', name:'Anhanguera', emoji:'🦅', rarity:'uncommon', diet:'Piscivore', habitat:'Sky', era:'Cretaceous', desc:'Crested pterosaur with a 15-foot wingspan. Fish never stood a chance.' },
   { id:'hatz', name:'Hatzegopteryx', emoji:'🦅', rarity:'epic', diet:'Carnivore', habitat:'Sky', era:'Cretaceous', desc:'Island giant with a skull like a battering ram. Ate small dinosaurs.' },
   { id:'ptdac', name:'Pterodactylus', emoji:'🦇', rarity:'common', diet:'Piscivore', habitat:'Sky', era:'Jurassic', desc:'The original pterosaur. Small, nimble, and endlessly curious.' },
@@ -1035,95 +1098,91 @@ const EX = AB + 'jurassic-dino-320-expansion160/icons/';
 const BP = AB + 'AncientBeastsPack/';
 
 const ASSET_MAP = {
-  compy:    { icon: IC+'dinosaurs/compsognathus.png' },
-  proto:    { icon: IC+'dinosaurs/protoceratops.png' },
-  galli:    { icon: IC+'dinosaurs/gallimimus.png' },
-  coelo:    { icon: EX+'more_named_species/coelophysis.png' },
-  dimetro:  { icon: IC+'dinosaurs/dimetrodon.png' },
-  iguan:    { icon: IC+'dinosaurs/iguanodon.png' },
-  edmont:   { icon: IC+'dinosaurs/hadrosaur.png' },
-  maia:     { icon: EX+'more_named_species/lambeosaurus.png' },
-  dimor:    { icon: EX+'flying_marine_reptiles/dimorphodon.png' },
-  pachy:    { icon: IC+'dinosaurs/pachycephalosaurus.png' },
-  kentro:   { icon: IC+'dinosaurs/kentrosaurus.png' },
-  ovira:    { icon: IC+'dinosaurs/oviraptor.png' },
-  micro:    { icon: IC+'dinosaurs/microraptor.png' },
-  archae:   { icon: IC+'dinosaurs/archaeopteryx.png' },
-  dodo:     { icon: IC+'prehistoric_mammals/dodo_bird.png' },
-  raptor:   { icon: IC+'dinosaurs/velociraptor.png', portrait: BP+'Raptor-72x72.png', baby: IC+'baby_eggs/baby_raptor.png', ic:'saturate(1.7) brightness(1.2)' },
-  dilopho:  { icon: IC+'dinosaurs/dilophosaurus.png', portrait: BP+'Dilophosaurus-72x72.png', ic:'hue-rotate(54deg) saturate(0.6) brightness(1.3)' },
-  stego:    { icon: IC+'dinosaurs/stegosaurus.png', portrait: BP+'Stegosaurus-72x72.png', baby: IC+'baby_eggs/baby_stegosaurus.png', ic:'hue-rotate(102deg) saturate(0.7) brightness(1.3)' },
+  compy:    { icon: IC+'dinosaurs/compsognathus.png', portrait: BP+'Compsognathus-72x72.png' },
+  proto:    { icon: IC+'dinosaurs/protoceratops.png', portrait: BP+'Protoceratops-72x72.png' },
+  galli:    { icon: IC+'dinosaurs/gallimimus.png', portrait: BP+'Gallimimus-72x72.png' },
+  coelo:    { icon: EX+'more_named_species/coelophysis.png', portrait: BP+'Coelophysis-72x72.png' },
+  dimetro:  { icon: IC+'dinosaurs/dimetrodon.png', portrait: BP+'Dimetrodon-72x72.png' },
+  iguan:    { icon: IC+'dinosaurs/iguanodon.png', portrait: BP+'Iguanodon-72x72.png' },
+  dimor:    { icon: EX+'flying_marine_reptiles/dimorphodon.png', portrait: BP+'Dimorphodon-72x72.png' },
+  pachy:    { icon: IC+'dinosaurs/pachycephalosaurus.png', portrait: BP+'Pachycephalosaurus-72x72.png' },
+  kentro:   { icon: IC+'dinosaurs/kentrosaurus.png', portrait: BP+'Kentrosaurus-72x72.png' },
+  ovira:    { icon: IC+'dinosaurs/oviraptor.png', portrait: BP+'Oviraptor-72x72.png' },
+  micro:    { icon: IC+'dinosaurs/microraptor.png', portrait: BP+'Microraptor-72x72.png' },
+  archae:   { icon: IC+'dinosaurs/archaeopteryx.png', portrait: BP+'Archaeopteryx-72x72.png' },
+  dodo:     { icon: IC+'prehistoric_mammals/dodo_bird.png', portrait: BP+'Dodo-72x72.png' },
+  raptor:   { icon: IC+'dinosaurs/velociraptor.png', portrait: BP+'Raptor-72x72.png', baby: IC+'baby_eggs/baby_raptor.png' },
+  dilopho:  { icon: IC+'dinosaurs/dilophosaurus.png', portrait: BP+'Dilophosaurus-72x72.png' },
+  stego:    { icon: IC+'dinosaurs/stegosaurus.png', portrait: BP+'Stegosaurus-72x72.png', baby: IC+'baby_eggs/baby_stegosaurus.png' },
   para:     { icon: IC+'dinosaurs/parasaurolophus.png', portrait: BP+'Parasaurolophus-72x72.png' },
-  baryo:    { icon: IC+'dinosaurs/baryonyx.png' },
-  cory:     { icon: IC+'dinosaurs/corythosaurus.png' },
-  styra:    { icon: IC+'dinosaurs/styracosaurus.png' },
-  rhamph:   { icon: EX+'flying_marine_reptiles/rhamphorhynchus.png' },
-  ichthy:   { icon: IC+'dinosaurs/ichthyosaur.png', portrait: BP+'Ichthyosaurus-72x72.png', ic:'hue-rotate(-70deg) saturate(2.5) brightness(1.2)' },
-  megalo:   { icon: IC+'dinosaurs/megalosaurus.png' },
-  utah:     { icon: IC+'dinosaurs/utahraptor.png' },
-  deino:    { icon: IC+'dinosaurs/deinonychus.png' },
-  trike:    { icon: IC+'dinosaurs/triceratops.png', portrait: BP+'Triceratops-72x72.png', baby: IC+'baby_eggs/baby_triceratops.png', ic:'saturate(2.2) brightness(1.2)' },
-  allo:     { icon: IC+'dinosaurs/allosaurus.png' },
-  anky:     { icon: IC+'dinosaurs/ankylosaurus.png', portrait: BP+'Ankylosaurus-72x72.png', baby: IC+'baby_eggs/baby_ankylosaur.png', ic:'hue-rotate(-23deg) saturate(0.75) brightness(1.2)' },
-  diplo:    { icon: IC+'dinosaurs/diplodocus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
-  carno:    { icon: IC+'dinosaurs/carnotaurus.png' },
-  plesio:   { icon: IC+'dinosaurs/plesiosaurus.png', portrait: BP+'Plesiosaurus-72x72.png', ic:'hue-rotate(-14deg) saturate(6) brightness(1.3)' },
+  baryo:    { icon: IC+'dinosaurs/baryonyx.png', portrait: BP+'Baryonyx-72x72.png' },
+  cory:     { icon: IC+'dinosaurs/corythosaurus.png', portrait: BP+'Corythosaurus-72x72.png' },
+  styra:    { icon: IC+'dinosaurs/styracosaurus.png', portrait: BP+'Styracosaurus-72x72.png' },
+  rhamph:   { icon: EX+'flying_marine_reptiles/rhamphorhynchus.png', portrait: BP+'Rhamphorhynchus-72x72.png' },
+  ichthy:   { icon: IC+'dinosaurs/ichthyosaur.png', portrait: BP+'Ichthyosaurus-72x72.png' },
+  megalo:   { icon: IC+'dinosaurs/megalosaurus.png', portrait: BP+'Megalosaurus-72x72.png' },
+  utah:     { icon: IC+'dinosaurs/utahraptor.png', portrait: BP+'Utahraptor-72x72.png' },
+  deino:    { icon: IC+'dinosaurs/deinonychus.png', portrait: BP+'Deinonychus-72x72.png' },
+  trike:    { icon: IC+'dinosaurs/triceratops.png', portrait: BP+'Triceratops-72x72.png', baby: IC+'baby_eggs/baby_triceratops.png' },
+  allo:     { icon: IC+'dinosaurs/allosaurus.png', portrait: BP+'Allosaurus-72x72.png' },
+  anky:     { icon: IC+'dinosaurs/ankylosaurus.png', portrait: BP+'Ankylosaurus-72x72.png', baby: IC+'baby_eggs/baby_ankylosaur.png' },
+  diplo:    { icon: IC+'dinosaurs/diplodocus.png', portrait: BP+'Diplodocus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  carno:    { icon: IC+'dinosaurs/carnotaurus.png', portrait: BP+'Carnotaurus-72x72.png' },
+  plesio:   { icon: IC+'dinosaurs/plesiosaurus.png', portrait: BP+'Plesiosaurus-72x72.png' },
   pterano:  { icon: IC+'dinosaurs/pteranodon.png', portrait: BP+'Pteranodon-72x72.png', baby: IC+'baby_eggs/baby_pteranodon.png' },
-  brachio:  { icon: IC+'dinosaurs/brachiosaurus.png', portrait: BP+'Brachiosaurus-72x72.png', baby: IC+'baby_eggs/baby_brachiosaurus.png', ic:'hue-rotate(81deg) saturate(1.2) brightness(1.1)' },
-  smilo:    { icon: IC+'prehistoric_mammals/smilodon.png', portrait: BP+'Smilodon-72x72.png', ic:'saturate(0.8) brightness(1.2)' },
-  therizo:  { icon: IC+'dinosaurs/therizinosaurus.png' },
-  trex:     { icon: IC+'dinosaurs/tyrannosaurus_rex.png', portrait: BP+'T-Rex-72x72.png', baby: IC+'baby_eggs/baby_t_rex.png', ic:'hue-rotate(-160deg) saturate(0.6) brightness(1.15)' },
-  spino:    { icon: IC+'dinosaurs/spinosaurus.png', portrait: BP+'Spinosaurus-72x72.png', ic:'hue-rotate(185deg) saturate(1.3) brightness(1.15)' },
-  apato:    { icon: IC+'dinosaurs/apatosaurus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
-  gigano:   { icon: IC+'dinosaurs/giganotosaurus.png' },
-  mosa:     { icon: IC+'dinosaurs/mosasaurus.png' },
-  bronto:   { icon: IC+'dinosaurs/brontosaurus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
-  mammoth:  { icon: IC+'prehistoric_mammals/woolly_mammoth.png' },
-  elasmo:   { icon: EX+'flying_marine_reptiles/elasmosaurus.png' },
-  argent:   { icon: IC+'dinosaurs/long_neck_dinosaur.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  brachio:  { icon: IC+'dinosaurs/brachiosaurus.png', portrait: BP+'Brachiosaurus-72x72.png', baby: IC+'baby_eggs/baby_brachiosaurus.png' },
+  smilo:    { icon: IC+'prehistoric_mammals/smilodon.png', portrait: BP+'Smilodon-72x72.png' },
+  therizo:  { icon: IC+'dinosaurs/therizinosaurus.png', portrait: BP+'Therizinosaurus-72x72.png' },
+  trex:     { icon: IC+'dinosaurs/tyrannosaurus_rex.png', portrait: BP+'T-Rex-72x72.png', baby: IC+'baby_eggs/baby_t_rex.png' },
+  spino:    { icon: IC+'dinosaurs/spinosaurus.png', portrait: BP+'Spinosaurus-72x72.png' },
+  apato:    { icon: IC+'dinosaurs/apatosaurus.png', portrait: BP+'Apatosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  gigano:   { icon: IC+'dinosaurs/giganotosaurus.png', portrait: BP+'Giganotosaurus-72x72.png' },
+  mosa:     { icon: IC+'dinosaurs/mosasaurus.png', portrait: BP+'Mosasaurus-72x72.png' },
+  bronto:   { icon: IC+'dinosaurs/brontosaurus.png', portrait: BP+'Brontosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  mammoth:  { icon: IC+'prehistoric_mammals/woolly_mammoth.png', portrait: BP+'Woolly_Mammoth-72x72.png' },
+  elasmo:   { icon: EX+'flying_marine_reptiles/elasmosaurus.png', portrait: BP+'Elasmosaurus-72x72.png' },
+  argent:   { icon: IC+'dinosaurs/long_neck_dinosaur.png', portrait: BP+'Argentinosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
   megashark:{ icon: EX+'flying_marine_reptiles/megalodon.png' },
   quetz:    { icon: IC+'dinosaurs/quetzalcoatlus.png' },
-  liopl:    { icon: EX+'flying_marine_reptiles/liopleurodon.png' },
-  anomal:   { icon: EX+'flying_marine_reptiles/anomalocaris.png' },
-  cerato:   { icon: IC+'dinosaurs/ceratosaurus.png' },
-  ornitho:  { icon: IC+'dinosaurs/ornithomimus.png' },
-  trood:    { icon: IC+'dinosaurs/troodon.png' },
-  amarg:    { icon: EX+'more_named_species/amargasaurus.png' },
-  concav:   { icon: EX+'more_named_species/concavenator.png' },
-  cryo:     { icon: EX+'more_named_species/cryolophosaurus.png' },
-  deinoch:  { icon: EX+'more_named_species/deinocheirus.png' },
-  guanl:    { icon: EX+'more_named_species/guanlong.png' },
-  hetero:   { icon: EX+'more_named_species/heterodontosaurus.png' },
-  mamen:    { icon: EX+'more_named_species/mamenchisaurus.png' },
-  niger:    { icon: EX+'more_named_species/nigersaurus.png' },
-  plat:     { icon: EX+'more_named_species/plateosaurus.png' },
-  psitt:    { icon: EX+'more_named_species/psittacosaurus.png' },
-  sinosaur: { icon: EX+'more_named_species/sinosauropteryx.png' },
-  stygi:    { icon: EX+'more_named_species/stygimoloch.png' },
-  yuty:     { icon: EX+'more_named_species/yutyrannus.png' },
-  anhan:    { icon: EX+'flying_marine_reptiles/anhanguera.png' },
-  hatz:     { icon: EX+'flying_marine_reptiles/hatzegopteryx.png' },
-  ptdac:    { icon: EX+'flying_marine_reptiles/pterodactylus.png' },
-  tape:     { icon: EX+'flying_marine_reptiles/tapejara.png' },
-  nycto:    { icon: EX+'flying_marine_reptiles/nyctosaurus.png' },
-  dunky:    { icon: EX+'flying_marine_reptiles/dunkleosteus.png' },
-  krono:    { icon: EX+'flying_marine_reptiles/kronosaurus.png' },
-  tylo:     { icon: EX+'flying_marine_reptiles/tylosaurus.png' },
-  notho:    { icon: EX+'flying_marine_reptiles/nothosaurus.png' },
-  shoni:    { icon: EX+'flying_marine_reptiles/shonisaurus.png' },
-  archel:   { icon: EX+'flying_marine_reptiles/archelon_sea_turtle.png' },
-  heli:     { icon: EX+'flying_marine_reptiles/helicoprion.png' },
+  liopl:    { icon: EX+'flying_marine_reptiles/liopleurodon.png', portrait: BP+'Liopleurodon-72x72.png' },
+  anomal:   { icon: EX+'flying_marine_reptiles/anomalocaris.png', portrait: BP+'Anomalocaris-72x72.png' },
+  cerato:   { icon: IC+'dinosaurs/ceratosaurus.png', portrait: BP+'Ceratosaurus-72x72.png' },
+  ornitho:  { icon: IC+'dinosaurs/ornithomimus.png', portrait: BP+'Ornithomimus-72x72.png' },
+  trood:    { icon: IC+'dinosaurs/troodon.png', portrait: BP+'Troodon-72x72.png' },
+  amarg:    { icon: EX+'more_named_species/amargasaurus.png', portrait: BP+'Amargasaurus-72x72.png' },
+  concav:   { icon: EX+'more_named_species/concavenator.png', portrait: BP+'Concavenator-72x72.png' },
+  cryo:     { icon: EX+'more_named_species/cryolophosaurus.png', portrait: BP+'Cryolophosaurus-72x72.png' },
+  deinoch:  { icon: EX+'more_named_species/deinocheirus.png', portrait: BP+'Deinocheirus-72x72.png' },
+  guanl:    { icon: EX+'more_named_species/guanlong.png', portrait: BP+'Guanlong-72x72.png' },
+  hetero:   { icon: EX+'more_named_species/heterodontosaurus.png', portrait: BP+'Heterodontosaurus-72x72.png' },
+  mamen:    { icon: EX+'more_named_species/mamenchisaurus.png', portrait: BP+'Mamenchisaurus-72x72.png' },
+  plat:     { icon: EX+'more_named_species/plateosaurus.png', portrait: BP+'Plateosaurus-72x72.png' },
+  psitt:    { icon: EX+'more_named_species/psittacosaurus.png', portrait: BP+'Psittacosaurus-72x72.png' },
+  sinosaur: { icon: EX+'more_named_species/sinosauropteryx.png', portrait: BP+'Sinosauropteryx-72x72.png' },
+  stygi:    { icon: EX+'more_named_species/stygimoloch.png', portrait: BP+'Stygimoloch-72x72.png' },
+  anhan:    { icon: EX+'flying_marine_reptiles/anhanguera.png', portrait: BP+'Anhanguera-72x72.png' },
+  hatz:     { icon: EX+'flying_marine_reptiles/hatzegopteryx.png', portrait: BP+'Hatzegopteryx-72x72.png' },
+  ptdac:    { icon: EX+'flying_marine_reptiles/pterodactylus.png', portrait: BP+'Pterodactylus-72x72.png' },
+  tape:     { icon: EX+'flying_marine_reptiles/tapejara.png', portrait: BP+'Tapejara-72x72.png' },
+  nycto:    { icon: EX+'flying_marine_reptiles/nyctosaurus.png', portrait: BP+'Nyctosaurus-72x72.png' },
+  dunky:    { icon: EX+'flying_marine_reptiles/dunkleosteus.png', portrait: BP+'Dunkleosteus-72x72.png' },
+  krono:    { icon: EX+'flying_marine_reptiles/kronosaurus.png', portrait: BP+'Kronosaurus-72x72.png' },
+  tylo:     { icon: EX+'flying_marine_reptiles/tylosaurus.png', portrait: BP+'Tylosaurus-72x72.png' },
+  notho:    { icon: EX+'flying_marine_reptiles/nothosaurus.png', portrait: BP+'Nothosaurus-72x72.png' },
+  shoni:    { icon: EX+'flying_marine_reptiles/shonisaurus.png', portrait: BP+'Shonisaurus-72x72.png' },
+  archel:   { icon: EX+'flying_marine_reptiles/archelon_sea_turtle.png', portrait: BP+'Archelon-72x72.png' },
+  heli:     { icon: EX+'flying_marine_reptiles/helicoprion.png', portrait: BP+'Helicoprion-72x72.png' },
   megarach: { icon: BP+'Megarachne-72x72.png', portrait: BP+'Megarachne-72x72.png' },
-  tbird:    { icon: IC+'prehistoric_mammals/terror_bird.png' },
-  wrhino:   { icon: IC+'prehistoric_mammals/woolly_rhino.png' },
-  cbear:    { icon: IC+'prehistoric_mammals/cave_bear.png' },
-  clion:    { icon: IC+'prehistoric_mammals/cave_lion.png' },
-  dwolf:    { icon: IC+'prehistoric_mammals/prehistoric_dire_wolf.png' },
-  gsloth:   { icon: IC+'prehistoric_mammals/giant_ground_sloth.png' },
-  glypto:   { icon: IC+'prehistoric_mammals/glyptodon.png' },
-  masto:    { icon: IC+'prehistoric_mammals/mastodon.png' },
-  andrew:   { icon: IC+'prehistoric_mammals/andrewsarchus.png' },
-  entelo:   { icon: IC+'prehistoric_mammals/entelodont.png' },
+  tbird:    { icon: IC+'prehistoric_mammals/terror_bird.png', portrait: BP+'TerrorBird-72x72.png' },
+  wrhino:   { icon: IC+'prehistoric_mammals/woolly_rhino.png', portrait: BP+'Woolly_Rhino-72x72.png' },
+  cbear:    { icon: IC+'prehistoric_mammals/cave_bear.png', portrait: BP+'CaveBear-72x72.png' },
+  clion:    { icon: IC+'prehistoric_mammals/cave_lion.png', portrait: BP+'Cave_Lion-72x72.png' },
+  dwolf:    { icon: IC+'prehistoric_mammals/prehistoric_dire_wolf.png', portrait: BP+'DireWolf-72x72.png' },
+  gsloth:   { icon: IC+'prehistoric_mammals/giant_ground_sloth.png', portrait: BP+'Giant_Ground_Sloth-72x72.png' },
+  glypto:   { icon: IC+'prehistoric_mammals/glyptodon.png', portrait: BP+'Glyptodon-72x72.png' },
+  masto:    { icon: IC+'prehistoric_mammals/mastodon.png', portrait: BP+'Mastodon-72x72.png' },
+  andrew:   { icon: IC+'prehistoric_mammals/andrewsarchus.png', portrait: BP+'Andrewsarchus-72x72.png' },
+  entelo:   { icon: IC+'prehistoric_mammals/entelodont.png', portrait: BP+'Entelodont-72x72.png' },
 };
 
 const EGG_ASSETS = {
@@ -1188,11 +1247,11 @@ const COLOR_SWAP_FILTERS = {
   crimson:   'hue-rotate(-10deg) saturate(2.5) brightness(0.85)',
   azure:     'hue-rotate(200deg) saturate(1.5)',
   jade:      'hue-rotate(120deg) saturate(1.8)',
-  violet:    'hue-rotate(270deg) saturate(1.6)',
+  amethyst:  'hue-rotate(270deg) saturate(1.6)',
   amber:     'hue-rotate(40deg) saturate(2) brightness(1.1)',
+  arctic:    'brightness(1.5) saturate(0.4) hue-rotate(190deg)',
   obsidian:  'brightness(0.3) saturate(0.3)',
   ivory:     'brightness(1.6) saturate(0.2)',
-  rust:      'hue-rotate(15deg) saturate(1.8) brightness(0.75)',
   teal:      'hue-rotate(160deg) saturate(1.5)',
   rose:      'hue-rotate(330deg) saturate(1.8) brightness(1.1)',
   slate:     'saturate(0.2) brightness(0.7)',
@@ -1202,8 +1261,6 @@ const COLOR_SWAP_FILTERS = {
 function getMutFilter(specId, mutation) {
   if (!mutation) return '';
   if (MUTATION_FILTERS[mutation]) return MUTATION_FILTERS[mutation];
-  const swapKey = Object.keys(COLOR_SWAPS||{}).find(k => COLOR_SWAPS[k].id === mutation || k === mutation);
-  if (swapKey && COLOR_SWAP_FILTERS[swapKey]) return COLOR_SWAP_FILTERS[swapKey];
   if (COLOR_SWAP_FILTERS[mutation]) return COLOR_SWAP_FILTERS[mutation];
   return 'hue-rotate(30deg) saturate(1.3)';
 }
@@ -1237,8 +1294,6 @@ const SPECIES_DEF = {
   coelo:{t:'raptor',p:'#D2691E',a:'#F0A050',i:'#FFD700'},
   dimetro:{t:'armored',p:'#8B7355',a:'#C4A878',i:'#DAA520'},
   iguan:{t:'sauropod',p:'#5B8C5A',a:'#8DC88C',i:'#2E8B57'},
-  edmont:{t:'duck',p:'#7B886B',a:'#A8B898',i:'#556B2F'},
-  maia:{t:'sauropod',p:'#8FBC8F',a:'#C0E8C0',i:'#2E8B57'},
   dimor:{t:'flyer',p:'#8B4513',a:'#D4783C',i:'#FFD700'},
   pachy:{t:'armored',p:'#6B6B3E',a:'#A0A068',i:'#8B8000'},
   kentro:{t:'armored',p:'#A0522D',a:'#D87850',i:'#CD853F'},
@@ -1291,12 +1346,10 @@ const SPECIES_DEF = {
   guanl:{t:'raptor',p:'#B87830',a:'#E0A050',i:'#FF8C00'},
   hetero:{t:'raptor',p:'#6A8860',a:'#98B888',i:'#32CD32'},
   mamen:{t:'sauropod',p:'#8A7A60',a:'#B8A888',i:'#BDB76B'},
-  niger:{t:'sauropod',p:'#708060',a:'#98A888',i:'#6B8E23'},
   plat:{t:'sauropod',p:'#A08868',a:'#C8B090',i:'#DAA520'},
   psitt:{t:'horned',p:'#C87838',a:'#F0A060',i:'#FF8C00'},
   sinosaur:{t:'raptor',p:'#B06040',a:'#D89068',i:'#FF4500'},
   stygi:{t:'armored',p:'#6A5050',a:'#988080',i:'#CD5C5C'},
-  yuty:{t:'rex',p:'#4A4A40',a:'#787868',i:'#FFD700'},
   anhan:{t:'flyer',p:'#7A8890',a:'#A8B8C0',i:'#87CEEB'},
   hatz:{t:'flyer',p:'#8B6940',a:'#C0A068',i:'#FF8C00'},
   ptdac:{t:'flyer',p:'#90A878',a:'#B8D0A0',i:'#ADFF2F'},
@@ -1370,7 +1423,6 @@ const SPECIAL_MUTS={
   utah:['War Paint','#5A3A2A','#CC4400','#FFD700','tribal'],
   deino:['Nightfall','#0A0A1E','#4A2E8A','#9370DB','shadow'],
   iguan:['Mossy','#3A5A2A','#6B8A4A','#ADFF2F','bloom'],
-  maia:['Sunrise','#C87838','#FFB347','#FFD700','prism'],
   diplo:['Cloudwalker','#8AA8C8','#C0D8E8','#F0F8FF','stellar'],
   brachio:['Ancient Grove','#4A3A2A','#6B8A3A','#ADFF2F','bloom'],
   apato:['Earthshaker','#5A4A2A','#8B7355','#DAA520','crystal'],
@@ -1385,7 +1437,6 @@ const SPECIAL_MUTS={
   stego:['Opal','#5A7A8A','#88C8D8','#E0F0FF','prism'],
   anky:['Fortress','#4A4A4A','#787878','#B0C4DE','crystal'],
   galli:['Lightning','#8B8800','#FFFF00','#FFD700','volt'],
-  edmont:['Elder','#4A5A4A','#7A8A7A','#98FB98','bloom'],
   para:['Siren','#3A2A5A','#7848C8','#FF69B4','prism'],
   cory:['Regal','#4A2A6A','#8868C8','#FFD700','royal'],
   dimor:['Stormy','#2A2A3A','#5A5A8A','#FFD700','volt'],
@@ -1414,12 +1465,10 @@ const SPECIAL_MUTS={
   guanl:['Crown Prince','#8B5A0A','#FFB347','#FFD700','royal'],
   hetero:['Twilight Fang','#3A2A4A','#7A58A8','#DDA0DD','shadow'],
   mamen:['Sky Reach','#6A6A8A','#A0A0C8','#87CEEB','stellar'],
-  niger:['Lawnmower','#4A6A2A','#88C838','#ADFF2F','bloom'],
   plat:['Pioneer','#7A5A3A','#B88858','#DAA520','bloom'],
   psitt:['Parrot','#C84A0A','#FF8C00','#FF1493','prism'],
   sinosaur:['Flame Feather','#8B2A0A','#FF4500','#FFD700','ember'],
   stygi:['Demon Horn','#3A0A0A','#8B0000','#FF0000','tribal'],
-  yuty:['Blizzard','#4A5A6A','#88B8D8','#FFFFFF','frost'],
   anhan:['Ocean Wind','#2A4A6A','#4A98D0','#00BFFF','aqua'],
   hatz:['Bone Breaker','#5A3A2A','#B87838','#FF4500','tribal'],
   ptdac:['Curious One','#4A7A4A','#88C888','#ADFF2F','bloom'],
@@ -1461,7 +1510,6 @@ const RARE_MUTS={
   utah:['Alpha','#3A0A0A','#8B0000','#FF4500','tribal'],
   deino:['Shadow Strike','#0A0A0A','#1A1A3A','#FF0000','shadow'],
   iguan:['Knight','#4A5568','#C0C0C0','#FFD700','mech'],
-  maia:['Garden Mother','#3A6A3A','#8ACA8A','#FF69B4','bloom'],
   diplo:['Nebula','#1A0A2E','#6A28B2','#FF69B4','stellar'],
   brachio:['World Tree','#3A2A1A','#5A8A2A','#ADFF2F','bloom'],
   apato:['Earthquake','#5A4A2A','#C4A060','#FF4500','crystal'],
@@ -1476,7 +1524,6 @@ const RARE_MUTS={
   stego:['Prism Plates','#4A5A6A','#88B8D8','#FF69B4','crystal'],
   anky:['Battle Tank','#3A4A3A','#6B8B4A','#FFD700','mech'],
   galli:['Roadrunner','#6A4A2A','#FFD700','#FF4500','volt'],
-  edmont:['Ancient One','#3A4A3A','#6A8A6A','#FFD700','bloom'],
   para:['Maestro','#2A1A4A','#9370DB','#FFD700','prism'],
   cory:['Herald King','#3A1A4A','#DAA520','#FFD700','royal'],
   dimor:['Gargoyle','#4A4A4A','#707070','#FF4500','crystal'],
@@ -1505,12 +1552,10 @@ const RARE_MUTS={
   guanl:['Dynasty','#6A3A0A','#FFD700','#FF4500','royal'],
   hetero:['Moon Dancer','#1A1A3A','#9370DB','#FF69B4','stellar'],
   mamen:['Cloud Walker','#6A7A9A','#A0B8D8','#E0F0FF','stellar'],
-  niger:['Garden King','#2A5A1A','#7FFF00','#FFD700','royal'],
   plat:['Ancestor','#8B7D5A','#C4A870','#FFD700','bloom'],
   psitt:['Rainbow','#FF1493','#00FFFF','#FFD700','prism'],
   sinosaur:['Phoenix Down','#8B2500','#FF6347','#FFD700','ember'],
   stygi:['River Devil','#2A0A1A','#8B0000','#FF00FF','shadow'],
-  yuty:['Arctic Storm','#2A3A4A','#88C8E8','#FFFFFF','frost'],
   anhan:['Typhoon','#1A2A4A','#4A78C4','#FFFFFF','volt'],
   hatz:['Colossus','#5A2A0A','#DAA520','#FF4500','royal'],
   ptdac:['Zephyr','#2A6A2A','#88D888','#ADFF2F','bloom'],
@@ -2116,12 +2161,12 @@ const PFEAT={
   compy:{f:['tiny']},coelo:{f:['slim']},ovira:{f:['beak','sm_crest']},
   micro:{f:['quad_wings']},raptor:{f:['feathers','sickle']},dilopho:{f:['twin_crests']},
   utah:{f:['sickle','heavy']},deino:{f:['sickle']},
-  iguan:{f:['thumb_spike']},maia:{f:[]},diplo:{f:['long_neck','whip_tail']},
+  iguan:{f:['thumb_spike']},diplo:{f:['long_neck','whip_tail']},
   brachio:{f:['tall_front','high_head']},apato:{f:['stocky']},bronto:{f:[]},argent:{f:['massive']},
   proto:{f:['sm_frill']},styra:{f:['spike_frill']},trike:{f:['tri_horns','lg_frill']},
   dimetro:{f:['sail']},pachy:{f:['dome']},kentro:{f:['body_spikes']},
   stego:{f:['plates','thagomizer']},anky:{f:['armor','tail_club']},
-  galli:{f:['long_legs']},edmont:{f:['wide_bill']},para:{f:['tube_crest']},cory:{f:['helm_crest']},
+  galli:{f:['long_legs']},para:{f:['tube_crest']},cory:{f:['helm_crest']},
   dimor:{f:['big_head']},archae:{f:['feathers','teeth']},dodo:{pt:'dodo'},
   rhamph:{f:['tail_vane','teeth']},pterano:{f:['back_crest']},quetz:{f:['long_neck']},
   ichthy:{pt:'dolphin'},plesio:{pt:'plesio'},spino:{pt:'spino'},
@@ -2132,9 +2177,8 @@ const PFEAT={
   cerato:{f:['horn']},ornitho:{f:['long_legs']},trood:{f:[]},
   amarg:{f:['body_spikes','long_neck']},concav:{f:['sail']},cryo:{f:['crest']},
   deinoch:{f:['long_legs']},guanl:{f:['crest']},hetero:{f:[]},
-  mamen:{f:['long_neck']},niger:{f:['wide_bill']},plat:{f:['stocky']},
+  mamen:{f:['long_neck']},plat:{f:['stocky']},
   psitt:{f:['sm_frill']},sinosaur:{f:['feathers']},stygi:{f:['dome','body_spikes']},
-  yuty:{f:['feathers']},
   anhan:{f:['crest']},hatz:{f:['big_head']},ptdac:{f:[]},
   tape:{f:['crest']},nycto:{f:['crest']},
   dunky:{pt:'shark',f:['armor']},krono:{pt:'mosasaur',f:['big_head']},
@@ -2983,15 +3027,102 @@ function portraitImg(specId, size, cls, mutation) {
   const url = getPortrait(specId, size, mutation);
   return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
 }
-let state = { coins: 100, level: 1, xp: 0, park: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0 };
+let state = { coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0, liveSecAccum: 0, lastDecayLiveSec: 0 };
 let isStreamLive = false;
 let wasStreamLive = false;
 
-function save() { state.lastTick = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {} }
+function save() {
+  state.lastTick = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
+  if (getPlayerSession()) scheduleServerSave();
+}
 function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) { state = { ...state, ...JSON.parse(raw) }; applyOfflineDecay(); }
+  } catch(e) {}
+}
+
+/* ── Cloud save (logged-in players only) ──────────────────────────
+   Guests never touch any of this — localStorage stays their only save,
+   exactly as before. Logged-in players still save to localStorage on
+   every save() call (cheap, instant), but the server POST is throttled
+   to at most once per SERVER_SAVE_INTERVAL_MS so a 2s game tick and ~15
+   other save() call sites don't turn into a KV write storm. A trailing
+   call is scheduled so the most recent state still lands after the
+   throttle window, and pagehide/visibilitychange flush immediately so
+   nothing is lost if the tab closes right after an action. */
+let lastServerSaveAt = 0;
+let serverSaveTimer = null;
+
+function scheduleServerSave() {
+  const now = Date.now();
+  const elapsed = now - lastServerSaveAt;
+  if (elapsed >= SERVER_SAVE_INTERVAL_MS) {
+    doServerSave();
+  } else if (!serverSaveTimer) {
+    serverSaveTimer = setTimeout(() => { serverSaveTimer = null; doServerSave(); }, SERVER_SAVE_INTERVAL_MS - elapsed);
+  }
+}
+
+async function doServerSave() {
+  lastServerSaveAt = Date.now();
+  try {
+    await fetch(CLOUD_SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+  } catch(e) {}
+}
+
+function flushServerSave() {
+  if (!getPlayerSession()) return;
+  try {
+    const payload = JSON.stringify({ state });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(CLOUD_SAVE_URL, new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch(CLOUD_SAVE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true });
+    }
+    lastServerSaveAt = Date.now();
+  } catch(e) {}
+}
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushServerSave(); });
+window.addEventListener('pagehide', flushServerSave);
+
+/* Runs once at startup for logged-in players: the server save (if any)
+   is the source of truth across devices. No server save yet but a local
+   one exists (e.g. a returning player from before this shipped, or a
+   guest who just logged in) — migrate it up instead of discarding it. */
+async function syncCloudSave() {
+  const session = getPlayerSession();
+  if (!session || !session.user_id) return;
+
+  let hasLocal = false;
+  try { hasLocal = !!localStorage.getItem(SAVE_KEY); } catch(e) {}
+
+  try {
+    const res = await fetch(CLOUD_SAVE_URL);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (data && data.hasSave && data.state) {
+      state = { ...state, ...data.state };
+      applyOfflineDecay();
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
+      updateTopBar();
+      initParkView();
+      renderEggsTab();
+    } else if (hasLocal) {
+      lastServerSaveAt = Date.now();
+      await fetch(CLOUD_SAVE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state }),
+      });
+    }
   } catch(e) {}
 }
 
@@ -3001,29 +3132,44 @@ function ensureDinoStats(d) {
 }
 
 function applyOfflineDecay() {
-  const elapsed = (Date.now() - state.lastTick) / 1000;
-  const ticks = Math.floor(elapsed / DECAY_INTERVAL_SEC);
-  if (ticks > 0) {
-    const yardBonus = getYardMoodBonus();
-    // Time away is treated as night: the herd rests and stamina recovers
-    state.park.forEach(d => {
-      ensureDinoStats(d);
-      d.hunger = Math.max(0, d.hunger - ticks * STAT_DECAY_RATE);
-      d.thirst = Math.max(0, d.thirst - ticks * STAT_DECAY_RATE);
-      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE * (1 - yardBonus));
-      d.hygiene = Math.max(0, d.hygiene - ticks * STAT_DECAY_RATE * 0.7);
-      d.stamina = Math.min(100, d.stamina + ticks * NIGHT_STAMINA_REGEN);
-    });
+  // Hunger/thirst/happiness/hygiene only decay while the stream is live
+  // (see DECAY_INTERVAL_LIVE_SEC) — time the game was closed can't be
+  // attributed to live minutes, so it isn't decayed retroactively here.
+  // Stamina still gets a wall-clock "welcome back" rest bonus for time away.
+  const elapsedSec = (Date.now() - state.lastTick) / 1000;
+  const restTicks = Math.floor(elapsedSec / 600);
+  if (restTicks > 0) {
+    state.park.forEach(d => { ensureDinoStats(d); d.stamina = Math.min(100, d.stamina + restTicks * NIGHT_STAMINA_REGEN); });
   }
   state.park.forEach(ensureDinoStats);
   if (!state.yardItems) state.yardItems = [];
   if (!state.debris) state.debris = [];
   if (!state.lastOvergrowth) state.lastOvergrowth = Date.now();
   if (!state.parkDay) state.parkDay = 1;
+  if (state.liveSecAccum === undefined) {
+    // First load under the live-seconds cooldown system: any cooldown
+    // timestamps on this save are old Date.now() milliseconds, which would
+    // read as deeply negative (and permanently on-cooldown) against the new
+    // small liveSecAccum scale. Clear them — every action just starts ready.
+    state.liveSecAccum = 0;
+    state.lastDecayLiveSec = 0;
+    state.cooldowns = {};
+  }
+  if (state.vault === undefined) {
+    // First load under the active-park/vault split: the park used to hold
+    // up to 20. Keep the 10 most recently acquired active (park order is
+    // acquisition order), send anything older straight to the vault —
+    // nothing is lost, it just stops growing/decaying until reactivated.
+    state.vault = [];
+    if (state.park.length > MAX_ACTIVE_PARK) {
+      const overflow = state.park.length - MAX_ACTIVE_PARK;
+      state.vault.push(...state.park.splice(0, overflow));
+    }
+  }
 }
 
 function getLevel() {
-  const xp = state.park.reduce((s,d) => s + d.careCount, 0) + state.discovered.length * 10;
+  const xp = [...state.park, ...state.vault].reduce((s,d) => s + d.careCount, 0) + state.discovered.length * 10;
   return Math.max(1, Math.floor(Math.sqrt(xp / 5)) + 1);
 }
 function getStage(d) { return d.careCount >= GROWTH_THRESHOLDS.adult ? 'adult' : d.careCount >= GROWTH_THRESHOLDS.juvenile ? 'juvenile' : 'hatchling'; }
@@ -3045,6 +3191,8 @@ function rollSpecies(r) { const p = ROSTER.filter(x => x.rarity === r); return p
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function updateTopBar() { state.level = getLevel(); document.getElementById('coinDisplay').textContent = state.coins; document.getElementById('dinoCountDisplay').textContent = state.park.length; document.getElementById('levelDisplay').textContent = state.level; }
 
+let marketPollInterval = null;
+
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -3055,51 +3203,36 @@ function switchTab(tab) {
   if (tab === 'collection') renderCollection();
   if (tab === 'market') renderMarketplace();
   if (tab === 'dinodex') renderDinodex();
+
+  // Marketplace is shared/live — a listing another player just bought
+  // shouldn't keep showing as available. Poll only while that tab is open.
+  clearInterval(marketPollInterval);
+  marketPollInterval = null;
+  if (tab === 'market') {
+    marketPollInterval = setInterval(() => {
+      if (document.getElementById('tab-market')?.classList.contains('active')) renderMarketplace();
+    }, 8000);
+  }
 }
 
 /* ======================== VISUAL PARK ======================== */
 let selectedDinoIdx = -1;
 let parkReady = false;
 
-// Tile map configuration
-const PARK_GRID = { COLS: 32, ROWS: 24 };
-const FENCE = { L: 3, R: 28, T: 2, B: 21 };
-const FENCE_PCT = { minX: 14, maxX: 84, minY: 13, maxY: 83 };
-const POND = { x: 70, y: 68, w: 14, h: 13 };
-const POND_GRID = { x: 21, y: 15, w: 4, h: 3 };
+// Tile map configuration — the park is one composed background image now,
+// not a procedural atlas. COLS/ROWS just define the walkability mask's
+// resolution and must stay square to match the art's own proportions.
+const PARK_GRID = { COLS: 32, ROWS: 32 };
+const TSIZE = 96;
 
-let parkTileMap = null;
 let parkAssetsLoaded = false;
 const parkImgs = {};
 let resizeHandler = null;
 let yardClickHandler = null;
 
-const FL = AB + 'flora/';
-const floraTile = n => FL + 'tile_' + String(n).padStart(3, '0') + '.png';
-
-// Trees 1-20, ferns 21-56. Each tree's canopy gives way to trunk at this
-// percentage of its height — measured per sprite, used to split it across
-// the fence so the trunk passes behind and the crown drapes over.
-const TREE_SPLIT = {
-  1:52, 2:49, 3:50, 4:60, 5:68, 6:64, 7:58, 8:51, 9:64, 10:68,
-  11:55, 12:60, 13:58, 14:66, 15:66, 16:66, 17:68, 18:58, 19:62, 20:65,
+const PARK_ASSET_URLS = {
+  background: AB + 'dinoparkbackgroundv2.png',
 };
-const TREE_KINDS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20];
-const FERN_PLAIN = [21,22,23,24,25,28,29,30,38,40,42,43,44,45,46,47,48,49,50,51,53,54,55,56];
-const FERN_FLOWER = [26,27,31,35,36,37,39];
-
-const PARK_ASSET_URLS = (() => {
-  const u = {
-    atlas: AB + 'park-atlas.png',
-    fenceH: AB + 'fence-h.png',
-    fenceH2: AB + 'fence-h2.png',
-    fenceGate: AB + 'fence-gate.png',
-    fencePost: AB + 'fence-post.png',
-  };
-  TREE_KINDS.forEach(n => { u['t' + n] = floraTile(n); });
-  [...FERN_PLAIN, ...FERN_FLOWER].forEach(n => { u['f' + n] = floraTile(n); });
-  return u;
-})();
 
 function loadParkAssets() {
   if (parkAssetsLoaded) return Promise.resolve();
@@ -3117,294 +3250,63 @@ function loadParkAssets() {
   });
 }
 
-function seededRand(seed) {
-  return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return ((seed >>> 16) & 0x7fff) / 32768; };
+// Walkability mask, sampled once (offline) from the actual background art at
+// 32x32 resolution — not hand-drawn boundaries. L = land (grass/sand, open to
+// land & sky dinos), R = river/oasis (crossable by everyone), O = ocean
+// (water-habitat dinos only), X = the decorative strip of terrain drawn
+// beyond the fence line toward the canvas edge — visually present but never
+// walkable, so dinos can't path through the fence into it. See
+// _private/GAME-DEV-PRACTICES.md point 1: the walkable region is data,
+// sampled from the asset, not re-derived by eye.
+const WALK_MASK = [
+  'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  'XLLLLLLLLLLLRRRLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLRRLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLRRLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLRRRLLLLLLLLLLLLLRLLLX',
+  'XLLLLLLLLLLRRRLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLRRRLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLRRRLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLRRRRLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLRRRRRLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLRRRRRLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLRRRRRRLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLLLRRRRRRRRRRRRRRRR',
+  'XLLLLLLLLLLLLLLLLLLRRRRRRRRRRRRR',
+  'XLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLX',
+  'XLLLLLLLLLLLLLLLLLLLLLLLLLLLOOOO',
+  'XLLLLLLLLLLLLLLLLLLLLOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLLLLOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLLLLOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLLLOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLLOOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLLOOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLLOOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLOOOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLLLOOOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLLLOOOOOOOOOOOOOOOOO',
+  'XLLLLLLLLLLLLOOOOOOOOOOOOOOOOOOO',
+  'XXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOO',
+];
+
+function zoneAt(xPct, yPct) {
+  const col = Math.max(0, Math.min(PARK_GRID.COLS - 1, Math.floor(xPct / 100 * PARK_GRID.COLS)));
+  const row = Math.max(0, Math.min(PARK_GRID.ROWS - 1, Math.floor(yPct / 100 * PARK_GRID.ROWS)));
+  return WALK_MASK[row][col];
 }
-
-function buildTileMap() {
-  if (parkTileMap) return parkTileMap;
-  const { COLS, ROWS } = PARK_GRID;
-  const { L, R, T, B } = FENCE;
-  const pg = POND_GRID;
-  const rand = seededRand(54321);
-
-  parkTileMap = [];
-  for (let r = 0; r < ROWS; r++) {
-    const row = new Uint8Array(COLS);
-    for (let c = 0; c < COLS; c++) {
-      const inside = c > L && c < R && r > T && r < B;
-      const inPond = inside && c >= pg.x && c < pg.x + pg.w && r >= pg.y && r < pg.y + pg.h;
-      const pondBank = inside && !inPond &&
-        c >= pg.x - 1 && c < pg.x + pg.w + 1 && r >= pg.y - 1 && r < pg.y + pg.h + 1;
-      const nearFence = inside && (c <= L + 1 || c >= R - 1 || r <= T + 1 || r >= B - 1);
-
-      if (inPond) {
-        row[c] = rand() < 0.7 ? 20 : 21;
-      } else if (pondBank) {
-        row[c] = 3;
-      } else if (nearFence) {
-        row[c] = rand() < 0.5 ? 4 : 5;
-      } else if (inside) {
-        const v = rand();
-        if (v < 0.7) row[c] = rand() < 0.5 ? 0 : 1;
-        else row[c] = rand() < 0.5 ? 4 : 5;
-      } else {
-        row[c] = rand() < 0.5 ? 8 : 9;
-      }
-    }
-    parkTileMap.push(row);
-  }
-  return parkTileMap;
-}
-
-// The top fence occupies y 154-306; park dirt begins below it. Trees along the
-// top stand behind the fence, so their trunks stop inside that band and never
-// reach the pen floor.
-const TOP_FENCE_BOT = 306;
-const TOP_TREE_BASE = 288;
-const TOP_TREE_SCALE = 0.78;
-const TREE_WIDTH_TILES = 2.6;
-
-// Perimeter flora, generated from a fixed seed so the layout is stable across
-// reloads while staying irregular enough to read as jungle rather than a row.
-function buildFloraPlacements() {
-  const rnd = seededRand(77);
-  const pick = a => a[(rnd() * a.length) | 0];
-  const trees = [], ferns = [];
-  const belowFence = (FENCE.B + 1) * TSIZE;
-
-  for (let c = 0; c <= 32; c += 2.9) trees.push({ c: c + rnd(), k: pick(TREE_KINDS), s: (1.05 + rnd() * 0.3) * TOP_TREE_SCALE, top: true, depth: 0 });
-  for (let c = 1; c <= 31; c += 3.1) trees.push({ c: c + rnd() * 1.1, k: pick(TREE_KINDS), s: (0.85 + rnd() * 0.2) * TOP_TREE_SCALE, top: true, depth: 1 });
-  for (let c = 0; c <= 32; c += 3.4) trees.push({ c: c + rnd() * 1.2, y: belowFence + 120, k: pick(TREE_KINDS), s: 1.2 + rnd() * 0.35 });
-  for (let c = 1; c <= 31; c += 3.8) trees.push({ c: c + rnd() * 1.4, y: belowFence + 48, k: pick(TREE_KINDS), s: 0.9 + rnd() * 0.25 });
-  for (let r = 3; r <= 21; r += 2.6) {
-    trees.push({ c: 0.4 + rnd() * 1.6, y: r * TSIZE, k: pick(TREE_KINDS), s: 1.0 + rnd() * 0.35 });
-    trees.push({ c: 29.8 + rnd() * 1.8, y: r * TSIZE, k: pick(TREE_KINDS), s: 1.0 + rnd() * 0.35 });
-  }
-
-  for (let i = 0; i < 120; i++) {
-    const side = (rnd() * 4) | 0;
-    let c, r;
-    if (side === 0) { c = rnd() * 32; r = rnd() * 1.5; }
-    else if (side === 1) { c = rnd() * 32; r = 21.6 + rnd() * 2.4; }
-    else if (side === 2) { c = rnd() * 3.2; r = rnd() * 24; }
-    else { c = 28.8 + rnd() * 3.2; r = rnd() * 24; }
-    ferns.push({ c, r, k: pick(rnd() < 0.18 ? FERN_FLOWER : FERN_PLAIN), s: 0.5 + rnd() * 0.4, outside: true });
-  }
-  for (let i = 0; i < 16; i++) {
-    const c = FENCE.L + 1 + rnd() * (FENCE.R - FENCE.L - 2);
-    const r = FENCE.T + 1 + rnd() * (FENCE.B - FENCE.T - 2);
-    if (c >= POND_GRID.x - 1 && c <= POND_GRID.x + POND_GRID.w && r >= POND_GRID.y - 1 && r <= POND_GRID.y + POND_GRID.h) continue;
-    ferns.push({ c, r, k: pick(FERN_PLAIN), s: 0.34 + rnd() * 0.16, outside: false });
-  }
-  return { trees, ferns };
-}
-
-// Resolve a placement into its on-canvas box plus the y where crown meets trunk.
-function treeBox(o) {
-  const img = parkImgs['t' + o.k];
-  const dw = (TSIZE * o.s * TREE_WIDTH_TILES) | 0;
-  const dh = img ? (dw * img.naturalHeight / img.naturalWidth) | 0 : dw;
-  const split = Math.round(dh * (TREE_SPLIT[o.k] || 60) / 100);
-  const base = o.top ? Math.min(TOP_TREE_BASE - (o.depth ? 18 : 0), TOP_FENCE_BOT - 8) : o.y + 40;
-  return { img, dx: (o.c * TSIZE - dw * 0.5) | 0, dy: base - dh, dw, dh, split, base };
-}
+// Land & sky dinos: grass, sand, or the crossable river/oasis — never the
+// fence border strip or the ocean.
+function isLandWalkable(x, y) { const z = zoneAt(x, y); return z === 'L' || z === 'R'; }
+// Water-habitat dinos: the river/oasis or the ocean — never dry land or the fence strip.
+function isWaterWalkable(x, y) { const z = zoneAt(x, y); return z === 'R' || z === 'O'; }
+// Decor placement: solid ground only — not the river/oasis a dino can wade through.
+function isSolidGround(x, y) { return zoneAt(x, y) === 'L'; }
 
 let groundCache = null;
-let overCache = null;
-
-const TSIZE = 96;
-const ACOLS = 8;
-const CELL = 98;
-
-function renderLayer(canvas, tiles, w, h) {
-  if (!canvas) return;
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, w, h);
-  for (const t of tiles) {
-    const img = parkImgs[t.file];
-    if (!img) continue;
-    if (t.sx !== undefined) {
-      ctx.drawImage(img, t.sx, t.sy, t.sw, t.sh, t.dx, t.dy, t.dw, t.dh);
-    } else {
-      const sr = (t.tile / ACOLS) | 0;
-      const sc = t.tile % ACOLS;
-      ctx.drawImage(img,
-        sc * CELL, sr * CELL, CELL, CELL,
-        (t.dc * TSIZE - 1) | 0, (t.dr * TSIZE - 1) | 0, TSIZE + 2, TSIZE + 2
-      );
-    }
-  }
-  return ctx;
-}
-
-function buildGroundTiles() {
-  const map = buildTileMap();
-  const { COLS, ROWS } = PARK_GRID;
-  const tiles = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      tiles.push({ file: 'atlas', tile: map[r][c], dc: c, dr: r });
-    }
-  }
-  return tiles;
-}
-
-function blendSeams(ctx, w, h) {
-  const { COLS, ROWS } = PARK_GRID;
-  const BLEND = 6;
-  const imgData = ctx.getImageData(0, 0, w, h);
-  const d = imgData.data;
-  const px4 = (x, y) => (y * w + x) << 2;
-
-  for (let c = 1; c < COLS; c++) {
-    const sx = c * TSIZE;
-    for (let y = 0; y < h; y++) {
-      for (let b = 0; b < BLEND; b++) {
-        const xl = sx - 1 - b, xr = sx + b;
-        if (xl < 0 || xr >= w) continue;
-        const il = px4(xl, y), ir = px4(xr, y);
-        const t = (BLEND - b) / (BLEND + 1);
-        for (let ch = 0; ch < 3; ch++) {
-          const vl = d[il + ch], vr = d[ir + ch];
-          const avg = (vl + vr) >> 1;
-          d[il + ch] = (vl + (avg - vl) * t * 0.7) | 0;
-          d[ir + ch] = (vr + (avg - vr) * t * 0.7) | 0;
-        }
-      }
-    }
-  }
-  for (let r = 1; r < ROWS; r++) {
-    const sy = r * TSIZE;
-    for (let x = 0; x < w; x++) {
-      for (let b = 0; b < BLEND; b++) {
-        const yt = sy - 1 - b, yb = sy + b;
-        if (yt < 0 || yb >= h) continue;
-        const it = px4(x, yt), ib = px4(x, yb);
-        const t = (BLEND - b) / (BLEND + 1);
-        for (let ch = 0; ch < 3; ch++) {
-          const vt = d[it + ch], vb = d[ib + ch];
-          const avg = (vt + vb) >> 1;
-          d[it + ch] = (vt + (avg - vt) * t * 0.7) | 0;
-          d[ib + ch] = (vb + (avg - vb) * t * 0.7) | 0;
-        }
-      }
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
-}
-
-// Fence only — undergrowth and trees are emitted by buildOverPasses, which
-// interleaves them around this layer.
-function buildOverTiles() {
-  const tiles = [];
-
-  const fh1 = parkImgs.fenceH;
-  if (fh1) {
-    const hFenceH = (TSIZE * 1.6) | 0;
-    const hFenceW = (hFenceH * fh1.naturalWidth / fh1.naturalHeight) | 0;
-    const yOff = (-hFenceH * 0.25) | 0;
-    const gateCol = ((FENCE.L + FENCE.R) / 2) | 0;
-    const hStep = hFenceW - 8;
-
-    for (let x = FENCE.L * TSIZE - 4; x < (FENCE.R + 1) * TSIZE; x += hStep) {
-      const isGate = parkImgs.fenceGate && Math.abs(x + hFenceW / 2 - gateCol * TSIZE - TSIZE / 2) < hFenceW * 0.4;
-      const fKey = isGate ? 'fenceGate' : ((x / hStep | 0) % 2 === 0 ? 'fenceH' : 'fenceH2');
-      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: x | 0, dy: FENCE.T * TSIZE + yOff, dw: hFenceW, dh: hFenceH, _autoSize: true });
-      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: x | 0, dy: FENCE.B * TSIZE + yOff, dw: hFenceW, dh: hFenceH, _autoSize: true });
-    }
-
-    const vFenceW = (TSIZE * 1.1) | 0;
-    const vFenceH = (vFenceW * fh1.naturalHeight / fh1.naturalWidth) | 0;
-    const vStep = vFenceH - 4;
-    const lx = (FENCE.L * TSIZE - vFenceW * 0.05) | 0;
-    const rx = (FENCE.R * TSIZE - vFenceW * 0.05) | 0;
-
-    for (let y = FENCE.T * TSIZE + yOff; y < (FENCE.B + 1) * TSIZE; y += vStep) {
-      const fKey = ((y / vStep | 0) % 2 === 0) ? 'fenceH' : 'fenceH2';
-      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: lx, dy: y | 0, dw: vFenceW, dh: vFenceH, _autoSize: true });
-      tiles.push({ file: fKey, sx: 0, sy: 0, sw: -1, sh: -1, dx: rx, dy: y | 0, dw: vFenceW, dh: vFenceH, _autoSize: true });
-    }
-  }
-
-  return tiles;
-}
-
-// The overlay paints in four passes so the fence reads as a real barrier:
-// undergrowth, then tree trunks, then the fence, then the crowns that drape
-// over it. Trees within a pass sort by trunk base, so nearer ones overlap.
-function buildOverPasses() {
-  const { trees, ferns } = buildFloraPlacements();
-  const boxes = trees.map(treeBox).sort((a, b) => a.base - b.base);
-  const fernTile = f => {
-    const img = parkImgs['f' + f.k];
-    const dw = (TSIZE * f.s * 1.5) | 0;
-    const dh = img ? (dw * img.naturalHeight / img.naturalWidth) | 0 : dw;
-    return { file: 'f' + f.k, dx: (f.c * TSIZE - dw / 2) | 0, dy: (f.r * TSIZE - dh * 0.8) | 0, dw, dh, alpha: f.outside ? 1 : 0.9 };
-  };
-  return {
-    under: ferns.filter(f => f.outside).map(fernTile),
-    trunks: boxes,
-    fence: buildOverTiles(),
-    crowns: boxes,
-    over: ferns.filter(f => !f.outside).map(fernTile),
-  };
-}
-
-function renderOverPasses(ctx, w, h) {
-  const p = buildOverPasses();
-  const blit = t => {
-    const img = parkImgs[t.file];
-    if (!img) return;
-    if (t.alpha !== undefined) ctx.globalAlpha = t.alpha;
-    ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
-    ctx.globalAlpha = 1;
-  };
-  // A tree is drawn twice, clipped either side of its crown/trunk split.
-  const slice = (b, y, sh) => {
-    if (!b.img || sh <= 0) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(b.dx, y, b.dw, sh);
-    ctx.clip();
-    ctx.drawImage(b.img, b.dx, b.dy, b.dw, b.dh);
-    ctx.restore();
-  };
-
-  p.under.forEach(blit);
-  p.trunks.forEach(b => slice(b, b.dy + b.split, b.dh - b.split));
-  renderOverCanvasTiles(ctx, p.fence);
-  p.crowns.forEach(b => slice(b, b.dy, b.split));
-  p.over.forEach(blit);
-}
-
-function renderOverCanvasTiles(ctx, tiles) {
-  for (const t of tiles) {
-    const img = parkImgs[t.file];
-    if (!img) continue;
-    const sw = t.sw === -1 ? img.naturalWidth : t.sw;
-    const sh = t.sh === -1 ? img.naturalHeight : t.sh;
-    const dh = t.dh === -1 ? (t.dw * img.naturalHeight / img.naturalWidth) | 0 : t.dh;
-    let dy = t.dy;
-    if (t._autoSize && t.dh === -1) dy = (dy - dh * 0.4) | 0;
-    if (t._alpha) ctx.globalAlpha = t._alpha;
-    ctx.drawImage(img, 0, 0, sw, sh, t.dx, dy, t.dw, dh);
-    if (t._alpha) ctx.globalAlpha = 1;
-  }
-}
-
-function renderOverCanvas(canvas, w, h) {
-  if (!canvas) return;
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, w, h);
-  renderOverPasses(ctx, w, h);
-}
 
 function buildGroundCache() {
   const { COLS, ROWS } = PARK_GRID;
@@ -3414,39 +3316,15 @@ function buildGroundCache() {
   offscreen.width = w;
   offscreen.height = h;
   const ctx = offscreen.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#3a6e28';
-  ctx.fillRect(0, 0, w, h);
-
-  const groundTiles = buildGroundTiles();
-  for (const t of groundTiles) {
-    const sr = (t.tile / ACOLS) | 0;
-    const sc = t.tile % ACOLS;
-    const img = parkImgs[t.file];
-    if (!img) continue;
-    ctx.drawImage(img,
-      sc * CELL, sr * CELL, CELL, CELL,
-      (t.dc * TSIZE - 1) | 0, (t.dr * TSIZE - 1) | 0, TSIZE + 2, TSIZE + 2
-    );
-  }
-
-  blendSeams(ctx, w, h);
-  return offscreen;
-}
-
-function buildOverCache() {
-  const { COLS, ROWS } = PARK_GRID;
-  const w = COLS * TSIZE;
-  const h = ROWS * TSIZE;
-  const offscreen = document.createElement('canvas');
-  renderOverCanvas(offscreen, w, h);
+  ctx.imageSmoothingEnabled = true;
+  const img = parkImgs.background;
+  if (img) ctx.drawImage(img, 0, 0, w, h);
   return offscreen;
 }
 
 function renderTileCanvas() {
   const gCanvas = document.getElementById('dinoGround');
-  const oCanvas = document.getElementById('dinoOver');
-  if (!gCanvas || !parkImgs.atlas) return;
+  if (!gCanvas || !parkImgs.background) return;
 
   const world = document.getElementById('parkWorld');
   const dpr = window.devicePixelRatio || 1;
@@ -3454,55 +3332,63 @@ function renderTileCanvas() {
   const ch = world.clientHeight;
 
   if (!groundCache) groundCache = buildGroundCache();
-  if (!overCache) overCache = buildOverCache();
 
   gCanvas.width = cw * dpr;
   gCanvas.height = ch * dpr;
   const gCtx = gCanvas.getContext('2d');
-  gCtx.imageSmoothingEnabled = false;
+  gCtx.imageSmoothingEnabled = true;
   gCtx.drawImage(groundCache, 0, 0, gCanvas.width, gCanvas.height);
+}
 
-  oCanvas.width = cw * dpr;
-  oCanvas.height = ch * dpr;
-  const oCtx = oCanvas.getContext('2d');
-  oCtx.imageSmoothingEnabled = false;
-  oCtx.drawImage(overCache, 0, 0, oCanvas.width, oCanvas.height);
+// Rejection-samples a random point in [0,100)x[0,100) until `ok` accepts it.
+function randomZonePoint(ok, attempts) {
+  let x = 50, y = 50;
+  for (let i = 0; i < (attempts || 30); i++) {
+    x = Math.random() * 100; y = Math.random() * 100;
+    if (ok(x, y)) return { x, y };
+  }
+  return { x, y };
 }
 
 function initDinoPosition(dino) {
   const spec = getRosterById(dino.speciesId);
-  if (spec.habitat === 'Water') {
-    dino.px = POND.x + (Math.random() - 0.5) * POND.w * 0.6;
-    dino.py = POND.y + (Math.random() - 0.5) * POND.h * 0.6;
-  } else {
-    dino.px = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX - 4);
-    dino.py = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY - 4);
-    while (Math.hypot(dino.px - POND.x, dino.py - POND.y) < 12) {
-      dino.px = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX - 4);
-      dino.py = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY - 4);
-    }
-  }
+  const p = spec.habitat === 'Water' ? randomZonePoint(isWaterWalkable) : randomZonePoint(isLandWalkable);
+  dino.px = p.x;
+  dino.py = p.y;
   dino.tx = dino.px;
   dino.ty = dino.py;
   dino.facing = Math.random() > 0.5 ? 1 : -1;
 }
 
+// New dino goes active if there's room, otherwise straight to the vault.
+// Returns 'park' | 'vault' | null (both full) so callers can message accordingly.
+function addNewDino(newDino) {
+  if (state.park.length < MAX_ACTIVE_PARK) {
+    state.park.push(newDino);
+    initDinoPosition(newDino);
+    return 'park';
+  }
+  if (state.vault.length < MAX_VAULT_SIZE) {
+    state.vault.push(newDino);
+    return 'vault';
+  }
+  return null;
+}
+
 function pickNewTarget(dino) {
   const spec = getRosterById(dino.speciesId);
-  if (spec.habitat === 'Water') {
-    dino.tx = POND.x + (Math.random() - 0.5) * POND.w * 0.7;
-    dino.ty = POND.y + (Math.random() - 0.5) * POND.h * 0.7;
-  } else if (spec.habitat === 'Sky') {
-    dino.tx = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX);
-    dino.ty = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY);
+  if (spec.habitat === 'Sky') {
+    // Sky dinos fly over everything — land, river, and ocean alike.
+    dino.tx = Math.random() * 100;
+    dino.ty = Math.random() * 100;
   } else {
-    // Ground dinos wander, steering clear of the pond and any solid yard decor
+    const zoneOk = spec.habitat === 'Water' ? isWaterWalkable : isLandWalkable;
     let nx = dino.px, ny = dino.py;
     for (let i = 0; i < 12; i++) {
-      const cx = Math.max(FENCE_PCT.minX, Math.min(FENCE_PCT.maxX, dino.px + (Math.random() - 0.5) * 22));
-      const cy = Math.max(FENCE_PCT.minY, Math.min(FENCE_PCT.maxY, dino.py + (Math.random() - 0.5) * 22));
-      if (Math.hypot(cx - POND.x, cy - POND.y) < 10) continue;
-      if (isBlockedByYard(cx, cy, 1.5)) continue;
+      const cx = Math.max(0, Math.min(100, dino.px + (Math.random() - 0.5) * 22));
+      const cy = Math.max(0, Math.min(100, dino.py + (Math.random() - 0.5) * 22));
+      if (!zoneOk(cx, cy)) continue;
+      if (spec.habitat !== 'Water' && isBlockedByYard(cx, cy, 1.5)) continue;
       nx = cx; ny = cy;
       break;
     }
@@ -3674,14 +3560,13 @@ function renderBottomPanel() {
   const dino = state.park[selectedDinoIdx];
   const spec = getRosterById(dino.speciesId);
   const stage = getStage(dino);
-  const now = Date.now();
   const idx = selectedDinoIdx;
   ensureDinoStats(dino);
-  const cdFeed = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['feed_'+idx] || 0)));
-  const cdWater = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['water_'+idx] || 0)));
-  const cdPlay = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['play_'+idx] || 0)));
-  const cdWash = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['wash_'+idx] || 0)));
-  const cdGraze = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['graze_'+idx] || 0)));
+  const cdFeed = getCareCooldown(idx, 'feed');
+  const cdWater = getCareCooldown(idx, 'water');
+  const cdPlay = getCareCooldown(idx, 'play');
+  const cdWash = getCareCooldown(idx, 'wash');
+  const cdGraze = getCareCooldown(idx, 'graze');
 
   panel.innerHTML = `
     <div class="panel-header">
@@ -3726,23 +3611,23 @@ function renderBottomPanel() {
     <div class="panel-actions">
       <button class="panel-action" onclick="careAction(${idx},'feed')" ${cdFeed > 0 ? 'disabled' : ''}>
         <span class="action-icon">🍖</span>Feed
-        ${cdFeed > 0 ? `<span class="action-cd">${Math.ceil(cdFeed/1000)}s</span>` : ''}
+        ${cdFeed > 0 ? `<span class="action-cd">${fmtTime(Math.ceil(cdFeed))}</span>` : ''}
       </button>
       <button class="panel-action" onclick="careAction(${idx},'water')" ${cdWater > 0 ? 'disabled' : ''}>
         <span class="action-icon">💧</span>Water
-        ${cdWater > 0 ? `<span class="action-cd">${Math.ceil(cdWater/1000)}s</span>` : ''}
+        ${cdWater > 0 ? `<span class="action-cd">${fmtTime(Math.ceil(cdWater))}</span>` : ''}
       </button>
       <button class="panel-action" onclick="careAction(${idx},'play')" ${cdPlay > 0 ? 'disabled' : ''}>
         <span class="action-icon">🎾</span>Play
-        ${cdPlay > 0 ? `<span class="action-cd">${Math.ceil(cdPlay/1000)}s</span>` : ''}
+        ${cdPlay > 0 ? `<span class="action-cd">${fmtTime(Math.ceil(cdPlay))}</span>` : ''}
       </button>
       <button class="panel-action" onclick="careAction(${idx},'wash')" ${cdWash > 0 ? 'disabled' : ''}>
         <span class="action-icon">🧼</span>Wash
-        ${cdWash > 0 ? `<span class="action-cd">${Math.ceil(cdWash/1000)}s</span>` : ''}
+        ${cdWash > 0 ? `<span class="action-cd">${fmtTime(Math.ceil(cdWash))}</span>` : ''}
       </button>
       <button class="panel-action" onclick="careAction(${idx},'graze')" ${cdGraze > 0 ? 'disabled' : ''}>
         <span class="action-icon">🌿</span>Graze
-        ${cdGraze > 0 ? `<span class="action-cd">${Math.ceil(cdGraze/1000)}s</span>` : ''}
+        ${cdGraze > 0 ? `<span class="action-cd">${fmtTime(Math.ceil(cdGraze))}</span>` : ''}
       </button>
       <button class="panel-action sell-action" onclick="sellDino(${idx})" title="Sell for ${getSellPrice(dino)} coins">💰 ${getSellPrice(dino)}</button>
     </div>
@@ -3750,12 +3635,20 @@ function renderBottomPanel() {
   panel.classList.add('open');
 }
 
+// Remaining cooldown in live-seconds — 0 if never used or already ready.
+function getCareCooldown(idx, type) {
+  const lastUse = state.cooldowns[type + '_' + idx];
+  if (lastUse === undefined) return 0;
+  return Math.max(0, CARE_COOLDOWN_LIVE_SEC - ((state.liveSecAccum || 0) - lastUse));
+}
+
 function careAction(idx, type) {
   const dino = state.park[idx];
   const cdKey = type + '_' + idx;
-  const now = Date.now();
-  if (now - (state.cooldowns[cdKey] || 0) < CARE_COOLDOWN) return;
-  state.cooldowns[cdKey] = now;
+  const liveNow = state.liveSecAccum || 0;
+  const lastUse = state.cooldowns[cdKey];
+  if (lastUse !== undefined && liveNow - lastUse < CARE_COOLDOWN_LIVE_SEC) return;
+  state.cooldowns[cdKey] = liveNow;
 
   if (type === 'feed') dino.hunger = Math.min(100, dino.hunger + CARE_AMOUNT);
   if (type === 'water') dino.thirst = Math.min(100, dino.thirst + CARE_AMOUNT);
@@ -3803,10 +3696,11 @@ function getSellPrice(dino) {
   return price;
 }
 
-function sellDino(idx) {
+function sellDino(idx, source) {
+  source = source || 'park';
   const session = getPlayerSession();
   if (!session) { showToast('Login with Twitch to sell on the marketplace.'); return; }
-  const dino = state.park[idx];
+  const dino = (source === 'vault' ? state.vault : state.park)[idx];
   const spec = getRosterById(dino.speciesId);
   const suggested = getSellPrice(dino);
   const mutInfo = dino.mutation ? resolveSpeciesMut(dino.speciesId, dino.mutation) : null;
@@ -3827,7 +3721,7 @@ function sellDino(idx) {
       </div>
       <div class="sell-dialog-btns">
         <button class="sell-cancel" onclick="closeSellDialog()">Cancel</button>
-        <button class="sell-confirm" onclick="confirmListDino(${idx})">List for Sale</button>
+        <button class="sell-confirm" onclick="confirmListDino(${idx},'${source}')">List for Sale</button>
       </div>
     </div>
   `;
@@ -3840,11 +3734,13 @@ function closeSellDialog() {
   if (overlay) overlay.remove();
 }
 
-async function confirmListDino(idx) {
+async function confirmListDino(idx, source) {
+  source = source || 'park';
+  const arr = source === 'vault' ? state.vault : state.park;
   const priceInput = document.getElementById('sellPriceInput');
   const price = parseInt(priceInput.value);
   if (!price || price < 1) { showToast('Enter a valid price.'); return; }
-  const dino = state.park[idx];
+  const dino = arr[idx];
   const spec = getRosterById(dino.speciesId);
   try {
     const res = await fetch('/api/marketplace', {
@@ -3854,13 +3750,17 @@ async function confirmListDino(idx) {
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.error || 'Failed to list.'); return; }
-    state.park.splice(idx, 1);
-    selectedDinoIdx = -1;
-    Object.keys(state.cooldowns).forEach(k => { if (k.endsWith('_' + idx)) delete state.cooldowns[k]; });
+    arr.splice(idx, 1);
+    if (source === 'park') {
+      selectedDinoIdx = -1;
+      Object.keys(state.cooldowns).forEach(k => { if (k.endsWith('_' + idx)) delete state.cooldowns[k]; });
+    }
+    collSelectedIdx = -1;
     save();
     closeSellDialog();
     renderParkWorld();
     renderBottomPanel();
+    if (document.getElementById('tab-collection')?.classList.contains('active')) renderCollection();
     updateTopBar();
     showToast(`${spec.name} listed for ${price} coins!`);
   } catch (e) {
@@ -3950,10 +3850,7 @@ function placeYardItem(x, y) {
   if (!state.yardItems) state.yardItems = [];
   if (state.yardItems.length >= MAX_YARD_ITEMS) { showToast(`Yard is full (${MAX_YARD_ITEMS} items).`); return; }
   if (state.coins < t.cost) { showToast(`Not enough coins (need ${t.cost}).`); return; }
-  if (x < FENCE_PCT.minX || x > FENCE_PCT.maxX || y < FENCE_PCT.minY || y > FENCE_PCT.maxY) {
-    showToast('Place items inside the fence.'); return;
-  }
-  if (Math.hypot(x - POND.x, y - POND.y) < 11) { showToast("Can't build on the pond."); return; }
+  if (!isSolidGround(x, y)) { showToast('Place items on dry land.'); return; }
   if (state.yardItems.some(it => Math.hypot(x - it.x, y - it.y) < 5)) { showToast('Too close to another item.'); return; }
 
   state.coins -= t.cost;
@@ -3992,16 +3889,18 @@ const DEBRIS_TYPES = [
 ];
 
 function getMaxEnergy() { return 10 + (state.subTier || 0) * 2; }
+// Base 3 slots, +3 per subscription tier (tier 3 = 12 total).
+function getMaxIncubatorSlots() { return 3 + (state.subTier || 0) * 3; }
 
 const MAX_DEBRIS = 14;
 const OVERGROWTH_INTERVAL_SEC = 420; // one new patch roughly every 7 minutes
 
-// Find a clear spot inside the fence, away from the pond and placed decor
+// Find a clear spot on solid ground, away from water and placed decor
 function findOpenSpot(minGap) {
   for (let i = 0; i < 24; i++) {
-    const x = FENCE_PCT.minX + Math.random() * (FENCE_PCT.maxX - FENCE_PCT.minX);
-    const y = FENCE_PCT.minY + Math.random() * (FENCE_PCT.maxY - FENCE_PCT.minY);
-    if (Math.hypot(x - POND.x, y - POND.y) < 12) continue;
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    if (!isSolidGround(x, y)) continue;
     if (isBlockedByYard(x, y, 2)) continue;
     if ((state.debris || []).some(d => Math.hypot(x - d.x, y - d.y) < (minGap || 5))) continue;
     return { x, y };
@@ -4155,8 +4054,9 @@ async function renderMarketplace() {
     return;
   }
 
-  container.innerHTML = '<div class="market-empty">Loading marketplace...</div>';
+  if (!container.dataset.loadedOnce) container.innerHTML = '<div class="market-empty">Loading marketplace...</div>';
   await Promise.all([fetchMarketplace(), fetchMyListings()]);
+  container.dataset.loadedOnce = '1';
 
   const otherListings = marketListings.filter(l => l.seller.userId !== session.user_id);
 
@@ -4193,7 +4093,7 @@ async function renderMarketplace() {
       if (!spec) return;
       const mutInfo = l.dino.mutation ? resolveSpeciesMut(l.dino.speciesId, l.dino.mutation) : null;
       const canAfford = state.coins >= l.price;
-      const parkFull = state.park.length >= MAX_PARK_SIZE;
+      const allFull = state.park.length >= MAX_ACTIVE_PARK && state.vault.length >= MAX_VAULT_SIZE;
       html += `
         <div class="market-card">
           <div class="market-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', l.dino.mutation)}</div>
@@ -4204,8 +4104,8 @@ async function renderMarketplace() {
           </div>
           <div class="market-card-seller">from ${l.seller.displayName}</div>
           <div class="market-card-price">${l.price} coins</div>
-          <button class="market-card-buy" onclick="buyDino('${l.id}')" ${!canAfford || parkFull ? 'disabled' : ''}>
-            ${parkFull ? 'Park Full' : !canAfford ? 'Not Enough Coins' : 'Buy'}
+          <button class="market-card-buy" onclick="buyDino('${l.id}')" ${!canAfford || allFull ? 'disabled' : ''}>
+            ${allFull ? 'Park & Vault Full' : !canAfford ? 'Not Enough Coins' : 'Buy'}
           </button>
         </div>`;
     });
@@ -4221,7 +4121,7 @@ async function buyDino(listingId) {
   const spec = getRosterById(listing.dino.speciesId);
   if (!spec) return;
   if (state.coins < listing.price) { showToast('Not enough coins.'); return; }
-  if (state.park.length >= MAX_PARK_SIZE) { showToast('Park is full!'); return; }
+  if (state.park.length >= MAX_ACTIVE_PARK && state.vault.length >= MAX_VAULT_SIZE) { showToast('Park and vault are both full!'); return; }
   if (!confirm(`Buy ${listing.dino.nickname || spec.name} for ${listing.price} coins?`)) return;
 
   try {
@@ -4241,8 +4141,7 @@ async function buyDino(listingId) {
       careCount: data.dino.careCount || 0,
       hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
     };
-    state.park.push(newDino);
-    initDinoPosition(newDino);
+    const dest = addNewDino(newDino);
     if (!state.discovered.includes(data.dino.speciesId)) state.discovered.push(data.dino.speciesId);
     if (data.dino.mutation) {
       const mk = data.dino.speciesId + '_' + data.dino.mutation;
@@ -4250,7 +4149,7 @@ async function buyDino(listingId) {
     }
     save();
     updateTopBar();
-    showToast(`Adopted ${spec.name}!`);
+    showToast(`Adopted ${spec.name}!${dest === 'vault' ? ' (park full — sent to your Dino Vault)' : ''}`);
     renderMarketplace();
   } catch (e) {
     showToast('Network error. Try again.');
@@ -4267,20 +4166,19 @@ async function cancelListing(listingId) {
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.error || 'Cancel failed.'); return; }
-    if (state.park.length < MAX_PARK_SIZE) {
-      const newDino = {
-        speciesId: data.dino.speciesId,
-        nickname: data.dino.nickname || '',
-        mutation: data.dino.mutation || null,
-        careCount: data.dino.careCount || 0,
-        hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
-      };
-      state.park.push(newDino);
-      initDinoPosition(newDino);
-      save();
-    }
+    const newDino = {
+      speciesId: data.dino.speciesId,
+      nickname: data.dino.nickname || '',
+      mutation: data.dino.mutation || null,
+      careCount: data.dino.careCount || 0,
+      hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
+    };
+    const dest = addNewDino(newDino);
+    save();
     updateTopBar();
-    showToast('Listing cancelled. Dino returned to park.');
+    showToast(dest === 'vault' ? 'Listing cancelled. Park was full — dino sent to your Dino Vault.'
+      : dest === 'park' ? 'Listing cancelled. Dino returned to park.'
+      : 'Listing cancelled, but park and vault are both full — contact support.');
     renderMarketplace();
   } catch (e) {
     showToast('Network error. Try again.');
@@ -4349,7 +4247,7 @@ function checkForEvent() {
 
 function claimEvent() {
   if (!state.activeEvent || state.activeEvent.claimed) return;
-  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); return; }
+  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); return; }
   const rarity = rollRarity(state.activeEvent.weights);
   const species = rollSpecies(rarity);
   state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
@@ -4361,7 +4259,7 @@ function claimEvent() {
 function dailyDig() {
   const now = Date.now();
   if (now - state.lastDailyDig < DAILY_DIG_COOLDOWN) return;
-  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); return; }
+  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); return; }
   state.lastDailyDig = now;
   const weights = { common:50, uncommon:30, rare:15, epic:4, legendary:1 };
   const rarity = rollRarity(weights);
@@ -4378,7 +4276,7 @@ function redeemCode() {
   if (state.usedCodes.includes(code)) { showToast('Code already redeemed!'); input.value = ''; return; }
   const codeData = VALID_CODES[code];
   if (!codeData) { showToast('Invalid code.'); input.value = ''; return; }
-  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); input.value = ''; return; }
+  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); input.value = ''; return; }
   state.usedCodes.push(code);
   const rarity = rollRarity(codeData.weights);
   const species = rollSpecies(rarity);
@@ -4410,7 +4308,7 @@ function renderEventBanner() {
       <div class="event-banner-title">${evt.name}</div>
       <div class="event-banner-desc">${evt.desc}</div>
       <div class="event-banner-timer">⏰ ${m}:${String(s).padStart(2,'0')} remaining</div>
-      <button class="event-banner-btn" onclick="claimEvent()" ${state.eggs.length >= 3 ? 'disabled' : ''}>Claim Egg!</button>
+      <button class="event-banner-btn" onclick="claimEvent()" ${state.eggs.length >= getMaxIncubatorSlots() ? 'disabled' : ''}>Claim Egg!</button>
     </div>`;
   }
 }
@@ -4505,10 +4403,11 @@ function renderIncubator() {
       ${ready?`<button class="egg-hatch-btn" onclick="hatchEgg(${i})">HATCH!</button>`
       :`<div class="egg-timer">${fmtTime(rem)}</div>
         <div class="egg-progress"><div class="egg-progress-fill" style="width:${progress*100}%"></div></div>
-        ${liveTag}`}
+        ${liveTag}
+        <button class="egg-speedup-btn" onclick="speedUpEgg(${i})" ${state.coins < EGG_SPEEDUP_COST ? 'disabled' : ''} title="Cut remaining time in half">⚡ ${EGG_SPEEDUP_COST}</button>`}
     </div>`);
   });
-  while (slots.length < 3) slots.push('<div class="egg-slot empty"><img src="'+IC+'baby_eggs/empty_egg_shell.png" width="32" height="32" style="image-rendering:pixelated;opacity:0.3;" alt=""><div style="margin-top:4px;">Empty Slot</div></div>');
+  while (slots.length < getMaxIncubatorSlots()) slots.push('<div class="egg-slot empty"><img src="'+IC+'baby_eggs/empty_egg_shell.png" width="32" height="32" style="image-rendering:pixelated;opacity:0.3;" alt=""><div style="margin-top:4px;">Empty Slot</div></div>');
   document.getElementById('incubatorGrid').innerHTML = slots.join('');
 }
 
@@ -4516,12 +4415,11 @@ function hatchEgg(idx) {
   if (idx >= state.eggs.length) return;
   const egg = state.eggs[idx];
   if (egg.elapsed < egg.hatchTime) return;
-  if (state.park.length >= MAX_PARK_SIZE) { showToast('Park is full! Release a dinosaur first.'); return; }
+  if (state.park.length >= MAX_ACTIVE_PARK && state.vault.length >= MAX_VAULT_SIZE) { showToast('Park and vault are both full!'); return; }
   const spec = getRosterById(egg.speciesId);
   const mut = rollMutation(spec.id);
   const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, hygiene:80, stamina:80, careCount:0, mutation: mut };
-  state.park.push(newDino);
-  initDinoPosition(newDino);
+  const dest = addNewDino(newDino);
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
   if (mut) { const mk=spec.id+'_'+mut; if(!state.discoveredMutations)state.discoveredMutations=[]; if(!state.discoveredMutations.includes(mk))state.discoveredMutations.push(mk); }
   state.eggs.splice(idx, 1);
@@ -4532,8 +4430,20 @@ function hatchEgg(idx) {
   const mutInfo = newDino.mutation ? resolveSpeciesMut(spec.id, newDino.mutation) : null;
   document.getElementById('hatchRarity').textContent = spec.rarity + (mutInfo ? ' · ' + mutInfo.label + ' Mutation' : '');
   document.getElementById('hatchRarity').style.color = mutInfo ? '#ff0000' : RARITY_COLORS[spec.rarity];
-  document.getElementById('hatchDesc').textContent = spec.desc;
+  document.getElementById('hatchDesc').textContent = spec.desc + (dest === 'vault' ? ' (Park is full — sent to your Dino Vault.)' : '');
   document.getElementById('hatchOverlay').classList.add('show');
+}
+
+function speedUpEgg(idx) {
+  const egg = state.eggs[idx];
+  if (!egg || egg.elapsed >= egg.hatchTime) return;
+  if (state.coins < EGG_SPEEDUP_COST) { showToast(`Not enough coins (need ${EGG_SPEEDUP_COST}).`); return; }
+  state.coins -= EGG_SPEEDUP_COST;
+  egg.elapsed += (egg.hatchTime - egg.elapsed) / 2;
+  save();
+  updateTopBar();
+  renderIncubator();
+  showToast(egg.elapsed >= egg.hatchTime ? 'Egg is ready to hatch!' : 'Incubation time halved!');
 }
 
 function closeHatch() {
@@ -4543,6 +4453,16 @@ function closeHatch() {
 
 /* ======================== COLLECTION ======================== */
 let collSelectedIdx = -1;
+let collViewMode = 'park'; // 'park' (active, growing/decaying) | 'vault' (stored, frozen)
+
+function collArray() { return collViewMode === 'vault' ? state.vault : state.park; }
+
+function setCollViewMode(mode) {
+  if (collViewMode === mode) return;
+  collViewMode = mode;
+  collSelectedIdx = -1;
+  renderCollection();
+}
 
 function renderCollection() {
   renderCollList();
@@ -4551,11 +4471,16 @@ function renderCollection() {
 
 function renderCollList() {
   const list = document.getElementById('collList');
-  if (state.park.length === 0) {
-    list.innerHTML = '<div style="color:#333;font-size:10px;text-align:center;padding:20px;">No dinosaurs yet</div>';
+  const arr = collArray();
+  const toggle = `<div class="coll-view-toggle">
+    <button class="${collViewMode==='park'?'active':''}" onclick="setCollViewMode('park')">Park (${state.park.length}/${MAX_ACTIVE_PARK})</button>
+    <button class="${collViewMode==='vault'?'active':''}" onclick="setCollViewMode('vault')">Vault (${state.vault.length}/${MAX_VAULT_SIZE})</button>
+  </div>`;
+  if (arr.length === 0) {
+    list.innerHTML = toggle + `<div style="color:#333;font-size:10px;text-align:center;padding:20px;">${collViewMode==='vault' ? 'Vault is empty' : 'No dinosaurs yet'}</div>`;
     return;
   }
-  list.innerHTML = state.park.map((dino, i) => {
+  list.innerHTML = toggle + arr.map((dino, i) => {
     const spec = getRosterById(dino.speciesId);
     const stage = getStage(dino);
     const hPct = Math.max(0, dino.hunger / 100);
@@ -4579,22 +4504,23 @@ function renderCollList() {
 
 function renderCollDetail() {
   const detail = document.getElementById('collDetail');
-  if (collSelectedIdx < 0 || collSelectedIdx >= state.park.length) {
+  const arr = collArray();
+  if (collSelectedIdx < 0 || collSelectedIdx >= arr.length) {
     detail.innerHTML = '<div class="coll-detail-empty">Select a dinosaur</div>';
     return;
   }
 
-  const dino = state.park[collSelectedIdx];
+  const inVault = collViewMode === 'vault';
+  const dino = arr[collSelectedIdx];
   const spec = getRosterById(dino.speciesId);
   const stage = getStage(dino);
-  const now = Date.now();
   const idx = collSelectedIdx;
   ensureDinoStats(dino);
-  const cdFeed = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['feed_'+idx] || 0)));
-  const cdWater = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['water_'+idx] || 0)));
-  const cdPlay = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['play_'+idx] || 0)));
-  const cdWash = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['wash_'+idx] || 0)));
-  const cdGraze = Math.max(0, CARE_COOLDOWN - (now - (state.cooldowns['graze_'+idx] || 0)));
+  const cdFeed = inVault ? 0 : getCareCooldown(idx, 'feed');
+  const cdWater = inVault ? 0 : getCareCooldown(idx, 'water');
+  const cdPlay = inVault ? 0 : getCareCooldown(idx, 'play');
+  const cdWash = inVault ? 0 : getCareCooldown(idx, 'wash');
+  const cdGraze = inVault ? 0 : getCareCooldown(idx, 'graze');
 
   const hungerDots = makeDots(dino.hunger, 'hunger');
   const thirstDots = makeDots(dino.thirst, 'thirst');
@@ -4608,9 +4534,13 @@ function renderCollDetail() {
   const speed = Math.floor(dino.careCount * 0.6 + rarityBonus * 0.85);
 
   detail.innerHTML = `
+    <button class="coll-sell-btn" onclick="sellDino(${idx},'${collViewMode}')" title="List for ${getSellPrice(dino)} coins on the marketplace">💰 Sell · ${getSellPrice(dino)}</button>
+    <button class="coll-move-btn" onclick="${inVault ? `moveDinoToActive(${idx})` : `moveDinoToVault(${idx})`}" title="${inVault ? 'Bring back to the park to resume care' : 'Put in storage — stops growing and needs'}">
+      ${inVault ? '🏞️ Move to Park' : '📦 Move to Vault'}
+    </button>
     <div class="coll-sprite-large">${portraitImg(spec.id, 128, 'sprite-img', dino.mutation)}</div>
     <div class="coll-name">${dino.nickname || spec.name}</div>
-    <div class="coll-species">${spec.name} · ${spec.era}</div>
+    <div class="coll-species">${spec.name} · ${spec.era}${inVault ? ' · <span style="color:#888">Vaulted</span>' : ''}</div>
     ${dino.mutation ? `<div style="font-size:11px;color:#ff0000;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em">✨ ${(resolveSpeciesMut(spec.id,dino.mutation)||{}).label||dino.mutation} Mutation</div>` : ''}
     <div class="coll-badges">
       <span class="coll-badge pbadge-${spec.rarity}">${spec.rarity}</span>
@@ -4635,30 +4565,63 @@ function renderCollDetail() {
       <div class="coll-attr"><div class="coll-attr-label">SPD</div><div class="coll-attr-val">${speed}</div></div>
       <div class="coll-attr"><div class="coll-attr-label">CARE</div><div class="coll-attr-val">${dino.careCount}</div></div>
     </div>
+    ${inVault ? `<div class="coll-vault-note">📦 In storage — needs don't decay and it won't grow until moved back to the park.</div>` : `
     <div class="coll-actions">
       <button class="coll-action" onclick="careAction(${idx},'feed');renderCollection();" ${cdFeed > 0 ? 'disabled' : ''}>
         <span class="ca-icon">🍖</span>Feed
-        ${cdFeed > 0 ? `<span class="ca-cd">${Math.ceil(cdFeed/1000)}s</span>` : ''}
+        ${cdFeed > 0 ? `<span class="ca-cd">${fmtTime(Math.ceil(cdFeed))}</span>` : ''}
       </button>
       <button class="coll-action" onclick="careAction(${idx},'water');renderCollection();" ${cdWater > 0 ? 'disabled' : ''}>
         <span class="ca-icon">💧</span>Water
-        ${cdWater > 0 ? `<span class="ca-cd">${Math.ceil(cdWater/1000)}s</span>` : ''}
+        ${cdWater > 0 ? `<span class="ca-cd">${fmtTime(Math.ceil(cdWater))}</span>` : ''}
       </button>
       <button class="coll-action" onclick="careAction(${idx},'play');renderCollection();" ${cdPlay > 0 ? 'disabled' : ''}>
         <span class="ca-icon">🎾</span>Play
-        ${cdPlay > 0 ? `<span class="ca-cd">${Math.ceil(cdPlay/1000)}s</span>` : ''}
+        ${cdPlay > 0 ? `<span class="ca-cd">${fmtTime(Math.ceil(cdPlay))}</span>` : ''}
       </button>
       <button class="coll-action" onclick="careAction(${idx},'wash');renderCollection();" ${cdWash > 0 ? 'disabled' : ''}>
         <span class="ca-icon">🧼</span>Wash
-        ${cdWash > 0 ? `<span class="ca-cd">${Math.ceil(cdWash/1000)}s</span>` : ''}
+        ${cdWash > 0 ? `<span class="ca-cd">${fmtTime(Math.ceil(cdWash))}</span>` : ''}
       </button>
       <button class="coll-action" onclick="careAction(${idx},'graze');renderCollection();" ${cdGraze > 0 ? 'disabled' : ''}>
         <span class="ca-icon">🌿</span>Graze
-        ${cdGraze > 0 ? `<span class="ca-cd">${Math.ceil(cdGraze/1000)}s</span>` : ''}
+        ${cdGraze > 0 ? `<span class="ca-cd">${fmtTime(Math.ceil(cdGraze))}</span>` : ''}
       </button>
-    </div>
+    </div>`}
     <div class="coll-desc">"${spec.desc}"</div>
   `;
+}
+
+// Park <-> Vault transfers. Both arrays share the same dino object shape;
+// only membership decides whether a dino grows/decays (park) or is frozen (vault).
+function moveDinoToVault(idx) {
+  const dino = state.park[idx];
+  if (!dino) return;
+  if (state.vault.length >= MAX_VAULT_SIZE) { showToast(`Vault is full (max ${MAX_VAULT_SIZE}).`); return; }
+  state.park.splice(idx, 1);
+  state.vault.push(dino);
+  Object.keys(state.cooldowns).forEach(k => { if (k.endsWith('_' + idx)) delete state.cooldowns[k]; });
+  selectedDinoIdx = -1;
+  collSelectedIdx = -1;
+  save();
+  renderParkWorld();
+  renderBottomPanel();
+  renderCollection();
+  showToast(`${getRosterById(dino.speciesId).name} moved to the Dino Vault.`);
+}
+
+function moveDinoToActive(idx) {
+  const dino = state.vault[idx];
+  if (!dino) return;
+  if (state.park.length >= MAX_ACTIVE_PARK) { showToast(`Park is full (max ${MAX_ACTIVE_PARK} active). Move one to the vault first.`); return; }
+  state.vault.splice(idx, 1);
+  state.park.push(dino);
+  initDinoPosition(dino);
+  collSelectedIdx = -1;
+  save();
+  renderParkWorld();
+  renderCollection();
+  showToast(`${getRosterById(dino.speciesId).name} is back in the park!`);
 }
 
 function makeDots(val, cls) {
@@ -4812,21 +4775,21 @@ function renderDinodex() {
 function gameTick() {
   const now = Date.now();
   const deltaSec = (now - state.lastTick) / 1000;
-  if (deltaSec >= DECAY_INTERVAL_SEC) {
-    const ticks = Math.floor(deltaSec / DECAY_INTERVAL_SEC);
+  state.lastTick = now;
+
+  if (isStreamLive) state.liveSecAccum = (state.liveSecAccum || 0) + deltaSec;
+  const liveTicks = Math.floor(((state.liveSecAccum || 0) - (state.lastDecayLiveSec || 0)) / DECAY_INTERVAL_LIVE_SEC);
+  if (liveTicks > 0) {
     const yardBonus = getYardMoodBonus();
-    const resting = !isStreamLive; // night: the park sleeps and recovers
     state.park.forEach(d => {
       ensureDinoStats(d);
-      d.hunger = Math.max(0, d.hunger - ticks * STAT_DECAY_RATE);
-      d.thirst = Math.max(0, d.thirst - ticks * STAT_DECAY_RATE);
-      d.happiness = Math.max(0, d.happiness - ticks * STAT_DECAY_RATE * (1 - yardBonus));
-      d.hygiene = Math.max(0, d.hygiene - ticks * STAT_DECAY_RATE * 0.7);
-      d.stamina = resting
-        ? Math.min(100, d.stamina + ticks * NIGHT_STAMINA_REGEN)
-        : Math.max(0, d.stamina - ticks * STAT_DECAY_RATE * 0.8 * (1 - yardBonus * 0.5));
+      d.hunger = Math.max(0, d.hunger - liveTicks * STAT_DECAY_RATE);
+      d.thirst = Math.max(0, d.thirst - liveTicks * STAT_DECAY_RATE);
+      d.happiness = Math.max(0, d.happiness - liveTicks * STAT_DECAY_RATE * (1 - yardBonus));
+      d.hygiene = Math.max(0, d.hygiene - liveTicks * STAT_DECAY_RATE * 0.7);
+      d.stamina = Math.max(0, d.stamina - liveTicks * STAT_DECAY_RATE * 0.8 * (1 - yardBonus * 0.5));
     });
-    state.lastTick = now;
+    state.lastDecayLiveSec = (state.lastDecayLiveSec || 0) + liveTicks * DECAY_INTERVAL_LIVE_SEC;
   }
   if (isStreamLive) {
     state.eggs.forEach(e => { e.elapsed = Math.min(e.hatchTime, e.elapsed + deltaSec); });
@@ -4964,7 +4927,7 @@ async function loadInventoryEggs() {
 }
 
 async function useInventoryEgg(itemId) {
-  if (state.eggs.length >= 3) { showToast('Incubator full! (max 3 eggs)'); return; }
+  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); return; }
   const egg = inventoryEggs.find(e => e.id === itemId);
   if (!egg) return;
 
@@ -5018,7 +4981,7 @@ function renderInventoryEggSection() {
   for (const egg of inventoryEggs) {
     const qty = egg.quantity || 1;
     const rarityLabel = (egg.rarity || 'common').charAt(0).toUpperCase() + (egg.rarity || 'common').slice(1);
-    const disabled = state.eggs.length >= 3 ? 'disabled style="opacity:0.4;cursor:default"' : '';
+    const disabled = state.eggs.length >= getMaxIncubatorSlots() ? 'disabled style="opacity:0.4;cursor:default"' : '';
     const eggIcon = EGG_ASSETS[egg.rarity] || EGG_ASSETS.common;
     html += `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:#111;border:1px solid #ffffff14;border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="useInventoryEgg('${egg.id}')" ${disabled}>
       <div><img src="${eggIcon}" width="32" height="32" style="image-rendering:pixelated;" alt=""></div>
@@ -5041,6 +5004,7 @@ loadInventoryEggs();
 updateTopBar();
 initParkView();
 checkTwitchLive();
+syncCloudSave();
 setInterval(checkTwitchLive, 60000);
 setInterval(() => { gameTick(); save(); }, 2000);
 </script>

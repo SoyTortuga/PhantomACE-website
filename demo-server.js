@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const ROOT = __dirname;
 
 const MIME = {
@@ -26,42 +26,36 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
-  let url = req.url.split('?')[0];
+  let url = decodeURIComponent(req.url.split('?')[0]);
+  if (url.endsWith('/')) url += 'index.html';
   if (url === '/') url = '/index.html';
   if (!path.extname(url)) url += '.html';
 
-  const filePath = path.join(ROOT, url);
+  const filePath = path.normalize(path.join(ROOT, url));
   if (!filePath.startsWith(ROOT)) {
     res.writeHead(403);
     res.end('Forbidden');
     return;
   }
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      if (url !== '/index.html') {
-        const htmlPath = path.join(ROOT, url.replace(path.extname(url), '') + '.html');
-        fs.readFile(htmlPath, (err2, data2) => {
-          if (err2) {
-            res.writeHead(404);
-            res.end('Not Found');
-          } else {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(data2);
-          }
-        });
-      } else {
-        res.writeHead(404);
-        res.end('Not Found');
-      }
-      return;
-    }
-    const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, {
-      'Content-Type': MIME[ext] || 'application/octet-stream',
-      'X-Frame-Options': 'SAMEORIGIN',
+  const tryFile = (fp, cb) => {
+    fs.readFile(fp, (err, data) => {
+      if (err) return cb(err);
+      const ext = path.extname(fp).toLowerCase();
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'X-Frame-Options': 'SAMEORIGIN',
+      });
+      res.end(data);
     });
-    res.end(data);
+  };
+
+  tryFile(filePath, () => {
+    const dirIndex = path.join(filePath.replace(/\.html$/, ''), 'index.html');
+    tryFile(dirIndex, () => {
+      res.writeHead(404);
+      res.end('Not Found');
+    });
   });
 });
 

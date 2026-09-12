@@ -5,6 +5,8 @@
    + GET endpoint for live hype train state
    ══════════════════════════════════════════════ */
 
+import { pullGiveawayCode, getBotToken, sendChatMessage } from './bot/send-chat.js';
+
 const HMAC_PREFIX = 'sha256=';
 const TWITCH_MESSAGE_ID = 'twitch-eventsub-message-id';
 const TWITCH_MESSAGE_TIMESTAMP = 'twitch-eventsub-message-timestamp';
@@ -41,74 +43,6 @@ async function verifySignature(secret, request, body) {
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
   const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
   return expected === HMAC_PREFIX + hex;
-}
-
-async function pullGiveawayCode(env, rarity) {
-  const tier = rarity || 'common';
-  const poolKey = `gc_${tier}`;
-  const ptrKey = `gc_ptr_${tier}`;
-  const ptr = parseInt(await env.MARKETPLACE.get(ptrKey) || '0', 10);
-  const pool = await env.MARKETPLACE.get(poolKey, 'json');
-  if (!pool || ptr >= pool.length) return null;
-  const code = pool[ptr];
-  await env.MARKETPLACE.put(ptrKey, String(ptr + 1));
-  return code;
-}
-
-async function getBotToken(env) {
-  const cached = await env.MARKETPLACE.get('twitch_bot_token', 'json');
-  if (cached && cached.expiresAt > Date.now() + 60000) return cached.access_token;
-
-  const refresh = env.TWITCH_BOT_REFRESH_TOKEN
-    || await env.MARKETPLACE.get('twitch_bot_refresh_token');
-  if (!refresh) return null;
-
-  const res = await fetch('https://id.twitch.tv/oauth2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refresh,
-      client_id: env.TWITCH_CLIENT_ID,
-      client_secret: env.TWITCH_CLIENT_SECRET,
-    }),
-  });
-
-  if (!res.ok) return null;
-  const tokens = await res.json();
-
-  await env.MARKETPLACE.put('twitch_bot_token', JSON.stringify({
-    access_token: tokens.access_token,
-    expiresAt: Date.now() + (tokens.expires_in * 1000),
-  }), { expirationTtl: tokens.expires_in });
-
-  return tokens.access_token;
-}
-
-async function sendChatMessage(env, message) {
-  const token = await getBotToken(env);
-  if (!token) return false;
-
-  const broadcasterId = env.TWITCH_BROADCASTER_ID;
-  const botUserId = env.TWITCH_BOT_USER_ID
-    || await env.MARKETPLACE.get('twitch_bot_user_id')
-    || broadcasterId;
-
-  const res = await fetch('https://api.twitch.tv/helix/chat/messages', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Client-Id': env.TWITCH_CLIENT_ID,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      broadcaster_id: broadcasterId,
-      sender_id: botUserId,
-      message: message,
-    }),
-  });
-
-  return res.ok;
 }
 
 async function handleHypeTrainProgress(env, event) {
@@ -151,7 +85,7 @@ async function handleHypeTrainProgress(env, event) {
   const msg = `${reward.emoji} HYPE TRAIN LEVEL ${level}! ${reward.emoji} ` +
     `${codes.length} bonus ${plural}: ${codeList} — ` +
     `${reward.entries} bonus entries each! ` +
-    `Paste into the Gleam giveaway at phantomace.com/giveaway — expires in 5 min!`;
+    `Paste into the Gleam giveaway at phantomace.tv/giveaway — expires in 5 min!`;
 
   await sendChatMessage(env, msg);
 }

@@ -5,12 +5,10 @@
   left: 0;
   bottom: 0;
   width: 200px;
-  background:
-    linear-gradient(90deg, rgba(152, 9, 10, 0.10) 0%, rgba(71, 8, 9, 0.06) 60%, transparent 100%),
-    rgba(0, 0, 0, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(152, 9, 10, 0.2);
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--border-mid);
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -84,7 +82,7 @@
   font-family: var(--font-gothic);
   font-size: 13px;
   color: var(--text-sec);
-  border-radius: 3px;
+  border-radius: 8px;
   transition: color 0.2s, background 0.2s;
 }
 
@@ -96,7 +94,7 @@
 .site-nav a.active,
 .nav-has-sub.active > a {
   color: var(--red);
-  background: rgba(152, 9, 10, 0.08);
+  background: rgba(255, 0, 0, 0.06);
 }
 
 /* Sidebar flyout submenus */
@@ -114,12 +112,13 @@
   left: 100%;
   top: 0;
   min-width: 160px;
-  background: rgba(0, 0, 0, 0.95);
-  border: 1px solid rgba(152, 9, 10, 0.25);
-  border-radius: 3px;
+  background: rgba(10, 10, 10, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
   padding: 6px 0;
   z-index: 1100;
-  box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .nav-has-sub:hover .nav-submenu {
@@ -138,7 +137,7 @@
 
 .nav-submenu a:hover {
   color: var(--white);
-  background: rgba(152, 9, 10, 0.12);
+  background: rgba(255, 0, 0, 0.08);
 }
 
 /* Hamburger — hidden on desktop */
@@ -170,7 +169,7 @@
     align-items: center;
     padding: 0 16px;
     border-right: none;
-    border-bottom: 1px solid rgba(152, 9, 10, 0.2);
+    border-bottom: 1px solid var(--border-mid);
   }
 
   .header-inner {
@@ -202,10 +201,13 @@
     top: 56px;
     left: 0;
     right: 0;
-    background:
-      linear-gradient(180deg, rgba(152, 9, 10, 0.08) 0%, transparent 100%),
-      #1a1a1a;
-    border-top: 1px solid rgba(152, 9, 10, 0.4);
+    max-height: calc(100vh - 56px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: rgba(10, 10, 10, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-mid);
     border-bottom: 1px solid var(--border);
     padding: 8px 0;
     transform: translateY(-100%);
@@ -230,8 +232,9 @@
     display: block;
     position: static;
     background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: none;
-    box-shadow: none;
     padding: 0 0 0 16px;
     min-width: 0;
   }
@@ -254,7 +257,9 @@
   body { padding-top: 56px; padding-left: 0; }
 }
 
-/* Nav backdrop */
+/* Nav backdrop — must stay below .site-header's stacking context (z-index:
+   1000) since it's a later DOM sibling; equal z-index would let it paint
+   over (and swallow taps on) the open mobile nav menu inside the header. */
 .nav-backdrop {
   display: none;
   position: fixed;
@@ -263,7 +268,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  z-index: 1000;
+  z-index: 999;
 }
 .nav-open .nav-backdrop { display: block; }
 
@@ -275,10 +280,8 @@
 /* Footer */
 .site-footer {
   position: relative;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(152, 9, 10, 0.12) 0%, transparent 60%),
-    linear-gradient(180deg, #0d0101 0%, #111111 30%, #111111 100%);
-  border-top: 1px solid rgba(152, 9, 10, 0.25);
+  background: var(--gray-lo);
+  border-top: 1px solid var(--border-mid);
   padding: 48px 24px 24px;
   margin-top: 80px;
   overflow: hidden;
@@ -291,8 +294,8 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #98090a, transparent);
-  opacity: 0.5;
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
+  opacity: 0.3;
 }
 
 .site-footer::after {
@@ -302,7 +305,7 @@
   left: 0;
   right: 0;
   height: 80px;
-  background: linear-gradient(180deg, rgba(152, 9, 10, 0.06) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(255, 0, 0, 0.03) 0%, transparent 100%);
   pointer-events: none;
 }
 
@@ -357,7 +360,7 @@
   color: var(--text-sec);
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 8px;
   transition: border-color 0.2s, color 0.2s;
 }
 .footer-social a:hover {

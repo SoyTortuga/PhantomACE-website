@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Icon vs Portrait — Current State</title>
+<style>
+  body { margin:0; background:#0a0a0a; color:#e0e0e0; font-family:system-ui,sans-serif; padding:16px; }
+  h1 { font-size:16px; color:#ff0000; margin:0 0 4px; }
+  .sub { font-size:10px; color:#666; margin-bottom:12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+  .card { background:#111; border:1px solid #222; border-radius:6px; padding:10px; }
+  .name { font-size:11px; font-weight:700; color:#ccc; margin-bottom:6px; }
+  .pair { display:flex; gap:8px; align-items:center; margin-bottom:4px; }
+  .pair img { image-rendering:pixelated; border:1px solid #333; background:#0a0a0a; }
+  .ic { width:48px; height:48px; }
+  .pt { width:72px; height:72px; }
+  .lbl { font-size:8px; color:#666; }
+  .row-label { font-size:8px; color:#ff0000; text-transform:uppercase; margin-bottom:2px; }
+</style></head><body>
+<h1>ICON vs PORTRAIT — With Current Corrections</h1>
+<div class="sub">Showing corrected icon next to portrait for all 13 dual-asset species. Check if colors match.</div>
+<div class="grid">
+
+<div class="card">
+  <div class="name">Velociraptor</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/velociraptor.png" style="filter:saturate(1.7) brightness(1.2)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Raptor-72x72.png">
+  </div>
+  <div class="lbl">ic: saturate(1.7) brightness(1.2)</div>
+</div>
+
+<div class="card">
+  <div class="name">Dilophosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/dilophosaurus.png" style="filter:hue-rotate(54deg) saturate(0.6) brightness(1.3)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Dilophosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(54deg) saturate(0.6) brightness(1.3)</div>
+</div>
+
+<div class="card">
+  <div class="name">Stegosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/stegosaurus.png" style="filter:hue-rotate(102deg) saturate(0.7) brightness(1.3)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Stegosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(102deg) saturate(0.7) brightness(1.3)</div>
+</div>
+
+<div class="card">
+  <div class="name">Parasaurolophus</div>
+  <div class="row-label">NO CORRECTION</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/parasaurolophus.png">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Parasaurolophus-72x72.png">
+  </div>
+  <div class="lbl">none</div>
+</div>
+
+<div class="card">
+  <div class="name">Ichthyosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/ichthyosaur.png" style="filter:hue-rotate(-70deg) saturate(2.5) brightness(1.2)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Ichthyosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(-70deg) saturate(2.5) brightness(1.2)</div>
+</div>
+
+<div class="card">
+  <div class="name">Triceratops</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/triceratops.png" style="filter:saturate(2.2) brightness(1.2)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Triceratops-72x72.png">
+  </div>
+  <div class="lbl">ic: saturate(2.2) brightness(1.2)</div>
+</div>
+
+<div class="card">
+  <div class="name">Ankylosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/ankylosaurus.png" style="filter:hue-rotate(-23deg) saturate(0.75) brightness(1.2)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Ankylosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(-23deg) saturate(0.75) brightness(1.2)</div>
+</div>
+
+<div class="card">
+  <div class="name">Plesiosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/plesiosaurus.png" style="filter:hue-rotate(-14deg) saturate(6) brightness(1.3)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Plesiosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(-14deg) saturate(6) brightness(1.3)</div>
+</div>
+
+<div class="card">
+  <div class="name">Pteranodon</div>
+  <div class="row-label">NO CORRECTION</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/pteranodon.png">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Pteranodon-72x72.png">
+  </div>
+  <div class="lbl">none</div>
+</div>
+
+<div class="card">
+  <div class="name">Brachiosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/brachiosaurus.png" style="filter:hue-rotate(81deg) saturate(1.2) brightness(1.1)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Brachiosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(81deg) saturate(1.2) brightness(1.1)</div>
+</div>
+
+<div class="card">
+  <div class="name">Smilodon</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/prehistoric_mammals/smilodon.png" style="filter:saturate(0.8) brightness(1.2)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Smilodon-72x72.png">
+  </div>
+  <div class="lbl">ic: saturate(0.8) brightness(1.2)</div>
+</div>
+
+<div class="card">
+  <div class="name">Tyrannosaurus Rex</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/tyrannosaurus_rex.png" style="filter:hue-rotate(-160deg) saturate(0.6) brightness(1.15)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/T-Rex-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(-160deg) saturate(0.6) brightness(1.15)</div>
+</div>
+
+<div class="card">
+  <div class="name">Spinosaurus</div>
+  <div class="row-label">CORRECTED</div>
+  <div class="pair">
+    <img class="ic" src="assets/dino-assets/jurassic-dino-320/icons/dinosaurs/spinosaurus.png" style="filter:hue-rotate(185deg) saturate(1.3) brightness(1.15)">
+    <img class="pt" src="assets/dino-assets/AncientBeastsPack/Spinosaurus-72x72.png">
+  </div>
+  <div class="lbl">ic: hue-rotate(185deg) saturate(1.3) brightness(1.15)</div>
+</div>
+
+</div>
+</body></html>

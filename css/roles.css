@@ -161,20 +161,17 @@ body[data-role="broadcaster"] .role-broadcaster-inline { display: inline; }
   color: var(--text-pri);
 }
 
-/* Mobile auth */
-.nav-auth-link {
-  display: none;
-}
-
+/* Mobile auth — login/account stays in the top bar so it's reachable
+   without opening the hamburger menu. */
 @media (max-width: 767px) {
-  .auth-login-btn,
-  .auth-user-info {
-    display: none !important;
+  .auth-user-name {
+    max-width: 84px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .nav-auth-link {
-    display: block;
-    border-top: 1px solid var(--border);
-    color: var(--red) !important;
+  .auth-user-title {
+    display: none;
   }
 }

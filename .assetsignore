@@ -1,0 +1,26 @@
+# Cloudflare Pages deploy-time exclusions.
+# `wrangler pages deploy .` uploads the local working directory directly —
+# NOT from git — so .gitignore alone does not keep these off the live site.
+# This file is the actual mechanism for that. Syntax matches .gitignore.
+
+# Internal docs/tools — never meant to be public (setup guides, internal
+# reference docs, generated reports, etc.)
+/_private/
+
+# Dino Park's one-off asset-processing/dev-preview scripts. Kept in the
+# working directory for future reuse (e.g. re-extracting sprites from a
+# new pack) but never served on the live site.
+/games/dino-park/_*
+
+# Scratch output from asset extraction/tuning runs at the repo root.
+/_test_*.png
+/_tile_*.png
+/_fence_crop.png
+
+# Local demo package — a standalone zip handed to stakeholders for offline
+# preview, not part of the live site. Also well over Cloudflare Pages'
+# 25 MiB per-file upload limit, so this actually blocks deploy if included.
+/PhantomACE-Demo.zip
+/START_DEMO.bat
+/start-demo.bat
+/demo-server.js

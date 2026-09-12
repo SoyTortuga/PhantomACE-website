@@ -50,10 +50,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.08s, box-shadow 0.2s, border-color 0.2s;
+      transition: transform 0.08s, border-color 0.2s, background 0.2s;
       position: relative;
     }
-    .skull-btn:hover { border-color: #ff0000; box-shadow: 0 0 30px rgba(255,0,0,0.2); }
+    .skull-btn:hover { border-color: #ff0000; background: radial-gradient(circle at 40% 35%, #331111, #1a0000, #000); }
     .skull-btn:active { transform: scale(0.93); }
     .skull-btn img { width: 65%; height: auto; pointer-events: none; }
     .click-pop {
@@ -149,6 +149,18 @@
     .upgrade-row.locked { opacity: 0.25; cursor: not-allowed; }
     .upgrade-row.bought { opacity: 0.4; cursor: default; border-color: #1a1a1a; }
     .upgrade-row.bought .building-cost { color: #0a0; }
+
+    @keyframes reject-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-4px); }
+      40% { transform: translateX(4px); }
+      60% { transform: translateX(-3px); }
+      80% { transform: translateX(3px); }
+    }
+    .building-row.reject-shake, .upgrade-row.reject-shake {
+      animation: reject-shake 0.35s ease-in-out;
+      border-color: #ff0000 !important;
+    }
     .upgrade-tag {
       font-size: 8px; font-weight: 700;
       padding: 2px 6px; border-radius: 2px;
@@ -228,8 +240,8 @@
       animation: boost-pulse 1.5s ease-in-out infinite;
     }
     @keyframes boost-pulse {
-      0%, 100% { box-shadow: 0 0 6px rgba(255,0,0,0.3); }
-      50% { box-shadow: 0 0 16px rgba(255,0,0,0.6); }
+      0%, 100% { border-color: #ff0000; background: linear-gradient(90deg, #1a0000, #330000, #1a0000); }
+      50% { border-color: #ff8888; background: linear-gradient(90deg, #330000, #660000, #330000); }
     }
 
     .section-label {
@@ -263,14 +275,15 @@
     .cosmetic-equipped-tag { font-size: 9px; color: #ff0000; font-weight: 700; }
     .cosmetic-empty { text-align: center; color: #333; padding: 30px 16px; font-size: 12px; line-height: 1.6; }
 
-    .skull-btn.theme-blood { border-color: #cc0000; box-shadow: 0 0 20px rgba(255,0,0,0.3); }
-    .skull-btn.theme-void { border-color: #6600cc; box-shadow: 0 0 20px rgba(102,0,204,0.3); }
-    .skull-btn.theme-chaos { border-color: #ff6600; box-shadow: 0 0 20px rgba(255,102,0,0.3); }
-    .skull-btn.theme-eternal { border-color: #aa44ff; box-shadow: 0 0 30px rgba(170,68,255,0.4);
+    .skull-btn.theme-blood { border-color: #cc0000; border-width: 3px; background: radial-gradient(circle at 40% 35%, #440000, #1a0000, #000); }
+    .skull-btn.theme-void { border-color: #6600cc; border-width: 3px; background: radial-gradient(circle at 40% 35%, #2a0044, #150022, #000); }
+    .skull-btn.theme-chaos { border-color: #ff6600; border-width: 3px; background: radial-gradient(circle at 40% 35%, #442200, #221100, #000); }
+    .skull-btn.theme-eternal { border-color: #aa44ff; border-width: 3px;
+      background: radial-gradient(circle at 40% 35%, #33115a, #1a0a2e, #000);
       animation: eternal-pulse 2s ease-in-out infinite; }
     @keyframes eternal-pulse {
-      0%, 100% { box-shadow: 0 0 20px rgba(170,68,255,0.3); }
-      50% { box-shadow: 0 0 40px rgba(170,68,255,0.6); }
+      0%, 100% { border-color: #aa44ff; }
+      50% { border-color: #ff99ff; }
     }
     .click-effect-blood .click-pop { color: #ff3333 !important; }
     .click-effect-void .click-pop { color: #aa66ff !important; }
@@ -397,19 +410,29 @@
       render();
     }
 
-    function buyBuilding(id) {
+    function shakeReject(e) {
+      const row = e && e.currentTarget;
+      if (!row) return;
+      row.classList.remove('reject-shake');
+      void row.offsetWidth;
+      row.classList.add('reject-shake');
+      setTimeout(() => row.classList.remove('reject-shake'), 350);
+    }
+
+    function buyBuilding(id, e) {
       const b = BUILDINGS.find(x => x.id === id);
       if (!b) return;
       const cost = getBuildingCost(b);
-      if (skulls < cost) return;
+      if (skulls < cost) { shakeReject(e); return; }
       skulls -= cost;
       owned[b.id]++;
       render();
     }
 
-    function buyUpgrade(id) {
+    function buyUpgrade(id, e) {
       const u = UPGRADES.find(x => x.id === id);
-      if (!u || boughtUpgrades.has(id) || skulls < u.cost) return;
+      if (!u || boughtUpgrades.has(id)) return;
+      if (skulls < u.cost) { shakeReject(e); return; }
       skulls -= u.cost;
       boughtUpgrades.add(id);
       u.apply();
@@ -489,7 +512,7 @@
         const revealed = totalSkulls >= b.baseCost * 0.5 || cnt > 0;
         if (!revealed) continue;
         const cps = (b.baseCps * cnt * globalCpsMult);
-        html += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}')">
+        html += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}', event)">
           <div class="building-icon">${cnt}</div>
           <div class="building-info">
             <div class="building-name">${b.name}</div>
@@ -522,7 +545,7 @@
       const bought = boughtUpgrades.has(u.id);
       const can = skulls >= u.cost;
       const tagClass = u.tag === 'click' ? 'tag-click' : u.tag === 'cps' ? 'tag-cps' : 'tag-mult';
-      return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyUpgrade('${u.id}')`}">
+      return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyUpgrade('${u.id}', event)`}">
         <div class="building-info">
           <div class="building-name">${u.name} <span class="upgrade-tag ${tagClass}">${u.tag}</span></div>
           <div class="building-desc">${u.desc}</div>
@@ -633,6 +656,26 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
+    const SAVE_VERSION = 2;
+
+    function migrateSave(d) {
+      if (typeof d.version !== 'number') d.version = 1;
+      if (d.skulls === undefined) d.skulls = 0;
+      if (d.totalSkulls === undefined) d.totalSkulls = 0;
+      if (d.totalClicks === undefined) d.totalClicks = 0;
+      if (d.clickBonus === undefined) d.clickBonus = 0;
+      if (d.clickMulti === undefined) d.clickMulti = 1;
+      if (d.cpsClickPct === undefined) d.cpsClickPct = 0;
+      if (d.globalCpsMult === undefined) d.globalCpsMult = 1;
+      if (!d.owned) d.owned = {};
+      BUILDINGS.forEach(b => { if (!(b.id in d.owned)) d.owned[b.id] = 0; });
+      if (!d.boughtUpgrades) d.boughtUpgrades = [];
+      if (!d.hitMilestones) d.hitMilestones = [];
+      if (d.startTime === undefined) d.startTime = Date.now();
+      d.version = SAVE_VERSION;
+      return d;
+    }
+
     function save() {
       const data = {
         skulls, totalSkulls, totalClicks, clickBonus, clickMulti,
@@ -640,7 +683,7 @@
         boughtUpgrades: [...boughtUpgrades],
         hitMilestones: [...hitMilestones],
         savedAt: Date.now(),
-        version: 2
+        version: SAVE_VERSION
       };
       try {
         localStorage.setItem('sc_save', JSON.stringify(data));
@@ -655,19 +698,18 @@
       try {
         const raw = localStorage.getItem('sc_save');
         if (!raw) return;
-        const d = JSON.parse(raw);
-        skulls = d.skulls || 0;
-        totalSkulls = d.totalSkulls || 0;
-        totalClicks = d.totalClicks || 0;
-        clickBonus = d.clickBonus || 0;
-        clickMulti = d.clickMulti || 1;
-        cpsClickPct = d.cpsClickPct || 0;
-        globalCpsMult = d.globalCpsMult || 1;
-        owned = d.owned || {};
-        startTime = d.startTime || Date.now();
-        boughtUpgrades = new Set(d.boughtUpgrades || []);
-        hitMilestones = new Set(d.hitMilestones || []);
-        BUILDINGS.forEach(b => { if (!(b.id in owned)) owned[b.id] = 0; });
+        const d = migrateSave(JSON.parse(raw));
+        skulls = d.skulls;
+        totalSkulls = d.totalSkulls;
+        totalClicks = d.totalClicks;
+        clickBonus = d.clickBonus;
+        clickMulti = d.clickMulti;
+        cpsClickPct = d.cpsClickPct;
+        globalCpsMult = d.globalCpsMult;
+        owned = d.owned;
+        startTime = d.startTime;
+        boughtUpgrades = new Set(d.boughtUpgrades);
+        hitMilestones = new Set(d.hitMilestones);
 
         if (d.savedAt) {
           const away = (Date.now() - d.savedAt) / 1000;

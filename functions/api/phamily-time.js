@@ -72,6 +72,46 @@ function getBoostRate(role) {
   return BOOST_RATES[role] || 1;
 }
 
+/* ── Live-status gate ──────────────────────────
+   Watch time should only accrue while PhantomACE is actually live, not
+   just whenever a logged-in user has a page open. Cached in KV for 30s
+   so N concurrent viewers heartbeating every 60s don't each trigger their
+   own Twitch API call — one shared check covers all of them. */
+async function isChannelLive(env) {
+  const cached = await env.MARKETPLACE.get('twitch_live_cache', 'json');
+  if (cached && cached.checkedAt > Date.now() - 30000) return cached.live;
+
+  const clientId = env.TWITCH_CLIENT_ID;
+  const clientSecret = env.TWITCH_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return false;
+
+  try {
+    const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+      }),
+    });
+    if (!tokenRes.ok) return false;
+    const { access_token } = await tokenRes.json();
+
+    const streamRes = await fetch('https://api.twitch.tv/helix/streams?user_login=phantomace', {
+      headers: { Authorization: `Bearer ${access_token}`, 'Client-Id': clientId },
+    });
+    if (!streamRes.ok) return false;
+    const { data } = await streamRes.json();
+    const live = !!(data && data.length > 0);
+
+    await env.MARKETPLACE.put('twitch_live_cache', JSON.stringify({ live, checkedAt: Date.now() }), { expirationTtl: 60 });
+    return live;
+  } catch {
+    return false;
+  }
+}
+
 function getSubTier(role) {
   if (role === 'sub_tier1') return 1;
   if (role === 'sub_tier2') return 2;
@@ -155,6 +195,8 @@ export async function onRequestGet(context) {
         month: prevData.month,
         level: prevData.level,
         unclaimedRewards: countUnclaimed(prevData),
+        claimedRewards: prevData.claimedRewards,
+        claimedMilestones: prevData.claimedMilestones,
       } : null,
       allTime: {
         totalHours: Math.round(allTime.totalHours * 10) / 10,
@@ -229,7 +271,9 @@ async function handleHeartbeat(env, session, mk, now) {
   const INTERVAL = 60000;
   const MAX_GAP = 120000;
 
-  if (data.lastHeartbeat > 0 && (timestamp - data.lastHeartbeat) < MAX_GAP) {
+  const live = await isChannelLive(env);
+
+  if (live && data.lastHeartbeat > 0 && (timestamp - data.lastHeartbeat) < MAX_GAP) {
     const elapsed = Math.min(timestamp - data.lastHeartbeat, MAX_GAP) / 3600000;
     const boosted = elapsed * getBoostRate(session.role);
     data.hours = Math.min(data.hours + boosted, MAX_LEVEL);
@@ -255,6 +299,7 @@ async function handleHeartbeat(env, session, mk, now) {
     hours: Math.round(data.hours * 10) / 10,
     level: data.level,
     attendance: data.attendance,
+    live,
   });
 }
 
@@ -364,6 +409,13 @@ async function handleClaimMilestone(env, session, mk, body) {
       if (bonus.type && REWARD_ITEM_MAP[bonus.type]) {
         const mapper = REWARD_ITEM_MAP[bonus.type];
         const itemBase = mapper(bonus.rarity || 'common', bonus.name || '');
+
+        if (itemBase._needsCode) {
+          const code = await pullGiveawayCode(env, bonus.rarity || 'common');
+          if (code) itemBase.meta.code = code;
+          delete itemBase._needsCode;
+        }
+
         await grantItem(env, session.user_id, {
           id: `ms_${milestoneLevel}_${bonus.type}_${mk}`,
           name: bonus.name || bonus.type,

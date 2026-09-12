@@ -31,10 +31,33 @@ async function saveInventory(env, userId, inv) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
+  const url = new URL(request.url);
+  const action = url.searchParams.get('action');
+
+  /* Public — no session required. Returns ONLY each requested user's
+     chosen showcase badges (name/rarity), never their full inventory.
+     Used by games/leaderboards/forums to show badges next to OTHER
+     people's names, not just your own. */
+  if (action === 'showcase') {
+    const idsParam = url.searchParams.get('userIds') || url.searchParams.get('userId') || '';
+    const userIds = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    const result = {};
+
+    for (const uid of userIds) {
+      const inv = await getInventory(env, uid);
+      const showcaseIds = (inv.equips.profile && inv.equips.profile.badgeShowcase) || [];
+      result[uid] = showcaseIds
+        .map(id => inv.items.find(i => i.id === id && i.type === 'badge'))
+        .filter(Boolean)
+        .map(i => ({ id: i.id, name: i.name, rarity: i.rarity || 'common' }));
+    }
+
+    return json(result);
+  }
+
   const session = getSession(request);
   if (!session) return json({ error: 'Not logged in' }, 401);
 
-  const url = new URL(request.url);
   const game = url.searchParams.get('game');
 
   const inv = await getInventory(env, session.user_id);
@@ -68,6 +91,10 @@ export async function onRequestPost(context) {
 
   if (body.action === 'use') {
     return await handleUse(env, session, body);
+  }
+
+  if (body.action === 'set-showcase') {
+    return await handleSetShowcase(env, session, body);
   }
 
   return json({ error: 'Invalid action' }, 400);
@@ -118,6 +145,29 @@ async function handleEquip(env, session, body) {
 
   await saveInventory(env, session.user_id, inv);
   return json({ success: true, equips: inv.equips[body.game] });
+}
+
+const SHOWCASE_MAX = 5;
+
+async function handleSetShowcase(env, session, body) {
+  const badgeIds = Array.isArray(body.badgeIds) ? body.badgeIds : null;
+  if (!badgeIds) return json({ error: 'badgeIds must be an array' }, 400);
+  if (badgeIds.length > SHOWCASE_MAX) {
+    return json({ error: `Choose at most ${SHOWCASE_MAX} badges` }, 400);
+  }
+
+  const inv = await getInventory(env, session.user_id);
+
+  const valid = badgeIds.filter(id => inv.items.some(i => i.id === id && i.type === 'badge'));
+  if (valid.length !== badgeIds.length) {
+    return json({ error: 'One or more badges are not in your inventory' }, 400);
+  }
+
+  if (!inv.equips.profile) inv.equips.profile = {};
+  inv.equips.profile.badgeShowcase = valid;
+
+  await saveInventory(env, session.user_id, inv);
+  return json({ success: true, badgeShowcase: valid });
 }
 
 async function handleUse(env, session, body) {

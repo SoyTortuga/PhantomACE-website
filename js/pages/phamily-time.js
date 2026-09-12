@@ -7,6 +7,7 @@
 
   const MAX_LEVEL = 150;
   const MILESTONE_INTERVAL = 15;
+  const GRACE_DAYS = 7;
 
   /* ── Reward Definitions ──────────────────────── */
 
@@ -116,16 +117,45 @@
       ['Eternal','Badge + Title'],
     ];
     const phamilyBundles = [
-      ['Initiate','Badge + Title + Common Egg'],
-      ['Acolyte','Badge + Title + Card Back + Common Egg'],
-      ['Watcher','Badge + Title + Profile Banner'],
-      ['Guardian','Badge + Title + Uncommon Egg + Dice Pack'],
-      ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Code'],
-      ['Phantom','Badge + Title + Profile Banner + Rare Egg'],
-      ['Wraith','Badge + Title + Name Effect + Bingo Wildcard Bundle'],
-      ['Revenant','Badge + Title + Profile Banner + Mutant Egg'],
-      ['Specter','Badge + Title + Mythic Giveaway Code + Dice Pack'],
-      ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Code'],
+      ['Initiate','Badge + Title + Common Egg', [
+        { type:'egg', rarity:'common', name:'Common Egg' },
+      ]],
+      ['Acolyte','Badge + Title + Card Back + Common Egg', [
+        { type:'cardback', rarity:'uncommon', name:'Card Back' },
+        { type:'egg', rarity:'common', name:'Common Egg' },
+      ]],
+      ['Watcher','Badge + Title + Profile Banner', [
+        { type:'banner', rarity:'rare', name:'Profile Banner' },
+      ]],
+      ['Guardian','Badge + Title + Uncommon Egg + Dice Pack', [
+        { type:'egg', rarity:'uncommon', name:'Uncommon Egg' },
+        { type:'dice', rarity:'rare', name:'Dice Pack' },
+      ]],
+      ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Code', [
+        { type:'nameeffect', rarity:'rare', name:'Name Effect' },
+        { type:'giveaway', rarity:'rare', name:'Rare Giveaway Code' },
+      ]],
+      ['Phantom','Badge + Title + Profile Banner + Rare Egg', [
+        { type:'banner', rarity:'rare', name:'Profile Banner' },
+        { type:'egg', rarity:'rare', name:'Rare Egg' },
+      ]],
+      ['Wraith','Badge + Title + Name Effect + Bingo Wildcard Bundle', [
+        { type:'nameeffect', rarity:'mythic', name:'Name Effect' },
+        { type:'wildcard', rarity:'rare', name:'Bingo Wildcard Bundle' },
+      ]],
+      ['Revenant','Badge + Title + Profile Banner + Mutant Egg', [
+        { type:'banner', rarity:'mythic', name:'Profile Banner' },
+        { type:'egg', rarity:'mythic', name:'Guaranteed Mutant Egg' },
+      ]],
+      ['Specter','Badge + Title + Mythic Giveaway Code + Dice Pack', [
+        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Code' },
+        { type:'dice', rarity:'mythic', name:'Dice Pack' },
+      ]],
+      ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Code', [
+        { type:'banner', rarity:'mythic', name:'Exclusive Banner' },
+        { type:'nameeffect', rarity:'mythic', name:'Exclusive Name Effect' },
+        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Code' },
+      ]],
     ];
     for (let i = 0; i < 10; i++) {
       ms.push({
@@ -133,6 +163,7 @@
         title: followerBundles[i][0],
         followerDesc: followerBundles[i][1],
         phamilyDesc: phamilyBundles[i][1],
+        bonusItems: phamilyBundles[i][2],
       });
     }
     return ms;
@@ -151,6 +182,8 @@
   let claimedMilestones = [];
   let isLoggedIn = false;
   let heartbeatTimer = null;
+  let activePopoverIsPrev = false;
+  let prevMonthInfo = null;
 
   function rewardKey(reward, track) {
     return reward.level + '_' + track + '_' + reward.type + '_' + reward.rarity;
@@ -305,11 +338,12 @@
   let activePopoverTrack = null;
   let activePopoverMilestone = null;
 
-  function showPopover(e, reward, state, track) {
+  function showPopover(e, reward, state, track, isPrev) {
     e.stopPropagation();
     activePopoverReward = reward;
     activePopoverTrack = track;
     activePopoverMilestone = null;
+    activePopoverIsPrev = !!isPrev;
 
     const rarityEl = document.getElementById('ptPopRarity');
     rarityEl.textContent = reward.rarity;
@@ -338,11 +372,12 @@
     popover.hidden = false;
   }
 
-  function showMilestonePopover(e, ms, state) {
+  function showMilestonePopover(e, ms, state, isPrev) {
     e.stopPropagation();
     activePopoverMilestone = ms;
     activePopoverReward = null;
     activePopoverTrack = null;
+    activePopoverIsPrev = !!isPrev;
 
     const rarityEl = document.getElementById('ptPopRarity');
     rarityEl.textContent = 'Milestone';
@@ -382,23 +417,30 @@
 
     try {
       if (activePopoverReward) {
-        const key = rewardKey(activePopoverReward, activePopoverTrack === 'top' ? 'follower' : 'phamily');
+        const track = activePopoverTrack === 'top' ? 'follower' : 'phamily';
+        const key = rewardKey(activePopoverReward, track);
+        const payload = activePopoverIsPrev
+          ? { action: 'claim-prev', type: 'reward', rewardKey: key,
+              rewardType: activePopoverReward.type, rewardRarity: activePopoverReward.rarity,
+              rewardName: activePopoverReward.name }
+          : { action: 'claim-reward', rewardKey: key,
+              rewardType: activePopoverReward.type, rewardRarity: activePopoverReward.rarity,
+              rewardName: activePopoverReward.name };
         const res = await fetch('/api/phamily-time', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'claim-reward',
-            rewardKey: key,
-            rewardType: activePopoverReward.type,
-            rewardRarity: activePopoverReward.rarity,
-            rewardName: activePopoverReward.name,
-          }),
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
-          claimedRewards.push(key);
+          if (activePopoverIsPrev) {
+            prevMonthInfo.claimedRewards.push(key);
+            renderGraceBanner(prevMonthInfo);
+          } else {
+            claimedRewards.push(key);
+            buildThermometer(userLevel);
+          }
           btn.hidden = true;
           document.getElementById('ptPopStatus').textContent = 'Claimed';
-          buildThermometer(userLevel);
           updateRewardsCount();
         } else {
           const err = await res.json();
@@ -407,20 +449,26 @@
           btn.disabled = false;
         }
       } else if (activePopoverMilestone) {
+        const payload = activePopoverIsPrev
+          ? { action: 'claim-prev', type: 'milestone', milestoneLevel: activePopoverMilestone.level,
+              milestoneTitle: activePopoverMilestone.title, bonusItems: activePopoverMilestone.bonusItems }
+          : { action: 'claim-milestone', milestoneLevel: activePopoverMilestone.level,
+              milestoneTitle: activePopoverMilestone.title, bonusItems: activePopoverMilestone.bonusItems };
         const res = await fetch('/api/phamily-time', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'claim-milestone',
-            milestoneLevel: activePopoverMilestone.level,
-            milestoneTitle: activePopoverMilestone.title,
-          }),
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
-          claimedMilestones.push(activePopoverMilestone.level);
+          if (activePopoverIsPrev) {
+            prevMonthInfo.claimedMilestones.push(activePopoverMilestone.level);
+            renderGraceBanner(prevMonthInfo);
+          } else {
+            claimedMilestones.push(activePopoverMilestone.level);
+            buildThermometer(userLevel);
+          }
           btn.hidden = true;
           document.getElementById('ptPopStatus').textContent = 'Claimed';
-          buildThermometer(userLevel);
           updateRewardsCount();
         } else {
           const err = await res.json();
@@ -535,6 +583,85 @@
     summary.textContent = attended + ' of ' + total + ' streams this month';
   }
 
+  /* ── Grace Period Banner (previous month) ────── */
+
+  function renderGraceBanner(prevMonth) {
+    const anchor = document.getElementById('ptPersonalStats');
+    let banner = document.getElementById('ptGraceBanner');
+
+    if (!prevMonth) {
+      if (banner) banner.remove();
+      prevMonthInfo = null;
+      return;
+    }
+
+    prevMonthInfo = prevMonth;
+
+    const readyFollower = followerRewards.filter(r =>
+      r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'follower')));
+    const readyPhamily = phamilyRewards.filter(r =>
+      r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'phamily')));
+    const readyMilestones = milestones.filter(ms =>
+      ms.level <= prevMonth.level && !prevMonth.claimedMilestones.includes(ms.level));
+
+    const totalReady = readyFollower.length + readyPhamily.length + readyMilestones.length;
+
+    if (totalReady === 0) {
+      if (banner) banner.remove();
+      return;
+    }
+
+    if (!banner) {
+      banner = document.createElement('section');
+      banner.className = 'page-container';
+      banner.id = 'ptGraceBanner';
+      anchor.insertAdjacentElement('beforebegin', banner);
+    }
+    banner.innerHTML = '';
+
+    const [y, mo] = prevMonth.month.split('-').map(Number);
+    const monthLabel = new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const today = new Date().getDate();
+    const graceDaysLeft = Math.max(0, GRACE_DAYS - today + 1);
+
+    const card = document.createElement('div');
+    card.className = 'card pt-grace-card';
+
+    const header = document.createElement('div');
+    header.className = 'pt-grace-header';
+    header.innerHTML = `
+      <span class="pt-grace-icon">⏳</span>
+      <div>
+        <div class="pt-grace-title">Unclaimed rewards from ${monthLabel}</div>
+        <div class="pt-grace-sub">${totalReady} reward${totalReady === 1 ? '' : 's'} waiting — claim within ${graceDaysLeft} day${graceDaysLeft === 1 ? '' : 's'} before they're gone.</div>
+      </div>`;
+    card.appendChild(header);
+
+    const itemsWrap = document.createElement('div');
+    itemsWrap.className = 'pt-grace-items';
+
+    function addItem(iconText, name, rarity, onClick) {
+      const el = document.createElement('div');
+      el.className = `pt-grace-item pt-rarity-${rarity}`;
+      el.innerHTML = `<span class="pt-grace-item-icon">${iconText}</span><span class="pt-grace-item-name">${name}</span>`;
+      el.addEventListener('click', onClick);
+      itemsWrap.appendChild(el);
+    }
+
+    for (const r of readyFollower) {
+      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'top', true));
+    }
+    for (const r of readyPhamily) {
+      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'bottom', true));
+    }
+    for (const ms of readyMilestones) {
+      addItem('💀', ms.title, 'mythic', (e) => showMilestonePopover(e, ms, 'ready', true));
+    }
+
+    card.appendChild(itemsWrap);
+    banner.appendChild(card);
+  }
+
   /* ── Dashboard Update ────────────────────────── */
 
   function updateDashboard(level, hours, rewardsAvailable, daysLeft) {
@@ -578,6 +705,7 @@
     updateBoostDisplay(data.subTier);
     buildThermometer(data.level);
     updateRewardsCount();
+    renderGraceBanner(data.prevMonth);
 
     if (data.allTime) {
       document.getElementById('ptTotalHours').textContent = data.allTime.totalHours + 'h';
@@ -622,25 +750,20 @@
     }
   }
 
+  /* The actual heartbeat POST now happens globally from js/twitch.js (every
+     page, not just this one — see sendPhamilyHeartbeatIfLive() there), so
+     the numbers keep accruing correctly no matter where the user is on the
+     site. This just re-fetches and re-renders this page's own display
+     periodically, so it doesn't go stale while left open. */
   function startHeartbeat() {
     if (heartbeatTimer) return;
-    async function beat() {
+    async function refresh() {
       try {
-        const res = await fetch('/api/phamily-time', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'heartbeat' }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          userLevel = data.level;
-          document.getElementById('ptLevel').textContent = data.level;
-          document.getElementById('ptHours').textContent = data.hours + 'h';
-        }
-      } catch { /* silent */ }
+        const data = await loadFromAPI();
+        if (data && !data.error) applyAPIData(data);
+      } catch { /* silent — try again next cycle */ }
     }
-    beat();
-    heartbeatTimer = setInterval(beat, 60000);
+    heartbeatTimer = setInterval(refresh, 60000);
   }
 
   /* ── Demo Data (fallback) ───────────────────── */

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE broadcaster bot control panel — manual code drops and chat announcements.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Bot Control | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/bot-control.css">
+</head>
+<body data-page="bot-control">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+    <h1 class="page-hero-title">Bot Control</h1>
+    <p class="page-hero-subtitle">Manual drops and announcements, straight to chat</p>
+  </section>
+
+  <section class="page-container">
+
+    <div id="botControlDenied" class="card bot-denied" hidden>
+      <p id="botControlDeniedText">This page is for the broadcaster only.</p>
+      <button class="btn-primary" id="botControlLoginBtn" hidden onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <div class="role-broadcaster" id="botControlPanel">
+
+      <div class="card bot-section">
+        <h2>Drop a Code</h2>
+        <p class="bot-section-desc">Pulls the next code from that tier's pool and posts it to chat, same as a hype train drop.</p>
+        <div class="bot-tier-buttons">
+          <button class="btn-secondary bot-drop-btn" data-rarity="common">Common</button>
+          <button class="btn-secondary bot-drop-btn" data-rarity="uncommon">Uncommon</button>
+          <button class="btn-secondary bot-drop-btn" data-rarity="rare">Rare</button>
+          <button class="btn-secondary bot-drop-btn" data-rarity="mythic">Mythic</button>
+        </div>
+      </div>
+
+      <div class="card bot-section" id="itemDropSection">
+        <h2>Drop an Item Code</h2>
+        <p class="bot-section-desc">Activates a queued item code and posts it to chat — same 5-minute window as a giveaway drop, but the winner redeems it for a specific item instead of entries.</p>
+        <ul class="bot-item-queue" id="botItemQueue">
+          <li class="bot-item-queue-empty">Loading...</li>
+        </ul>
+      </div>
+
+      <div class="card bot-section" id="giveawaySection">
+        <h2>Big Prize Giveaway</h2>
+        <p class="bot-section-desc">Toggle the "Enter Giveaway" channel points reward, spin for a winner among everyone who redeemed, then whisper them the prize code.</p>
+
+        <div class="giveaway-toggle-row">
+          <span class="giveaway-status" id="giveawayStatus">Entries Closed</span>
+          <button class="btn-secondary" id="giveawayToggleBtn">Open Entries</button>
+          <span class="giveaway-entrant-count" id="giveawayEntrantCount">0 entrants</span>
+        </div>
+
+        <div class="giveaway-wheel-wrap">
+          <div class="giveaway-wheel-pointer"></div>
+          <div class="giveaway-wheel" id="giveawayWheel"></div>
+        </div>
+
+        <div class="giveaway-actions">
+          <button class="btn-primary" id="giveawaySpinBtn">Spin the Wheel</button>
+          <button class="btn-secondary" id="giveawayResetBtn">Reset</button>
+        </div>
+
+        <div class="giveaway-winner-panel" id="giveawayWinnerPanel" hidden>
+          <p>Winner: <b id="giveawayWinnerName"></b></p>
+          <div class="giveaway-code-form">
+            <select id="giveawayCodeTier">
+              <option value="">— pick a tier to auto-pull a code —</option>
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+              <option value="mythic">Mythic</option>
+            </select>
+            <input type="text" id="giveawayCodeManual" placeholder="...or paste a specific code">
+            <button class="btn-primary" id="giveawaySendCodeBtn">Whisper Code to Winner</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bot-section">
+        <h2>Send Announcement</h2>
+        <p class="bot-section-desc">Posts a custom message to chat verbatim, exactly as typed.</p>
+        <div class="bot-announce-form">
+          <textarea id="botAnnounceText" class="bot-announce-input" maxlength="450" placeholder="Type an announcement to post in chat..."></textarea>
+          <span class="bot-announce-count" id="botAnnounceCount">0 / 450</span>
+          <button class="btn-primary" id="botAnnounceBtn">Send to Chat</button>
+        </div>
+      </div>
+
+      <div id="botStatusMsg" class="bot-status-msg" hidden></div>
+
+      <div class="card bot-section">
+        <h2>Recent Bot Actions</h2>
+        <ul class="bot-action-feed" id="botActionFeed">
+          <li class="bot-action-feed-empty">Loading...</li>
+        </ul>
+      </div>
+
+    </div>
+
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/bot-control.js" defer></script>
+</body>
+</html>

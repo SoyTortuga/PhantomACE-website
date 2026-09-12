@@ -6,5 +6,8 @@
   "scripts": {
     "dev": "npx wrangler pages dev . --port 8788",
     "deploy": "npx wrangler pages deploy ."
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4"
   }
 }

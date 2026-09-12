@@ -44,6 +44,21 @@
       text-align: center;
     }
 
+    .dev-banner {
+      display: inline-block;
+      margin: 0 auto 20px;
+      padding: 5px 14px;
+      background: rgba(255, 170, 0, 0.08);
+      border: 1px solid rgba(255, 170, 0, 0.4);
+      border-radius: 3px;
+      color: #ffaa00;
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-align: center;
+    }
+
     .create-btn {
       padding: 14px 40px;
       background: #ff0000;
@@ -436,6 +451,7 @@
   <div class="screen active create-screen" id="createScreen">
     <h1 class="host-title">Commander Bingo</h1>
     <p class="host-subtitle">Host Control Panel</p>
+    <div class="dev-banner">🚧 Still in Development</div>
     <button class="create-btn" onclick="createGame()">Create Game</button>
     <p class="create-note">
       Creates a game session with a 4-letter code. Share the code with your audience so they can join and get their bingo cards.

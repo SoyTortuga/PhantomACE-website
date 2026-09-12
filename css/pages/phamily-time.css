@@ -48,7 +48,7 @@
   padding: 10px 16px;
   background: var(--gray-lo);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .pt-boost-info {
@@ -99,7 +99,7 @@
 .pt-modal {
   background: var(--gray-mid);
   border: 1px solid var(--border-mid);
-  border-radius: 6px;
+  border-radius: 12px;
   max-width: 440px;
   width: 100%;
   padding: 24px;
@@ -231,7 +231,6 @@
 
 .pt-dot-ready {
   background: var(--red);
-  box-shadow: 0 0 6px var(--red);
 }
 
 .pt-dot-locked {
@@ -323,12 +322,11 @@
   font-size: 16px;
   border: 2px solid #333;
   background: var(--gray-lo);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s;
 }
 
 .pt-reward-node[data-state="ready"] .pt-reward-icon {
   border-color: var(--red);
-  box-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
   animation: pt-pulse 1.8s ease-in-out infinite;
 }
 
@@ -350,8 +348,8 @@
 }
 
 @keyframes pt-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(255, 0, 0, 0.3); }
-  50% { box-shadow: 0 0 16px rgba(255, 0, 0, 0.6); }
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
 }
 
 .pt-reward-lvl {
@@ -411,7 +409,6 @@
   width: 0%;
   background: linear-gradient(90deg, #cc0000, #ff0000, #ff2222);
   border-radius: 6px;
-  box-shadow: 0 0 12px rgba(255, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   transition: width 0.8s ease-out;
   position: relative;
 }
@@ -463,12 +460,11 @@
   height: 20px;
   border-radius: 50%;
   background: #1a1a1a;
-  transition: background 0.6s, box-shadow 0.6s;
+  transition: background 0.6s;
 }
 
 .pt-bulb-inner.filled {
   background: var(--red);
-  box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
 }
 
 /* ── Milestone Lane ──────────────────────────── */
@@ -499,12 +495,11 @@
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s;
 }
 
 .pt-milestone-node[data-state="ready"] .pt-milestone-icon {
   border-color: var(--red);
-  box-shadow: 0 0 14px rgba(255, 0, 0, 0.5);
   animation: pt-pulse 1.8s ease-in-out infinite;
 }
 
@@ -532,10 +527,9 @@
   z-index: 500;
   background: var(--gray-mid);
   border: 1px solid var(--border-mid);
-  border-radius: 6px;
+  border-radius: 12px;
   padding: 16px;
   width: 260px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
 .pt-popover[hidden] { display: none; }
@@ -665,7 +659,6 @@
 .pt-attendance-cell.attended {
   background: var(--red);
   border-color: rgba(255, 0, 0, 0.4);
-  box-shadow: 0 0 4px rgba(255, 0, 0, 0.2);
 }
 
 .pt-attendance-cell.missed {
@@ -746,3 +739,67 @@
   color: var(--red);
   margin-top: 2px;
 }
+
+/* ── Grace Period Banner ──────────────────────── */
+.pt-grace-card {
+  padding: 16px 20px;
+  border-color: var(--red);
+}
+
+.pt-grace-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.pt-grace-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.pt-grace-title {
+  font-family: var(--font-gothic);
+  font-size: 15px;
+  color: var(--text-pri);
+}
+
+.pt-grace-sub {
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.pt-grace-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pt-grace-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.pt-grace-item:hover { transform: translateY(-2px); }
+
+.pt-grace-item-icon { font-size: 16px; }
+
+.pt-grace-item-name {
+  font-family: var(--font-system);
+  font-size: 11px;
+  color: var(--text-sec);
+}
+
+.pt-grace-item.pt-rarity-common { border-color: var(--border); }
+.pt-grace-item.pt-rarity-uncommon { border-color: #2a5a2a; }
+.pt-grace-item.pt-rarity-rare { border-color: #3344aa; }
+.pt-grace-item.pt-rarity-mythic { border-color: #8833cc; }

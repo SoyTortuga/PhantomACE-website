@@ -72,6 +72,28 @@ async function pollTwitchStatus() {
   if (typeof handleTwitchStatusForNotifications === 'function') {
     handleTwitchStatusForNotifications(status);
   }
+  sendPhamilyHeartbeatIfLive(status);
+}
+
+/* Phamily Time watch-time tracking runs from here — every page, not just
+   community-stats.html — so it counts as long as the user has ANY page
+   open while PhantomACE is live, not just one specific tab. The server
+   re-checks live status itself before crediting any time (see
+   isChannelLive() in functions/api/phamily-time.js) — this client-side
+   check is just to skip a pointless request while offline, not a trust
+   boundary. */
+async function sendPhamilyHeartbeatIfLive(status) {
+  if (!status || !status.live) return;
+  if (typeof getSession !== 'function' || !getSession()) return;
+
+  try {
+    await fetch('/api/phamily-time', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'heartbeat' }),
+    });
+  } catch { /* silent — next poll cycle will retry */ }
 }
 
 function startTwitchPolling() {
@@ -90,6 +112,8 @@ async function pollHypeTrain() {
     updateHypeTrainBanner(data);
   } catch (e) {}
 }
+
+document.addEventListener('DOMContentLoaded', startTwitchPolling);
 
 function updateHypeTrainBanner(data) {
   var banner = document.getElementById('hypeTrainBanner');

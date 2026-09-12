@@ -1,0 +1,136 @@
+.redeem-card {
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.redeem-login p {
+  color: var(--text-sec);
+  margin-bottom: 16px;
+  font-family: var(--font-ui);
+}
+
+.redeem-label {
+  display: block;
+  font-family: var(--font-ui);
+  color: var(--text-sec);
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.redeem-input-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.redeem-input {
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: var(--white);
+  font-family: var(--font-system);
+  font-size: 18px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-align: center;
+  width: 220px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.redeem-input:focus {
+  border-color: var(--red);
+}
+.redeem-input::placeholder {
+  color: var(--text-dim);
+  letter-spacing: 4px;
+}
+
+.redeem-submit {
+  flex-shrink: 0;
+}
+.redeem-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.redeem-result {
+  margin-top: 24px;
+}
+
+.redeem-error {
+  color: var(--red);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.redeem-expired {
+  color: var(--amber);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.redeem-duplicate {
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.redeem-success {
+  text-align: center;
+}
+.redeem-success-title {
+  font-family: var(--font-gothic);
+  color: var(--green);
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.redeemed-item-card {
+  display: inline-block;
+  background: var(--gray-mid);
+  border: 2px solid var(--border-mid);
+  border-radius: 12px;
+  padding: 20px 28px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.redeemed-item-card:hover {
+  border-color: rgba(255, 0, 0, 0.3);
+}
+
+.redeemed-item-name {
+  font-family: var(--font-ui);
+  color: var(--white);
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.redeemed-item-meta {
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: capitalize;
+}
+
+.rarity-common   { color: #888888; }
+.rarity-uncommon  { color: var(--green); }
+.rarity-rare      { color: #4488ff; }
+.rarity-mythic    { color: var(--purple); }
+
+.rarity-border-common   { border-color: #888888; }
+.rarity-border-uncommon  { border-color: var(--green); }
+.rarity-border-rare      { border-color: #4488ff; }
+.rarity-border-mythic    { border-color: var(--purple); }
+
+@media (max-width: 500px) {
+  .redeem-input-row {
+    flex-direction: column;
+    align-items: center;
+  }
+  .redeem-input {
+    width: 100%;
+    max-width: 260px;
+  }
+}

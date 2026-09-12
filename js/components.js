@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="nav-submenu">
                 <a href="/events.html">Schedule</a>
                 <a href="/giveaway.html">Giveaway</a>
+                <a href="/redeem.html">Redeem Code</a>
               </div>
             </div>
             <a href="/media.html" data-page="media">Media</a>
@@ -37,11 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <a href="/community.html" data-page="community">Community</a>
               <div class="nav-submenu">
                 <a href="/community.html">Forums</a>
-                <a href="/community-stats.html">Viewer Stats</a>
+                <a href="/community-stats.html">Phamily Time</a>
                 <a href="/community-leaderboards.html">Leaderboards</a>
               </div>
             </div>
-            <a href="#" class="nav-auth-link" id="navAuthLink" onclick="event.preventDefault(); loginWithTwitch();">Log In with Twitch</a>
           </nav>
 
           <div class="header-right">
@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <a href="/about.html">About</a>
             <a href="/events.html">Events</a>
             <a href="/giveaway.html">Giveaway</a>
+            <a href="/redeem.html">Redeem Code</a>
             <a href="/media.html">Media</a>
             <a href="/games.html">Games</a>
             <a href="/membership.html">Phamily</a>
@@ -113,5 +114,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </footer>
     `;
+  }
+
+  /* auth.js's applyRole() runs on this same DOMContentLoaded event, but
+     its listener is registered first (its <script> tag comes before this
+     one on every page), so it fires before the header/footer above even
+     exist — meaning it never finds #authLoginBtn/#authUserInfo to update.
+     Call it again now that they're actually in the DOM. */
+  if (typeof applyRole === 'function') {
+    applyRole();
   }
 });

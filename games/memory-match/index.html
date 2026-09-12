@@ -35,9 +35,9 @@
 
     .board {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 8px;
-      max-width: 400px;
+      max-width: 480px;
       width: 100%;
     }
 
@@ -150,6 +150,8 @@
     .cosmetic-select option { background: #111; color: #fff; }
     .cosmetic-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
 
+    .card-front.cb-basic { background: #161616; border-color: #888; }
+    .card-front.cb-basic::after { content: '♦'; color: #aaa; opacity: 0.5; }
     .card-front.cb-phamily { background: linear-gradient(135deg, #1a0000, #111); border-color: #cc0000; }
     .card-front.cb-phamily::after { content: '💀'; color: #ff0000; opacity: 0.6; }
     .card-front.cb-rare { background: linear-gradient(135deg, #0a0a1e, #111); border-color: #3344aa; }
@@ -163,7 +165,7 @@
   <div class="stats">
     Moves: <span id="moveCount">0</span>
     &nbsp;&middot;&nbsp;
-    Pairs: <span id="pairCount">0</span> / <span id="totalPairs">4</span>
+    Pairs: <span id="pairCount">0</span> / <span id="totalPairs">20</span>
   </div>
   <div class="cosmetics-bar" id="cosmeticsBar" hidden>
     <div>
@@ -187,27 +189,74 @@
   </div>
 
   <script>
-    const DEFAULT_IMAGES = [
-      '/assets/images/phantomace-logo.png',
-      '/assets/images/phantomace-logo-mythic.png',
-      '/assets/images/skull.png',
-      '/assets/images/logo.png',
+    const CHANNEL_EMOTES = [
+      { name: 'phamLove', src: 'https://static-cdn.jtvnw.net/emoticons/v2/120322/default/light/3.0' },
+      { name: 'phamPham', src: 'https://static-cdn.jtvnw.net/emoticons/v2/121671/default/light/3.0' },
+      { name: 'phamHype', src: 'https://static-cdn.jtvnw.net/emoticons/v2/152733/default/light/3.0' },
+      { name: 'phamW', src: 'https://static-cdn.jtvnw.net/emoticons/v2/137132/default/light/3.0' },
+      { name: 'phamL', src: 'https://static-cdn.jtvnw.net/emoticons/v2/415421/default/light/3.0' },
+      { name: 'phamGG', src: 'https://static-cdn.jtvnw.net/emoticons/v2/121668/default/light/3.0' },
+      { name: 'phamLit', src: 'https://static-cdn.jtvnw.net/emoticons/v2/120782/default/light/3.0' },
+      { name: 'phamIly', src: 'https://static-cdn.jtvnw.net/emoticons/v2/121672/default/light/3.0' },
+      { name: 'phamCoin', src: 'https://static-cdn.jtvnw.net/emoticons/v2/153656/default/light/3.0' },
+      { name: 'phamMonkaS', src: 'https://static-cdn.jtvnw.net/emoticons/v2/303615499/default/light/3.0' },
+      { name: 'phamLaugh', src: 'https://static-cdn.jtvnw.net/emoticons/v2/303615519/default/light/3.0' },
+      { name: 'phamG', src: 'https://static-cdn.jtvnw.net/emoticons/v2/415419/default/light/3.0' },
+      { name: 'phamPoggers', src: 'https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_92dfe6ff82464cdda9d0261e1ca4e7ed/default/light/3.0' },
+      { name: 'phamV', src: 'https://static-cdn.jtvnw.net/emoticons/v2/413668/default/light/3.0' },
+      { name: 'phamHi', src: 'https://static-cdn.jtvnw.net/emoticons/v2/121673/default/light/3.0' },
+      { name: 'phamPog', src: 'https://static-cdn.jtvnw.net/emoticons/v2/303615529/default/light/3.0' },
+      { name: 'phamNice', src: 'https://static-cdn.jtvnw.net/emoticons/v2/303615522/default/light/3.0' },
+      { name: 'phamClown', src: 'https://static-cdn.jtvnw.net/emoticons/v2/303615503/default/light/3.0' },
+      { name: 'phamYEP', src: 'https://static-cdn.jtvnw.net/emoticons/v2/303615534/default/light/3.0' },
+      { name: 'phamUsure', src: 'https://static-cdn.jtvnw.net/emoticons/v2/472088/default/light/3.0' },
+    ];
+
+    const DEFAULT_IMAGES = CHANNEL_EMOTES.map(e => e.src);
+    const DEFAULT_NAMES = CHANNEL_EMOTES.map(e => e.name);
+
+    function emoteUrl(id) { return `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/light/3.0`; }
+
+    const BONUS_EMOTES = [
+      { name: 'phamDrum', src: emoteUrl('emotesv2_454abcf6e3104137b1eeeac026d5f62d') },
+      { name: 'phamBass', src: emoteUrl('emotesv2_11714d9a022d4fd7b4cb872b0d5bba1d') },
+      { name: 'phamJam', src: emoteUrl('emotesv2_62be33ae947d41eeb96785317e0ff198') },
+      { name: 'phamHUH', src: emoteUrl('emotesv2_6700d9409cfc499ab30d1235e680b25b') },
+      { name: 'phamHeal', src: emoteUrl('emotesv2_1f60e4c71d9e4af19fa7b3812f40d71f') },
+      { name: 'phamEcho', src: emoteUrl('emotesv2_325e83dde662429c82020e6d2af7f08f') },
+      { name: 'phamPoint', src: emoteUrl('303615525') },
+      { name: 'phamTime', src: emoteUrl('emotesv2_66462619face41b1abec201b92022a0b') },
+      { name: 'phamPepelaugh', src: emoteUrl('emotesv2_92f127f639ff4ff2a3b8ed07faa86d49') },
+      { name: 'phamDrink', src: emoteUrl('emotesv2_8c96393fd63f46a6bb0f15d5ba9051d0') },
+    ];
+
+    const PREMIUM_EMOTES = [
+      { name: 'phamHYPERS', src: emoteUrl('1142146') },
+      { name: 'phamLove2', src: emoteUrl('168361') },
+      { name: 'phamLove3', src: emoteUrl('168352') },
+      { name: 'phamLovespin', src: emoteUrl('emotesv2_8243b0b6a8534d43b216c89e64404320') },
+      { name: 'phamMaid', src: emoteUrl('emotesv2_d8b593cb945b49b89b2bfdacd32bf276') },
+      { name: 'phamGear', src: emoteUrl('emotesv2_9fad6fab6f35430390613ab56d7a008f') },
+      { name: 'phamButton', src: emoteUrl('emotesv2_a1f04eab77664362881740e2756f60b4') },
+      { name: 'phamCoinroll', src: emoteUrl('emotesv2_26bf7acbf75644e69473adf3952110b7') },
+      { name: 'phamRee', src: emoteUrl('303615532') },
+      { name: 'phamFroze', src: emoteUrl('emotesv2_1d3742cd0c33464f9fdc9d5e2495a4cb') },
+      { name: 'phamFeelsBad', src: emoteUrl('303615479') },
+      { name: 'phamToxic', src: emoteUrl('300609000') },
+      { name: 'phamHyperss', src: emoteUrl('emotesv2_2b7c7263e8234fbd963c87bc085969fb') },
+      { name: 'phamChair', src: emoteUrl('emotesv2_e4a4f5d9bc764548ba26a61d54140bfe') },
+      { name: 'phamPepeHands', src: emoteUrl('303615508') },
     ];
 
     const EMOTE_SETS = {
-      default: { name: 'Default', images: DEFAULT_IMAGES },
-      emote1: { name: 'Emote Pack', images: [
-        '/assets/images/phantomace-logo.png', '/assets/images/skull.png',
-        '/assets/images/logo.png', '/assets/images/phantomace-logo-mythic.png',
-      ]},
-      premium1: { name: 'Premium Emotes', images: [
-        '/assets/images/phantomace-logo-mythic.png', '/assets/images/skull.png',
-        '/assets/images/logo.png', '/assets/images/phantomace-logo.png',
-      ]},
+      default: { name: 'PhantomACE Emotes', images: DEFAULT_IMAGES, alts: DEFAULT_NAMES },
+      bonus: { name: 'Emote Pack', images: BONUS_EMOTES.map(e => e.src), alts: BONUS_EMOTES.map(e => e.name) },
+      premium: { name: 'Premium Emote Pack', images: PREMIUM_EMOTES.map(e => e.src), alts: PREMIUM_EMOTES.map(e => e.name) },
     };
 
     const CARD_BACKS = {
       default: { name: 'Default', cssClass: '' },
+      basic: { name: 'Basic Card Back', cssClass: 'cb-basic' },
       phamily: { name: 'Phamily Card Back', cssClass: 'cb-phamily' },
       rare: { name: 'Rare Card Back', cssClass: 'cb-rare' },
       legendary: { name: 'Legendary Card Back', cssClass: 'cb-legendary' },
@@ -223,10 +272,16 @@
     let matched = 0;
     let moves = 0;
     let locked = false;
+    let totalPairs = 4;
 
     function getActiveImages() {
       const set = EMOTE_SETS[activeEmoteSet] || EMOTE_SETS.default;
-      return [...set.images, ...set.images];
+      const alts = set.alts || set.images.map(() => 'card');
+      return {
+        images: [...set.images, ...set.images],
+        alts: [...alts, ...alts],
+        pairTotal: set.images.length,
+      };
     }
 
     async function loadMMCosmetics() {
@@ -278,11 +333,13 @@
 
     function getCosmeticId(item, prefix) {
       const n = (item.name || '').toLowerCase();
-      if (n.includes('phamily')) return 'phamily';
       if (n.includes('legendary')) return 'legendary';
+      if (n.includes('phamily')) return 'phamily';
       if (n.includes('rare')) return 'rare';
-      if (n.includes('premium')) return 'premium1';
-      return prefix + '_' + (item.id || '').replace(/[^a-z0-9]/g, '').slice(0, 12);
+      if (n.includes('premium')) return 'premium';
+      // Unrecognized reward name — fall back to the lowest tier for this slot
+      // rather than silently duplicating the default set.
+      return prefix === 'cb' ? 'basic' : 'bonus';
     }
 
     function applyCardBack() {
@@ -323,10 +380,13 @@
       document.getElementById('pairCount').textContent = '0';
       document.getElementById('winMessage').classList.remove('show');
 
-      const images = getActiveImages();
+      const { images, alts, pairTotal } = getActiveImages();
+      totalPairs = pairTotal;
+      document.getElementById('totalPairs').textContent = totalPairs;
+
       const pairs = [];
       images.forEach((src, i) => {
-        pairs.push({ id: i, pairId: i % (images.length / 2), src });
+        pairs.push({ id: i, pairId: i % pairTotal, src, alt: alts[i] });
       });
 
       cards = shuffle(pairs);
@@ -338,7 +398,7 @@
           <div class="card-inner">
             <div class="card-front ${cbClass}"></div>
             <div class="card-back">
-              <img src="${card.src}" alt="card">
+              <img src="${card.src}" alt="${card.alt}">
             </div>
           </div>
         </div>
@@ -369,7 +429,7 @@
           flipped = [];
           locked = false;
 
-          if (matched === 4) {
+          if (matched === totalPairs) {
             setTimeout(() => {
               document.getElementById('finalMoves').textContent = moves;
               document.getElementById('winMessage').classList.add('show');

@@ -45,9 +45,8 @@
   width: 100%;
   max-width: 280px;
   margin: 0 auto;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid var(--border-mid);
-  box-shadow: 0 0 30px rgba(152, 9, 10, 0.15);
 }
 
 .bio-text h2 {
@@ -123,11 +122,10 @@
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  transition: border-color 0.3s;
 }
 
 .social-card:hover {
-  box-shadow: 0 0 15px rgba(152, 9, 10, 0.15);
 }
 
 .social-card-name {

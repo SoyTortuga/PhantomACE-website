@@ -44,7 +44,6 @@ function applyRole() {
   const userInfo = document.getElementById('authUserInfo');
   const userName = document.getElementById('authUserName');
   const userAvatar = document.getElementById('authUserAvatar');
-  const navAuthLink = document.getElementById('navAuthLink');
 
   if (session && session.display_name) {
     if (loginBtn) loginBtn.style.display = 'none';
@@ -53,11 +52,6 @@ function applyRole() {
     if (userAvatar && session.profile_image) {
       userAvatar.src = session.profile_image;
       userAvatar.alt = session.display_name;
-    }
-    if (navAuthLink) {
-      navAuthLink.textContent = session.display_name;
-      navAuthLink.href = '#';
-      navAuthLink.onclick = function (e) { e.preventDefault(); logout(); };
     }
 
     loadProfileCosmetics();
@@ -68,11 +62,6 @@ function applyRole() {
   } else {
     if (loginBtn) loginBtn.style.display = '';
     if (userInfo) userInfo.style.display = 'none';
-    if (navAuthLink) {
-      navAuthLink.textContent = 'Log In with Twitch';
-      navAuthLink.href = '#';
-      navAuthLink.onclick = function (e) { e.preventDefault(); loginWithTwitch(); };
-    }
   }
 }
 

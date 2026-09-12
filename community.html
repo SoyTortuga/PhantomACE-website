@@ -36,7 +36,7 @@
     <div class="page-container">
       <div class="subnav-links">
         <a href="/community.html" class="subnav-link active">Forums</a>
-        <a href="/community-stats.html" class="subnav-link">Viewer Stats</a>
+        <a href="/community-stats.html" class="subnav-link">Phamily Time</a>
         <a href="/community-leaderboards.html" class="subnav-link">Leaderboards</a>
       </div>
       <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="subnav-discord">Join Discord</a>
@@ -44,15 +44,21 @@
   </nav>
 
   <!-- Forum Content -->
-  <section class="page-container">
+  <section class="page-container" style="position: relative;">
 
-    <!-- Breadcrumb -->
-    <div class="forum-breadcrumb" id="forumBreadcrumb">
-      <a href="#" onclick="forumNav('home'); return false;">Forums</a>
+    <!-- Coming Soon Overlay -->
+    <div class="coming-soon-overlay">
+      <div class="coming-soon-card">
+        <div class="coming-soon-icon">🚧</div>
+        <h2 class="coming-soon-title">Forums Coming Soon</h2>
+        <p class="coming-soon-text">The community forums are being rebuilt. In the meantime, hop into the Discord to chat with the Phamily!</p>
+        <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener" class="btn-primary" style="margin-top: 16px; display: inline-block; padding: 10px 28px; text-decoration: none;">Join Discord</a>
+      </div>
     </div>
 
-    <!-- Forum Views (swapped by JS) -->
-    <div id="forumView"></div>
+    <!-- Forum Views (hidden until ready) -->
+    <div id="forumBreadcrumb" style="display:none;"></div>
+    <div id="forumView" style="display:none;"></div>
 
   </section>
 

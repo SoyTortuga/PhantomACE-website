@@ -1,77 +1,8 @@
-const GALLERY_DATA = [
-  {
-    id: 1,
-    title: 'Phamathon Highlights',
-    category: 'highlight',
-    type: 'image',
-    src: '/assets/images/phantomace-logo.png',
-    date: '2026-08-15',
-    role: null,
-  },
-  {
-    id: 2,
-    title: 'Commander Night Chaos',
-    category: 'clip',
-    type: 'image',
-    src: '/assets/images/phantomace-logo-mythic.png',
-    date: '2026-08-10',
-    role: null,
-  },
-  {
-    id: 3,
-    title: 'Fan Art: Skull King',
-    category: 'art',
-    type: 'image',
-    src: '/assets/images/phantomace-logo.png',
-    date: '2026-08-05',
-    role: null,
-  },
-  {
-    id: 4,
-    title: 'Stream Setup Tour',
-    category: 'screenshot',
-    type: 'image',
-    src: '/assets/images/phantomace-banner.jpg',
-    date: '2026-07-28',
-    role: null,
-  },
-  {
-    id: 5,
-    title: 'Drum Fill Compilation',
-    category: 'highlight',
-    type: 'image',
-    src: '/assets/images/phantomace-logo-mythic.png',
-    date: '2026-07-20',
-    role: null,
-  },
-  {
-    id: 6,
-    title: 'Subscriber-Only Blooper Reel',
-    category: 'clip',
-    type: 'image',
-    src: '/assets/images/phantomace-logo.png',
-    date: '2026-07-15',
-    role: 'sub_tier2',
-  },
-  {
-    id: 7,
-    title: 'Community Game Night Recap',
-    category: 'screenshot',
-    type: 'image',
-    src: '/assets/images/phantomace-banner.jpg',
-    date: '2026-07-10',
-    role: null,
-  },
-  {
-    id: 8,
-    title: 'Behind the Scenes',
-    category: 'screenshot',
-    type: 'image',
-    src: '/assets/images/phantomace-logo-mythic.png',
-    date: '2026-07-05',
-    role: 'follower',
-  },
-];
+/* Populated by real uploads via /api/media/upload once the media backend
+   (currently being reworked to use the dedicated server instead of R2 —
+   see wrangler.toml) is live. Empty until then; renderGallery() already
+   shows a clean "No items in this category yet." state for an empty array. */
+const GALLERY_DATA = [];
 
 let currentFilter = 'all';
 let lightboxIndex = -1;

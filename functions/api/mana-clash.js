@@ -31,6 +31,16 @@ function generateCode() {
   return code;
 }
 
+function rollFace() { return FACES[Math.floor(Math.random() * FACES.length)]; }
+
+function freshLock() { return [false, false, false, false, false, false]; }
+
+function ensurePlayerRoundFields(p) {
+  if (p.dice === undefined) p.dice = null;
+  if (!Array.isArray(p.locked) || p.locked.length !== 6) p.locked = freshLock();
+  if (typeof p.rollsLeft !== 'number') p.rollsLeft = 3;
+}
+
 function validateDice(dice) {
   return Array.isArray(dice) && dice.length === 6 && dice.every(f => FACES.includes(f));
 }
@@ -94,6 +104,9 @@ function advanceRound(room) {
       }
     }
     p.roundSubmitted = false;
+    p.dice = null;
+    p.locked = freshLock();
+    p.rollsLeft = 3;
   }
   const active = Object.values(room.players).filter(p => !p.busted);
   if (active.length === 0 || room.round >= MAX_ROUNDS) {
@@ -171,7 +184,7 @@ export async function onRequestPost(context) {
       code, host: userId, hostName: displayName,
       password: body.password || null, status: 'lobby',
       round: 0, roundStartedAt: null,
-      players: { [userId]: { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0 } },
+      players: { [userId]: { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0, dice: null, locked: freshLock(), rollsLeft: 3 } },
       createdAt: Date.now(),
     };
     await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
@@ -187,7 +200,7 @@ export async function onRequestPost(context) {
     if (Object.keys(room.players).length >= MAX_PLAYERS) return json({ error: 'Room is full' }, 400);
     if (room.password && body.password !== room.password) return json({ error: 'Wrong password' }, 403);
 
-    room.players[userId] = { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0 };
+    room.players[userId] = { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0, dice: null, locked: freshLock(), rollsLeft: 3 };
     await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
     return json({ success: true, code });
   }
@@ -212,7 +225,38 @@ export async function onRequestPost(context) {
     if (room.host !== userId) return json({ error: 'Only the host can start' }, 403);
     if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
     room.status = 'playing'; room.round = 1; room.roundStartedAt = Date.now();
-    for (const p of Object.values(room.players)) { p.roundSubmitted = false; }
+    for (const p of Object.values(room.players)) { p.roundSubmitted = false; p.dice = null; p.locked = freshLock(); p.rollsLeft = 3; }
+    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    addTimeLeft(room);
+    return json({ success: true, room });
+  }
+
+  if (body.action === 'roll-dice') {
+    const code = body.code;
+    if (!code) return json({ error: 'Missing room code' }, 400);
+    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
+    if (!room) return json({ error: 'Room not found' }, 404);
+    if (room.status !== 'playing') return json({ error: 'Game not in progress' }, 400);
+
+    while (room.roundStartedAt && Date.now() - room.roundStartedAt >= ROUND_MS) { advanceRound(room); }
+
+    const p = room.players[userId];
+    if (!p) return json({ error: 'Not in this room' }, 403);
+    ensurePlayerRoundFields(p);
+    if (p.busted) return json({ error: 'You are busted' }, 400);
+    if (p.roundSubmitted) return json({ error: 'Already submitted' }, 400);
+    if (body.round !== room.round) return json({ error: 'Round mismatch' }, 400);
+    if (p.rollsLeft <= 0) return json({ error: 'No rolls left' }, 400);
+
+    const lockedIn = Array.isArray(body.locked) && body.locked.length === 6 ? body.locked.map(Boolean) : freshLock();
+    if (!p.dice) {
+      p.dice = Array.from({ length: 6 }, rollFace);
+    } else {
+      p.dice = p.dice.map((f, i) => lockedIn[i] ? f : rollFace());
+    }
+    p.locked = lockedIn;
+    p.rollsLeft--;
+
     await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
     addTimeLeft(room);
     return json({ success: true, room });
@@ -229,6 +273,7 @@ export async function onRequestPost(context) {
 
     const p = room.players[userId];
     if (!p) return json({ error: 'Not in this room' }, 403);
+    ensurePlayerRoundFields(p);
     if (p.busted) return json({ error: 'You are busted' }, 400);
     if (p.roundSubmitted) return json({ error: 'Already submitted' }, 400);
     if (body.round !== room.round) return json({ error: 'Round mismatch' }, 400);
@@ -236,17 +281,18 @@ export async function onRequestPost(context) {
     if (body.slotId === '__bust__') {
       p.busted = true; p.roundSubmitted = true; p.bustedRound = room.round;
     } else {
-      if (!validateDice(body.dice)) return json({ error: 'Invalid dice' }, 400);
+      const dice = p.dice;
+      if (!validateDice(dice)) return json({ error: 'Roll dice before submitting' }, 400);
       if (p.scores.hasOwnProperty(body.slotId)) return json({ error: 'Slot already used' }, 400);
-      const valid = validateSlot(body.slotId, body.dice);
-      const score = valid ? scoreSlot(body.slotId, body.dice) : 0;
+      const valid = validateSlot(body.slotId, dice);
+      const score = valid ? scoreSlot(body.slotId, dice) : 0;
       p.scores[body.slotId] = score; p.totalScore += score; p.roundSubmitted = true;
       p.lastSlot = body.slotId; p.lastScore = score;
     }
 
     const allDone = Object.values(room.players).every(pl => pl.busted || pl.roundSubmitted);
     if (allDone) {
-      for (const pl of Object.values(room.players)) pl.roundSubmitted = false;
+      for (const pl of Object.values(room.players)) { pl.roundSubmitted = false; pl.dice = null; pl.locked = freshLock(); pl.rollsLeft = 3; }
       const active = Object.values(room.players).filter(pl => !pl.busted);
       if (active.length === 0 || room.round >= MAX_ROUNDS) { room.status = 'finished'; room.roundStartedAt = null; }
       else { room.round++; room.roundStartedAt = Date.now(); }

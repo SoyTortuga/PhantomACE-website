@@ -143,6 +143,21 @@
   color: var(--red);
 }
 
+/* ── Badge Showcase ── */
+.showcase-desc {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-sec);
+  margin: 0 0 12px;
+  max-width: 60ch;
+}
+
+.showcase-save-btn {
+  margin-top: 12px;
+  font-size: 13px;
+  padding: 8px 20px;
+}
+
 /* ── Import badges bar ── */
 .import-badges-bar {
   text-align: center;

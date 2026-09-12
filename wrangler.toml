@@ -1,27 +1,26 @@
 name = "phantomace-website"
 compatibility_date = "2024-01-01"
+pages_build_output_dir = "."
 
-[vars]
-TWITCH_CLIENT_ID = ""
-# Set in Cloudflare dashboard as encrypted secrets:
-# TWITCH_CLIENT_SECRET — from Twitch dev console
-# TWITCH_EVENTSUB_SECRET — random string for webhook signature verification
-# TWITCH_BROADCASTER_ID — your Twitch user ID
-# TWITCH_BOT_REFRESH_TOKEN — OAuth refresh token for chat bot (user:write:chat scope)
-# TWITCH_BOT_USER_ID — the bot account's Twitch user ID (defaults to broadcaster if omitted)
+# All Twitch/bot credentials are set as encrypted secrets in the Cloudflare
+# dashboard (Pages project → Settings → Variables and secrets), not here —
+# TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, TWITCH_EVENTSUB_SECRET,
+# TWITCH_BROADCASTER_ID, BOT_SERVICE_SECRET. Declaring any of these in
+# [vars] here conflicts with the dashboard-defined binding of the same
+# name and fails deploy with "Binding name already in use" — don't
+# re-add them here.
+# TWITCH_BOT_REFRESH_TOKEN / TWITCH_BOT_USER_ID are optional fallbacks —
+# normally set automatically in KV once bot-setup.js's OAuth flow runs.
 
-# For production: run these commands and paste the real IDs below:
-#   npx wrangler kv:namespace create MARKETPLACE
-#   npx wrangler kv:namespace create MARKETPLACE --preview
-# Used by: Dino Park marketplace, Mana Clash rooms
+# Used by: Dino Park marketplace, Mana Clash rooms, bot/giveaway/item-code
+# systems, leaderboards — created via `wrangler kv namespace create MARKETPLACE`
 [[kv_namespaces]]
 binding = "MARKETPLACE"
-id = "placeholder-create-namespace-for-prod"
-preview_id = "placeholder-create-namespace-for-prod"
+id = "2457282c1b4146449d1497124055f8ef"
+preview_id = "3f3b2a004511471282d2727d393e78d7"
 
-# For production: run these commands and paste the real name below:
-#   npx wrangler r2 bucket create phantomace-media
-# Used by: Media gallery uploads
-[[r2_buckets]]
-binding = "MEDIA_BUCKET"
-bucket_name = "phantomace-media"
+# R2 removed — media storage is moving to the dedicated server instead of
+# Cloudflare R2 (decision made 2026-09-07). functions/api/media/upload.js
+# and functions/cdn/media/[[path]].js still reference env.MEDIA_BUCKET and
+# need reworking to talk to that server's own upload/serve endpoint before
+# the media gallery feature works again — tracked as a follow-up, not yet done.

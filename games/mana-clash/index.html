@@ -301,6 +301,7 @@ let myScores = {};
 let submitted = false;
 let lastSeenRound = 0;
 let prepTimer = null;
+let autoRollInFlight = false;
 
 function getSession() {
   const cookie = document.cookie;
@@ -607,6 +608,7 @@ function newRound(room) {
   hasRolled = false;
   myPhase = 'rolling';
   submitted = false;
+  autoRollInFlight = false;
 
   const me = room.players[myId] || room.players['guest_' + myId];
   if (me) myScores = { ...me.scores };
@@ -628,13 +630,23 @@ function startLocalTimer() {
     fill.className = 'timer-fill' + (secs <= 5 ? ' danger' : secs <= 10 ? ' warn' : '');
     text.textContent = secs;
 
-    if (left <= 0 && myPhase === 'rolling' && !submitted) {
-      if (!hasRolled) {
-        dice = dice.map(() => FACES[Math.floor(Math.random()*6)]);
-        hasRolled = true;
-      }
-      enterAssignPhase();
-      autoZero();
+    if (left <= 0 && myPhase === 'rolling' && !submitted && !autoRollInFlight) {
+      autoRollInFlight = true;
+      (async () => {
+        if (!hasRolled) {
+          const data = await api('POST', { action: 'roll-dice', code: roomCode, round: lastSeenRound, locked });
+          if (!data.error) {
+            const me = data.room.players[myId] || data.room.players['guest_' + myId];
+            dice = me.dice;
+            rollsLeft = me.rollsLeft;
+            hasRolled = true;
+            roomState = data.room;
+          }
+        }
+        enterAssignPhase();
+        autoZero();
+        autoRollInFlight = false;
+      })();
     }
     if (left <= 0 && myPhase === 'assigning' && !submitted) {
       autoZero();
@@ -642,11 +654,17 @@ function startLocalTimer() {
   }, 200);
 }
 
-function rollDice() {
+async function rollDice() {
   if (myPhase !== 'rolling' || rollsLeft <= 0 || submitted) return;
+  document.getElementById('rollBtn').disabled = true;
+  const data = await api('POST', { action: 'roll-dice', code: roomCode, round: lastSeenRound, locked });
+  document.getElementById('rollBtn').disabled = false;
+  if (data.error) { showFeedback('gameFeedback', data.error, 'error'); return; }
+  const me = data.room.players[myId] || data.room.players['guest_' + myId];
+  dice = me.dice;
+  rollsLeft = me.rollsLeft;
   hasRolled = true;
-  dice = dice.map((f,i) => locked[i] ? f : FACES[Math.floor(Math.random()*6)]);
-  rollsLeft--;
+  roomState = data.room;
 
   animateRoll(() => {
     renderDice();
@@ -708,7 +726,7 @@ async function assignSlot(slotId) {
   renderWaiting(roomState);
   renderScorepad();
 
-  await api('POST', { action: 'submit-round', code: roomCode, round: lastSeenRound, slotId, dice, score: pts });
+  await api('POST', { action: 'submit-round', code: roomCode, round: lastSeenRound, slotId });
 }
 
 function getBottomSlot() {
@@ -729,7 +747,7 @@ async function autoZero() {
   showFeedback('gameFeedback', `Time's up! Took a zero on ${SLOTS.find(s=>s.id===slotId)?.name || slotId}.`, 'error');
   renderWaiting(roomState);
   renderScorepad();
-  await api('POST', { action: 'submit-round', code: roomCode, round: lastSeenRound, slotId, dice, score: 0 });
+  await api('POST', { action: 'submit-round', code: roomCode, round: lastSeenRound, slotId });
 }
 
 /* ═══════ RENDER ═══════ */

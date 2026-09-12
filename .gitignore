@@ -5,6 +5,10 @@ node_modules/
 Thumbs.db
 *.log
 
+# Internal-only docs (setup guides, checklists, roster notes) — not for
+# the public repo.
+_private/
+
 # Purchased asset packs (pack-forge / Game Paradise) are NOT tracked.
 # Their licence permits shipping them inside the game but forbids redistributing
 # them "as assets" — and this repo is public, so committing them would do exactly

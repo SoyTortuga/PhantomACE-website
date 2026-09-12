@@ -41,6 +41,21 @@
       text-align: center;
     }
 
+    .dev-banner {
+      display: inline-block;
+      margin: 0 auto 20px;
+      padding: 5px 14px;
+      background: rgba(255, 170, 0, 0.08);
+      border: 1px solid rgba(255, 170, 0, 0.4);
+      border-radius: 3px;
+      color: #ffaa00;
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-align: center;
+    }
+
     .join-form {
       width: 100%;
       max-width: 300px;
@@ -487,6 +502,7 @@
   <div class="screen active" id="joinScreen">
     <h1 class="game-title">Commander Bingo</h1>
     <p class="game-subtitle">MTG Commander Edition</p>
+    <div class="dev-banner">🚧 Still in Development</div>
 
     <div class="join-form">
       <input class="join-input code-input" id="codeInput" placeholder="CODE" maxlength="4" autocomplete="off">
@@ -560,6 +576,12 @@
     let previousBingos = 0;
     let pollTimer = null;
 
+    let guestId = localStorage.getItem('bingo_guestId');
+    if (!guestId) {
+      guestId = 'g' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('bingo_guestId', guestId);
+    }
+
     const params = new URLSearchParams(window.location.search);
     if (params.get('code')) {
       document.getElementById('codeInput').value = params.get('code').toUpperCase();
@@ -567,7 +589,11 @@
 
     /* ── Card generation ─────────────────── */
     function generateCard() {
-      const shuffled = [...BINGO_EVENTS].sort(() => Math.random() - 0.5);
+      const shuffled = [...BINGO_EVENTS];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
       const selected = shuffled.slice(0, 24);
       selected.splice(12, 0, { id: 'free', text: 'FREE', cat: 'free' });
       return selected;
@@ -636,7 +662,7 @@
         const res = await fetch('/api/bingo/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, name })
+          body: JSON.stringify({ code, name, guestId })
         });
 
         if (!res.ok) throw new Error('not found');
@@ -673,10 +699,15 @@
         return;
       }
 
-      card = generateCard();
-      const ids = cardToIds(card);
-
-      game.players.push({ name, cardIds: ids });
+      const existing = game.players.find(p => p.id === guestId);
+      if (existing) {
+        if (existing.name !== name) existing.name = name;
+        card = idsToCard(existing.cardIds);
+      } else {
+        card = generateCard();
+        const ids = cardToIds(card);
+        game.players.push({ id: guestId, name, cardIds: ids });
+      }
       localStorage.setItem(storeKey, JSON.stringify(game));
 
       markedSet = new Set(['free']);
