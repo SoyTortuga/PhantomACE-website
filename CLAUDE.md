@@ -84,3 +84,6 @@ This project uses specialized sub-agents. The manager agent handles coordination
 - **chat-system** — Community forums & chat
 - **phamily-giveaway** — Phamily Time watch pass & Giveaway system
 - **cosmetics** — Profile cosmetics, inventory, channel points
+- **server** — Everything executed on the rig: Postgres, the self-hosted Node server, Windows
+  services, the Cloudflare Tunnel, data migration runs, and cutover. Authors no application
+  code — that arrives via `git pull`. See `server/MIGRATION-PLAN.md`.

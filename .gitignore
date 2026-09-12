@@ -1,6 +1,11 @@
 node_modules/
 .dev.vars
 .wrangler/
+
+# Self-hosted server secrets (Twitch credentials, EventSub HMAC secret,
+# bot service secret, Postgres connection string). Template lives at
+# server/.env.example.
+server/.env
 .DS_Store
 Thumbs.db
 *.log

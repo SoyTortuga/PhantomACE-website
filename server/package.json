@@ -1,0 +1,23 @@
+{
+  "name": "phantomace-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted Node server for the PhantomACE site. Serves the static site and the /api routes (the same handlers under ../functions) backed by Postgres instead of Cloudflare KV.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "probe": "node scripts/probe-urls.cjs",
+    "dump-kv": "node scripts/dump-kv.js",
+    "load-kv": "node scripts/load-kv.js",
+    "verify-migration": "node scripts/verify-migration.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.1",
+    "send": "^1.1.0"
+  }
+}
