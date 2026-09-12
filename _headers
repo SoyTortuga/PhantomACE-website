@@ -7,11 +7,6 @@
   Content-Security-Policy: frame-ancestors 'self'
 
 /api/*
-  # Was `public, max-age=60`, which browsers honoured literally: the 2s
-  # room-state polling in Mana Clash / PhamShock / Bingo was being served
-  # from the browser cache for up to a minute (verified — repeat fetches
-  # returned transferSize 0), and per-user authenticated responses like
-  # /api/inventory were marked `public` so shared proxies could store them.
   Cache-Control: no-store
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Methods: GET, POST, OPTIONS
