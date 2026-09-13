@@ -10,9 +10,9 @@
 | 3 — adapter, router, static | **Done and verified.** 18/18 URL behaviours identical to production Cloudflare, 0 mismatches, plus 3 deliberate blocks. 31 routes mounted. Full static site serves |
 | 4 — schema | **SQL written** (`sql/001_schema.sql`), not yet applied anywhere |
 | 5 — migration rehearsal | **DONE on the rig.** Schema applied cleanly to `phantomace-tv-dev` (17 tables, no fixes needed). dump/load/verify run twice, identical: 46/46 distinct keys, 0 unmapped, 45 values matched (46 minus `market_index`, discarded by design), verify exited 0 |
-| 6 — validate on dev.phantomace.tv | **In progress.** `dev.phantomace.tv` is now served by the Node server off Postgres, not Pages. `/api/health` → `ok:true`. `/api/marketplace` → the 14 real listings, byte-identical local and via tunnel. `/_private/giveaway-codes/…` → 404 confirmed through the public URL. Login end-to-end pending |
-| 7 — Postgres-native rewrites | Not started — see the Pages-compatibility note below before starting |
-| 8 / 9 — cutover, follow-ups | Not started. `install-services.ps1` written (NSSM, discovers the Postgres service name, keeps secrets out of the registry) |
+| 6 — validate on dev.phantomace.tv | **DONE.** Login proven end-to-end (callback reaches dev, return_to round-trip correct, `Secure`/`SameSite=Lax`/`Path=/` confirmed over HTTP). Room games incl. lazy round-advance and expiry. HEAD fixed. Read-only smoke over migrated data. `dev.phantomace.tv` is now served by the Node server off Postgres, not Pages. `/api/health` → `ok:true`. `/api/marketplace` → the 14 real listings, byte-identical local and via tunnel. `/_private/giveaway-codes/…` → 404 confirmed through the public URL. Login end-to-end pending |
+| 7 — Postgres-native rewrites | **Deliberately deferred until immediately before cutover**, so the live site stays deployable to Pages (used twice on 2026-09-13 already). See the Pages-compatibility note below |
+| 8 / 9 — cutover, follow-ups | **`CUTOVER-RUNBOOK.md` written** — supersedes the cutover section below. `install-services.ps1` written (NSSM, discovers the Postgres service name, keeps secrets out of the registry) |
 
 ### The core premise is proven
 `/api/marketplace` returns real production listings through the chain
