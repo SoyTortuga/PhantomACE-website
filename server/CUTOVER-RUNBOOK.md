@@ -63,10 +63,14 @@ node server\scripts\verify-migration.js <outside-repo>\cutover.ndjson --database
 Must exit 0. **Everything up to here is fully reversible; nothing public has changed.**
 
 ### 4. Start the production service
+From an **elevated** PowerShell (it installs a service):
 ```
-.\server\scripts\install-services.ps1 -PostgresPassword '...' -Database 'phantomace-tv' -PublicOrigin 'https://phantomace.tv' -Port 8790 -ServiceName 'phantomace-web'
+.\server\scripts\install-services.ps1 -Database 'phantomace-tv' -PublicOrigin 'https://phantomace.tv' -Port 8790 -ServiceName 'phantomace-web'
 Start-Service phantomace-web
 ```
+No password is passed. The script reads `DATABASE_URL` from `server\.env` and
+swaps only the database name, so credentials never reach the command line —
+where they would persist in PowerShell history and process listings.
 Leave the dev service on 8789 running — `dev.phantomace.tv` keeps working.
 
 Smoke over localhost before any public change:

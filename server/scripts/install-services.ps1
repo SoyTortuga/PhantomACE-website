@@ -1,8 +1,15 @@
 # ══════════════════════════════════════════════
 #  Install the PhantomACE web server as a Windows service.
 #
-#  Run from an ELEVATED PowerShell on the rig:
-#     .\server\scripts\install-services.ps1 -PostgresPassword '...'
+#  Run from an ELEVATED PowerShell on the rig.
+#
+#  Dev service (port 8789, dev database):
+#     .\server\scripts\install-services.ps1 `
+#        -Database 'phantomace-tv-dev' -PublicOrigin 'https://dev.phantomace.tv' `
+#        -Port 8789 -ServiceName 'phantomace-web-dev'
+#
+#  Production service (added at cutover, see server\CUTOVER-RUNBOOK.md):
+#     .\server\scripts\install-services.ps1
 #
 #  WHY NSSM RATHER THAN PM2
 #  pm2 is what the bot service's README documents, but `pm2 startup` does not
@@ -17,13 +24,18 @@
 #  with neither, the site is down after every reboot until someone notices.
 # ══════════════════════════════════════════════
 
+#  CREDENTIALS ARE NOT PASSED ON THE COMMAND LINE. The connection string is
+#  read from server\.env, and only the database NAME is swapped when targeting
+#  dev vs production. A password typed as a parameter would end up in
+#  PowerShell history, in process listings, and in any transcript of the
+#  session that ran it.
+
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string] $PostgresPassword,
-    [string] $Database    = 'phantomace-tv',
+    [string] $Database     = 'phantomace-tv',
     [string] $PublicOrigin = 'https://phantomace.tv',
-    [int]    $Port        = 8790,
-    [string] $ServiceName = 'phantomace-web'
+    [int]    $Port         = 8790,
+    [string] $ServiceName  = 'phantomace-web'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,6 +57,25 @@ $logDir    = Join-Path $serverDir 'logs'
 
 if (-not (Test-Path $entry)) { throw "Cannot find $entry" }
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+# ── Derive the connection string from server\.env ─────────────────────────
+# dotenv does not override variables already present in the environment, so
+# whatever we set on the service wins over the file. That is what lets one
+# .env serve both the dev and production services.
+$envFile = Join-Path $serverDir '.env'
+if (-not (Test-Path $envFile)) {
+    throw "server\.env not found. Copy server\.env.example and fill it in first."
+}
+$envLine = Select-String -Path $envFile -Pattern '^\s*DATABASE_URL\s*=' | Select-Object -First 1
+if (-not $envLine) { throw 'DATABASE_URL is not set in server\.env' }
+
+$databaseUrl = ($envLine.Line -replace '^\s*DATABASE_URL\s*=\s*', '').Trim().Trim('"').Trim("'")
+# Swap only the database name; leave credentials and host untouched.
+$databaseUrl = $databaseUrl -replace '/[^/?]+(\?|$)', "/$Database`$1"
+
+# Redacted for display — never print the password back to the console.
+$shown = $databaseUrl -replace '://([^:]+):[^@]+@', '://$1:***@'
+Write-Host "[setup] database url: $shown"
 
 # ── nssm ──────────────────────────────────────────────────────────────────
 if (-not (Get-Command nssm -ErrorAction SilentlyContinue)) {
@@ -98,7 +129,7 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
 $envBlock = @(
     "PORT=$Port",
     "PUBLIC_ORIGIN=$PublicOrigin",
-    "DATABASE_URL=postgres://postgres:$PostgresPassword@localhost:5432/$Database"
+    "DATABASE_URL=$databaseUrl"
 ) -join "`r`n"
 & $nssm set $ServiceName AppEnvironmentExtra $envBlock
 
