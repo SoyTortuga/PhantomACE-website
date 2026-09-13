@@ -6,6 +6,7 @@
      node server/scripts/mint-egg-codes.js --rarity rare --count 3
      node server/scripts/mint-egg-codes.js --rarity rare --count 3 --confirm
      node server/scripts/mint-egg-codes.js --rarity mythic --count 2 --mutation --confirm
+     node server/scripts/mint-egg-codes.js --rarity rare --count 3 --broadcaster --confirm
      node server/scripts/mint-egg-codes.js --rarity rare --count 3 --restrict 53418405,77379157 --confirm
 
    Dry run unless --confirm. Refuses any database but phantomace-tv.
@@ -64,6 +65,20 @@ async function main() {
 
   const restrictedTo = String(restrictRaw || '')
     .split(',').map(s => s.trim()).filter(Boolean);
+
+  /* --broadcaster is sugar for "restrict to me". The id comes from the env
+     the server already trusts for this, so nobody has to look it up and
+     retype it — a typo here does not fail loudly, it just mints codes locked
+     to a stranger. */
+  if (arg('broadcaster') === true) {
+    const id = process.env.TWITCH_BROADCASTER_ID;
+    if (!id) {
+      console.error('[mint] --broadcaster needs TWITCH_BROADCASTER_ID in server/.env');
+      process.exit(2);
+    }
+    if (!restrictedTo.includes(id)) restrictedTo.push(id);
+  }
+
   const badIds = restrictedTo.filter(id => !/^\d+$/.test(id));
   if (badIds.length) {
     console.error(`[mint] --restrict takes numeric Twitch user IDs. Not numeric: ${badIds.join(', ')}`);
