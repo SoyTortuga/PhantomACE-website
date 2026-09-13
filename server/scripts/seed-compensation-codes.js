@@ -23,7 +23,16 @@
    whatever the redemption code expects.
    ══════════════════════════════════════════════ */
 
-import 'dotenv/config';
+/* dotenv resolves .env against process.cwd(), so `import 'dotenv/config'`
+   silently finds nothing when this is run from the repo root rather than
+   from server/ — which is what happened the first time it was used, and it
+   surfaced as the unhelpful "No DATABASE_URL". Resolve the path from the
+   script's own location so it works from any directory. */
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env') });
+
 import { createPool, waitForDatabase } from '../lib/db.js';
 import { createKVStore } from '../lib/kv.js';
 import { createItemCode, activateItemCode } from '../../functions/api/item-codes.js';
