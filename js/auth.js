@@ -68,6 +68,7 @@ function applyRole() {
     if (userInfo) userInfo.style.display = 'flex';
     if (userName) userName.textContent = session.display_name;
     if (menuName) menuName.textContent = session.display_name;
+    renderRoleBadge(session.role);
     if (userAvatar && session.profile_image) {
       userAvatar.src = session.profile_image;
       userAvatar.alt = session.display_name;
@@ -81,6 +82,74 @@ function applyRole() {
   } else {
     if (loginBtn) loginBtn.style.display = '';
     if (userInfo) userInfo.style.display = 'none';
+  }
+}
+
+/* ── Role indicator ────────────────────────────────────────────────
+   Exists because there was no way for anyone to see what the site thought
+   they were. A subscriber silently demoted to visitor noticed only because
+   their Dino Park incubator slots dropped from 6 to 3 — the role itself was
+   invisible, so the symptom showed up somewhere unrelated and confusing. */
+
+const ROLE_LABELS = {
+  broadcaster: 'Broadcaster',
+  moderator:   'Moderator',
+  sub_tier3:   'Tier 3 Subscriber',
+  sub_tier2:   'Tier 2 Subscriber',
+  sub_tier1:   'Tier 1 Subscriber',
+  follower:    'Follower',
+  visitor:     'Visitor',
+};
+
+function renderRoleBadge(role) {
+  const badge = document.getElementById('accountRoleBadge');
+  if (!badge) return;
+  const key = ROLE_LABELS[role] ? role : 'visitor';
+  badge.textContent = ROLE_LABELS[key];
+  /* data-role, NOT a role-* class: roles.css owns that namespace for
+     showing/hiding content by role, and a .role-sub_tier1 class here made
+     the badge hide itself. */
+  badge.setAttribute('data-role', key);
+}
+
+async function refreshMyRole() {
+  const msg = document.getElementById('accountRoleMsg');
+  const btn = document.getElementById('accountRoleRefresh');
+  if (!msg) return;
+
+  if (btn) btn.disabled = true;
+  msg.className = 'account-role-msg';
+  msg.textContent = 'Checking with Twitch…';
+
+  try {
+    const res = await fetch('/api/auth/recheck-roles', { credentials: 'same-origin' });
+    const d = await res.json();
+
+    if (!res.ok) {
+      msg.className = 'account-role-msg err';
+      msg.textContent = d.error || 'Could not check right now.';
+      return;
+    }
+
+    renderRoleBadge(d.role);
+
+    /* Reported honestly rather than as a success. The endpoint currently
+       cannot verify anything — it holds an app token, which Twitch rejects
+       for the subscription and follow lookups — so claiming "up to date"
+       would be a lie, and a viewer chasing a missing perk deserves to know
+       the check did not actually happen. */
+    if (d.verified === false) {
+      msg.className = 'account-role-msg warn';
+      msg.textContent = 'Twitch check unavailable — showing your role as of last login. Log out and back in to refresh it.';
+    } else {
+      msg.className = 'account-role-msg ok';
+      msg.textContent = 'Up to date.';
+    }
+  } catch (e) {
+    msg.className = 'account-role-msg err';
+    msg.textContent = 'Network error — try again.';
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

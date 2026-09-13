@@ -405,6 +405,68 @@
   color: var(--text-pri);
 }
 
+/* Role indicator. Border-based, no box-shadow, per the design rules. */
+.account-menu-role {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-role-badge {
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-sec);
+}
+
+/* Each tier reads differently at a glance, so a demotion is noticeable
+   rather than something you only discover through a missing perk.
+
+   NOT named .role-<x>. That namespace belongs to the role-GATING system in
+   roles.css, which hides .role-sub_tier1 and friends unless body[data-role]
+   matches — so the badge styled itself and then hid itself. */
+.account-role-badge[data-role="broadcaster"] { color: var(--red); border-color: var(--red); }
+.account-role-badge[data-role="moderator"]   { color: #2ecc71; border-color: #2ecc71; }
+.account-role-badge[data-role="sub_tier3"],
+.account-role-badge[data-role="sub_tier2"],
+.account-role-badge[data-role="sub_tier1"]   { color: #9b59b6; border-color: #9b59b6; }
+.account-role-badge[data-role="follower"]    { color: #3498db; border-color: #3498db; }
+
+.account-role-refresh {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-system);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.account-role-refresh:hover:not(:disabled) { color: var(--text-pri); }
+.account-role-refresh:disabled { opacity: 0.5; cursor: default; }
+
+.account-role-msg:not(:empty) {
+  padding: 0 16px 10px;
+  font-family: var(--font-system);
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+
+.account-role-msg.ok   { color: #2ecc71; }
+.account-role-msg.warn { color: #f39c12; }
+.account-role-msg.err  { color: var(--red); }
+
 .account-menu-item {
   display: flex;
   align-items: center;

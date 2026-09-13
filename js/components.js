@@ -66,6 +66,12 @@ document.addEventListener('DOMContentLoaded', () => {
               </button>
               <div class="account-menu" id="accountMenu">
                 <div class="account-menu-header" id="accountMenuName"></div>
+                <div class="account-menu-role" id="accountMenuRole">
+                  <span class="account-role-badge" id="accountRoleBadge">—</span>
+                  <button class="account-role-refresh" id="accountRoleRefresh"
+                          onclick="refreshMyRole()" title="Re-check with Twitch">Refresh</button>
+                </div>
+                <div class="account-role-msg" id="accountRoleMsg"></div>
                 <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Profile <span class="account-menu-soon">Soon</span></a>
                 <a href="/redeem.html" class="account-menu-item">Redeems</a>
                 <a href="/inventory.html" class="account-menu-item">Inventory</a>
