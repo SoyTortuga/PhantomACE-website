@@ -2,11 +2,28 @@ const AUTH_COOKIE = 'pham_session';
 
 const ROLES = ['visitor', 'follower', 'sub_tier1', 'sub_tier2', 'sub_tier3', 'moderator', 'broadcaster'];
 
+/* The cookie is `<base64url(json)>.<signature>`. The payload is deliberately
+   readable — this file needs the display name, avatar and role to render the
+   header without an extra round trip on every page load.
+
+   Reading it here is NOT a security check and never was. The signature is
+   verified server-side on every request, so editing the payload in a browser
+   changes what YOUR header looks like and nothing else: the server will
+   reject the altered cookie and treat the request as logged out. Do not add
+   a signature check here — it would be checking a value the client controls
+   against a secret the client must not have. */
 function getSession() {
   const match = document.cookie.match(new RegExp(`(?:^|; )${AUTH_COOKIE}=([^;]*)`));
   if (!match) return null;
   try {
-    return JSON.parse(decodeURIComponent(match[1]));
+    const raw = decodeURIComponent(match[1]);
+    const dot = raw.lastIndexOf('.');
+    if (dot <= 0) return null;               // unsigned/legacy — server rejects it too
+
+    const b64 = raw.slice(0, dot).replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '==='.slice((b64.length + 3) % 4);
+    const bytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return null;
   }

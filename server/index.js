@@ -21,6 +21,7 @@ import send from 'send';
 import 'dotenv/config';
 
 import { toWebRequest, writeWebResponse, isHostAllowed } from './adapter.js';
+import { verifySession, readCookie } from '../functions/api/auth/session-crypto.js';
 import { createStatic } from './static.js';
 import { buildRoutes, matchRoute } from './router.js';
 import { createPool, waitForDatabase } from './lib/db.js';
@@ -43,6 +44,11 @@ const REQUIRED_SECRETS = [
   'TWITCH_EVENTSUB_SECRET',
   'TWITCH_BROADCASTER_ID',
   'BOT_SERVICE_SECRET',
+  /* Without this nothing can verify a session signature, so every request
+     would arrive looking logged out — including the broadcaster's. Refusing
+     to boot is far better than serving a site where nobody can log in and
+     the reason is invisible. */
+  'SESSION_SECRET',
 ];
 
 const ALLOWED_HOSTS = new Set([
@@ -146,6 +152,37 @@ async function main() {
 
       const url = new URL(PUBLIC_ORIGIN + (req.url || '/'));
       const method = (req.method || 'GET').toUpperCase();
+
+      /* ── THE SESSION GATE ────────────────────────────────────────────
+         Every request passes through here, so this is the one place a
+         session is verified. The 23 getSession() copies scattered across
+         functions/ are left exactly as they are: they parse plain JSON,
+         and by the time they run the header either holds a session whose
+         signature checked out, or holds nothing at all.
+
+         Verifying inside those 23 copies instead would mean 23 chances to
+         miss one, and one miss is a total bypass. This cannot be missed.
+
+         An invalid or forged cookie is STRIPPED rather than rejected with
+         an error: the request simply proceeds as logged out, which is what
+         a tampered cookie deserves and keeps public pages working for
+         someone with stale cookie state. */
+      const rawCookie = readCookie(req.headers.cookie, 'pham_session');
+      if (rawCookie) {
+        const session = await verifySession(rawCookie, process.env.SESSION_SECRET);
+        if (session) {
+          /* Rewritten into the legacy plain form the handlers already
+             parse, so signing needed no changes across 23 files. */
+          req.headers.cookie = `pham_session=${encodeURIComponent(JSON.stringify(session))}`;
+        } else {
+          const others = String(req.headers.cookie || '')
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => s && !s.startsWith('pham_session='));
+          req.headers.cookie = others.join('; ');
+          console.warn(`[auth] rejected an unverifiable session cookie on ${url.pathname}`);
+        }
+      }
 
       /* Not a file under functions/ — this server is a single point of
          failure in a way Cloudflare Pages never was, so it needs something

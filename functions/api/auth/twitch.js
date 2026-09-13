@@ -136,7 +136,10 @@ export async function onRequestGet(context) {
       subExpiresAt,
     };
 
-    const cookieValue = encodeURIComponent(JSON.stringify(session));
+    /* Signed, so it cannot be edited in a browser. See session-crypto.js —
+       the payload stays readable for the frontend; only forgery is closed. */
+    const { signSession } = await import('./session-crypto.js');
+    const cookieValue = await signSession(session, env.SESSION_SECRET);
     const isSecure = url.protocol === 'https:';
     const flags = [
       `Path=/`,

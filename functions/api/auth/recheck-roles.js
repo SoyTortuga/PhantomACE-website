@@ -77,7 +77,12 @@ export async function onRequestGet(context) {
 
     const updatedSession = { ...session, role };
     const url = new URL(request.url);
-    const cookieValue = encodeURIComponent(JSON.stringify(updatedSession));
+    /* Must sign, exactly as the login flow does. An unsigned cookie issued
+       here would be rejected by the server's session gate on the very next
+       request, silently logging the user out the moment their roles were
+       refreshed — the opposite of what this endpoint is for. */
+    const { signSession } = await import('./session-crypto.js');
+    const cookieValue = await signSession(updatedSession, env.SESSION_SECRET);
     const isSecure = url.protocol === 'https:';
     const flags = ['Path=/', 'Max-Age=86400', 'SameSite=Lax'];
     if (isSecure) flags.push('Secure');
