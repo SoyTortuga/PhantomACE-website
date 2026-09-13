@@ -71,6 +71,18 @@ Start-Service phantomace-web
 No password is passed. The script reads `DATABASE_URL` from `server\.env` and
 swaps only the database name, so credentials never reach the command line —
 where they would persist in PowerShell history and process listings.
+
+**Wait for the `[setup] verified:` line.** The script reads its configuration
+back out of NSSM and refuses to leave a broken service installed. This is not
+ceremony: the dev install reported success at every step while producing a
+service that could not start at all, and the failure only surfaced later at
+`Start-Service`, looking like a different problem.
+
+If it does crash-loop, `Get-Service` reports **`Paused`**, not `Stopped`, and
+the reason is only ever in `server\logs\server.out.log`. `Stop-Service` quiets
+it. This exact procedure has now been run and proven on dev, including an
+unattended reboot — production is a repeat of a known-good sequence, not a
+first attempt.
 Leave the dev service on 8789 running — `dev.phantomace.tv` keeps working.
 
 Smoke over localhost before any public change:

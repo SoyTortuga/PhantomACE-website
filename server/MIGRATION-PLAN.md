@@ -10,9 +10,44 @@
 | 3 — adapter, router, static | **Done and verified.** 18/18 URL behaviours identical to production Cloudflare, 0 mismatches, plus 3 deliberate blocks. 31 routes mounted. Full static site serves |
 | 4 — schema | **SQL written** (`sql/001_schema.sql`), not yet applied anywhere |
 | 5 — migration rehearsal | **DONE on the rig.** Schema applied cleanly to `phantomace-tv-dev` (17 tables, no fixes needed). dump/load/verify run twice, identical: 46/46 distinct keys, 0 unmapped, 45 values matched (46 minus `market_index`, discarded by design), verify exited 0 |
-| 6 — validate on dev.phantomace.tv | **DONE.** Login proven end-to-end (callback reaches dev, return_to round-trip correct, `Secure`/`SameSite=Lax`/`Path=/` confirmed over HTTP). Room games incl. lazy round-advance and expiry. HEAD fixed. Read-only smoke over migrated data. `dev.phantomace.tv` is now served by the Node server off Postgres, not Pages. `/api/health` → `ok:true`. `/api/marketplace` → the 14 real listings, byte-identical local and via tunnel. `/_private/giveaway-codes/…` → 404 confirmed through the public URL. Login end-to-end pending |
+| 6 — validate on dev.phantomace.tv | **DONE.** Login proven end-to-end (callback reaches dev, return_to round-trip correct, `Secure`/`SameSite=Lax`/`Path=/` confirmed over HTTP). Room games incl. lazy round-advance and expiry. HEAD fixed. Read-only smoke over migrated data. `dev.phantomace.tv` is now served by the Node server off Postgres, not Pages. `/api/health` → `ok:true`. `/api/marketplace` → the 14 real listings, byte-identical local and via tunnel. `/_private/giveaway-codes/…` → 404 confirmed through the public URL |
+| Process supervision | **DONE and proven by a real reboot.** `phantomace-web-dev` runs under NSSM and came back unattended — see "Reboot survival" below |
 | 7 — Postgres-native rewrites | **Deliberately deferred until immediately before cutover**, so the live site stays deployable to Pages (used twice on 2026-09-13 already). See the Pages-compatibility note below |
-| 8 / 9 — cutover, follow-ups | **`CUTOVER-RUNBOOK.md` written** — supersedes the cutover section below. `install-services.ps1` written (NSSM, discovers the Postgres service name, keeps secrets out of the registry) |
+| 8 / 9 — cutover, follow-ups | **`CUTOVER-RUNBOOK.md` written** — supersedes the cutover section below. Everything before Phase 7 is now complete; cutover is a scheduled, owner-initiated event |
+
+### Reboot survival — PROVEN, 2026-09-12
+The rig was rebooted and `https://dev.phantomace.tv/api/health` answered
+`{"ok":true,"database":"up"}` **without anyone logging into the machine** — the
+strict form of the test, checked from a different device with the rig sitting at
+its login screen. No manual intervention at any point. First successful request
+roughly 10–15 seconds after boot.
+
+**Postgres was ready before the server needed it**: zero `[db] not ready` lines
+in the fresh boot log, so `DependOnService` alone was sufficient and the retry
+loop in `lib/db.js` did not run.
+
+**Keep the retry loop anyway.** That is one data point from one fast, lightly
+loaded boot. `DependOnService` guarantees start *ordering*, not *readiness* —
+Windows considers a service started as soon as it reports running, which for
+Postgres precedes accepting connections. A slower boot (Windows Update, a
+larger WAL replay) can still open that gap, and the failure mode without the
+loop is a crash-looping web server after an unattended 3am reboot. Belt and
+braces here costs nothing and the evidence does not argue against it.
+
+**Two findings from the install, both now fixed in the script:**
+- NSSM does not quote the parameters string when building the service command
+  line, so the absolute path split at the space in `...\PhantomACE Website` and
+  node crash-looped with `MODULE_NOT_FOUND`. The script now passes a bare
+  `index.js` resolved against `AppDirectory`. Spaces in single-value settings
+  (`AppDirectory`, `AppStdout`) are fine — only the parameters string is affected.
+- Every `nssm set` reported success while producing an unstartable service. The
+  script now reads the stored configuration back, asserts it, and **removes the
+  service** on mismatch rather than leaving an auto-start service to crash-loop
+  at the next boot.
+
+A crash-looping NSSM service reports `Status: Paused`, not `Stopped`, and the
+reason is only ever in `server.out.log`. Rotate that log before any reboot test
+or the two boots' output interleave.
 
 ### The core premise is proven
 `/api/marketplace` returns real production listings through the chain
@@ -33,15 +68,16 @@ Production still runs on Pages until cutover, so pick one deliberately:
 Option (b) keeps the ability to ship hotfixes to the live site; option (a) gets
 the concurrency fixes finished sooner. Decide before writing Phase 7 code.
 
-**Next task, and it belongs to the rig** (the dev machine has no Postgres):
+**Next task: none that is not owner-initiated.** Everything that can be built
+and proven ahead of time is done. What remains, in order:
 
-1. `psql ... -d phantomace-tv-dev -f server/sql/001_schema.sql`
-2. Exercise `lib/kv.js` against it with fixtures. **Test the string-vs-json
-   `get()` distinction first** — `get(key)` must return a JSON *string* and
-   `get(key,'json')` an object. All five bingo files, the `gc_ptr_*` cursor
-   reads and `twitch_bot_user_id` depend on it, so a mistake there breaks
-   several things simultaneously and confusingly.
-3. Then a dump/load/verify rehearsal into `phantomace-tv-dev`.
+1. **Phase 7**, immediately before cutover — see the sequencing constraint above.
+   It is the last code change, and it makes the repo undeployable to Pages.
+2. **Phase 8**, following `CUTOVER-RUNBOOK.md`. Off-stream, announced, with an
+   abort time written down before starting.
+
+Do not start Phase 7 speculatively. Its whole value is being deferred: the
+moment it lands, the ability to hotfix the live site on Pages is gone.
 
 **Note on production data:** it is growing. A dump on 2026-09-12 found 35
 keys; a few hours later, 47 — including 8 `dino_park_*` saves that did not
