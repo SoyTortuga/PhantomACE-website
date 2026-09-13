@@ -124,9 +124,20 @@ export async function grantEgg(env, userId, rarity, opts = {}) {
   const speciesId = rollSpeciesId(rarity);
   if (!speciesId) return { success: false, error: 'Invalid rarity' };
 
-  const egg = { speciesId, hatchTime: HATCH_TIMES[rarity], elapsed: 0 };
+  /* grantId identifies this specific grant so a client can tell an egg it
+     has never seen from one it already has, and merge without duplicating.
+     grantSeq is the optimistic-concurrency token: onRequestPost refuses any
+     save carrying an older value. Together they are what stops the client's
+     next full-state POST from destroying this egg. */
+  const egg = {
+    speciesId,
+    hatchTime: HATCH_TIMES[rarity],
+    elapsed: 0,
+    grantId: crypto.randomUUID(),
+  };
   if (opts.guaranteedMutation) egg.guaranteedMutation = true;
   state.eggs.push(egg);
+  state.grantSeq = Number(state.grantSeq || 0) + 1;
   state.lastTick = Date.now();
 
   const updated = { userId, state, savedAt: Date.now() };
@@ -167,6 +178,33 @@ export async function onRequestPost(context) {
 
   if (!body || typeof body.state !== 'object' || body.state === null) {
     return json({ error: 'Missing state' }, 400);
+  }
+
+  /* ── The save is a wholesale replace, so it must be refused when the
+        client has not seen the latest grant. ────────────────────────────
+
+     The client POSTs its ENTIRE state every 20 seconds. grantEgg writes
+     directly to the same record. So a player who had the game open while
+     redeeming a code used to lose the egg: the next save overwrote it with
+     state captured before the grant, and they saw a success toast and no
+     egg. Nothing detected it, because a blind PUT cannot.
+
+     grantSeq lives inside the state document, so the client round-trips it
+     for free. If the stored value is ahead, this save predates a grant —
+     reject it and hand back the current state so the client can merge the
+     egg in and retry. Rejecting costs at most the few seconds of progress
+     in that one request; accepting costs the reward. */
+  const existing = await env.MARKETPLACE.get(saveKey(session.user_id), 'json');
+  const storedSeq = Number((existing && existing.state && existing.state.grantSeq) || 0);
+  const incomingSeq = Number(body.state.grantSeq || 0);
+
+  if (storedSeq > incomingSeq) {
+    return json({
+      error: 'stale',
+      reason: 'A reward was granted since this save was taken.',
+      grantSeq: storedSeq,
+      state: existing.state,
+    }, 409);
   }
 
   const record = { userId: session.user_id, state: body.state, savedAt: Date.now() };

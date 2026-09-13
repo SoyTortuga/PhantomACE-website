@@ -3144,17 +3144,60 @@ function scheduleServerSave() {
   }
 }
 
-async function doServerSave() {
+/* Pull in eggs the server granted that this client has never seen, without
+   duplicating ones it already has. Matching on grantId rather than position
+   or species is what makes it safe to run repeatedly.
+
+   A granted egg can push the incubator one over its slot count — the server
+   granted against its own view, which may differ from ours. That is
+   deliberate and harmless: renderIncubator pads up to the slot count and
+   renders whatever is there, and a brief overflow is a far better outcome
+   than silently dropping a reward. */
+function adoptServerGrants(serverState) {
+  if (!serverState || typeof serverState !== 'object') return 0;
+  if (!Array.isArray(state.eggs)) state.eggs = [];
+
+  const known = new Set(state.eggs.map(e => e && e.grantId).filter(Boolean));
+  const missing = (serverState.eggs || []).filter(e => e && e.grantId && !known.has(e.grantId));
+  for (const e of missing) state.eggs.push(e);
+
+  state.grantSeq = Number(serverState.grantSeq || 0);
+  return missing.length;
+}
+
+async function doServerSave(isRetry) {
   lastServerSaveAt = Date.now();
   try {
-    await fetch(CLOUD_SAVE_URL, {
+    const res = await fetch(CLOUD_SAVE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),
     });
+
+    /* 409 means a reward landed after this state was captured. Merge it in
+       and save again — once only, so a persistent disagreement cannot turn
+       into a request loop. */
+    if (res.status === 409 && !isRetry) {
+      let payload = null;
+      try { payload = await res.json(); } catch(e) {}
+      const added = adoptServerGrants(payload && payload.state);
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
+      if (added > 0) {
+        updateTopBar();
+        renderEggsTab();
+        showToast(added === 1 ? 'A new egg arrived in your incubator! 🥚' : `${added} new eggs arrived! 🥚`);
+      }
+      await doServerSave(true);
+    }
   } catch(e) {}
 }
 
+/* Fired on pagehide/visibilitychange. sendBeacon cannot read a response, so
+   this path cannot honour a 409 — if a grant landed since the last sync, the
+   server rejects this final save and the last few seconds of progress are
+   lost. That is the right way round: the alternative is accepting it and
+   destroying the granted egg. The next load re-reads the server state and
+   picks the egg up. */
 function flushServerSave() {
   if (!getPlayerSession()) return;
   try {
