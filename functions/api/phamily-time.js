@@ -86,13 +86,20 @@ async function isChannelLive(env) {
        issued — so ordinary traffic here was silently revoking the token the
        bot setup relied on, surfacing as "Invalid OAuth token" on an unrelated
        admin page. See functions/api/auth/app-token.js. */
-    const { getAppToken } = await import('./auth/app-token.js');
-    const access_token = await getAppToken(env);
-    if (!access_token) return false;
-
-    const streamRes = await fetch('https://api.twitch.tv/helix/streams?user_login=phantomace', {
-      headers: { Authorization: `Bearer ${access_token}`, 'Client-Id': clientId },
-    });
+    /* withAppToken, NOT getAppToken. The wrapper refreshes once on a 401 and
+       retries, which is what makes a revoked token self-heal on ordinary
+       traffic. Calling getAppToken directly returns a cached token forever
+       while it is unexpired — a token Twitch has already revoked looks
+       perfectly valid by its own metadata, so nothing on this path would ever
+       discover it was dead. That is exactly what happened: this endpoint
+       returned {"live":false,"error":"Stream request failed: 401"} on every
+       poll, with HTTP 200, so it failed silently and indefinitely. */
+    const { withAppToken } = await import('./auth/app-token.js');
+    const streamRes = await withAppToken(env, (token) => fetch(
+      'https://api.twitch.tv/helix/streams?user_login=phantomace',
+      { headers: { Authorization: `Bearer ${token}`, 'Client-Id': clientId } }
+    ));
+    if (!streamRes) return false;
     if (!streamRes.ok) return false;
     const { data } = await streamRes.json();
     const live = !!(data && data.length > 0);

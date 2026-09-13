@@ -27,6 +27,13 @@ export async function onRequestGet(context) {
        issued — so ordinary traffic here was silently revoking the token the
        bot setup relied on, surfacing as "Invalid OAuth token" on an unrelated
        admin page. See functions/api/auth/app-token.js. */
+    /* getAppToken, not withAppToken: this handler makes several Helix calls
+       with one token, so a per-call retry would be awkward. It does not need
+       one. twitch-status.js is polled by every page load and uses
+       withAppToken, so a revoked token is discovered and replaced in the
+       SHARED cache within seconds — long before a low-traffic endpoint like
+       this one would notice. Stating that dependency explicitly, because it
+       is the reason this is safe rather than an oversight. */
     const { getAppToken } = await import('./app-token.js');
     const access_token = await getAppToken(env);
     if (!access_token) throw new Error('Could not get an app access token');
