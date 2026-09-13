@@ -72,9 +72,48 @@ async function showSetupPage(env, url) {
   const subStatus = subs && subs.length > 0
     ? `✅ ${subs.length} EventSub subscription(s) active`
     : '❌ No EventSub subscriptions — create below';
-  const broadcasterStatus = broadcasterRefresh
-    ? '✅ Channel points management authorized'
-    : '❌ Not authorized — needed to toggle the giveaway reward on/off';
+  /* ── WHY THIS CHECKS SCOPES AND NOT JUST "IS THERE A TOKEN" ──────────
+     It used to say "✅ Channel points management authorized" whenever a
+     refresh token existed, regardless of what that token could actually do.
+     When channel:read:hype_train was added, the broadcaster opened this page,
+     saw a green tick against Step 2, reasonably skipped it, and pressed
+     Create Subscriptions — which failed with 403 "subscription missing proper
+     authorization" on all three hype train types. The page had told them a
+     step was done when the thing it needed to grant had never been granted.
+
+     A status line that reports the presence of a credential rather than its
+     adequacy is worse than no status line: it actively directs someone past
+     the step they need. So ask Twitch what the token can really do. */
+  const REQUIRED_BROADCASTER_SCOPES = [
+    'channel:manage:redemptions',
+    'channel:read:hype_train',
+    'channel:read:subscriptions',
+  ];
+
+  let broadcasterStatus;
+  let missingScopes = [];
+  if (!broadcasterRefresh) {
+    broadcasterStatus = '❌ Not authorized — needed for the giveaway reward and hype train events';
+  } else {
+    const stored = await env.MARKETPLACE.get('twitch_broadcaster_token', 'json');
+    const token = stored && (stored.access_token || stored.token);
+    let granted = null;
+    try {
+      const vr = await fetch('https://id.twitch.tv/oauth2/validate', {
+        headers: { Authorization: 'OAuth ' + token },
+      });
+      if (vr.ok) granted = (await vr.json()).scopes || [];
+    } catch { /* reported as unknown below */ }
+
+    if (granted === null) {
+      broadcasterStatus = '⚠️ Authorization stored but Twitch rejected it — re-authorize below';
+    } else {
+      missingScopes = REQUIRED_BROADCASTER_SCOPES.filter(sc => !granted.includes(sc));
+      broadcasterStatus = missingScopes.length
+        ? `❌ RE-AUTHORIZATION REQUIRED — missing: ${escapeHtml(missingScopes.join(', '))}`
+        : `✅ Authorized with all ${REQUIRED_BROADCASTER_SCOPES.length} required permissions`;
+    }
+  }
   const giveawayRewardStatus = giveawayRewardId
     ? `✅ "Enter Giveaway" reward created (ID: ${giveawayRewardId})`
     : '❌ Not created yet';
@@ -469,6 +508,31 @@ async function createEventSubSubscriptions(env, request) {
   const origin = new URL(request.url).origin;
   const botUserId = env.TWITCH_BOT_USER_ID || await env.MARKETPLACE.get('twitch_bot_user_id');
   const giveawayRewardId = await env.MARKETPLACE.get('giveaway_reward_id');
+
+  /* Refuse rather than produce three identical 403s. Twitch rejects a hype
+     train subscription with "subscription missing proper authorization" when
+     the broadcaster has not granted channel:read:hype_train — a message that
+     says nothing about which step to go back to. Checking first turns three
+     red crosses into one sentence naming the button to press. */
+  {
+    const stored = await env.MARKETPLACE.get('twitch_broadcaster_token', 'json');
+    const bToken = stored && (stored.access_token || stored.token);
+    let granted = null;
+    try {
+      const vr = await fetch('https://id.twitch.tv/oauth2/validate', {
+        headers: { Authorization: 'OAuth ' + bToken },
+      });
+      if (vr.ok) granted = (await vr.json()).scopes || [];
+    } catch { /* handled below */ }
+
+    if (granted === null || !granted.includes('channel:read:hype_train')) {
+      return json({
+        error: 'Hype train events need channel:read:hype_train, which this channel has not granted.',
+        fix: 'Go back to Step 2 and click "Authorize Channel Points" again. Twitch will ask you to approve a NEW permission — approve it, then return here.',
+        grantedScopes: granted,
+      }, 409);
+    }
+  }
 
   const subscriptions = [
     /* HYPE TRAIN IS VERSION 2, not 1.
