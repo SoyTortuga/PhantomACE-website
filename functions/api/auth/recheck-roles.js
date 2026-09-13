@@ -36,12 +36,27 @@ export async function onRequestGet(context) {
 
     const headers = { 'Authorization': `Bearer ${access_token}`, 'Client-Id': clientId };
 
-    const broadcasterRes = await fetch(
-      `https://api.twitch.tv/helix/users?login=${TWITCH_CHANNEL}`, { headers }
-    );
-    const { data: broadcasters } = await broadcasterRes.json();
-    const broadcasterId = broadcasters[0]?.id;
+    /* Configuration, not a name lookup — same reasoning as the login flow.
+       A stale TWITCH_CHANNEL would silently check the wrong channel. */
+    let broadcasterId = env.TWITCH_BROADCASTER_ID || null;
+    if (!broadcasterId) {
+      const broadcasterRes = await fetch(
+        `https://api.twitch.tv/helix/users?login=${TWITCH_CHANNEL}`, { headers }
+      );
+      const { data: broadcasters } = await broadcasterRes.json();
+      broadcasterId = broadcasters[0]?.id || null;
+    }
     if (!broadcasterId) return json({ error: 'Channel not found' }, 500);
+
+    /* THE BROADCASTER IS NEVER RE-EVALUATED.
+       Twitch reports a broadcaster as tier 3000 on their own channel, so
+       running them through the subscription check below would "successfully"
+       determine that the broadcaster is a Tier 3 subscriber and demote them —
+       a verified result, and completely wrong. Their identity is fixed and
+       there is nothing to re-check. */
+    if (String(session.user_id) === String(broadcasterId)) {
+      return json({ role: 'broadcaster', subTier: 0, verified: true });
+    }
 
     /* ── WHY THIS STARTS FROM THE EXISTING ROLE ──────────────────────────
        It used to start at 'visitor' and write whatever it ended up with. The

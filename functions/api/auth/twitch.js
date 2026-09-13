@@ -78,19 +78,37 @@ export async function onRequestGet(context) {
     const { data: users } = await userRes.json();
     const user = users[0];
 
-    const broadcasterRes = await fetch(
-      `https://api.twitch.tv/helix/users?login=${TWITCH_CHANNEL}`,
-      { headers }
-    );
-    const { data: broadcasters } = await broadcasterRes.json();
-    const broadcasterId = broadcasters[0]?.id;
+    /* The channel's id comes from configuration, not from a name lookup.
+       Looking it up by TWITCH_CHANNEL meant that if that hardcoded name were
+       ever wrong or stale, every follow and subscription check would silently
+       run against a DIFFERENT channel and come back negative — with no error
+       anywhere to say so. The name lookup remains only as a fallback for a
+       missing env var. */
+    let broadcasterId = env.TWITCH_BROADCASTER_ID || null;
+    if (!broadcasterId) {
+      const broadcasterRes = await fetch(
+        `https://api.twitch.tv/helix/users?login=${TWITCH_CHANNEL}`,
+        { headers }
+      );
+      const { data: broadcasters } = await broadcasterRes.json();
+      broadcasterId = broadcasters[0]?.id || null;
+      console.warn('[auth] TWITCH_BROADCASTER_ID not set — fell back to a name lookup');
+    }
 
     let role = 'visitor';
     let followedAt = null;
     let subscribedAt = null;
     let subExpiresAt = null;
 
-    if (user.login.toLowerCase() === TWITCH_CHANNEL.toLowerCase()) {
+    /* Identify the broadcaster by ID, not by display/login name.
+       Comparing user.login against a hardcoded 'phantomace' meant that if the
+       account's login differed at all, the broadcaster fell through to the
+       subscriber checks — and Twitch reports a broadcaster as tier 3000 on
+       their own channel, so they were handed 'sub_tier3'. The badge said Tier
+       3 Subscriber and every broadcaster-only piece of UI hid itself, while
+       server-side authorisation (which already compared ids) still let them
+       through. A name is not an identity. */
+    if (broadcasterId && String(user.id) === String(broadcasterId)) {
       role = 'broadcaster';
     } else if (broadcasterId) {
       try {
