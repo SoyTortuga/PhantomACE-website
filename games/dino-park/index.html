@@ -997,6 +997,27 @@
 
 <script>
 const SAVE_KEY = 'pham_dino_park';
+
+/* SAVE_EPOCH — bump to force every player to start over.
+
+   A save whose epoch does not match this value is discarded on sight,
+   wherever it came from: localStorage, or the cloud.
+
+   WHY THIS EXISTS RATHER THAN JUST CLEARING THE SERVER. Deleting the
+   dino_park_* records would reset nobody. syncCloudSave() below treats
+   "no cloud save but a local one exists" as a returning player and
+   UPLOADS the local save — so a server-side wipe silently restores
+   itself from every player's browser the next time they open the game,
+   and looks like it worked right up until it doesn't.
+
+   MUST MATCH `SAVE_EPOCH` in functions/api/dino-park.js. The server
+   stamps it onto states it creates for redeemed eggs; if the two
+   disagree, the client discards a save the server just wrote and the
+   granted egg vanishes.
+
+   Epoch 2 — 2026-09-13, rebalance: full progression and economy reset. */
+const SAVE_EPOCH = 2;
+
 const CLOUD_SAVE_URL = '/api/dino-park';
 const SERVER_SAVE_INTERVAL_MS = 20000;
 const RARITY_ORDER = ['common','uncommon','rare','epic','legendary'];
@@ -3043,19 +3064,38 @@ function portraitImg(specId, size, cls, mutation) {
   const url = getPortrait(specId, size, mutation);
   return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
 }
-let state = { coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0, liveSecAccum: 0, lastDecayLiveSec: 0 };
+let state = { saveEpoch: SAVE_EPOCH, coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0, liveSecAccum: 0, lastDecayLiveSec: 0 };
 let isStreamLive = false;
 let wasStreamLive = false;
 
+/* A save from before the current SAVE_EPOCH. Treated as absent, not
+   upgraded — the point of an epoch bump is that the old progression is
+   deliberately void. Anything missing an epoch predates the mechanism
+   entirely and is therefore also stale. */
+function isStaleSave(s) {
+  return !s || typeof s !== 'object' || s.saveEpoch !== SAVE_EPOCH;
+}
+
+function discardLocalSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
+}
+
 function save() {
   state.lastTick = Date.now();
+  // Stamped on every write, never assumed — a state assembled by spreading
+  // over the defaults can otherwise lose it and read as stale on next load.
+  state.saveEpoch = SAVE_EPOCH;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
   if (getPlayerSession()) scheduleServerSave();
 }
 function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) { state = { ...state, ...JSON.parse(raw) }; applyOfflineDecay(); }
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (isStaleSave(parsed)) { discardLocalSave(); return; }
+    state = { ...state, ...parsed };
+    applyOfflineDecay();
   } catch(e) {}
 }
 
@@ -3116,13 +3156,44 @@ async function syncCloudSave() {
   const session = getPlayerSession();
   if (!session || !session.user_id) return;
 
+  /* Deliberately "a usable local save" rather than "any local save". A
+     pre-epoch save must not count as something worth migrating upward,
+     or the branch below would push it back into the cloud and undo the
+     reset for this player permanently. */
   let hasLocal = false;
-  try { hasLocal = !!localStorage.getItem(SAVE_KEY); } catch(e) {}
+  try {
+    const rawLocal = localStorage.getItem(SAVE_KEY);
+    if (rawLocal) {
+      if (isStaleSave(JSON.parse(rawLocal))) discardLocalSave();
+      else hasLocal = true;
+    }
+  } catch(e) { discardLocalSave(); }
 
   try {
     const res = await fetch(CLOUD_SAVE_URL);
     if (!res.ok) return;
     const data = await res.json();
+
+    if (data && data.hasSave && data.state && isStaleSave(data.state)) {
+      /* A pre-epoch cloud save. Overwrite it now with the fresh state
+         rather than merely ignoring it: otherwise it sits there being
+         re-read and re-discarded on every load, and any other device
+         still running an older build could pick it back up. */
+      discardLocalSave();
+      applySubTierFromSession(session);
+      lastServerSaveAt = Date.now();
+      try {
+        await fetch(CLOUD_SAVE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        });
+      } catch(e) {}
+      updateTopBar();
+      initParkView();
+      renderEggsTab();
+      return;
+    }
 
     if (data && data.hasSave && data.state) {
       state = { ...state, ...data.state };
@@ -3171,6 +3242,18 @@ function applyOfflineDecay() {
     state.liveSecAccum = 0;
     state.lastDecayLiveSec = 0;
     state.cooldowns = {};
+  }
+  // A stale save (an old cloud snapshot merged in over a newer local one, or
+  // vice versa) can reintroduce a cooldowns object from before liveSecAccum
+  // even while liveSecAccum itself stays at its current value, which the
+  // guard above won't catch. lastUse is always a past reading of the same
+  // ever-increasing liveSecAccum counter, so it can never legitimately
+  // exceed the current value — anything that does is stale/wrong-format
+  // and shows up as a wildly huge cooldown (e.g. "43,657,202h"). Drop those.
+  if (state.cooldowns) {
+    Object.keys(state.cooldowns).forEach(k => {
+      if (state.cooldowns[k] > state.liveSecAccum) delete state.cooldowns[k];
+    });
   }
   if (state.vault === undefined) {
     // First load under the active-park/vault split: the park used to hold
@@ -4548,7 +4631,7 @@ function renderEggSources() {
       <div class="egg-source-icon"><img src="${IC}baby_eggs/rare_dino_egg.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Broadcaster & Mod Drops</div>
-        <div class="egg-source-desc">Mods and PhantomACE drop exclusive egg codes during stream. Enter them above!</div>
+        <div class="egg-source-desc">Mods and PhantomACE drop exclusive egg codes during stream. Enter them below!</div>
       </div>
       <span class="egg-source-badge esbadge-waiting">Codes</span>
     </div>
@@ -4587,7 +4670,9 @@ function renderIncubator() {
       :`<div class="egg-timer">${fmtTime(rem)}</div>
         <div class="egg-progress"><div class="egg-progress-fill" style="width:${progress*100}%"></div></div>
         ${liveTag}
-        <button class="egg-speedup-btn" onclick="speedUpEgg(${i})" ${state.coins < EGG_SPEEDUP_COST ? 'disabled' : ''} title="Cut remaining time in half">⚡ ${EGG_SPEEDUP_COST}</button>`}
+        ${egg.speedUpUsed
+          ? '<div style="font-size:8px;color:#666;margin-top:4px;">Already sped up</div>'
+          : `<button class="egg-speedup-btn" onclick="speedUpEgg(${i})" ${state.coins < EGG_SPEEDUP_COST ? 'disabled' : ''} title="Cut remaining time in half — once per egg">⚡ ${EGG_SPEEDUP_COST}</button>`}`}
     </div>`);
   });
   while (slots.length < getMaxIncubatorSlots()) slots.push('<div class="egg-slot empty"><img src="'+IC+'baby_eggs/empty_egg_shell.png" width="32" height="32" style="image-rendering:pixelated;opacity:0.3;" alt=""><div style="margin-top:4px;">Empty Slot</div></div>');
@@ -4620,9 +4705,11 @@ function hatchEgg(idx) {
 function speedUpEgg(idx) {
   const egg = state.eggs[idx];
   if (!egg || egg.elapsed >= egg.hatchTime) return;
+  if (egg.speedUpUsed) { showToast('Already sped up — only once per egg.'); return; }
   if (state.coins < EGG_SPEEDUP_COST) { showToast(`Not enough coins (need ${EGG_SPEEDUP_COST}).`); return; }
   state.coins -= EGG_SPEEDUP_COST;
   egg.elapsed += (egg.hatchTime - egg.elapsed) / 2;
+  egg.speedUpUsed = true;
   save();
   updateTopBar();
   renderIncubator();

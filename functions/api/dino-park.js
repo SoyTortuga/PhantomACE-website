@@ -21,6 +21,17 @@ function saveKey(userId) {
   return `dino_park_${userId}`;
 }
 
+/* MUST MATCH `SAVE_EPOCH` in games/dino-park/index.html.
+
+   The client discards any save whose epoch differs, so this value is
+   stamped onto states created here — otherwise a player who redeems an
+   egg while having no save yet gets a state the client throws away on
+   sight, and the egg silently disappears.
+
+   Like ROSTER_BY_RARITY above, this is hand-synced because a Pages
+   Function cannot import from the game's inline <script>. */
+const SAVE_EPOCH = 2;
+
 /* ══════════════════════════════════════════════
    SPECIES ROSTER (by rarity) & HATCH TIMES
    Intentionally duplicated from games/dino-park/index.html's
@@ -61,6 +72,7 @@ function getMaxIncubatorSlots(state) {
    games/dino-park/index.html) for a player who has never synced. */
 function defaultState() {
   return {
+    saveEpoch: SAVE_EPOCH,
     coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [],
     discovered: [], discoveredMutations: [], cooldowns: {},
     lastTick: Date.now(), energy: 10, subTier: 0, debris: [],
@@ -84,7 +96,15 @@ export async function grantEgg(env, userId, rarity) {
 
   const key = saveKey(userId);
   const record = await env.MARKETPLACE.get(key, 'json');
-  const state = (record && record.state) ? record.state : defaultState();
+
+  /* A pre-epoch record is treated as no record at all. Pushing the egg
+     into a stale state would write a state the client discards on its
+     next load, taking the egg with it — the player redeems a code, sees
+     the success toast, and receives nothing. */
+  const existing = (record && record.state && record.state.saveEpoch === SAVE_EPOCH)
+    ? record.state
+    : null;
+  const state = existing || defaultState();
   if (!Array.isArray(state.eggs)) state.eggs = [];
 
   const maxSlots = getMaxIncubatorSlots(state);
