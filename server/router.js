@@ -102,13 +102,20 @@ export async function buildRoutes(functionsDir) {
  * @returns {{handler: Function, params: object}|null|'method-not-allowed'}
  */
 export function matchRoute({ routes, catchAll }, pathname, method) {
+  /* HEAD must work anywhere GET does — it's what uptime monitors, link
+     previewers and proxies use, and RFC 9110 defines it as GET without a
+     body. The handlers only export onRequestGet, so resolve HEAD against the
+     GET handler and let the caller drop the body. (Rejecting HEAD outright
+     was a real bug: every route 405'd for it.) */
+  const lookup = method === 'HEAD' ? 'GET' : method;
+
   const entry = routes.get(pathname);
   if (entry) {
-    const h = entry[method] || entry.ALL;
+    const h = entry[lookup] || entry.ALL;
     return h ? { handler: h, params: {} } : 'method-not-allowed';
   }
   if (catchAll && pathname.startsWith(catchAll.prefix)) {
-    const h = catchAll.handlers[method] || catchAll.handlers.ALL;
+    const h = catchAll.handlers[lookup] || catchAll.handlers.ALL;
     if (!h) return 'method-not-allowed';
     const rest = pathname.slice(catchAll.prefix.length);
     // The handler does params.path.join('/'), so it must be an array.

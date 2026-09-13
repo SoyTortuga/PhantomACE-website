@@ -68,6 +68,22 @@ const SECURITY_HEADERS = {
     already filtered by expires_at, so correctness never waits on this. */
 const REAP_INTERVAL_MS = 60_000;
 
+/* Access log. Cloudflare gave us request visibility for free; self-hosted,
+   there is none unless we write it. Without this you cannot answer basic
+   questions like "did the OAuth callback actually reach this server?" —
+   which is exactly the question that came up during login testing, where a
+   successful 302 produced no output at all.
+
+   Query strings are NOT logged verbatim: the OAuth callback carries ?code=,
+   a single-use authorization code, and logs get pasted into chat and issue
+   trackers. Only the parameter NAMES are recorded. */
+function logRequest(req, url, status, startedAt) {
+  const ms = Date.now() - startedAt;
+  const params = [...url.searchParams.keys()];
+  const q = params.length ? ` ?${params.join(',')}` : '';
+  console.log(`[req] ${String(status)} ${(req.method || 'GET').padEnd(4)} ${url.pathname}${q} ${ms}ms`);
+}
+
 function isPublicOrigin(origin) {
   return !/^https?:\/\/(127\.0\.0\.1|localhost)(:|$)/.test(origin);
 }
@@ -119,8 +135,10 @@ async function main() {
   }, REAP_INTERVAL_MS).unref();
 
   const server = http.createServer(async (req, res) => {
+    const started = Date.now();
     try {
       if (!isHostAllowed(req, ALLOWED_HOSTS)) {
+        console.warn(`[req] 421 rejected Host: ${req.headers.host}`);
         res.writeHead(421, { 'Content-Type': 'text/plain' });
         res.end('Misdirected Request');
         return;
@@ -141,6 +159,7 @@ async function main() {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         });
+        logRequest(req, url, dbOk ? 200 : 503, started);
         res.end(JSON.stringify({
           ok: dbOk,
           database: dbOk ? 'up' : 'unreachable',
@@ -155,11 +174,13 @@ async function main() {
       if (isApi) {
         const match = matchRoute(table, url.pathname, method);
         if (match === 'method-not-allowed') {
+          logRequest(req, url, 405, started);
           res.writeHead(405, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
           res.end(JSON.stringify({ error: 'Method not allowed' }));
           return;
         }
         if (!match) {
+          logRequest(req, url, 404, started);
           res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
           res.end(JSON.stringify({ error: 'Not found' }));
           return;
@@ -177,8 +198,9 @@ async function main() {
         if (!webRes || typeof webRes.status !== 'number') {
           throw new Error(`handler for ${url.pathname} did not return a Response`);
         }
-        const withNoStore = new Response(webRes.body, webRes);
+        const withNoStore = new Response(method === 'HEAD' ? null : webRes.body, webRes);
         withNoStore.headers.set('Cache-Control', 'no-store');
+        logRequest(req, url, withNoStore.status, started);
         await writeWebResponse(res, withNoStore);
         return;
       }
@@ -187,12 +209,14 @@ async function main() {
       const decision = statik.resolve(url.pathname, url.search);
 
       if (decision.kind === 'redirect') {
+        logRequest(req, url, decision.status, started);
         res.writeHead(decision.status, { Location: decision.location, ...SECURITY_HEADERS });
         res.end();
         return;
       }
 
       if (decision.kind === 'notfound') {
+        logRequest(req, url, 404, started);
         const notFoundPage = path.join(ROOT, '404.html');
         const headers = { ...SECURITY_HEADERS, 'Content-Type': 'text/html; charset=utf-8' };
         if (fs.existsSync(notFoundPage)) {
@@ -210,6 +234,8 @@ async function main() {
         extra['Content-Security-Policy'] = "frame-ancestors 'self'";
       }
       for (const [k, v] of Object.entries(extra)) res.setHeader(k, v);
+      logRequest(req, url, 200, started);
+      // `send` handles HEAD, conditional GETs and Range on its own.
       send(req, decision.relPath, { root: ROOT, dotfiles: 'deny', index: false }).pipe(res);
     } catch (err) {
       console.error('[request]', req.method, req.url, err);
