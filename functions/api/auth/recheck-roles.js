@@ -55,7 +55,30 @@ export async function onRequestGet(context) {
        a verified result, and completely wrong. Their identity is fixed and
        there is nothing to re-check. */
     if (String(session.user_id) === String(broadcasterId)) {
-      return json({ role: 'broadcaster', subTier: 0, verified: true });
+      /* AND WRITE IT BACK. Returning the right answer without reissuing the
+         cookie made Refresh useless for repairing a stale session: the badge
+         corrected itself to Broadcaster, then reverted to whatever the cookie
+         still said on the next page load, because the badge is rendered from
+         the cookie. Worse, the role-gated UI reads body[data-role] from that
+         same stale cookie, so the panel kept hiding itself while the server
+         would happily have allowed the request.
+
+         A "refresh my role" button that cannot actually change your role is
+         just a way to be told the truth once and then shown a lie. */
+      const corrected = { ...session, role: 'broadcaster' };
+      const { signSession } = await import('./session-crypto.js');
+      const cookieValue = await signSession(corrected, env.SESSION_SECRET);
+      const flags = ['Path=/', 'Max-Age=86400', 'SameSite=Lax'];
+      if (new URL(request.url).protocol === 'https:') flags.push('Secure');
+
+      return new Response(JSON.stringify({ role: 'broadcaster', subTier: 0, verified: true }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Set-Cookie': `${COOKIE_NAME}=${cookieValue}; ${flags.join('; ')}`,
+        },
+      });
     }
 
     /* ── WHY THIS STARTS FROM THE EXISTING ROLE ──────────────────────────

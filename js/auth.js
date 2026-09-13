@@ -133,6 +133,13 @@ async function refreshMyRole() {
 
     renderRoleBadge(d.role);
 
+    /* Re-apply the role to the document too, not just the badge. roles.css
+       shows and hides content via body[data-role], so updating only the badge
+       left the page still gated on the OLD role — the header would say
+       Broadcaster while the broadcaster-only panel stayed hidden, which reads
+       as "it says I have access and denies me anyway". */
+    if (d.role) document.body.dataset.role = d.role;
+
     /* Reported honestly rather than as a success. The endpoint currently
        cannot verify anything — it holds an app token, which Twitch rejects
        for the subscription and follow lookups — so claiming "up to date"
