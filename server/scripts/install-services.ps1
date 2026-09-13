@@ -105,7 +105,25 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
     Start-Sleep -Seconds 2
 }
 
-& $nssm install $ServiceName $node $entry
+# WHY THE SCRIPT NAME IS RELATIVE AND NOT $entry
+# `nssm install <name> <exe> <params>` stores everything after the exe as one
+# verbatim parameters string and does NOT quote it when building the service's
+# command line. The repo path on the rig is "...\PhantomACE Website" — it has a
+# space — so an absolute path here is split at that space: node receives
+# "C:\Users\EZiRLS8\Documents\PhantomACE", exits 1 with MODULE_NOT_FOUND, and
+# NSSM turns that into a crash loop that reports only as Status=Paused.
+#
+# Passing a bare "index.js" removes the space from the command line entirely,
+# so there is no quoting to get wrong. It resolves against AppDirectory, which
+# is already load-bearing for an unrelated reason — dotenv reads server\.env
+# from the working directory — so this relies on nothing new. If AppDirectory
+# were ever wrong the server could not read its secrets either.
+#
+# Note this is specific to the parameters string. Paths in single-value
+# settings (AppDirectory, AppStdout, AppStderr) are stored and used verbatim,
+# and spaces in those are fine — the crash-looping install still wrote its log
+# to "...\PhantomACE Website\server\logs\server.out.log" correctly.
+& $nssm install $ServiceName $node 'index.js'
 & $nssm set $ServiceName AppDirectory       $serverDir
 & $nssm set $ServiceName DisplayName        'PhantomACE Web Server'
 & $nssm set $ServiceName Description        'Serves phantomace.tv (static site + /api) backed by Postgres.'
@@ -133,6 +151,48 @@ $envBlock = @(
 ) -join "`r`n"
 & $nssm set $ServiceName AppEnvironmentExtra $envBlock
 
+# ── read back what NSSM actually stored ───────────────────────────────────
+# Every `nssm set` above reported success while the service it produced could
+# not start at all: the parameters string had been silently split at a space.
+# An installer that says "installed" and hands over a service that crash-loops
+# is worse than one that fails, because the failure surfaces later and looks
+# like a different problem. So assert on the stored values rather than on the
+# exit codes of the commands that wrote them.
+#
+# `nssm get` emits UTF-16, which arrives here with embedded NULs.
+function Get-NssmValue([string] $key) {
+    ((& $nssm get $ServiceName $key) -join '') -replace "`0", ''
+}
+
+$storedParams = (Get-NssmValue 'AppParameters').Trim()
+$storedDir    = (Get-NssmValue 'AppDirectory').Trim()
+$storedApp    = (Get-NssmValue 'Application').Trim()
+
+$failures = @()
+if ($storedParams -ne 'index.js') {
+    $failures += "AppParameters is '$storedParams', expected 'index.js'"
+}
+if ($storedDir -ne $serverDir) {
+    $failures += "AppDirectory is '$storedDir', expected '$serverDir'"
+}
+if (-not (Test-Path (Join-Path $storedDir 'index.js'))) {
+    $failures += "no index.js in '$storedDir'"
+}
+if (-not (Test-Path $storedApp)) {
+    $failures += "Application '$storedApp' does not exist"
+}
+
+if ($failures.Count) {
+    Write-Host ''
+    Write-Host '[setup] REFUSING TO LEAVE A BROKEN SERVICE INSTALLED:' -ForegroundColor Red
+    foreach ($f in $failures) { Write-Host "          $f" -ForegroundColor Red }
+    Write-Host ''
+    Write-Host '[setup] removing it again so nothing auto-starts at next boot.'
+    & $nssm remove $ServiceName confirm | Out-Null
+    throw 'Service configuration failed verification; the service was removed.'
+}
+Write-Host "[setup] verified: $storedApp index.js (in $storedDir)"
+
 Write-Host ''
 Write-Host "[setup] installed '$ServiceName'"
 Write-Host "        port      : $Port"
@@ -143,6 +203,11 @@ Write-Host ''
 Write-Host '[setup] NOT started automatically. Start it deliberately when ready:'
 Write-Host "          Start-Service $ServiceName"
 Write-Host "          Get-Content '$logDir\server.out.log' -Tail 20"
+Write-Host ''
+Write-Host '[setup] If it crash-loops, Status reads "Paused" rather than "Stopped"'
+Write-Host '        and NSSM keeps restarting it with escalating backoff. Quiet it'
+Write-Host "        with:  Stop-Service $ServiceName"
+Write-Host '        The reason is always in server.out.log, not in Get-Service.'
 Write-Host ''
 Write-Host '[setup] Reboot survival is the point of this script. Verify it by actually'
 Write-Host '        rebooting and confirming the site answers without anyone logging in.'
