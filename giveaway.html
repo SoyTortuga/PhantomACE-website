@@ -121,7 +121,7 @@
       <div class="step-card">
         <div class="step-num">2</div>
         <div class="step-title">Complete Actions</div>
-        <div class="step-desc">Earn extra entries by completing actions in the Gleam widget — follow socials, join Discord, share, and more.</div>
+        <div class="step-desc">Claim bonus codes dropped in chat during streams and hype trains. Each code is worth 2 to 50 entries and stays claimable for 5 minutes.</div>
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
@@ -142,8 +142,8 @@
     <div class="section-header">Rules</div>
     <ul class="rules-list">
       <li>Must be 18 years or older (or have parental consent) to enter.</li>
-      <li>One entry per person per method. Duplicate or fraudulent entries will be disqualified.</li>
-      <li>Winners are selected randomly via Gleam.io at the end of each month.</li>
+      <li>Each code can be claimed once per account. Entries accumulate across the whole month.</li>
+      <li>Winners are drawn at random at the end of each month, weighted by entry count — more entries means better odds.</li>
       <li>Winners will be announced live on stream and contacted via Twitch or Discord DM.</li>
       <li>Winners must respond within 48 hours or a new winner will be drawn.</li>
       <li>Prizes may vary month to month. Physical prizes ship to US addresses only unless otherwise stated.</li>
@@ -233,7 +233,7 @@
         setInterval(updateCountdown, 60000);
       }
 
-      loadGiveawayEntries();
+      loadEntryTracker();
     });
 
     /* ── Entry tracker ─────────────────────────────────────────────
@@ -242,7 +242,7 @@
        not signed in. */
     let entriesRefreshTimer = null;
 
-    async function loadGiveawayEntries() {
+    async function loadEntryTracker() {
       try {
         const res = await fetch('/api/giveaway-entries', { headers: { 'Accept': 'application/json' } });
         if (!res.ok) return;
@@ -310,7 +310,7 @@
           msg.className = 'entry-claim-msg ok';
           msg.textContent = `+${d.entries} entries! You now have ${d.total} this month.`;
           input.value = '';
-          loadGiveawayEntries();
+          loadEntryTracker();
         } else {
           msg.className = 'entry-claim-msg err';
           msg.textContent = d.error || 'Could not claim that code.';

@@ -48,7 +48,7 @@ function renderEntries(container) {
   let html = `
     <div class="entries-header">
       <span class="entries-total">${totalEntries} bonus entries</span>
-      <span class="entries-hint">Click a card to reveal your code, then paste it into the giveaway widget.</span>
+      <span class="entries-hint">Click a card to reveal your code, then claim it in the box above.</span>
     </div>
     <div class="entry-cards">`;
 
@@ -170,7 +170,7 @@ function renderDrops(drops) {
   var html = '<div class="hype-drops-header">' +
     '<span class="hype-drops-icon">🚂</span>' +
     '<span class="hype-drops-title">Hype Train Code Drops</span>' +
-    '<span class="hype-drops-hint">Grab a code and paste it into the giveaway widget above — they expire!</span>' +
+    '<span class="hype-drops-hint">Copy a code and claim it in the box above — 5 minutes each, one claim per account.</span>' +
     '</div><div class="hype-drops-grid">';
 
   for (var i = 0; i < active.length; i++) {
