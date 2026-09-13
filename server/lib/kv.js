@@ -46,6 +46,33 @@ function ttlToExpiresAt(ttlSeconds) {
 
 const NOT_EXPIRED = '(expires_at IS NULL OR expires_at > now())';
 
+/* Giveaway code pools, kept stocked automatically.
+
+   `low` is the point at which a top-up is triggered and is deliberately well
+   above the largest SINGLE drop for that tier — a level-5 hype train pulls
+   four commons at once, so a threshold of four would let a pool empty mid-drop
+   and hand out a partial batch. Refills go back up to `target`. */
+const GIVEAWAY_POOL = {
+  common:   { target: 100, low: 20 },   // 4 per level-5 drop
+  uncommon: { target: 50,  low: 15 },   // 3 per level-10 drop
+  rare:     { target: 20,  low: 10 },   // 2 per level-15 drop
+  mythic:   { target: 5,   low: 5 },    // 1 per level-20 drop; refills after one
+};
+
+/* Ambiguous characters are omitted — no 0/O, no 1/I/L. Viewers read these off
+   a fast-moving chat and type them into a box under time pressure, so a code
+   that can be misread costs someone their entry. 8 characters of a 31-symbol
+   alphabet is roughly 40 bits, and the UNIQUE(tier, code) constraint plus
+   ON CONFLICT DO NOTHING absorbs a collision rather than failing a refill. */
+const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+function mintGiveawayCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  let out = '';
+  for (const b of bytes) out += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  return out;
+}
+
 export function createKVStore(pool) {
   function mustResolve(key, op) {
     const target = resolveKey(key);
@@ -272,7 +299,7 @@ export function createKVStore(pool) {
    * Zero rows is exactly the old "pool exhausted" case, so callers keep
    * their existing null handling.
    */
-  async function pullGiveawayCode(tier) {
+  async function claimOneGiveawayCode(tier) {
     const { rows } = await pool.query(
       `UPDATE giveaway_codes SET claimed_at = now()
         WHERE id = (SELECT id FROM giveaway_codes
@@ -283,6 +310,98 @@ export function createKVStore(pool) {
       [tier]
     );
     return rows.length ? rows[0].code : null;
+  }
+
+  async function pullGiveawayCode(tier) {
+    let code = await claimOneGiveawayCode(tier);
+
+    if (!code) {
+      /* Pool exhausted. Refill and retry ONCE, synchronously.
+         This is the difference between a hype train working and a hype train
+         doing nothing whatsoever: hype-train.js returns early when it gets no
+         codes, without posting to chat, without a drop record and without a
+         log line. An empty pool used to make the entire feature silently
+         vanish, and the first anyone would know is a viewer asking why
+         nothing dropped. */
+      const added = await topUpGiveawayCodes(tier, true);
+      if (added) console.log(`[giveaway] ${tier} pool was empty — minted ${added}`);
+      code = await claimOneGiveawayCode(tier);
+      return code;
+    }
+
+    /* Running low: top up WITHOUT blocking the drop. A drop is on a live
+       stream and should not wait on housekeeping. */
+    topUpGiveawayCodes(tier).catch(err =>
+      console.error(`[giveaway] ${tier} top-up failed: ${err.message}`)
+    );
+    return code;
+  }
+
+  /**
+   * Keep a tier's pool stocked.
+   *
+   * @param {string} tier
+   * @param {boolean} [force] refill regardless of the low-water mark, used
+   *   when the pool has actually run dry.
+   * @returns {Promise<number>} how many codes were minted
+   */
+  async function topUpGiveawayCodes(tier, force = false) {
+    const cfg = GIVEAWAY_POOL[tier];
+    if (!cfg) return 0;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      /* Locked per tier so two simultaneous drops cannot both decide the pool
+         is low and each mint a full batch. */
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`giveaway_pool:${tier}`]);
+
+      const { rows } = await client.query(
+        `SELECT count(*)::int AS n FROM giveaway_codes
+          WHERE tier = $1 AND claimed_at IS NULL`, [tier]
+      );
+      const have = rows[0].n;
+      if (!force && have >= cfg.low) { await client.query('COMMIT'); return 0; }
+
+      const need = Math.max(0, cfg.target - have);
+      if (need === 0) { await client.query('COMMIT'); return 0; }
+
+      const codes = Array.from({ length: need }, () => mintGiveawayCode());
+      await client.query(
+        `INSERT INTO giveaway_codes (tier, code)
+         SELECT $1, unnest($2::text[])
+         ON CONFLICT (tier, code) DO NOTHING`,
+        [tier, codes]
+      );
+      await client.query('COMMIT');
+      return need;
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Current unclaimed count per tier, for the broadcaster's dashboard. */
+  async function giveawayPoolLevels() {
+    const { rows } = await pool.query(
+      `SELECT tier,
+              count(*) FILTER (WHERE claimed_at IS NULL)::int AS available,
+              count(*)::int AS total
+         FROM giveaway_codes GROUP BY tier`
+    );
+    const out = {};
+    for (const t of Object.keys(GIVEAWAY_POOL)) {
+      const row = rows.find(r => r.tier === t);
+      out[t] = {
+        available: row ? row.available : 0,
+        total: row ? row.total : 0,
+        target: GIVEAWAY_POOL[t].target,
+        low: GIVEAWAY_POOL[t].low,
+      };
+    }
+    return out;
   }
 
   /**
@@ -318,7 +437,7 @@ export function createKVStore(pool) {
   return {
     get, put, delete: del, list,
     mutate, listValues, claim, withLock,
-    pullGiveawayCode, claimMonthlyAward,
+    pullGiveawayCode, topUpGiveawayCodes, giveawayPoolLevels, claimMonthlyAward,
     reap,
   };
 }

@@ -74,6 +74,28 @@ the site down for real users rather than just failing quietly.
 `phantomace.tv/giveaway` should show four figures and, once signed in, a claim
 box instead of the login prompt.
 
+### 7b. Fill the giveaway code pools
+```
+node server\scripts\seed-giveaway-pools.js                 # dry run, shows current levels
+node server\scripts\seed-giveaway-pools.js --confirm
+```
+Run it against **production**. It prints a before/after table; expect
+100 / 50 / 20 / 5 available across common / uncommon / rare / mythic.
+
+This does not strictly require the restart — the script builds its own
+connection — but the AUTOMATIC top-up does, since that lives in the running
+server.
+
+Why it matters more than it looks: `hype-train.js` pulls codes and returns
+early if it gets none, without posting to chat, without a drop record and
+without a log line. An empty pool made a hype train do **nothing at all**,
+with no error anywhere. The pools have been empty since the migration.
+
+Do NOT seed from `_private/giveaway-codes/*.txt`. Those were publicly
+downloadable from the site until 2026-09-13 and must be considered burned.
+The script mints fresh codes and never prints them; a code is revealed only
+when it is dropped into chat.
+
 ### 8. Hand back to the broadcaster
 At `phantomace.tv/api/admin/bot-setup`, in order:
 1. **Authorize Channel Points Management** — Twitch prompts for the new hype
@@ -90,8 +112,6 @@ Want **six**, all `enabled`, all callbacks on `https://phantomace.tv`.
 
 ## Still outstanding after this
 
-- **Giveaway code pools are empty.** Every drop fails with "No codes left in
-  the … pool" until they are seeded. Owner approved 100/50/20/5 per tier.
 - **Moderator dashboard** — broadcaster-managed allowlist, now that a signed
   cookie makes an access check mean something.
 - Dev and production share `SESSION_SECRET` because they share `.env`. Fine
