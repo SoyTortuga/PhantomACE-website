@@ -43,18 +43,44 @@
       </div>
     </div>
 
-    <!-- Gleam.io Embed -->
-    <div class="gleam-embed" id="gleamEmbed">
-      <div class="gleam-placeholder" id="gleamPlaceholder">
-        <p>The giveaway widget will appear here once the monthly competition is set up.</p>
-        <p style="font-size: 11px; color: var(--text-dim);">Powered by Gleam.io</p>
+    <!-- Entry tracker. Replaced the Gleam embed, which was never configured
+         past a placeholder while drop messages sent viewers here to use it. -->
+    <div class="entry-tracker" id="entryTracker">
+      <div class="entry-stats">
+        <div class="entry-stat">
+          <div class="entry-stat-value" id="statYourEntries">—</div>
+          <div class="entry-stat-label">Your Entries</div>
+        </div>
+        <div class="entry-stat">
+          <div class="entry-stat-value" id="statTotalEntries">—</div>
+          <div class="entry-stat-label">Total Entries</div>
+        </div>
+        <div class="entry-stat">
+          <div class="entry-stat-value" id="statParticipants">—</div>
+          <div class="entry-stat-label">Entrants</div>
+        </div>
+        <div class="entry-stat">
+          <div class="entry-stat-value" id="statEndsIn">—</div>
+          <div class="entry-stat-label">Giveaway Ends</div>
+        </div>
       </div>
-      <!--
-        Replace the placeholder above with your Gleam.io embed code:
 
-        <a class="e-widget no-button" href="https://gleam.io/YOUR_CODE/your-giveaway-name" rel="nofollow">Your Giveaway Name</a>
-        <script type="text/javascript" src="https://widget.gleam.io/e.js" async="true"></script>
-      -->
+      <div class="entry-claim" id="entryClaim">
+        <p class="entry-claim-hint">Got a code from chat? Claim it within 5 minutes of the drop.</p>
+        <div class="entry-claim-row">
+          <input type="text" id="entryCodeInput" class="entry-code-input" placeholder="ENTER CODE"
+                 maxlength="32" autocomplete="off" spellcheck="false">
+          <button class="btn-primary" id="entryClaimBtn" onclick="claimEntryCode()">Claim</button>
+        </div>
+        <div class="entry-claim-msg" id="entryClaimMsg"></div>
+      </div>
+
+      <div class="entry-login" id="entryLogin" style="display:none;">
+        <p>Log in with Twitch to claim codes and track your entries.</p>
+        <button class="btn-primary" onclick="loginWithTwitch()">Log In with Twitch</button>
+      </div>
+
+      <div class="entry-history" id="entryHistory"></div>
     </div>
   </section>
 
@@ -205,6 +231,103 @@
 
         updateCountdown();
         setInterval(updateCountdown, 60000);
+      }
+
+      loadGiveawayEntries();
+    });
+
+    /* ── Entry tracker ─────────────────────────────────────────────
+       Month-wide totals are public; only the "your entries" figure and the
+       claim box need a login, so the page stays useful to a visitor who is
+       not signed in. */
+    let entriesRefreshTimer = null;
+
+    async function loadGiveawayEntries() {
+      try {
+        const res = await fetch('/api/giveaway-entries', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const d = await res.json();
+
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        const fmt = (n) => Number(n || 0).toLocaleString();
+
+        set('statTotalEntries', fmt(d.totalEntries));
+        set('statParticipants', fmt(d.participants));
+        set('statYourEntries', d.loggedIn ? fmt(d.you ? d.you.entries : 0) : '—');
+
+        if (d.endsAt) {
+          // Shown as a date rather than a duration; the banner countdown
+          // above already covers time-remaining, and two live counters
+          // disagreeing by a second looks broken.
+          set('statEndsIn', new Date(d.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        }
+
+        const claim = document.getElementById('entryClaim');
+        const login = document.getElementById('entryLogin');
+        if (claim && login) {
+          claim.style.display = d.loggedIn ? '' : 'none';
+          login.style.display = d.loggedIn ? 'none' : '';
+        }
+
+        const hist = document.getElementById('entryHistory');
+        if (hist) {
+          const items = (d.you && d.you.history) || [];
+          hist.innerHTML = items.length
+            ? '<div class="entry-history-title">Recent entries</div>' + items.map(h => {
+                const label = String(h.source || '').startsWith('drop:')
+                  ? String(h.source).slice(5).replace(/^./, c => c.toUpperCase()) + ' drop'
+                  : 'Channel points';
+                const when = new Date(h.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                return `<div class="entry-history-row"><span>${label}</span><span class="entry-history-n">+${Number(h.entries || 0)}</span><span class="entry-history-when">${when}</span></div>`;
+              }).join('')
+            : '';
+        }
+      } catch (e) { /* leave the dashes in place rather than showing an error */ }
+    }
+
+    async function claimEntryCode() {
+      const input = document.getElementById('entryCodeInput');
+      const btn = document.getElementById('entryClaimBtn');
+      const msg = document.getElementById('entryClaimMsg');
+      if (!input || !msg) return;
+
+      const code = input.value.trim().toUpperCase();
+      if (!code) return;
+
+      if (btn) btn.disabled = true;
+      msg.className = 'entry-claim-msg';
+      msg.textContent = 'Checking…';
+
+      try {
+        const res = await fetch('/api/giveaway-entries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const d = await res.json();
+
+        if (res.ok && d.success) {
+          msg.className = 'entry-claim-msg ok';
+          msg.textContent = `+${d.entries} entries! You now have ${d.total} this month.`;
+          input.value = '';
+          loadGiveawayEntries();
+        } else {
+          msg.className = 'entry-claim-msg err';
+          msg.textContent = d.error || 'Could not claim that code.';
+        }
+      } catch (e) {
+        msg.className = 'entry-claim-msg err';
+        msg.textContent = 'Network error — try again.';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Enter submits, since people paste a code and hit return.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'entryCodeInput') {
+        e.preventDefault();
+        claimEntryCode();
       }
     });
   </script>

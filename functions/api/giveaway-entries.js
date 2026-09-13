@@ -1,0 +1,233 @@
+/* ══════════════════════════════════════════════
+   MONTHLY GIVEAWAY — native entry ledger
+
+   Replaces the Gleam dependency. Gleam was never actually configured:
+   giveaway.html carried a placeholder embed while the drop messages told
+   viewers to paste codes into it, so bonus entries went nowhere.
+
+   HOW ENTRIES ARE EARNED
+     - Redeeming a code dropped in chat, at /redeem. Claimable once per
+       account by ANYONE, for five minutes from the drop.
+     - Redeeming the "Enter Giveaway" channel points reward (1 entry).
+
+   Both land in the same monthly ledger so the draw has one source of truth.
+
+   REQUIRES the self-hosted server — mutate() and listValues() do not exist
+   on a Cloudflare KV binding.
+   ══════════════════════════════════════════════ */
+
+const COOKIE_NAME = 'pham_session';
+const LEDGER_PREFIX = 'gwe_';
+const DROP_PREFIX = 'gwc_';
+
+/** Codes are claimable for five minutes from the drop. */
+export const DROP_WINDOW_SECONDS = 300;
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
+}
+
+function getSession(request) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(/pham_session=([^;]+)/);
+  if (!match) return null;
+  try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
+}
+
+/* UTC, matching leaderboards.js and phamily-time.js. Using local time here
+   would put a viewer's entry in a different month from their watch time on
+   the last day of a month. */
+export function monthKey(d = new Date()) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Millisecond timestamp of the instant the current month's giveaway closes. */
+export function monthEndsAt(d = new Date()) {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0);
+}
+
+function ledgerKey(userId, month) {
+  return `${LEDGER_PREFIX}${userId}_${month}`;
+}
+
+export function dropKey(code) {
+  return `${DROP_PREFIX}${String(code).trim().toUpperCase()}`;
+}
+
+/**
+ * Add entries to a user's ledger for the current month.
+ *
+ * Under mutate() because this is genuinely contended: when a code drops,
+ * dozens of viewers submit it within the same few seconds. An unlocked
+ * read-modify-write would lose entries constantly rather than theoretically.
+ *
+ * @returns {Promise<number>} the user's new total for the month
+ */
+export async function addEntries(env, userId, username, count, source) {
+  const n = Math.floor(Number(count) || 0);
+  if (!userId || n <= 0) return 0;
+
+  const month = monthKey();
+  let total = 0;
+
+  await env.MARKETPLACE.mutate(ledgerKey(userId, month), (current) => {
+    const rec = current && current.month === month
+      ? current
+      : { userId: String(userId), username: username || '', month, entries: 0, history: [] };
+
+    rec.entries = Number(rec.entries || 0) + n;
+    rec.username = username || rec.username || '';
+    /* Trimmed to the most recent 50. The history is for showing a viewer
+       where their entries came from, not an audit log, and an unbounded
+       array in a hot row grows every single drop. */
+    rec.history = [...(rec.history || []), { source, entries: n, at: Date.now() }].slice(-50);
+
+    total = rec.entries;
+    return rec;
+  });
+
+  return total;
+}
+
+/**
+ * Register a code that has just been dropped in chat, making it claimable
+ * for DROP_WINDOW_SECONDS.
+ *
+ * The five-minute limit is enforced by the row's own expiry, not by a
+ * comparison in a handler: kv.js filters expired rows out of every read, so
+ * a late claim finds nothing rather than relying on someone remembering to
+ * check a timestamp.
+ */
+export async function registerDropCode(env, code, tier, entries) {
+  if (!code) return null;
+  const record = {
+    code: String(code).trim().toUpperCase(),
+    tier: tier || 'common',
+    entries: Math.floor(Number(entries) || 0),
+    droppedAt: Date.now(),
+    redeemedBy: [],
+  };
+  await env.MARKETPLACE.put(dropKey(record.code), JSON.stringify(record), {
+    expirationTtl: DROP_WINDOW_SECONDS,
+  });
+  return record;
+}
+
+/**
+ * Claim a dropped code for one user.
+ *
+ * @returns {Promise<{ok: true, entries: number, total: number, tier: string}
+ *                 | {ok: false, reason: 'unknown'|'already'}>}
+ */
+export async function redeemDropCode(env, userId, username, code) {
+  const key = dropKey(code);
+
+  /* An expired code is filtered out by the read, so 'unknown' covers both
+     "never existed" and "the five minutes are up". Deliberately the same
+     answer for both: distinguishing them tells someone probing which codes
+     were real. */
+  const existing = await env.MARKETPLACE.get(key, 'json');
+  if (!existing) return { ok: false, reason: 'unknown' };
+  if ((existing.redeemedBy || []).includes(String(userId))) {
+    return { ok: false, reason: 'already' };
+  }
+
+  let claimed = false;
+  let tier = existing.tier;
+  let entries = existing.entries;
+
+  await env.MARKETPLACE.mutate(key, (current) => {
+    if (!current) return undefined;
+    const list = current.redeemedBy || [];
+    if (list.includes(String(userId))) return undefined;   // lost the race
+    claimed = true;
+    tier = current.tier;
+    entries = current.entries;
+    return { ...current, redeemedBy: [...list, String(userId)] };
+  });
+
+  if (!claimed) return { ok: false, reason: 'already' };
+
+  const total = await addEntries(env, userId, username, entries, `drop:${tier}`);
+  return { ok: true, entries, total, tier };
+}
+
+/**
+ * Everything the giveaway page shows. Works without a session — the
+ * month-wide figures are public; only `you` needs a login.
+ */
+export async function getGiveawaySummary(env, session) {
+  const month = monthKey();
+  const rows = await env.MARKETPLACE.listValues({ prefix: LEDGER_PREFIX });
+
+  let totalEntries = 0;
+  let participants = 0;
+  let you = null;
+
+  for (const { value } of rows) {
+    if (!value || value.month !== month) continue;
+    const n = Number(value.entries || 0);
+    if (n <= 0) continue;
+    totalEntries += n;
+    participants += 1;
+    if (session && String(value.userId) === String(session.user_id)) {
+      you = { entries: n, history: (value.history || []).slice(-10).reverse() };
+    }
+  }
+
+  return {
+    month,
+    endsAt: monthEndsAt(),
+    totalEntries,
+    participants,
+    loggedIn: !!session,
+    you: session ? (you || { entries: 0, history: [] }) : null,
+  };
+}
+
+/* ── GET — the giveaway page's data ──────────── */
+
+export async function onRequestGet(context) {
+  const { env, request } = context;
+  return json(await getGiveawaySummary(env, getSession(request)));
+}
+
+/* ── POST — redeem a dropped code ─────────────── */
+
+export async function onRequestPost(context) {
+  const { env, request } = context;
+  const session = getSession(request);
+
+  /* Login is required, by design: an entry has to belong to an account for
+     the ledger to mean anything. The page gates on this too, but the check
+     lives here so it cannot be bypassed by calling the API directly. */
+  if (!session || !session.user_id) {
+    return json({ error: 'Log in with Twitch to claim giveaway entries.' }, 401);
+  }
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+
+  const code = (body && body.code ? String(body.code) : '').trim().toUpperCase();
+  if (!code) return json({ error: 'No code provided' }, 400);
+
+  const result = await redeemDropCode(env, session.user_id, session.display_name, code);
+
+  if (!result.ok) {
+    if (result.reason === 'already') {
+      return json({ error: 'You have already claimed this code.' }, 409);
+    }
+    return json({ error: 'That code is not valid, or the 5 minutes are up.' }, 404);
+  }
+
+  return json({
+    success: true,
+    entries: result.entries,
+    tier: result.tier,
+    total: result.total,
+    month: monthKey(),
+  });
+}

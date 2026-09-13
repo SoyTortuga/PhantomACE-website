@@ -80,12 +80,20 @@ async function handleHypeTrainProgress(env, event) {
   drops.push(drop);
   await env.MARKETPLACE.put(dropsKey, JSON.stringify(drops), { expirationTtl: CODE_EXPIRY_SECONDS });
 
+  /* Make each dropped code claimable. Without this the code is just a
+     string in chat that nothing recognises — which is what it was while the
+     message pointed at a Gleam embed that had never been configured. */
+  const { registerDropCode } = await import('./giveaway-entries.js');
+  for (const c of codes) {
+    await registerDropCode(env, c, reward.rarity, reward.entries);
+  }
+
   const codeList = codes.join(' | ');
   const plural = codes.length > 1 ? 'codes' : 'code';
   const msg = `${reward.emoji} HYPE TRAIN LEVEL ${level}! ${reward.emoji} ` +
     `${codes.length} bonus ${plural}: ${codeList} — ` +
     `${reward.entries} bonus entries each! ` +
-    `Paste into the Gleam giveaway at phantomace.tv/giveaway — expires in 5 min!`;
+    `Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
 
   await sendChatMessage(env, msg);
 }

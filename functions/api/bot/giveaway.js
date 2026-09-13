@@ -70,14 +70,33 @@ export async function onRequestGet(context) {
   }
 
   const state = await env.MARKETPLACE.get(STATE_KEY, 'json') || { open: false };
-  const entrants = await env.MARKETPLACE.get(ENTRANTS_KEY, 'json') || [];
   const winner = await env.MARKETPLACE.get(WINNER_KEY, 'json') || null;
   const rewardId = await env.MARKETPLACE.get('giveaway_reward_id');
 
+  /* Read the monthly ledger, not the retired giveaway_entrants array. That
+     key is no longer written, so reading it here would have shown the
+     broadcaster zero entrants however many people had entered. */
+  const { monthKey } = await import('../giveaway-entries.js');
+  const month = monthKey();
+  const rows = await env.MARKETPLACE.listValues({ prefix: 'gwe_' });
+
+  const entrants = [];
+  let totalEntries = 0;
+  for (const { value } of rows) {
+    if (!value || value.month !== month) continue;
+    const n = Math.floor(Number(value.entries || 0));
+    if (n <= 0) continue;
+    entrants.push({ userId: value.userId, username: value.username, entries: n });
+    totalEntries += n;
+  }
+  entrants.sort((a, b) => b.entries - a.entries);
+
   return json({
     open: !!state.open,
+    month,
     entrants: entrants.map(publicEntrant),
     entrantCount: entrants.length,
+    totalEntries,
     winner,
     rewardConfigured: !!rewardId,
   });
@@ -105,11 +124,47 @@ export async function onRequestPost(context) {
   }
 
   if (body.action === 'pick-winner') {
-    const entrants = await env.MARKETPLACE.get(ENTRANTS_KEY, 'json') || [];
-    if (entrants.length === 0) return json({ error: 'No entrants yet.' }, 400);
+    /* Weighted by entry count, read from the monthly ledger.
+       A flat pick over one row per user would make 50 entries from a mythic
+       drop worth exactly as much as a single channel-point entry, which
+       would quietly make the whole entry system decorative. */
+    const { monthKey } = await import('../giveaway-entries.js');
+    const month = monthKey();
+    const rows = await env.MARKETPLACE.listValues({ prefix: 'gwe_' });
 
-    const winnerIndex = Math.floor(Math.random() * entrants.length);
-    const winner = { ...entrants[winnerIndex], pickedAt: Date.now(), sent: false };
+    const pool = [];
+    let totalEntries = 0;
+    for (const { value } of rows) {
+      if (!value || value.month !== month) continue;
+      const n = Math.floor(Number(value.entries || 0));
+      if (n <= 0) continue;
+      pool.push({ userId: value.userId, username: value.username, entries: n });
+      totalEntries += n;
+    }
+
+    if (pool.length === 0) return json({ error: 'No entrants yet this month.' }, 400);
+
+    /* Walk the cumulative weights rather than materialising one slot per
+       entry — a month of mythic drops could otherwise mean an array with
+       tens of thousands of duplicated objects in it. */
+    let ticket = Math.floor(Math.random() * totalEntries);
+    let chosen = pool[pool.length - 1];
+    for (const p of pool) {
+      if (ticket < p.entries) { chosen = p; break; }
+      ticket -= p.entries;
+    }
+
+    const entrants = pool;
+    const winnerIndex = pool.indexOf(chosen);
+    const winner = {
+      userId: chosen.userId,
+      username: chosen.username,
+      entries: chosen.entries,
+      month,
+      totalEntries,
+      pickedAt: Date.now(),
+      sent: false,
+    };
     await env.MARKETPLACE.put(WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
 
     await logBotAction(env, {
@@ -158,9 +213,20 @@ export async function onRequestPost(context) {
   }
 
   if (body.action === 'reset') {
-    await env.MARKETPLACE.delete(ENTRANTS_KEY);
+    /* Clears the WINNER only, so another can be drawn.
+
+       It deliberately does NOT clear the monthly entry ledger. Reset used
+       to wipe giveaway_entrants, which was a single session's worth of
+       entries and cheap to lose. The ledger is a whole month of entries
+       people earned by watching and redeeming drops, and one click of a
+       button labelled "reset" should not be able to destroy that. A month
+       rolls over on its own because the ledger is keyed by month.
+
+       If a month genuinely needs clearing, that is a deliberate database
+       operation, not a panel button. */
     await env.MARKETPLACE.delete(WINNER_KEY);
-    return json({ success: true });
+    await env.MARKETPLACE.delete(ENTRANTS_KEY);   // retired key; clear any leftover
+    return json({ success: true, note: 'Winner cleared. Monthly entries are untouched.' });
   }
 
   return json({ error: 'Invalid action' }, 400);

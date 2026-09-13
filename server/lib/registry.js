@@ -62,6 +62,18 @@ export const SINGLETONS = {
 /* Ordered LONGEST PREFIX FIRST. `pt_alltime_` must be tested before `pt_`,
    or lifetime stats would be filed as monthly records. */
 export const FAMILIES = [
+  /* Monthly giveaway entry ledger, one row per user per month. Mirrors
+     pt_{userId}_{YYYY-MM}, and like that family it must NOT expire: the
+     month's totals are what the draw reads, and a hygiene TTL on a record
+     the business logic depends on is the bug we already fixed once. */
+  { prefix: 'gwe_',            table: 'giveaway_entries', expiry: 'none' },
+
+  /* A code dropped in chat. expiry is 'real' and load-bearing: the read
+     filter makes the row invisible once expires_at passes, which IS the
+     "claimable for five minutes only" rule. No handler has to check a
+     clock — an expired code simply reads as a code that does not exist. */
+  { prefix: 'gwc_',            table: 'giveaway_drop_codes', expiry: 'real' },
+
   { prefix: 'cp_skull_boost_', table: 'cp_skull_boosts',  expiry: 'none' },
   { prefix: 'pt_alltime_',     table: 'phamily_alltime',  expiry: 'none' },
   { prefix: 'dino_park_',      table: 'dino_parks',       expiry: 'none' },
@@ -106,4 +118,5 @@ export function resolveKey(key) {
 /** Every table the DAL may touch — used to build the reaper's sweep list. */
 export const TABLES_WITH_REAL_EXPIRY = [
   'cp_queues', 'listings', 'bingo_rooms', 'mc_rooms', 'ps_rooms', 'singletons',
+  'giveaway_drop_codes',
 ];

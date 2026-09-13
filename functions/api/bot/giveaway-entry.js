@@ -34,15 +34,24 @@ async function verifySignature(secret, request, body) {
   return expected === HMAC_PREFIX + hex;
 }
 
+/* Channel-point entries now go into the MONTHLY LEDGER, the same place
+   chat-drop code redemptions land, so the winner draw has one source of
+   truth instead of two half-pictures.
+
+   What this replaces: a giveaway_entrants array capped at 500 with a
+   one-day TTL. That was built for a single short giveaway session and is
+   wrong for a month-long one in three ways — it silently stopped recording
+   at 500, it discarded everything after a day, and it counted rows rather
+   than entries, so it could not represent someone holding 50 entries from
+   a mythic drop.
+
+   The open/closed toggle still applies: no entries while entries are shut. */
 async function addEntrant(env, userId, username) {
   const state = await env.MARKETPLACE.get(STATE_KEY, 'json');
   if (!state || !state.open) return;
 
-  const entrants = await env.MARKETPLACE.get(ENTRANTS_KEY, 'json') || [];
-  if (entrants.length >= MAX_ENTRANTS) return;
-
-  entrants.push({ userId, username, enteredAt: Date.now() });
-  await env.MARKETPLACE.put(ENTRANTS_KEY, JSON.stringify(entrants), { expirationTtl: ENTRANTS_TTL });
+  const { addEntries } = await import('../giveaway-entries.js');
+  await addEntries(env, userId, username, 1, 'channel-points');
 }
 
 export async function onRequestPost(context) {

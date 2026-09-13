@@ -198,8 +198,14 @@ export async function dropCodeAction(env, rarity, actorLabel) {
     return { success: false, error: `No codes left in the ${tier} pool.` };
   }
 
+  /* Register it before announcing it. Announce-then-register would leave a
+     window where the fastest viewer in chat gets "that code is not valid",
+     which is the worst possible first impression of a drop. */
+  const { registerDropCode } = await import('../giveaway-entries.js');
+  await registerDropCode(env, code, tier, info.entries);
+
   const msg = `${info.emoji} BONUS DROP! ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
-    `${info.entries} bonus entries! Paste into the Gleam giveaway at phantomace.tv/giveaway — expires in 5 min!`;
+    `${info.entries} bonus entries! Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
 
   const sent = await sendChatMessage(env, msg);
 

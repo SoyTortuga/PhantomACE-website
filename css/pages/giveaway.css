@@ -102,25 +102,132 @@
 }
 
 /* Gleam Embed Container */
-.gleam-embed {
+/* Entry tracker — replaced the Gleam embed, which never got past a
+   placeholder. Border-based hierarchy, no box-shadow, per the design rules. */
+.entry-tracker {
   background: var(--gray-mid);
   border: 1px solid var(--border-mid);
   border-radius: 12px;
   padding: 24px;
-  min-height: 300px;
   margin-bottom: 48px;
 }
 
-.gleam-placeholder {
-  text-align: center;
-  padding: 60px 24px;
-  color: var(--text-dim);
-  font-family: var(--font-system);
-  font-size: 13px;
+.entry-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
-.gleam-placeholder p {
-  margin-bottom: 16px;
+.entry-stat {
+  text-align: center;
+  padding: 16px 8px;
+  background: var(--black);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+}
+
+.entry-stat-value {
+  font-family: var(--font-header);
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--red);
+}
+
+.entry-stat-label {
+  margin-top: 6px;
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.entry-claim,
+.entry-login {
+  border-top: 1px solid var(--border-mid);
+  padding-top: 20px;
+  text-align: center;
+}
+
+.entry-claim-hint,
+.entry-login p {
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-sec);
+  margin-bottom: 12px;
+}
+
+.entry-claim-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.entry-code-input {
+  flex: 0 1 240px;
+  padding: 10px 14px;
+  background: var(--black);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  color: var(--text-pri);
+  font-family: var(--font-system);
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.entry-code-input:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.entry-claim-msg {
+  min-height: 18px;
+  margin-top: 12px;
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.entry-claim-msg.ok  { color: #2ecc71; }
+.entry-claim-msg.err { color: var(--red); }
+
+.entry-history:not(:empty) {
+  margin-top: 20px;
+  border-top: 1px solid var(--border-mid);
+  padding-top: 16px;
+}
+
+.entry-history-title {
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.entry-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-sec);
+  border-bottom: 1px solid var(--border-low, #ffffff0d);
+}
+
+.entry-history-row:last-child { border-bottom: none; }
+.entry-history-n { color: var(--red); font-weight: 600; }
+.entry-history-when { margin-left: auto; color: var(--text-dim); font-size: 11px; }
+
+@media (max-width: 640px) {
+  .entry-stats { grid-template-columns: repeat(2, 1fr); }
+  .entry-stat-value { font-size: 22px; }
 }
 
 /* How It Works */

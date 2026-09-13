@@ -224,6 +224,42 @@ CREATE TABLE IF NOT EXISTS giveaway_codes (
 CREATE INDEX IF NOT EXISTS giveaway_codes_unclaimed_idx
   ON giveaway_codes (tier, id) WHERE claimed_at IS NULL;
 
+-- ══════════════════════════════════════════════════════════════════════════
+-- MONTHLY GIVEAWAY (native — replaces the Gleam embed, which was never
+-- configured beyond a placeholder)
+-- ══════════════════════════════════════════════════════════════════════════
+
+-- gwe_{userId}_{YYYY-MM} — one row per user per month, holding that user's
+-- running entry total and where each entry came from. Deliberately mirrors
+-- phamily_months, and like it has NO expiry: the month's totals are what the
+-- winner draw reads, so an expiring row would silently delete entries a
+-- viewer earned.
+CREATE TABLE IF NOT EXISTS giveaway_entries (
+  key        text PRIMARY KEY,
+  value      jsonb NOT NULL,
+  expires_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- The draw reads every row for one month, so index the month rather than
+-- scanning and filtering in JS.
+CREATE INDEX IF NOT EXISTS giveaway_entries_month_idx
+  ON giveaway_entries ((value->>'month'));
+
+-- gwc_{CODE} — a code dropped in chat, claimable once per account by anyone
+-- for five minutes.
+--
+-- expires_at is LOAD-BEARING here, not hygiene. kv.js filters every read by
+-- it, so an expired code reads as a code that does not exist — which IS the
+-- five-minute rule. No handler compares a clock, and there is no window
+-- where a late claim can slip through because someone forgot a check.
+CREATE TABLE IF NOT EXISTS giveaway_drop_codes (
+  key        text PRIMARY KEY,
+  value      jsonb NOT NULL,
+  expires_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ── Migration safety net ──────────────────────────────────────────────────
 
 -- The loader routes each dumped KV key to a table by longest-matching
