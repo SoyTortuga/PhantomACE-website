@@ -119,10 +119,29 @@ curl.exe -s https://phantomace.tv/api/health                                   #
 curl.exe -s https://phantomace.tv/api/marketplace                              # real listings
 curl.exe -s -o NUL -w "%{http_code}`n" https://phantomace.tv/_private/giveaway-codes/common_bonus_codes.txt
 ```
-**That last one MUST be 404, every single time.** Cloudflare's built-in
-"don't serve underscore paths" rule protected it before and does not apply now;
-the static allowlist is the only thing standing between real giveaway codes and
-the internet. Verify it explicitly rather than trusting it.
+**That last one MUST be 404, every single time.**
+
+**Correction, verified against production on 2026-09-13: it is NOT 404 on
+Cloudflare Pages today — it returns 200 and serves the real file.** The earlier
+claim that Cloudflare's built-in "root-level `_` paths aren't served" rule
+protected `_private/` was wrong. So was the hope that `.assetsignore` did: that
+file lists `/_private/` explicitly and the directory is served anyway,
+confirming for the second time that `.assetsignore` is inert on Pages.
+
+What actually determines exposure on Pages is simply whether the file exists in
+the uploaded directory. `_private/SETUP-GUIDE.txt` 404s only because it no
+longer exists locally; `server/.env` 404s only because it lives on the rig.
+Nothing is protecting the rest.
+
+Currently public on production: `/_private/giveaway-codes/*.txt` (171 codes),
+`/_private/BROADCASTER-SETUP-STEPS.txt`, `/.dev.vars` (empty values),
+`/wrangler.toml`, `/package.json`.
+
+**This is an argument for the migration rather than a cutover risk.** The Node
+server's allowlist inverts the default — a path is private unless explicitly
+served — and `assertPrivatePathsUnreachable()` fails the boot if any of these
+resolve. So this check flips from "hope it still 404s" to "the server refuses to
+start otherwise." Keep verifying it anyway.
 
 Then **log in through a browser** and confirm you land back on the page you
 started from. If anything goes wrong, the URL now carries `?login_error=<reason>` —
