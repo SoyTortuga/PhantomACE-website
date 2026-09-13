@@ -35,6 +35,9 @@ const NON_ROUTE_MODULES = new Set([
      boot assertion below demands every file be declared one way or the
      other rather than guessed at. */
   'api/auth/session-crypto.js',
+
+  /* The shared Twitch app access token. Library, no handler. */
+  'api/auth/app-token.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */
