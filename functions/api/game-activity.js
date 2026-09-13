@@ -12,12 +12,15 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+/* One query per prefix instead of a list() followed by a get() per room.
+   This endpoint is polled by every open game page, so it was the single
+   busiest N+1 in the codebase: three prefixes times one round trip per
+   active room, on every poll, from every client. */
 async function countRoomPlayers(env, prefix, playersField) {
-  const list = await env.MARKETPLACE.list({ prefix });
+  const rows = await env.MARKETPLACE.listValues({ prefix });
   let players = 0;
   let rooms = 0;
-  for (const key of list.keys) {
-    const room = await env.MARKETPLACE.get(key.name, 'json');
+  for (const { value: room } of rows) {
     if (!room) continue;
     const p = room[playersField];
     const count = Array.isArray(p) ? p.length : (p ? Object.keys(p).length : 0);

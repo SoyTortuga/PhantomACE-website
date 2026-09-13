@@ -12,8 +12,10 @@
 
    1. get(key) with no type returns a STRING; get(key, 'json') returns a
       parsed object. All five bingo files do a raw get() then JSON.parse()
-      themselves, gc_ptr_* does parseInt(), and twitch_bot_user_id is read
-      raw. A DAL that always returned objects would break all of them.
+      themselves, and twitch_bot_user_id is read raw. A DAL that always
+      returned objects would break all of them. (gc_ptr_* used to be a
+      third case; Phase 7 replaced that cursor with the giveaway_codes
+      table, so nothing reads it any more.)
 
    2. list() returns { keys: [{ name }], list_complete: true } — every call
       site iterates `result.keys` and reads `key.name`.
@@ -164,6 +166,143 @@ export function createKVStore(pool) {
     return rows.map(r => ({ name: r.key, value: r.value }));
   }
 
+  /**
+   * Atomically remove a row and return what it held. Exactly one concurrent
+   * caller receives the value; every other gets null.
+   *
+   * This is the fix for the marketplace double-sell. On KV, `buy` had to
+   * read the listing, check it, then delete it — three separate operations
+   * with no way to make them one. Two buyers clicking at the same moment
+   * both read the same listing, both passed the check, and both were told
+   * they had bought it: one dino delivered twice, the seller credited
+   * twice. A single DELETE ... RETURNING makes the read and the claim the
+   * same operation, so the race cannot be expressed.
+   */
+  async function claim(key) {
+    const { table } = mustResolve(key, 'claim');
+    const { rows } = await pool.query(
+      `DELETE FROM ${table} WHERE key = $1 AND ${NOT_EXPIRED} RETURNING value`,
+      [key]
+    );
+    return rows.length ? rows[0].value : null;
+  }
+
+  /**
+   * Run `fn` inside one transaction, holding a named advisory lock for its
+   * duration. `fn` receives a store with the same get/put/delete/list/
+   * listValues methods, bound to that transaction.
+   *
+   * For invariants that span MULTIPLE keys, where mutate()'s single-key
+   * lock is not enough — the marketplace's "at most 10 active listings per
+   * seller" is one: the count and the insert have to be atomic with respect
+   * to each other, and they touch different rows.
+   *
+   * The lock name is arbitrary text, not a key, so it does not need a table
+   * mapping. Keep names namespaced (e.g. "listings:<userId>") so unrelated
+   * call sites cannot collide on a hash.
+   */
+  async function withLock(lockName, fn) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [String(lockName)]);
+
+      const tx = {
+        async get(key, type) {
+          const { table } = mustResolve(key, 'get');
+          const { rows } = await client.query(
+            `SELECT value FROM ${table} WHERE key = $1 AND ${NOT_EXPIRED}`, [key]
+          );
+          if (!rows.length) return null;
+          return type === 'json' ? rows[0].value : toRawString(rows[0].value);
+        },
+        async put(key, value, options = {}) {
+          const { table, expiry } = mustResolve(key, 'put');
+          const expiresAt = expiry === 'real' ? ttlToExpiresAt(options.expirationTtl) : null;
+          await client.query(
+            `INSERT INTO ${table} (key, value, expires_at, updated_at)
+             VALUES ($1, $2::jsonb, $3, now())
+             ON CONFLICT (key) DO UPDATE
+               SET value = EXCLUDED.value,
+                   expires_at = EXCLUDED.expires_at,
+                   updated_at = now()`,
+            [key, JSON.stringify(toStorable(value)), expiresAt]
+          );
+        },
+        async delete(key) {
+          const { table } = mustResolve(key, 'delete');
+          await client.query(`DELETE FROM ${table} WHERE key = $1`, [key]);
+        },
+        async listValues(options = {}) {
+          const prefix = options.prefix || '';
+          const target = resolveKey(prefix) || resolveKey(prefix + 'x');
+          if (!target) throw new Error(`listValues() prefix "${prefix}" has no table mapping`);
+          const { rows } = await client.query(
+            `SELECT key, value FROM ${target.table}
+              WHERE key LIKE $1 || '%' AND ${NOT_EXPIRED}
+              ORDER BY key`, [prefix]
+          );
+          return rows.map(r => ({ name: r.key, value: r.value }));
+        },
+      };
+
+      const result = await fn(tx);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /* ── Two normalised families that are not key/value at all ──────────── */
+
+  /**
+   * Claim one unclaimed giveaway code, or null when the tier is exhausted.
+   *
+   * Replaces the `gc_{tier}` array plus `gc_ptr_{tier}` cursor. That pair
+   * was read, incremented and written as three separate operations, so two
+   * drops firing at the same moment handed the SAME code to two people and
+   * burned one. FOR UPDATE SKIP LOCKED makes that structurally impossible:
+   * concurrent claimers skip past each other's locked rows rather than
+   * queueing on them or colliding.
+   *
+   * Zero rows is exactly the old "pool exhausted" case, so callers keep
+   * their existing null handling.
+   */
+  async function pullGiveawayCode(tier) {
+    const { rows } = await pool.query(
+      `UPDATE giveaway_codes SET claimed_at = now()
+        WHERE id = (SELECT id FROM giveaway_codes
+                     WHERE tier = $1 AND claimed_at IS NULL
+                     ORDER BY id LIMIT 1
+                     FOR UPDATE SKIP LOCKED)
+        RETURNING code`,
+      [tier]
+    );
+    return rows.length ? rows[0].code : null;
+  }
+
+  /**
+   * Claim the right to run a month's awards. Returns true for exactly one
+   * caller per month, ever.
+   *
+   * Replaces the `monthly_awards_done_{YYYY-MM}` flag, which was checked
+   * and then set non-atomically — so two requests on the last day of a
+   * month could both pass the check and both hand out prizes.
+   */
+  async function claimMonthlyAward(month) {
+    const { rows } = await pool.query(
+      `INSERT INTO monthly_awards (month) VALUES ($1)
+       ON CONFLICT (month) DO NOTHING
+       RETURNING month`,
+      [month]
+    );
+    return rows.length > 0;
+  }
+
   /** Disk reclamation only — reads are already filtered. */
   async function reap() {
     let removed = 0;
@@ -176,5 +315,10 @@ export function createKVStore(pool) {
     return removed;
   }
 
-  return { get, put, delete: del, list, mutate, listValues, reap };
+  return {
+    get, put, delete: del, list,
+    mutate, listValues, claim, withLock,
+    pullGiveawayCode, claimMonthlyAward,
+    reap,
+  };
 }

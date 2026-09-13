@@ -1,4 +1,27 @@
+/* ══════════════════════════════════════════════
+   MARKETPLACE — Postgres-native (Phase 7 of the self-hosting migration).
+
+   REQUIRES the self-hosted server. env.MARKETPLACE.claim(), .mutate() and
+   .withLock() do not exist on a Cloudflare KV binding, so this file CANNOT
+   run on Cloudflare Pages. Deploying it there breaks buying outright.
+
+   Four races are closed here, all of which were unfixable on KV because it
+   offers no transactions and no compare-and-swap:
+
+     buy          read-check-delete became one DELETE ... RETURNING, so two
+                  simultaneous buyers cannot both win. Previously both were
+                  told they had bought it: the dino was delivered twice and
+                  the seller was paid twice.
+     earnings     get-then-put became mutate(), so two sales completing at
+                  once cannot lose one another's credit.
+     listing cap  count-then-insert now happens under one per-seller lock.
+     browse       list()-then-N-gets became one query.
+   ══════════════════════════════════════════════ */
+
 const COOKIE_NAME = 'pham_session';
+const MAX_ACTIVE_LISTINGS = 10;
+const LISTING_TTL_SECONDS = 604800;   // 7 days, unchanged from KV
+const EARNINGS_TTL_SECONDS = 2592000; // ignored by the registry (expiry: none)
 
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
@@ -21,31 +44,30 @@ export async function onRequestGet(context) {
   const action = url.searchParams.get('action');
 
   if (action === 'earnings' && session) {
-    const key = 'earnings_' + session.user_id;
-    const data = await env.MARKETPLACE.get(key, 'json');
+    /* Collecting earnings is a claim, not a read: the balance is handed to
+       the player and the record destroyed. Done as get-then-delete, two
+       requests arriving together both read the same balance and both paid
+       out, minting coins. */
+    const data = await env.MARKETPLACE.claim('earnings_' + session.user_id);
     if (data && data.amount > 0) {
-      await env.MARKETPLACE.delete(key);
       return json({ coins: data.amount, sales: data.sales || [] });
     }
     return json({ coins: 0, sales: [] });
   }
 
   if (action === 'my-listings' && session) {
-    const list = await env.MARKETPLACE.list({ prefix: 'listing_' });
-    const mine = [];
-    for (const key of list.keys) {
-      const val = await env.MARKETPLACE.get(key.name, 'json');
-      if (val && val.seller.userId === session.user_id) mine.push(val);
-    }
+    const rows = await env.MARKETPLACE.listValues({ prefix: 'listing_' });
+    const mine = rows
+      .map(r => r.value)
+      .filter(v => v && v.seller && v.seller.userId === session.user_id);
+    mine.sort((a, b) => b.listedAt - a.listedAt);
     return json(mine);
   }
 
-  const list = await env.MARKETPLACE.list({ prefix: 'listing_' });
-  const listings = [];
-  for (const key of list.keys) {
-    const val = await env.MARKETPLACE.get(key.name, 'json');
-    if (val) listings.push(val);
-  }
+  /* One query. This used to be a list() followed by a get() per key, which
+     on KV also silently truncated at 1000 keys. */
+  const rows = await env.MARKETPLACE.listValues({ prefix: 'listing_' });
+  const listings = rows.map(r => r.value).filter(Boolean);
   listings.sort((a, b) => b.listedAt - a.listedAt);
   return json(listings);
 }
@@ -62,14 +84,6 @@ export async function onRequestPost(context) {
     if (!body.dino || !body.price || body.price < 1) return json({ error: 'Invalid listing' }, 400);
     if (body.price > 99999) return json({ error: 'Price too high (max 99,999)' }, 400);
 
-    const existingList = await env.MARKETPLACE.list({ prefix: 'listing_' });
-    let myCount = 0;
-    for (const key of existingList.keys) {
-      const val = await env.MARKETPLACE.get(key.name, 'json');
-      if (val && val.seller.userId === session.user_id) myCount++;
-    }
-    if (myCount >= 10) return json({ error: 'Max 10 active listings.' }, 400);
-
     const id = crypto.randomUUID();
     const listing = {
       id,
@@ -78,24 +92,54 @@ export async function onRequestPost(context) {
       price: Math.floor(body.price),
       listedAt: Date.now(),
     };
-    await env.MARKETPLACE.put('listing_' + id, JSON.stringify(listing), { expirationTtl: 604800 });
+
+    /* Count and insert under one per-seller lock. Separately they race:
+       two requests could each see nine listings and both insert a tenth.
+       The lock is per seller, so it never serialises unrelated sellers. */
+    const accepted = await env.MARKETPLACE.withLock(`listings:${session.user_id}`, async (tx) => {
+      const rows = await tx.listValues({ prefix: 'listing_' });
+      const mine = rows.filter(r => r.value && r.value.seller && r.value.seller.userId === session.user_id);
+      if (mine.length >= MAX_ACTIVE_LISTINGS) return false;
+      await tx.put('listing_' + id, JSON.stringify(listing), { expirationTtl: LISTING_TTL_SECONDS });
+      return true;
+    });
+
+    if (!accepted) return json({ error: `Max ${MAX_ACTIVE_LISTINGS} active listings.` }, 400);
     return json({ success: true, id });
   }
 
   if (body.action === 'buy') {
     if (!body.listingId) return json({ error: 'Missing listing ID' }, 400);
     const key = 'listing_' + body.listingId;
-    const listing = await env.MARKETPLACE.get(key, 'json');
+
+    /* Own-listing check must happen BEFORE the claim, or rejecting it would
+       have already destroyed the listing. Read first, then claim — a stale
+       read here is harmless, because the claim is what actually decides. */
+    const preview = await env.MARKETPLACE.get(key, 'json');
+    if (!preview) return json({ error: 'Listing no longer available.' }, 404);
+    if (preview.seller.userId === session.user_id) {
+      return json({ error: 'Cannot buy your own listing.' }, 400);
+    }
+
+    /* The atomic claim. Of two simultaneous buyers exactly one gets the
+       listing back and the other gets null — there is no window between
+       checking and taking, because they are the same statement. */
+    const listing = await env.MARKETPLACE.claim(key);
     if (!listing) return json({ error: 'Listing no longer available.' }, 404);
-    if (listing.seller.userId === session.user_id) return json({ error: 'Cannot buy your own listing.' }, 400);
 
-    await env.MARKETPLACE.delete(key);
-
-    const earningsKey = 'earnings_' + listing.seller.userId;
-    const existing = await env.MARKETPLACE.get(earningsKey, 'json') || { amount: 0, sales: [] };
-    existing.amount += listing.price;
-    existing.sales.push({ buyer: session.display_name, dino: listing.dino.speciesId, price: listing.price, at: Date.now() });
-    await env.MARKETPLACE.put(earningsKey, JSON.stringify(existing), { expirationTtl: 2592000 });
+    /* Credit the seller under a lock: two of their listings selling at the
+       same instant previously read the same balance and one credit was
+       silently lost. */
+    await env.MARKETPLACE.mutate('earnings_' + listing.seller.userId, (current) => {
+      const acc = current || { amount: 0, sales: [] };
+      return {
+        amount: (acc.amount || 0) + listing.price,
+        sales: [
+          ...(acc.sales || []),
+          { buyer: session.display_name, dino: listing.dino.speciesId, price: listing.price, at: Date.now() },
+        ],
+      };
+    });
 
     return json({ success: true, dino: listing.dino, price: listing.price });
   }
@@ -103,10 +147,16 @@ export async function onRequestPost(context) {
   if (body.action === 'cancel') {
     if (!body.listingId) return json({ error: 'Missing listing ID' }, 400);
     const key = 'listing_' + body.listingId;
-    const listing = await env.MARKETPLACE.get(key, 'json');
-    if (!listing) return json({ error: 'Listing not found.' }, 404);
-    if (listing.seller.userId !== session.user_id) return json({ error: 'Not your listing.' }, 403);
-    await env.MARKETPLACE.delete(key);
+
+    const preview = await env.MARKETPLACE.get(key, 'json');
+    if (!preview) return json({ error: 'Listing not found.' }, 404);
+    if (preview.seller.userId !== session.user_id) return json({ error: 'Not your listing.' }, 403);
+
+    /* Claim rather than delete, so a cancel racing a buy resolves to exactly
+       one winner. Previously both could succeed: the buyer received the dino
+       and the seller got it back too, duplicating it. */
+    const listing = await env.MARKETPLACE.claim(key);
+    if (!listing) return json({ error: 'Listing no longer available.' }, 404);
     return json({ success: true, dino: listing.dino });
   }
 

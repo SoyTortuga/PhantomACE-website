@@ -61,11 +61,15 @@ async function maybeRunMonthlyAwards(env) {
   if (!isLastDayOfMonth(now)) return;
 
   const key = monthKey(now);
-  const flagKey = `monthly_awards_done_${key}`;
-  if (await env.MARKETPLACE.get(flagKey)) return;
 
-  // Claim the flag immediately so concurrent requests can't double-run this.
-  await env.MARKETPLACE.put(flagKey, String(Date.now()));
+  /* One atomic claim, replacing a get-then-put on monthly_awards_done_*.
+     That pair could NOT stop a double-run despite the comment that said it
+     did: two requests on the last day of the month both read no flag, both
+     wrote it, and both handed out prizes — duplicate winners, duplicate
+     prize codes whispered. INSERT ... ON CONFLICT DO NOTHING RETURNING
+     returns a row to exactly one caller per month, ever. */
+  const claimed = await env.MARKETPLACE.claimMonthlyAward(key);
+  if (!claimed) return;
 
   const label = monthLabel(now);
   const summaryLines = [];

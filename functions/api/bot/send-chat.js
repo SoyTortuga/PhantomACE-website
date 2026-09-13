@@ -137,16 +137,18 @@ export async function sendWhisper(env, toUserId, message) {
   return res.ok;
 }
 
+/* Claims one code from the tier, or null when the pool is exhausted.
+
+   This was an array plus a cursor: read gc_ptr_{tier}, read gc_{tier},
+   take pool[ptr], write ptr+1. Three separate operations, so two drops
+   firing together read the same cursor, handed out the SAME code twice,
+   and burned one. The claim is now a single statement using FOR UPDATE
+   SKIP LOCKED — concurrent claimers skip past each other's locked rows
+   instead of colliding, so double-issuance cannot be expressed.
+
+   Null still means "pool exhausted", so callers are unchanged. */
 export async function pullGiveawayCode(env, rarity) {
-  const tier = rarity || 'common';
-  const poolKey = `gc_${tier}`;
-  const ptrKey = `gc_ptr_${tier}`;
-  const ptr = parseInt(await env.MARKETPLACE.get(ptrKey) || '0', 10);
-  const pool = await env.MARKETPLACE.get(poolKey, 'json');
-  if (!pool || ptr >= pool.length) return null;
-  const code = pool[ptr];
-  await env.MARKETPLACE.put(ptrKey, String(ptr + 1));
-  return code;
+  return env.MARKETPLACE.pullGiveawayCode(rarity || 'common');
 }
 
 /* ── Cooldowns ─────────────────────────────────

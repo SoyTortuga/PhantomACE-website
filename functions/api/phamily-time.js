@@ -23,18 +23,13 @@ async function grantItem(env, userId, item) {
   await saveInventory(env, userId, inv);
 }
 
+/* Byte-identical duplicate of send-chat.js's version, now that both are
+   one line. Kept as a local function rather than imported because
+   send-chat.js is a library of bot-token helpers and importing it here
+   for one call would drag that surface in. See the comment on the
+   exported copy for why the array-plus-cursor design was unsafe. */
 async function pullGiveawayCode(env, rarity) {
-  const tier = rarity || 'common';
-  const poolKey = `gc_${tier}`;
-  const ptrKey = `gc_ptr_${tier}`;
-
-  const ptr = parseInt(await env.MARKETPLACE.get(ptrKey) || '0', 10);
-  const pool = await env.MARKETPLACE.get(poolKey, 'json');
-  if (!pool || ptr >= pool.length) return null;
-
-  const code = pool[ptr];
-  await env.MARKETPLACE.put(ptrKey, String(ptr + 1));
-  return code;
+  return env.MARKETPLACE.pullGiveawayCode(rarity || 'common');
 }
 
 function json(data, status = 200) {

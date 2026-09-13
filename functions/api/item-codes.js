@@ -82,6 +82,37 @@ async function saveCodeRecord(env, code, record) {
   await env.MARKETPLACE.put(`item_code_${code}`, JSON.stringify(record));
 }
 
+/* ── Redemption claiming ───────────────────────
+   "Has this user redeemed?" and "mark them as having redeemed" used to be
+   a check followed by a push-and-save. Two requests from the same account
+   arriving together both saw themselves absent, both granted the item, and
+   the second save overwrote the first — so a code good for one item handed
+   out two. mutate() makes read and write one locked operation, and reports
+   which caller actually added the id. */
+async function claimRedemption(env, code, userId) {
+  let claimed = false;
+  await env.MARKETPLACE.mutate(`item_code_${code}`, (current) => {
+    if (!current) return undefined;
+    const list = current.redeemedBy || [];
+    if (list.includes(userId)) return undefined;   // someone else got here first
+    claimed = true;
+    return { ...current, redeemedBy: [...list, userId] };
+  });
+  return claimed;
+}
+
+/* Undo a claim. Used only when granting fails after the claim succeeded —
+   an incubator-full egg must leave the code redeemable so the player can
+   make space and retry. */
+async function releaseRedemption(env, code, userId) {
+  await env.MARKETPLACE.mutate(`item_code_${code}`, (current) => {
+    if (!current) return undefined;
+    const list = current.redeemedBy || [];
+    if (!list.includes(userId)) return undefined;
+    return { ...current, redeemedBy: list.filter(id => id !== userId) };
+  });
+}
+
 /* ── Exported functions for twitch-bot ────────── */
 
 export async function activateItemCode(env, code, durationSeconds = 300) {
@@ -131,10 +162,14 @@ export async function onRequestGet(context) {
       if (record) pending.push({ code: record.code, item: record.item });
     }
 
-    const allKeys = await env.MARKETPLACE.list({ prefix: 'item_code_' });
-    for (const key of allKeys.keys) {
-      if (key.name === 'item_code_queue') continue;
-      const record = await env.MARKETPLACE.get(key.name, 'json');
+    /* One query instead of a list() plus a get() per code.
+       The `item_code_queue` skip this loop used to need is gone: that key
+       is a singleton and now lives in its own table, while item_code_* codes
+       live in item_codes, so a prefix scan cannot pick the queue up. The
+       registry resolves exact keys before prefixes precisely so that
+       collision stops needing a hardcoded exception. */
+    const rows = await env.MARKETPLACE.listValues({ prefix: 'item_code_' });
+    for (const { value: record } of rows) {
       if (record && record.active && record.expiresAt > now) {
         active.push({ code: record.code, item: record.item, expiresAt: record.expiresAt });
       }
@@ -237,8 +272,9 @@ async function handleRedeem(env, session, body) {
     return await redeemDinoEgg(env, record, code, userId);
   }
 
-  record.redeemedBy.push(userId);
-  await saveCodeRecord(env, code, record);
+  if (!(await claimRedemption(env, code, userId))) {
+    return json({ error: 'Already redeemed' }, 409);
+  }
 
   const inv = await getInventory(env, userId);
   const existing = inv.items.find(i => i.id === record.item.id && !i.consumable);
@@ -284,23 +320,32 @@ async function redeemDinoEgg(env, record, code, userId) {
     return json({ error: 'Dino Park egg redemption is not available right now. Try again later.' }, 503);
   }
 
+  /* Claim BEFORE granting. Claiming afterwards cannot prevent the problem
+     it exists to prevent — two simultaneous requests would each grant an
+     egg and only then discover they had collided, by which point two eggs
+     are already in the incubator. Every failure path below releases the
+     claim, which is what preserves "incubator full, free up space and
+     retry the same code". */
+  if (!(await claimRedemption(env, code, userId))) {
+    return json({ error: 'Already redeemed' }, 409);
+  }
+
   let result;
   try {
     result = await grantEgg(env, userId, dinoTier);
   } catch {
+    await releaseRedemption(env, code, userId);
     return json({ error: 'Something went wrong granting your egg. Try again.' }, 500);
   }
 
   if (!result || !result.success) {
-    /* Do NOT mark the code redeemed for this user — e.g. an incubator-full
-       failure should let them free up space and retry the same code.
+    /* Release the claim so the code stays redeemable — e.g. an
+       incubator-full failure should let them free up space and retry.
        Status 400 (not 409) so the redemption page shows this real error
        instead of the generic "already redeemed" message it shows for 409. */
+    await releaseRedemption(env, code, userId);
     return json({ error: (result && result.error) || 'Could not grant your egg right now.' }, 400);
   }
-
-  record.redeemedBy.push(userId);
-  await saveCodeRecord(env, code, record);
 
   return json({
     success: true,

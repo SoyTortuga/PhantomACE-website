@@ -224,10 +224,10 @@ export async function onRequestGet(ctx) {
   const action = url.searchParams.get('action');
 
   if (action === 'list-rooms') {
-    const list = await env.MARKETPLACE.list({ prefix: 'ps_room_' });
+    // One query rather than a list() plus a get() per room.
+    const rows = await env.MARKETPLACE.listValues({ prefix: 'ps_room_' });
     const rooms = [];
-    for (const key of list.keys) {
-      const room = await env.MARKETPLACE.get(key.name, 'json');
+    for (const { value: room } of rows) {
       if (room && room.status === 'lobby') {
         rooms.push({
           code: room.code, host: room.hostName,
