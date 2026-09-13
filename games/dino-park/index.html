@@ -3087,7 +3087,7 @@ function portraitImg(specId, size, cls, mutation) {
   const url = getPortrait(specId, size, mutation);
   return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
 }
-let state = { saveEpoch: SAVE_EPOCH, coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0, liveSecAccum: 0, lastDecayLiveSec: 0 };
+let state = { saveEpoch: SAVE_EPOCH, coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [], eggStorage: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0, liveSecAccum: 0, lastDecayLiveSec: 0 };
 let isStreamLive = false;
 let wasStreamLive = false;
 
@@ -4577,28 +4577,73 @@ function checkForEvent() {
   }
 }
 
+/* Every in-game egg source funnels through here. A full incubator no longer
+   throws the egg away: it goes to Egg Storage and waits.
+
+   Storage lives in the player's OWN save rather than the server inventory,
+   which is where redeemed-code eggs overflow to. That is deliberate. These
+   eggs are rolled by the client — it picks the rarity and the species — so
+   routing them through /api/inventory would mean that endpoint has to accept
+   client-minted items, and anyone could then mint themselves legendaries.
+   Keeping them in the save is exactly as trustworthy as the status quo,
+   since the client already pushes straight into state.eggs.
+
+   Returns 'incubator' or 'storage' so callers can word their own message. */
+function acquireEgg(speciesId, rarity, opts = {}) {
+  if (!Array.isArray(state.eggStorage)) state.eggStorage = [];
+  const egg = { speciesId, hatchTime: HATCH_TIMES[rarity], elapsed: 0 };
+  if (opts.guaranteedMutation) egg.guaranteedMutation = true;
+
+  if (state.eggs.length < getMaxIncubatorSlots()) {
+    state.eggs.push(egg);
+    return 'incubator';
+  }
+  // rarity is kept alongside so the storage list can label it without
+  // having to look the species back up.
+  state.eggStorage.push({ ...egg, rarity });
+  return 'storage';
+}
+
+/* Move one stored egg into a free incubator slot. */
+function moveStoredEggToIncubator(idx) {
+  if (!Array.isArray(state.eggStorage)) return;
+  if (state.eggs.length >= getMaxIncubatorSlots()) {
+    showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`);
+    return;
+  }
+  const taken = state.eggStorage.splice(idx, 1)[0];
+  if (!taken) return;
+  const { rarity, ...egg } = taken;
+  egg.elapsed = 0;   // incubation starts now, not when it was found
+  state.eggs.push(egg);
+  save(); updateTopBar(); renderEggsTab();
+  showToast(`${(rarity || 'common')} egg moved into the incubator!`);
+}
+
 function claimEvent() {
   if (!state.activeEvent || state.activeEvent.claimed) return;
-  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); return; }
   const rarity = rollRarity(state.activeEvent.weights);
   const species = rollSpecies(rarity);
-  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  const where = acquireEgg(species.id, rarity);
   state.activeEvent.claimed = true;
   save(); updateTopBar(); renderEggsTab();
-  showToast(`${state.activeEvent.icon} Found a ${rarity} egg from the event!`);
+  showToast(where === 'storage'
+    ? `${state.activeEvent.icon} Found a ${rarity} egg — incubator full, sent to Egg Storage!`
+    : `${state.activeEvent.icon} Found a ${rarity} egg from the event!`);
 }
 
 function dailyDig() {
   const now = Date.now();
   if (now - state.lastDailyDig < DAILY_DIG_COOLDOWN) return;
-  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); return; }
   state.lastDailyDig = now;
   const weights = { common:50, uncommon:30, rare:15, epic:4, legendary:1 };
   const rarity = rollRarity(weights);
   const species = rollSpecies(rarity);
-  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  const where = acquireEgg(species.id, rarity);
   save(); updateTopBar(); renderEggsTab();
-  showToast(`Daily dig found a ${rarity} egg! 🥚`);
+  showToast(where === 'storage'
+    ? `Daily dig found a ${rarity} egg — incubator full, sent to Egg Storage! 🥚`
+    : `Daily dig found a ${rarity} egg! 🥚`);
 }
 
 function redeemCode() {
@@ -4608,14 +4653,15 @@ function redeemCode() {
   if (state.usedCodes.includes(code)) { showToast('Code already redeemed!'); input.value = ''; return; }
   const codeData = VALID_CODES[code];
   if (!codeData) { showToast('Invalid code.'); input.value = ''; return; }
-  if (state.eggs.length >= getMaxIncubatorSlots()) { showToast(`Incubator full! (max ${getMaxIncubatorSlots()} eggs)`); input.value = ''; return; }
   state.usedCodes.push(code);
   const rarity = rollRarity(codeData.weights);
   const species = rollSpecies(rarity);
-  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  const where = acquireEgg(species.id, rarity);
   input.value = '';
   save(); updateTopBar(); renderEggsTab();
-  showToast(`Code redeemed! Found a ${rarity} egg! 🎁`);
+  showToast(where === 'storage'
+    ? `Code redeemed! A ${rarity} egg is waiting in Egg Storage! 🎁`
+    : `Code redeemed! Found a ${rarity} egg! 🎁`);
 }
 
 function renderEggsTab() { renderEventBanner(); renderIncubator(); renderEggSources(); }
@@ -4683,14 +4729,21 @@ function renderEggSources() {
       <span class="egg-source-badge ${eventStatus === 'available' ? 'esbadge-ready' : (eventStatus === 'claimed' ? 'esbadge-claimed' : 'esbadge-waiting')}">${eventStatus === 'available' ? 'Active!' : (eventStatus === 'claimed' ? 'Claimed' : 'Waiting')}</span>
     </div>
 
-    <div class="egg-source ${inventoryEggs.length > 0 ? 'available' : ''}">
+    ${(() => {
+      /* Counts BOTH stores: redeemed rewards waiting in the site inventory,
+         and eggs found in-game while the incubator was full, which live in
+         the save. A count that showed only one of the two would have players
+         reporting missing eggs that are sitting right there. */
+      const storedCount = (Array.isArray(state.eggStorage) ? state.eggStorage.length : 0) + inventoryEggs.length;
+      return `<div class="egg-source ${storedCount > 0 ? 'available' : ''}">
       <div class="egg-source-icon"><img src="${IC}baby_eggs/egg_clutch.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
         <div class="egg-source-name">Egg Storage</div>
-        <div class="egg-source-desc">${inventoryEggs.length > 0 ? inventoryEggs.length + ' egg(s) waiting — click to move one into the incubator!' : 'Eggs you earn or redeem while the incubator is full wait here. Earn them from Phamily Time levels and drop codes.'}</div>
+        <div class="egg-source-desc">${storedCount > 0 ? storedCount + ' egg(s) waiting — click one below to move it into the incubator!' : 'Any egg you find or redeem while the incubator is full waits here instead of being lost.'}</div>
       </div>
-      <span class="egg-source-badge ${inventoryEggs.length > 0 ? 'esbadge-ready' : 'esbadge-waiting'}">${inventoryEggs.length > 0 ? inventoryEggs.length + ' Eggs' : 'Earn'}</span>
-    </div>
+      <span class="egg-source-badge ${storedCount > 0 ? 'esbadge-ready' : 'esbadge-waiting'}">${storedCount > 0 ? storedCount + ' Eggs' : 'Empty'}</span>
+    </div>`;
+    })()}
     ${renderInventoryEggSection()}
 
     <div class="egg-source">
@@ -5318,8 +5371,32 @@ async function useInventoryEgg(itemId) {
 const origRenderEggSources = typeof renderEggSources === 'function' ? renderEggSources : null;
 
 function renderInventoryEggSection() {
-  if (inventoryEggs.length === 0) return '';
-  let html = '<div class="section-title" style="margin-top:16px">Phamily Time Eggs</div>';
+  const stored = Array.isArray(state.eggStorage) ? state.eggStorage : [];
+  if (inventoryEggs.length === 0 && stored.length === 0) return '';
+
+  const noRoom = state.eggs.length >= getMaxIncubatorSlots();
+  let html = '<div class="section-title" style="margin-top:16px">Egg Storage</div>';
+  if (noRoom) {
+    html += '<div style="font-size:10px;color:#666;margin-bottom:6px">Incubator is full — hatch one to free a slot.</div>';
+  }
+
+  /* Eggs found in-game while the incubator was full. These live in the save,
+     not the site inventory, so they are listed separately from redeemed
+     rewards — see acquireEgg for why the two are kept apart. */
+  stored.forEach((egg, i) => {
+    const rarityLabel = (egg.rarity || 'common').charAt(0).toUpperCase() + (egg.rarity || 'common').slice(1);
+    const eggIcon = EGG_ASSETS[egg.rarity] || EGG_ASSETS.common;
+    const dim = noRoom ? 'opacity:0.4;cursor:default' : 'cursor:pointer';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:#111;border:1px solid #ffffff14;border-radius:6px;margin-bottom:6px;${dim}" onclick="moveStoredEggToIncubator(${i})">
+      <div><img src="${eggIcon}" width="32" height="32" style="image-rendering:pixelated;" alt=""></div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:#fff">${rarityLabel} Egg</div>
+        <div style="font-size:10px;color:#666">${egg.guaranteedMutation ? 'Mutation guaranteed • ' : ''}Found in your park</div>
+      </div>
+      <div style="font-size:9px;color:#ff0000;text-transform:uppercase;letter-spacing:0.05em">Incubate</div>
+    </div>`;
+  });
+
   for (const egg of inventoryEggs) {
     const qty = egg.quantity || 1;
     const rarityLabel = (egg.rarity || 'common').charAt(0).toUpperCase() + (egg.rarity || 'common').slice(1);
