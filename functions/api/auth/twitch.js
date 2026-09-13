@@ -19,8 +19,24 @@ export async function onRequestGet(context) {
   const state = url.searchParams.get('state');
 
   if (error) {
+    /* Twitch rejected the authorisation. This used to redirect to returnTo
+       and drop the reason entirely, which made a failed login look identical
+       to "the button did nothing": no cookie, no message, no trace. That cost
+       real debugging time — an invalid redirect_uri produced a silent bounce
+       with nothing anywhere to explain it.
+
+       Surface it both ways: a log line for whoever is running the server, and
+       a query param so it is visible in the address bar even when the failure
+       happens on a deployment whose logs nobody can read. */
+    const description = url.searchParams.get('error_description') || '';
+    console.error(`[auth] Twitch OAuth error: ${error}${description ? ' — ' + description : ''} (redirect_uri sent: ${redirectUri})`);
+
     const returnTo = state ? decodeURIComponent(state) : '/';
-    return Response.redirect(`${url.origin}${returnTo}`, 302);
+    const sep = returnTo.includes('?') ? '&' : '?';
+    return Response.redirect(
+      `${url.origin}${returnTo}${sep}login_error=${encodeURIComponent(error)}`,
+      302
+    );
   }
 
   if (!code) {
