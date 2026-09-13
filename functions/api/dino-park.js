@@ -103,52 +103,69 @@ export async function grantEgg(env, userId, rarity, opts = {}) {
   if (!userId) return { success: false, error: 'Missing user' };
   if (!HATCH_TIMES[rarity]) return { success: false, error: 'Invalid rarity' };
 
-  const key = saveKey(userId);
-  const record = await env.MARKETPLACE.get(key, 'json');
-
-  /* A pre-epoch record is treated as no record at all. Pushing the egg
-     into a stale state would write a state the client discards on its
-     next load, taking the egg with it — the player redeems a code, sees
-     the success toast, and receives nothing. */
-  const existing = (record && record.state && record.state.saveEpoch === SAVE_EPOCH)
-    ? record.state
-    : null;
-  const state = existing || defaultState();
-  if (!Array.isArray(state.eggs)) state.eggs = [];
-
-  const maxSlots = getMaxIncubatorSlots(state);
-  if (state.eggs.length >= maxSlots) {
-    return { success: false, error: 'Incubator full' };
-  }
-
   const speciesId = rollSpeciesId(rarity);
   if (!speciesId) return { success: false, error: 'Invalid rarity' };
 
-  /* grantId identifies this specific grant so a client can tell an egg it
-     has never seen from one it already has, and merge without duplicating.
-     grantSeq is the optimistic-concurrency token: onRequestPost refuses any
-     save carrying an older value. Together they are what stops the client's
-     next full-state POST from destroying this egg. */
-  const egg = {
-    speciesId,
-    hatchTime: HATCH_TIMES[rarity],
-    elapsed: 0,
-    grantId: crypto.randomUUID(),
-  };
-  if (opts.guaranteedMutation) egg.guaranteedMutation = true;
-  state.eggs.push(egg);
-  state.grantSeq = Number(state.grantSeq || 0) + 1;
-  state.lastTick = Date.now();
+  /* ── WHY THIS IS UNDER A LOCK ───────────────────────────────────────
+     This used to be a get, a push, and a put — three separate operations.
+     Two redemptions arriving close together both read the same state, both
+     appended their egg to that same snapshot, and both wrote it back: last
+     writer won and the other egg vanished. It was not theoretical. A player
+     redeeming twelve codes in one sitting received two eggs, because ten
+     grants overwrote each other.
 
-  const updated = { userId, state, savedAt: Date.now() };
-  await env.MARKETPLACE.put(key, JSON.stringify(updated));
+     mutate() takes an advisory lock on the key for the duration, so the
+     read and the write are one atomic step and concurrent grants queue
+     instead of colliding. The mutator returns undefined to opt out of
+     writing, which is how the incubator-full case leaves the record
+     untouched. */
+  let outcome = null;
+
+  await env.MARKETPLACE.mutate(saveKey(userId), (record) => {
+    /* A pre-epoch record is treated as no record at all. Pushing the egg
+       into a stale state would write a state the client discards on its
+       next load, taking the egg with it. */
+    const usable = (record && record.state && record.state.saveEpoch === SAVE_EPOCH)
+      ? record.state
+      : null;
+    const state = usable || defaultState();
+    if (!Array.isArray(state.eggs)) state.eggs = [];
+
+    if (state.eggs.length >= getMaxIncubatorSlots(state)) {
+      outcome = { full: true };
+      return undefined;                    // no write; caller overflows to inventory
+    }
+
+    /* grantId identifies this specific grant so a client can tell an egg it
+       has never seen from one it already has, and merge without duplicating.
+       grantSeq is the optimistic-concurrency token: onRequestPost refuses any
+       save carrying an older value. Together they are what stops the client's
+       next full-state POST from destroying this egg. */
+    const egg = {
+      speciesId,
+      hatchTime: HATCH_TIMES[rarity],
+      elapsed: 0,
+      grantId: crypto.randomUUID(),
+    };
+    if (opts.guaranteedMutation) egg.guaranteedMutation = true;
+
+    state.eggs.push(egg);
+    state.grantSeq = Number(state.grantSeq || 0) + 1;
+    state.lastTick = Date.now();
+
+    outcome = { egg };
+    return { userId, state, savedAt: Date.now() };
+  });
+
+  if (!outcome) return { success: false, error: 'Grant failed' };
+  if (outcome.full) return { success: false, error: 'Incubator full' };
 
   return {
     success: true,
     egg: {
-      speciesId: egg.speciesId,
-      hatchTime: egg.hatchTime,
-      guaranteedMutation: !!egg.guaranteedMutation,
+      speciesId: outcome.egg.speciesId,
+      hatchTime: outcome.egg.hatchTime,
+      guaranteedMutation: !!outcome.egg.guaranteedMutation,
     },
   };
 }
