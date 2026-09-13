@@ -471,21 +471,31 @@ async function createEventSubSubscriptions(env, request) {
   const giveawayRewardId = await env.MARKETPLACE.get('giveaway_reward_id');
 
   const subscriptions = [
+    /* HYPE TRAIN IS VERSION 2, not 1.
+       Twitch replaced the hype train EventSub events when it overhauled the
+       feature and retired v1; requesting v1 now returns "invalid subscription
+       type and version", which reads like a typo in the type string and is
+       not. The other four subscription types here are still v1 — the version
+       is per type, not global, so they must not be bumped along with it.
+
+       Payload-compatible with this handler: v2 still carries id, level,
+       total, goal and top_contributions, which is everything hype-train.js
+       reads. */
     {
       type: 'channel.hype_train.begin',
-      version: '1',
+      version: '2',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/hype-train`,
     },
     {
       type: 'channel.hype_train.progress',
-      version: '1',
+      version: '2',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/hype-train`,
     },
     {
       type: 'channel.hype_train.end',
-      version: '1',
+      version: '2',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/hype-train`,
     },
@@ -576,7 +586,14 @@ async function createEventSubSubscriptions(env, request) {
         warning: `A subscription for this type+condition already exists, possibly with a different callback than ${sub.callback}. Twitch does not allow two, and this request changed nothing. Use action:'list-eventsub' to see where it actually points, and action:'delete-eventsub' to remove it first if you need to re-point it.`,
       });
     } else {
-      results.push({ type: sub.type, ok: false, error: data.message || res.statusText });
+      /* Include the version. "invalid subscription type and version" with
+         no indication of WHICH version was tried is what made this take a
+         round trip to diagnose. */
+      results.push({
+        type: `${sub.type} (v${sub.version})`,
+        ok: false,
+        error: data.message || res.statusText,
+      });
     }
   }
 
