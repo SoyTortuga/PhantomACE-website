@@ -1644,6 +1644,29 @@ function rollMutation(specId){
   return null;
 }
 
+/* A mutation is guaranteed, but WHICH mutation keeps its normal relative
+   odds. Rolling inside 0-18 rather than 0-100 is exactly the mutation band
+   of rollMutation above, so a rare mutation is still rare *relative to* a
+   colour swap (0.5 in 18, not 1 in 4). Flattening the distribution would
+   quietly make guaranteed-mutation eggs the best source of rare mutations
+   in the game, which is not what "guaranteed a mutation" should mean.
+
+   Species without a rare or special variant fall through those bands, so
+   the loop retries; the global-mutation fallback always succeeds because
+   MUTATIONS is never empty. */
+function rollMutationGuaranteed(specId){
+  for(let i=0;i<40;i++){
+    const r=Math.random()*18;
+    if(r<0.5&&RARE_MUTS[specId])return'rare_'+specId;
+    if(r<3&&SPECIAL_MUTS[specId])return'sp_'+specId;
+    if(r<15){const n=pickSwaps(SPECIES_DEF[specId].p);if(n&&n.length)return n[Math.floor(Math.random()*n.length)].id;continue;}
+    const gk=Object.keys(MUTATIONS);
+    return gk[Math.floor(Math.random()*gk.length)];
+  }
+  const gk=Object.keys(MUTATIONS);
+  return gk[Math.floor(Math.random()*gk.length)];
+}
+
 const spriteCache = {};
 
 // Drawing helpers
@@ -4685,7 +4708,7 @@ function hatchEgg(idx) {
   if (egg.elapsed < egg.hatchTime) return;
   if (state.park.length >= MAX_ACTIVE_PARK && state.vault.length >= MAX_VAULT_SIZE) { showToast('Park and vault are both full!'); return; }
   const spec = getRosterById(egg.speciesId);
-  const mut = rollMutation(spec.id);
+  const mut = egg.guaranteedMutation ? rollMutationGuaranteed(spec.id) : rollMutation(spec.id);
   const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, hygiene:80, stamina:80, careCount:0, mutation: mut };
   const dest = addNewDino(newDino);
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);

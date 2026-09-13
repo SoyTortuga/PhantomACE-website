@@ -90,7 +90,16 @@ function defaultState() {
    calling here. Always produces a species AT the requested rarity
    (never weighted toward it). Returns {success:false, error} if the
    incubator is full so the caller can avoid marking the code consumed. */
-export async function grantEgg(env, userId, rarity) {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.guaranteedMutation] the hatch must produce a
+ *   mutation. Mutations are rolled by the CLIENT at hatch time (~18% chance),
+ *   so this cannot be decided here — it is recorded on the egg and honoured
+ *   by hatchEgg() in games/dino-park/index.html. An older client simply
+ *   ignores the flag and rolls normally, which is a silent downgrade rather
+ *   than a break.
+ */
+export async function grantEgg(env, userId, rarity, opts = {}) {
   if (!userId) return { success: false, error: 'Missing user' };
   if (!HATCH_TIMES[rarity]) return { success: false, error: 'Invalid rarity' };
 
@@ -116,13 +125,21 @@ export async function grantEgg(env, userId, rarity) {
   if (!speciesId) return { success: false, error: 'Invalid rarity' };
 
   const egg = { speciesId, hatchTime: HATCH_TIMES[rarity], elapsed: 0 };
+  if (opts.guaranteedMutation) egg.guaranteedMutation = true;
   state.eggs.push(egg);
   state.lastTick = Date.now();
 
   const updated = { userId, state, savedAt: Date.now() };
   await env.MARKETPLACE.put(key, JSON.stringify(updated));
 
-  return { success: true, egg: { speciesId: egg.speciesId, hatchTime: egg.hatchTime } };
+  return {
+    success: true,
+    egg: {
+      speciesId: egg.speciesId,
+      hatchTime: egg.hatchTime,
+      guaranteedMutation: !!egg.guaranteedMutation,
+    },
+  };
 }
 
 /* ── GET — fetch the player's cloud save ──────── */

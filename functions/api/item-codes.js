@@ -50,6 +50,9 @@ function validateItemShape(item) {
   if (item.game === 'dino-park' && item.type === 'egg' && !SITE_RARITIES.includes(item.rarity)) {
     return `Dino Park egg items require rarity to be one of: ${SITE_RARITIES.join(', ')}`;
   }
+  if (item.guaranteedMutation && !(item.game === 'dino-park' && item.type === 'egg')) {
+    return 'guaranteedMutation only applies to Dino Park egg items';
+  }
   return null;
 }
 
@@ -205,13 +208,24 @@ export async function onRequestPost(context) {
 /* ── Exported for server-to-server callers (e.g. monthly leaderboard
    awards in leaderboards.js) — bypasses the HTTP session/role check
    since the caller already knows it's an authorized, internal grant. ── */
-export async function createItemCode(env, item) {
+/**
+ * @param {object} item the reward
+ * @param {object} [opts]
+ * @param {string[]} [opts.restrictedTo] user ids allowed to redeem. Omit for
+ *   a public code. Present = nobody else can redeem it even knowing the
+ *   string, which is what makes a code safe to hand to a named person.
+ */
+export async function createItemCode(env, item, opts = {}) {
   const invalidReason = validateItemShape(item);
   if (invalidReason) throw new Error(invalidReason);
 
   const code = generateCode();
   const record = {
     code,
+    /* Fields are picked explicitly rather than spread, so a typo in a caller
+       cannot smuggle an unexpected field into a stored reward. Anything new
+       has to be added here deliberately — which is why guaranteedMutation
+       appears below. */
     item: {
       id: item.id,
       game: item.game,
@@ -220,12 +234,18 @@ export async function createItemCode(env, item) {
       rarity: item.rarity || 'common',
       consumable: item.consumable || false,
       quantity: item.quantity || 1,
+      guaranteedMutation: item.guaranteedMutation || false,
     },
     active: false,
     createdAt: Date.now(),
     activatedAt: null,
     expiresAt: null,
     redeemedBy: [],
+    /* null means public. An array means only these accounts may redeem,
+       regardless of who learns the code. */
+    restrictedTo: Array.isArray(opts.restrictedTo) && opts.restrictedTo.length
+      ? opts.restrictedTo.map(String)
+      : null,
   };
 
   await saveCodeRecord(env, code, record);
@@ -264,6 +284,19 @@ async function handleRedeem(env, session, body) {
   }
 
   const userId = session.user_id;
+
+  /* Account restriction, checked before anything is granted. A restricted
+     code is useless to anyone outside the list even if the string leaks —
+     which is the whole point, given 171 public giveaway codes were
+     downloadable from the site until recently.
+
+     Deliberately the same "Invalid code" wording as an unknown code: telling
+     a stranger that a code is real but not theirs invites them to go looking
+     for whose it is. */
+  if (Array.isArray(record.restrictedTo) && !record.restrictedTo.includes(String(userId))) {
+    return json({ error: 'Invalid code' }, 404);
+  }
+
   if (record.redeemedBy.includes(userId)) {
     return json({ error: 'Already redeemed' }, 409);
   }
@@ -332,7 +365,9 @@ async function redeemDinoEgg(env, record, code, userId) {
 
   let result;
   try {
-    result = await grantEgg(env, userId, dinoTier);
+    result = await grantEgg(env, userId, dinoTier, {
+      guaranteedMutation: !!record.item.guaranteedMutation,
+    });
   } catch {
     await releaseRedemption(env, code, userId);
     return json({ error: 'Something went wrong granting your egg. Try again.' }, 500);
