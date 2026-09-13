@@ -97,6 +97,36 @@ $pg = Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | Select-Obj
 if (-not $pg) { throw 'No postgresql* service found. Is Postgres installed on this machine?' }
 Write-Host "[setup] postgres service: $($pg.Name)"
 
+# ── snapshot the OTHER services before touching anything ─────────────────
+# Installing 'phantomace-web' was observed to also rewrite the configuration
+# of 'phantomace-web-dev' — port, public origin and database all replaced
+# with the new service's values. The previous verification step missed it
+# entirely because it read back through `nssm get` on the service it thought
+# it had configured, i.e. through the same name resolution that was going
+# wrong. An assertion that shares a failure mode with the thing it checks is
+# not an assertion.
+#
+# So: record every sibling service's stored parameters now, and compare after.
+$SVC_REG = 'HKLM:\SYSTEM\CurrentControlSet\Services'
+
+function Get-ServiceParams([string] $name) {
+    $p = Join-Path $SVC_REG "$name\Parameters"
+    if (-not (Test-Path $p)) { return $null }
+    return (((Get-ItemProperty -Path $p).PSObject.Properties |
+             Where-Object { $_.Name -notlike 'PS*' } |
+             Sort-Object Name |
+             ForEach-Object { "$($_.Name)=$($_.Value -join '|')" }) -join "`n")
+}
+
+$siblings = @(Get-Service -Name 'phantomace*' -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -ne $ServiceName } |
+              Select-Object -ExpandProperty Name)
+$siblingsBefore = @{}
+foreach ($s in $siblings) { $siblingsBefore[$s] = Get-ServiceParams $s }
+if ($siblings.Count) {
+    Write-Host "[setup] watching $($siblings.Count) sibling service(s) for collateral changes: $($siblings -join ', ')"
+}
+
 # ── (re)create the service ────────────────────────────────────────────────
 if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
     Write-Host "[setup] $ServiceName exists; stopping and removing first"
@@ -125,7 +155,7 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
 # to "...\PhantomACE Website\server\logs\server.out.log" correctly.
 & $nssm install $ServiceName $node 'index.js'
 & $nssm set $ServiceName AppDirectory       $serverDir
-& $nssm set $ServiceName DisplayName        'PhantomACE Web Server'
+& $nssm set $ServiceName DisplayName        "PhantomACE Web Server ($ServiceName)"
 & $nssm set $ServiceName Description        'Serves phantomace.tv (static site + /api) backed by Postgres.'
 & $nssm set $ServiceName Start              SERVICE_AUTO_START
 & $nssm set $ServiceName DependOnService    $pg.Name
@@ -136,8 +166,15 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
 & $nssm set $ServiceName AppRestartDelay    5000
 & $nssm set $ServiceName AppThrottle        5000
 
-& $nssm set $ServiceName AppStdout          (Join-Path $logDir 'server.out.log')
-& $nssm set $ServiceName AppStderr          (Join-Path $logDir 'server.err.log')
+# Log paths are PER SERVICE. They used to be fixed names derived only from
+# the repo location, so phantomace-web and phantomace-web-dev wrote to the
+# same server.out.log and their output interleaved — production traffic mixed
+# into dev's boot sequence, with NSSM's size-based rotation triggered by the
+# combined volume of both. Each service is otherwise fully isolated, so this
+# was purely a debuggability problem, but it surfaced during a live cutover
+# and cost real time tracing which lines belonged to which process.
+& $nssm set $ServiceName AppStdout          (Join-Path $logDir "$ServiceName.out.log")
+& $nssm set $ServiceName AppStderr          (Join-Path $logDir "$ServiceName.err.log")
 & $nssm set $ServiceName AppRotateFiles     1
 & $nssm set $ServiceName AppRotateBytes     10485760
 
@@ -159,16 +196,28 @@ $envBlock = @(
 # like a different problem. So assert on the stored values rather than on the
 # exit codes of the commands that wrote them.
 #
-# `nssm get` emits UTF-16, which arrives here with embedded NULs.
-function Get-NssmValue([string] $key) {
-    ((& $nssm get $ServiceName $key) -join '') -replace "`0", ''
+# Read the REGISTRY, not `nssm get`. NSSM is where the writes are going
+# wrong, so asking it what it stored is asking the suspect for an alibi.
+# These four values are exactly where NSSM keeps them.
+function Get-RegValue([string] $key) {
+    $p = Join-Path $SVC_REG "$ServiceName\Parameters"
+    $v = (Get-ItemProperty -Path $p -Name $key -ErrorAction SilentlyContinue).$key
+    if ($null -eq $v) { return '' }
+    return (($v -join '') -replace "`0", '').Trim()
 }
 
-$storedParams = (Get-NssmValue 'AppParameters').Trim()
-$storedDir    = (Get-NssmValue 'AppDirectory').Trim()
-$storedApp    = (Get-NssmValue 'Application').Trim()
+$storedParams = Get-RegValue 'AppParameters'
+$storedDir    = Get-RegValue 'AppDirectory'
+$storedApp    = Get-RegValue 'Application'
 
 $failures = @()
+
+# Did configuring this service change a different one?
+foreach ($s in $siblings) {
+    if ((Get-ServiceParams $s) -ne $siblingsBefore[$s]) {
+        $failures += "installing '$ServiceName' also MODIFIED sibling service '$s'"
+    }
+}
 if ($storedParams -ne 'index.js') {
     $failures += "AppParameters is '$storedParams', expected 'index.js'"
 }
@@ -186,12 +235,36 @@ if ($failures.Count) {
     Write-Host ''
     Write-Host '[setup] REFUSING TO LEAVE A BROKEN SERVICE INSTALLED:' -ForegroundColor Red
     foreach ($f in $failures) { Write-Host "          $f" -ForegroundColor Red }
+
+    # A damaged sibling is NOT repaired by removing the service we just made,
+    # so print what it held before. Without this the operator is left with a
+    # silently misconfigured service and no record of its previous values —
+    # which is exactly the situation that had production pointed at the dev
+    # port during a live cutover.
+    $damaged = @($siblings | Where-Object { (Get-ServiceParams $_) -ne $siblingsBefore[$_] })
+    if ($damaged.Count) {
+        Write-Host ''
+        Write-Host '[setup] A SIBLING SERVICE WAS ALTERED. Removing this service does NOT' -ForegroundColor Red
+        Write-Host '        undo that. Its configuration BEFORE this run was:' -ForegroundColor Red
+        foreach ($d in $damaged) {
+            Write-Host ''
+            Write-Host "        == $d ==" -ForegroundColor Yellow
+            # Passwords live in DATABASE_URL inside AppEnvironmentExtra.
+            foreach ($line in ($siblingsBefore[$d] -split "`n")) {
+                Write-Host ('        ' + ($line -replace '://([^:]+):[^@]+@', '://$1:***@'))
+            }
+        }
+        Write-Host ''
+        Write-Host "        Re-run this script for that service to restore it." -ForegroundColor Yellow
+    }
+
     Write-Host ''
-    Write-Host '[setup] removing it again so nothing auto-starts at next boot.'
+    Write-Host '[setup] removing the service just created so nothing auto-starts at next boot.'
     & $nssm remove $ServiceName confirm | Out-Null
     throw 'Service configuration failed verification; the service was removed.'
 }
 Write-Host "[setup] verified: $storedApp index.js (in $storedDir)"
+if ($siblings.Count) { Write-Host '[setup] verified: no sibling service was modified' }
 
 Write-Host ''
 Write-Host "[setup] installed '$ServiceName'"
