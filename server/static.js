@@ -89,10 +89,20 @@ export function createStatic(root) {
       308s to it) — so accept both spellings of an enumerated page. */
   function isAllowed(segments) {
     if (segments.length === 0) return false;
-    if (ALLOWED_DIRS.includes(segments[0])) return segments.length > 1;
-    if (segments.length === 1) {
-      return rootHtmlFiles.has(segments[0]) || rootHtmlFiles.has(segments[0] + '.html');
+
+    /* A root page may share its name with an allowed directory, so the page
+       spelling is tested FIRST. `games.html` and `games/` both exist: with
+       the directory rule first, "/games" was denied for having only one
+       segment and never fell through to the page check — a 404 on a main
+       nav page, while "/games.html" still 308'd to it, so the games page
+       was unreachable entirely. "/about" only escaped this because no
+       "about/" directory happens to exist. */
+    if (segments.length === 1 &&
+        (rootHtmlFiles.has(segments[0]) || rootHtmlFiles.has(segments[0] + '.html'))) {
+      return true;
     }
+
+    if (ALLOWED_DIRS.includes(segments[0])) return segments.length > 1;
     return false;
   }
 
