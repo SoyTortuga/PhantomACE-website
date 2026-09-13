@@ -1,5 +1,35 @@
 # Cutover runbook — Cloudflare Pages → self-hosted
 
+> ## ✅ EXECUTED 2026-09-13. `phantomace.tv` is served by the rig.
+>
+> Kept as the record of what was done, and because the rollback section is
+> still live for ~30 days. Steps carry their outcomes inline.
+>
+> **What went wrong, all caught before it mattered:**
+> - The installer wrote its settings to the *wrong service*, leaving production
+>   configured for the dev port and database. Its readback assertion missed it
+>   because it verified through `nssm get` on the service it believed it had
+>   configured — the same name resolution that was failing. Repaired by writing
+>   the registry directly; installer fixed in `1d49f95` to verify against the
+>   registry and to snapshot sibling services before and after.
+> - `/games` 404'd because the static allowlist tested the directory rule before
+>   the page rule, and `games` is both `games.html` and `games/`. `/about` only
+>   escaped the identical bug because no `about/` directory exists. Fixed in
+>   `a5e6aad`.
+> - The tunnel briefly pointed at **8789**, the dev port. This produced a
+>   visible 502 only because dev was stopped; had dev been running, production
+>   would have quietly served the **dev database** to the public. Stopping dev
+>   before the switch turned a silent data incident into an obvious error —
+>   keep doing that.
+> - Step 8's original caching advice would have frozen HTML/CSS/JS at the edge.
+>   See that step.
+>
+> **Proven after cutover:** production survives an unattended reboot. Boot at
+> 07:30:55 UTC, both services back at ~07:31:04 with identical uptimes, no
+> manual intervention, no `[db] not ready` lines — `DependOnService` sufficed.
+>
+> **Still outstanding:** see the "After cutover" section at the end.
+
 Executable checklist for moving `phantomace.tv` from Cloudflare Pages to the
 rig. Supersedes the cutover section of `MIGRATION-PLAN.md`, which was written
 before several findings that simplify it.
@@ -147,14 +177,50 @@ Then **log in through a browser** and confirm you land back on the page you
 started from. If anything goes wrong, the URL now carries `?login_error=<reason>` —
 read it rather than guessing.
 
-### 8. Restore edge caching
-Zone → Rules → Cache Rules:
-- **Cache** `/assets/*`, `/css/*`, `/js/*`, `/games/*` with a long edge TTL
-- **Bypass** `/api/*` and `/cdn/*`
+### 8. Restore edge caching — DONE, and not the way this step originally said
 
-Not optional polish: 72 MB of Dino Park sprites just moved onto a residential
-upstream. This restores the offload Pages gave for free. Confirm with
-`cf-cache-status: HIT` on a repeat asset request.
+> **The original advice here was wrong and would have broken deploys.** It said
+> to cache `/assets/*`, `/css/*`, `/js/*` and `/games/*` with a long edge TTL.
+> This project has **no cache-busting whatsoever** — CSS and JS are referenced
+> as plain `/css/base.css`, there is no build step and no content hashing — so a
+> long edge TTL on those paths means no future deploy reaches users until
+> someone manually purges. Worse, `/games/*` includes
+> `games/dino-park/index.html`, the game itself, so the `SAVE_EPOCH` progression
+> reset and every future hotfix would have been frozen at the edge.
+
+Match on **file extension**, not path prefix, so HTML/CSS/JS are never caught
+and any asset folder added later is covered automatically:
+
+**Rule 1 — Cache static media.** Custom expression:
+```
+ends_with(http.request.uri.path, ".png") or ... (.jpg .jpeg .gif .webp .svg
+.ico .woff .woff2 .ttf .otf .mp3 .ogg .wav)
+```
+- Cache eligibility: *Eligible for cache*
+- Edge TTL: **Ignore cache-control header and use this TTL** → `2592000` (30d)
+- Browser TTL: override → `86400` (1d)
+
+The Edge TTL override is mandatory, not a preference: `send` serves static
+files with `Cache-Control: public, max-age=0`, so "use cache-control if present"
+caches essentially nothing.
+
+**Rule 2 — Bypass API**, ordered BELOW rule 1:
+```
+starts_with(http.request.uri.path, "/api/") or starts_with(http.request.uri.path, "/cdn/")
+```
+- Cache eligibility: *Bypass cache*
+
+Order matters for exactly one overlap: `/cdn/media/x.png` matches both, and the
+later rule wins, so bypass must come second.
+
+**Verified 2026-09-13:** a 15.5 MB Dino Park background returns
+`cf-cache-status: HIT` on a repeat request; `/api/health` is `DYNAMIC` with
+`no-store`; `/games` HTML is `DYNAMIC` with `max-age=0`, so deploys still land.
+
+**Caveat worth remembering:** a Cloudflare purge does not clear browsers. With
+a 1-day browser TTL, *replacing* an existing sprite at the same filename can
+show stale for up to a day. Add new files under new names rather than
+overwriting.
 
 ### 9. Point the bot service at localhost — only once everything above is green
 In `PhantomACE-Bot-Service/.env`, change `BRIDGE_URL` to `http://localhost:8790`.
