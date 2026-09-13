@@ -1,15 +1,28 @@
 # Pending deploy — prepared 2026-09-13
 
-Production is running **866b407**. Three commits are waiting, and two of them
-will stop the server booting if the steps are done out of order.
+Production is running **866b407**. Target is **7c1ee50**.
 
 Delete this file once it has been carried out.
 
-| Commit | What | Extra requirement |
-|---|---|---|
-| `ddbcd43` | `channel:read:hype_train` scope | restart only |
-| `615f3b2` | Native giveaway entry ledger | **schema apply, both databases** |
-| `998ceb7` | Signed session cookie | **`SESSION_SECRET` in `server/.env`** |
+## Already done — do not repeat
+
+- ✅ `SESSION_SECRET` is in `server/.env`
+- ✅ Schema applied to **both** databases (`giveaway_entries`, `giveaway_drop_codes`)
+- ✅ Dev is already running this code and the full chain was tested green on it
+
+So steps 1 and 3 below are complete. The deploy is: pull, restart, verify,
+seed pools.
+
+## What is shipping
+
+| Commit | What |
+|---|---|
+| `ddbcd43` | `channel:read:hype_train` scope — unblocks the broadcaster |
+| `615f3b2` | Native giveaway entry ledger, replacing the Gleam placeholder |
+| `998ceb7` | **Signed session cookie — logs everyone out** |
+| `3130b1f` | Function-name collision fix + last of the Gleam copy |
+| `625fd6a` | Giveaway pools: seeding + automatic top-up |
+| `7c1ee50` | EventSub replay window |
 
 ## The dependency that decides the order
 
@@ -23,18 +36,10 @@ So: deploy, then broadcaster. Not the other way round.
 
 ## Steps
 
-### 1. `SESSION_SECRET` into `server/.env` — before anything restarts
-```
-SESSION_SECRET=<64 hex chars>
-```
-Generate with:
-`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-
-The server refuses to boot without it, deliberately: with no secret nothing
-could verify a session and every request, the broadcaster's included, would
-arrive looking logged out with no visible cause.
-
-One entry covers both services — they share `.env`.
+### 1. `SESSION_SECRET` — ALREADY DONE
+Present in `server/.env`. The server refuses to boot without it, so if the
+restart fails with a missing-secret message, that file is the place to look
+rather than the code.
 
 ### 2. Pull
 ```
