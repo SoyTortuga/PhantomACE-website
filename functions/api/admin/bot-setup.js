@@ -314,6 +314,14 @@ export async function onRequestPost(context) {
     return await createEventSubSubscriptions(env, request);
   }
 
+  if (body.action === 'list-eventsub') {
+    return await listEventSubSubscriptions(env);
+  }
+
+  if (body.action === 'delete-eventsub') {
+    return await deleteEventSubSubscription(env, body);
+  }
+
   if (body.action === 'create-giveaway-reward') {
     return await createGiveawayReward(env, body);
   }
@@ -531,8 +539,20 @@ async function createEventSubSubscriptions(env, request) {
     });
 
     const data = await res.json();
-    if (res.ok || res.status === 409) {
-      results.push({ type: sub.type, ok: true, status: res.status === 409 ? 'already exists' : 'created' });
+    if (res.ok) {
+      results.push({ type: sub.type, ok: true, status: 'created' });
+    } else if (res.status === 409) {
+      // Twitch's uniqueness is on type + version + condition — NOT the
+      // callback URL. So a 409 means "one already exists somewhere", quite
+      // possibly pointing at a different origin, and nothing was subscribed
+      // here. Reporting that as plain success is how you end up believing
+      // dev is wired up when every event is still going to production.
+      results.push({
+        type: sub.type,
+        ok: true,
+        status: 'already exists — NOT re-pointed',
+        warning: `A subscription for this type+condition already exists, possibly with a different callback than ${sub.callback}. Twitch does not allow two, and this request changed nothing. Use action:'list-eventsub' to see where it actually points, and action:'delete-eventsub' to remove it first if you need to re-point it.`,
+      });
     } else {
       results.push({ type: sub.type, ok: false, error: data.message || res.statusText });
     }
@@ -543,4 +563,77 @@ async function createEventSubSubscriptions(env, request) {
   ));
 
   return json({ success: true, results });
+}
+
+/* ── Inspect and remove subscriptions ──────────────────────────────────────
+   Without these there is no recovery path: create-eventsub never deletes and
+   treats 409 as success, so once a subscription is revoked, or is pointing at
+   an origin you no longer use, the admin panel cannot fix it and the only
+   option is raw curl against the Helix API. That gap matters most during a
+   migration, when callbacks may need re-pointing at a new origin. */
+
+async function listEventSubSubscriptions(env) {
+  const appToken = await getAppAccessToken(env);
+  if (!appToken) return json({ error: 'Could not get app access token.' }, 500);
+
+  const subs = [];
+  let cursor = '';
+  // Paginate — a partial list is worse than none here, since a subscription
+  // you cannot see is exactly the one causing the 409 you cannot explain.
+  do {
+    const url = 'https://api.twitch.tv/helix/eventsub/subscriptions' + (cursor ? `?after=${cursor}` : '');
+    const res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + appToken, 'Client-Id': env.TWITCH_CLIENT_ID },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return json({ error: err.message || res.statusText }, res.status);
+    }
+    const data = await res.json();
+    for (const s of data.data || []) {
+      subs.push({
+        id: s.id,
+        type: s.type,
+        version: s.version,
+        status: s.status,
+        condition: s.condition,
+        callback: s.transport && s.transport.callback,
+        createdAt: s.created_at,
+      });
+    }
+    cursor = data.pagination && data.pagination.cursor;
+  } while (cursor);
+
+  return json({
+    success: true,
+    total: subs.length,
+    subscriptions: subs,
+    // Anything not 'enabled' will never deliver again and must be deleted
+    // and recreated; Twitch does not resurrect these on its own.
+    needsAttention: subs.filter(s => s.status !== 'enabled').map(s => ({ id: s.id, type: s.type, status: s.status })),
+  });
+}
+
+async function deleteEventSubSubscription(env, body) {
+  const id = (body.id || '').trim();
+  if (!id) return json({ error: "Missing 'id'. Use action:'list-eventsub' to find it." }, 400);
+
+  const appToken = await getAppAccessToken(env);
+  if (!appToken) return json({ error: 'Could not get app access token.' }, 500);
+
+  const res = await fetch(
+    `https://api.twitch.tv/helix/eventsub/subscriptions?id=${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + appToken, 'Client-Id': env.TWITCH_CLIENT_ID },
+    }
+  );
+
+  // Twitch answers 204 on success and 404 if it was already gone; treat the
+  // latter as success so retrying a delete is safe.
+  if (res.status === 204 || res.status === 404) {
+    return json({ success: true, id, alreadyGone: res.status === 404 });
+  }
+  const err = await res.json().catch(() => ({}));
+  return json({ error: err.message || res.statusText }, res.status);
 }

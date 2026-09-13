@@ -29,6 +29,23 @@ keys; a few hours later, 47 — including 8 `dino_park_*` saves that did not
 exist before, because the Dino Park cloud-save feature went live. Re-dump at
 cutover; do not reuse an old dump.
 
+**CONFIRMED against the Helix API: there are ZERO EventSub subscriptions.**
+(`GET /helix/eventsub/subscriptions` → `total: 0`.) This was previously only
+inferred from the absence of an `eventsub_subscriptions` key. Two consequences:
+
+1. **The cutover's EventSub risk is gone.** The 409 trap, the re-registration
+   worry, the "record a baseline and re-verify after the flip" step, and the
+   need for a delete path during the window are all moot — nothing is
+   registered to break or re-point. Cutover step 1 and step 9 can be skipped.
+2. **The bot / hype train / channel points subsystem is built but has never
+   been switched on in production.** No subscriptions and no bot OAuth tokens
+   means hype train drops, channel-point redemptions, chat commands
+   (`!drop`, `!announce`) and channel-point giveaway entries have never fired.
+   This is unrelated to the migration and worth fixing separately, by
+   completing the steps in `_private/BROADCASTER-SETUP-STEPS.txt` — which is
+   now safe to do, since the 1101 crash that blocked it was fixed and the
+   panel has `list-eventsub` / `delete-eventsub` recovery actions.
+
 ## Context
 
 The site's entire backend runs as Cloudflare Pages Functions with Cloudflare KV as the only
