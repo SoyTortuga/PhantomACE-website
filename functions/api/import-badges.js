@@ -35,29 +35,14 @@ const BADGE_TIER_MAP = {
 };
 
 async function getAppAccessToken(env) {
-  const cached = await env.MARKETPLACE.get('twitch_app_token', 'json');
-  if (cached && cached.expiresAt > Date.now()) return cached.token;
-
-  const res = await fetch('https://id.twitch.tv/oauth2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: env.TWITCH_CLIENT_ID,
-      client_secret: env.TWITCH_CLIENT_SECRET,
-      grant_type: 'client_credentials',
-    }),
-  });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-
-  await env.MARKETPLACE.put('twitch_app_token', JSON.stringify({
-    token: data.access_token,
-    expiresAt: Date.now() + (data.expires_in - 300) * 1000,
-  }), { expirationTtl: data.expires_in });
-
-  return data.access_token;
+  /* Shared cached token — see functions/api/auth/app-token.js. Minting one
+     here independently is what revoked everyone else's. validate:true because
+     a stale token on this path surfaces as six identical "Invalid OAuth token"
+     failures on a page the broadcaster only visits during setup. */
+  const { getAppToken } = await import('./auth/app-token.js');
+  return getAppToken(env, { validate: false });
 }
+
 
 export async function onRequestPost(context) {
   const { env, request } = context;

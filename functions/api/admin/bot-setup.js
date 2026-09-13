@@ -445,33 +445,19 @@ async function createGiveawayReward(env, body) {
   return json({ success: true, rewardId });
 }
 
-async function getAppAccessToken(env) {
-  const cached = await env.MARKETPLACE.get('twitch_app_token', 'json');
-  if (cached && cached.expiresAt > Date.now() + 60000) return cached.access_token;
 
-  const res = await fetch('https://id.twitch.tv/oauth2/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: env.TWITCH_CLIENT_ID,
-      client_secret: env.TWITCH_CLIENT_SECRET,
-      grant_type: 'client_credentials',
-    }),
-  });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-
-  await env.MARKETPLACE.put('twitch_app_token', JSON.stringify({
-    access_token: data.access_token,
-    expiresAt: Date.now() + (data.expires_in * 1000),
-  }), { expirationTtl: data.expires_in });
-
-  return data.access_token;
+async function getAppAccessToken(env, { forceRefresh = false } = {}) {
+  /* Shared cached token — see functions/api/auth/app-token.js. Minting one
+     here independently is what revoked everyone else's. validate:true because
+     a stale token on this path surfaces as six identical "Invalid OAuth token"
+     failures on a page the broadcaster only visits during setup. */
+  const { getAppToken } = await import('../auth/app-token.js');
+  return getAppToken(env, { force: forceRefresh, validate: !forceRefresh });
 }
 
+
 async function createEventSubSubscriptions(env, request) {
-  const appToken = await getAppAccessToken(env);
+  let appToken = await getAppAccessToken(env);
   if (!appToken) return json({ error: 'Could not get app access token. Check TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET.' }, 500);
 
   const broadcasterId = env.TWITCH_BROADCASTER_ID;
@@ -545,10 +531,13 @@ async function createEventSubSubscriptions(env, request) {
     });
   }
   for (const sub of subscriptions) {
-    const res = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+    /* One 401 means the token is dead for ALL of them, so mint a fresh one
+       once and carry on rather than reporting six identical failures and
+       making the broadcaster guess which of their own actions broke it. */
+    const post = async (token) => fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + appToken,
+        'Authorization': 'Bearer ' + token,
         'Client-Id': env.TWITCH_CLIENT_ID,
         'Content-Type': 'application/json',
       },
@@ -563,6 +552,13 @@ async function createEventSubSubscriptions(env, request) {
         },
       }),
     });
+
+    let res = await post(appToken);
+    if (res.status === 401) {
+      console.warn('[bot-setup] EventSub returned 401 — refreshing the app token and retrying');
+      const fresh = await getAppAccessToken(env, { forceRefresh: true });
+      if (fresh) { appToken = fresh; res = await post(appToken); }
+    }
 
     const data = await res.json();
     if (res.ok) {

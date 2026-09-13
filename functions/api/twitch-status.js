@@ -11,21 +11,15 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: 'client_credentials',
-      }),
-    });
+    /* Shared cached token. This used to mint a brand new app token on every
+       single request, and Twitch invalidates older app tokens as new ones are
+       issued — so ordinary traffic here was silently revoking the token the
+       bot setup relied on, surfacing as "Invalid OAuth token" on an unrelated
+       admin page. See functions/api/auth/app-token.js. */
+    const { getAppToken } = await import('./auth/app-token.js');
+    const access_token = await getAppToken(env);
+    if (!access_token) throw new Error('Could not get an app access token');
 
-    if (!tokenRes.ok) {
-      throw new Error(`Token request failed: ${tokenRes.status}`);
-    }
-
-    const { access_token } = await tokenRes.json();
 
     const streamRes = await fetch(
       'https://api.twitch.tv/helix/streams?user_login=phantomace',
