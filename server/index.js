@@ -23,6 +23,8 @@ import 'dotenv/config';
 import { toWebRequest, writeWebResponse, isHostAllowed } from './adapter.js';
 import { createStatic } from './static.js';
 import { buildRoutes, matchRoute } from './router.js';
+import { createPool, waitForDatabase } from './lib/db.js';
+import { createKVStore } from './lib/kv.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -62,18 +64,9 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
-/** Placeholder storage until lib/kv.js lands. Fails loudly rather than
-    silently returning empty data, which would look like data loss. */
-const storageNotReady = new Proxy({}, {
-  get(_t, prop) {
-    return async () => {
-      throw new Error(
-        `Storage not wired up yet (called MARKETPLACE.${String(prop)}). ` +
-        'lib/kv.js is not implemented — API routes are expected to fail at this stage.'
-      );
-    };
-  },
-});
+/** How often expired rows are swept. Purely disk reclamation — reads are
+    already filtered by expires_at, so correctness never waits on this. */
+const REAP_INTERVAL_MS = 60_000;
 
 function isPublicOrigin(origin) {
   return !/^https?:\/\/(127\.0\.0\.1|localhost)(:|$)/.test(origin);
@@ -105,7 +98,25 @@ async function main() {
   const table = await buildRoutes(FUNCTIONS_DIR);
   console.log(`[boot] mounted ${table.count} routes from functions/`);
 
-  const env = { ...process.env, MARKETPLACE: storageNotReady };
+  if (!process.env.DATABASE_URL) {
+    console.error('FATAL: DATABASE_URL is not set. See server/.env.example.');
+    process.exit(1);
+  }
+  const pool = createPool(process.env.DATABASE_URL);
+  const info = await waitForDatabase();
+  console.log(`[boot] postgres ready: ${info.db}`);
+
+  /* The handlers receive this as env.MARKETPLACE and cannot tell it from the
+     Cloudflare KV binding — which is the entire point, and why none of the
+     183 storage call sites needed editing. */
+  const store = createKVStore(pool);
+  const env = { ...process.env, MARKETPLACE: store };
+
+  setInterval(() => {
+    store.reap()
+      .then(n => { if (n) console.log(`[reap] removed ${n} expired row(s)`); })
+      .catch(err => console.error('[reap]', err.message));
+  }, REAP_INTERVAL_MS).unref();
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -117,6 +128,28 @@ async function main() {
 
       const url = new URL(PUBLIC_ORIGIN + (req.url || '/'));
       const method = (req.method || 'GET').toUpperCase();
+
+      /* Not a file under functions/ — this server is a single point of
+         failure in a way Cloudflare Pages never was, so it needs something
+         an external uptime monitor can watch. Touches the database
+         deliberately: a process that is up but cannot reach Postgres serves
+         500s on every API route and should read as down, not healthy. */
+      if (url.pathname === '/api/health') {
+        let dbOk = false;
+        try { await pool.query('SELECT 1'); dbOk = true; } catch { /* reported below */ }
+        res.writeHead(dbOk ? 200 : 503, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        });
+        res.end(JSON.stringify({
+          ok: dbOk,
+          database: dbOk ? 'up' : 'unreachable',
+          uptimeSeconds: Math.round(process.uptime()),
+          routes: table.count,
+        }));
+        return;
+      }
+
       const isApi = url.pathname.startsWith('/api/') || url.pathname.startsWith('/cdn/');
 
       if (isApi) {
