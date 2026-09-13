@@ -34,6 +34,11 @@ export const SINGLETONS = {
   eventsub_subscriptions:{ table: 'singletons', expiry: 'none' },
   giveaway_reward_id:    { table: 'singletons', expiry: 'none' },
 
+  /* Moderator allowlist. expiry 'none' is load-bearing: if this row expired
+     every moderator would silently lose access, and the only symptom would
+     be a mod saying "the drop button stopped working". */
+  site_moderators:       { table: 'singletons', expiry: 'none' },
+
   // group (b): value.checkedAt / value.at are the real rules
   twitch_live_cache:     { table: 'singletons', expiry: 'none' },
   bot_cooldown_drop:     { table: 'singletons', expiry: 'none' },

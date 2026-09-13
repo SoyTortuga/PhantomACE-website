@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════
    GIVEAWAY CONTROL
-   Broadcaster-only: open/close the "Enter Giveaway"
+   Broadcaster or an allowlisted moderator: open/close the "Enter Giveaway"
    channel points reward, spin for a winner from the
    entrants captured by giveaway-entry.js, then
    whisper the winner their prize code.
@@ -65,8 +65,12 @@ async function setRewardEnabled(env, enabled) {
 export async function onRequestGet(context) {
   const { env, request } = context;
   const session = getSession(request);
-  if (!session || session.role !== 'broadcaster') {
-    return json({ error: 'Broadcaster only' }, 403);
+  /* Moderators may drop codes. Checked against the allowlist rather than
+     the cookie's role field, so removing someone takes effect immediately
+     instead of when their session happens to expire. */
+  const { isModerator } = await import('../admin/moderators.js');
+  if (!(await isModerator(env, session))) {
+    return json({ error: 'You need broadcaster or moderator access for this.' }, 403);
   }
 
   const state = await env.MARKETPLACE.get(STATE_KEY, 'json') || { open: false };
@@ -107,8 +111,12 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = getSession(request);
-  if (!session || session.role !== 'broadcaster') {
-    return json({ error: 'Broadcaster only' }, 403);
+  /* Moderators may drop codes. Checked against the allowlist rather than
+     the cookie's role field, so removing someone takes effect immediately
+     instead of when their session happens to expire. */
+  const { isModerator } = await import('../admin/moderators.js');
+  if (!(await isModerator(env, session))) {
+    return json({ error: 'You need broadcaster or moderator access for this.' }, 403);
   }
 
   let body;

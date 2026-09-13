@@ -139,6 +139,22 @@ export async function onRequestGet(context) {
       } catch {}
     }
 
+    /* An allowlisted moderator outranks their sub tier for display purposes.
+       Applied AFTER the sub check so it wins, and only if they are not the
+       broadcaster, who already outranks everything.
+
+       This is a UI HINT ONLY. Every privileged endpoint calls isModerator()
+       and reads the allowlist fresh on each request, so removing someone
+       takes effect immediately rather than whenever their session happens to
+       expire. Nothing is authorised on the strength of this field. */
+    if (role !== 'broadcaster') {
+      try {
+        const { getModerators } = await import('../admin/moderators.js');
+        const { userIds } = await getModerators(env);
+        if (userIds.includes(String(user.id))) role = 'moderator';
+      } catch { /* a failure here must not block a login */ }
+    }
+
     const session = {
       user_id: user.id,
       display_name: user.display_name,

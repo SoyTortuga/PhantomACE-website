@@ -23,8 +23,12 @@ function getSession(request) {
 export async function onRequestGet(context) {
   const { env, request } = context;
   const session = getSession(request);
-  if (!session || session.role !== 'broadcaster') {
-    return json({ error: 'Broadcaster only' }, 403);
+  /* Moderators may drop codes. Checked against the allowlist rather than
+     the cookie's role field, so removing someone takes effect immediately
+     instead of when their session happens to expire. */
+  const { isModerator } = await import('../admin/moderators.js');
+  if (!(await isModerator(env, session))) {
+    return json({ error: 'You need broadcaster or moderator access for this.' }, 403);
   }
 
   const log = await getBotActionLog(env);
@@ -36,8 +40,12 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = getSession(request);
-  if (!session || session.role !== 'broadcaster') {
-    return json({ error: 'Broadcaster only' }, 403);
+  /* Moderators may drop codes. Checked against the allowlist rather than
+     the cookie's role field, so removing someone takes effect immediately
+     instead of when their session happens to expire. */
+  const { isModerator } = await import('../admin/moderators.js');
+  if (!(await isModerator(env, session))) {
+    return json({ error: 'You need broadcaster or moderator access for this.' }, 403);
   }
 
   let body;
