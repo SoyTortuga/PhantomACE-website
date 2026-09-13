@@ -29,3 +29,9 @@ _fence_crop.png
 _vfence-*.png
 games/dino-park/assets/dino-assets/_*.png
 PhantomACE-Demo.zip
+
+# Database dumps. They contain every player's data and must never be
+# committed; backup-db.ps1 writes to C:\PhantomACE-Backups, outside the repo,
+# but this catches a stray one written here by hand.
+*.dump
+*.ndjson

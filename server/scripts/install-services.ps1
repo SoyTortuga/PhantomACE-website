@@ -1,4 +1,4 @@
-# ══════════════════════════════════════════════
+﻿# ══════════════════════════════════════════════
 #  Install the PhantomACE web server as a Windows service.
 #
 #  Run from an ELEVATED PowerShell on the rig.
