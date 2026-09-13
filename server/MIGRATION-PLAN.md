@@ -1,5 +1,34 @@
 # Migrate PhantomACE off Cloudflare Pages to self-hosted Node + Postgres
 
+## CURRENT STATUS
+
+| Phase | State |
+|---|---|
+| 0 — prevent irreversible loss | **Done.** See "Phase 0 results" below |
+| 1 — scaffold `server/` | **Done.** Own ESM package, deps installed |
+| 2 — leaf libraries | **Code written, untested against a live database.** `lib/{db,kv,registry,value,eventsub}.js`. eventsub has 8 passing tests; registry verified against a real 47-key production dump |
+| 3 — adapter, router, static | **Done and verified.** 18/18 URL behaviours identical to production Cloudflare, 0 mismatches, plus 3 deliberate blocks. 31 routes mounted. Full static site serves |
+| 4 — schema | **SQL written** (`sql/001_schema.sql`), not yet applied anywhere |
+| 5 — migration rehearsal | **Scripts written** (`scripts/{dump-kv,load-kv,verify-migration}.js`). dump-kv has been run successfully against production |
+| 6 — validate on dev.phantomace.tv | Not started |
+| 7 — Postgres-native rewrites | Not started |
+| 8 / 9 — cutover, follow-ups | Not started |
+
+**Next task, and it belongs to the rig** (the dev machine has no Postgres):
+
+1. `psql ... -d phantomace-tv-dev -f server/sql/001_schema.sql`
+2. Exercise `lib/kv.js` against it with fixtures. **Test the string-vs-json
+   `get()` distinction first** — `get(key)` must return a JSON *string* and
+   `get(key,'json')` an object. All five bingo files, the `gc_ptr_*` cursor
+   reads and `twitch_bot_user_id` depend on it, so a mistake there breaks
+   several things simultaneously and confusingly.
+3. Then a dump/load/verify rehearsal into `phantomace-tv-dev`.
+
+**Note on production data:** it is growing. A dump on 2026-09-12 found 35
+keys; a few hours later, 47 — including 8 `dino_park_*` saves that did not
+exist before, because the Dino Park cloud-save feature went live. Re-dump at
+cutover; do not reuse an old dump.
+
 ## Context
 
 The site's entire backend runs as Cloudflare Pages Functions with Cloudflare KV as the only
