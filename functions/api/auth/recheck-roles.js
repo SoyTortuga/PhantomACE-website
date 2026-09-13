@@ -43,8 +43,25 @@ export async function onRequestGet(context) {
     const broadcasterId = broadcasters[0]?.id;
     if (!broadcasterId) return json({ error: 'Channel not found' }, 500);
 
-    let role = 'visitor';
-    let subTier = 0;
+    /* ── WHY THIS STARTS FROM THE EXISTING ROLE ──────────────────────────
+       It used to start at 'visitor' and write whatever it ended up with. The
+       two checks below need a USER access token, and this endpoint only has
+       an APP token (client_credentials) — helix/subscriptions/user and
+       helix/channels/followed both reject an app token with 401. So both
+       checks silently failed, role stayed 'visitor', and the endpoint
+       overwrote the caller's cookie with it.
+
+       The effect: a subscriber who opened the Phamily Time page, which calls
+       this on load, was demoted to visitor. It cost a real subscriber their
+       incubator slots in Dino Park and would have stripped every role on the
+       site the same way.
+
+       A verification that cannot verify must never DOWNGRADE. Starting from
+       the current role means a failed check leaves things exactly as they
+       were; only a successful check can change anything. */
+    let role = session.role || 'visitor';
+    let subTier = role === 'sub_tier3' ? 3 : role === 'sub_tier2' ? 2 : role === 'sub_tier1' ? 1 : 0;
+    let verified = false;          // did ANY check actually succeed?
 
     try {
       const subRes = await fetch(
@@ -52,13 +69,22 @@ export async function onRequestGet(context) {
         { headers }
       );
       if (subRes.ok) {
+        verified = true;
         const subData = await subRes.json();
         if (subData.data?.length > 0) {
           const tier = subData.data[0].tier;
           if (tier === '3000') { role = 'sub_tier3'; subTier = 3; }
           else if (tier === '2000') { role = 'sub_tier2'; subTier = 2; }
           else { role = 'sub_tier1'; subTier = 1; }
+        } else if (role.startsWith('sub_')) {
+          /* Checked successfully and genuinely not subscribed any more. A
+             downgrade here is a real result rather than a failure, so it is
+             allowed to stand. */
+          role = 'follower';
+          subTier = 0;
         }
+      } else {
+        console.warn(`[recheck-roles] subscription check unavailable (${subRes.status}) — leaving role as ${role}`);
       }
     } catch {}
 
@@ -69,10 +95,18 @@ export async function onRequestGet(context) {
           { headers }
         );
         if (followRes.ok) {
+          verified = true;
           const followData = await followRes.json();
           if (followData.data?.length > 0) role = 'follower';
         }
       } catch {}
+    }
+
+    /* Nothing could actually be checked. Report the role unchanged and,
+       critically, do NOT reissue the cookie — a call that failed to inspect
+       a session has no business rewriting it. */
+    if (!verified) {
+      return json({ role, subTier, verified: false, reason: 'Twitch role check unavailable' });
     }
 
     const updatedSession = { ...session, role };

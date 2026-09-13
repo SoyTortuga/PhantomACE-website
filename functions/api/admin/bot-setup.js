@@ -98,7 +98,20 @@ async function showSetupPage(env, url) {
      Adding a scope here does NOT upgrade an existing token. The broadcaster
      has to run the "Authorize Channel Points Management" step again so
      Twitch re-prompts for the new scope. */
-  const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train';
+  /* channel:read:subscriptions lets the site re-check a viewer's sub tier
+     AFTER login, using the broadcaster's token.
+
+     It is needed because /api/auth/recheck-roles cannot work without it. That
+     endpoint used an app token, which Twitch rejects for both
+     helix/subscriptions/user and helix/channels/followed, so it verified
+     nothing. Roles are therefore only accurate at the moment of login: a
+     viewer who subscribes mid-session keeps their old role until they log out
+     and back in.
+
+     Grabbing it now because the broadcaster is already re-authorizing for
+     channel:read:hype_train. Adding it later would mean asking them a third
+     time. */
+  const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train channel:read:subscriptions';
   const broadcasterAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
     `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}&state=broadcaster`;
