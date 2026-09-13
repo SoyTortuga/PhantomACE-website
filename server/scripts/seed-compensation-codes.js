@@ -49,12 +49,12 @@ const PACKAGE = [
   { count: 2, rarity: 'uncommon', label: 'Uncommon Dino Egg' },
   { count: 2, rarity: 'rare',     label: 'Rare Dino Egg' },
   { count: 4, rarity: 'mythic',   label: 'Mythic Dino Egg' },
-  /* Guaranteed-mutation eggs. Species rarity is deliberately 'rare' rather
-     than 'mythic': the mythic codes above are the top-tier SPECIES reward,
-     and these are the top-tier MUTATION reward. Making them mythic too
-     would make four of the twelve codes strictly worse than the other two
-     for no reason. */
-  { count: 2, rarity: 'rare',     label: 'Mutation Dino Egg', guaranteedMutation: true },
+  /* Guaranteed-mutation eggs at MYTHIC species rarity — owner's call, and
+     it makes these unambiguously the best two codes in the package: a
+     mythic species roll (random epic or legendary) AND a guaranteed
+     mutation. Note the hatch time comes with it: epic is 4 hours and
+     legendary 8, against 2 for rare. */
+  { count: 2, rarity: 'mythic',   label: 'Mythic Mutation Dino Egg', guaranteedMutation: true },
 ];
 
 /* 30 days. The default activation window is 300 seconds, which is right for
