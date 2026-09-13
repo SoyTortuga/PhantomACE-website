@@ -4643,8 +4643,8 @@ function renderEggSources() {
     <div class="egg-source ${inventoryEggs.length > 0 ? 'available' : ''}">
       <div class="egg-source-icon"><img src="${IC}baby_eggs/egg_clutch.png" width="28" height="28" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-source-info">
-        <div class="egg-source-name">Phamily Time Rewards</div>
-        <div class="egg-source-desc">${inventoryEggs.length > 0 ? inventoryEggs.length + ' egg(s) from Phamily Time — click to use!' : 'Earn eggs by leveling up Phamily Time while watching stream.'}</div>
+        <div class="egg-source-name">Egg Storage</div>
+        <div class="egg-source-desc">${inventoryEggs.length > 0 ? inventoryEggs.length + ' egg(s) waiting — click to move one into the incubator!' : 'Eggs you earn or redeem while the incubator is full wait here. Earn them from Phamily Time levels and drop codes.'}</div>
       </div>
       <span class="egg-source-badge ${inventoryEggs.length > 0 ? 'esbadge-ready' : 'esbadge-waiting'}">${inventoryEggs.length > 0 ? inventoryEggs.length + ' Eggs' : 'Earn'}</span>
     </div>
@@ -5246,9 +5246,15 @@ async function useInventoryEgg(itemId) {
     species = rollSpecies(rarity);
   }
 
-  state.eggs.push({ speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 });
+  /* meta.guaranteedMutation has to survive the hop from inventory into the
+     incubator, or a Mutation Egg that overflowed to inventory would hatch
+     as an ordinary one — the reward silently downgraded by nothing more
+     than the incubator having been full at redemption time. */
+  const incubated = { speciesId: species.id, hatchTime: HATCH_TIMES[rarity], elapsed: 0 };
+  if (meta.guaranteedMutation) incubated.guaranteedMutation = true;
+  state.eggs.push(incubated);
   save(); updateTopBar(); renderEggsTab();
-  showToast(`Phamily Time egg hatching! Found a ${rarity} ${species.name}! 🎁`);
+  showToast(`Egg incubating! A ${rarity} ${species.name}${meta.guaranteedMutation ? ' (mutation guaranteed)' : ''}! 🎁`);
 
   try {
     await fetch('/api/inventory', {

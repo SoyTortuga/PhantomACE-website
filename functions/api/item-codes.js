@@ -373,9 +373,60 @@ async function redeemDinoEgg(env, record, code, userId) {
     return json({ error: 'Something went wrong granting your egg. Try again.' }, 500);
   }
 
+  /* INCUBATOR FULL IS NOT A FAILURE ANY MORE — the egg goes to the player's
+     inventory instead, which the Eggs tab already surfaces as "N egg(s) —
+     click to use!" and which useInventoryEgg() moves into the incubator when
+     a slot frees. The inventory is effectively the idle-egg area.
+
+     Three things this fixes at once:
+       - Twelve compensation codes can all be redeemed immediately, rather
+         than three at a time across several sessions.
+       - Nobody has to retry a code later and wonder if it was consumed.
+       - The inventory lives under inv_{userId}, a key the Dino Park client
+         never blindly overwrites — unlike dino_park_{userId}, where a
+         server-granted egg can still be clobbered by the client's next
+         full-state save.
+
+     meta carries the EXACT tier: useInventoryEgg re-rolls rarity from
+     weights unless meta.guaranteed is set, so without it a mythic egg would
+     silently degrade into a mostly-common roll. */
+  if (result && !result.success && result.error === 'Incubator full') {
+    const inv = await getInventory(env, userId);
+    inv.items.push({
+      id: record.item.id,
+      game: 'dino-park',
+      type: 'egg',
+      name: record.item.name || `${capitalize(dinoTier)} Dino Park Egg`,
+      rarity: siteRarity,
+      consumable: true,
+      quantity: 1,
+      grantedAt: Date.now(),
+      source: 'item-code',
+      meta: {
+        guaranteed: true,
+        rarity: dinoTier,
+        guaranteedMutation: !!record.item.guaranteedMutation,
+      },
+    });
+    await saveInventory(env, userId, inv);
+
+    return json({
+      success: true,
+      placed: 'inventory',
+      message: 'Incubator was full — the egg is waiting in your inventory.',
+      item: {
+        id: record.item.id,
+        game: 'dino-park',
+        type: 'egg',
+        name: `${capitalize(dinoTier)} Dino Park Egg`,
+        rarity: siteRarity,
+        dinoTier,
+      },
+    });
+  }
+
   if (!result || !result.success) {
-    /* Release the claim so the code stays redeemable — e.g. an
-       incubator-full failure should let them free up space and retry.
+    /* Any OTHER failure releases the claim so the code stays redeemable.
        Status 400 (not 409) so the redemption page shows this real error
        instead of the generic "already redeemed" message it shows for 409. */
     await releaseRedemption(env, code, userId);
