@@ -9,10 +9,29 @@
 | 2 — leaf libraries | **Code written, untested against a live database.** `lib/{db,kv,registry,value,eventsub}.js`. eventsub has 8 passing tests; registry verified against a real 47-key production dump |
 | 3 — adapter, router, static | **Done and verified.** 18/18 URL behaviours identical to production Cloudflare, 0 mismatches, plus 3 deliberate blocks. 31 routes mounted. Full static site serves |
 | 4 — schema | **SQL written** (`sql/001_schema.sql`), not yet applied anywhere |
-| 5 — migration rehearsal | **Scripts written** (`scripts/{dump-kv,load-kv,verify-migration}.js`). dump-kv has been run successfully against production |
-| 6 — validate on dev.phantomace.tv | Not started |
-| 7 — Postgres-native rewrites | Not started |
-| 8 / 9 — cutover, follow-ups | Not started |
+| 5 — migration rehearsal | **DONE on the rig.** Schema applied cleanly to `phantomace-tv-dev` (17 tables, no fixes needed). dump/load/verify run twice, identical: 46/46 distinct keys, 0 unmapped, 45 values matched (46 minus `market_index`, discarded by design), verify exited 0 |
+| 6 — validate on dev.phantomace.tv | **In progress.** `dev.phantomace.tv` is now served by the Node server off Postgres, not Pages. `/api/health` → `ok:true`. `/api/marketplace` → the 14 real listings, byte-identical local and via tunnel. `/_private/giveaway-codes/…` → 404 confirmed through the public URL. Login end-to-end pending |
+| 7 — Postgres-native rewrites | Not started — see the Pages-compatibility note below before starting |
+| 8 / 9 — cutover, follow-ups | Not started. `install-services.ps1` written (NSSM, discovers the Postgres service name, keeps secrets out of the registry) |
+
+### The core premise is proven
+`/api/marketplace` returns real production listings through the chain
+Postgres → `lib/kv.js` → an **unmodified** Cloudflare Pages handler → the tunnel.
+That was the central bet: that 183 storage call sites could change database
+backend without being rewritten. It holds.
+
+### Before starting Phase 7 — a sequencing constraint not in the original plan
+The Phase 7 rewrites use things Cloudflare KV does not have: `mutate()`,
+`listValues()`, and raw SQL. Once they land in `main`, **deploying that code to
+Cloudflare Pages would break production**, because `env.MARKETPLACE` there is a
+real KV binding with only four methods.
+
+Production still runs on Pages until cutover, so pick one deliberately:
+  (a) Phase 7 lands and Pages deploys STOP from that moment until cutover, or
+  (b) Phase 7 is deferred until immediately before cutover, keeping Pages
+      deployable for longer.
+Option (b) keeps the ability to ship hotfixes to the live site; option (a) gets
+the concurrency fixes finished sooner. Decide before writing Phase 7 code.
 
 **Next task, and it belongs to the rig** (the dev machine has no Postgres):
 
