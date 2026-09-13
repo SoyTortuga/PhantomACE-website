@@ -37,8 +37,14 @@ import { createPool, waitForDatabase } from '../lib/db.js';
 import { createKVStore } from '../lib/kv.js';
 import { createItemCode, activateItemCode } from '../../functions/api/item-codes.js';
 
-/* The eight accounts whose saves vanished, from the dino_parks table of the
-   2026-09-12 rehearsal load. 77379157 is the broadcaster's own account. */
+/* The accounts whose saves vanished, from the dino_parks table of the
+   2026-09-12 rehearsal load. 77379157 is the broadcaster's own account.
+
+   IF YOU ADD SOMEONE HERE, that only affects a FRESH seed. To include a
+   late-discovered recipient in the codes that already exist, use
+   add-compensation-recipient.js instead — it adds them to the live codes so
+   they can use the same list everyone else was sent, rather than creating a
+   second set that does the same job. */
 const RECIPIENTS = [
   '38108896',
   '40848342',
