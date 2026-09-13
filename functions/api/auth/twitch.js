@@ -108,10 +108,24 @@ export async function onRequestGet(context) {
       } catch {}
 
       try {
+        /* user_id is REQUIRED here, not optional. It was missing, so Twitch
+           answered 400, subRes.ok was false, the check was skipped in
+           silence and every subscriber was assigned 'follower'. The follow
+           check directly above passes both ids correctly — the pattern was
+           already in the file and simply was not applied here.
+
+           The symptom was far from the cause: a tier 1 subscriber saw three
+           Dino Park incubator slots instead of six, because subTier is
+           derived from the role. Nobody looks at an incubator and suspects a
+           missing query parameter, which is why the failure is now logged
+           rather than swallowed. */
         const subRes = await fetch(
-          `https://api.twitch.tv/helix/subscriptions/user?broadcaster_id=${broadcasterId}`,
+          `https://api.twitch.tv/helix/subscriptions/user?broadcaster_id=${broadcasterId}&user_id=${user.id}`,
           { headers }
         );
+        if (!subRes.ok) {
+          console.warn(`[auth] subscription check failed for ${user.login}: ${subRes.status} — role stays '${role}'`);
+        }
         if (subRes.ok) {
           const subData = await subRes.json();
           if (subData.data?.length > 0) {
