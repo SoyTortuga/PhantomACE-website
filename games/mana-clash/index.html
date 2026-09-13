@@ -263,6 +263,7 @@
   </div>
 </div>
 
+<script src="/js/session-read.js"></script>
 <script>
 const FACES = ['W','U','B','R','G','C'];
 const VALUES = { W:1, U:2, B:3, R:4, G:5, C:6 };
@@ -303,11 +304,9 @@ let lastSeenRound = 0;
 let prepTimer = null;
 let autoRollInFlight = false;
 
+// Delegates to js/session-read.js — see that file for why this is shared.
 function getSession() {
-  const cookie = document.cookie;
-  const m = cookie.match(/pham_session=([^;]+)/);
-  if (!m) return null;
-  try { return JSON.parse(decodeURIComponent(m[1])); } catch { return null; }
+  return typeof readPhamSession === 'function' ? readPhamSession() : null;
 }
 
 function initIdentity() {

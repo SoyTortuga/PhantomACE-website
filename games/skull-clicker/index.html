@@ -322,7 +322,8 @@
 
   <div class="save-msg" id="saveMsg">Saved</div>
 
-  <script>
+  <script src="/js/session-read.js"></script>
+<script>
     /* ═══════ CONSTANTS ═══════ */
 
     const BUILDINGS = [
@@ -736,10 +737,11 @@
     /* ═══════ LEADERBOARD ═══════ */
 
     function getPlayerId() {
-      const cookie = document.cookie.match(/pham_session=([^;]+)/);
+      // Shared reader — see js/session-read.js.
+      const cookie = typeof readPhamSession === 'function' ? readPhamSession() : null;
       if (cookie) {
         try {
-          const s = JSON.parse(decodeURIComponent(cookie[1]));
+          const s = cookie;
           playerName = s.display_name;
           return { userId: s.user_id, displayName: s.display_name };
         } catch(e) {}

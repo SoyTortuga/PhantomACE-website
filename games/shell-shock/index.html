@@ -204,6 +204,7 @@
   </div>
 </div>
 
+<script src="/js/session-read.js"></script>
 <script>
 const GW = 960, GH = 500;
 const COLORS = [
@@ -239,8 +240,9 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 // ── Auth ──
 (function initAuth() {
   try {
-    const c = document.cookie.match(/pham_session=([^;]+)/);
-    if (c) { const s = JSON.parse(decodeURIComponent(c[1])); myId = s.user_id; document.getElementById('guestBar').style.display = 'none'; return; }
+    // Shared reader — see js/session-read.js.
+    const s = typeof readPhamSession === 'function' ? readPhamSession() : null;
+    if (s) { myId = s.user_id; document.getElementById('guestBar').style.display = 'none'; return; }
   } catch {}
   guestId = localStorage.getItem('ps_guest_id');
   if (!guestId) { guestId = Math.random().toString(36).slice(2, 10); localStorage.setItem('ps_guest_id', guestId); }

@@ -995,6 +995,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/js/session-read.js"></script>
 <script>
 const SAVE_KEY = 'pham_dino_park';
 
@@ -4293,12 +4294,13 @@ function updateEnergyBar() {
 }
 
 /* ======================== AUTH / SESSION ======================== */
+/* Delegates to js/session-read.js. This used to parse the cookie itself and
+   broke the moment the cookie was signed — the player looked logged out, the
+   sub tier fell to 0 (3 incubator slots instead of 6) and cloud saves
+   silently stopped, because save() only pushes to the server when it thinks
+   someone is signed in. */
 function getPlayerSession() {
-  try {
-    const match = document.cookie.match(/pham_session=([^;]+)/);
-    if (!match) return null;
-    return JSON.parse(decodeURIComponent(match[1]));
-  } catch { return null; }
+  return typeof readPhamSession === 'function' ? readPhamSession() : null;
 }
 
 function applySubTierFromSession(session) {
