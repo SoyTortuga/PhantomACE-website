@@ -85,7 +85,20 @@ async function showSetupPage(env, url) {
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
     `&response_type=code&scope=${encodeURIComponent(scopes)}`;
 
-  const broadcasterScopes = 'channel:manage:redemptions';
+  /* channel:read:hype_train is REQUIRED to create any channel.hype_train.*
+     EventSub subscription — Twitch checks the broadcaster's granted scopes
+     when the subscription is created, not when the event fires.
+
+     It was missing, and the consequence was invisible in the obvious place:
+     "Create EventSub Subscriptions" succeeded for channel points and chat
+     while all three hype train types were rejected, so the feature looked
+     set up and no hype train event could ever arrive. Confirmed against
+     Helix on 2026-09-13 — 3 subscriptions enabled, zero hype train.
+
+     Adding a scope here does NOT upgrade an existing token. The broadcaster
+     has to run the "Authorize Channel Points Management" step again so
+     Twitch re-prompts for the new scope. */
+  const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train';
   const broadcasterAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
     `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}&state=broadcaster`;
