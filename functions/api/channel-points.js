@@ -5,6 +5,11 @@
    ══════════════════════════════════════════════ */
 
 const HMAC_PREFIX = 'sha256=';
+
+/* Twitch recommends rejecting any message whose timestamp is more than ten
+   minutes old. Without it, a captured signed request stays replayable for
+   ever, because the signature never expires. */
+const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000;
 const TWITCH_MESSAGE_ID = 'twitch-eventsub-message-id';
 const TWITCH_MESSAGE_TIMESTAMP = 'twitch-eventsub-message-timestamp';
 const TWITCH_MESSAGE_SIGNATURE = 'twitch-eventsub-message-signature';
@@ -24,6 +29,11 @@ function getSession(request) {
 async function verifySignature(secret, request, body) {
   const msgId = request.headers.get(TWITCH_MESSAGE_ID) || '';
   const timestamp = request.headers.get(TWITCH_MESSAGE_TIMESTAMP) || '';
+
+  /* Reject stale messages BEFORE spending time on the HMAC. A valid
+     signature on an old message is exactly what a replay looks like. */
+  const age = Date.now() - Date.parse(timestamp);
+  if (!Number.isFinite(age) || Math.abs(age) > MAX_MESSAGE_AGE_MS) return false;
   const expected = request.headers.get(TWITCH_MESSAGE_SIGNATURE) || '';
 
   const message = msgId + timestamp + body;
