@@ -224,18 +224,22 @@
   border-radius: 50%;
 }
 
+/* These MUST match the node states below. They did not: the legend showed a
+   grey dot for Claimed and red for Ready while the track rendered green and
+   amber, so the key to the picture disagreed with the picture. */
 .pt-dot-claimed {
-  background: var(--text-dim);
-  border: 1px solid var(--text-dim);
+  background: var(--green);
+  border: 1px solid var(--green);
 }
 
 .pt-dot-ready {
-  background: var(--red);
+  background: var(--amber);
+  border: 1px solid var(--amber);
 }
 
 .pt-dot-locked {
   background: transparent;
-  border: 1px solid #333;
+  border: 1px solid #2a2a2a;
 }
 
 /* ── Track Labels ────────────────────────────── */
@@ -282,14 +286,17 @@
 
 .pt-thermometer-inner {
   position: relative;
-  min-width: 2400px;
-  padding: 0 20px;
+  /* Width is set in JS from MAX_LEVEL * PX_PER_LEVEL. The old fixed 2400px
+     gave 16px per level for a 36px node, which is why every reward sat on
+     top of its neighbours. */
+  padding: 0 40px;
 }
 
 /* ── Reward Lanes ────────────────────────────── */
 .pt-reward-lane {
   position: relative;
-  height: 80px;
+  /* Tall enough for a staggered node plus its stem and label. */
+  height: 132px;
 }
 
 .pt-lane-top { margin-bottom: 6px; }
@@ -305,7 +312,6 @@
   transition: transform 0.15s;
 }
 
-.pt-reward-node:hover { transform: scale(1.1); }
 
 .pt-lane-top .pt-reward-node {
   bottom: 0;
@@ -313,38 +319,98 @@
 }
 
 .pt-reward-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 4px;
+  position: relative;            /* the badge anchors to THIS, not the page */
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  border: 2px solid #333;
-  background: var(--gray-lo);
-  transition: border-color 0.2s;
+  font-size: 20px;
+  border: 2px solid var(--border-mid);
+  background: #14100c;
+  transition: border-color 0.2s, transform 0.15s;
 }
 
-.pt-reward-node[data-state="ready"] .pt-reward-icon {
-  border-color: var(--red);
-  animation: pt-pulse 1.8s ease-in-out infinite;
+/* Corner badge: claimed / locked / ready. Its own element rather than a
+   ::after on the icon — the old one was absolutely positioned inside a box
+   with no positioning context, so the tick landed on top of the emoji in the
+   middle of the square instead of in a corner. */
+.pt-reward-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  border: 2px solid var(--black);
+  background: var(--gray-hi);
+  color: var(--text-dim);
 }
 
 .pt-reward-node[data-state="claimed"] .pt-reward-icon {
-  border-color: var(--text-dim);
-  opacity: 0.4;
+  border-color: var(--green);
+  opacity: 1;
+}
+.pt-reward-node[data-state="claimed"] .pt-reward-badge {
+  background: var(--green);
+  color: var(--black);
+  font-weight: bold;
 }
 
-.pt-reward-node[data-state="claimed"] .pt-reward-icon::after {
-  content: '\2713';
-  position: absolute;
-  font-size: 14px;
-  color: var(--text-pri);
+.pt-reward-node[data-state="ready"] .pt-reward-icon {
+  border-color: var(--amber);
+  animation: pt-pulse 1.8s ease-in-out infinite;
+}
+.pt-reward-node[data-state="ready"] .pt-reward-badge {
+  background: var(--amber);
+  color: var(--black);
+  font-weight: bold;
 }
 
 .pt-reward-node[data-state="locked"] .pt-reward-icon {
-  border-color: #222;
-  opacity: 0.3;
+  border-color: #2a2a2a;
+  opacity: 0.45;
+}
+.pt-reward-node[data-state="locked"] .pt-reward-badge {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* Stem joining the node to the spine. Two lengths, alternating, so nodes on
+   adjacent levels pass each other vertically instead of colliding. */
+.pt-reward-stem {
+  width: 2px;
+  background: var(--border-mid);
+}
+.pt-reward-node[data-tier="near"] .pt-reward-stem { height: 14px; }
+.pt-reward-node[data-tier="far"]  .pt-reward-stem { height: 46px; }
+
+.pt-reward-node[data-state="claimed"] .pt-reward-stem { background: var(--green); opacity: 0.5; }
+.pt-reward-node[data-state="ready"]   .pt-reward-stem { background: var(--amber); }
+
+.pt-reward-node:hover .pt-reward-icon { transform: scale(1.12); }
+
+/* YOU marker on the spine */
+.pt-you-marker {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  background: var(--amber);
+  color: var(--black);
+  font-family: var(--font-system);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 10px;
+  pointer-events: none;
 }
 
 @keyframes pt-pulse {
@@ -354,7 +420,7 @@
 
 .pt-reward-lvl {
   font-family: var(--font-system);
-  font-size: 8px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-dim);

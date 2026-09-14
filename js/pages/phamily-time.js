@@ -253,60 +253,107 @@
     milestoneLane.innerHTML = '';
     ticks.innerHTML = '';
 
-    const totalWidth = inner.offsetWidth - 72;
+    /* ── SPACING ────────────────────────────────────────────────────────────
+       Nodes used to be positioned as a percentage of MAX_LEVEL inside a
+       2400px container: 16px per level against a 36px node, so every reward
+       sat on top of its neighbours and the track read as one clump.
+
+       Each level now owns a fixed number of pixels and the track is as wide
+       as it needs to be, scrolling horizontally. Two things still collide at
+       this density and are handled explicitly below:
+
+         adjacent levels — rewards sit every 2 levels in places, so nodes are
+           STAGGERED to two different distances from the spine. Neighbours
+           pass each other vertically instead of overlapping.
+         the same level — several rewards share a level (two at 30). Those
+           are spread sideways around their level's position, since nothing
+           about the vertical stagger separates them. */
+    const PX_PER_LEVEL = 42;
+    const trackWidth = MAX_LEVEL * PX_PER_LEVEL;
+    inner.style.width = trackWidth + 'px';
+
+    const xFor = (level) => level * PX_PER_LEVEL;
 
     for (let h = 10; h <= MAX_LEVEL; h += 10) {
-      const pct = (h / MAX_LEVEL) * 100;
       const mark = document.createElement('div');
       mark.className = 'pt-thermo-hour-mark';
-      mark.style.left = `calc(${pct}% - 16px)`;
+      mark.style.left = (xFor(h) - 16) + 'px';
       mark.textContent = h + 'h';
       ticks.appendChild(mark);
     }
 
-    function placeReward(lane, reward, track) {
-      const pct = (reward.level / MAX_LEVEL) * 100;
-      const state = getRewardState(reward, track);
-      const node = document.createElement('div');
-      node.className = `pt-reward-node pt-rarity-${reward.rarity}`;
-      node.dataset.state = state;
-      node.style.left = `calc(${pct}% - 18px)`;
-
-      const tickEl = document.createElement('div');
-      tickEl.className = 'pt-reward-tick';
-
-      const iconEl = document.createElement('div');
-      iconEl.className = 'pt-reward-icon';
-      iconEl.textContent = reward.icon;
-
-      const lvlEl = document.createElement('div');
-      lvlEl.className = 'pt-reward-lvl';
-      lvlEl.textContent = 'LVL ' + reward.level;
-
-      if (track === 'top') {
-        node.appendChild(lvlEl);
-        node.appendChild(iconEl);
-        node.appendChild(tickEl);
-      } else {
-        node.appendChild(tickEl);
-        node.appendChild(iconEl);
-        node.appendChild(lvlEl);
-      }
-
-      node.addEventListener('click', (e) => showPopover(e, reward, state, track));
-      lane.appendChild(node);
+    /* How many rewards share each level, so same-level ones can be fanned
+       out rather than stacked invisibly. */
+    function levelCounts(list) {
+      const counts = new Map();
+      for (const r of list) counts.set(r.level, (counts.get(r.level) || 0) + 1);
+      return counts;
     }
 
-    for (const r of followerRewards) placeReward(laneTop, r, 'top');
-    for (const r of phamilyRewards) placeReward(laneBottom, r, 'bottom');
+    function placeLane(lane, list, track) {
+      const counts = levelCounts(list);
+      const seen = new Map();
+
+      list.forEach(function (reward, i) {
+        const state = getRewardState(reward, track);
+        const total = counts.get(reward.level) || 1;
+        const nth = seen.get(reward.level) || 0;
+        seen.set(reward.level, nth + 1);
+
+        /* Centre the group on the level, then fan outwards. */
+        const spread = 46;
+        const offset = total > 1 ? (nth - (total - 1) / 2) * spread : 0;
+
+        const node = document.createElement('div');
+        node.className = `pt-reward-node pt-rarity-${reward.rarity}`;
+        node.dataset.state = state;
+        node.dataset.tier = (i % 2 === 0) ? 'near' : 'far';
+        node.style.left = (xFor(reward.level) + offset - 22) + 'px';
+
+        const stemEl = document.createElement('div');
+        stemEl.className = 'pt-reward-stem';
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'pt-reward-icon';
+        iconEl.textContent = reward.icon;
+
+        /* The state badge is its own element rather than a ::after on the
+           icon. The old one was absolutely positioned inside a non-relative
+           box, so the tick rendered in the middle of the icon on top of the
+           emoji instead of in a corner. */
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'pt-reward-badge';
+        badgeEl.textContent = state === 'claimed' ? '✓' : state === 'locked' ? '🔒' : '!';
+        iconEl.appendChild(badgeEl);
+
+        const lvlEl = document.createElement('div');
+        lvlEl.className = 'pt-reward-lvl';
+        lvlEl.textContent = 'LVL ' + reward.level;
+
+        if (track === 'top') {
+          node.appendChild(lvlEl);
+          node.appendChild(iconEl);
+          node.appendChild(stemEl);
+        } else {
+          node.appendChild(stemEl);
+          node.appendChild(iconEl);
+          node.appendChild(lvlEl);
+        }
+
+        node.addEventListener('click', (e) => showPopover(e, reward, state, track));
+        lane.appendChild(node);
+      });
+    }
+
+    placeLane(laneTop, followerRewards, 'top');
+    placeLane(laneBottom, phamilyRewards, 'bottom');
 
     for (const ms of milestones) {
-      const pct = (ms.level / MAX_LEVEL) * 100;
       const state = getMilestoneState(ms);
       const node = document.createElement('div');
       node.className = 'pt-milestone-node';
       node.dataset.state = state;
-      node.style.left = `calc(${pct}% - 22px)`;
+      node.style.left = (xFor(ms.level) - 22) + 'px';
 
       const iconEl = document.createElement('div');
       iconEl.className = 'pt-milestone-icon';
@@ -328,6 +375,22 @@
     const bulb = document.getElementById('ptBulbInner');
     if (currentLevel >= MAX_LEVEL) bulb.classList.add('filled');
     else bulb.classList.remove('filled');
+
+    /* A "YOU ARE HERE" marker on the spine, and scroll to it.
+       The track is now several thousand pixels wide, so it opens showing
+       level 0 — which for anyone past the first few levels is the one part
+       of it they do not need to see. */
+    const youEl = document.getElementById('ptYouMarker');
+    if (youEl) {
+      youEl.style.left = (xFor(Math.min(currentLevel, MAX_LEVEL)) - 24) + 'px';
+      youEl.hidden = false;
+    }
+
+    const wrap = document.getElementById('ptThermometerWrap');
+    if (wrap) {
+      const target = xFor(currentLevel) - wrap.clientWidth / 2;
+      wrap.scrollTo({ left: Math.max(0, target), behavior: 'auto' });
+    }
   }
 
   /* ── Popover ─────────────────────────────────── */
