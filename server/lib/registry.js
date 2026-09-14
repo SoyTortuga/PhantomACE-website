@@ -50,6 +50,13 @@ export const SINGLETONS = {
   /* Milestone drop config: on/off, the rarity per event, the raid floor. */
   milestone_drops:       { table: 'singletons', expiry: 'none' },
 
+  /* Every code currently claimable, from any drop path. expiry 'none' is
+     deliberate: each ENTRY carries its own expiresAt and is pruned on write,
+     so no external lifecycle can clear a code that is still good — which is
+     precisely the bug this replaced, where ending a hype train wiped codes
+     that had minutes left. */
+  live_drops:            { table: 'singletons', expiry: 'none' },
+
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
      slightly slower one. */

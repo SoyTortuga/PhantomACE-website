@@ -606,3 +606,15 @@
   width: 100%;
   height: auto;
 }
+
+/* Where this particular code is claimed. Entry codes go in the box on this
+   page; item and egg codes are redeemed at /redeem. Pasted into the wrong
+   one the answer is "invalid code", which reads as a broken drop rather than
+   a wrong box — so the card says which. */
+.hype-drop-where {
+  margin-top: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}

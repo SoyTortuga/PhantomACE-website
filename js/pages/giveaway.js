@@ -21,21 +21,32 @@ function esc(s) {
 
 let dropPollTimer = null;
 
+/* Clock offset against the server. A viewer whose machine runs a few minutes
+   fast would otherwise see every drop as already expired, or hold one that
+   has quietly run out. The countdown is the one thing on this page that must
+   not be wrong. */
+var dropClockOffset = 0;
+
 function loadHypeTrainDrops() {
-  fetch('/api/hype-train?action=drops')
+  fetch('/api/live-drops')
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (data) {
+      if (data && typeof data.serverNow === 'number') {
+        dropClockOffset = data.serverNow - Date.now();
+      }
       renderDrops(data && data.drops ? data.drops : []);
     })
     .catch(function () { renderDrops([]); });
 }
+
+function dropNow() { return Date.now() + dropClockOffset; }
 
 function renderDrops(drops) {
   var section = document.getElementById('hypeDropsSection');
   var container = document.getElementById('hypeDropsPanel');
   if (!section || !container) return;
 
-  var now = Date.now();
+  var now = dropNow();
   var active = drops.filter(function (d) { return d.expiresAt > now; });
 
   if (active.length === 0) {
@@ -47,9 +58,9 @@ function renderDrops(drops) {
   section.style.display = '';
 
   var html = '<div class="hype-drops-header">' +
-    '<span class="hype-drops-icon">🚂</span>' +
-    '<span class="hype-drops-title">Hype Train Code Drops</span>' +
-    '<span class="hype-drops-hint">Copy a code and claim it in the box above — 5 minutes each, one claim per account.</span>' +
+    '<span class="hype-drops-icon">&#127873;</span>' +
+    '<span class="hype-drops-title">Live Code Drops</span>' +
+    '<span class="hype-drops-hint">5 minutes each, one claim per account.</span>' +
     '</div><div class="hype-drops-grid">';
 
   for (var i = 0; i < active.length; i++) {
@@ -59,27 +70,48 @@ function renderDrops(drops) {
     var secs = secsLeft % 60;
     var timeStr = mins + ':' + (secs < 10 ? '0' : '') + secs;
 
-    html += '<div class="hype-drop-group rarity-' + drop.rarity + '">' +
-      '<div class="hype-drop-level">Level ' + drop.level + '</div>' +
+    /* Where a code is claimed depends on what it IS. Entry codes go in the
+       box on this page; item and egg codes are redeemed at /redeem. Saying so
+       on the card is not decoration — pasted into the wrong box, the honest
+       answer is "invalid code", which reads as a broken drop. */
+    var isItem = drop.kind === 'item';
+    var reward = isItem
+      ? esc(drop.itemName || 'Item')
+      : '&times;' + (drop.entries || 0) + ' entries';
+    var whereText = isItem ? 'Redeem at /redeem' : 'Claim in the box above';
+
+    var origin = drop.source === 'hype-train'
+      ? 'Hype Train' + (drop.level ? ' &bull; Level ' + esc(String(drop.level)) : '')
+      : 'Chat drop';
+
+    html += '<div class="hype-drop-group rarity-' + esc(drop.rarity || 'common') + '">' +
+      '<div class="hype-drop-level">' + origin + '</div>' +
       '<div class="hype-drop-meta">' +
-        '<span class="hype-drop-rarity">' + drop.rarity + '</span>' +
-        '<span class="hype-drop-entries">&times;' + drop.entries + ' entries each</span>' +
+        '<span class="hype-drop-rarity">' + esc(drop.rarity || '') + '</span>' +
+        '<span class="hype-drop-entries">' + reward + '</span>' +
       '</div>' +
       '<div class="hype-drop-timer" data-expires="' + drop.expiresAt + '">' + timeStr + '</div>' +
-      '<div class="hype-drop-codes">';
-
-    for (var j = 0; j < drop.codes.length; j++) {
-      html += '<div class="hype-drop-code-row">' +
-        '<span class="hype-drop-code">' + esc(drop.codes[j]) + '</span>' +
-        '<button class="hype-drop-copy" onclick="copyDropCode(this, \'' + esc(drop.codes[j]) + '\')">Copy</button>' +
-        '</div>';
-    }
-
-    html += '</div></div>';
+      '<div class="hype-drop-codes">' +
+        '<div class="hype-drop-code-row">' +
+          '<span class="hype-drop-code">' + esc(drop.code) + '</span>' +
+          '<button class="hype-drop-copy" data-code="' + esc(drop.code) + '">Copy</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="hype-drop-where">' + whereText + '</div>' +
+      '</div>';
   }
 
   html += '</div>';
   container.innerHTML = html;
+
+  /* Listeners rather than an inline onclick carrying the code — nothing to
+     escape wrong. */
+  var buttons = container.querySelectorAll('.hype-drop-copy');
+  for (var b = 0; b < buttons.length; b++) {
+    (function (btn) {
+      btn.addEventListener('click', function () { copyDropCode(btn, btn.dataset.code); });
+    })(buttons[b]);
+  }
 
   if (!dropPollTimer) {
     dropPollTimer = setInterval(tickDropTimers, 1000);
@@ -88,7 +120,7 @@ function renderDrops(drops) {
 
 function tickDropTimers() {
   var timers = document.querySelectorAll('.hype-drop-timer[data-expires]');
-  var now = Date.now();
+  var now = dropNow();   /* server-corrected, same as renderDrops */
   var anyActive = false;
 
   for (var i = 0; i < timers.length; i++) {

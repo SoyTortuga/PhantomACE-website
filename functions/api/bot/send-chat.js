@@ -233,7 +233,7 @@ export async function dropCodeAction(env, rarity, actorLabel, opts = {}) {
      window where the fastest viewer in chat gets "that code is not valid",
      which is the worst possible first impression of a drop. */
   const { registerDropCode } = await import('../giveaway-entries.js');
-  await registerDropCode(env, code, tier, info.entries);
+  await registerDropCode(env, code, tier, info.entries, { source: 'manual' });
 
   /* Optional headline so a milestone drop can say WHY it fired — "thanks for
      the sub" reads very differently from a bare BONUS DROP, and the reason is
@@ -277,6 +277,21 @@ export async function dropItemAction(env, code, actorLabel) {
 
   const msg = `🎁 ITEM DROP! 🎁 ${record.item.rarity.toUpperCase()} — ${record.item.name} ` +
     `— code: ${record.code} — redeem at phantomace.tv/redeem.html — expires in 5 min!`;
+
+  /* Item and egg codes never touched the live feed, because they go through
+     activateItemCode rather than registerDropCode. Same problem, different
+     path: dropped in chat, invisible on the site. Recorded before the send,
+     so the page cannot be behind chat. */
+  const { recordLiveDrop } = await import('../giveaway-entries.js');
+  await recordLiveDrop(env, {
+    kind: 'item',
+    code: record.code,
+    rarity: record.item.rarity,
+    itemName: record.item.name,
+    source: 'manual',
+    expiresAt: record.expiresAt,
+    redeemPath: '/redeem',
+  });
 
   const sent = await sendChatMessage(env, msg);
 

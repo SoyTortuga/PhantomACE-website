@@ -95,7 +95,9 @@ async function handleHypeTrainProgress(env, event) {
      message pointed at a Gleam embed that had never been configured. */
   const { registerDropCode } = await import('./giveaway-entries.js');
   for (const c of codes) {
-    await registerDropCode(env, c, reward.rarity, reward.entries);
+    await registerDropCode(env, c, reward.rarity, reward.entries, {
+      source: 'hype-train', level,
+    });
   }
 
   const codeList = codes.join(' | ');
@@ -139,7 +141,11 @@ async function handleHypeTrainEnd(env, event) {
   };
   await env.MARKETPLACE.put('hype_train_site', JSON.stringify(summary), { expirationTtl: 300 });
   await env.MARKETPLACE.delete('hype_train_active');
-  await env.MARKETPLACE.delete('hype_train_drops');
+  /* hype_train_drops is NOT deleted here any more. Codes dropped at the top
+     of a train stay claimable for their full five minutes, and wiping the
+     list when the train ended made them vanish from the site while still
+     working — the display window contradicting the claim window. The live
+     feed now expires each code on its own schedule. */
 
   const droppedCount = (state.droppedLevels || []).length;
   await sendChatMessage(env,
@@ -165,10 +171,10 @@ export async function onRequestGet(context) {
   }
 
   if (action === 'drops') {
-    const drops = await env.MARKETPLACE.get('hype_train_drops', 'json') || [];
-    const now = Date.now();
-    const active = drops.filter(d => d.expiresAt > now);
-    return json({ drops: active });
+    /* Serves the unified feed so anything still polling this path sees
+       manual drops too, rather than a hype-train-only view. */
+    const { getLiveDrops } = await import('./giveaway-entries.js');
+    return json({ drops: await getLiveDrops(env) });
   }
 
   return json({ error: 'Invalid action' }, 400);

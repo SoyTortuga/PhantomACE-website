@@ -101,7 +101,7 @@ export async function addEntries(env, userId, username, count, source) {
  * a late claim finds nothing rather than relying on someone remembering to
  * check a timestamp.
  */
-export async function registerDropCode(env, code, tier, entries) {
+export async function registerDropCode(env, code, tier, entries, opts = {}) {
   if (!code) return null;
   const record = {
     code: String(code).trim().toUpperCase(),
@@ -113,7 +113,65 @@ export async function registerDropCode(env, code, tier, entries) {
   await env.MARKETPLACE.put(dropKey(record.code), JSON.stringify(record), {
     expirationTtl: DROP_WINDOW_SECONDS,
   });
+
+  /* Every entry-code drop flows through here, so this is the one place that
+     sees all of them — hype train, panel button and !drop alike. */
+  await recordLiveDrop(env, {
+    kind: 'entries',
+    code: record.code,
+    rarity: record.tier,
+    entries: record.entries,
+    source: opts.source || 'manual',
+    level: opts.level || null,
+    expiresAt: Date.now() + DROP_WINDOW_SECONDS * 1000,
+    redeemPath: '/giveaway',
+  });
+
   return record;
+}
+
+/* ══════════════════════════════════════════════
+   THE LIVE DROP FEED
+
+   One list of every code currently claimable, whatever dropped it.
+
+   Before this, the site read hype_train_drops — written ONLY by
+   hype-train.js. A code dropped from the panel or by !drop was registered as
+   claimable and posted to chat, and appeared nowhere on the site at all:
+   anyone who had tabbed away, scrolled past, or was reading the giveaway
+   page in another window never saw it existed.
+
+   Worse, hype-train.js DELETED that key when a train ended, so a code
+   dropped at level 20 stayed claimable for its full five minutes while
+   vanishing from the page the instant the train finished. The claim window
+   and the display window disagreed.
+
+   Entries here carry their own expiresAt and are pruned on write, so
+   nothing else's lifecycle can clear a code that is still good.
+   ══════════════════════════════════════════════ */
+
+const LIVE_DROPS_KEY = 'live_drops';
+const LIVE_DROPS_MAX = 40;
+
+export async function recordLiveDrop(env, entry) {
+  if (!entry || !entry.code) return;
+  const now = Date.now();
+  await env.MARKETPLACE.mutate(LIVE_DROPS_KEY, (current) => {
+    const list = current && Array.isArray(current.drops) ? current.drops : [];
+    /* Prune by each entry's OWN expiry, never by an external event. */
+    const live = list.filter(d => d && d.expiresAt > now && d.code !== entry.code);
+    live.push({ ...entry, at: now });
+    return { drops: live.slice(-LIVE_DROPS_MAX) };
+  });
+}
+
+/** Everything still inside its claim window, newest first. */
+export async function getLiveDrops(env) {
+  const rec = await env.MARKETPLACE.get(LIVE_DROPS_KEY, 'json');
+  const now = Date.now();
+  return (rec && Array.isArray(rec.drops) ? rec.drops : [])
+    .filter(d => d && d.expiresAt > now)
+    .sort((a, b) => b.at - a.at);
 }
 
 /**

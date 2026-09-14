@@ -47,26 +47,35 @@ export async function onRequestGet(context) {
 
   /* ── Live drops, with how many people actually claimed each code ──────
      Answers the question a broadcaster genuinely has mid-stream — "did
-     anyone get that?" — which nothing previously reported. */
-  const drops = await env.MARKETPLACE.get('hype_train_drops', 'json') || [];
-  const now = Date.now();
+     anyone get that?" — which nothing previously reported.
+
+     Reads the unified live feed, so a code dropped from THIS panel shows up
+     here too. It used to read hype_train_drops, written only by the hype
+     train handler — so pressing a tier button on this very page produced no
+     row, and the card silently reported on one drop path out of four. */
+  const { getLiveDrops } = await import('../giveaway-entries.js');
+  const live = await getLiveDrops(env);
   const activeDrops = [];
-  for (const d of drops.filter(x => x.expiresAt > now)) {
-    const codes = [];
-    for (const code of (d.codes || [])) {
-      const rec = await env.MARKETPLACE.get(`gwc_${String(code).toUpperCase()}`, 'json');
-      codes.push({
-        code,
-        claims: rec ? (rec.redeemedBy || []).length : 0,
-        /* A live code with no record means it expired from the drop-code
-           table while the drop record itself is still within its window.
-           Worth surfacing rather than showing a silent zero. */
-        registered: !!rec,
-      });
+  for (const d of live) {
+    let claims = 0;
+    let registered = true;
+    if (d.kind === 'entries') {
+      const rec = await env.MARKETPLACE.get(`gwc_${String(d.code).toUpperCase()}`, 'json');
+      /* A live code with no record expired from the drop-code table while
+         the feed entry is still inside its window. Worth surfacing rather
+         than showing a silent zero, which reads as "nobody claimed it". */
+      registered = !!rec;
+      claims = rec ? (rec.redeemedBy || []).length : 0;
+    } else {
+      const rec = await env.MARKETPLACE.get(`item_code_${String(d.code).toUpperCase()}`, 'json');
+      registered = !!rec;
+      claims = rec ? (rec.redeemedBy || []).length : 0;
     }
     activeDrops.push({
-      level: d.level, rarity: d.rarity, entries: d.entries,
-      expiresAt: d.expiresAt, codes,
+      kind: d.kind, source: d.source, level: d.level || null,
+      rarity: d.rarity, entries: d.entries || null, itemName: d.itemName || null,
+      expiresAt: d.expiresAt,
+      codes: [{ code: d.code, claims, registered }],
     });
   }
 
