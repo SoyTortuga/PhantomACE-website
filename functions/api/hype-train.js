@@ -57,23 +57,69 @@ async function verifySignature(secret, request, body) {
 
 async function handleHypeTrainProgress(env, event) {
   const level = event.level;
-  const reward = LEVEL_REWARDS[level];
-  if (!reward) return;
 
   const stateKey = 'hype_train_active';
-  const state = await env.MARKETPLACE.get(stateKey, 'json') || { id: null, droppedLevels: [] };
+  let state = await env.MARKETPLACE.get(stateKey, 'json') || { id: null, droppedLevels: [], alertedLevels: [] };
 
-  if (state.id === event.id && state.droppedLevels.includes(level)) return;
+  /* A new train id resets the per-train bookkeeping. Without this, a second
+     train in the same session would inherit the first one's dropped and
+     alerted levels and silently skip them. */
+  if (state.id !== event.id) {
+    state = { id: event.id, startedAt: Date.now(), droppedLevels: [], alertedLevels: [] };
+  }
+  state.droppedLevels = state.droppedLevels || [];
+  state.alertedLevels = state.alertedLevels || [];
+
+  /* ── THIS USED TO RETURN IMMEDIATELY ────────────────────────────────────
+     The old first act was `const reward = LEVEL_REWARDS[level]; if (!reward)
+     return;` — and rewards exist only at levels 5, 10, 15 and 20. So every
+     other level did nothing at all, and two things depended on that:
+
+     hype_train_site, which the site-wide banner reads, was written only when
+     a train BEGAN and ENDED. During the train it stayed frozen at level 1
+     with the opening progress numbers, on every page, however far the train
+     actually got. It is refreshed on every progress event now.
+
+     And no overlay alert was possible for a level that paid no code, which
+     is most of them. */
+  await env.MARKETPLACE.put('hype_train_site', JSON.stringify({
+    id: event.id,
+    level,
+    total: event.total,
+    goal: event.goal,
+    startedAt: state.startedAt || Date.now(),
+    status: 'active',
+  }), { expirationTtl: 3600 });
+
+  /* One alert per level reached, not per progress event — Twitch sends
+     progress on every contribution, so this would otherwise fire dozens of
+     times at the same level. */
+  if (!state.alertedLevels.includes(level)) {
+    state.alertedLevels.push(level);
+    const { pushOverlayEvent } = await import('./overlay/events.js');
+    await pushOverlayEvent(env, { type: 'hype-level', level, total: event.total, goal: event.goal });
+  }
+
+  const reward = LEVEL_REWARDS[level];
+  if (!reward || state.droppedLevels.includes(level)) {
+    /* Nothing to drop, but the alert bookkeeping above still has to persist
+       or the next progress event re-alerts the same level. */
+    await env.MARKETPLACE.put(stateKey, JSON.stringify(state), { expirationTtl: 3600 });
+    return;
+  }
 
   const codes = [];
   for (let i = 0; i < reward.count; i++) {
     const code = await pullGiveawayCode(env, reward.rarity);
     if (code) codes.push(code);
   }
-  if (codes.length === 0) return;
+  if (codes.length === 0) {
+    /* Pool exhausted. Saved anyway, for the same reason as above. */
+    await env.MARKETPLACE.put(stateKey, JSON.stringify(state), { expirationTtl: 3600 });
+    return;
+  }
 
-  state.id = event.id;
-  if (!state.droppedLevels.includes(level)) state.droppedLevels.push(level);
+  state.droppedLevels.push(level);
   await env.MARKETPLACE.put(stateKey, JSON.stringify(state), { expirationTtl: 3600 });
 
   const drop = {
