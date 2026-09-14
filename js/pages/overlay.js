@@ -42,46 +42,104 @@
     return d.innerHTML;
   }
 
-  /* ── What each event looks like on screen ──────────────────────────────
-     The mark is the PhantomACE logo rather than an emoji. There is no
-     per-event artwork in the repo, and inventing a different icon per event
-     would mean shipping art that does not exist — so the logo is constant
-     and the EVENT TYPE is carried by the kind label and the accent colour.
+  /* ── ARTWORK ───────────────────────────────────────────────────────────
+     Channel emotes first. They are PhantomACE's own art, viewers already
+     recognise them, several are animated so the alert moves for free, and
+     they carry no licensing question the way a bought asset pack does.
 
-     assets/images/logo.png is used because it is one of only three assets
-     with a genuine transparent cutout. phantomace-logo.png and its mythic
-     variant have baked-in backgrounds (the mythic one is white), which would
-     render as a solid square on a dark card. */
-  var MARK = '/assets/images/logo.png';
+     Emotes come from Twitch's CDN, which is hotlinkable by design — that is
+     how every chat client renders them. The cost is a dependency: if Twitch
+     is unreachable the image would break ON STREAM, so every one falls back
+     to a LOCAL file. A local fallback is the point; falling back to another
+     CDN URL would fail in exactly the same moment. */
+  var EMOTE = function (id, fmt) {
+    return 'https://static-cdn.jtvnw.net/emoticons/v2/' + id + '/' + (fmt || 'static') + '/dark/3.0';
+  };
 
+  var ART = {
+    coinroll: EMOTE('emotesv2_26bf7acbf75644e69473adf3952110b7', 'animated'), // phamCoinroll
+    hype:     EMOTE('152733'),                                                // phamHype
+    pham:     EMOTE('121671'),                                                // phamPham
+    love:     EMOTE('120322'),                                                // phamLove
+    love2:    EMOTE('168361'),                                                // phamLove2
+    love3:    EMOTE('168352'),                                                // phamLove3
+    hi:       EMOTE('121673'),                                                // phamHi
+    lit:      EMOTE('120782'),                                                // phamLit
+  };
+
+  /* The same mark the site header and footer use, so a fallback still looks
+     like PhantomACE rather than a stray graphic. It carries a baked-in
+     red/black background — that is deliberate in the artwork, and the header
+     presents it as a square badge with a 4px radius, which .is-fallback
+     mirrors. */
+  var FALLBACK = '/assets/images/phantomace-logo.png';
+
+  /* Egg drops show the actual egg, matched to its rarity. Local files:
+     copied into the repo rather than referenced inside
+     games/dino-park/assets/dino-assets/, which is gitignored and shipped to
+     the server out of band — an overlay should not depend on a tree that is
+     not version controlled. */
+  var EGGS = {
+    common:   '/assets/images/eggs/egg-common.png',
+    uncommon: '/assets/images/eggs/egg-uncommon.png',
+    rare:     '/assets/images/eggs/egg-rare.png',
+    mythic:   '/assets/images/eggs/egg-mythic.png',
+  };
+
+  /* 1-4 -> phamLove, 5-10 -> phamLove2, 11+ -> phamLove3. The 2-4 band was
+     not specified and is folded into the first, so no gift count can fall
+     through to no artwork at all. */
+  function giftArt(n) {
+    if (n >= 11) return ART.love3;
+    if (n >= 5) return ART.love2;
+    return ART.love;
+  }
+
+  function isEgg(ev) {
+    return ev.kind === 'item' && /egg/i.test(ev.itemName || '');
+  }
+
+  /* ── What each event looks like on screen ── */
   function describe(ev) {
     if (ev.type === 'drop') {
-      var isItem = ev.kind === 'item';
-      var where = isItem ? 'phantomace.tv/redeem' : 'phantomace.tv/giveaway';
+      var rarity = ev.rarity || 'common';
+      if (isEgg(ev)) {
+        return {
+          art: EGGS[rarity] || EGGS.common, pixel: true,
+          kind: 'Egg Drop', title: esc(ev.itemName || 'Dino Egg'),
+          sub: 'Redeem at phantomace.tv/redeem', code: ev.code, rarity: rarity,
+        };
+      }
+      if (ev.kind === 'item') {
+        return {
+          art: ART.lit,
+          kind: 'Item Drop', title: esc(ev.itemName || 'Item Drop'),
+          sub: 'Redeem at phantomace.tv/redeem', code: ev.code, rarity: rarity,
+        };
+      }
       return {
-        kind: isItem ? 'Item Drop' : 'Code Drop',
-        title: isItem ? esc(ev.itemName || 'Item Drop') : 'Claim it fast',
-        sub: (isItem ? 'Redeem at ' : (ev.entries ? '+' + ev.entries + ' entries • ' : '') + 'Claim at ') + where,
-        code: ev.code,
-        rarity: ev.rarity || 'common',
+        art: ART.coinroll,
+        kind: 'Code Drop', title: 'Claim it fast',
+        sub: (ev.entries ? '+' + ev.entries + ' entries • ' : '') + 'Claim at phantomace.tv/giveaway',
+        code: ev.code, rarity: rarity,
       };
     }
     if (ev.type === 'sub') {
-      return { kind: 'New Subscriber', title: esc(ev.who) + ' subscribed!', sub: 'Welcome to the Phamily', rarity: 'rare' };
+      return { art: ART.pham, kind: 'New Subscriber', title: esc(ev.who) + ' subscribed!', sub: 'Welcome to the Phamily', rarity: 'rare' };
     }
     if (ev.type === 'giftsub') {
       var n = ev.count || 1;
       return {
-        kind: 'Gift Subs',
+        art: giftArt(n), kind: 'Gift Subs',
         title: esc(ev.who) + ' gifted ' + n + ' sub' + (n === 1 ? '' : 's') + '!',
         sub: 'Absolute legend', rarity: 'mythic',
       };
     }
     if (ev.type === 'raid') {
-      return { kind: 'Raid', title: esc(ev.who) + ' raided!', sub: (ev.viewers || 0) + ' raiders incoming', rarity: 'rare' };
+      return { art: ART.hi, kind: 'Raid', title: esc(ev.who) + ' raided!', sub: (ev.viewers || 0) + ' raiders incoming', rarity: 'rare' };
     }
     if (ev.type === 'hype-level') {
-      return { kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
+      return { art: ART.hype, kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
     }
     return null;
   }
@@ -95,17 +153,31 @@
     card.dataset.type = ev.type;
     card.dataset.rarity = d.rarity || 'common';
 
-    /* Titles are built from Twitch display names, so the pieces that come
-       from an event are escaped; the fixed wording around them is not. */
-    card.innerHTML =
-      '<img class="ov-mark" src="' + MARK + '" alt="">' +
-      '<div class="ov-text">' +
-        '<span class="ov-kind">' + esc(d.kind) + '</span>' +
-        '<p class="ov-title">' + d.title + '</p>' +
-        '<p class="ov-sub">' + esc(d.sub) + '</p>' +
-        (d.code ? '<div class="ov-code">' + esc(d.code) + '</div>' : '') +
-      '</div>';
+    var img = document.createElement('img');
+    img.className = 'ov-mark' + (d.pixel ? ' is-pixel' : '');
+    img.alt = '';
+    img.src = d.art;
+    /* One retry to the local mark, then give up. Without the guard a
+       fallback that also failed would loop onerror forever. */
+    img.addEventListener('error', function handler() {
+      img.removeEventListener('error', handler);
+      img.classList.remove('is-pixel');
+      img.classList.add('is-fallback');
+      img.src = FALLBACK;
+    });
 
+    var text = document.createElement('div');
+    text.className = 'ov-text';
+    /* Titles mix fixed wording with Twitch display names; the event-derived
+       pieces are escaped inside describe(). */
+    text.innerHTML =
+      '<span class="ov-kind">' + esc(d.kind) + '</span>' +
+      '<p class="ov-title">' + d.title + '</p>' +
+      '<p class="ov-sub">' + esc(d.sub) + '</p>' +
+      (d.code ? '<div class="ov-code">' + esc(d.code) + '</div>' : '');
+
+    card.appendChild(img);
+    card.appendChild(text);
     stage.appendChild(card);
 
     setTimeout(function () {

@@ -203,3 +203,19 @@ html, body {
 }
 
 .ov-fault[hidden] { display: none; }
+
+/* Egg sprites are 32x32 pixel art. Without this they are smoothed into mush
+   when scaled up; the emotes are photographic-ish and must NOT get it, which
+   is why it is a modifier rather than a rule on .ov-mark. */
+.ov-mark.is-pixel {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* The fallback mark is the site's own logo, which has a baked-in red/black
+   background rather than a transparent cutout. The header presents it as a
+   square badge with a 4px radius; matching that here keeps a fallback
+   looking deliberate instead of like a stray rectangle on the card. */
+.ov-mark.is-fallback {
+  border-radius: 4px;
+}
