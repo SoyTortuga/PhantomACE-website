@@ -37,7 +37,20 @@
       <button class="btn-primary" id="botControlLoginBtn" hidden onclick="loginWithTwitch()">Log In with Twitch</button>
     </div>
 
-    <div class="role-broadcaster" id="botControlPanel">
+    <!-- Visibility is decided by the server's answer to /api/bot/dashboard,
+         not by a CSS role class. A moderator is allowed here and the cookie's
+         role field does not say so. -->
+    <div id="botControlPanel" hidden>
+
+      <div id="botWarnings"></div>
+
+      <div class="card bot-section" id="poolSection">
+        <h2>Code Pools</h2>
+        <p class="bot-section-desc">How many unclaimed codes are left in each tier. An empty pool doesn't fail loudly — the drop simply never reaches chat, so check here before you rely on one.</p>
+        <div class="bot-pool-grid" id="botPoolGrid">
+          <p class="bot-muted">Loading…</p>
+        </div>
+      </div>
 
       <div class="card bot-section">
         <h2>Drop a Code</h2>
@@ -48,6 +61,12 @@
           <button class="btn-secondary bot-drop-btn" data-rarity="rare">Rare</button>
           <button class="btn-secondary bot-drop-btn" data-rarity="mythic">Mythic</button>
         </div>
+      </div>
+
+      <div class="card bot-section" id="liveDropSection" hidden>
+        <h2>Live Drops</h2>
+        <p class="bot-section-desc">Codes still inside their claim window, and how many people have actually redeemed each one.</p>
+        <div id="botLiveDrops"></div>
       </div>
 
       <div class="card bot-section" id="itemDropSection">
@@ -107,10 +126,36 @@
       <div id="botStatusMsg" class="bot-status-msg" hidden></div>
 
       <div class="card bot-section">
+        <h2>Monthly Giveaway</h2>
+        <p class="bot-section-desc">The running entry ledger everyone accumulates from drops and channel points. Separate from the wheel above, which is a one-off prize.</p>
+        <div class="bot-stat-row" id="botGiveawayStats">
+          <p class="bot-muted">Loading…</p>
+        </div>
+      </div>
+
+      <div class="card bot-section">
         <h2>Recent Bot Actions</h2>
         <ul class="bot-action-feed" id="botActionFeed">
           <li class="bot-action-feed-empty">Loading...</li>
         </ul>
+      </div>
+
+      <!-- Broadcaster only. Revealed by JS on the server's isBroadcaster
+           answer — managing who holds power is not itself delegated. -->
+      <div class="card bot-section" id="modSection" hidden>
+        <h2>Moderator Access</h2>
+        <p class="bot-section-desc">Accounts allowed to drop codes and run the giveaway from this panel. Removal takes effect immediately — it doesn't wait for their session to expire.</p>
+
+        <ul class="bot-mod-list" id="botModList">
+          <li class="bot-muted">Loading…</li>
+        </ul>
+
+        <div class="bot-mod-add">
+          <input type="text" id="botModUserId" class="bot-mod-input" placeholder="Twitch user ID (numbers only)" inputmode="numeric">
+          <input type="text" id="botModName" class="bot-mod-input" placeholder="Name (optional, for your reference)" maxlength="40">
+          <button class="btn-primary" id="botModAddBtn">Add</button>
+        </div>
+        <p class="bot-section-desc bot-mod-hint">This is a numeric user ID, not a username — display names can change hands, IDs can't. Look one up at <a href="https://streamscharts.com/tools/convert-username" target="_blank" rel="noopener noreferrer">streamscharts.com/tools/convert-username</a>.</p>
       </div>
 
     </div>

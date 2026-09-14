@@ -6,6 +6,13 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["wrangler", "pages", "dev", ".", "--port", "8789"],
       "port": 8789
+    },
+    {
+      "name": "static-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["demo-server.js"],
+      "port": 8080,
+      "autoPort": true
     }
   ]
 }

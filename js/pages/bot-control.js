@@ -61,14 +61,137 @@ function showBotStatus(message, isError) {
   el.hidden = false;
 }
 
-async function loadBotActionLog() {
+/* ── Dashboard ───────────────────────────────────────────────────────────
+   One call backing the whole panel. /api/bot/dashboard existed for this and
+   was wired to nothing — the page was making three separate calls and still
+   showing none of the state the endpoint was built to surface. */
+
+function renderPools(pools) {
+  const grid = document.getElementById('botPoolGrid');
+  if (!grid) return;
+
+  if (!pools || pools.error) {
+    grid.innerHTML = '<p class="bot-pool-error">Could not read pool levels' +
+      (pools && pools.error ? ': ' + escapeBotHtml(pools.error) : '.') + '</p>';
+    return;
+  }
+
+  grid.innerHTML = ['common', 'uncommon', 'rare', 'mythic'].map(function (tier) {
+    const p = pools[tier];
+    if (!p) return '';
+    /* Three states, because "low" and "empty" need different reactions: low
+       is a restock reminder, empty means pressing Drop does nothing at all. */
+    let state = 'ok';
+    if (p.available === 0) state = 'empty';
+    else if (p.available <= p.low) state = 'low';
+
+    const pct = p.target > 0 ? Math.min(100, Math.round((p.available / p.target) * 100)) : 0;
+    const note = state === 'empty' ? 'Empty — drops will not post'
+      : state === 'low' ? 'Running low' : '';
+
+    return '<div class="bot-pool" data-tier="' + tier + '" data-state="' + state + '">' +
+      '<span class="bot-pool-tier">' + RARITY_LABELS[tier] + '</span>' +
+      '<span class="bot-pool-count">' + p.available + '<small> / ' + p.target + '</small></span>' +
+      '<span class="bot-pool-bar"><i style="width:' + pct + '%"></i></span>' +
+      (note ? '<span class="bot-pool-note">' + note + '</span>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function renderWarnings(data) {
+  const box = document.getElementById('botWarnings');
+  if (!box) return;
+  const warnings = [];
+
+  /* Hype train drops cannot fire without this subscription and the failure
+     is completely silent — no error, no log line, nothing in chat. A
+     standing banner beats finding out during a hype train. */
+  if (data.hypeTrain && !data.hypeTrain.subscribed) {
+    warnings.push('No hype train EventSub subscription is registered, so hype train drops will not fire. Re-run Step 4 on the bot setup page.');
+  }
+
+  const pools = data.pools;
+  if (pools && !pools.error) {
+    const empty = ['common', 'uncommon', 'rare', 'mythic']
+      .filter(function (t) { return pools[t] && pools[t].available === 0; })
+      .map(function (t) { return RARITY_LABELS[t]; });
+    if (empty.length) {
+      warnings.push('Out of codes: ' + empty.join(', ') + '. Dropping these tiers will post nothing to chat.');
+    }
+  }
+
+  box.innerHTML = warnings.map(function (w) {
+    return '<div class="bot-warning">' + escapeBotHtml(w) + '</div>';
+  }).join('');
+}
+
+function renderLiveDrops(drops) {
+  const section = document.getElementById('liveDropSection');
+  const box = document.getElementById('botLiveDrops');
+  if (!section || !box) return;
+
+  if (!drops || drops.length === 0) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  box.innerHTML = drops.map(function (d) {
+    const secs = Math.max(0, Math.round((d.expiresAt - Date.now()) / 1000));
+    const mins = Math.floor(secs / 60);
+    const left = mins > 0 ? mins + 'm ' + (secs % 60) + 's' : secs + 's';
+
+    const codes = (d.codes || []).map(function (c) {
+      /* A live code with no record expired out of the drop-code table while
+         the drop itself is still open. Showing a plain 0 would read as
+         "nobody claimed it" when the truth is "it can't be claimed". */
+      if (!c.registered) {
+        return '<li class="bot-drop-code unregistered"><code>' + escapeBotHtml(c.code) +
+          '</code><span>expired from the code table</span></li>';
+      }
+      return '<li class="bot-drop-code"><code>' + escapeBotHtml(c.code) + '</code>' +
+        '<span>' + c.claims + (c.claims === 1 ? ' claim' : ' claims') + '</span></li>';
+    }).join('');
+
+    return '<div class="bot-drop-live">' +
+      '<div class="bot-drop-live-head">' +
+      '<span class="bot-item-rarity ' + d.rarity + '">' + (RARITY_LABELS[d.rarity] || d.rarity) + '</span>' +
+      (d.level ? '<span class="bot-drop-level">Level ' + escapeBotHtml(String(d.level)) + '</span>' : '') +
+      '<span class="bot-drop-timer">' + left + ' left</span>' +
+      '</div>' +
+      '<ul class="bot-drop-codes">' + codes + '</ul>' +
+      '</div>';
+  }).join('');
+}
+
+function renderGiveawayStats(g) {
+  const box = document.getElementById('botGiveawayStats');
+  if (!box || !g) return;
+
+  const ends = g.endsAt ? new Date(g.endsAt) : null;
+  const daysLeft = ends ? Math.max(0, Math.ceil((ends - Date.now()) / 86400000)) : null;
+
+  box.innerHTML =
+    '<div class="bot-stat"><span class="bot-stat-num">' + (g.totalEntries || 0) + '</span><span class="bot-stat-label">total entries</span></div>' +
+    '<div class="bot-stat"><span class="bot-stat-num">' + (g.participants || 0) + '</span><span class="bot-stat-label">participants</span></div>' +
+    '<div class="bot-stat"><span class="bot-stat-num">' + (daysLeft === null ? '—' : daysLeft) + '</span><span class="bot-stat-label">days left</span></div>' +
+    '<div class="bot-stat"><span class="bot-stat-num">' + escapeBotHtml(g.month || '—') + '</span><span class="bot-stat-label">month</span></div>';
+}
+
+async function refreshDashboard() {
   try {
-    const res = await fetch('/api/bot/trigger', { credentials: 'same-origin' });
-    if (!res.ok) return;
+    const res = await fetch('/api/bot/dashboard', { credentials: 'same-origin' });
+    if (!res.ok) return null;
     const data = await res.json();
-    renderBotActionFeed(data.log || []);
+
+    renderWarnings(data);
+    renderPools(data.pools);
+    renderLiveDrops(data.activeDrops);
+    renderGiveawayStats(data.giveaway);
+    renderBotActionFeed(data.recentActions || []);
+    return data;
   } catch {
-    /* leave feed as-is */
+    return null;    /* leave the last good render on screen */
   }
 }
 
@@ -92,7 +215,7 @@ async function fireBotAction(payload, button) {
         announce: 'Announcement sent to chat.',
       };
       showBotStatus(messages[payload.action] || 'Done.', false);
-      await loadBotActionLog();
+      await refreshDashboard();
       if (payload.action === 'dropitem') await loadItemQueue();
     } else {
       showBotStatus(data.error || 'Action failed.', true);
@@ -317,7 +440,7 @@ async function sendGiveawayCode() {
     const data = await res.json();
     if (data.success) {
       showBotStatus(data.sent ? 'Code whispered to the winner.' : 'Code saved but the whisper failed to send.', !data.sent);
-      await loadBotActionLog();
+      await refreshDashboard();
     } else {
       showBotStatus(data.error || 'Could not send the code.', true);
     }
@@ -390,27 +513,174 @@ function initBotControlPanel() {
     });
   }
 
-  loadBotActionLog();
+  refreshDashboard();
   loadItemQueue();
   initGiveawayPanel();
+
+  /* Modest poll. Pools drift slowly, but a drop's claim count is the number
+     you actually watch while it is live, and its window is only 5 minutes.
+     Paused while the tab is hidden — this panel sits open on a machine that
+     is also running a stream. */
+  setInterval(function () {
+    if (!document.hidden) refreshDashboard();
+  }, 20000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refreshDashboard();
+  });
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  const session = getSession();
+/* ── Moderator allowlist (broadcaster only) ─────────────────────────────── */
+
+function renderModerators(entries, canEdit) {
+  const list = document.getElementById('botModList');
+  if (!list) return;
+
+  if (!entries || entries.length === 0) {
+    list.innerHTML = '<li class="bot-muted">Nobody yet — only you can use this panel.</li>';
+    return;
+  }
+
+  list.innerHTML = entries.map(function (m) {
+    const name = m.displayName || '(no name)';
+    const added = m.addedAt ? new Date(m.addedAt).toLocaleDateString() : '';
+    return '<li class="bot-mod-row">' +
+      '<span class="bot-mod-name">' + escapeBotHtml(name) + '</span>' +
+      '<span class="bot-mod-id">' + escapeBotHtml(String(m.userId)) + '</span>' +
+      (added ? '<span class="bot-mod-added">added ' + escapeBotHtml(added) + '</span>' : '') +
+      (canEdit ? '<button class="btn-secondary bot-mod-remove" data-user-id="' +
+        escapeBotHtml(String(m.userId)) + '">Remove</button>' : '') +
+      '</li>';
+  }).join('');
+
+  list.querySelectorAll('.bot-mod-remove').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      changeModerator('remove', btn.dataset.userId, '', btn);
+    });
+  });
+}
+
+async function loadModerators() {
+  try {
+    const res = await fetch('/api/admin/moderators', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const data = await res.json();
+    renderModerators(data.moderators, data.canEdit);
+  } catch {
+    /* leave the list as-is */
+  }
+}
+
+async function changeModerator(action, userId, displayName, button) {
+  if (action === 'remove' && !confirm('Remove this moderator? They lose panel access immediately.')) return;
+
+  const original = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '...'; }
+
+  try {
+    const res = await fetch('/api/admin/moderators', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action, userId: userId, displayName: displayName }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      renderModerators(data.moderators, true);
+      /* `changed: false` means the server accepted the request and did
+         nothing — already on the list, or not on it. Saying "Added" there
+         would be a lie about what happened. */
+      showBotStatus(
+        data.changed
+          ? (action === 'add' ? 'Moderator added.' : 'Moderator removed.')
+          : 'No change — ' + (data.note || 'already in that state') + '.',
+        false
+      );
+      if (action === 'add') {
+        document.getElementById('botModUserId').value = '';
+        document.getElementById('botModName').value = '';
+      }
+    } else {
+      showBotStatus(data.error || 'Could not update the moderator list.', true);
+    }
+  } catch {
+    showBotStatus('Network error updating the moderator list.', true);
+  }
+
+  if (button) { button.disabled = false; button.textContent = original; }
+}
+
+function initModeratorPanel() {
+  const section = document.getElementById('modSection');
+  if (section) section.hidden = false;
+
+  const addBtn = document.getElementById('botModAddBtn');
+  const idInput = document.getElementById('botModUserId');
+  const nameInput = document.getElementById('botModName');
+
+  if (addBtn && idInput) {
+    addBtn.addEventListener('click', function () {
+      const userId = idInput.value.trim();
+      if (!/^\d+$/.test(userId)) {
+        showBotStatus('That needs to be a numeric Twitch user ID, not a username.', true);
+        return;
+      }
+      changeModerator('add', userId, nameInput ? nameInput.value.trim() : '', addBtn);
+    });
+  }
+
+  loadModerators();
+}
+
+/* ── Access ──────────────────────────────────────────────────────────────
+   The page used to gate on `session.role !== 'broadcaster'`, which locked
+   moderators out of a panel the server was already willing to serve them —
+   the entire allowlist feature was unreachable from the UI.
+
+   So the client no longer decides. It asks /api/bot/dashboard and renders
+   whatever the server is prepared to answer. The cookie's role field still
+   cannot be forged, but it is a snapshot from login: gating on it means
+   somebody removed from the list keeps their panel until their session
+   expires. Asking every load, and every poll, is what makes removal
+   immediate — which is the promise the card itself makes.  */
+
+function showBotDenied(message, offerLogin) {
   const denied = document.getElementById('botControlDenied');
   const deniedText = document.getElementById('botControlDeniedText');
   const loginBtn = document.getElementById('botControlLoginBtn');
+  if (denied) denied.hidden = false;
+  if (deniedText) deniedText.textContent = message;
+  if (loginBtn) loginBtn.hidden = !offerLogin;
+}
 
-  if (!session || session.role !== 'broadcaster') {
-    if (denied) denied.hidden = false;
+document.addEventListener('DOMContentLoaded', async function () {
+  let res;
+  try {
+    res = await fetch('/api/bot/dashboard', { credentials: 'same-origin' });
+  } catch {
+    showBotDenied('Could not reach the server. Reload to try again.', false);
+    return;
+  }
+
+  if (!res.ok) {
+    /* getSession() is used only to choose the wording — never to decide
+       access. The server already decided. */
+    const session = typeof getSession === 'function' ? getSession() : null;
     if (!session) {
-      if (deniedText) deniedText.textContent = 'Log in as the broadcaster to access this page.';
-      if (loginBtn) loginBtn.hidden = false;
-    } else if (deniedText) {
-      deniedText.textContent = 'This page is for the broadcaster only.';
+      showBotDenied('Log in with Twitch to access this page.', true);
+    } else {
+      let msg = 'This page is for the broadcaster and approved moderators.';
+      try { const body = await res.json(); if (body && body.error) msg = body.error; } catch {}
+      showBotDenied(msg, false);
     }
     return;
   }
 
+  const data = await res.json();
+
+  const panel = document.getElementById('botControlPanel');
+  if (panel) panel.hidden = false;
+
   initBotControlPanel();
+  if (data.isBroadcaster) initModeratorPanel();
 });
