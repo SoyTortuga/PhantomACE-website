@@ -29,11 +29,35 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$serverDir = Split-Path -Parent $PSScriptRoot
+
+# ── log to a FILE, not just the console ───────────────────────────────────
+# Run from a Scheduled Task there is no console: everything this script says
+# goes nowhere, and the only signal left is the task's exit code. That is how
+# a backup fails every night for a month without anyone knowing — the exact
+# silence this script's verification steps exist to prevent.
+$logDir  = Join-Path $serverDir 'logs'
+$logFile = Join-Path $logDir 'backup.log'
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
 function Log([string] $msg) {
-    Write-Host ("[backup] {0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg)
+    $line = "[backup] {0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg
+    Write-Host $line
+    try { Add-Content -Path $logFile -Value $line -Encoding utf8 } catch { }
 }
 
-$serverDir = Split-Path -Parent $PSScriptRoot
+# Any terminating error is logged and then rethrown, so the log says what
+# happened AND the task still reports a non-zero exit code. Logging without
+# rethrowing would turn a failure into a silent success, which is worse than
+# the silence it replaces.
+trap {
+    $line = "[backup] {0}  FAILED: {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $_.Exception.Message
+    Write-Host $line
+    try { Add-Content -Path $logFile -Value $line -Encoding utf8 } catch { }
+    break
+}
+
+Log ("run starting as {0}" -f [Security.Principal.WindowsIdentity]::GetCurrent().Name)
 $envFile   = Join-Path $serverDir '.env'
 
 if (-not (Test-Path $envFile)) { throw "server\.env not found at $envFile" }
