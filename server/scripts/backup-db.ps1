@@ -91,7 +91,12 @@ $pgRestore = $pgDump -replace 'pg_dump\.exe$', 'pg_restore.exe'
 if (Test-Path $pgRestore) {
     $tables = (& $pgRestore --list $target 2>$null | Select-String -Pattern 'TABLE DATA public (\w+)' -AllMatches |
                ForEach-Object { $_.Matches.Groups[1].Value })
-    $required = @('dino_parks', 'inventories', 'phamily_months', 'phamily_alltime')
+    # The tables whose loss could not be reconstructed from anywhere else.
+    # giveaway_entries and checkins are on the list because they hold a month
+    # of earned entries and every check-in streak: unlike a leaderboard, there
+    # is no second copy and no way to recompute them from Twitch.
+    $required = @('dino_parks', 'inventories', 'phamily_months', 'phamily_alltime',
+                  'giveaway_entries', 'checkins')
     $missing  = $required | Where-Object { $tables -notcontains $_ }
     if ($missing) { throw "backup is missing expected table(s): $($missing -join ', ')" }
     Log ("verified {0} table(s) present, including {1}" -f $tables.Count, ($required -join ', '))
