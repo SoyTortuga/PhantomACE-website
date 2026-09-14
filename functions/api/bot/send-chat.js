@@ -79,7 +79,38 @@ export async function sendChatMessage(env, message) {
     }),
   });
 
-  return res.ok;
+  if (!res.ok) return false;
+
+  /* ── 200 DOES NOT MEAN THE MESSAGE APPEARED ──────────────────────────
+     Twitch accepts the request and then decides separately whether to post
+     it. AutoMod holds, blocked terms, follower/subscriber-only mode and the
+     "block hyperlinks from non-moderators" setting all come back as HTTP 200
+     with data[0].is_sent === false and a drop_reason.
+
+     This used to `return res.ok`, so every one of those was reported as a
+     successful send: the panel said "Code dropped to chat", the action log
+     recorded it, and chat showed nothing. That mattered little while the bot
+     was the broadcaster, who is exempt from all of it. It matters a great
+     deal for a bot account that is not a moderator — and every drop message
+     contains a phantomace.tv link, which is exactly what those filters
+     catch. */
+  let result = null;
+  try {
+    const payload = await res.json();
+    result = payload && payload.data && payload.data[0];
+  } catch {
+    /* Accepted, but the body was unreadable. Nothing says it was refused, so
+       do not invent a failure. */
+    return true;
+  }
+
+  if (result && result.is_sent === false) {
+    const reason = result.drop_reason || {};
+    console.warn(`[chat] Twitch accepted but did not post the message: ${reason.code || 'unknown'} ${reason.message || ''}`.trim());
+    return false;
+  }
+
+  return true;
 }
 
 export async function getBroadcasterToken(env) {
