@@ -33,10 +33,29 @@
 
   <!-- Current Giveaway -->
   <section class="page-container giveaway-current">
+
+    <!-- Current prize art. To change the prize, regenerate these three files
+         and update the alt text — nothing else in the site references them.
+         The 2.8 MB source PNG is deliberately not shipped: this page is the
+         one viewers are sent to from chat mid-stream, off a residential
+         upstream. -->
+    <picture class="giveaway-art">
+      <source type="image/webp"
+              srcset="/assets/images/giveaway-reality-fracture-800.webp 800w,
+                      /assets/images/giveaway-reality-fracture-1200.webp 1200w,
+                      /assets/images/giveaway-reality-fracture-1600.webp 1600w"
+              sizes="(max-width: 920px) 100vw, 880px">
+      <img src="/assets/images/giveaway-reality-fracture-1600.jpg"
+           alt="PhantomACE's Magic: The Gathering Reality Fracture Play Boosters booster box giveaway"
+           width="1600" height="900" fetchpriority="high" decoding="async">
+    </picture>
+
     <div class="giveaway-banner">
       <div class="giveaway-month" id="giveawayMonth">September 2026</div>
-      <h2 class="giveaway-title" id="giveawayTitle">Monthly Giveaway</h2>
-      <p class="giveaway-prize" id="giveawayPrize">Prize details coming soon — check back or follow on Twitch for announcements.</p>
+      <!-- Static. Unlike #giveawayMonth above, nothing writes to these two —
+           edit them here when the prize changes, alongside the art. -->
+      <h2 class="giveaway-title" id="giveawayTitle">Reality Fracture Booster Box</h2>
+      <p class="giveaway-prize" id="giveawayPrize">One sealed Magic: The Gathering &mdash; Reality Fracture Play Booster box.</p>
       <div class="giveaway-countdown" id="giveawayCountdown"></div>
       <div>
         <span class="giveaway-status active" id="giveawayStatus">Entries Open</span>

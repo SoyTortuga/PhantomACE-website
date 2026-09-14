@@ -712,3 +712,23 @@
   color: var(--text-dim);
   line-height: 1.4;
 }
+
+/* ── Current prize art ──────────────────────────
+   Matches .giveaway-banner's border treatment and radius so the art and the
+   text block beneath it read as one unit. No box-shadow, per the design rule
+   — the border and the red top rule carry the hierarchy. */
+
+.giveaway-art {
+  display: block;
+  max-width: 880px;
+  margin: 0 auto 24px;
+  border: 1px solid rgba(152, 9, 10, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.giveaway-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
