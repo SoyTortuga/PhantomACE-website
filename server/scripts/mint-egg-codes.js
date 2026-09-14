@@ -33,6 +33,7 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 
 import { createPool, waitForDatabase } from '../lib/db.js';
 import { createKVStore } from '../lib/kv.js';
+import { resolveDatabaseUrl } from '../lib/service-env.js';
 import { createItemCode, activateItemCode } from '../../functions/api/item-codes.js';
 
 /* Site rarities the redemption path understands. 'mythic' rolls a random
@@ -56,7 +57,12 @@ async function main() {
   const mutation = arg('mutation') === true;
   const confirm = arg('confirm') === true;
   const restrictRaw = arg('restrict', '');
-  const databaseUrl = arg('database-url', process.env.DATABASE_URL);
+  /* --service phantomace-web reads the production connection string from
+     that service's own environment, so the common case stops needing a
+     PowerShell preamble that leaves DATABASE_URL set (or not) for whatever
+     command runs next. Without it, server/.env applies — which is dev. */
+  const service = arg('service');
+  const databaseUrl = resolveDatabaseUrl({ service, fallback: arg('database-url') });
 
   if (!RARITIES.includes(rarity)) {
     console.error(`[mint] --rarity must be one of: ${RARITIES.join(', ')}`);
