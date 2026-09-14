@@ -2,7 +2,12 @@
 /* ══════════════════════════════════════════════
    What can we actually learn from Twitch about ad breaks?
 
-   READ-ONLY. Creates nothing, changes nothing, stores nothing.
+   Creates nothing on Twitch and changes nothing about the site's
+   configuration. It is NOT strictly read-only: obtaining the broadcaster
+   token can refresh it, which stores the new one — the same write the
+   running site performs on any request that needs that token. Said plainly
+   rather than claimed away, because "read-only" was the first thing this
+   file asserted and it was not quite true.
 
    Written because the design depends on answers I should not guess at:
 
@@ -63,8 +68,10 @@ async function main() {
   const kv = createKVStore(pool);
   const vars = service ? readServiceEnv(service) : {};
   const clientId = vars.TWITCH_CLIENT_ID || process.env.TWITCH_CLIENT_ID;
-  /* TWITCH_CLIENT_SECRET is not read here on purpose. Nothing in this script
-     mints a token, so it has no reason to touch the secret at all. */
+  /* TWITCH_CLIENT_SECRET is not read into a local here, but it IS used:
+     getBroadcasterToken below needs it to exchange the refresh token, and
+     reaches it through the env object assembled from the service config. It
+     is never printed. */
   const broadcasterId = vars.TWITCH_BROADCASTER_ID || process.env.TWITCH_BROADCASTER_ID;
 
   if (!clientId || !broadcasterId) {
@@ -74,10 +81,34 @@ async function main() {
 
   /* ── 1. The broadcaster token, and what it is allowed to do ── */
   head('BROADCASTER TOKEN');
-  const stored = await kv.get('twitch_broadcaster_token', 'json');
-  const token = stored && (stored.access_token || stored.token);
+
+  /* Goes through getBroadcasterToken, which REFRESHES an expired access
+     token from the stored refresh token — exactly as every handler on the
+     site does.
+
+     The first version of this read twitch_broadcaster_token straight out of
+     storage and validated that. It reported "Twitch rejected the stored
+     token: HTTP 401. Re-run Step 2", which read as "the authorisation is
+     dead" when the truth was "the cached access token aged out an hour ago
+     and the site refreshes it on demand". Reporting what is STORED rather
+     than what the system can DO is the exact failure this project keeps
+     finding elsewhere, and I wrote it into the diagnostic meant to catch it.
+
+     Consequence worth stating: this may WRITE a refreshed token. That is the
+     same write the running site performs, and there is no honest way to
+     answer "can we call the ads endpoint" without obtaining the token the
+     way the caller would. */
+  const { getBroadcasterToken } = await import('../../functions/api/bot/send-chat.js');
+  const tokenEnv = { ...process.env, ...vars, MARKETPLACE: kv };
+  const token = await getBroadcasterToken(tokenEnv);
+
   if (!token) {
-    line('  No broadcaster token stored. Run Step 2 on the bot setup page first.');
+    const hasRefresh = !!(await kv.get('twitch_broadcaster_refresh_token'));
+    line(hasRefresh
+      ? '  A refresh token is stored but Twitch refused to refresh it — the'
+      : '  No broadcaster refresh token stored at all.');
+    if (hasRefresh) line('  authorisation has genuinely been revoked. Re-run Step 2.');
+    else line('  Run Step 2 on the bot setup page first.');
     await pool.end().catch(() => {});
     return;
   }
@@ -91,7 +122,8 @@ async function main() {
       line(`  Belongs to: @${d.login} (id ${d.user_id})`);
       line(`  Scopes:     ${granted.join(', ') || '(none)'}`);
     } else {
-      line(`  Twitch rejected the stored token: HTTP ${v.status}. Re-run Step 2.`);
+      line(`  Twitch rejected the token even after a refresh: HTTP ${v.status}.`);
+      line('  That IS a dead authorisation — re-run Step 2.');
       await pool.end().catch(() => {});
       return;
     }
