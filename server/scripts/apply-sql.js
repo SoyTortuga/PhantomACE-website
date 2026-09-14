@@ -67,8 +67,15 @@ async function main() {
   console.log(`File:     ${file}  (${sql.split('\n').length} lines)`);
 
   /* Statement count is a sanity signal, not a parser — a file that reads as
-     one statement when you expected six is worth noticing before it runs. */
-  const statements = sql.split(';').map(s => s.trim()).filter(s => s && !s.startsWith('--')).length;
+     one statement when you expected six is worth noticing before it runs.
+     Comments are stripped FIRST: splitting on ';' and then discarding chunks
+     that start with '--' throws away every statement preceded by a comment
+     block, which in this codebase is all of them. It under-reported 3 as 2
+     on its first real use. */
+  const stripped = sql
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+  const statements = stripped.split(';').map(s => s.trim()).filter(Boolean).length;
   console.log(`Statements: ~${statements}`);
   console.log('');
 
