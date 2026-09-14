@@ -41,6 +41,9 @@ const NON_ROUTE_MODULES = new Set([
 
   /* Live state + which broadcast is on air. Library, no handler. */
   'api/stream-info.js',
+
+  /* Check-in history, streaks and arrival rewards. Library, no handler. */
+  'api/checkin-rewards.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

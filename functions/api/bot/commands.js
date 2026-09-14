@@ -53,6 +53,51 @@ function isAuthorizedSender(env, event) {
   return badges.some(b => b.set_id === 'broadcaster' || b.set_id === 'moderator');
 }
 
+/* ── !entries ────────────────────────────────────────────────────────────
+   Tells a viewer their own standing. The whole point is the people who
+   never open the site: the ledger is invisible to them otherwise, and an
+   invisible reward system may as well not exist.
+
+   Rate-limited per asker rather than globally. A global cooldown would mean
+   the second person to ask in the same few seconds gets silence and no idea
+   why — and "the bot ignored me" is exactly the impression this command
+   exists to avoid. One person spamming it only silences themselves. */
+const ENTRIES_COOLDOWN_MS = 30000;
+
+async function handleEntriesCommand(env, event) {
+  const userId = event.chatter_user_id;
+  const name = event.chatter_user_name || event.chatter_user_login || 'friend';
+  if (!userId) return;
+
+  const key = `bot_cooldown_entries_${userId}`;
+  const last = await env.MARKETPLACE.get(key, 'json');
+  if (last && last.at > Date.now() - ENTRIES_COOLDOWN_MS) return;
+  await env.MARKETPLACE.put(key, JSON.stringify({ at: Date.now() }), { expirationTtl: 120 });
+
+  const [{ getGiveawaySummary }, { getCheckinStats }, { sendChatMessage }] = await Promise.all([
+    import('../giveaway-entries.js'),
+    import('../checkin-rewards.js'),
+    import('./send-chat.js'),
+  ]);
+
+  const summary = await getGiveawaySummary(env, { user_id: userId });
+  const mine = (summary.you && summary.you.entries) || 0;
+  const stats = await getCheckinStats(env, userId);
+
+  /* No link. This fires many times a stream, and a bot posting a URL on
+     every reply is both spammy and the thing a non-moderator link filter
+     blocks — which would make the command fail silently for everyone. */
+  let msg = `@${name} — ${mine} ${mine === 1 ? 'entry' : 'entries'} in this month's giveaway`;
+  if (stats.streak > 0) {
+    msg += ` · ${stats.streak}-stream check-in streak`;
+  }
+  if (mine === 0) {
+    msg += '. Grab a code when one drops in chat!';
+  }
+
+  await sendChatMessage(env, msg);
+}
+
 function parseCommand(event) {
   const text = event && event.message && typeof event.message.text === 'string' ? event.message.text.trim() : '';
   if (!text.startsWith('!')) return null;
@@ -64,12 +109,22 @@ function parseCommand(event) {
 }
 
 async function handleChatMessage(env, event) {
-  if (!isAuthorizedSender(env, event)) return;
-
   const parsed = parseCommand(event);
   if (!parsed) return;
 
   const actor = event.chatter_user_login || event.chatter_user_name || 'unknown';
+
+  /* ── PUBLIC COMMANDS ────────────────────────────────────────────────────
+     Checked BEFORE the moderator gate. Every command used to sit behind it,
+     which is correct for !drop and would have made !entries answer only the
+     three people who least need to ask. */
+  if (parsed.command === '!entries') {
+    await handleEntriesCommand(env, event);
+    return;
+  }
+
+  /* Everything past here is broadcaster/moderator only. */
+  if (!isAuthorizedSender(env, event)) return;
 
   if (parsed.command === '!drop') {
     await dropCodeAction(env, parsed.rest, actor);

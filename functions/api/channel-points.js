@@ -71,6 +71,8 @@ const REWARD_HANDLERS = {
     const { getStreamInfo } = await import('./stream-info.js');
     const { streamId, startedAt } = await getStreamInfo(env);
 
+    let position = null;   // 1-based arrival order this broadcast
+
     await env.MARKETPLACE.mutate('checkin_current', (current) => {
       /* A new broadcast replaces the list wholesale. Twitch's per-stream
          limit has already reset by this point, so carrying the old list
@@ -95,7 +97,18 @@ const REWARD_HANDLERS = {
            makes that arithmetic the reader's problem. */
         minutesIn: rec.startedAt ? Math.max(0, Math.round((at - Date.parse(rec.startedAt)) / 60000)) : null,
       });
+      position = rec.checkins.length;
       return rec;
+    });
+
+    /* History, streak and any entries earned. Separate from the list above
+       because that one is "who is here now" and is thrown away each
+       broadcast; this is the durable record streaks are computed from. */
+    const { recordCheckin } = await import('./checkin-rewards.js');
+    await recordCheckin(env, {
+      userId,
+      username: redemption.user_name || redemption.user_login || '',
+      streamId, startedAt, position,
     });
 
     await queueRedemption(env, userId, 'pham-checkin', redemption);

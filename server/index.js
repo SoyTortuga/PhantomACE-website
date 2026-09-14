@@ -154,6 +154,25 @@ async function main() {
       .catch(err => console.error('[announce]', err.message));
   }, 60000).unref();
 
+  /* ── Broadcast log ──────────────────────────────────────────────────────
+     Records each stream as it goes live, so check-in streaks know what the
+     previous broadcast was. Written here rather than on a check-in
+     deliberately: a stream NOBODY checks into still has to count, or a
+     viewer who attended two streams a month apart would look consecutive.
+     recordStream is idempotent per stream id, so running every minute
+     appends once per broadcast. */
+  setInterval(() => {
+    Promise.all([
+      import('../functions/api/stream-info.js'),
+      import('../functions/api/checkin-rewards.js'),
+    ])
+      .then(([info, rewards]) => info.getStreamInfo(env).then(s => (
+        s.live && s.streamId ? rewards.recordStream(env, s.streamId, s.startedAt) : false
+      )))
+      .then(added => { if (added) console.log('[stream] new broadcast recorded'); })
+      .catch(err => console.error('[stream]', err.message));
+  }, 60000).unref();
+
   const server = http.createServer(async (req, res) => {
     const started = Date.now();
     try {

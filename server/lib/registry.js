@@ -40,6 +40,13 @@ export const SINGLETONS = {
      and lose every message the broadcaster had written. */
   announcements:         { table: 'singletons', expiry: 'none' },
 
+  /* Ordered list of recent broadcasts. Streaks need to know what the
+     PREVIOUS stream was; without it, a viewer who attended two streams a
+     month apart would look consecutive. Written by the server's minute tick
+     rather than by a check-in, so a stream nobody checks into still counts
+     as a stream and correctly breaks a streak. */
+  stream_log:            { table: 'singletons', expiry: 'none' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled
@@ -104,6 +111,15 @@ export const FAMILIES = [
   { prefix: 'bingo_',          table: 'bingo_rooms',      expiry: 'real' },
   { prefix: 'inv_',            table: 'inventories',      expiry: 'none' },
   { prefix: 'pt_',             table: 'phamily_months',   expiry: 'none' },
+
+  /* ci_{userId} — a viewer's check-in history, for streaks. Distinct from
+     the `checkin_*` singletons, which are exact keys and matched before any
+     prefix, so there is no collision between ci_ and checkin_current. */
+  { prefix: 'ci_',             table: 'checkins',         expiry: 'none' },
+
+  /* Per-asker cooldown for !entries. Group (a): the TTL IS the rule, so the
+     row disappearing is what lets someone ask again. */
+  { prefix: 'bot_cooldown_entries_', table: 'cp_queues',  expiry: 'real' },
 ];
 
 /* Keys the migration handles specially instead of copying into a table.
