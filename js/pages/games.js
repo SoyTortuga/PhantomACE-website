@@ -4,7 +4,7 @@ const GAMES = [
   { id: 'commander-bingo', title: 'Commander Bingo', thumb: '/assets/images/game-commander-bingo.png', play: () => launchGame('Commander Bingo', '/games/commander-bingo/'), live: true },
   { id: 'dino-park', title: 'Dino Park', thumb: '/assets/images/game-dino-park.png', play: () => launchGame('Dino Park', '/games/dino-park/') },
   { id: 'mana-clash', title: 'Mana Clash', thumb: '/assets/images/game-mana-clash.png', play: () => launchGame('Mana Clash', '/games/mana-clash/'), live: true },
-  { id: 'pham-shock', title: 'PhamShock', thumb: '/assets/images/game-phamshock.png', play: () => launchGame('PhamShock', '/games/shell-shock/'), live: true },
+  { id: 'pham-shock', title: 'PhamShock', thumb: '/assets/images/game-phamshock.png', play: () => launchGame('PhamShock', '/games/phamshock/'), live: true },
 ];
 
 function launchGame(title, src) {

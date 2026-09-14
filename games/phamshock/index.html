@@ -64,7 +64,7 @@
     .lobby-actions { display: flex; gap: 8px; }
 
     /* ── GAME ── */
-    #gameScreen { flex-direction: column; min-height: 100vh; }
+    #gameScreen { flex-direction: column; height: 100vh; }
     .players-bar { display: flex; gap: 4px; padding: 4px 8px; background: #0a0a0a; border-bottom: 1px solid #ffffff14; overflow-x: auto; flex-shrink: 0; }
     .pbar-item { display: flex; align-items: center; gap: 4px; padding: 3px 6px; background: #151515; border-radius: 4px; white-space: nowrap; min-width: 0; flex-shrink: 0; }
     .pbar-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -80,8 +80,8 @@
     .timer-fill { height: 100%; background: #00cc66; transition: width 0.3s linear; position: absolute; left: 0; top: 0; }
     .timer-fill.warn { background: #ffaa00; } .timer-fill.danger { background: #ff0000; }
 
-    .game-canvas-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
-    canvas { display: block; width: 100%; max-height: 100%; object-fit: contain; }
+    .game-canvas-wrap { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+    canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; cursor: crosshair; }
 
     .controls-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0a0a0a; border-top: 1px solid #ffffff14; flex-shrink: 0; flex-wrap: wrap; }
     .aim-group { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #999; }
@@ -856,6 +856,37 @@ document.getElementById('powerSlider').addEventListener('input', function() {
   localPower = parseInt(this.value);
   document.getElementById('powerVal').textContent = localPower;
 });
+
+const AIM_MAX_DIST = 400;
+
+function aimAtPoint(clientX, clientY) {
+  if (!roomState || roomState.phase !== 'aiming' || submitted || !terrain) return;
+  const me = roomState.players[getMyId()];
+  if (!me || me.eliminated) return;
+
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const scaleX = GW / rect.width, scaleY = GH / rect.height;
+  const clickX = (clientX - rect.left) * scaleX;
+  const clickY = (clientY - rect.top) * scaleY;
+
+  const originX = me.x, originY = tY(originX) - 8;
+  const dx = clickX - originX, dyScreen = clickY - originY;
+  const mag = Math.sqrt(dx * dx + dyScreen * dyScreen);
+  if (mag < 5) return;
+
+  let angle = Math.atan2(-dyScreen, dx) * 180 / Math.PI;
+  if (angle < 0) angle = dx >= 0 ? 0 : 180;
+  localAngle = Math.round(Math.max(0, Math.min(180, angle)));
+  localPower = Math.round(Math.max(10, Math.min(100, (mag / AIM_MAX_DIST) * 100)));
+
+  document.getElementById('angleSlider').value = localAngle;
+  document.getElementById('angleVal').textContent = localAngle + '°';
+  document.getElementById('powerSlider').value = localPower;
+  document.getElementById('powerVal').textContent = localPower;
+}
+
+canvas.addEventListener('click', e => aimAtPoint(e.clientX, e.clientY));
 
 async function submitTurn() {
   if (submitted || !roomState || roomState.phase !== 'aiming') return;

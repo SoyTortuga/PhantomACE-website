@@ -137,6 +137,22 @@ export function createStatic(root) {
 
     if (!segmentsAreSafe(segments)) return { kind: 'notfound' };
 
+    /* ── MOVED PATHS ────────────────────────────────────────────────────────
+       PhamShock's folder was still named shell-shock from before the game
+       was renamed. Renaming the folder changes a URL that already exists in
+       people's bookmarks, in old chat messages, and in anything the bot has
+       posted — so the old path keeps working rather than starting to 404.
+
+       301, not 308: this is permanent and only ever a GET, so letting
+       browsers and crawlers cache it is the point. Anything deeper under the
+       old folder is carried across too, so a direct link to an asset still
+       resolves. */
+    if (segments[0] === 'games' && segments[1] === 'shell-shock') {
+      const rest = segments.slice(2);
+      const loc = '/games/phamshock/' + (rest.length ? rest.join('/') : '');
+      return { kind: 'redirect', location: loc + search, status: 301 };
+    }
+
     const last = segments[segments.length - 1];
     const dirOf = segments.slice(0, -1);
 
