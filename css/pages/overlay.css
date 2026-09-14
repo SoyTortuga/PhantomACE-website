@@ -1,16 +1,39 @@
 /* ══════════════════════════════════════════════
-   ON-STREAM OVERLAY
+   ON-STREAM OVERLAY — gothic theme
 
-   Loaded by OBS as a browser source. Two rules that matter more than looks:
+   Loaded by OBS as a browser source. Three rules that matter more than looks:
 
    1. THE BACKGROUND IS TRANSPARENT. OBS composites this over the scene, so
       any opaque body would cover the whole stream with a black rectangle.
    2. NOTHING SHIFTS LAYOUT. Alerts are absolutely positioned, so one
       appearing cannot nudge another mid-animation.
+   3. THE FONTS ARE DECLARED HERE. This page does NOT load base.css — that
+      file sets a body background and margins that would fight a transparent
+      overlay — and base.css is where the @font-face rules live. Without
+      these, var(--font-gothic) silently fell through to Cinzel Decorative
+      and the overlay was not using GodOfWar at all.
 
-   No box-shadow anywhere, per the project rule — depth comes from borders
-   and a solid backing panel.
+   Palette and radii follow _private/THEME-REFERENCE.md: pure blacks, solid
+   dark-gray borders, 12px card radius, and no box-shadow anywhere. Depth
+   comes from borders and the glassmorphic surface; the only glow is a
+   drop-shadow on the logo, which the rules permit on non-box elements.
    ══════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'PhantomACE';
+  src: url('/assets/fonts/PHANTOMACE.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;   /* an alert flashing in a fallback face looks broken */
+}
+
+@font-face {
+  font-family: 'GodOfWar';
+  src: url('/assets/fonts/GODOFWAR.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
 
 html, body {
   margin: 0;
@@ -22,7 +45,7 @@ html, body {
 }
 
 .overlay-body {
-  font-family: var(--font-system, system-ui, sans-serif);
+  font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -31,7 +54,7 @@ html, body {
   top: 40px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(720px, 90vw);
+  width: min(760px, 92vw);
   display: flex;
   justify-content: center;
   pointer-events: none;       /* never intercept clicks in OBS */
@@ -40,20 +63,43 @@ html, body {
 /* ── Alert card ─────────────────────────────── */
 
 .ov-alert {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 18px 26px;
-  background: rgba(8, 6, 6, 0.92);
-  border: 2px solid var(--red, #FF0000);
-  border-radius: 14px;
-  min-width: 380px;
+  gap: 20px;
+  padding: 20px 28px;
+  /* Glassmorphic surface from the theme reference. Pure black, never warm. */
+  background: rgba(10, 10, 10, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-mid);
+  border-left: 3px solid var(--red);
+  border-radius: 12px;
+  min-width: 420px;
   animation: ov-in 380ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
 }
 
-.ov-alert.is-leaving {
-  animation: ov-out 320ms ease-in both;
+/* Gothic corner accents, the same motif the page heroes use. Drawn with
+   borders rather than a shadow, per the rules. */
+.ov-alert::before,
+.ov-alert::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--red);
+  opacity: 0.55;
 }
+.ov-alert::before {
+  top: 7px; left: 7px;
+  border-top: 2px solid; border-left: 2px solid;
+}
+.ov-alert::after {
+  bottom: 7px; right: 7px;
+  border-bottom: 2px solid; border-right: 2px solid;
+}
+
+.ov-alert.is-leaving { animation: ov-out 320ms ease-in both; }
 
 @keyframes ov-in {
   from { opacity: 0; transform: translateY(-28px) scale(0.94); }
@@ -65,56 +111,82 @@ html, body {
   to   { opacity: 0; transform: translateY(-18px) scale(0.97); }
 }
 
-/* Motion is the alert's whole job, so prefers-reduced-motion is respected by
-   removing movement rather than the alert. */
+/* Motion is the alert's whole job, so reduced-motion drops the movement
+   rather than the alert. */
 @media (prefers-reduced-motion: reduce) {
   .ov-alert, .ov-alert.is-leaving { animation: none; }
 }
 
-.ov-icon {
-  font-size: 40px;
-  line-height: 1;
+/* ── The mark ───────────────────────────────── */
+
+.ov-mark {
+  width: 56px;
+  height: 56px;
   flex: none;
+  object-fit: contain;
+  /* drop-shadow, not box-shadow — permitted on non-box elements and the only
+     glow in the theme. */
+  filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.55));
 }
+
+/* ── Text ───────────────────────────────────── */
 
 .ov-text { min-width: 0; }
 
+.ov-kind {
+  display: block;
+  font-family: var(--font-system);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
 .ov-title {
-  font-family: var(--font-gothic, 'Cinzel Decorative', serif);
-  font-size: 26px;
-  line-height: 1.15;
-  color: #fff;
-  margin: 0 0 4px;
+  font-family: var(--font-gothic);
+  font-size: 28px;
+  line-height: 1.12;
+  color: var(--text-pri);
+  margin: 0 0 5px;
   overflow-wrap: anywhere;
 }
 
 .ov-sub {
+  font-family: var(--font-ui);
   font-size: 15px;
-  color: #cfc7c7;
+  color: var(--text-sec);
   margin: 0;
   overflow-wrap: anywhere;
 }
 
 .ov-code {
   display: inline-block;
-  margin-top: 8px;
-  padding: 6px 14px;
-  border: 2px dashed var(--amber, #ffaa00);
-  border-radius: 8px;
-  font-size: 24px;
+  margin-top: 10px;
+  padding: 7px 16px;
+  border: 2px dashed var(--red);
+  border-radius: 6px;
+  background: rgba(255, 0, 0, 0.06);
+  font-family: var(--font-system);
+  font-size: 26px;
   font-weight: bold;
-  letter-spacing: 0.14em;
-  color: var(--amber, #ffaa00);
+  letter-spacing: 0.16em;
+  color: var(--white);
 }
 
-/* Rarity accents — the border is the only thing that changes, so a mythic
-   drop reads differently at a glance without a second layout. */
-.ov-alert[data-rarity="uncommon"] { border-color: var(--green, #00cc66); }
-.ov-alert[data-rarity="rare"]     { border-color: var(--purple, #cc88ff); }
-.ov-alert[data-rarity="mythic"]   { border-color: #ff6600; }
+/* ── Rarity accents ─────────────────────────── */
 
-.ov-alert[data-type="raid"]    { border-color: var(--purple, #cc88ff); }
-.ov-alert[data-type="giftsub"] { border-color: var(--amber, #ffaa00); }
+.ov-alert[data-rarity="uncommon"] { border-left-color: var(--green); }
+.ov-alert[data-rarity="rare"]     { border-left-color: var(--purple); }
+.ov-alert[data-rarity="mythic"]   { border-left-color: var(--amber); }
+
+.ov-alert[data-rarity="uncommon"] .ov-kind { color: var(--green); }
+.ov-alert[data-rarity="rare"]     .ov-kind { color: var(--purple); }
+.ov-alert[data-rarity="mythic"]   .ov-kind { color: var(--amber); }
+
+.ov-alert[data-rarity="uncommon"] .ov-mark { filter: drop-shadow(0 0 6px rgba(0, 204, 102, 0.5)); }
+.ov-alert[data-rarity="rare"]     .ov-mark { filter: drop-shadow(0 0 6px rgba(204, 136, 255, 0.5)); }
+.ov-alert[data-rarity="mythic"]   .ov-mark { filter: drop-shadow(0 0 8px rgba(255, 170, 0, 0.6)); }
 
 /* ── Fault notice ───────────────────────────── */
 
@@ -122,10 +194,11 @@ html, body {
   position: fixed;
   bottom: 10px;
   right: 12px;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 90, 90, 0.75);
+  color: rgba(255, 0, 0, 0.7);
   pointer-events: none;
 }
 

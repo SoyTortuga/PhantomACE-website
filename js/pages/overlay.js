@@ -42,34 +42,46 @@
     return d.innerHTML;
   }
 
-  /* ── What each event looks like on screen ── */
+  /* ── What each event looks like on screen ──────────────────────────────
+     The mark is the PhantomACE logo rather than an emoji. There is no
+     per-event artwork in the repo, and inventing a different icon per event
+     would mean shipping art that does not exist — so the logo is constant
+     and the EVENT TYPE is carried by the kind label and the accent colour.
+
+     assets/images/logo.png is used because it is one of only three assets
+     with a genuine transparent cutout. phantomace-logo.png and its mythic
+     variant have baked-in backgrounds (the mythic one is white), which would
+     render as a solid square on a dark card. */
+  var MARK = '/assets/images/logo.png';
+
   function describe(ev) {
     if (ev.type === 'drop') {
       var isItem = ev.kind === 'item';
       var where = isItem ? 'phantomace.tv/redeem' : 'phantomace.tv/giveaway';
       return {
-        icon: isItem ? '\uD83C\uDF81' : '\uD83C\uDFAB',
-        title: isItem ? (ev.itemName || 'Item drop') : 'Code Drop',
-        sub: (isItem ? 'Redeem at ' : (ev.entries ? '+' + ev.entries + ' entries \u2022 ' : '') + 'Claim at ') + where,
+        kind: isItem ? 'Item Drop' : 'Code Drop',
+        title: isItem ? esc(ev.itemName || 'Item Drop') : 'Claim it fast',
+        sub: (isItem ? 'Redeem at ' : (ev.entries ? '+' + ev.entries + ' entries • ' : '') + 'Claim at ') + where,
         code: ev.code,
         rarity: ev.rarity || 'common',
       };
     }
     if (ev.type === 'sub') {
-      return { icon: '\u2B50', title: esc(ev.who) + ' subscribed!', sub: 'Welcome to the Phamily', rarity: 'rare' };
+      return { kind: 'New Subscriber', title: esc(ev.who) + ' subscribed!', sub: 'Welcome to the Phamily', rarity: 'rare' };
     }
     if (ev.type === 'giftsub') {
+      var n = ev.count || 1;
       return {
-        icon: '\uD83C\uDF81',
-        title: esc(ev.who) + ' gifted ' + (ev.count || 1) + ' sub' + ((ev.count || 1) === 1 ? '' : 's') + '!',
+        kind: 'Gift Subs',
+        title: esc(ev.who) + ' gifted ' + n + ' sub' + (n === 1 ? '' : 's') + '!',
         sub: 'Absolute legend', rarity: 'mythic',
       };
     }
     if (ev.type === 'raid') {
-      return { icon: '\u2694\uFE0F', title: esc(ev.who) + ' raided!', sub: (ev.viewers || 0) + ' raiders incoming', rarity: 'rare' };
+      return { kind: 'Raid', title: esc(ev.who) + ' raided!', sub: (ev.viewers || 0) + ' raiders incoming', rarity: 'rare' };
     }
     if (ev.type === 'hype-level') {
-      return { icon: '\uD83D\uDE82', title: 'Hype Train Level ' + esc(ev.level), sub: 'Keep it rolling', rarity: 'mythic' };
+      return { kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
     }
     return null;
   }
@@ -86,8 +98,9 @@
     /* Titles are built from Twitch display names, so the pieces that come
        from an event are escaped; the fixed wording around them is not. */
     card.innerHTML =
-      '<div class="ov-icon">' + d.icon + '</div>' +
+      '<img class="ov-mark" src="' + MARK + '" alt="">' +
       '<div class="ov-text">' +
+        '<span class="ov-kind">' + esc(d.kind) + '</span>' +
         '<p class="ov-title">' + d.title + '</p>' +
         '<p class="ov-sub">' + esc(d.sub) + '</p>' +
         (d.code ? '<div class="ov-code">' + esc(d.code) + '</div>' : '') +
