@@ -35,11 +35,39 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+/* ── WHO MAY DO WHAT ─────────────────────────────────────────────────────
+   This page used to be broadcaster-only in one lump, which drew the line in
+   the wrong place. The steps are not the same kind of action:
+
+     Step 1 (authorize chat bot)  — consent comes from the BOT account, whose
+                                    password the designer holds. The
+                                    broadcaster's channel is not involved.
+     Step 4 / EventSub management — no consent at all, just stored tokens.
+     Step 2, 3 (channel points,   — grants NEW permissions on, and creates
+       hype train scopes)           rewards in, the broadcaster's own
+                                    channel. Nobody else can approve that,
+                                    and nobody else should.
+
+   Lumping them together meant the person who actually holds the bot
+   credentials could not link the bot, while the broadcaster had to be walked
+   through a step that was never theirs to do. So the gate is per-step now.
+
+   Note the asymmetry is enforced on the SERVER for every path, not just
+   hidden in the page — a moderator who constructs the broadcaster OAuth
+   callback by hand is refused at the callback itself.  */
+
+const MODERATOR_ACTIONS = new Set(['create-eventsub', 'list-eventsub', 'delete-eventsub']);
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const session = getSession(request);
-  if (!session || session.role !== 'broadcaster') {
-    return html('<h1>Access Denied</h1><p>You must be logged in as the broadcaster.</p>', 403);
+
+  /* isBroadcaster compares user_id against TWITCH_BROADCASTER_ID rather than
+     trusting session.role — identity, not a claim. See moderators.js. */
+  const { isModerator, isBroadcaster } = await import('./moderators.js');
+  const broadcaster = isBroadcaster(env, session);
+  if (!broadcaster && !(await isModerator(env, session))) {
+    return html('<h1>Access Denied</h1><p>You must be logged in as the broadcaster or an approved moderator.</p>', 403);
   }
 
   const url = new URL(request.url);
@@ -53,15 +81,22 @@ export async function onRequestGet(context) {
   if (code) {
     const state = url.searchParams.get('state');
     if (state === 'broadcaster') {
+      /* Refused here as well as in the page, because the page only hides the
+         link. This callback stores a token granting permissions on the
+         broadcaster's channel; it must not be reachable by anyone who simply
+         navigated to the Twitch consent URL themselves. */
+      if (!broadcaster) {
+        return html('<h1>Broadcaster Only</h1><p>Channel points and hype train permissions can only be granted by the broadcaster\'s own account.</p>', 403);
+      }
       return await handleBroadcasterOAuthCallback(env, url, code);
     }
     return await handleOAuthCallback(env, url, code);
   }
 
-  return showSetupPage(env, url);
+  return showSetupPage(env, url, broadcaster);
 }
 
-async function showSetupPage(env, url) {
+async function showSetupPage(env, url, isBroadcasterUser = false) {
   const botToken = await env.MARKETPLACE.get('twitch_bot_token', 'json');
   const botRefresh = await env.MARKETPLACE.get('twitch_bot_refresh_token');
   const subs = await env.MARKETPLACE.get('eventsub_subscriptions', 'json');
@@ -170,39 +205,51 @@ async function showSetupPage(env, url) {
   .step { color: #ff4400; font-weight: bold; }
   code { background: #2a2a2a; padding: 2px 6px; border-radius: 3px; }
   #result, #giveawayResult { margin-top: 12px; padding: 12px; background: #1a2a1a; border-radius: 6px; display: none; }
+  .locked { background: #2a1a1a; border: 1px solid #553333; padding: 12px; border-radius: 6px; color: #ffaa88; }
+  .section.is-locked { opacity: 0.65; }
 </style></head><body>
 <h1>🤖 Bot Setup</h1>
-<p>This page configures the hype train chat bot and EventSub webhooks. Everything runs on Cloudflare — no local machine needed.</p>
+<p>This page configures the hype train chat bot and EventSub webhooks.</p>
+${isBroadcasterUser ? '' : `<div class="locked"><b>You are signed in as a moderator.</b> Steps 1 and 4 are yours to run —
+Step 1's approval comes from the bot account, not this channel. Steps 2 and 3 grant permissions on
+PhantomACE's own channel and only they can approve those, so they are shown here for status but disabled.</div>`}
 
 <div class="section">
   <h2><span class="step">Step 1:</span> Authorize Chat Bot</h2>
   <div class="status">${tokenStatus}</div>
-  <p>Click below to authorize the bot to send messages in your Twitch chat.
-  Log in with the account you want the bot to post as (your main account or a separate bot account).</p>
+  <p>Authorizes the bot to send messages in chat. <b>Whichever Twitch account is signed in
+  when you click this becomes the bot</b> — Twitch has no way to ask which one you meant.</p>
+  <p class="locked">⚠️ If you are signed into Twitch as the broadcaster right now, this will make the
+  broadcaster the bot, and every drop and announcement will post as them. That has already happened
+  once on this channel. Sign into <code>twitch.tv</code> as the bot account first — a private window
+  is the easy way, since this page's own login is a separate cookie and will survive it.</p>
   <p><b>Important:</b> Make sure <code>${callbackUrl}</code> is added as an OAuth Redirect URL in your
   <a href="https://dev.twitch.tv/console/apps" style="color:#9146ff">Twitch Developer Console</a> app settings.</p>
   <a class="btn" href="${authUrl}">Authorize with Twitch</a>
 </div>
 
-<div class="section">
+<div class="section${isBroadcasterUser ? '' : ' is-locked'}">
   <h2><span class="step">Step 2:</span> Authorize Channel Points Management</h2>
   <div class="status">${broadcasterStatus}</div>
-  <p>Separate authorization, using your <b>broadcaster</b> account specifically — Twitch only lets the
+  <p>Separate authorization, using the <b>broadcaster</b> account specifically — Twitch only lets the
   channel owner manage channel points rewards. This lets the site toggle the "Enter Giveaway" reward
   on/off from the bot control panel for big-prize drawings.</p>
-  <a class="btn" href="${broadcasterAuthUrl}">Authorize Channel Points</a>
+  ${isBroadcasterUser
+    ? `<a class="btn" href="${broadcasterAuthUrl}">Authorize Channel Points</a>`
+    : `<div class="locked">🔒 Broadcaster only — this grants new permissions on their channel, so it cannot be delegated. Twitch would approve whichever account is signed in, which is exactly the mistake worth preventing.</div>`}
 </div>
 
-<div class="section">
+<div class="section${isBroadcasterUser ? '' : ' is-locked'}">
   <h2><span class="step">Step 3:</span> Create the "Enter Giveaway" Reward</h2>
   <div class="status">${giveawayRewardStatus}</div>
   <p>Creates a channel points reward viewers redeem to enter a big-prize giveaway. Only needs to be
   done once — after that, toggle it on/off from the bot control panel. Requires Step 2.</p>
-  <label style="display:block;margin:10px 0">Cost (channel points):
+  ${isBroadcasterUser ? `<label style="display:block;margin:10px 0">Cost (channel points):
     <input id="giveawayCost" type="number" value="5000" min="1" style="width:100px;margin-left:8px;padding:6px;background:#222;color:#eee;border:1px solid #333;border-radius:4px">
   </label>
   <button class="btn btn-red" onclick="createGiveawayReward()" ${giveawayRewardId ? 'disabled' : ''}>Create Reward</button>
-  <div id="giveawayResult"></div>
+  <div id="giveawayResult"></div>`
+    : `<div class="locked">🔒 Broadcaster only — creates a reward in their channel.</div>`}
 </div>
 
 <div class="section">
@@ -368,12 +415,22 @@ async function handleOAuthCallback(env, url, code) {
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = getSession(request);
-  if (!session || session.role !== 'broadcaster') {
-    return json({ error: 'Broadcaster only' }, 403);
+
+  const { isModerator, isBroadcaster } = await import('./moderators.js');
+  const broadcaster = isBroadcaster(env, session);
+  if (!broadcaster && !(await isModerator(env, session))) {
+    return json({ error: 'Broadcaster or moderator access required' }, 403);
   }
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+
+  /* Allowlist, not a denylist. A new action added later is broadcaster-only
+     until somebody deliberately decides otherwise — the safe direction to
+     fail when the thing being gated is someone else's channel. */
+  if (!broadcaster && !MODERATOR_ACTIONS.has(body.action)) {
+    return json({ error: 'That action is broadcaster-only.' }, 403);
+  }
 
   if (body.action === 'create-eventsub') {
     return await createEventSubSubscriptions(env, request);
