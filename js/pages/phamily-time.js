@@ -38,7 +38,7 @@
     const entries = { common:2, uncommon:5, rare:15, mythic:50 };
     for (const [lvl, rarity] of giveawayLevels) {
       r.push({ level:lvl, rarity, type:'giveaway', icon:REWARD_ICONS.giveaway,
-        name:`Giveaway Code`, desc:`+${entries[rarity]} entries into the monthly giveaway` });
+        name:`Giveaway Entries`, desc:`+${entries[rarity]} entries into the monthly giveaway, added automatically` });
     }
     r.push({ level:10, rarity:'common', type:'cardback', icon:REWARD_ICONS.cardback,
       name:'Basic Card Back', desc:'A simple card back for Memory Match' });
@@ -67,7 +67,7 @@
     const entries = { common:2, uncommon:5, rare:15, mythic:50 };
     for (const [lvl, rarity] of giveawayLevels) {
       r.push({ level:lvl, rarity, type:'giveaway', icon:REWARD_ICONS.giveaway,
-        name:`Giveaway Code`, desc:`+${entries[rarity]} entries into the monthly giveaway` });
+        name:`Giveaway Entries`, desc:`+${entries[rarity]} entries into the monthly giveaway, added automatically` });
     }
     r.push({ level:6, rarity:'common', type:'egg', icon:REWARD_ICONS.egg,
       name:'Common Egg', desc:'A Dino Park egg — hatch a random common dinosaur' });
@@ -131,9 +131,9 @@
         { type:'egg', rarity:'uncommon', name:'Uncommon Egg' },
         { type:'dice', rarity:'rare', name:'Dice Pack' },
       ]],
-      ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Code', [
+      ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Entries', [
         { type:'nameeffect', rarity:'rare', name:'Name Effect' },
-        { type:'giveaway', rarity:'rare', name:'Rare Giveaway Code' },
+        { type:'giveaway', rarity:'rare', name:'Rare Giveaway Entries' },
       ]],
       ['Phantom','Badge + Title + Profile Banner + Rare Egg', [
         { type:'banner', rarity:'rare', name:'Profile Banner' },
@@ -147,14 +147,14 @@
         { type:'banner', rarity:'mythic', name:'Profile Banner' },
         { type:'egg', rarity:'mythic', name:'Guaranteed Mutant Egg' },
       ]],
-      ['Specter','Badge + Title + Mythic Giveaway Code + Dice Pack', [
-        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Code' },
+      ['Specter','Badge + Title + Mythic Giveaway Entries + Dice Pack', [
+        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
         { type:'dice', rarity:'mythic', name:'Dice Pack' },
       ]],
-      ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Code', [
+      ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Entries', [
         { type:'banner', rarity:'mythic', name:'Exclusive Banner' },
         { type:'nameeffect', rarity:'mythic', name:'Exclusive Name Effect' },
-        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Code' },
+        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
       ]],
     ];
     for (let i = 0; i < 10; i++) {

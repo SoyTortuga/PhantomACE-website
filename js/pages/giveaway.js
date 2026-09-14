@@ -1,140 +1,19 @@
 /* ══════════════════════════════════════════
-   GIVEAWAY ENTRY CODES
-   Show entry code cards with copy-to-clipboard
+   GIVEAWAY PAGE
+   Live hype train code drops.
+
+   The entry-code card UI that used to live here is gone. Phamily Time
+   rewards no longer hand out giveaway codes — they add entries straight to
+   the monthly ledger — so there are no cards to reveal, and the "Your Bonus
+   Entries" panel they filled has been removed with them. Where a viewer's
+   entries came from is shown by the history list in the entry tracker.
    ══════════════════════════════════════════ */
-
-let giveawayEntries = [];
-
-async function loadGiveawayEntries() {
-  const container = document.getElementById('bonusEntriesPanel');
-  if (!container) return;
-
-  const session = getSession();
-  if (!session) {
-    container.innerHTML = `
-      <div class="entries-login">
-        <p>Log in with Twitch to see your bonus entry codes.</p>
-        <button class="btn-primary" onclick="loginWithTwitch()">Log In with Twitch</button>
-      </div>`;
-    container.closest('.bonus-entries-section').style.display = '';
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/inventory?game=giveaway');
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    giveawayEntries = (data.items || []).filter(i => i.type === 'entry-code' && i.meta && i.meta.code);
-  } catch {
-    giveawayEntries = [];
-  }
-
-  renderEntries(container);
-  container.closest('.bonus-entries-section').style.display = '';
-}
-
-function renderEntries(container) {
-  if (giveawayEntries.length === 0) {
-    container.innerHTML = `
-      <div class="entries-empty">
-        <p>No bonus entry codes yet.</p>
-        <p class="entries-hint">Earn them through <a href="/community-stats.html">Phamily Time</a> rewards!</p>
-      </div>`;
-    return;
-  }
-
-  const totalEntries = giveawayEntries.reduce((s, i) => s + (i.meta.entries || 0), 0);
-
-  let html = `
-    <div class="entries-header">
-      <span class="entries-total">${totalEntries} bonus entries</span>
-      <span class="entries-hint">Click a card to reveal your code, then claim it in the box above.</span>
-    </div>
-    <div class="entry-cards">`;
-
-  for (let idx = 0; idx < giveawayEntries.length; idx++) {
-    const item = giveawayEntries[idx];
-    const rarity = item.rarity || 'common';
-    const entries = item.meta.entries || 0;
-
-    html += `
-      <div class="entry-card rarity-${rarity}" onclick="showEntryCode(${idx})">
-        <div class="entry-card-rarity">${rarity}</div>
-        <div class="entry-card-value">&times;${entries}</div>
-        <div class="entry-card-label">entries</div>
-        <div class="entry-card-name">${esc(item.name || 'Giveaway Entries')}</div>
-      </div>`;
-  }
-
-  html += '</div>';
-  container.innerHTML = html;
-}
-
-function showEntryCode(idx) {
-  const item = giveawayEntries[idx];
-  if (!item || !item.meta || !item.meta.code) return;
-
-  closeEntryPopover();
-
-  const card = document.querySelectorAll('.entry-card')[idx];
-  if (!card) return;
-
-  const popover = document.createElement('div');
-  popover.className = 'entry-popover';
-  popover.id = 'entryPopover';
-  popover.innerHTML = `
-    <div class="entry-popover-header">
-      <span class="entry-popover-rarity rarity-${item.rarity || 'common'}">${item.rarity || 'common'}</span>
-      <span class="entry-popover-entries">&times;${item.meta.entries || 0} entries</span>
-    </div>
-    <div class="entry-popover-code" id="entryCodeText">${item.meta.code}</div>
-    <button class="btn-primary entry-copy-btn" onclick="copyEntryCode(event)">Copy Code</button>
-    <div class="entry-popover-hint">Paste this code into the giveaway widget above</div>
-  `;
-
-  card.style.position = 'relative';
-  card.appendChild(popover);
-
-  setTimeout(() => {
-    document.addEventListener('click', outsideClickHandler);
-  }, 10);
-}
-
-function copyEntryCode(e) {
-  e.stopPropagation();
-  const codeEl = document.getElementById('entryCodeText');
-  if (!codeEl) return;
-
-  navigator.clipboard.writeText(codeEl.textContent).then(() => {
-    const btn = e.target;
-    btn.textContent = 'Copied!';
-    btn.style.background = 'var(--green)';
-    setTimeout(() => {
-      btn.textContent = 'Copy Code';
-      btn.style.background = '';
-    }, 2000);
-  }).catch(() => {});
-}
-
-function closeEntryPopover() {
-  const existing = document.getElementById('entryPopover');
-  if (existing) existing.remove();
-  document.removeEventListener('click', outsideClickHandler);
-}
-
-function outsideClickHandler(e) {
-  const popover = document.getElementById('entryPopover');
-  if (popover && !popover.contains(e.target)) {
-    closeEntryPopover();
-  }
-}
 
 function esc(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
 }
-
 /* ══════════════════════════════════════════
    HYPE TRAIN CODE DROPS
    Live codes that expire after 5 minutes
@@ -249,7 +128,6 @@ function copyDropCode(btn, code) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-  loadGiveawayEntries();
   loadHypeTrainDrops();
   setInterval(loadHypeTrainDrops, 15000);
 });

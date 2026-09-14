@@ -120,13 +120,10 @@
     <div class="card" id="hypeDropsPanel"></div>
   </section>
 
-  <!-- Bonus Entries -->
-  <section class="page-container bonus-entries-section">
-    <div class="section-header">Your Bonus Entries</div>
-    <div class="card" id="bonusEntriesPanel">
-      <div class="entries-login"><p>Loading...</p></div>
-    </div>
-  </section>
+  <!-- "Your Bonus Entries" used to sit here, listing giveaway codes earned
+       from Phamily Time. Those rewards now add entries to the monthly ledger
+       directly, so there are no codes to list — the entry tracker above
+       shows the running total and where each entry came from. -->
 
   <!-- How It Works -->
   <section class="page-container giveaway-info">
@@ -293,9 +290,16 @@
           const items = (d.you && d.you.history) || [];
           hist.innerHTML = items.length
             ? '<div class="entry-history-title">Recent entries</div>' + items.map(h => {
-                const label = String(h.source || '').startsWith('drop:')
-                  ? String(h.source).slice(5).replace(/^./, c => c.toUpperCase()) + ' drop'
-                  : 'Channel points';
+                /* Anything unrecognised falls through to "Channel points",
+                   which was fine when drops were the only other source.
+                   Phamily Time writes phamily:<reward>, so name it rather
+                   than mislabel it. */
+                const src = String(h.source || '');
+                const label = src.startsWith('drop:')
+                  ? src.slice(5).replace(/^./, c => c.toUpperCase()) + ' drop'
+                  : src.startsWith('phamily:')
+                    ? 'Phamily Time'
+                    : 'Channel points';
                 const when = new Date(h.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
                 return `<div class="entry-history-row"><span>${label}</span><span class="entry-history-n">+${Number(h.entries || 0)}</span><span class="entry-history-when">${when}</span></div>`;
               }).join('')

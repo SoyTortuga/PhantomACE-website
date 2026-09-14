@@ -23,14 +23,9 @@ async function grantItem(env, userId, item) {
   await saveInventory(env, userId, inv);
 }
 
-/* Byte-identical duplicate of send-chat.js's version, now that both are
-   one line. Kept as a local function rather than imported because
-   send-chat.js is a library of bot-token helpers and importing it here
-   for one call would drag that surface in. See the comment on the
-   exported copy for why the array-plus-cursor design was unsafe. */
-async function pullGiveawayCode(env, rarity) {
-  return env.MARKETPLACE.pullGiveawayCode(rarity || 'common');
-}
+/* pullGiveawayCode used to live here. Phamily Time no longer draws from the
+   giveaway code pool at all — rewards add entries to the monthly ledger
+   directly — so the pool now has exactly one consumer, the chat drops. */
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -302,12 +297,11 @@ async function handleHeartbeat(env, session, mk, now) {
   });
 }
 
+const GIVEAWAY_ENTRIES_BY_RARITY = { common: 2, uncommon: 5, rare: 15, mythic: 50 };
+
+/* 'giveaway' is deliberately absent from this map — see grantReward below.
+   It is the one reward type that is not an inventory item. */
 const REWARD_ITEM_MAP = {
-  giveaway: (rarity) => {
-    const entries = { common:2, uncommon:5, rare:15, mythic:50 };
-    return { game:'giveaway', type:'entry-code', consumable:false, quantity: entries[rarity] || 2,
-      meta: { code: null, entries: entries[rarity] || 2 }, _needsCode: true };
-  },
   egg: (rarity, name) => {
     const guaranteed = name.toLowerCase().includes('guaranteed');
     const mutant = name.toLowerCase().includes('mutant');
@@ -329,6 +323,42 @@ const REWARD_ITEM_MAP = {
   nameeffect: () => ({ game:'profile', type:'name-effect', consumable:false }),
 };
 
+/**
+ * Grant one reward of any type.
+ *
+ * ONE function because the reward branch and the milestone-bonus branch used
+ * to carry byte-identical copies of the code-pulling logic, which is exactly
+ * the shape of bug this project keeps finding: two copies, one gets fixed.
+ *
+ * GIVEAWAY REWARDS GO STRAIGHT INTO THE MONTHLY LEDGER.
+ *
+ * They used to pull a real code out of the shared giveaway pool and park it
+ * in the claimer's inventory. Nothing ever registered that code as
+ * redeemable — only chat drops call registerDropCode — so the giveaway page
+ * invited people to "claim it in the box above" and the box always answered
+ * "invalid code", while every claim quietly drained the pool the chat drops
+ * depend on. Real codes spent, nothing delivered.
+ *
+ * A code is a shared secret for reaching somebody you cannot identify, in
+ * chat. Here the claimer is logged in and the reward is already tied to
+ * their own level, so there is nobody to prove anything to and no reason for
+ * the code to exist.
+ */
+async function grantReward(env, session, { id, type, rarity, name }) {
+  if (!type) return;
+
+  if (type === 'giveaway') {
+    const entries = GIVEAWAY_ENTRIES_BY_RARITY[rarity] || GIVEAWAY_ENTRIES_BY_RARITY.common;
+    const { addEntries } = await import('./giveaway-entries.js');
+    await addEntries(env, session.user_id, session.display_name, entries, `phamily:${name || 'reward'}`);
+    return;
+  }
+
+  const mapper = REWARD_ITEM_MAP[type];
+  if (!mapper) return;
+  await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name) });
+}
+
 async function handleClaimReward(env, session, mk, body) {
   const rewardKey = body.rewardKey;
   if (!rewardKey) return json({ error: 'Missing reward key' }, 400);
@@ -347,23 +377,12 @@ async function handleClaimReward(env, session, mk, body) {
   data.claimedRewards.push(rewardKey);
   await saveUserData(env, session.user_id, mk, data);
 
-  if (body.rewardType && REWARD_ITEM_MAP[body.rewardType]) {
-    const mapper = REWARD_ITEM_MAP[body.rewardType];
-    const itemBase = mapper(body.rewardRarity || 'common', body.rewardName || '');
-
-    if (itemBase._needsCode) {
-      const code = await pullGiveawayCode(env, body.rewardRarity || 'common');
-      if (code) itemBase.meta.code = code;
-      delete itemBase._needsCode;
-    }
-
-    await grantItem(env, session.user_id, {
-      id: rewardKey,
-      name: body.rewardName || rewardKey,
-      rarity: body.rewardRarity || 'common',
-      ...itemBase,
-    });
-  }
+  await grantReward(env, session, {
+    id: rewardKey,
+    type: body.rewardType,
+    rarity: body.rewardRarity || 'common',
+    name: body.rewardName || rewardKey,
+  });
 
   const allTime = await getAllTimeStats(env, session.user_id);
   allTime.totalRewardsClaimed++;
@@ -405,23 +424,12 @@ async function handleClaimMilestone(env, session, mk, body) {
 
   if (isSub && body.bonusItems) {
     for (const bonus of body.bonusItems) {
-      if (bonus.type && REWARD_ITEM_MAP[bonus.type]) {
-        const mapper = REWARD_ITEM_MAP[bonus.type];
-        const itemBase = mapper(bonus.rarity || 'common', bonus.name || '');
-
-        if (itemBase._needsCode) {
-          const code = await pullGiveawayCode(env, bonus.rarity || 'common');
-          if (code) itemBase.meta.code = code;
-          delete itemBase._needsCode;
-        }
-
-        await grantItem(env, session.user_id, {
-          id: `ms_${milestoneLevel}_${bonus.type}_${mk}`,
-          name: bonus.name || bonus.type,
-          rarity: bonus.rarity || 'common',
-          ...itemBase,
-        });
-      }
+      await grantReward(env, session, {
+        id: `ms_${milestoneLevel}_${bonus.type}_${mk}`,
+        type: bonus.type,
+        rarity: bonus.rarity || 'common',
+        name: bonus.name || bonus.type,
+      });
     }
   }
 

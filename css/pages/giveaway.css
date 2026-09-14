@@ -511,99 +511,6 @@
   background: var(--green);
 }
 
-/* ── BONUS ENTRIES SECTION ── */
-
-.bonus-entries-section {
-  display: none;
-}
-
-.entries-login,
-.entries-empty {
-  text-align: center;
-  padding: 24px 16px;
-  color: var(--text-dim);
-  font-size: 14px;
-  font-family: var(--font-ui);
-}
-
-.entries-login .btn-primary {
-  margin-top: 12px;
-}
-
-.entries-empty a,
-.entries-hint a {
-  color: var(--red);
-}
-
-.entries-hint {
-  font-family: var(--font-system);
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-top: 4px;
-}
-
-/* ── Header ── */
-.entries-header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-
-.entries-total {
-  font-family: var(--font-system);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--red);
-}
-
-.entries-header .entries-hint {
-  margin-top: 0;
-}
-
-/* ── Entry cards ── */
-.entry-cards {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.entry-card {
-  width: 100px;
-  background: var(--gray-lo);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 10px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s;
-  position: relative;
-}
-
-.entry-card:hover {
-  border-color: var(--red);
-  transform: translateY(-2px);
-}
-
-.entry-card.rarity-mythic { border-left: 3px solid #ff6600; }
-.entry-card.rarity-rare { border-left: 3px solid var(--purple); }
-.entry-card.rarity-uncommon { border-left: 3px solid var(--green); }
-.entry-card.rarity-common { border-left: 3px solid var(--text-dim); }
-
-.entry-card-rarity {
-  font-family: var(--font-system);
-  font-size: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: 6px;
-}
-
-.rarity-mythic .entry-card-rarity { color: #ff6600; }
-.rarity-rare .entry-card-rarity { color: var(--purple); }
-.rarity-uncommon .entry-card-rarity { color: var(--green); }
-.rarity-common .entry-card-rarity { color: var(--text-dim); }
-
 .entry-card-value {
   font-family: var(--font-system);
   font-size: 28px;
@@ -628,32 +535,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* ── Code popover ── */
-.entry-popover {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 220px;
-  background: var(--gray-mid);
-  border: 1px solid var(--red-dim);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  z-index: 100;
-  animation: popover-in 0.15s ease-out;
-}
-
-.entry-popover::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: var(--red-dim);
 }
 
 @keyframes popover-in {
@@ -697,13 +578,6 @@
   border: 1px solid var(--border);
   margin-bottom: 10px;
   user-select: all;
-}
-
-.entry-copy-btn {
-  width: 100%;
-  padding: 8px 16px;
-  font-size: 12px;
-  margin-bottom: 8px;
 }
 
 .entry-popover-hint {
