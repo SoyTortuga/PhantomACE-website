@@ -252,6 +252,48 @@ async function main() {
     line(`  ${' '.repeat(28)} -> ${p.why}`);
   }
 
+  /* ── CHANNEL EMOTES ──────────────────────────────────────────────────
+     Listed because they are the one source of artwork with no licensing
+     question attached: the broadcaster's own emotes, on the broadcaster's
+     own overlay. Needs an APP token and no scope, so nothing has to be
+     re-authorised to use them.
+
+     Animated emotes come back as GIFs on Twitch's CDN, which is hotlinkable
+     by design — that is how every chat client renders them — so an overlay
+     can point at the URL rather than copying the file. */
+  head('CHANNEL EMOTES');
+  try {
+    const { getAppToken } = await import('../../functions/api/auth/app-token.js');
+    const appToken = await getAppToken({ ...process.env, ...vars, MARKETPLACE: kv });
+    if (!appToken) {
+      line('  No app token available; skipping.');
+    } else {
+      const r = await fetch(`https://api.twitch.tv/helix/chat/emotes?broadcaster_id=${broadcasterId}`,
+        { headers: { Authorization: `Bearer ${appToken}`, 'Client-Id': clientId } });
+      if (!r.ok) {
+        line(`  HTTP ${r.status} — ${(await r.text()).slice(0, 160)}`);
+      } else {
+        const d = await r.json();
+        const list = d.data || [];
+        line(`  ${list.length} emote(s). template: ${d.template || '(none returned)'}`);
+        line('');
+        for (const e of list) {
+          const fmts = (e.format || []).join('/');
+          const animated = (e.format || []).includes('animated');
+          line(`  ${String(e.name).padEnd(24)} ${animated ? 'ANIMATED' : 'static  '}  ${fmts}  id=${e.id}`);
+        }
+        if (list.length) {
+          line('');
+          line('  A 4x URL is built from the template by substituting id, format,');
+          line('  theme_mode and scale — e.g. format=animated, theme_mode=dark,');
+          line('  scale=3.0 for the largest animated version.');
+        }
+      }
+    }
+  } catch (err) {
+    line(`  Could not list emotes: ${err.message}`);
+  }
+
   head('SCOPES NEEDING NO PERMISSION AT ALL');
   line('  stream.online / stream.offline require no scope. Worth taking on its');
   line('  own merits: the site currently POLLS /helix/streams every 60s, so');
