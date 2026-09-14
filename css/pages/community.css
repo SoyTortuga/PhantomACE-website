@@ -605,3 +605,87 @@
   color: var(--text-dim);
   font-style: italic;
 }
+
+/* Lives here, not in css/pages/leaderboards.css, because that file is
+   linked by no page at all — community-leaderboards.html loads
+   community.css. Styles put there render as unstyled markup. */
+
+/* ── Community boards ──────────────────────── */
+
+.community-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.community-boards-loading {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0;
+}
+
+.community-board {
+  border: 1px solid var(--border-mid);
+  padding: 16px 18px;
+}
+
+.community-board h3 {
+  font-family: var(--font-gothic);
+  font-size: 15px;
+  color: var(--red);
+  margin: 0 0 12px;
+  letter-spacing: 0.04em;
+}
+
+.community-board-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0;
+}
+
+.community-board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: none;
+}
+
+.community-board-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.community-board-row:last-child { border-bottom: none; }
+.community-board-row.is-top .community-board-name { color: var(--text-pri); font-weight: bold; }
+
+.community-board-rank {
+  width: 20px;
+  color: var(--text-dim);
+  font-size: 12px;
+  flex: none;
+}
+
+.community-board-name {
+  color: var(--text-sec);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-board-value {
+  margin-left: auto;
+  color: var(--text-pri);
+  font-weight: bold;
+  flex: none;
+}
+
+.community-board-value small {
+  color: var(--text-dim);
+  font-weight: normal;
+  font-size: 11px;
+}

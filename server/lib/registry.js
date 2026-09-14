@@ -50,6 +50,11 @@ export const SINGLETONS = {
   /* Milestone drop config: on/off, the rarity per event, the raid floor. */
   milestone_drops:       { table: 'singletons', expiry: 'none' },
 
+  /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
+     going away IS the cache expiring, and a stale board is worse than a
+     slightly slower one. */
+  community_leaderboard_cache: { table: 'singletons', expiry: 'real' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled

@@ -83,3 +83,57 @@
 
   document.addEventListener('DOMContentLoaded', loadLeaderboards);
 })();
+
+/* ══════════════════════════════════════════════
+   COMMUNITY BOARDS — this month's entries, watch hours and check-in streaks
+
+   Read-only, and shows names and positions only. The API deliberately does
+   not return user ids: they are how every authorisation check on the site
+   identifies a person, and a public page has no reason to publish a
+   directory of them.
+   ══════════════════════════════════════════════ */
+
+function escCommunity(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : s;
+  return d.innerHTML;
+}
+
+function renderCommunityBoard(title, rows, unit) {
+  if (!rows || !rows.length) {
+    return '<div class="community-board">' +
+      '<h3>' + escCommunity(title) + '</h3>' +
+      '<p class="community-board-empty">Nothing yet this month.</p>' +
+      '</div>';
+  }
+  return '<div class="community-board">' +
+    '<h3>' + escCommunity(title) + '</h3>' +
+    '<ol class="community-board-list">' + rows.map(function (r) {
+      return '<li class="community-board-row' + (r.rank <= 3 ? ' is-top' : '') + '">' +
+        '<span class="community-board-rank">' + r.rank + '</span>' +
+        '<span class="community-board-name">' + escCommunity(r.name) + '</span>' +
+        '<span class="community-board-value">' + escCommunity(String(r.value)) +
+        (unit ? ' <small>' + escCommunity(unit) + '</small>' : '') + '</span>' +
+        '</li>';
+    }).join('') + '</ol></div>';
+}
+
+async function loadCommunityBoards() {
+  const box = document.getElementById('communityBoards');
+  if (!box) return;
+  try {
+    const res = await fetch('/api/community-leaderboard');
+    if (!res.ok) throw new Error('unavailable');
+    const d = await res.json();
+    box.innerHTML =
+      renderCommunityBoard('Giveaway Entries', d.entries, 'entries') +
+      renderCommunityBoard('Watch Time', d.hours, 'hrs') +
+      renderCommunityBoard('Check-In Streaks', d.streaks, 'streams');
+  } catch {
+    /* Says it is unavailable rather than sitting on "Loading…" for ever —
+       a spinner that never resolves reads as a broken page. */
+    box.innerHTML = '<p class="community-boards-loading">Community boards are unavailable right now.</p>';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadCommunityBoards);
