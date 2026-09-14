@@ -1,36 +1,38 @@
 #!/usr/bin/env node
 /* ══════════════════════════════════════════════
-   What can we actually learn from Twitch about ad breaks?
+   What can this channel's authorisation actually DO?
 
-   Creates nothing on Twitch and changes nothing about the site's
-   configuration. It is NOT strictly read-only: obtaining the broadcaster
-   token can refresh it, which stores the new one — the same write the
-   running site performs on any request that needs that token. Said plainly
-   rather than claimed away, because "read-only" was the first thing this
-   file asserted and it was not quite true.
+   Asks Twitch directly, so nobody re-authorises against my recollection of
+   which scope a feature needs. Scope names and subscription versions move,
+   and a wrong guess here costs a broadcaster a second consent screen.
 
-   Written because the design depends on answers I should not guess at:
+   HOW IT TESTS A SCOPE WITHOUT ASKING FOR ONE
 
-     - is channel:read:ads granted? (it is not, as of writing — that is the
-       whole point of asking before anyone re-authorises)
-     - does GET /helix/channels/ads work while the channel is OFFLINE, or
-       does it only return a schedule mid-stream? A "next ad in 4 min"
-       countdown is worth building only if the answer is known.
-     - what does it actually return — field names and shapes move, and
-       building against a remembered payload is how you ship something that
-       has never worked.
-     - is a channel.ad_break.begin subscription already registered?
+   It does NOT attempt to create EventSub subscriptions. Twitch treats
+   type + condition as unique and ignores the callback, so "just trying"
+   would either 409 against a live subscription or leave a real one pointing
+   at a route that does not exist. There is no dry-run.
 
-   IT DELIBERATELY DOES NOT CREATE AN EVENTSUB SUBSCRIPTION. Twitch treats
-   type + condition as unique and ignores the callback, so a probe that
-   "just tried it" would either 409 against something real or leave a live
-   subscription pointing at a route that does not exist yet. Listing is
-   enough to answer the question.
+   Instead it calls the READ endpoint that sits behind each scope. Those are
+   plain GETs, and Twitch names the missing scope in the error itself —
+   exactly as /helix/channels/ads answered "Missing scope: channel:read:ads".
+   That makes Twitch the authority instead of my memory.
+
+   THE LIMIT OF THAT, STATED PLAINLY: this proves what the read endpoint
+   needs. An EventSub subscription of the related type USUALLY requires the
+   same scope, but Twitch documents them separately and they can differ. So
+   treat a PASS as "this scope is granted and working", not as proof the
+   subscription will register. The subscription is still the moment of
+   truth — this just stops us asking for the wrong scopes.
+
+   Creates nothing on Twitch and changes no configuration. Not strictly
+   read-only: obtaining the broadcaster token can refresh it, which stores
+   the new one — the same write the running site performs.
 
    Usage:
-     node server/scripts/probe-ads.js --service phantomace-web
+     node server/scripts/probe-twitch.js --service phantomace-web
 
-   Prints statuses, scopes and ad-schedule fields. Never a token value.
+   Prints statuses, scopes and payload fields. Never a token value.
    ══════════════════════════════════════════════ */
 
 import path from 'node:path';
@@ -57,7 +59,7 @@ async function main() {
   const service = arg('service');
   const databaseUrl = resolveDatabaseUrl({ service, fallback: arg('database-url') });
   if (!databaseUrl) {
-    console.error('[ads] No DATABASE_URL. Use --service phantomace-web.');
+    console.error('[probe] No DATABASE_URL. Use --service phantomace-web.');
     process.exit(2);
   }
 
@@ -75,7 +77,7 @@ async function main() {
   const broadcasterId = vars.TWITCH_BROADCASTER_ID || process.env.TWITCH_BROADCASTER_ID;
 
   if (!clientId || !broadcasterId) {
-    console.error('[ads] TWITCH_CLIENT_ID / TWITCH_BROADCASTER_ID missing.');
+    console.error('[probe] TWITCH_CLIENT_ID / TWITCH_BROADCASTER_ID missing.');
     process.exit(2);
   }
 
@@ -182,64 +184,88 @@ async function main() {
     line(`  ${err.message}`);
   }
 
-  /* ── 3. THE ACTUAL QUESTION ── */
-  head('GET /helix/channels/ads');
-  try {
-    const r = await fetch(`https://api.twitch.tv/helix/channels/ads?broadcaster_id=${broadcasterId}`,
-      { headers: { Authorization: `Bearer ${token}`, 'Client-Id': clientId } });
-    line(`  HTTP ${r.status}`);
-    const body = await r.text();
-    if (!r.ok) {
-      line(`  ${body.slice(0, 300)}`);
-      if (r.status === 401 || r.status === 403) {
-        line('');
-        line('  Expected while channel:read:ads is not granted. Re-run Step 2 with');
-        line('  the scope added, then run this again to see the real payload.');
+  /* ── 3. CAPABILITY MATRIX ──────────────────────────────────────────────
+     One GET per scope we might want. Twitch's own error names the scope,
+     which is the point — every row below is answered by Twitch rather than
+     asserted here. */
+  head('WHAT THE BROADCASTER TOKEN CAN DO');
+
+  const B = broadcasterId;
+  const PROBES = [
+    { scope: 'channel:read:subscriptions', why: 'resub-with-message alerts (channel.subscription.message)',
+      url: `https://api.twitch.tv/helix/subscriptions?broadcaster_id=${B}&first=1` },
+    { scope: 'channel:read:ads',           why: 'ad countdown + drop guard (channel.ad_break.begin)',
+      url: `https://api.twitch.tv/helix/channels/ads?broadcaster_id=${B}` },
+    { scope: 'bits:read',                  why: 'cheer alerts (channel.cheer)',
+      url: `https://api.twitch.tv/helix/bits/leaderboard?count=1` },
+    { scope: 'moderator:read:followers',   why: 'follow alerts (channel.follow v2)',
+      url: `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${B}&first=1` },
+    { scope: 'channel:read:polls',         why: 'poll overlay (channel.poll.*)',
+      url: `https://api.twitch.tv/helix/polls?broadcaster_id=${B}&first=1` },
+    { scope: 'channel:read:predictions',   why: 'prediction overlay (channel.prediction.*)',
+      url: `https://api.twitch.tv/helix/predictions?broadcaster_id=${B}&first=1` },
+    { scope: 'channel:read:goals',         why: 'goal bar (channel.goal.*)',
+      url: `https://api.twitch.tv/helix/goals?broadcaster_id=${B}` },
+  ];
+
+  const missing = [];
+  for (const p of PROBES) {
+    let verdict;
+    try {
+      const r = await fetch(p.url, { headers: { Authorization: `Bearer ${token}`, 'Client-Id': clientId } });
+      if (r.ok) {
+        const d = await r.json().catch(() => ({}));
+        const n = Array.isArray(d.data) ? d.data.length : 0;
+        verdict = `OK (${n} row${n === 1 ? '' : 's'})`;
+      } else {
+        const body = await r.text();
+        let msg = '';
+        try { msg = JSON.parse(body).message || ''; } catch { msg = body.slice(0, 80); }
+        verdict = `HTTP ${r.status}  ${msg}`;
+        /* Only a scope complaint counts as "needs granting". A 400 or 404
+           means the call is wrong or there is simply nothing to return, and
+           filing that as a missing scope would send somebody to a consent
+           screen for no reason. */
+        if (/missing scope|unauthorized/i.test(msg) || r.status === 401) missing.push(p);
       }
-    } else {
-      /* Printed raw AND parsed. The raw form is what settles field names,
-         which is the thing this probe exists to establish. */
-      line('  Raw: ' + body.slice(0, 500));
-      try {
-        const d = JSON.parse(body);
-        const row = d.data && d.data[0];
-        if (row) {
-          line('');
-          for (const [k, v] of Object.entries(row)) line(`    ${k.padEnd(20)} ${v}`);
-          if (row.next_ad_at) {
-            const secs = Math.round((Number(row.next_ad_at) * 1000 - Date.now()) / 1000);
-            line('');
-            line(`    -> next break in roughly ${Math.round(secs / 60)} min` +
-                 (secs < 0 ? '  (in the past — probably means none scheduled)' : ''));
-          }
-        } else {
-          line('  data[] was empty — no schedule available right now.');
-        }
-      } catch { line('  (body was not JSON)'); }
+    } catch (err) {
+      verdict = 'request failed: ' + err.message;
     }
-  } catch (err) {
-    line(`  Request failed: ${err.message}`);
+    line(`  ${p.scope.padEnd(28)} ${verdict}`);
+    line(`  ${' '.repeat(28)} -> ${p.why}`);
   }
 
-  head('WHAT THIS MEANS');
-  if (!hasRead) {
-    line('  channel:read:ads is not granted, so nothing ad-related can work yet.');
-    line('  Adding it needs PhantomACE to re-run Step 2. Grant the scope BEFORE');
-    line('  creating any EventSub subscription — Twitch checks granted scopes at');
-    line('  creation time, which is how the hype train subscriptions failed.');
-  } else if (!live) {
-    line('  Scope is granted. Worth running this again WHILE LIVE — an offline');
-    line('  channel may legitimately have no schedule to report, and that is the');
-    line('  difference between "not supported" and "nothing on right now".');
+  head('SCOPES NEEDING NO PERMISSION AT ALL');
+  line('  stream.online / stream.offline require no scope. Worth taking on its');
+  line('  own merits: the site currently POLLS /helix/streams every 60s, so');
+  line('  "went live" is up to a minute late — which is also how late the');
+  line('  stream_log entry that check-in streaks are computed from can be.');
+
+  head('WHAT TO DO WITH THIS');
+  if (!missing.length) {
+    line('  Every scope probed is already granted. No re-authorisation needed.');
   } else {
-    line('  Scope granted and channel live: the payload above is what a countdown');
-    line('  and an ad-aware drop guard would be built on.');
+    line('  Missing, and each one needs PhantomACE to approve it:');
+    for (const m of missing) line(`    ${m.scope.padEnd(28)} ${m.why}`);
+    line('');
+    line('  DO IT IN ONE GO. Every separate re-authorisation is another consent');
+    line('  screen for the broadcaster, so add every scope you actually intend');
+    line('  to use before asking rather than returning per feature.');
+    line('');
+    line('  Paste this as broadcasterScopes in functions/api/admin/bot-setup.js,');
+    line('  then have PhantomACE re-run Step 2:');
+    line('');
+    line('    ' + [...new Set([...granted, ...missing.map(m => m.scope)])].join(' '));
+    line('');
+    line('  GRANT BEFORE SUBSCRIBING. Twitch checks granted scopes when an');
+    line('  EventSub subscription is CREATED, not when the event fires — which');
+    line('  is exactly how the hype train subscriptions failed with three 403s.');
   }
 
   await pool.end().catch(() => {});
 }
 
 main().catch(err => {
-  console.error('[ads] FAILED:', err.message);
+  console.error('[probe] FAILED:', err.message);
   process.exit(1);
 });
