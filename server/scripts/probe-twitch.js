@@ -216,7 +216,24 @@ async function main() {
       if (r.ok) {
         const d = await r.json().catch(() => ({}));
         const n = Array.isArray(d.data) ? d.data.length : 0;
-        verdict = `OK (${n} row${n === 1 ? '' : 's'})`;
+        const total = Number(d.total);
+
+        /* A 200 IS NOT ALWAYS A PASS.
+           /helix/channels/followers answers 200 without moderator:read:followers
+           — it just returns `total` and an EMPTY data array. The endpoint
+           "works" while withholding the very rows a follow alert needs, so
+           the naive check reported the scope as granted when it was not.
+           Caught on this probe's first real run against production.
+
+           total > 0 with no rows is that shape. Reported as missing, because
+           the thing being asked is "can we read the data", not "does the URL
+           respond". */
+        if (n === 0 && Number.isFinite(total) && total > 0) {
+          verdict = `200 but 0 of ${total} rows — data withheld, scope NOT granted`;
+          missing.push(p);
+        } else {
+          verdict = `OK (${n} row${n === 1 ? '' : 's'}${Number.isFinite(total) ? ` of ${total}` : ''})`;
+        }
       } else {
         const body = await r.text();
         let msg = '';
