@@ -38,7 +38,12 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 import { createPool, waitForDatabase } from '../lib/db.js';
 import { createKVStore } from '../lib/kv.js';
 import { resolveDatabaseUrl } from '../lib/service-env.js';
-import { addEntries, monthKey } from '../../functions/api/giveaway-entries.js';
+import { addEntries, monthKey, ledgerKey } from '../../functions/api/giveaway-entries.js';
+
+/* The history source written for a migrated credit. Doubles as the marker
+   that says "this account has already been paid", which is what makes a
+   re-run after a partial failure safe — see creditOnce below. */
+const MIGRATION_SOURCE = 'phamily:legacy entry codes';
 
 function arg(name, fallback = null) {
   const hit = process.argv.find(a => a.startsWith(`--${name}=`));
@@ -73,11 +78,23 @@ export function entriesFor(item) {
   return RARITY_ENTRIES[item && item.rarity] || RARITY_ENTRIES.common;
 }
 
-/** @returns {{key,userId,items,entries}[]} one row per account owed entries */
+/**
+ * @param {{name?:string, key?:string, value:object}[]} rows from listValues
+ * @returns {{key,userId,items,entries}[]} one row per account owed entries
+ *
+ * listValues returns `name`, not `key` — it mirrors Cloudflare KV's list()
+ * shape, where keys arrive as {name}. Reading `key` here silently produced
+ * undefined: the plan still printed correctly because the user id comes from
+ * the value, and the run then died on the first write with "Cannot read
+ * properties of undefined". Both spellings are accepted now, and a row with
+ * neither is dropped rather than carried forward as a broken key.
+ */
 export function planMigration(rows) {
   const plan = [];
-  for (const { key, value } of rows) {
-    if (!value || !Array.isArray(value.items)) continue;
+  for (const row of rows) {
+    const key = row.name || row.key;
+    const value = row.value;
+    if (!key || !value || !Array.isArray(value.items)) continue;
     const dead = value.items.filter(isDeadEntryCode);
     if (!dead.length) continue;
     plan.push({
@@ -88,6 +105,26 @@ export function planMigration(rows) {
     });
   }
   return plan;
+}
+
+/**
+ * Has this account already received its migration credit?
+ *
+ * Reads the account's ledger for the current month and looks for this
+ * migration's own history entry. That is the only durable record that the
+ * entries actually landed — the inventory mark is written separately and can
+ * lag it.
+ *
+ * addEntries trims history to the most recent 50, so in principle a very
+ * active account could push the marker off the end and be credited twice.
+ * For a one-time backfill run now, minutes after the partial failure, that
+ * cannot happen; it is called out rather than engineered around because the
+ * script is not meant to be kept for months.
+ */
+export async function alreadyCredited(env, userId) {
+  const rec = await env.MARKETPLACE.get(ledgerKey(userId, monthKey()), 'json');
+  return !!(rec && Array.isArray(rec.history) &&
+    rec.history.some(h => h && h.source === MIGRATION_SOURCE));
 }
 
 /** The credited form of an inventory, used by the writer below. */
@@ -147,16 +184,29 @@ async function main() {
 
   console.log('');
   for (const p of plan) {
-    /* Credit first, then mark. If this dies in between, the worst case is an
-       account credited twice on a re-run — visible and correctable. Marking
-       first would risk the opposite: items marked as credited whose entries
-       were never actually added, which is silent and unrecoverable without
-       knowing which accounts to look at. */
-    const total = await addEntries(env, p.userId, '', p.entries, 'phamily:legacy entry codes');
+    /* Credit, then mark. Marking first would risk items recorded as paid
+       whose entries never landed — silent, and unrecoverable without knowing
+       which accounts to inspect.
+
+       Crediting first has the opposite risk: a crash between the two steps
+       leaves an account paid but unmarked, and the next run would pay again.
+       That is not hypothetical — it happened, when this loop passed an
+       undefined key to mutate() and threw after the first credit. So the
+       credit checks the ledger for its own marker first and skips if it is
+       already there. */
+    const already = await alreadyCredited(env, p.userId);
+    let total = null;
+    if (already) {
+      console.log(`  ${String(p.userId).padEnd(12)} already credited — marking items only`);
+    } else {
+      total = await addEntries(env, p.userId, '', p.entries, MIGRATION_SOURCE);
+    }
 
     await env.MARKETPLACE.mutate(p.key, (current) => creditInventory(current, Date.now()));
 
-    console.log(`  ${String(p.userId).padEnd(12)} +${p.entries} → ${total} entries this month`);
+    if (!already) {
+      console.log(`  ${String(p.userId).padEnd(12)} +${p.entries} → ${total} entries this month`);
+    }
   }
 
   console.log('');

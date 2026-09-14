@@ -49,7 +49,7 @@ export function monthEndsAt(d = new Date()) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0);
 }
 
-function ledgerKey(userId, month) {
+export function ledgerKey(userId, month) {
   return `${LEDGER_PREFIX}${userId}_${month}`;
 }
 
