@@ -55,12 +55,20 @@ async function handleEvent(env, type, event) {
   const cfg = await getMilestoneConfig(env);
   if (!cfg.enabled) return { fired: false, reason: 'milestone drops are off' };
 
+  /* Raised before the drop is attempted, and independently of it. A drop
+     can be refused by the shared cooldown — two milestones inside fifteen
+     seconds — and the second one is still worth putting on screen even when
+     no code goes with it. Tying the alert to the drop would silently swallow
+     it. */
+  const { pushOverlayEvent } = await import('./overlay/events.js');
+
   if (type === 'channel.subscribe') {
     /* is_gift subs arrive here AND as channel.subscription.gift. Firing on
        both would drop twice for one act of generosity, so the gift event
        owns gifts and this one ignores them. */
     if (event.is_gift) return { fired: false, reason: 'gift — handled by the gift event' };
     const who = event.user_name || event.user_login || 'someone';
+    await pushOverlayEvent(env, { type: 'sub', who, tier: event.tier || null });
     return await dropCodeAction(env, cfg.subRarity, 'milestone:sub', {
       headline: `${who} just subscribed! Thank you!`,
     });
@@ -69,6 +77,7 @@ async function handleEvent(env, type, event) {
   if (type === 'channel.subscription.gift') {
     const who = event.is_anonymous ? 'An anonymous gifter' : (event.user_name || event.user_login || 'Someone');
     const n = Number(event.total) || 1;
+    await pushOverlayEvent(env, { type: 'giftsub', who, count: n });
     return await dropCodeAction(env, cfg.giftRarity, 'milestone:giftsub', {
       headline: `${who} gifted ${n} sub${n === 1 ? '' : 's'}!`,
     });
@@ -80,6 +89,7 @@ async function handleEvent(env, type, event) {
       return { fired: false, reason: `raid of ${viewers} below threshold ${cfg.raidMinViewers}` };
     }
     const who = event.from_broadcaster_user_name || 'A raider';
+    await pushOverlayEvent(env, { type: 'raid', who, viewers });
     return await dropCodeAction(env, cfg.raidRarity, 'milestone:raid', {
       headline: `${who} raided with ${viewers}! Welcome raiders!`,
     });

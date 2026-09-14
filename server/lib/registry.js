@@ -57,6 +57,12 @@ export const SINGLETONS = {
      that had minutes left. */
   live_drops:            { table: 'singletons', expiry: 'none' },
 
+  /* On-stream alert feed and the key that guards it. Both 'none': an expired
+     key would lock the overlay out mid-stream with no visible cause, and an
+     expired event row would reset the sequence and replay old alerts. */
+  overlay_events:        { table: 'singletons', expiry: 'none' },
+  overlay_key:           { table: 'singletons', expiry: 'none' },
+
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
      slightly slower one. */

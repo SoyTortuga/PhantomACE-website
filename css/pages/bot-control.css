@@ -784,3 +784,20 @@
 }
 
 .bot-announce-add .bot-announce-input { flex: 1 1 260px; }
+
+/* ── Overlay URL ───────────────────────────── */
+
+.bot-overlay-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bot-overlay-row .bot-mod-input {
+  flex: 1 1 320px;
+  font-size: 12px;
+}
+
+.bot-overlay-hint {
+  margin: 12px 0 0;
+}

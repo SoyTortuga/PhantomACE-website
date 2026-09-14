@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Overlay | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/pages/overlay.css">
+</head>
+<body class="overlay-body">
+
+  <!-- One alert at a time. Everything else waits in a queue rather than
+       stacking, so twenty gift subs do not bury the screen. -->
+  <div class="ov-stage" id="ovStage" aria-live="polite"></div>
+
+  <!-- Shown only when the overlay cannot reach the server, and only after
+       several consecutive failures. A stream must never carry a debug
+       banner because one poll blipped. -->
+  <div class="ov-fault" id="ovFault" hidden>overlay disconnected</div>
+
+  <script src="/js/pages/overlay.js" defer></script>
+</body>
+</html>

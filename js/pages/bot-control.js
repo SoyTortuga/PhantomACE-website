@@ -730,6 +730,37 @@ function initRotationPanel() {
   loadRotation();
 }
 
+/* ── Stream overlay URL (broadcaster only) ──────────────────────────────── */
+
+function initOverlayPanel(url) {
+  const section = document.getElementById('overlaySection');
+  const input = document.getElementById('botOverlayUrl');
+  const copy = document.getElementById('botOverlayCopy');
+  if (!section || !input || !url) return;
+
+  section.hidden = false;
+  input.value = url;
+
+  if (copy) {
+    copy.addEventListener('click', function () {
+      input.select();
+      /* Falls back to leaving it selected rather than claiming success —
+         clipboard access is blocked in plenty of contexts, and "Copied!" on
+         an empty clipboard is worse than no feedback. */
+      const done = () => { copy.textContent = 'Copied!'; setTimeout(() => { copy.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(function () {
+          copy.textContent = 'Press Ctrl+C';
+          setTimeout(() => { copy.textContent = 'Copy'; }, 2500);
+        });
+      } else {
+        copy.textContent = 'Press Ctrl+C';
+        setTimeout(() => { copy.textContent = 'Copy'; }, 2500);
+      }
+    });
+  }
+}
+
 /* ── Moderator allowlist (broadcaster only) ─────────────────────────────── */
 
 function renderModerators(entries, canEdit) {
@@ -883,5 +914,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (panel) panel.hidden = false;
 
   initBotControlPanel();
-  if (data.isBroadcaster) initModeratorPanel();
+  if (data.isBroadcaster) {
+    initModeratorPanel();
+    initOverlayPanel(data.overlayUrl);
+  }
 });

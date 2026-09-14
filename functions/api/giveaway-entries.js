@@ -156,6 +156,24 @@ const LIVE_DROPS_MAX = 40;
 export async function recordLiveDrop(env, entry) {
   if (!entry || !entry.code) return;
   const now = Date.now();
+
+  /* The overlay alert is raised here rather than at each call site, for the
+     same reason the feed itself is: this is the single point every drop
+     passes through, so nothing can be added later that reaches chat without
+     reaching the screen. */
+  const { pushOverlayEvent } = await import('./overlay/events.js');
+  await pushOverlayEvent(env, {
+    type: 'drop',
+    kind: entry.kind,
+    code: entry.code,
+    rarity: entry.rarity,
+    entries: entry.entries || null,
+    itemName: entry.itemName || null,
+    source: entry.source,
+    level: entry.level || null,
+    redeemPath: entry.redeemPath,
+    expiresAt: entry.expiresAt,
+  });
   await env.MARKETPLACE.mutate(LIVE_DROPS_KEY, (current) => {
     const list = current && Array.isArray(current.drops) ? current.drops : [];
     /* Prune by each entry's OWN expiry, never by an external event. */

@@ -107,6 +107,17 @@ export async function onRequestGet(context) {
     stale: !!(stored && !current),
   };
 
+  /* The OBS browser-source URL, key included, so it can be copied rather
+     than assembled by hand. Broadcaster only: the key is what stops anyone
+     from loading the alert feed, so it does not belong in a moderator's
+     view of the panel. */
+  let overlayUrl = null;
+  if (isBroadcaster(env, session)) {
+    const { getOverlayKey } = await import('../overlay/events.js');
+    const origin = env.PUBLIC_ORIGIN || new URL(request.url).origin;
+    overlayUrl = `${origin}/overlay?key=${await getOverlayKey(env)}`;
+  }
+
   const log = await env.MARKETPLACE.get('bot_action_log', 'json') || [];
 
   return json({
@@ -130,6 +141,7 @@ export async function onRequestGet(context) {
       subscribed: hasHypeTrainSub,
     },
     checkins,
+    overlayUrl,
     recentActions: log.slice(-15).reverse(),
   });
 }
