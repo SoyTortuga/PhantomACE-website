@@ -212,7 +212,7 @@ export async function getBotActionLog(env) {
 /* ── Shared actions — used by both commands.js
    (chat-triggered) and trigger.js (panel-triggered) ── */
 
-export async function dropCodeAction(env, rarity, actorLabel) {
+export async function dropCodeAction(env, rarity, actorLabel, opts = {}) {
   const tier = (rarity || '').toLowerCase();
   const info = TIER_INFO[tier];
   if (!info) {
@@ -235,7 +235,12 @@ export async function dropCodeAction(env, rarity, actorLabel) {
   const { registerDropCode } = await import('../giveaway-entries.js');
   await registerDropCode(env, code, tier, info.entries);
 
-  const msg = `${info.emoji} BONUS DROP! ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
+  /* Optional headline so a milestone drop can say WHY it fired — "thanks for
+     the sub" reads very differently from a bare BONUS DROP, and the reason is
+     the whole point of tying a drop to an event. */
+  const headline = (opts.headline || 'BONUS DROP!').slice(0, 120);
+
+  const msg = `${info.emoji} ${headline} ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
     `${info.entries} bonus entries! Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
 
   const sent = await sendChatMessage(env, msg);

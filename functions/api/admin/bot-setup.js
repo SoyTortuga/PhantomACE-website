@@ -840,6 +840,29 @@ async function createEventSubSubscriptions(env, request) {
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/channel-points`,
     },
+    /* Milestone drops. They fire nothing until milestone drops are switched
+       on in the panel, so subscribing early is harmless and saves coming
+       back to this page later. channel.raid is conditioned on the
+       TO-broadcaster: it fires when somebody raids this channel, not when
+       this channel raids out. */
+    {
+      type: 'channel.subscribe',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/milestones`,
+    },
+    {
+      type: 'channel.subscription.gift',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/milestones`,
+    },
+    {
+      type: 'channel.raid',
+      version: '1',
+      condition: { to_broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/milestones`,
+    },
   ];
 
   if (botUserId) {

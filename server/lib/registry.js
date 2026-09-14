@@ -47,6 +47,9 @@ export const SINGLETONS = {
      as a stream and correctly breaks a streak. */
   stream_log:            { table: 'singletons', expiry: 'none' },
 
+  /* Milestone drop config: on/off, the rarity per event, the raid floor. */
+  milestone_drops:       { table: 'singletons', expiry: 'none' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled

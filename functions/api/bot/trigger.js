@@ -68,6 +68,12 @@ export async function onRequestPost(context) {
     return json(result, result.success ? 200 : 400);
   }
 
+  if (body.action === 'milestone-config') {
+    const { setMilestoneConfig } = await import('../milestones.js');
+    const result = await setMilestoneConfig(env, body);
+    return json(result, result.error ? 400 : 200);
+  }
+
   if (body.action === 'announce') {
     const result = await announceAction(env, body.message, actor);
     return json(result, result.success ? 200 : 400);
