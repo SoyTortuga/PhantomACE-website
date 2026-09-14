@@ -898,3 +898,65 @@
   });
 
 })();
+
+/* ══════════════════════════════════════════════
+   ACCRUAL INDICATOR
+
+   Answers the only question a viewer actually has while the page is open:
+   is my time counting right now?
+
+   It reports the SERVER's answer about the last heartbeat, not the page's
+   assumption. Three of the states below happen while the channel is live and
+   credit nothing, and before this they were indistinguishable from working —
+   the number simply did not move and there was nothing to explain why.
+
+   Deliberately never says "counting" unless the server said it credited
+   time. A reassuring indicator that is wrong is worse than none: it turns a
+   fixable problem into one nobody reports.
+   ══════════════════════════════════════════════ */
+(function () {
+  const STATES = {
+    credited:   { state: 'on',      text: 'Counting your time',        sub: 'PhantomACE is live and this page is checked in.' },
+    'first-beat':{ state: 'pending', text: 'Starting…',                sub: 'Your first check-in landed. Time counts from the next one.' },
+    gap:        { state: 'pending', text: 'Resumed',                   sub: 'The gap since your last check-in was too long to count. Counting again from now.' },
+    offline:    { state: 'off',     text: 'PhantomACE is offline',     sub: 'Watch time only counts while the stream is live.' },
+    'logged-out':{ state: 'off',    text: 'Not logged in',             sub: 'Log in with Twitch to earn watch time.' },
+    unreachable:{ state: 'error',   text: 'Can’t reach the server',    sub: 'Time is not being counted right now. It should resume on its own.' },
+    error:      { state: 'error',   text: 'Server error',              sub: 'Time is not being counted right now.' },
+    idle:       { state: 'idle',    text: 'Checking…',                 sub: '' },
+    unknown:    { state: 'idle',    text: 'Checking…',                 sub: '' },
+  };
+
+  const box = document.getElementById('ptAccrual');
+  const textEl = document.getElementById('ptAccrualText');
+  const subEl = document.getElementById('ptAccrualSub');
+  if (!box || !textEl || !subEl) return;
+
+  let last = null;
+
+  function render() {
+    const hb = last || window.phamilyHeartbeat || { reason: 'idle' };
+    const conf = STATES[hb.reason] || STATES.unknown;
+
+    box.dataset.state = conf.state;
+    textEl.textContent = conf.text;
+
+    let sub = conf.sub;
+    if (hb.reason === 'credited') {
+      const mins = Math.round((hb.creditedSeconds || 0) / 60);
+      const ago = Math.max(0, Math.round((Date.now() - (hb.at || Date.now())) / 1000));
+      sub = `Last counted ${mins >= 1 ? mins + ' min' : (hb.creditedSeconds || 0) + 's'}` +
+            (hb.boostRate && hb.boostRate !== 1 ? ` at ${hb.boostRate}x` : '') +
+            `, ${ago}s ago.`;
+    }
+    subEl.textContent = sub;
+  }
+
+  document.addEventListener('pham-heartbeat', function (e) { last = e.detail; render(); });
+
+  /* Re-render on a timer as well as on each beat, so the "Xs ago" stays
+     honest between heartbeats instead of freezing at whatever it said when
+     the last one landed. */
+  setInterval(render, 5000);
+  render();
+})();

@@ -82,18 +82,54 @@ async function pollTwitchStatus() {
    isChannelLive() in functions/api/phamily-time.js) — this client-side
    check is just to skip a pointless request while offline, not a trust
    boundary. */
+/* The outcome of the last heartbeat, published so any page can show whether
+   watch time is actually accruing. It used to be thrown away: the response
+   was awaited and discarded, so nothing could tell "counting" from "live but
+   silently crediting nothing", which is the state this reports. */
+window.phamilyHeartbeat = { reason: 'idle', at: 0 };
+
+function publishHeartbeat(detail) {
+  window.phamilyHeartbeat = Object.assign({ at: Date.now() }, detail);
+  document.dispatchEvent(new CustomEvent('pham-heartbeat', { detail: window.phamilyHeartbeat }));
+}
+
 async function sendPhamilyHeartbeatIfLive(status) {
-  if (!status || !status.live) return;
-  if (typeof getSession !== 'function' || !getSession()) return;
+  if (typeof getSession !== 'function' || !getSession()) {
+    publishHeartbeat({ reason: 'logged-out', live: !!(status && status.live) });
+    return;
+  }
+  if (!status || !status.live) {
+    /* Reported rather than returned silently. "PhantomACE is offline" is the
+       single most common reason time is not accruing, and a viewer deserves
+       to be told that instead of watching a number not move. */
+    publishHeartbeat({ reason: 'offline', live: false });
+    return;
+  }
 
   try {
-    await fetch('/api/phamily-time', {
+    const res = await fetch('/api/phamily-time', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'heartbeat' }),
     });
-  } catch { /* silent — next poll cycle will retry */ }
+    if (!res.ok) { publishHeartbeat({ reason: 'error', live: true, status: res.status }); return; }
+    const data = await res.json();
+    publishHeartbeat({
+      reason: data.reason || 'unknown',
+      live: !!data.live,
+      creditedSeconds: data.creditedSeconds || 0,
+      boostRate: data.boostRate || 1,
+      hours: data.hours,
+      level: data.level,
+      nextBeatMs: data.nextBeatMs,
+    });
+  } catch {
+    /* A network failure is NOT the same as "offline", and saying so matters:
+       one means nothing is being missed, the other means time is being lost
+       right now while the channel is live. */
+    publishHeartbeat({ reason: 'unreachable', live: true });
+  }
 }
 
 function startTwitchPolling() {

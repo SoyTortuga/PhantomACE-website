@@ -237,14 +237,42 @@ async function handleHeartbeat(env, session, mk, now) {
 
   const live = await isChannelLive(env);
 
-  if (live && data.lastHeartbeat > 0 && (timestamp - data.lastHeartbeat) < MAX_GAP) {
-    const elapsed = Math.min(timestamp - data.lastHeartbeat, MAX_GAP) / 3600000;
+  /* ── SAY WHAT THIS BEAT ACTUALLY DID ────────────────────────────────────
+     The response used to carry only `live`, which is not the same question
+     as "did my time count". Three of these cases credit nothing while the
+     channel IS live, and from the outside they were indistinguishable from
+     working:
+
+       offline    — nothing to count
+       first-beat — no previous beat to measure from, so the FIRST one after
+                    opening a page always credits zero
+       gap        — more than MAX_GAP since the last beat (tab backgrounded,
+                    laptop asleep, connection dropped). Deliberately not
+                    credited, because the viewer may not have been watching.
+
+     A viewer staring at a page that says "live" while nothing accrues has no
+     way to tell a working system from a broken one. Now the page can. */
+  const gap = data.lastHeartbeat > 0 ? (timestamp - data.lastHeartbeat) : null;
+  let creditedSeconds = 0;
+  let reason;
+
+  if (!live) {
+    reason = 'offline';
+  } else if (gap === null) {
+    reason = 'first-beat';
+  } else if (gap >= MAX_GAP) {
+    reason = 'gap';
+  } else {
+    const elapsed = Math.min(gap, MAX_GAP) / 3600000;
     const boosted = elapsed * getBoostRate(session.role);
     data.hours = Math.min(data.hours + boosted, MAX_LEVEL);
     data.level = Math.min(Math.floor(data.hours), MAX_LEVEL);
 
     const dayStr = String(now.getUTCDate());
     data.attendance[dayStr] = (data.attendance[dayStr] || 0) + elapsed;
+
+    creditedSeconds = Math.round(gap / 1000);
+    reason = 'credited';
   }
 
   data.lastHeartbeat = timestamp;
@@ -264,6 +292,13 @@ async function handleHeartbeat(env, session, mk, now) {
     level: data.level,
     attendance: data.attendance,
     live,
+    /* What this beat did, for the accrual indicator. */
+    reason,
+    creditedSeconds,
+    boostRate: getBoostRate(session.role),
+    /* So the page can say when to expect the next one instead of leaving a
+       viewer wondering whether anything is still happening. */
+    nextBeatMs: INTERVAL,
   });
 }
 
