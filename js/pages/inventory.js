@@ -50,7 +50,7 @@ async function loadInventory() {
   if (profileItems.length === 0) {
     container.innerHTML = `
       <div class="collection-empty">
-        <p>No cosmetics yet. Earn them through <a href="/community-stats.html">Phamily Time</a>, or redeem a code dropped in chat on the <a href="/redeem.html">Redeem</a> page!</p>
+        <p>No cosmetics yet. Earn them through <a href="/phamily-time.html">Phamily Time</a>, or redeem a code dropped in chat on the <a href="/redeem.html">Redeem</a> page!</p>
       </div>`;
     return;
   }
@@ -129,7 +129,7 @@ function renderActiveTabGrid() {
   if (items.length === 0) {
     html += `
       <div class="inv-tab-empty">
-        <p>No ${slot.label.toLowerCase()}s yet. Earn one through <a href="/community-stats.html">Phamily Time</a>, a channel point redemption, or a code drop on the <a href="/redeem.html">Redeem</a> page.</p>
+        <p>No ${slot.label.toLowerCase()}s yet. Earn one through <a href="/phamily-time.html">Phamily Time</a>, a channel point redemption, or a code drop on the <a href="/redeem.html">Redeem</a> page.</p>
       </div>`;
     html += '</div>';
     return html;
@@ -196,7 +196,7 @@ function renderShowcaseSection() {
 function renderFooterTip() {
   return `
     <div class="inv-footer-tip">
-      <p>Earn more cosmetics by climbing the <a href="/community-stats.html">Phamily Time</a> leaderboard, catching a channel point drop, or redeeming a code the moment it's dropped in chat on the <a href="/redeem.html">Redeem</a> page. Once they're yours, they're yours to keep.</p>
+      <p>Earn more cosmetics by climbing the <a href="/phamily-time.html">Phamily Time</a> leaderboard, catching a channel point drop, or redeeming a code the moment it's dropped in chat on the <a href="/redeem.html">Redeem</a> page. Once they're yours, they're yours to keep.</p>
     </div>`;
 }
 

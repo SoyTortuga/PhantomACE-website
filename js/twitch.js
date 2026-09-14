@@ -75,13 +75,6 @@ async function pollTwitchStatus() {
   sendPhamilyHeartbeatIfLive(status);
 }
 
-/* Phamily Time watch-time tracking runs from here — every page, not just
-   community-stats.html — so it counts as long as the user has ANY page
-   open while PhantomACE is live, not just one specific tab. The server
-   re-checks live status itself before crediting any time (see
-   isChannelLive() in functions/api/phamily-time.js) — this client-side
-   check is just to skip a pointless request while offline, not a trust
-   boundary. */
 /* The outcome of the last heartbeat, published so any page can show whether
    watch time is actually accruing. It used to be thrown away: the response
    was awaited and discarded, so nothing could tell "counting" from "live but
@@ -93,6 +86,12 @@ function publishHeartbeat(detail) {
   document.dispatchEvent(new CustomEvent('pham-heartbeat', { detail: window.phamilyHeartbeat }));
 }
 
+/* Phamily Time watch-time tracking runs from here — every page, not just
+   phamily-time.html — so it counts as long as the user has ANY page open
+   while PhantomACE is live, not just one specific tab. The server re-checks
+   live status itself before crediting any time (see isChannelLive() in
+   functions/api/phamily-time.js) — this client-side check is just to skip a
+   pointless request while offline, not a trust boundary. */
 async function sendPhamilyHeartbeatIfLive(status) {
   if (typeof getSession !== 'function' || !getSession()) {
     publishHeartbeat({ reason: 'logged-out', live: !!(status && status.live) });

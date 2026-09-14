@@ -138,19 +138,29 @@ export function createStatic(root) {
     if (!segmentsAreSafe(segments)) return { kind: 'notfound' };
 
     /* ── MOVED PATHS ────────────────────────────────────────────────────────
-       PhamShock's folder was still named shell-shock from before the game
-       was renamed. Renaming the folder changes a URL that already exists in
-       people's bookmarks, in old chat messages, and in anything the bot has
-       posted — so the old path keeps working rather than starting to 404.
+       Pages and folders whose names lagged behind what the thing is called.
+       Renaming them changes URLs that already exist in bookmarks, in old
+       chat messages and in anything the bot has posted, so the old paths
+       keep working rather than starting to 404.
 
-       301, not 308: this is permanent and only ever a GET, so letting
-       browsers and crawlers cache it is the point. Anything deeper under the
-       old folder is carried across too, so a direct link to an asset still
-       resolves. */
-    if (segments[0] === 'games' && segments[1] === 'shell-shock') {
-      const rest = segments.slice(2);
-      const loc = '/games/phamshock/' + (rest.length ? rest.join('/') : '');
-      return { kind: 'redirect', location: loc + search, status: 301 };
+       301, not the 308 used for clean-URL canonicalisation: these are
+       permanent and only ever GETs, so browsers and crawlers caching them is
+       the point rather than a hazard.
+
+       Checked BEFORE the .html rules on purpose. Those verify the file
+       exists, and after a rename it does not — so /community-stats.html
+       would 404 here instead of being forwarded. */
+    const MOVED = [
+      { from: ['games', 'shell-shock'], to: '/games/phamshock/' },
+      { from: ['community-stats'],      to: '/phamily-time' },
+      { from: ['community-stats.html'], to: '/phamily-time' },
+    ];
+    for (const m of MOVED) {
+      if (m.from.every((seg, i) => segments[i] === seg)) {
+        const rest = segments.slice(m.from.length);
+        const base = rest.length ? m.to.replace(/\/$/, '') + '/' : m.to;
+        return { kind: 'redirect', location: base + rest.join('/') + search, status: 301 };
+      }
     }
 
     const last = segments[segments.length - 1];
