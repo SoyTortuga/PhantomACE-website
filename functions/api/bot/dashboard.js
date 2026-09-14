@@ -80,6 +80,24 @@ export async function onRequestGet(context) {
   const hasHypeTrainSub = Array.isArray(subs) &&
     subs.some(s => String(s.type || '').startsWith('channel.hype_train'));
 
+  /* ── Pham Check-ins for the broadcast on air ──────────────────────────
+     Only shown when the stored stream id matches the one currently live —
+     the row survives past the end of a stream, and yesterday's attendance
+     presented as today's is worse than showing none. */
+  const { getStreamInfo } = await import('../stream-info.js');
+  const stream = await getStreamInfo(env);
+  const stored = await env.MARKETPLACE.get('checkin_current', 'json');
+  const current = stored && stream.streamId && stored.streamId === stream.streamId ? stored : null;
+
+  const checkins = {
+    live: stream.live,
+    streamStartedAt: stream.startedAt,
+    count: current ? current.checkins.length : 0,
+    /* Most recent first — mid-stream the question is who just arrived. */
+    recent: current ? current.checkins.slice(-25).reverse() : [],
+    stale: !!(stored && !current),
+  };
+
   const log = await env.MARKETPLACE.get('bot_action_log', 'json') || [];
 
   return json({
@@ -102,6 +120,7 @@ export async function onRequestGet(context) {
          the panel than to discover it during a hype train. */
       subscribed: hasHypeTrainSub,
     },
+    checkins,
     recentActions: log.slice(-15).reverse(),
   });
 }

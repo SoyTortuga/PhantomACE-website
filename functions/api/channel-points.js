@@ -62,6 +62,44 @@ const REWARD_HANDLERS = {
     }
     await queueRedemption(env, userId, 'theme-unlock', redemption);
   },
+  /* PHAM CHECK-IN — "I'm here", once per broadcast.
+     The once-per-stream limit is Twitch's own (max_per_user_per_stream on
+     the reward), so there is no counter to reset and no scheduled job; the
+     reward simply becomes redeemable again when the next stream starts.
+     What is recorded here is WHEN, which is the part Twitch does not keep. */
+  'pham-checkin': async (env, userId, redemption) => {
+    const { getStreamInfo } = await import('./stream-info.js');
+    const { streamId, startedAt } = await getStreamInfo(env);
+
+    await env.MARKETPLACE.mutate('checkin_current', (current) => {
+      /* A new broadcast replaces the list wholesale. Twitch's per-stream
+         limit has already reset by this point, so carrying the old list
+         forward would let one person appear twice in what reads as a single
+         stream's attendance. */
+      const sameStream = current && streamId && current.streamId === streamId;
+      const rec = sameStream
+        ? current
+        : { streamId: streamId || null, startedAt: startedAt || null, checkins: [] };
+
+      /* Defensive: Twitch enforces one per user per stream, but a webhook can
+         be redelivered, and a redelivery is not a second check-in. */
+      if (rec.checkins.some(c => String(c.userId) === String(userId))) return undefined;
+
+      const at = Date.now();
+      rec.checkins.push({
+        userId: String(userId),
+        displayName: redemption.user_name || redemption.user_login || '',
+        at,
+        /* Minutes into the broadcast — the actual question being asked is
+           "when did they start watching", and a wall-clock timestamp alone
+           makes that arithmetic the reader's problem. */
+        minutesIn: rec.startedAt ? Math.max(0, Math.round((at - Date.parse(rec.startedAt)) / 60000)) : null,
+      });
+      return rec;
+    });
+
+    await queueRedemption(env, userId, 'pham-checkin', redemption);
+  },
   'spin-the-wheel': async (env, userId, redemption) => {
     await queueRedemption(env, userId, 'spin-the-wheel', redemption);
   },
@@ -94,6 +132,10 @@ async function queueRedemption(env, userId, type, redemption) {
 
 function mapRewardTitle(title) {
   const lower = title.toLowerCase();
+  /* Before 'theme' and the rest: matched on "check" so a renamed reward
+     ("Pham Check-In", "Check In!", "checkin") still routes. Titles are typed
+     by hand in the Twitch dashboard and will drift. */
+  if (lower.includes('check') && (lower.includes('in') || lower.includes('pham'))) return 'pham-checkin';
   if (lower.includes('skull') && lower.includes('boost')) return 'skull-boost';
   if (lower.includes('theme')) return 'theme-unlock';
   if (lower.includes('wheel') || lower.includes('spin')) return 'spin-the-wheel';

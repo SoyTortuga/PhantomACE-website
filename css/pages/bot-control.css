@@ -628,3 +628,41 @@
 
 .bot-mod-hint a { color: var(--text-sec); }
 .bot-mod-hint a:hover { color: var(--red); }
+
+/* ── Pham check-ins ────────────────────────── */
+
+.bot-checkin-count {
+  font-family: var(--font-gothic);
+  font-size: 15px;
+  color: var(--text-pri);
+  margin-bottom: 10px;
+}
+
+.bot-checkin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bot-checkin-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 7px 0;
+}
+
+.bot-checkin-row:last-child { border-bottom: none; }
+
+.bot-checkin-name {
+  color: var(--text-pri);
+  font-weight: bold;
+}
+
+.bot-checkin-when {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}

@@ -38,6 +38,9 @@ const NON_ROUTE_MODULES = new Set([
 
   /* The shared Twitch app access token. Library, no handler. */
   'api/auth/app-token.js',
+
+  /* Live state + which broadcast is on air. Library, no handler. */
+  'api/stream-info.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

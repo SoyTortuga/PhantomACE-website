@@ -33,6 +33,14 @@ export const SINGLETONS = {
   bridge_pending_actions:{ table: 'singletons', expiry: 'none' },
   eventsub_subscriptions:{ table: 'singletons', expiry: 'none' },
   giveaway_reward_id:    { table: 'singletons', expiry: 'none' },
+  checkin_reward_id:     { table: 'singletons', expiry: 'none' },
+
+  /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
+     a new stream id appears — Twitch already resets the reward's per-stream
+     limit on its own, and keeping only the live stream means no scheduled
+     cleanup and no new table. The trade is that check-ins are not kept once
+     the next stream begins. */
+  checkin_current:       { table: 'singletons', expiry: 'none' },
 
   /* Moderator allowlist. expiry 'none' is load-bearing: if this row expired
      every moderator would silently lose access, and the only symptom would

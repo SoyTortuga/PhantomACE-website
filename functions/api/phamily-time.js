@@ -63,47 +63,17 @@ function getBoostRate(role) {
 }
 
 /* ── Live-status gate ──────────────────────────
-   Watch time should only accrue while PhantomACE is actually live, not
-   just whenever a logged-in user has a page open. Cached in KV for 30s
-   so N concurrent viewers heartbeating every 60s don't each trigger their
-   own Twitch API call — one shared check covers all of them. */
+   Watch time should only accrue while PhantomACE is actually live, not just
+   whenever a logged-in user has a page open.
+
+   The implementation moved to stream-info.js, shared with the channel-points
+   check-in handler. It used to live here and write twitch_live_cache as
+   {live, checkedAt}; the check-in handler needs a stream id from that same
+   cached row, and two writers with different shapes on one key means
+   whichever ran last decides what the other can see. One writer now. */
 async function isChannelLive(env) {
-  const cached = await env.MARKETPLACE.get('twitch_live_cache', 'json');
-  if (cached && cached.checkedAt > Date.now() - 30000) return cached.live;
-
-  const clientId = env.TWITCH_CLIENT_ID;
-  const clientSecret = env.TWITCH_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return false;
-
-  try {
-    /* Shared cached token. This used to mint a brand new app token on every
-       single request, and Twitch invalidates older app tokens as new ones are
-       issued — so ordinary traffic here was silently revoking the token the
-       bot setup relied on, surfacing as "Invalid OAuth token" on an unrelated
-       admin page. See functions/api/auth/app-token.js. */
-    /* withAppToken, NOT getAppToken. The wrapper refreshes once on a 401 and
-       retries, which is what makes a revoked token self-heal on ordinary
-       traffic. Calling getAppToken directly returns a cached token forever
-       while it is unexpired — a token Twitch has already revoked looks
-       perfectly valid by its own metadata, so nothing on this path would ever
-       discover it was dead. That is exactly what happened: this endpoint
-       returned {"live":false,"error":"Stream request failed: 401"} on every
-       poll, with HTTP 200, so it failed silently and indefinitely. */
-    const { withAppToken } = await import('./auth/app-token.js');
-    const streamRes = await withAppToken(env, (token) => fetch(
-      'https://api.twitch.tv/helix/streams?user_login=phantomace',
-      { headers: { Authorization: `Bearer ${token}`, 'Client-Id': clientId } }
-    ));
-    if (!streamRes) return false;
-    if (!streamRes.ok) return false;
-    const { data } = await streamRes.json();
-    const live = !!(data && data.length > 0);
-
-    await env.MARKETPLACE.put('twitch_live_cache', JSON.stringify({ live, checkedAt: Date.now() }), { expirationTtl: 60 });
-    return live;
-  } catch {
-    return false;
-  }
+  const { getStreamInfo } = await import('./stream-info.js');
+  return (await getStreamInfo(env)).live;
 }
 
 function getSubTier(role) {

@@ -178,6 +178,41 @@ function renderGiveawayStats(g) {
     '<div class="bot-stat"><span class="bot-stat-num">' + escapeBotHtml(g.month || '—') + '</span><span class="bot-stat-label">month</span></div>';
 }
 
+function renderCheckins(c) {
+  const section = document.getElementById('checkinSection');
+  const box = document.getElementById('botCheckins');
+  if (!section || !box) return;
+
+  /* Hidden entirely when offline with nobody checked in — an empty panel on
+     a channel that is not live says nothing worth the space. */
+  if (!c || (!c.live && !c.count)) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  if (!c.count) {
+    box.innerHTML = '<p class="bot-muted">' +
+      (c.live ? 'Live — nobody has checked in yet this stream.' : 'No check-ins.') + '</p>';
+    return;
+  }
+
+  const rows = c.recent.map(function (p) {
+    const when = p.minutesIn === null || p.minutesIn === undefined
+      ? new Date(p.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : (p.minutesIn === 0 ? 'at the start' : '+' + p.minutesIn + 'm in');
+    return '<li class="bot-checkin-row">' +
+      '<span class="bot-checkin-name">' + escapeBotHtml(p.displayName || p.userId) + '</span>' +
+      '<span class="bot-checkin-when">' + escapeBotHtml(when) + '</span>' +
+      '</li>';
+  }).join('');
+
+  box.innerHTML =
+    '<div class="bot-checkin-count">' + c.count + (c.count === 1 ? ' check-in' : ' check-ins') +
+    (c.recent.length < c.count ? ' (showing ' + c.recent.length + ')' : '') + '</div>' +
+    '<ul class="bot-checkin-list">' + rows + '</ul>';
+}
+
 async function refreshDashboard() {
   try {
     const res = await fetch('/api/bot/dashboard', { credentials: 'same-origin' });
@@ -186,6 +221,7 @@ async function refreshDashboard() {
 
     renderWarnings(data);
     renderPools(data.pools);
+    renderCheckins(data.checkins);
     renderLiveDrops(data.activeDrops);
     renderGiveawayStats(data.giveaway);
     renderBotActionFeed(data.recentActions || []);
