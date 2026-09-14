@@ -5,7 +5,7 @@
    (see commands.js) without needing to type in chat.
    ══════════════════════════════════════════════ */
 
-import { dropCodeAction, dropItemAction, announceAction, getBotActionLog } from './send-chat.js';
+import { dropCodeAction, dropItemAction, dropEggAction, announceAction, getBotActionLog } from './send-chat.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -60,6 +60,11 @@ export async function onRequestPost(context) {
 
   if (body.action === 'dropitem') {
     const result = await dropItemAction(env, body.code || null, actor);
+    return json(result, result.success ? 200 : 400);
+  }
+
+  if (body.action === 'dropegg') {
+    const result = await dropEggAction(env, body.rarity, actor, { mutation: !!body.mutation });
     return json(result, result.success ? 200 : 400);
   }
 

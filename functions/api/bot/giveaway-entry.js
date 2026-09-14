@@ -44,24 +44,35 @@ async function verifySignature(secret, request, body) {
   return expected === HMAC_PREFIX + hex;
 }
 
-/* Channel-point entries now go into the MONTHLY LEDGER, the same place
-   chat-drop code redemptions land, so the winner draw has one source of
-   truth instead of two half-pictures.
+/* TWO GIVEAWAYS, TWO SOURCES, NO OVERLAP.
 
-   What this replaces: a giveaway_entrants array capped at 500 with a
-   one-day TTL. That was built for a single short giveaway session and is
-   wrong for a month-long one in three ways — it silently stopped recording
-   at 500, it discarded everything after a day, and it counted rows rather
-   than entries, so it could not represent someone holding 50 entries from
-   a mythic drop.
+     chat drop codes    → the MONTHLY ledger (giveaway-entries.js)
+     Phamily Time       → the MONTHLY ledger
+     channel points     → THIS event's entrant list, and nothing else
 
-   The open/closed toggle still applies: no entries while entries are shut. */
+   A redemption used to add to the monthly ledger instead, which meant a
+   spontaneous on-stream spin drew from every entry accumulated since the
+   1st — including people who were not watching — while the cheap
+   one-point entry quietly inflated a month-long prize draw.
+
+   The old session list was capped at 500 and silently stopped recording
+   past it. This one records everyone, because a cap that hides the people
+   it drops is worse than no cap. */
 async function addEntrant(env, userId, username) {
   const state = await env.MARKETPLACE.get(STATE_KEY, 'json');
   if (!state || !state.open) return;
 
-  const { addEntries } = await import('../giveaway-entries.js');
-  await addEntries(env, userId, username, 1, 'channel-points');
+  await env.MARKETPLACE.mutate(ENTRANTS_KEY, (current) => {
+    const rec = current && Array.isArray(current.entrants)
+      ? current
+      : { entrants: [], openedAt: Date.now() };
+    /* One slice per person. Twitch allows repeat redemptions of the same
+       reward, and someone redeeming five times should not get five slices
+       of a wheel that is meant to pick a person. */
+    if (rec.entrants.some(e => String(e.userId) === String(userId))) return undefined;
+    rec.entrants.push({ userId: String(userId), username: username || 'unknown', at: Date.now() });
+    return rec;
+  });
 }
 
 export async function onRequestPost(context) {

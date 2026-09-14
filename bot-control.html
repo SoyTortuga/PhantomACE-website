@@ -75,6 +75,20 @@
         <div id="botLiveDrops"></div>
       </div>
 
+      <div class="card bot-section">
+        <h2>Drop a Dino Egg</h2>
+        <p class="bot-section-desc">Mints a fresh Dino Park egg code and posts it to chat — same 5-minute window as any drop, redeemable once per account. Nothing to stock beforehand.</p>
+        <label class="bot-egg-mutation">
+          <input type="checkbox" id="botEggMutation"> Guaranteed mutation
+        </label>
+        <div class="bot-tier-buttons">
+          <button class="btn-secondary bot-egg-btn" data-rarity="common">Common</button>
+          <button class="btn-secondary bot-egg-btn" data-rarity="uncommon">Uncommon</button>
+          <button class="btn-secondary bot-egg-btn" data-rarity="rare">Rare</button>
+          <button class="btn-secondary bot-egg-btn" data-rarity="mythic">Mythic</button>
+        </div>
+      </div>
+
       <div class="card bot-section" id="itemDropSection">
         <h2>Drop an Item Code</h2>
         <p class="bot-section-desc">Activates a queued item code and posts it to chat — same 5-minute window as a giveaway drop, but the winner redeems it for a specific item instead of entries.</p>
@@ -85,7 +99,7 @@
 
       <div class="card bot-section" id="giveawaySection">
         <h2>Big Prize Giveaway</h2>
-        <p class="bot-section-desc">Toggle the "Enter Giveaway" channel points reward, spin for a winner among everyone who redeemed, then whisper them the prize code.</p>
+        <p class="bot-section-desc">A live, one-off drawing. Open entries, let chat redeem the "Enter Giveaway" channel points reward, spin, then whisper the winner a code. One slice per person. Reset clears the entrants for the next event — it never touches the monthly giveaway, which runs separately and keeps its own ledger.</p>
 
         <div class="giveaway-toggle-row">
           <span class="giveaway-status" id="giveawayStatus">Entries Closed</span>
@@ -126,6 +140,30 @@
           <textarea id="botAnnounceText" class="bot-announce-input" maxlength="450" placeholder="Type an announcement to post in chat..."></textarea>
           <span class="bot-announce-count" id="botAnnounceCount">0 / 450</span>
           <button class="btn-primary" id="botAnnounceBtn">Send to Chat</button>
+        </div>
+      </div>
+
+      <div class="card bot-section">
+        <h2>Rotating Announcements</h2>
+        <p class="bot-section-desc">Messages the bot posts on a timer, one at a time, in order. It only posts while you're live — being offline is not something anyone has to remember to pause.</p>
+
+        <div class="bot-rotation-row">
+          <span class="bot-rotation-state" id="botRotationState">Off</span>
+          <button class="btn-secondary" id="botRotationToggle">Turn On</button>
+          <label class="bot-rotation-interval">Every
+            <input type="number" id="botRotationInterval" min="5" value="15"> min
+          </label>
+          <button class="btn-secondary" id="botRotationSave">Save</button>
+          <span class="bot-rotation-next" id="botRotationNext"></span>
+        </div>
+
+        <ul class="bot-announce-list" id="botAnnounceList">
+          <li class="bot-muted">Loading…</li>
+        </ul>
+
+        <div class="bot-announce-add">
+          <textarea id="botRotationText" class="bot-announce-input" maxlength="450" placeholder="Add a message to the rotation..."></textarea>
+          <button class="btn-primary" id="botRotationAdd">Add</button>
         </div>
       </div>
 

@@ -287,6 +287,54 @@ export async function dropItemAction(env, code, actorLabel) {
   return { success: true, code: record.code, item: record.item, sent, expiresAt: record.expiresAt };
 }
 
+/* ── DROP A DINO EGG ─────────────────────────────────────────────────────
+   Nothing drops dino eggs today. The giveaway drops give ENTRY codes, and
+   the item-code queue only hands out codes somebody created beforehand — so
+   putting an egg in chat meant running a script on the rig.
+
+   This mints one on demand and hands it straight to dropItemAction, which
+   already owns the cooldown, the five-minute activation, the chat message
+   and the action log. Minting a fresh code per drop rather than drawing from
+   a pool is right here: an egg code is not a scarce pre-printed thing like a
+   giveaway code, and a pool would just be one more thing to keep stocked. */
+const EGG_RARITIES = ['common', 'uncommon', 'rare', 'mythic'];
+
+export async function dropEggAction(env, rarity, actorLabel, opts = {}) {
+  const r = String(rarity || 'common').toLowerCase();
+  if (!EGG_RARITIES.includes(r)) {
+    return { success: false, error: `Rarity must be one of: ${EGG_RARITIES.join(', ')}` };
+  }
+  const mutation = !!opts.mutation;
+
+  const cap = r.charAt(0).toUpperCase() + r.slice(1);
+  const name = mutation ? `${cap} Mutation Dino Egg` : `${cap} Dino Egg`;
+
+  const { createItemCode } = await import('../item-codes.js');
+  let record;
+  try {
+    /* Public: no restrictedTo. A code in chat is meant for whoever reads it,
+       once each — the same contract as every other drop. */
+    record = await createItemCode(env, {
+      id: mutation ? 'dino_egg_mutation' : `dino_egg_${r}`,
+      game: 'dino-park',
+      type: 'egg',
+      name,
+      rarity: r,
+      consumable: true,
+      quantity: 1,
+      guaranteedMutation: mutation,
+    });
+  } catch (err) {
+    return { success: false, error: `Could not create the egg code: ${err.message}` };
+  }
+
+  /* If the drop is refused past this point — cooldown, most likely — the
+     code exists but was never announced. Harmless: it is inactive, nobody
+     has seen it, and it cannot be redeemed. Said out loud because an unused
+     row appearing in item_codes otherwise looks like a leak. */
+  return await dropItemAction(env, record.code, actorLabel);
+}
+
 export async function announceAction(env, message, actorLabel) {
   const text = (message || '').trim();
   if (!text) return { success: false, error: 'Announcement message is empty.' };

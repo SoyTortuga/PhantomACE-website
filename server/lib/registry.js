@@ -35,6 +35,11 @@ export const SINGLETONS = {
   giveaway_reward_id:    { table: 'singletons', expiry: 'none' },
   checkin_reward_id:     { table: 'singletons', expiry: 'none' },
 
+  /* Rotating chat announcements: the list, the interval, and the rotation
+     cursor. expiry 'none' — an expired row would silently stop the rotation
+     and lose every message the broadcaster had written. */
+  announcements:         { table: 'singletons', expiry: 'none' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled

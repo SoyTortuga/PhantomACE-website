@@ -140,6 +140,20 @@ async function main() {
       .catch(err => console.error('[reap]', err.message));
   }, REAP_INTERVAL_MS).unref();
 
+  /* ── Rotating chat announcements ────────────────────────────────────────
+     Checked every minute; the module decides whether anything is due, and
+     refuses to post while the channel is offline. It lives here rather than
+     in the control panel because a browser-driven timer stops when the tab
+     closes and doubles up when two are open. Safe as a single interval for
+     the same reason the whole server is single-instance: Mana Clash and
+     PhamShock already advance round timers in-process. */
+  setInterval(() => {
+    import('../functions/api/bot/announcements.js')
+      .then(m => m.tickAnnouncements(env))
+      .then(r => { if (r && r.posted) console.log(`[announce] posted${r.sent ? '' : ' (Twitch refused it)'}`); })
+      .catch(err => console.error('[announce]', err.message));
+  }, 60000).unref();
+
   const server = http.createServer(async (req, res) => {
     const started = Date.now();
     try {

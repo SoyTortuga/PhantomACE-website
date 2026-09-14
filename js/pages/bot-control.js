@@ -248,9 +248,17 @@ async function fireBotAction(payload, button) {
       const messages = {
         drop: 'Code dropped to chat.',
         dropitem: 'Item code dropped to chat.',
+        dropegg: 'Egg code dropped to chat.',
         announce: 'Announcement sent to chat.',
       };
-      showBotStatus(messages[payload.action] || 'Done.', false);
+      /* data.sent is false when Twitch accepted the request but refused to
+         post — AutoMod, a link filter, follower-only mode. Saying "dropped to
+         chat" then would be the same lie sendChatMessage used to tell. */
+      if (data.sent === false) {
+        showBotStatus('Code created, but Twitch did not post it to chat — check AutoMod and the link filter.', true);
+      } else {
+        showBotStatus(messages[payload.action] || 'Done.', false);
+      }
       await refreshDashboard();
       if (payload.action === 'dropitem') await loadItemQueue();
     } else {
@@ -323,6 +331,29 @@ async function loadItemQueue() {
 
 let giveawayIsOpen = false;
 
+/* ── THE WHEEL MUST MATCH THE ODDS ──────────────────────────────────────
+   The draw is weighted by entry count — giveaway.js walks cumulative
+   weights, so 50 entries from a mythic drop really are worth fifty times a
+   single channel-point entry. The wheel drew one EQUAL segment per entrant,
+   so it showed every viewer the same slice while the server gave them wildly
+   different chances.
+
+   That is not cosmetic. The wheel is shown on stream as the draw happens; a
+   viewer watching a thin-sliced whale win a booster box off an equal-looking
+   wheel is watching something that looks rigged. Segments are proportional
+   to entries now, and the pointer lands inside the winner's real arc. */
+function giveawaySegments(entrants) {
+  const total = entrants.reduce(function (s, e) { return s + Math.max(1, Number(e.entries) || 1); }, 0);
+  let cursor = 0;
+  return entrants.map(function (e) {
+    const weight = Math.max(1, Number(e.entries) || 1);
+    const deg = (weight / total) * 360;
+    const seg = { start: cursor, end: cursor + deg, mid: cursor + deg / 2, deg, username: e.username };
+    cursor += deg;
+    return seg;
+  });
+}
+
 function renderGiveawayWheel(entrants) {
   const wheel = document.getElementById('giveawayWheel');
   if (!wheel) return;
@@ -339,34 +370,41 @@ function renderGiveawayWheel(entrants) {
     return;
   }
 
-  const n = entrants.length;
-  const segDeg = 360 / n;
+  const segs = giveawaySegments(entrants);
   const colors = ['#1a0000', '#000000'];
-  const stops = entrants.map(function (e, i) {
-    return colors[i % 2] + ' ' + (i * segDeg) + 'deg ' + ((i + 1) * segDeg) + 'deg';
-  }).join(', ');
-  wheel.style.background = 'conic-gradient(' + stops + ')';
+  wheel.style.background = 'conic-gradient(' + segs.map(function (s, i) {
+    return colors[i % 2] + ' ' + s.start + 'deg ' + s.end + 'deg';
+  }).join(', ') + ')';
 
-  if (segDeg >= 12) {
-    entrants.forEach(function (e, i) {
-      const angle = i * segDeg + segDeg / 2;
-      const label = document.createElement('div');
-      label.className = 'giveaway-wheel-label';
-      label.textContent = e.username;
-      label.style.transform = 'rotate(' + angle + 'deg) translate(90px) rotate(' + (-angle) + 'deg)';
-      wheel.appendChild(label);
-    });
-  }
+  segs.forEach(function (s) {
+    /* Only label a slice wide enough to read. A 200-entrant month makes most
+       arcs a fraction of a degree, and overlapping text is worse than none. */
+    if (s.deg < 12) return;
+    const label = document.createElement('div');
+    label.className = 'giveaway-wheel-label';
+    label.textContent = s.username;
+    label.style.transform = 'rotate(' + s.mid + 'deg) translate(90px) rotate(' + (-s.mid) + 'deg)';
+    wheel.appendChild(label);
+  });
 }
 
 function spinGiveawayWheelTo(entrants, winnerIndex) {
   const wheel = document.getElementById('giveawayWheel');
   if (!wheel) return;
-  const segDeg = 360 / entrants.length;
-  const target = 360 * 6 - (winnerIndex * segDeg + segDeg / 2);
+  const segs = giveawaySegments(entrants);
+  const seg = segs[winnerIndex];
+  if (!seg) return;
+
+  /* Land somewhere inside the winner's arc rather than dead centre, so
+     repeated draws do not stop in an identical spot and read as scripted.
+     Kept off the very edge, where rounding could show the neighbouring
+     slice under the pointer. */
+  const inset = seg.deg * 0.2;
+  const landing = seg.start + inset + Math.random() * Math.max(0.0001, seg.deg - inset * 2);
+
   wheel.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.25, 1)';
   requestAnimationFrame(function () {
-    wheel.style.transform = 'rotate(' + target + 'deg)';
+    wheel.style.transform = 'rotate(' + (360 * 6 - landing) + 'deg)';
   });
 }
 
@@ -528,6 +566,13 @@ function initBotControlPanel() {
     });
   });
 
+  document.querySelectorAll('.bot-egg-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const mut = document.getElementById('botEggMutation');
+      fireBotAction({ action: 'dropegg', rarity: btn.dataset.rarity, mutation: !!(mut && mut.checked) }, btn);
+    });
+  });
+
   const announceInput = document.getElementById('botAnnounceText');
   const announceCount = document.getElementById('botAnnounceCount');
   const announceBtn = document.getElementById('botAnnounceBtn');
@@ -552,6 +597,7 @@ function initBotControlPanel() {
   refreshDashboard();
   loadItemQueue();
   initGiveawayPanel();
+  initRotationPanel();
 
   /* Modest poll. Pools drift slowly, but a drop's claim count is the number
      you actually watch while it is live, and its window is only 5 minutes.
@@ -563,6 +609,125 @@ function initBotControlPanel() {
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) refreshDashboard();
   });
+}
+
+/* ── Rotating announcements ─────────────────────────────────────────────── */
+
+function renderRotation(d) {
+  const state = document.getElementById('botRotationState');
+  const toggle = document.getElementById('botRotationToggle');
+  const interval = document.getElementById('botRotationInterval');
+  const next = document.getElementById('botRotationNext');
+  const list = document.getElementById('botAnnounceList');
+  if (!state || !list) return;
+
+  state.textContent = d.enabled ? 'On' : 'Off';
+  state.className = 'bot-rotation-state' + (d.enabled ? ' on' : '');
+  if (toggle) toggle.textContent = d.enabled ? 'Turn Off' : 'Turn On';
+  if (interval && document.activeElement !== interval) interval.value = d.intervalMinutes;
+
+  if (next) {
+    /* Says why nothing is coming, not just when. "Next in 12m" on a rotation
+       with every message disabled would be a confident lie. */
+    if (!d.enabled) next.textContent = '';
+    else if (!d.activeCount) next.textContent = 'nothing active to post';
+    else if (d.nextDueAt) {
+      const mins = Math.max(0, Math.round((d.nextDueAt - Date.now()) / 60000));
+      next.textContent = mins <= 0 ? 'due now (posts when live)' : 'next in ~' + mins + 'm';
+    } else next.textContent = '';
+  }
+
+  if (!d.items || !d.items.length) {
+    list.innerHTML = '<li class="bot-muted">No announcements yet.</li>';
+    return;
+  }
+
+  list.innerHTML = d.items.map(function (it) {
+    const off = it.enabled === false;
+    return '<li class="bot-announce-item' + (off ? ' is-off' : '') + '">' +
+      '<span class="bot-announce-text">' + escapeBotHtml(it.text) + '</span>' +
+      '<span class="bot-announce-by">' + escapeBotHtml(it.addedBy || '') + '</span>' +
+      '<button class="btn-secondary bot-ann-now"    data-id="' + escapeBotHtml(it.id) + '">Post now</button>' +
+      '<button class="btn-secondary bot-ann-toggle" data-id="' + escapeBotHtml(it.id) + '">' + (off ? 'Enable' : 'Disable') + '</button>' +
+      '<button class="btn-secondary bot-ann-remove" data-id="' + escapeBotHtml(it.id) + '">Remove</button>' +
+      '</li>';
+  }).join('');
+
+  list.querySelectorAll('.bot-ann-now').forEach(function (b) {
+    b.addEventListener('click', function () { rotationAction({ action: 'post-now', id: b.dataset.id }, b); });
+  });
+  list.querySelectorAll('.bot-ann-toggle').forEach(function (b) {
+    b.addEventListener('click', function () { rotationAction({ action: 'toggle-item', id: b.dataset.id }, b); });
+  });
+  list.querySelectorAll('.bot-ann-remove').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (confirm('Remove this announcement?')) rotationAction({ action: 'remove', id: b.dataset.id }, b);
+    });
+  });
+}
+
+async function loadRotation() {
+  try {
+    const res = await fetch('/api/bot/announcements', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    renderRotation(await res.json());
+  } catch { /* leave the last render */ }
+}
+
+async function rotationAction(payload, button) {
+  const original = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '...'; }
+  try {
+    const res = await fetch('/api/bot/announcements', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (payload.action === 'post-now') {
+        showBotStatus(data.sent === false
+          ? 'Posted, but Twitch did not show it — check AutoMod and the link filter.'
+          : 'Announcement sent to chat.', data.sent === false);
+        await refreshDashboard();
+      } else {
+        renderRotation(data);
+      }
+      const box = document.getElementById('botRotationText');
+      if (payload.action === 'add' && box) box.value = '';
+    } else {
+      showBotStatus(data.error || 'Could not update the rotation.', true);
+    }
+  } catch {
+    showBotStatus('Network error updating the rotation.', true);
+  }
+  if (button) { button.disabled = false; button.textContent = original; }
+  if (payload.action !== 'post-now') await loadRotation();
+}
+
+function initRotationPanel() {
+  const toggle = document.getElementById('botRotationToggle');
+  const save = document.getElementById('botRotationSave');
+  const add = document.getElementById('botRotationAdd');
+  const text = document.getElementById('botRotationText');
+  const interval = document.getElementById('botRotationInterval');
+
+  if (toggle) toggle.addEventListener('click', function () { rotationAction({ action: 'toggle' }, toggle); });
+  if (save && interval) {
+    save.addEventListener('click', function () {
+      rotationAction({ action: 'set-interval', intervalMinutes: parseInt(interval.value, 10) }, save);
+    });
+  }
+  if (add && text) {
+    add.addEventListener('click', function () {
+      const v = text.value.trim();
+      if (!v) { showBotStatus('Type a message before adding.', true); return; }
+      rotationAction({ action: 'add', text: v }, add);
+    });
+  }
+
+  loadRotation();
 }
 
 /* ── Moderator allowlist (broadcaster only) ─────────────────────────────── */
