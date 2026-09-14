@@ -265,6 +265,16 @@ PhantomACE's own channel and only they can approve those, so they are shown here
 </div>
 
 <div class="section">
+  <h2><span class="step">Step 4b:</span> Existing Subscriptions</h2>
+  <p>Twitch allows only ONE subscription per type + condition, and it ignores the callback when
+  deciding that — so re-creating never replaces, it 409s. To re-point one, delete it here first.</p>
+  <p><b>After changing the bot account</b> the <code>channel.chat.message</code> subscription still
+  carries the OLD bot's user ID and will never deliver again. Delete it, then run Step 4.</p>
+  <button class="btn" onclick="listSubs()">List Subscriptions</button>
+  <div id="subList"></div>
+</div>
+
+<div class="section">
   <h2><span class="step">Step 5:</span> Set Environment Variables</h2>
   <p>In your <a href="https://dash.cloudflare.com" style="color:#9146ff">Cloudflare Dashboard</a>,
   go to your Pages project → Settings → Environment variables. Add these as <b>encrypted</b> secrets:</p>
@@ -311,6 +321,99 @@ async function createSubs() {
   }
   btn.disabled = false;
   btn.textContent = 'Create Subscriptions';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s == null ? '' : s);
+  return d.innerHTML;
+}
+
+/* One renderer, one fetch. An earlier draft had a separate copy for the
+   post-delete refresh — which is how the two drift and only one gets the
+   next fix. */
+function renderSubs(data) {
+  const el = document.getElementById('subList');
+  if (!data.success) {
+    el.innerHTML = '<p style="color:#ff6666">❌ ' + esc(data.error || 'Unknown error') + '</p>';
+    return;
+  }
+  if (!data.total) {
+    el.innerHTML = '<p>No subscriptions registered.</p>';
+    return;
+  }
+  el.innerHTML = '<p>' + data.total + ' subscription(s):</p>' + data.subscriptions.map(function (s) {
+    /* The condition is shown because it is what actually distinguishes two
+       subscriptions of the same type — and for channel.chat.message the
+       user_id in it IS the bot account. That is the number you check after
+       changing bots. */
+    var cond = Object.keys(s.condition || {}).map(function (k) {
+      return esc(k) + '=' + esc(s.condition[k]);
+    }).join(' ');
+    return '<div style="border:1px solid #333;padding:10px;margin:8px 0;border-radius:6px">' +
+      '<b>' + esc(s.type) + '</b> <small>v' + esc(s.version) + '</small> ' +
+      (s.status === 'enabled'
+        ? '<span style="color:#66dd66">enabled</span>'
+        : '<span style="color:#ff6666">' + esc(s.status) + ' — will never deliver again</span>') +
+      '<br><small>' + cond + '</small>' +
+      '<br><button class="btn btn-red sub-del" style="margin-top:8px;padding:6px 14px;font-size:12px" ' +
+      'data-id="' + esc(s.id) + '">Delete</button>' +
+      '</div>';
+  }).join('');
+
+  /* Listeners rather than an inline onclick. This whole script is emitted
+     from inside a template literal, where a nested \\' collapses to a plain
+     quote and silently produces broken JS in the page — which is exactly
+     what happened in the first draft. A data attribute has nothing to
+     escape wrong. */
+  el.querySelectorAll('.sub-del').forEach(function (b) {
+    b.addEventListener('click', function () { deleteSub(b.dataset.id, b); });
+  });
+}
+
+async function fetchSubs() {
+  const res = await fetch('/api/admin/bot-setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list-eventsub' })
+  });
+  return await res.json();
+}
+
+async function listSubs() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  try {
+    renderSubs(await fetchSubs());
+  } catch (e) {
+    document.getElementById('subList').innerHTML = '<p style="color:#ff6666">❌ ' + esc(e.message) + '</p>';
+  }
+  btn.disabled = false;
+  btn.textContent = 'List Subscriptions';
+}
+
+async function deleteSub(id, btn) {
+  if (!confirm('Delete this subscription? Events of this type stop arriving until you recreate it in Step 4.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting...';
+  try {
+    const res = await fetch('/api/admin/bot-setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-eventsub', id: id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      renderSubs(await fetchSubs());
+      return;                       // the row this button lived on is gone
+    }
+    alert('Could not delete: ' + (data.error || 'unknown error'));
+  } catch (e) {
+    alert('Could not delete: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Delete';
 }
 
 async function createGiveawayReward() {
