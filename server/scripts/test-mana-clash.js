@@ -237,6 +237,7 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
 
   r = await post(env, 'a', { action: 'bank', code });
   check('banked total', r.data.room.players[0].total, 1200);
+  check('and the round gain is reported', r.data.room.players[0].gained, 1200);
 }
 
 {
@@ -256,6 +257,9 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
   check('pending is lost', r.data.room.you.pending, 0);
   check('the turn is over', r.data.room.you.done, 'burned');
   check('nothing banked', r.data.room.players[0].total, 0);
+  /* Zero, not null. The page shows MANA BURN off `done`, but the gain has
+     to be a real number so a burn cannot read as "still rolling". */
+  check('a burn gained nothing', r.data.room.players[0].gained, 0);
   /* Solo, so burning ended the round too — the refusal that comes back is
      "between rounds", which is the more useful of the two answers. */
   check('cannot act after burning', (await post(env, 'a', { action: 'roll', code })).status, 409);
@@ -313,6 +317,11 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
   const ash = r.data.players.find(p => p.name === 'Ash');
   check('an expired clock banks what was held', ash.total, 1000);
   check('and ends that turn', ash.done, 'timeout');
+  check('and reports it as the round gain', ash.gained, 1000);
+
+  /* Null while still rolling, so "holding 550" and "banked 550" are
+     distinguishable without the page guessing from `pending`. */
+  check('B has gained nothing yet this round', r.data.you.gained, null);
 
   /* Acting resets the clock, so B is untouched. */
   check('B is still live', r.data.you.done, null);
@@ -327,6 +336,7 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
   endIntermission(env, code);
   r = await get(env, 'a', `action=get-state&code=${code}`);
   check('the next round starts on its own', r.data.status, 'playing');
+  check('and the round gain resets with it', r.data.you.gained, null);
   check('round 2', r.data.round, 2);
   check('totals carry over', r.data.players.find(p => p.name === 'Ash').total, 1000);
   check('pending is reset', r.data.you.pending, 0);

@@ -104,9 +104,9 @@ many times this can chain.
 All players take their turns **simultaneously** — nobody waits for anybody.
 You see only your own dice.
 
-A round ends when every player has banked or burned. Then a **15-second
-intermission** shows the standings, so everyone knows where they are before
-the next round begins.
+A round ends when every player has banked or burned. Then a **10-second
+intermission** shows the standings — and what each player gained or lost that
+round — so everyone knows where they are before the next round begins.
 
 ### The idle clock
 

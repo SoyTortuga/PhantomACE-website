@@ -22,7 +22,7 @@ import {
 
 const ROOM_TTL = 7200;
 const MAX_PLAYERS = 100;
-const INTERMISSION_MS = 15000;
+const INTERMISSION_MS = 10000;
 const GOALS = [5000, 10000, 20000];
 const IDLE_CHOICES = [10000, 30000, 60000];
 
@@ -76,6 +76,11 @@ function freshTurn(room, now) {
     remaining: DICE_COUNT,  // how many will be rolled next
     awaitingSelection: false,
     done: null,             // 'banked' | 'burned' | 'timeout' | 'out'
+    /* What this round actually added to the total, filled in when the turn
+       resolves. Stated rather than left for the page to infer from `pending`
+       — pending happens not to be cleared on a bank, and a display that
+       depends on a field not being reset is one refactor from lying. */
+    gained: null,
     event: null,            // 'clash' | 'burn', for the page to animate
     deadline: now + room.idleMs,
   };
@@ -84,7 +89,7 @@ function freshTurn(room, now) {
 function sittingOut() {
   return {
     pending: 0, dice: [], kept: [], remaining: 0,
-    awaitingSelection: false, done: 'out', event: null, deadline: null,
+    awaitingSelection: false, done: 'out', gained: null, event: null, deadline: null,
   };
 }
 
@@ -191,6 +196,7 @@ function advance(room, now) {
            of `pending`, so it is neither kept nor lost — there was no
            decision, so nothing is taken for one. */
         room.players[id].total += turn.pending;
+        turn.gained = turn.pending;
         turn.done = 'timeout';
         turn.awaitingSelection = false;
         changed = true;
@@ -275,6 +281,9 @@ function publicPlayer(id, p) {
     ready: !!p.ready,
     total: p.total,
     pending: p.turn ? p.turn.pending : 0,
+    /* Null until the turn resolves, so the page can tell "holding 550, still
+       rolling" from "banked 550" without guessing. */
+    gained: p.turn ? p.turn.gained : null,
     done: p.turn ? p.turn.done : null,
     event: p.turn ? p.turn.event : null,
   };
@@ -337,6 +346,10 @@ function viewFor(room, userId, now) {
       remaining: t ? t.remaining : DICE_COUNT,
       awaitingSelection: !!(t && t.awaitingSelection),
       done: t ? t.done : null,
+      /* `?? null` rather than a bare read: a room created before this field
+         existed has turns without it, and JSON drops undefined entirely, so
+         the page would see the key missing rather than empty. */
+      gained: (t && t.gained !== undefined) ? t.gained : null,
       event: t ? t.event : null,
       msLeft: t && t.deadline ? Math.max(0, t.deadline - now) : 0,
       canRoll: !!(t && room.status === 'playing' && !t.done && !t.awaitingSelection),
@@ -627,6 +640,7 @@ export async function onRequestPost(context) {
            rolling again, and softening it would remove the decision. */
         t.pending = 0;
         t.kept = [];
+        t.gained = 0;
         t.done = 'burned';
         t.event = 'burn';
         t.awaitingSelection = false;
@@ -710,6 +724,7 @@ export async function onRequestPost(context) {
       if (t.pending <= 0) return json({ error: 'Nothing to bank yet.' }, 400);
 
       r.players[userId].total += t.pending;
+      t.gained = t.pending;
       t.done = 'banked';
       t.deadline = null;
       t.dice = [];

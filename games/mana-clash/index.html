@@ -101,13 +101,21 @@
     .standings-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 14px; width: 100%;
                        border-bottom: 1px solid var(--line); }
     .standing { flex: 0 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
-                padding: 5px 9px; font-size: 11px; min-width: 96px; }
+                padding: 5px 9px; font-size: 11px; min-width: 112px; max-width: 150px; }
+    /* Three stacked lines. Total and status used to share one, which was
+       fine while the status said "banked" and ran together the moment it
+       started saying "+300 pts (time)". */
     .standing .nm { color: #ddd; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .standing .tot { color: #fff; font-weight: 800; font-size: 14px; }
+    .standing .tot { color: #fff; font-weight: 800; font-size: 14px; display: block; line-height: 1.2; }
     .standing.me { border-color: var(--red); }
     .standing.done-banked { opacity: 0.6; }
     .standing.done-burned { opacity: 0.6; border-color: #5a2a2a; }
-    .standing .st { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); }
+    .standing .st { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+                    display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .standing .st.gain { color: #6ac46a; font-weight: 700; }
+    .standing .st.zero { color: #8a8a8a; }
+    .standing .st.burn { color: #ff4040; font-weight: 700; }
+    .standing .st.holding { color: #ffb300; }
 
     .play-area { display: flex; flex-direction: column; align-items: center; padding: 18px 14px; gap: 14px; width: 100%; }
     .pending-line { font-size: 13px; color: var(--dim); text-align: center; }
@@ -193,6 +201,13 @@
     .standings-table .srow .pos { color: var(--dim); width: 22px; font-weight: 700; }
     .standings-table .srow .nm { flex: 1; }
     .standings-table .srow .sc { font-weight: 800; }
+    /* What this round did to them, next to where it left them. The round
+       delta is the thing people actually look for on this screen. */
+    .standings-table .srow .delta { font-size: 11px; width: 92px; text-align: right;
+                                    text-transform: uppercase; letter-spacing: 0.06em; }
+    .standings-table .srow .delta.gain { color: #6ac46a; }
+    .standings-table .srow .delta.zero { color: #8a8a8a; }
+    .standings-table .srow .delta.burn { color: #ff4040; font-weight: 700; }
     .standings-table .srow.me { border-color: var(--red); }
 
     /* ════ RESULTS ════ */
@@ -631,6 +646,20 @@ function renderDice() {
   else $('trayLabel').textContent = 'Roll to begin';
 }
 
+/* One description of a player's round, used by the strip and the
+   intermission table so the two can never disagree about what happened. */
+function roundOutcome(p) {
+  if (p.done === 'out') return { text: 'sitting out', cls: 'zero' };
+  if (p.done === 'burned') return { text: 'Mana Burn', cls: 'burn' };
+  if (p.done === 'banked' || p.done === 'timeout') {
+    const g = p.gained || 0;
+    if (g <= 0) return { text: 'no points', cls: 'zero' };
+    return { text: '+' + g.toLocaleString() + ' pts' + (p.done === 'timeout' ? ' (time)' : ''), cls: 'gain' };
+  }
+  if (p.pending) return { text: 'holding ' + p.pending.toLocaleString(), cls: 'holding' };
+  return { text: 'rolling', cls: '' };
+}
+
 function renderStandings() {
   const strip = $('standingsStrip');
   strip.innerHTML = '';
@@ -638,15 +667,10 @@ function renderStandings() {
     const el = document.createElement('div');
     el.className = 'standing' + (p.id === (state.you && state.you.id) ? ' me' : '') +
                    (p.done ? ' done-' + p.done : '');
-    let st = '';
-    if (p.done === 'banked' || p.done === 'timeout') st = 'banked';
-    else if (p.done === 'burned') st = 'burned';
-    else if (p.done === 'out') st = 'sitting out';
-    else if (p.pending) st = 'holding ' + p.pending.toLocaleString();
-    else st = 'rolling';
+    const out = roundOutcome(p);
     el.innerHTML = '<span class="nm">' + esc(p.name) + '</span>' +
                    '<span class="tot">' + p.total.toLocaleString() + '</span>' +
-                   '<span class="st">' + esc(st) + '</span>';
+                   '<span class="st ' + out.cls + '">' + esc(out.text) + '</span>';
     strip.appendChild(el);
   }
 }
@@ -665,14 +689,19 @@ function renderRoundProgress() {
     (live.length > 4 ? ' and ' + (live.length - 4) + ' more' : '');
 }
 
-function standingsTable(el, players, meId) {
+function standingsTable(el, players, meId, showDelta) {
   el.innerHTML = '';
   players.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'srow' + (p.id === meId ? ' me' : '');
-    row.innerHTML = '<span class="pos">' + (i + 1) + '</span>' +
-                    '<span class="nm">' + esc(p.name) + '</span>' +
-                    '<span class="sc">' + p.total.toLocaleString() + '</span>';
+    let html = '<span class="pos">' + (i + 1) + '</span>' +
+               '<span class="nm">' + esc(p.name) + '</span>';
+    if (showDelta) {
+      const out = roundOutcome(p);
+      html += '<span class="delta ' + out.cls + '">' + esc(out.text) + '</span>';
+    }
+    html += '<span class="sc">' + p.total.toLocaleString() + '</span>';
+    row.innerHTML = html;
     el.appendChild(row);
   });
 }
@@ -721,7 +750,7 @@ function renderIntermission() {
   if (state.status !== 'intermission' || Date.now() < flashUntil) { inter.hidden = true; return; }
   inter.hidden = false;
   $('intermissionTitle').textContent = state.tiedPlayers ? 'Tied — one more round' : 'Round ' + state.round + ' over';
-  standingsTable($('intermissionTable'), state.players, state.you ? state.you.id : null);
+  standingsTable($('intermissionTable'), state.players, state.you ? state.you.id : null, true);
 }
 
 function renderResults() {
