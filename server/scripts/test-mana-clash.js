@@ -14,6 +14,9 @@
    multiplayer room breaks, and they are miserable to reproduce live.
    ══════════════════════════════════════════════ */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as scoring from '../../functions/api/mana-clash-scoring.js';
 import { onRequestGet, onRequestPost } from '../../functions/api/mana-clash.js';
 
@@ -137,6 +140,62 @@ function endIntermission(env, code) {
   const room = JSON.parse(env._store.get(key));
   room.intermissionEndsAt = Date.now() - 1;
   env._store.set(key, JSON.stringify(room));
+}
+
+/* ── The page's scorer matches the engine ────────────────────────────────
+   games/mana-clash/index.html carries its own copy of the scoring rules, so
+   dice can light up and the Keep button can price a selection without a
+   round trip. The rules panel on that page BUILDS ITS SCORE GUIDE by running
+   that copy — every number shown is computed rather than typed — which is
+   only trustworthy if the copy agrees with the engine the server pays from.
+
+   The page's functions are lifted out and run here, then compared across
+   every hand. A mirror that drifted would show players one table and pay
+   them another. */
+{
+  const pageFile = path.join(
+    path.dirname(fileURLToPath(import.meta.url)), '../../games/mana-clash/index.html');
+  const src = fs.readFileSync(pageFile, 'utf8');
+
+  const grab = (re, what) => {
+    const m = src.match(re);
+    if (!m) throw new Error(`could not find ${what} in games/mana-clash/index.html`);
+    return m[0];
+  };
+
+  const pageScorer = new Function([
+    grab(/const FACE_VALUE = \{[^}]+\};/, 'FACE_VALUE'),
+    grab(/function nOfAKind\([\s\S]*?\n\}/, 'nOfAKind'),
+    grab(/function bestConsumingAll\([\s\S]*?\n\}/, 'bestConsumingAll'),
+    grab(/function scoreFaces\([\s\S]*?\n\}/, 'scoreFaces'),
+    'return scoreFaces;',
+  ].join('\n'))();
+
+  const SIDES = ['C', 'W', 'U', 'B', 'R', 'G'];
+  function* everyHand(n) {
+    if (n === 0) { yield []; return; }
+    for (const rest of everyHand(n - 1)) for (const f of SIDES) yield [f, ...rest];
+  }
+
+  let mismatches = 0;
+  let firstBad = null;
+  let hands = 0;
+  for (let n = 1; n <= 6; n++) {
+    for (const hand of everyHand(n)) {
+      hands++;
+      const page = pageScorer(hand);
+      const engine = scoring.scoreSelection(hand);
+      const engineValue = engine.valid ? engine.points : null;
+      if (page !== engineValue) {
+        mismatches++;
+        if (!firstBad) firstBad = { hand: hand.join(''), page, engine: engineValue };
+      }
+    }
+  }
+
+  check('the page scores every hand exactly as the server does', mismatches, 0);
+  check('with nothing differing', firstBad, null);
+  check('across every hand of one to six dice', hands, 6 + 36 + 216 + 1296 + 7776 + 46656);
 }
 
 /* ── Room setup ──────────────────────────────────────────────────────── */

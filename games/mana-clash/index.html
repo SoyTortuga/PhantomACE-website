@@ -211,6 +211,66 @@
                     border-radius: 3px; font-size: 11px; padding: 3px 8px; cursor: pointer; }
     .sound-toggle:hover { color: #fff; border-color: #444; }
 
+    /* ════ RULES & SCORING ════ */
+    .rules { width: 100%; max-width: 620px; }
+    .rules > summary {
+      cursor: pointer; list-style: none;
+      padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px;
+      background: var(--panel); font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim);
+    }
+    .rules > summary::-webkit-details-marker { display: none; }
+    .rules > summary::after { content: ' ▾'; color: var(--red); }
+    .rules[open] > summary::after { content: ' ▴'; }
+    .rules > summary:hover { color: #fff; border-color: #3a3a3a; }
+
+    .rules-body { padding: 16px 4px 4px; }
+    .rules-h {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--red); margin: 18px 0 8px; border-bottom: 1px solid var(--line);
+      padding-bottom: 5px;
+    }
+    .rules-h:first-child { margin-top: 0; }
+    .rules-p { font-size: 13px; color: #bbb; line-height: 1.6; margin-bottom: 8px; }
+    .rules-p b { color: #fff; }
+    .rules-p .burn { color: #ff0000; font-weight: 700; }
+    .rules-p .clash { color: #ffb300; font-weight: 700; }
+
+    .rules-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .rules-table th {
+      text-align: left; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--dim); font-weight: 600;
+      padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line);
+    }
+    .rules-table td { padding: 5px 8px 5px 0; border-bottom: 1px solid #141414; }
+    .rules-table td:last-child, .rules-table th:last-child { text-align: right; padding-right: 0; }
+    .rules-table .pts { font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+    .rules-table tr:hover td { background: #0d0d0d; }
+
+    .rules-dice { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .rules-die { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #bbb; }
+    .rules-die i {
+      width: 20px; height: 20px; border-radius: 4px; display: inline-block;
+      border: 1px solid #333;
+    }
+
+    .rules-modal {
+      position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.9);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 24px 14px; overflow-y: auto;
+    }
+    .rules-modal-card {
+      position: relative; width: 100%; max-width: 620px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 8px; padding: 22px 24px;
+    }
+    .rules-close {
+      position: absolute; top: 10px; right: 12px;
+      background: none; border: none; color: var(--dim);
+      font-size: 24px; line-height: 1; cursor: pointer;
+    }
+    .rules-close:hover { color: #fff; }
+
     /* ════ INTERMISSION ════ */
     .intermission { position: fixed; inset: 0; background: rgba(0,0,0,0.94); z-index: 40;
                     display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
@@ -305,6 +365,15 @@
       </div>
     </div>
 
+    <!-- Rules and scoring. A <details> rather than a custom disclosure: it
+         opens without JavaScript, is keyboard-reachable and announces its
+         own state to a screen reader, none of which a div and a click
+         handler get for free. -->
+    <details class="rules" id="splashRules">
+      <summary>Rules &amp; Scoring</summary>
+      <div class="rules-body" data-rules-body></div>
+    </details>
+
     <div class="feedback" id="splashFeedback"></div>
 
     <div class="section-hdr" style="width:100%;max-width:620px">Open Rooms</div>
@@ -341,6 +410,7 @@
       <div>Round <span class="val" id="roundNum">1</span></div>
       <div>Target <span class="val" id="goalNum">—</span></div>
       <div>⏱ <span class="val" id="timerText">—</span></div>
+      <button class="sound-toggle" id="rulesBtn" title="Rules and scoring">?</button>
       <button class="sound-toggle" id="soundToggle" title="Dice sounds">🔊</button>
     </div>
   </div>
@@ -379,6 +449,16 @@
   </div>
 </div>
 
+<!-- The same content again, over the game. Mid-round the question is
+     always "what is this hand worth", and sending someone back to the
+     splash screen to find out is not an answer. -->
+<div class="rules-modal" id="rulesModal" hidden>
+  <div class="rules-modal-card">
+    <button class="rules-close" id="rulesClose" title="Close">&times;</button>
+    <div class="rules-body" data-rules-body></div>
+  </div>
+</div>
+
 <div class="flash" id="flash" hidden>
   <div class="flash-word" id="flashWord"></div>
   <div class="flash-note" id="flashNote"></div>
@@ -414,8 +494,16 @@
    ══════════════════════════════════════════════ */
 
 const API = '/api/mana-clash';
+/* In value order, matching FACES in functions/api/mana-clash-scoring.js. */
+const FACES = ['C', 'W', 'U', 'B', 'R', 'G'];
 const FACE_VALUE = { C: 1, W: 2, U: 3, B: 4, R: 5, G: 6 };
+const VALUE_FACE = { 1: 'C', 2: 'W', 3: 'U', 4: 'B', 5: 'R', 6: 'G' };
 const FACE_IMG = { C: 'c.png', W: 'w.png', U: 'u.png', B: 'b.png', R: 'r.png', G: 'g.png' };
+/* Named rather than inline in dieEl, so the rules panel can show the same
+   colours the dice are drawn in without a second copy of them. */
+const DIE_COLOUR = {
+  C: '#c8c0b8', W: '#f9f5d7', U: '#aad4f5', B: '#c9b8d8', R: '#f0a08a', G: '#a8d8a0',
+};
 
 let session = null;
 let roomCode = null;
@@ -588,14 +676,117 @@ function scoreFaces(faces) {
   return bestConsumingAll(counts);
 }
 
+/* ── Rules and scoring ───────────────────────────────────────────────────
+   EVERY NUMBER HERE IS COMPUTED, NOT TYPED. Each row runs the same
+   scoreFaces() the Keep button uses, so the guide cannot quietly disagree
+   with what the game actually pays — and server/scripts/test-mana-clash.js
+   asserts that scorer matches the engine across every hand, so the chain
+   holds end to end.
+
+   A printed table would be right on the day it was written and wrong the
+   first time a rule moved. */
+
+function rulesRow(label, digits, note) {
+  const faces = String(digits).split('').map(d => VALUE_FACE[Number(d)]);
+  const pts = scoreFaces(faces);
+  return '<tr><td>' + esc(label) + '</td>' +
+    '<td class="muted">' + (note ? esc(note) : esc(digits.split('').join(' '))) + '</td>' +
+    '<td class="pts">' + (pts === null ? '—' : pts.toLocaleString()) + '</td></tr>';
+}
+
+function rulesHtml() {
+  const dice = FACES.map(f =>
+    '<span class="rules-die"><i style="background:' + DIE_COLOUR[f] + '"></i>' +
+    esc(f) + ' = ' + FACE_VALUE[f] + '</span>').join('');
+
+  let h = '';
+
+  h += '<div class="rules-h">The dice</div>';
+  h += '<div class="rules-dice">' + dice + '</div>';
+  h += '<p class="rules-p">Each die is a mana symbol with a number behind it. ' +
+       '<b>Colorless is the 1</b> and <b>Red is the 5</b> — the only two faces that score on their own.</p>';
+
+  h += '<div class="rules-h">A turn</div>';
+  h += '<p class="rules-p">Roll six dice. Scoring dice light up and are held for you — ' +
+       'click one to put it back. Then <b>bank</b> what you are holding, or <b>roll again</b> ' +
+       'with what is left and risk it.</p>';
+  h += '<p class="rules-p">Roll and score <i>nothing</i> and the whole turn is lost: ' +
+       '<span class="burn">MANA BURN</span>. Score <i>every</i> die on the table and you pick all six ' +
+       'back up with your total intact: <span class="clash">MANA CLASH</span>.</p>';
+  h += '<p class="rules-p">Every die you keep has to score. You cannot hold a 2 next to two 1s.</p>';
+
+  h += '<div class="rules-h">Singles</div>';
+  h += '<table class="rules-table"><tr><th>Combination</th><th>Example</th><th>Points</th></tr>';
+  h += rulesRow('One Colorless', '1');
+  h += rulesRow('One Red', '5');
+  h += '</table>';
+
+  h += '<div class="rules-h">Three or more of a kind</div>';
+  h += '<p class="rules-p">Three of a kind is the face value &times; 100, except three 1s which are 1,000. ' +
+       'Every die past the third <b>doubles</b> it.</p>';
+  h += '<table class="rules-table"><tr><th>Combination</th><th>Example</th><th>Points</th></tr>';
+  for (const v of [1, 2, 3, 4, 5, 6]) {
+    for (const n of [3, 4, 5, 6]) {
+      if (n > 3 && v !== 1 && v !== 6) continue;   // the full grid is noise
+      h += rulesRow(n + ' of the ' + v + 's', String(v).repeat(n));
+    }
+  }
+  h += '</table>';
+  h += '<p class="rules-p">Six Colorless is ' + scoreFaces(new Array(6).fill('C')).toLocaleString() +
+       ' — enough to take a 5,000-point game in one roll.</p>';
+
+  h += '<div class="rules-h">Whole-hand combinations</div>';
+  h += '<table class="rules-table"><tr><th>Combination</th><th>Example</th><th>Points</th></tr>';
+  h += rulesRow('Straight (one of each)', '123456');
+  h += rulesRow('Three pairs', '223344');
+  h += rulesRow('Two triplets', '222333');
+  h += '</table>';
+
+  h += '<div class="rules-h">The best reading always wins</div>';
+  h += '<p class="rules-p">Some hands can be read more than one way. You are always given the ' +
+       'highest-scoring reading, never a technicality.</p>';
+  h += '<table class="rules-table"><tr><th>Hand</th><th>Read as</th><th>Points</th></tr>';
+  h += rulesRow('1 1 1 5 5 5', '111555', 'two triplets, not 1,000 + 500');
+  h += rulesRow('1 1 1 1', '1111', 'four of a kind, not 1,000 + 100');
+  h += rulesRow('5 5 5 5', '5555', 'four of a kind, not 500 + 50');
+  h += '</table>';
+  h += '<p class="rules-p">Keeping <b>1 1 1 1 3 3</b> whole scores ' +
+       scoreFaces(D_RULES('111133')).toLocaleString() + ' as three pairs — the four-of-a-kind reading ' +
+       'strands the 3s, and a keep may not strand anything. Keeping just the four 1s is ' +
+       scoreFaces(D_RULES('1111')).toLocaleString() + ' and leaves two dice to re-roll. That is a real choice.</p>';
+
+  h += '<div class="rules-h">Winning</div>';
+  h += '<p class="rules-p">The host picks a target. When someone\u2019s <b>banked</b> total reaches it, ' +
+       'they are finished — and everyone else gets <b>one final round</b> to beat them. ' +
+       'Highest total wins; a tie plays one more round between whoever is level.</p>';
+  h += '<p class="rules-p">Rounds are simultaneous, so nobody waits their turn. If your clock runs out ' +
+       'you <b>bank</b> what you are holding rather than losing it.</p>';
+
+  return h;
+}
+
+/** Digits to faces, for the examples above. */
+function D_RULES(digits) {
+  return String(digits).split('').map(d => VALUE_FACE[Number(d)]);
+}
+
+function initRules() {
+  const html = rulesHtml();
+  for (const el of document.querySelectorAll('[data-rules-body]')) el.innerHTML = html;
+
+  const modal = document.getElementById('rulesModal');
+  document.getElementById('rulesBtn').addEventListener('click', () => { modal.hidden = false; });
+  document.getElementById('rulesClose').addEventListener('click', () => { modal.hidden = true; });
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.hidden = true; });
+}
+
 /* ── Rendering ─────────────────────────────────────────────────────────── */
 
 function dieEl(face, opts = {}) {
   const d = document.createElement('div');
   d.className = 'die' + (opts.kept ? ' kept' : '');
-  d.style.background = ({
-    C: '#c8c0b8', W: '#f9f5d7', U: '#aad4f5', B: '#c9b8d8', R: '#f0a08a', G: '#a8d8a0',
-  })[face] || '#141414';
+  d.style.background = DIE_COLOUR[face] || '#141414';
   d.innerHTML = '<img src="assets/' + FACE_IMG[face] + '" alt="' + face + '">' +
                 '<span class="pip-num">' + FACE_VALUE[face] + '</span>';
   return d;
@@ -1136,6 +1327,11 @@ $('againBtn').addEventListener('click', async () => {
 
 $('soundToggle').addEventListener('click', () => setSound(!soundOn));
 setSound(soundOn);
+
+/* Before the login gate: the rules are worth reading whether or not you can
+   play yet, and somebody deciding whether to log in is exactly who wants
+   them. */
+initRules();
 
 session = typeof readPhamSession === 'function' ? readPhamSession() : null;
 if (!session) {
