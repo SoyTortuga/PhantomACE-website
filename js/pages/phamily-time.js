@@ -185,7 +185,19 @@
   let activePopoverIsPrev = false;
   let prevMonthInfo = null;
 
+  /* THE TRACK HAS ONE NAME: 'follower' or 'phamily'.
+     'top' and 'bottom' describe where a lane is drawn and must never reach
+     this function. They did: nodes were built with 'top'/'bottom' while
+     claims were stored under 'follower'/'phamily', so the key a claimed
+     reward was saved under could never match the key its node was checked
+     with. Every claimed reward kept its "!" badge for ever, and clicking it
+     again answered "Already claimed" — the claim had worked the first time
+     and the track simply never said so. Throwing is deliberate: a silent
+     mismatch is what made this survive. */
   function rewardKey(reward, track) {
+    if (track !== 'follower' && track !== 'phamily') {
+      throw new Error('rewardKey needs follower/phamily, got ' + track);
+    }
     return reward.level + '_' + track + '_' + reward.type + '_' + reward.rarity;
   }
 
@@ -330,7 +342,7 @@
         lvlEl.className = 'pt-reward-lvl';
         lvlEl.textContent = 'LVL ' + reward.level;
 
-        if (track === 'top') {
+        if (track === 'follower') {
           node.appendChild(lvlEl);
           node.appendChild(iconEl);
           node.appendChild(stemEl);
@@ -345,8 +357,8 @@
       });
     }
 
-    placeLane(laneTop, followerRewards, 'top');
-    placeLane(laneBottom, phamilyRewards, 'bottom');
+    placeLane(laneTop, followerRewards, 'follower');
+    placeLane(laneBottom, phamilyRewards, 'phamily');
 
     for (const ms of milestones) {
       const state = getMilestoneState(ms);
@@ -480,8 +492,7 @@
 
     try {
       if (activePopoverReward) {
-        const track = activePopoverTrack === 'top' ? 'follower' : 'phamily';
-        const key = rewardKey(activePopoverReward, track);
+        const key = rewardKey(activePopoverReward, activePopoverTrack);
         const payload = activePopoverIsPrev
           ? { action: 'claim-prev', type: 'reward', rewardKey: key,
               rewardType: activePopoverReward.type, rewardRarity: activePopoverReward.rarity,
@@ -712,10 +723,10 @@
     }
 
     for (const r of readyFollower) {
-      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'top', true));
+      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'follower', true));
     }
     for (const r of readyPhamily) {
-      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'bottom', true));
+      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'phamily', true));
     }
     for (const ms of readyMilestones) {
       addItem('💀', ms.title, 'mythic', (e) => showMilestonePopover(e, ms, 'ready', true));
