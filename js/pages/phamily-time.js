@@ -217,6 +217,9 @@
   /* ── Rates Modal ─────────────────────────────── */
 
   const ratesModal = document.getElementById('ptRatesModal');
+  const claimAllBtn = document.getElementById('ptClaimAllBtn');
+  if (claimAllBtn) claimAllBtn.addEventListener('click', claimAll);
+
   document.getElementById('ptRatesBtn').addEventListener('click', () => {
     ratesModal.hidden = false;
   });
@@ -558,6 +561,47 @@
     }
   });
 
+  /* Shown only when something is actually claimable, and labelled with how
+     many — a "Claim All" that might do nothing is worse than no button. */
+  function updateClaimAllBtn() {
+    const btn = document.getElementById('ptClaimAllBtn');
+    if (!btn) return;
+    const track = userIsSub ? 'phamily' : 'follower';
+    const list = userIsSub ? phamilyRewards : followerRewards;
+    const ready = list.filter(r => r.level <= userLevel && !claimedRewards.includes(rewardKey(r, track))).length
+      + milestones.filter(m => m.level <= userLevel && !claimedMilestones.includes(m.level)).length;
+    btn.hidden = ready === 0;
+    btn.textContent = ready === 1 ? 'Claim 1' : `Claim All (${ready})`;
+    btn.disabled = false;
+  }
+
+  async function claimAll() {
+    const btn = document.getElementById('ptClaimAllBtn');
+    btn.disabled = true;
+    btn.textContent = 'Claiming…';
+
+    try {
+      const res = await fetch('/api/phamily-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'claim-all' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not claim.');
+
+      /* Reloaded rather than patched. Claiming everything changes the track,
+         the rewards count, the all-time totals and the inventory behind it;
+         re-deriving all of that here would be a second copy of the render
+         path that has to stay in step with the first. */
+      window.location.reload();
+    } catch (err) {
+      btn.disabled = false;
+      updateClaimAllBtn();
+      window.alert(err.message);
+    }
+  }
+
   function updateRewardsCount() {
     const ready = followerRewards.filter(r => getRewardState(r, 'follower') === 'ready').length
       + phamilyRewards.filter(r => getRewardState(r, 'phamily') === 'ready').length
@@ -779,6 +823,7 @@
     updateBoostDisplay(data.subTier);
     buildThermometer(data.level);
     updateRewardsCount();
+    updateClaimAllBtn();
     renderGraceBanner(data.prevMonth);
 
     if (data.allTime) {

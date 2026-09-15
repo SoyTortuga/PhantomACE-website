@@ -222,6 +222,10 @@ export async function onRequestPost(context) {
     return await handleHeartbeat(env, session, mk, now);
   }
 
+  if (body.action === 'claim-all') {
+    return await handleClaimAll(env, session, mk);
+  }
+
   if (body.action === 'claim-reward') {
     return await handleClaimReward(env, session, mk, body);
   }
@@ -376,19 +380,38 @@ async function grantReward(env, session, { id, type, rarity, name }) {
   await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name) });
 }
 
+/**
+ * Claim one reward.
+ *
+ * WHAT IS GRANTED COMES FROM THE TABLE, NOT THE REQUEST. This used to read
+ * rewardType, rewardRarity and rewardName out of the body and hand them to
+ * grantReward, which uses all three to decide what a claim is worth — rarity
+ * picks the entry count, type picks the item mapper, and the name is read
+ * for the words "guaranteed" and "mutant". Only the key and the level were
+ * checked, so every reward on the track was claimable at mythic by anyone
+ * past level 2.
+ */
 async function handleClaimReward(env, session, mk, body) {
-  const rewardKey = body.rewardKey;
+  const rewardKey = String(body.rewardKey || '');
   if (!rewardKey) return json({ error: 'Missing reward key' }, 400);
+
+  const { findReward, trackFor } = await import('./phamily-rewards.js');
+  const reward = findReward(rewardKey);
+  if (!reward) return json({ error: 'No such reward' }, 400);
 
   const data = await getUserData(env, session.user_id, mk);
 
   if (data.claimedRewards.includes(rewardKey)) {
     return json({ error: 'Already claimed' }, 400);
   }
-
-  const level = parseInt(rewardKey.split('_')[0], 10);
-  if (isNaN(level) || level > data.level) {
+  if (reward.level > data.level) {
     return json({ error: 'Level not reached' }, 400);
+  }
+  /* The track is part of the key, and was never checked — so a follower
+     could claim the phamily-track version of a reward, which is a tier
+     higher at the same level. */
+  if (reward.track !== trackFor(getSubTier(session))) {
+    return json({ error: 'That reward is on the other track' }, 403);
   }
 
   data.claimedRewards.push(rewardKey);
@@ -396,21 +419,90 @@ async function handleClaimReward(env, session, mk, body) {
 
   await grantReward(env, session, {
     id: rewardKey,
-    type: body.rewardType,
-    rarity: body.rewardRarity || 'common',
-    name: body.rewardName || rewardKey,
+    type: reward.type,
+    rarity: reward.rarity,
+    name: reward.name,
   });
 
   const allTime = await getAllTimeStats(env, session.user_id);
   allTime.totalRewardsClaimed++;
   await saveAllTimeStats(env, session.user_id, allTime);
 
-  return json({ success: true, rewardKey });
+  return json({ success: true, rewardKey, granted: { type: reward.type, rarity: reward.rarity, name: reward.name } });
+}
+
+/**
+ * Claim everything currently unlocked and unclaimed, in one request.
+ *
+ * ONE PASS, SERVER-SIDE. The alternative — the page firing one request per
+ * reward — would be forty round trips for a full track, each able to fail on
+ * its own, leaving the viewer to work out which half went through. It would
+ * also mean forty writes to the same row.
+ *
+ * Nothing new is granted here: it walks the same two handlers, so every
+ * check they make still applies and there is no second path to keep in step
+ * with the first.
+ *
+ * A failure partway is reported rather than rolled back. The rewards already
+ * granted are genuinely granted — the claim was recorded before the item was
+ * handed over — and un-granting them would be a bigger lie than saying
+ * plainly that three of five landed.
+ */
+async function handleClaimAll(env, session, mk) {
+  const { earnedRewards, earnedMilestones, rewardKeyFor, trackFor } =
+    await import('./phamily-rewards.js');
+
+  const data = await getUserData(env, session.user_id, mk);
+  const track = trackFor(getSubTier(session));
+
+  const rewards = earnedRewards(track, data.level)
+    .map(r => rewardKeyFor(r, track))
+    .filter(key => !data.claimedRewards.includes(key));
+
+  const milestones = earnedMilestones(data.level)
+    .map(m => m.level)
+    .filter(level => !data.claimedMilestones.includes(level));
+
+  if (rewards.length === 0 && milestones.length === 0) {
+    return json({ success: true, claimed: 0, rewards: [], milestones: [], nothingToClaim: true });
+  }
+
+  /* Sequential, not parallel. Each claim reads and writes the same row, and
+     firing them at once would have every one of them read the same
+     pre-claim state and the last write win — the exact lost update mutate()
+     exists to prevent, except here it is the caller creating it. */
+  const claimedRewards = [];
+  const claimedMilestones = [];
+  const failed = [];
+
+  for (const rewardKey of rewards) {
+    const res = await handleClaimReward(env, session, mk, { rewardKey });
+    if (res.status === 200) claimedRewards.push(rewardKey);
+    else failed.push({ rewardKey, error: (await res.clone().json()).error });
+  }
+
+  for (const milestoneLevel of milestones) {
+    const res = await handleClaimMilestone(env, session, mk, { milestoneLevel });
+    if (res.status === 200) claimedMilestones.push(milestoneLevel);
+    else failed.push({ milestoneLevel, error: (await res.clone().json()).error });
+  }
+
+  return json({
+    success: true,
+    claimed: claimedRewards.length + claimedMilestones.length,
+    rewards: claimedRewards,
+    milestones: claimedMilestones,
+    failed,
+  });
 }
 
 async function handleClaimMilestone(env, session, mk, body) {
-  const milestoneLevel = body.milestoneLevel;
+  const milestoneLevel = Math.floor(Number(body.milestoneLevel));
   if (!milestoneLevel) return json({ error: 'Missing milestone level' }, 400);
+
+  const { findMilestone } = await import('./phamily-rewards.js');
+  const milestone = findMilestone(milestoneLevel);
+  if (!milestone) return json({ error: 'No such milestone' }, 400);
 
   const data = await getUserData(env, session.user_id, mk);
 
@@ -425,8 +517,12 @@ async function handleClaimMilestone(env, session, mk, body) {
   data.claimedMilestones.push(milestoneLevel);
   await saveUserData(env, session.user_id, mk, data);
 
-  const milestoneTitle = body.milestoneTitle || 'Milestone ' + milestoneLevel;
-  const isSub = session.role && session.role.startsWith('sub_');
+  const milestoneTitle = milestone.title;
+  /* Subscriber status from subTier, not from the role string. role is a
+     display ladder on which moderator outranks every sub tier, so a
+     subscribing moderator read as not-a-sub here and silently lost every
+     milestone bonus they had paid for. */
+  const isSub = getSubTier(session) > 0;
 
   await grantItem(env, session.user_id, {
     id: `ms_${milestoneLevel}_badge_${mk}`,
@@ -439,8 +535,9 @@ async function handleClaimMilestone(env, session, mk, body) {
     name: milestoneTitle, rarity: milestoneLevel >= 120 ? 'mythic' : milestoneLevel >= 60 ? 'rare' : 'uncommon',
   });
 
-  if (isSub && body.bonusItems) {
-    for (const bonus of body.bonusItems) {
+  /* From the table, not the body. These were whatever the client sent. */
+  if (isSub && milestone.bonusItems) {
+    for (const bonus of milestone.bonusItems) {
       await grantReward(env, session, {
         id: `ms_${milestoneLevel}_${bonus.type}_${mk}`,
         type: bonus.type,

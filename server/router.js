@@ -48,6 +48,11 @@ const NON_ROUTE_MODULES = new Set([
   /* Farkle scoring rules. Pure functions, no handler. Covered by
      server/scripts/test-scoring.js. */
   'api/mana-clash-scoring.js',
+
+  /* The Phamily Time reward table — what each level actually grants.
+     Library, no handler. It is the server's answer to "what is this reward
+     worth", which used to come from the request body. */
+  'api/phamily-rewards.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */
