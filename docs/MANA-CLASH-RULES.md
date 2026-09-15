@@ -124,11 +124,23 @@ does not punish slow play: it hands you your points rather than taking them.
 The host picks a goal of **5,000, 10,000 or 20,000** when creating the room.
 
 When any player's **banked** total reaches the goal, the current round
-finishes as normal. Then **one final round** is played by everyone. The
-highest total after it wins.
+finishes as normal. Then **one final round** is played by everyone *else* —
+the player who reached the goal is finished and does not roll again.
+
+That is the point of a final round: the people behind get one turn to catch
+up. If the leader played it too they would simply extend their own lead, and
+the round would decide nothing.
+
+The player resting on the goal is still very much in the running — they win
+unless somebody passes them. They get a screen showing the score being
+defended and how each chaser's round is going.
+
+The highest total once the final round ends wins.
 
 **Ties** for the lead trigger one extra round played only by the tied
-players, repeating until it breaks.
+players, repeating until it breaks. Everyone tied rolls in a tiebreak,
+including someone who had been resting on the goal — nobody sits out a round
+that decides the game between equals.
 
 ---
 

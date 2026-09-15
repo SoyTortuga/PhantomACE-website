@@ -98,11 +98,32 @@ function touch(room, turn, now) {
   turn.deadline = now + room.idleMs;
 }
 
-/** Who is expected to play this round — everyone, or only the tied leaders. */
-function eligibleIds(room) {
+/**
+ * Who ROLLS this round.
+ *
+ * Not everyone, on a final round. Reaching the goal ends your game: the
+ * final round belongs to the people trying to beat you, and you watch.
+ */
+function playersInRound(room) {
   const all = Object.keys(room.players);
-  if (!room.tiedPlayers) return all;
-  return all.filter(id => room.tiedPlayers.includes(id));
+  if (room.tiedPlayers) return all.filter(id => room.tiedPlayers.includes(id));
+  const resting = room.restingIds || [];
+  return all.filter(id => !resting.includes(id));
+}
+
+/**
+ * Who can WIN. A different list, and conflating the two was a real bug.
+ *
+ * The player who crossed the goal sits the final round out but is very much
+ * still in the running — everyone else is playing to beat them. One
+ * eligibility list served both purposes, so the leader was excluded from the
+ * comparison that decides their own victory, and whoever came closest among
+ * the chasers won with a lower score.
+ */
+function contenders(room) {
+  const all = Object.keys(room.players);
+  if (room.tiedPlayers) return all.filter(id => room.tiedPlayers.includes(id));
+  return all;
 }
 
 /* ══ Round lifecycle ══════════════════════════════════════════════════════ */
@@ -115,9 +136,13 @@ function startRound(room, now) {
   room.roundStartedAt = now;
   room.intermissionEndsAt = null;
 
-  const eligible = eligibleIds(room);
+  /* Only a final round rests anyone. Cleared here so a tiebreak, or a game
+     that somehow carries on, does not inherit a stale list. */
+  if (!room.isFinalRound) room.restingIds = [];
+
+  const playing = playersInRound(room);
   for (const [id, p] of Object.entries(room.players)) {
-    p.turn = eligible.includes(id) ? freshTurn(room, now) : sittingOut();
+    p.turn = playing.includes(id) ? freshTurn(room, now) : sittingOut();
   }
 }
 
@@ -132,7 +157,7 @@ function endRound(room, now) {
   /* Everyone eligible has left or been removed. Ending on whoever is still
      in the room beats looping the round forever with nobody in it. */
   const remaining = Object.keys(room.players);
-  if (eligibleIds(room).length === 0) {
+  if (playersInRound(room).length === 0) {
     room.status = 'finished';
     room.winner = remaining.length
       ? remaining.reduce((a, b) => (room.players[b].total > room.players[a].total ? b : a))
@@ -143,12 +168,17 @@ function endRound(room, now) {
   }
 
   if (room.isFinalRound) {
-    const eligible = eligibleIds(room);
-    const best = Math.max(...eligible.map(id => room.players[id].total));
-    const tied = eligible.filter(id => room.players[id].total === best);
+    /* Over CONTENDERS, not over whoever rolled. The player resting on the
+       goal is the one everybody was chasing; leaving them out of this
+       comparison would hand the game to the best of the chasers even when
+       none of them caught up. */
+    const pool = contenders(room);
+    const best = Math.max(...pool.map(id => room.players[id].total));
+    const tied = pool.filter(id => room.players[id].total === best);
 
     if (tied.length > 1) {
       room.tiedPlayers = tied;
+      room.restingIds = [];             // a tiebreak is played by all the tied
       room.nextIsFinal = true;          // the tiebreak is itself a final round
       room.status = 'intermission';
       room.intermissionEndsAt = now + INTERMISSION_MS;
@@ -162,15 +192,21 @@ function endRound(room, now) {
     return;
   }
 
-  room.nextIsFinal = Object.values(room.players).some(p => p.total >= room.goal);
+  /* Whoever crossed the goal is finished. They rest through the final round
+     while everyone else gets one turn to beat them — which is the whole
+     point of a final round, and is not what happens if the leader plays it
+     too and simply extends their own lead. */
+  const crossed = Object.keys(room.players).filter(id => room.players[id].total >= room.goal);
+  room.nextIsFinal = crossed.length > 0;
+  room.restingIds = crossed;
   room.status = 'intermission';
   room.intermissionEndsAt = now + INTERMISSION_MS;
 }
 
 function roundIsOver(room) {
-  const eligible = eligibleIds(room);
-  if (eligible.length === 0) return true;
-  return eligible.every(id => room.players[id].turn && room.players[id].turn.done);
+  const playing = playersInRound(room);
+  if (playing.length === 0) return true;
+  return playing.every(id => room.players[id].turn && room.players[id].turn.done);
 }
 
 /**
@@ -187,7 +223,7 @@ function advance(room, now) {
 
   for (let guard = 0; guard < 50; guard++) {
     if (room.status === 'playing') {
-      for (const id of eligibleIds(room)) {
+      for (const id of playersInRound(room)) {
         const turn = room.players[id].turn;
         if (!turn || turn.done || turn.deadline === null || now < turn.deadline) continue;
         /* Expiry banks what they are holding rather than taking it. The
@@ -306,6 +342,11 @@ function viewFor(room, userId, now) {
     isFinalRound: !!room.isFinalRound,
     nextIsFinal: !!room.nextIsFinal,
     tiedPlayers: room.tiedPlayers || null,
+    /* Sent to EVERYONE, not only the player it applies to. The chasers
+       should be able to see which player they are chasing; a strip that
+       labels the leader "sitting out" describes the mechanic and hides the
+       fact. */
+    resting: (room.restingIds || []).slice(),
     host: room.host,
     hostName: room.hostName,
     hasPassword: !!room.password,
@@ -355,6 +396,27 @@ function viewFor(room, userId, now) {
       canRoll: !!(t && room.status === 'playing' && !t.done && !t.awaitingSelection),
       canBank: !!(t && room.status === 'playing' && !t.done && !t.awaitingSelection && t.pending > 0),
     };
+
+    /* Sitting out is not the same as having nothing to do. The player who
+       reached the goal has FINISHED — everyone else is rolling to beat
+       them — and a screen that just greys out their dice reads as being
+       locked out of their own win. They get told what is being chased and
+       by whom. */
+    if (me.turn && me.turn.done === 'out') {
+      const resting = (room.restingIds || []).includes(userId);
+      const chasers = playersInRound(room);
+      view.you.spectating = {
+        reason: resting ? 'goal' : 'tiebreak',
+        target: me.total,
+        chasers: chasers.length,
+        /* Highest total among the people still rolling, so the screen can
+           say how close the nearest one is. */
+        closest: chasers.length
+          ? Math.max(...chasers.map(id => room.players[id].total))
+          : 0,
+        done: chasers.filter(id => room.players[id].turn && room.players[id].turn.done).length,
+      };
+    }
   }
 
   return view;

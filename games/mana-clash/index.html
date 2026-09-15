@@ -161,6 +161,27 @@
     .sel-score { font-size: 12px; color: #6ac46a; min-width: 70px; text-align: center; }
     .sel-score.bad { color: var(--red); }
 
+    /* ════ SPECTATING ════ */
+    .spectate { width: 100%; max-width: 540px; text-align: center; }
+    .spectate-head {
+      font-size: 18px; font-weight: 800; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--red); margin-bottom: 10px;
+    }
+    .spectate-target { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+    .spectate-target b { display: block; font-size: 34px; color: #fff; font-weight: 800; line-height: 1.1; }
+    .spectate-sub { font-size: 13px; color: #aaa; margin: 10px 0 14px; }
+    .spectate-list { display: flex; flex-direction: column; gap: 5px; }
+    .spectate-list li {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 4px; padding: 8px 12px; font-size: 13px;
+    }
+    .spectate-list .sp-name { flex: 1; text-align: left; }
+    .spectate-list .sp-total { font-weight: 800; }
+    .spectate-list .sp-state { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; width: 116px; text-align: right; }
+    .spectate-list li.sp-ahead { border-color: var(--red); }
+    .spectate-list li.sp-ahead .sp-total { color: var(--red); }
+
     .callout { font-size: 26px; font-weight: 800; letter-spacing: 3px; text-align: center; min-height: 32px; }
     .callout.clash { color: #ffb300; }
     .callout.burn { color: var(--red); }
@@ -331,6 +352,16 @@
   <div class="play-area">
     <div class="callout" id="callout"></div>
     <div class="pending-line">This turn<b id="pendingVal">0</b></div>
+
+    <!-- Shown to the player who reached the goal. Their game is over; the
+         final round belongs to whoever is chasing them, and a greyed-out
+         dice tray would read as being locked out of their own win. -->
+    <div class="spectate" id="spectate" hidden>
+      <div class="spectate-head" id="spectateHead"></div>
+      <div class="spectate-target">Your score<b id="spectateTarget">0</b></div>
+      <div class="spectate-sub" id="spectateSub"></div>
+      <ul class="spectate-list" id="spectateList"></ul>
+    </div>
 
     <div class="tray-label" id="trayLabel">Roll to begin</div>
     <div class="dice-tray" id="diceTray"></div>
@@ -636,6 +667,19 @@ function renderDice() {
   $('rollBtn').disabled = !(you && you.canRoll);
   $('bankBtn').disabled = !(you && you.canBank);
 
+  /* Spectating replaces the play area rather than sitting beside it. A
+     visible-but-dead tray is the thing that reads as being locked out. */
+  const spec = you && you.spectating;
+  $('spectate').hidden = !spec;
+  $('diceTray').hidden = !!spec;
+  $('keptRow').hidden = !!spec;
+  $('keptLabel').hidden = !!spec || !(you && you.kept.length);
+  for (const id of ['rollBtn', 'keepBtn', 'bankBtn']) $(id).hidden = !!spec;
+  /* Nothing is pending for someone who is not rolling, and "This turn 0"
+     above a finished score reads as a loss. */
+  document.querySelector('.pending-line').hidden = !!spec;
+  if (spec) { renderSpectate(spec); $('trayLabel').textContent = ''; return; }
+
   if (!you) { $('trayLabel').textContent = ''; return; }
   if (you.done === 'out') $('trayLabel').textContent = 'You are sitting this round out';
   else if (you.done === 'banked') $('trayLabel').textContent = 'Banked — waiting on the others';
@@ -649,7 +693,15 @@ function renderDice() {
 /* One description of a player's round, used by the strip and the
    intermission table so the two can never disagree about what happened. */
 function roundOutcome(p) {
-  if (p.done === 'out') return { text: 'sitting out', cls: 'zero' };
+  if (p.done === 'out') {
+    /* "At the goal" rather than "sitting out": the first says why they are
+       not rolling and that they are the one to beat, the second describes
+       the mechanic and hides the point. */
+    const resting = state && Array.isArray(state.resting) && state.resting.includes(p.id);
+    return resting
+      ? { text: 'at the goal', cls: 'gain' }
+      : { text: 'sitting out', cls: 'zero' };
+  }
   if (p.done === 'burned') return { text: 'Mana Burn', cls: 'burn' };
   if (p.done === 'banked' || p.done === 'timeout') {
     const g = p.gained || 0;
@@ -658,6 +710,39 @@ function roundOutcome(p) {
   }
   if (p.pending) return { text: 'holding ' + p.pending.toLocaleString(), cls: 'holding' };
   return { text: 'rolling', cls: '' };
+}
+
+/* What the finished player sees. Their own score is the number to beat, so
+   it is the biggest thing on screen, and each chaser is listed with how
+   their round went — which is the only question they still care about. */
+function renderSpectate(spec) {
+  const meId = state.you.id;
+  const goal = spec.reason === 'goal';
+
+  $('spectateHead').textContent = goal ? 'You reached the goal' : 'Tiebreak';
+  $('spectateTarget').textContent = spec.target.toLocaleString();
+
+  const left = spec.chasers - spec.done;
+  $('spectateSub').textContent = goal
+    ? (left > 0
+        ? `${spec.chasers} ${spec.chasers === 1 ? 'player has' : 'players have'} one round to beat it — ${left} still rolling`
+        : 'Everyone has finished their round')
+    : 'Waiting on the other tied players';
+
+  const list = $('spectateList');
+  list.innerHTML = '';
+  for (const p of state.players) {
+    if (p.id === meId) continue;
+    if (p.done === 'out') continue;           // also resting, not chasing
+    const out = roundOutcome(p);
+    const li = document.createElement('li');
+    /* Flagged the moment somebody passes the score being defended. */
+    if (p.total > spec.target) li.className = 'sp-ahead';
+    li.innerHTML = '<span class="sp-name">' + esc(p.name) + '</span>' +
+                   '<span class="sp-state ' + out.cls + '">' + esc(out.text) + '</span>' +
+                   '<span class="sp-total">' + p.total.toLocaleString() + '</span>';
+    list.appendChild(li);
+  }
 }
 
 function renderStandings() {

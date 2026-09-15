@@ -404,7 +404,7 @@ async function playToFinish(env, code, hands) {
 
   const totals = Object.fromEntries(r.data.players.map(p => [p.name, p.total]));
   check('B overtook A in the final round', totals.Bry > totals.Ash, true);
-  check('and B won', r.data.players.find(p => p.id === r.data.winner).name, 'Bry');
+  check('and B won', (r.data.players.find(p => p.id === r.data.winner) || {}).name, 'Bry');
 
   /* Ranked, so both boards were written — by the server, from the room. */
   const wins = await env.MARKETPLACE.get('lb_mana_clash_wins', 'json');
@@ -443,7 +443,7 @@ async function playToFinish(env, code, hands) {
   }
   r = await get(env, 'a', `action=get-state&code=${code}`);
   check('a tie does not finish the game', r.data.status, 'intermission');
-  check('only the tied leaders play on', r.data.tiedPlayers.length, 2);
+  check('only the tied leaders play on', (r.data.tiedPlayers || []).length, 2);
 
   endIntermission(env, code);
   r = await get(env, 'c', `action=get-state&code=${code}`);
@@ -461,7 +461,7 @@ async function playToFinish(env, code, hands) {
 
   r = await get(env, 'a', `action=get-state&code=${code}`);
   check('the tiebreak decides it', r.data.status, 'finished');
-  check('A won', r.data.players.find(p => p.id === r.data.winner).name, 'Ash');
+  check('A won', (r.data.players.find(p => p.id === r.data.winner) || {}).name, 'Ash');
 
   /* A 5000-point game is not ranked, so no board was touched. */
   check('an unranked game does not reach the wins board',
@@ -489,6 +489,129 @@ async function playToFinish(env, code, hands) {
     await env.MARKETPLACE.get('lb_mana_clash_wins', 'json'), null);
   check('practice does not reach the high-score board',
     await env.MARKETPLACE.get('lb_mana_clash', 'json'), null);
+}
+
+/* ── Reaching the goal ends YOUR game ────────────────────────────────────
+   Farkle's actual rule, and the first version had it wrong: crossing the
+   goal armed a final round that everyone played, including the leader, who
+   simply extended their own lead. The final round belongs to the people
+   chasing.
+
+   The subtle half is the winner comparison. "Who plays" and "who can win"
+   were one list, so excluding the resting leader from the round also
+   excluded them from the comparison that decides their own victory — the
+   best of the chasers would have won with a lower score. */
+
+{
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 5000 });
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code });
+  await post(env, 'a', { action: 'start-game', code });
+
+  /* A crosses with 8000; B takes 4800. */
+  await playToFinish(env, code, [['a', '111111'], ['b', '666666']]);
+  endIntermission(env, code);
+
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('a final round is armed', r.data.isFinalRound);
+  check('the player who crossed sits it out', r.data.you.done, 'out');
+  check('and cannot roll', (await post(env, 'a', { action: 'roll', code })).status, 400);
+
+  /* They are told what is happening rather than shown a dead tray. */
+  const spec = r.data.you.spectating;
+  ok('they get a spectator view', !!spec);
+  check('for the right reason', spec.reason, 'goal');
+  check('showing the score being defended', spec.target, 8000);
+  check('and how many are chasing', spec.chasers, 1);
+  check('and the best of them so far', spec.closest, 4800);
+  check('with nobody finished yet', spec.done, 0);
+
+  /* The chaser still plays. */
+  r = await get(env, 'b', `action=get-state&code=${code}`);
+  check('the chaser does roll', r.data.you.done, null);
+  ok('and is not spectating', !r.data.you.spectating);
+
+  /* B falls short: 4800 + 1600 = 6400, under A's 8000. */
+  await playToFinish(env, code, [['b', '222222']]);
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('the game ends', r.data.status, 'finished');
+  /* THE BUG. With one list for both jobs, B won here with 6400 against
+     A's 8000, because A was not in the comparison. */
+  check('the resting leader still wins', (r.data.players.find(p => p.id === r.data.winner) || {}).name, 'Ash');
+  check('with their own score', r.data.players.find(p => p.name === 'Ash').total, 8000);
+}
+
+{
+  /* And the chaser wins when they actually overtake. */
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 5000 });
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code });
+  await post(env, 'a', { action: 'start-game', code });
+
+  await playToFinish(env, code, [['a', '555555'], ['b', '234566']]);  // A 4000, B 50
+  endIntermission(env, code);
+  await playToFinish(env, code, [['a', '555555'], ['b', '234566']]);  // A 8000 crosses
+  endIntermission(env, code);
+
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('A is resting on the goal', !!r.data.you.spectating);
+
+  /* B needs more than 8000 from 100. Six ones is 8000. */
+  await playToFinish(env, code, [['b', '111111']]);
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('the game ends', r.data.status, 'finished');
+  const bry = r.data.players.find(p => p.name === 'Bry');
+  check('B overtook', bry.total > 8000, true);
+  check('and won', (r.data.players.find(p => p.id === r.data.winner) || {}).name, 'Bry');
+}
+
+{
+  /* Two players crossing together leaves nobody to chase, so the game ends
+     on the higher score rather than looping a round with no players. */
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 5000 });
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code });
+  await post(env, 'a', { action: 'start-game', code });
+
+  await playToFinish(env, code, [['a', '111111'], ['b', '666666']]);  // 8000 / 4800
+  endIntermission(env, code);
+  await playToFinish(env, code, [['b', '666666']]);                   // B to 9600
+  endIntermission(env, code);
+
+  const r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('the game is over', r.data.status, 'finished');
+  check('the higher total takes it', (r.data.players.find(p => p.id === r.data.winner) || {}).name, 'Bry');
+}
+
+{
+  /* A tiebreak is played by ALL the tied players — nobody rests through it,
+     even someone who had been resting on the goal a round earlier. */
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 5000 });
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code });
+  await post(env, 'a', { action: 'start-game', code });
+
+  await playToFinish(env, code, [['a', '111111'], ['b', '234566']]);  // A 8000 crosses
+  endIntermission(env, code);
+  /* B matches exactly: 50 + 7950? Not reachable. Force the tie instead. */
+  const key = 'mc_room_' + code;
+  const room = JSON.parse(env._store.get(key));
+  room.players['202'].total = 8000;
+  env._store.set(key, JSON.stringify(room));
+  await playToFinish(env, code, [['b', '223466']]);                    // B burns, stays 8000
+
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('a tie sends it to a tiebreak', r.data.status, 'intermission');
+  check('with both players tied', (r.data.tiedPlayers || []).length, 2);
+
+  endIntermission(env, code);
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('the previously resting player now plays', r.data.you.done, null);
+  ok('and is no longer spectating', !r.data.you.spectating);
 }
 
 /* ── Host powers and leaving ─────────────────────────────────────────── */
