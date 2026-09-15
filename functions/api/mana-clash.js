@@ -308,24 +308,29 @@ function viewFor(room, userId, now) {
     serverNow: now,
   };
 
-  if (me && me.turn) {
+  /* `you` is present whenever the player is in the room, turn or no turn.
+     Gating it on me.turn meant the lobby — where turn is null until the game
+     starts — sent no `you` at all, so the page could not tell the host from
+     anyone else and never showed the Start button. Being in the room is the
+     fact the page needs; having a turn is not. */
+  if (me) {
     const t = me.turn;
     view.you = {
       id: userId,
       total: me.total,
-      pending: t.pending,
-      dice: t.dice,
+      pending: t ? t.pending : 0,
+      dice: t ? t.dice : [],
       /* Computed here so the page cannot disagree with the scorer about
          which dice are keepable. The client highlights what this says. */
-      scorable: t.dice.length ? scorableMask(t.dice) : [],
-      kept: t.kept,
-      remaining: t.remaining,
-      awaitingSelection: t.awaitingSelection,
-      done: t.done,
-      event: t.event,
-      msLeft: t.deadline ? Math.max(0, t.deadline - now) : 0,
-      canRoll: room.status === 'playing' && !t.done && !t.awaitingSelection,
-      canBank: room.status === 'playing' && !t.done && !t.awaitingSelection && t.pending > 0,
+      scorable: t && t.dice.length ? scorableMask(t.dice) : [],
+      kept: t ? t.kept : [],
+      remaining: t ? t.remaining : DICE_COUNT,
+      awaitingSelection: !!(t && t.awaitingSelection),
+      done: t ? t.done : null,
+      event: t ? t.event : null,
+      msLeft: t && t.deadline ? Math.max(0, t.deadline - now) : 0,
+      canRoll: !!(t && room.status === 'playing' && !t.done && !t.awaitingSelection),
+      canBank: !!(t && room.status === 'playing' && !t.done && !t.awaitingSelection && t.pending > 0),
     };
   }
 

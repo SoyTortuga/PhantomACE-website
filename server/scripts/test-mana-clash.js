@@ -168,6 +168,38 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
   check('anonymous cannot create a room', res.status, 401);
 }
 
+/* ── The lobby view ──────────────────────────────────────────────────────
+   Read the way the PAGE reads it, not the way the handlers do. The tests
+   below drive ready and start-game directly, which is exactly why they once
+   missed the lobby sending no `you` at all: the page decides who the host
+   is by comparing you.id to host, so without it the Start button never
+   appeared and a room could be created but never started. */
+
+{
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 10000 });
+
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('the lobby tells you who you are', r.data.you && r.data.you.id, '101');
+  check('and the host is you', r.data.host, '101');
+  check('so the page can show Start', r.data.host === r.data.you.id, true);
+  check('with no turn yet', r.data.you.done, null);
+  check('and nothing to roll with', r.data.you.canRoll, false);
+  check('or bank', r.data.you.canBank, false);
+  check('six dice waiting', r.data.you.remaining, 6);
+
+  await post(env, 'b', { action: 'join-room', code });
+  r = await get(env, 'b', `action=get-state&code=${code}`);
+  check('a joiner is told who they are', r.data.you.id, '202');
+  check('and that they are not the host', r.data.host === r.data.you.id, false);
+  check('and starts not ready', r.data.players.find(p => p.id === '202').ready, false);
+
+  /* Someone watching who never joined gets standings and no `you`. */
+  r = await get(env, 'c', `action=get-state&code=${code}`);
+  check('a non-member gets no identity', r.data.you, undefined);
+  check('but can still see the room', r.data.playerCount, 2);
+}
+
 /* ── Rolling, keeping, banking ───────────────────────────────────────── */
 
 {
