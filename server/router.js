@@ -44,6 +44,10 @@ const NON_ROUTE_MODULES = new Set([
 
   /* Check-in history, streaks and arrival rewards. Library, no handler. */
   'api/checkin-rewards.js',
+
+  /* Farkle scoring rules. Pure functions, no handler. Covered by
+     server/scripts/test-scoring.js. */
+  'api/mana-clash-scoring.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */
