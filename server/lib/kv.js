@@ -142,8 +142,11 @@ export function createKVStore(pool) {
    *
    * @param {string} key
    * @param {(current: any) => any} mutator receives parsed value (or null)
+   * @param {{expirationTtl?: number}} [options] slides the expiry forward,
+   *        exactly as put() does. Ignored for group-(b) families, also
+   *        exactly as put() ignores it.
    */
-  async function mutate(key, mutator) {
+  async function mutate(key, mutator, options = {}) {
     const { table, expiry } = mustResolve(key, 'mutate');
     const client = await pool.connect();
     try {
@@ -158,12 +161,27 @@ export function createKVStore(pool) {
         await client.query('COMMIT');
         return current;
       }
-      const expiresAt = expiry === 'real' && rows.length ? rows[0].expires_at : null;
+      /* Without a passed TTL, keep whatever the row already carried. With
+         one, slide it forward — room handlers re-write on every poll and
+         rely on that to stay alive, so freezing the expiry at creation
+         would make a long game vanish mid-play. */
+      const slide = expiry === 'real' && !!options.expirationTtl;
+      const expiresAt = slide
+        ? ttlToExpiresAt(options.expirationTtl)
+        : (expiry === 'real' && rows.length ? rows[0].expires_at : null);
+
+      /* Only a caller that passed a TTL may touch the expiry column. Every
+         existing caller passes none and must keep whatever the row carries —
+         writing EXCLUDED.expires_at unconditionally would set NULL on
+         giveaway_entrants and friends, quietly making TTL'd rows permanent. */
+      const expiryClause = slide ? 'expires_at = EXCLUDED.expires_at,' : '';
       await client.query(
         `INSERT INTO ${table} (key, value, expires_at, updated_at)
          VALUES ($1, $2::jsonb, $3, now())
          ON CONFLICT (key) DO UPDATE
-           SET value = EXCLUDED.value, updated_at = now()`,
+           SET value = EXCLUDED.value,
+               ${expiryClause}
+               updated_at = now()`,
         [key, JSON.stringify(next), expiresAt]
       );
       await client.query('COMMIT');

@@ -126,6 +126,33 @@ function addTimeLeft(room) {
   }
 }
 
+/* ==============================================
+   ROOM WRITES
+
+   Every write below goes through mutate(), which holds a per-room advisory
+   lock across the read-modify-write. The old shape - get, modify, put - is a
+   lost update whenever two players act inside the same tick, and with
+   simultaneous rounds that is the ordinary case rather than a rare one: two
+   people roll at once, both read the same room, and the second put erases
+   the first roll. It would have shown up as a die that visibly rolled and
+   then wasn't there.
+
+   `fn` mutates the room in place and returns a Response to abort. Aborting
+   returns `undefined` from the mutator, so mutate() writes nothing at all -
+   a rejected action cannot leave a partial change behind.
+   ============================================== */
+
+async function withRoom(env, code, fn) {
+  let failed = null;
+  const room = await env.MARKETPLACE.mutate('mc_room_' + code, (current) => {
+    if (!current) { failed = json({ error: 'Room not found' }, 404); return undefined; }
+    const err = fn(current);
+    if (err) { failed = err; return undefined; }
+    return current;
+  }, { expirationTtl: ROOM_TTL });
+  return { failed, room };
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
@@ -150,15 +177,24 @@ export async function onRequestGet(context) {
   if (action === 'get-state') {
     const code = url.searchParams.get('code');
     if (!code) return json({ error: 'Missing room code' }, 400);
-    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
 
-    while (room.status === 'playing' && room.roundStartedAt && Date.now() - room.roundStartedAt >= ROUND_MS) {
-      advanceRound(room);
-    }
-    if (room.status !== 'lobby') {
-      await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
-    }
+    /* Writes only when a round actually advanced. This used to put() on
+       every poll of every non-lobby room - with a full room polling every
+       two seconds that is fifty writes a second to one row, all but one of
+       them storing what was already there. Returning undefined when nothing
+       changed skips the write entirely. */
+    const room = await env.MARKETPLACE.mutate('mc_room_' + code, (current) => {
+      if (!current) return undefined;
+      let changed = false;
+      while (current.status === 'playing' && current.roundStartedAt &&
+             Date.now() - current.roundStartedAt >= ROUND_MS) {
+        advanceRound(current);
+        changed = true;
+      }
+      return changed ? current : undefined;
+    }, { expirationTtl: ROOM_TTL });
+
+    if (!room) return json({ error: 'Room not found' }, 404);
     addTimeLeft(room);
     return json(room);
   }
@@ -176,57 +212,80 @@ export async function onRequestPost(context) {
   const { userId, displayName, profileImage } = player;
 
   if (body.action === 'create-room') {
-    let code, exists;
-    for (let i = 0; i < 10; i++) { code = generateCode(); exists = await env.MARKETPLACE.get('mc_room_' + code); if (!exists) break; }
-    if (exists) return json({ error: 'Could not generate room code' }, 500);
-
-    const room = {
-      code, host: userId, hostName: displayName,
-      password: body.password || null, status: 'lobby',
-      round: 0, roundStartedAt: null,
-      players: { [userId]: { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0, dice: null, locked: freshLock(), rollsLeft: 3 } },
-      createdAt: Date.now(),
-    };
-    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    /* The claim on the code is the write itself. Checking with get() and
+       then put()ing let two simultaneous creates pick the same code, and the
+       second silently replaced the first room out from under its host. */
+    let code = null;
+    for (let i = 0; i < 10; i++) {
+      const candidate = generateCode();
+      const fresh = {
+        code: candidate, host: userId, hostName: displayName,
+        password: body.password || null, status: 'lobby',
+        round: 0, roundStartedAt: null,
+        players: { [userId]: { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0, dice: null, locked: freshLock(), rollsLeft: 3 } },
+        createdAt: Date.now(),
+      };
+      const stored = await env.MARKETPLACE.mutate('mc_room_' + candidate,
+        (current) => current ? undefined : fresh,
+        { expirationTtl: ROOM_TTL });
+      if (stored === fresh) { code = candidate; break; }
+    }
+    if (!code) return json({ error: 'Could not generate room code' }, 500);
     return json({ success: true, code });
   }
 
   if (body.action === 'join-room') {
     const code = (body.code || '').toUpperCase().trim();
     if (!code) return json({ error: 'Missing room code' }, 400);
-    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'lobby') return json({ error: 'Game already started' }, 400);
-    if (Object.keys(room.players).length >= MAX_PLAYERS) return json({ error: 'Room is full' }, 400);
-    if (room.password && body.password !== room.password) return json({ error: 'Wrong password' }, 403);
 
-    room.players[userId] = { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0, dice: null, locked: freshLock(), rollsLeft: 3 };
-    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    const { failed } = await withRoom(env, code, (room) => {
+      if (room.status !== 'lobby') return json({ error: 'Game already started' }, 400);
+      if (Object.keys(room.players).length >= MAX_PLAYERS) return json({ error: 'Room is full' }, 400);
+      if (room.password && body.password !== room.password) return json({ error: 'Wrong password' }, 403);
+      room.players[userId] = { displayName, profileImage, scores: {}, busted: false, roundSubmitted: false, totalScore: 0, dice: null, locked: freshLock(), rollsLeft: 3 };
+      return null;
+    });
+    if (failed) return failed;
     return json({ success: true, code });
   }
 
   if (body.action === 'leave-room') {
     const code = body.code;
     if (!code) return json({ error: 'Missing room code' }, 400);
-    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    delete room.players[userId];
-    if (Object.keys(room.players).length === 0) { await env.MARKETPLACE.delete('mc_room_' + code); return json({ success: true }); }
-    if (room.host === userId) { const nh = Object.keys(room.players)[0]; room.host = nh; room.hostName = room.players[nh].displayName; }
-    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+
+    let emptied = false;
+    const { failed } = await withRoom(env, code, (room) => {
+      delete room.players[userId];
+      if (Object.keys(room.players).length === 0) { emptied = true; return null; }
+      if (room.host === userId) {
+        const nh = Object.keys(room.players)[0];
+        room.host = nh;
+        room.hostName = room.players[nh].displayName;
+      }
+      return null;
+    });
+    if (failed) return failed;
+    /* Deleted outside the lock. A join landing in the gap writes into a room
+       that is about to vanish, which costs that player a rejoin - the
+       alternative, holding a write lock across a delete, is not something
+       mutate() offers, and an empty room is the one state where losing the
+       write costs nothing. */
+    if (emptied) await env.MARKETPLACE.delete('mc_room_' + code);
     return json({ success: true });
   }
 
   if (body.action === 'start-game') {
     const code = body.code;
     if (!code) return json({ error: 'Missing room code' }, 400);
-    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.host !== userId) return json({ error: 'Only the host can start' }, 403);
-    if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
-    room.status = 'playing'; room.round = 1; room.roundStartedAt = Date.now();
-    for (const p of Object.values(room.players)) { p.roundSubmitted = false; p.dice = null; p.locked = freshLock(); p.rollsLeft = 3; }
-    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+
+    const { failed, room } = await withRoom(env, code, (r) => {
+      if (r.host !== userId) return json({ error: 'Only the host can start' }, 403);
+      if (r.status !== 'lobby') return json({ error: 'Already started' }, 400);
+      r.status = 'playing'; r.round = 1; r.roundStartedAt = Date.now();
+      for (const p of Object.values(r.players)) { p.roundSubmitted = false; p.dice = null; p.locked = freshLock(); p.rollsLeft = 3; }
+      return null;
+    });
+    if (failed) return failed;
     addTimeLeft(room);
     return json({ success: true, room });
   }
@@ -234,30 +293,30 @@ export async function onRequestPost(context) {
   if (body.action === 'roll-dice') {
     const code = body.code;
     if (!code) return json({ error: 'Missing room code' }, 400);
-    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'playing') return json({ error: 'Game not in progress' }, 400);
 
-    while (room.roundStartedAt && Date.now() - room.roundStartedAt >= ROUND_MS) { advanceRound(room); }
+    const { failed, room } = await withRoom(env, code, (r) => {
+      if (r.status !== 'playing') return json({ error: 'Game not in progress' }, 400);
+      while (r.roundStartedAt && Date.now() - r.roundStartedAt >= ROUND_MS) { advanceRound(r); }
 
-    const p = room.players[userId];
-    if (!p) return json({ error: 'Not in this room' }, 403);
-    ensurePlayerRoundFields(p);
-    if (p.busted) return json({ error: 'You are busted' }, 400);
-    if (p.roundSubmitted) return json({ error: 'Already submitted' }, 400);
-    if (body.round !== room.round) return json({ error: 'Round mismatch' }, 400);
-    if (p.rollsLeft <= 0) return json({ error: 'No rolls left' }, 400);
+      const p = r.players[userId];
+      if (!p) return json({ error: 'Not in this room' }, 403);
+      ensurePlayerRoundFields(p);
+      if (p.busted) return json({ error: 'You are busted' }, 400);
+      if (p.roundSubmitted) return json({ error: 'Already submitted' }, 400);
+      if (body.round !== r.round) return json({ error: 'Round mismatch' }, 400);
+      if (p.rollsLeft <= 0) return json({ error: 'No rolls left' }, 400);
 
-    const lockedIn = Array.isArray(body.locked) && body.locked.length === 6 ? body.locked.map(Boolean) : freshLock();
-    if (!p.dice) {
-      p.dice = Array.from({ length: 6 }, rollFace);
-    } else {
-      p.dice = p.dice.map((f, i) => lockedIn[i] ? f : rollFace());
-    }
-    p.locked = lockedIn;
-    p.rollsLeft--;
-
-    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+      const lockedIn = Array.isArray(body.locked) && body.locked.length === 6 ? body.locked.map(Boolean) : freshLock();
+      if (!p.dice) {
+        p.dice = Array.from({ length: 6 }, rollFace);
+      } else {
+        p.dice = p.dice.map((f, i) => lockedIn[i] ? f : rollFace());
+      }
+      p.locked = lockedIn;
+      p.rollsLeft--;
+      return null;
+    });
+    if (failed) return failed;
     addTimeLeft(room);
     return json({ success: true, room });
   }
@@ -265,40 +324,40 @@ export async function onRequestPost(context) {
   if (body.action === 'submit-round') {
     const code = body.code;
     if (!code) return json({ error: 'Missing room code' }, 400);
-    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'playing') return json({ error: 'Game not in progress' }, 400);
 
-    while (room.roundStartedAt && Date.now() - room.roundStartedAt >= ROUND_MS) { advanceRound(room); }
+    const { failed, room } = await withRoom(env, code, (r) => {
+      if (r.status !== 'playing') return json({ error: 'Game not in progress' }, 400);
+      while (r.roundStartedAt && Date.now() - r.roundStartedAt >= ROUND_MS) { advanceRound(r); }
 
-    const p = room.players[userId];
-    if (!p) return json({ error: 'Not in this room' }, 403);
-    ensurePlayerRoundFields(p);
-    if (p.busted) return json({ error: 'You are busted' }, 400);
-    if (p.roundSubmitted) return json({ error: 'Already submitted' }, 400);
-    if (body.round !== room.round) return json({ error: 'Round mismatch' }, 400);
+      const p = r.players[userId];
+      if (!p) return json({ error: 'Not in this room' }, 403);
+      ensurePlayerRoundFields(p);
+      if (p.busted) return json({ error: 'You are busted' }, 400);
+      if (p.roundSubmitted) return json({ error: 'Already submitted' }, 400);
+      if (body.round !== r.round) return json({ error: 'Round mismatch' }, 400);
 
-    if (body.slotId === '__bust__') {
-      p.busted = true; p.roundSubmitted = true; p.bustedRound = room.round;
-    } else {
-      const dice = p.dice;
-      if (!validateDice(dice)) return json({ error: 'Roll dice before submitting' }, 400);
-      if (p.scores.hasOwnProperty(body.slotId)) return json({ error: 'Slot already used' }, 400);
-      const valid = validateSlot(body.slotId, dice);
-      const score = valid ? scoreSlot(body.slotId, dice) : 0;
-      p.scores[body.slotId] = score; p.totalScore += score; p.roundSubmitted = true;
-      p.lastSlot = body.slotId; p.lastScore = score;
-    }
+      if (body.slotId === '__bust__') {
+        p.busted = true; p.roundSubmitted = true; p.bustedRound = r.round;
+      } else {
+        const dice = p.dice;
+        if (!validateDice(dice)) return json({ error: 'Roll dice before submitting' }, 400);
+        if (p.scores.hasOwnProperty(body.slotId)) return json({ error: 'Slot already used' }, 400);
+        const valid = validateSlot(body.slotId, dice);
+        const score = valid ? scoreSlot(body.slotId, dice) : 0;
+        p.scores[body.slotId] = score; p.totalScore += score; p.roundSubmitted = true;
+        p.lastSlot = body.slotId; p.lastScore = score;
+      }
 
-    const allDone = Object.values(room.players).every(pl => pl.busted || pl.roundSubmitted);
-    if (allDone) {
-      for (const pl of Object.values(room.players)) { pl.roundSubmitted = false; pl.dice = null; pl.locked = freshLock(); pl.rollsLeft = 3; }
-      const active = Object.values(room.players).filter(pl => !pl.busted);
-      if (active.length === 0 || room.round >= MAX_ROUNDS) { room.status = 'finished'; room.roundStartedAt = null; }
-      else { room.round++; room.roundStartedAt = Date.now(); }
-    }
-
-    await env.MARKETPLACE.put('mc_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+      const allDone = Object.values(r.players).every(pl => pl.busted || pl.roundSubmitted);
+      if (allDone) {
+        for (const pl of Object.values(r.players)) { pl.roundSubmitted = false; pl.dice = null; pl.locked = freshLock(); pl.rollsLeft = 3; }
+        const active = Object.values(r.players).filter(pl => !pl.busted);
+        if (active.length === 0 || r.round >= MAX_ROUNDS) { r.status = 'finished'; r.roundStartedAt = null; }
+        else { r.round++; r.roundStartedAt = Date.now(); }
+      }
+      return null;
+    });
+    if (failed) return failed;
     addTimeLeft(room);
     return json({ success: true, room });
   }
