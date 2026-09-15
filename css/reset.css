@@ -4,3 +4,11 @@ img, video { max-width: 100%; display: block; }
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font: inherit; border: none; background: none; }
 ul, ol { list-style: none; }
+
+/* The browser's own rule for [hidden] is display:none at the lowest possible
+   specificity, so ANY class that sets a display beats it — and .btn-primary,
+   .btn-secondary and most layout classes here set one. The attribute was
+   therefore doing nothing on exactly the elements pages hide with it: the
+   bot control panel's buttons and cards, the games' modals, the About
+   editor's Save and Cancel. Made to mean what it says, once, here. */
+[hidden] { display: none !important; }

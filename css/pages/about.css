@@ -169,3 +169,46 @@
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* ── Broadcaster edit mode ─────────────────────────────────────────────
+   Only rendered for the broadcaster, and only by JS on the server's answer.
+   No CSS role class here: the cookie's role field is not the authority on
+   who may edit, the server is. */
+.about-edit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 1100px;
+  margin: 0 auto 8px;
+  padding: 10px 24px 0;
+}
+
+.about-edit-note {
+  margin-right: auto;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.about-edit-box {
+  width: 100%;
+  background: var(--gray-lo);
+  border: 1px solid var(--red-dim);
+  border-radius: 4px;
+  color: var(--text-pri);
+  font-family: var(--font-system);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.about-edit-box:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.about-edit-box.is-tall {
+  min-height: 220px;
+}

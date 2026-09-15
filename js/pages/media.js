@@ -1,19 +1,48 @@
-/* Populated by real uploads via /api/media/upload once the media backend
-   (currently being reworked to use the dedicated server instead of R2 —
-   see wrangler.toml) is live. Empty until then; renderGallery() already
-   shows a clean "No items in this category yet." state for an empty array. */
-const GALLERY_DATA = [];
+/* The gallery is loaded from the server. This used to be a hardcoded empty
+   array that nothing ever filled, so an upload appeared on the page until
+   the next refresh and then vanished — the file and the index entry both
+   survived, and no endpoint ever read them back. */
+let GALLERY_DATA = [];
+let canManage = false;
 
 let currentFilter = 'all';
 let lightboxIndex = -1;
 let filteredItems = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-  renderGallery();
   initFilters();
   initLightbox();
+  initGalleryClicks();
   initUpload();
+  loadGallery();
 });
+
+async function loadGallery() {
+  const grid = document.getElementById('galleryGrid');
+  if (grid) grid.innerHTML = '<div class="gallery-empty"><p>Loading…</p></div>';
+
+  try {
+    const res = await fetch('/api/media', { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Could not load the gallery.');
+    const data = await res.json();
+    GALLERY_DATA = Array.isArray(data.items) ? data.items : [];
+    canManage = !!data.canManage;
+  } catch {
+    GALLERY_DATA = [];
+    canManage = false;
+    if (grid) grid.innerHTML = '<div class="gallery-empty"><p>Could not load the gallery. Try again shortly.</p></div>';
+    return;
+  }
+
+  /* The server decides who sees Upload. media.html tags the button
+     `role-moderator`, which reads the cookie's role field — and that field
+     does not know about site moderators, so the button was hidden from
+     exactly the people it is for. */
+  const uploadBtn = document.getElementById('uploadBtn');
+  if (uploadBtn) uploadBtn.style.display = canManage ? '' : 'none';
+
+  renderGallery();
+}
 
 function renderGallery() {
   const grid = document.getElementById('galleryGrid');
@@ -33,27 +62,81 @@ function renderGallery() {
 
 function renderItem(item, index) {
   const badgeClass = `badge-${item.category}`;
-  const isClip = item.category === 'clip';
   const lockHtml = item.role
-    ? `<span class="gallery-item-lock">${item.role}+</span>`
+    ? `<span class="gallery-item-lock">${escapeHtml(item.role)}+</span>`
     : '';
-  const playHtml = isClip
-    ? '<div class="gallery-item-play"></div>'
-    : '';
+  /* Driven by the item's own type rather than by its category. A clip filed
+     under Highlights is still a video, and an image filed under Clips is
+     still an image — the old check read the category and got both wrong. */
+  const playHtml = item.type === 'video' ? '<div class="gallery-item-play"></div>' : '';
   const roleClass = item.role ? `role-${item.role}` : '';
 
+  /* Videos have no still to show, so the tile renders the video element
+     itself with preload="metadata" — enough for the browser to paint a
+     first frame without fetching the whole file for a thumbnail. */
+  const mediaHtml = item.type === 'video'
+    ? `<video src="${escapeAttr(item.url)}" preload="metadata" muted playsinline></video>`
+    : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}" loading="lazy">`;
+
+  const removeHtml = canManage
+    ? `<button class="gallery-item-remove" data-id="${escapeAttr(item.id)}" title="Remove">&times;</button>`
+    : '';
+
   return `
-    <div class="gallery-item ${roleClass}" data-index="${index}" onclick="openLightbox(${index})">
-      <img src="${escapeAttr(item.src)}" alt="${escapeAttr(item.title)}" loading="lazy">
+    <div class="gallery-item ${roleClass}" data-index="${index}">
+      ${mediaHtml}
       <span class="gallery-item-badge ${badgeClass}">${escapeHtml(item.category)}</span>
       ${lockHtml}
       ${playHtml}
+      ${removeHtml}
       <div class="gallery-item-overlay">
         <div class="gallery-item-title">${escapeHtml(item.title)}</div>
-        <div class="gallery-item-meta">${formatDate(item.date)}</div>
+        <div class="gallery-item-meta">${formatDate(item.uploadedAt)}${item.uploadedBy ? ' · ' + escapeHtml(item.uploadedBy) : ''}</div>
       </div>
     </div>
   `;
+}
+
+/* Delegated, so it survives every re-render, and bound once. Clicking the
+   tile opens the lightbox; clicking Remove must not. */
+function initGalleryClicks() {
+  const grid = document.getElementById('galleryGrid');
+  if (!grid) return;
+  grid.addEventListener('click', async (e) => {
+    const remove = e.target.closest('.gallery-item-remove');
+    if (remove) {
+      e.stopPropagation();
+      await removeItem(remove.dataset.id, remove);
+      return;
+    }
+    const tile = e.target.closest('.gallery-item');
+    if (tile) openLightbox(Number(tile.dataset.index));
+  });
+}
+
+async function removeItem(id, btn) {
+  const item = GALLERY_DATA.find(i => i.id === id);
+  if (!item) return;
+  if (!window.confirm(`Remove “${item.title}”? This deletes the file and cannot be undone.`)) return;
+
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/media/upload', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Could not remove it.');
+    }
+    GALLERY_DATA = GALLERY_DATA.filter(i => i.id !== id);
+    renderGallery();
+  } catch (err) {
+    btn.disabled = false;
+    window.alert(err.message);
+  }
 }
 
 function initFilters() {
@@ -130,16 +213,25 @@ function updateLightboxContent(item) {
   const prevBtn = document.querySelector('.lightbox-prev');
   const nextBtn = document.querySelector('.lightbox-next');
 
-  content.innerHTML = `<img src="${escapeAttr(item.src)}" alt="${escapeAttr(item.title)}">`;
+  /* Video was rendered as an <img> here, so opening a clip showed a broken
+     image icon. The item knows what it is; use it. */
+  content.innerHTML = item.type === 'video'
+    ? `<video src="${escapeAttr(item.url)}" controls autoplay playsinline></video>`
+    : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}">`;
   title.textContent = item.title;
-  meta.textContent = `${item.category} · ${formatDate(item.date)}`;
+  meta.textContent = `${item.category} · ${formatDate(item.uploadedAt)}` +
+    (item.uploadedBy ? ` · ${item.uploadedBy}` : '');
 
   prevBtn.style.display = lightboxIndex > 0 ? '' : 'none';
   nextBtn.style.display = lightboxIndex < filteredItems.length - 1 ? '' : 'none';
 }
 
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
+/* Accepts a millisecond timestamp (what the API returns) or a date string.
+   Anything unparseable renders as nothing rather than "Invalid Date". */
+function formatDate(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -264,29 +356,31 @@ async function handleUpload(e) {
   try {
     const res = await fetch('/api/media/upload', {
       method: 'POST',
+      credentials: 'same-origin',
       body: formData,
     });
 
-    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
 
-    const data = await res.json();
-
-    GALLERY_DATA.unshift({
-      id: data.id || Date.now(),
-      title: title,
-      category: category,
-      type: file.type.startsWith('video/') ? 'video' : 'image',
-      src: data.url || URL.createObjectURL(file),
-      date: new Date().toISOString().split('T')[0],
-      role: role,
-    });
+    /* The SERVER's record goes into the gallery, not a locally assembled
+       one. The old code pushed a guess — a blob: URL when the response had
+       no url, a date of today, an id of Date.now() — so the tile looked
+       right until the page was reloaded and the real item replaced it, or
+       didn't. */
+    GALLERY_DATA.unshift(data.item);
 
     renderGallery();
-    status.textContent = 'Uploaded successfully!';
+    status.textContent = 'Uploaded.';
     status.className = 'upload-status success';
-    setTimeout(closeUploadModal, 1500);
-  } catch {
-    status.textContent = 'Upload endpoint not available yet. This feature will activate once the backend API is connected.';
+    setTimeout(closeUploadModal, 1200);
+  } catch (err) {
+    /* The real reason, not a standing apology. This used to print "Upload
+       endpoint not available yet" for every failure, which was true when it
+       was written and has been misleading ever since — it hid the actual
+       message for a file that was too large, a wrong type, or a session
+       that had expired. */
+    status.textContent = err.message || 'Upload failed.';
     status.className = 'upload-status error';
   } finally {
     submitBtn.disabled = false;

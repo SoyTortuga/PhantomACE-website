@@ -89,6 +89,12 @@ export async function buildRoutes(functionsDir) {
     const handlers = {};
     if (typeof mod.onRequestGet === 'function') handlers.GET = mod.onRequestGet;
     if (typeof mod.onRequestPost === 'function') handlers.POST = mod.onRequestPost;
+    /* DELETE is registered for the same reason GET and POST are: a route
+       that exports a handler for it should be reachable. Media is the first
+       user — removing an upload is a deletion, and expressing it as
+       POST {action:'delete'} would have been a workaround for the router
+       rather than a decision about the API. */
+    if (typeof mod.onRequestDelete === 'function') handlers.DELETE = mod.onRequestDelete;
     if (typeof mod.onRequest === 'function') handlers.ALL = mod.onRequest;
 
     if (!Object.keys(handlers).length) {

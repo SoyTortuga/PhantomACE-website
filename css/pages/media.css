@@ -69,15 +69,63 @@
   transform: translateY(-2px);
 }
 
-.gallery-item img {
+/* Video tiles are styled with the images. A clip's tile IS a <video>
+   element, because an uploaded file has no separate thumbnail to show and
+   generating one server-side is a whole dependency for a still frame the
+   browser can paint itself. */
+.gallery-item img,
+.gallery-item video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
   transition: transform 0.4s;
 }
 
-.gallery-item:hover img {
+.gallery-item:hover img,
+.gallery-item:hover video {
   transform: scale(1.05);
+}
+
+/* Moderator-only, and added by JS on the server's answer rather than by a
+   CSS role class — the cookie's role field does not know about site
+   moderators. */
+.gallery-item-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.gallery-item:hover .gallery-item-remove,
+.gallery-item-remove:focus-visible {
+  opacity: 1;
+}
+
+.gallery-item-remove:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.gallery-item-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Touch has no hover, so the control would be permanently invisible. */
+@media (hover: none) {
+  .gallery-item-remove { opacity: 1; }
 }
 
 .gallery-item-overlay {

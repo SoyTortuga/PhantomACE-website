@@ -31,7 +31,7 @@
     <div class="corner-accent top-left"></div>
     <div class="corner-accent bottom-right"></div>
     <h1 class="page-hero-title">About</h1>
-    <p class="page-hero-subtitle">The person behind the chaos</p>
+    <p class="page-hero-subtitle" id="aboutSubtitle">The person behind the chaos</p>
   </section>
 
   <!-- Bio -->
@@ -39,10 +39,12 @@
     <div class="bio-section">
       <img src="/assets/images/phantomace-logo.png" alt="PhantomACE" class="bio-image">
       <div class="bio-text">
-        <h2>PhantomACE</h2>
+        <h2 id="aboutBioTitle">PhantomACE</h2>
+        <div id="aboutBioBody">
         <p>Broadcaster, drummer, and digital chaos architect. PhantomACE streams a chaotic mix of gaming, creative content, and community-driven events on Twitch &mdash; from marathon Phamathons with donation goals and punishment wheels to spontaneous drum sessions and Commander games.</p>
         <p>What started as a love of gaming and music has grown into a community built on shared chaos, laughter, and the occasional questionable decision. Whether it&rsquo;s raiding dungeons, spinning wheels of fate, or vibing to drum fills, there&rsquo;s always something unpredictable happening.</p>
         <p>When not live, PhantomACE is planning the next community event, building tools (like the Phamathon Timer), or dreaming up new ways to bring the community together.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -118,19 +120,19 @@
   <!-- Community Values -->
   <section class="page-container values-section">
     <div class="divider"></div>
-    <div class="section-header">Community Values</div>
+    <div class="section-header" id="aboutValuesHeading">Community Values</div>
     <div class="grid-3">
       <div class="card value-card">
-        <h3>Chaos Welcome</h3>
-        <p>The best moments come from the unexpected. Embrace the chaos, roll with the punches, and enjoy the ride.</p>
+        <h3 id="aboutValue1Title">Chaos Welcome</h3>
+        <p id="aboutValue1Body">The best moments come from the unexpected. Embrace the chaos, roll with the punches, and enjoy the ride.</p>
       </div>
       <div class="card value-card">
-        <h3>Respect Always</h3>
-        <p>We roast each other with love. Everyone is welcome here regardless of background, skill level, or how many times they&rsquo;ve died to the tutorial boss.</p>
+        <h3 id="aboutValue2Title">Respect Always</h3>
+        <p id="aboutValue2Body">We roast each other with love. Everyone is welcome here regardless of background, skill level, or how many times they&rsquo;ve died to the tutorial boss.</p>
       </div>
       <div class="card value-card">
-        <h3>Community First</h3>
-        <p>This isn&rsquo;t a one-person show. The community drives the content, picks the goals, and shapes the chaos together.</p>
+        <h3 id="aboutValue3Title">Community First</h3>
+        <p id="aboutValue3Body">This isn&rsquo;t a one-person show. The community drives the content, picks the goals, and shapes the chaos together.</p>
       </div>
     </div>
   </section>
@@ -142,5 +144,6 @@
   <script src="/js/nav.js" defer></script>
   <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/about.js" defer></script>
 </body>
 </html>

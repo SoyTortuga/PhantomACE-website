@@ -15,7 +15,8 @@
     "test-mana-clash": "node scripts/test-mana-clash.js",
     "test-badge-code": "node scripts/test-badge-code.js",
     "mint-badge-code": "node scripts/mint-badge-code.js",
-    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js"
+    "test-media-about": "node scripts/test-media-about.js",
+    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js"
   },
   "engines": {
     "node": ">=20"

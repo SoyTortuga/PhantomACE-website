@@ -30,6 +30,7 @@ export const SINGLETONS = {
   lb_phamily_time:       { table: 'singletons', expiry: 'none' },
 
   media_index:           { table: 'singletons', expiry: 'none' },
+  about_content:         { table: 'singletons', expiry: 'none' },
   item_code_queue:       { table: 'singletons', expiry: 'none' },
   bridge_pending_actions:{ table: 'singletons', expiry: 'none' },
   eventsub_subscriptions:{ table: 'singletons', expiry: 'none' },

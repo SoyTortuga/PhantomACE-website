@@ -26,6 +26,7 @@ import { createStatic } from './static.js';
 import { buildRoutes, matchRoute } from './router.js';
 import { createPool, waitForDatabase } from './lib/db.js';
 import { createKVStore } from './lib/kv.js';
+import { createMediaStore } from './lib/media-store.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -132,7 +133,18 @@ async function main() {
      Cloudflare KV binding — which is the entire point, and why none of the
      183 storage call sites needed editing. */
   const store = createKVStore(pool);
-  const env = { ...process.env, MARKETPLACE: store };
+
+  /* Uploaded media lives OUTSIDE the working tree. It is user content
+     arriving while the server runs: inside the repo it would clutter
+     `git status`, risk being committed, and sit one careless ALLOWED_DIRS
+     edit away from being served wholesale by the static handler. The default
+     is a sibling of the repo so a fresh clone needs no configuration, and
+     MEDIA_DIR overrides it. */
+  const mediaDir = process.env.MEDIA_DIR || path.join(ROOT, '..', 'phantomace-media');
+  const mediaStore = createMediaStore(mediaDir);
+  console.log(`[boot] media store: ${mediaStore.root}`);
+
+  const env = { ...process.env, MARKETPLACE: store, MEDIA_STORE: mediaStore };
 
   setInterval(() => {
     store.reap()
