@@ -14,7 +14,7 @@
    ══════════════════════════════════════════════ */
 
 import {
-  scoreSelection, scorableMask, hasAnyScore, isHotDice,
+  scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection,
   nOfAKindScore, FACES, FACE_VALUE, DICE_COUNT,
 } from '../../functions/api/mana-clash-scoring.js';
 
@@ -203,6 +203,65 @@ for (const hand of allHands(6)) {
   if (new Set(hand).size === 1) sixOfAKind++;
 }
 check('six of a kind is 6 in 46656', [sixOfAKind, 46656], [6, 46656]);
+
+/* ── The suggested keep ──────────────────────────────────────────────────
+   What the page pre-selects after a roll, so the player deselects what they
+   do not want. It has to be a selection the server will accept, which is a
+   stronger requirement than "the dice that light up": a die lights up if it
+   scores in SOME reading, and two dice can light up under readings that
+   exclude each other. */
+
+const sel = (str) => bestSelection(D(str));
+
+check('suggests both 1s and the 5', sel('115').points, 250);
+check('suggests the triple over a single', sel('111').points, 1000);
+check('suggests two triplets over triple+triple', sel('111555').points, 2500);
+check('suggests nothing on a bust', sel('223466'), null);
+/* Four 1s and a pair: three pairs takes all six for 1500, four-of-a-kind
+   takes four for 2000. More points wins. */
+check('prefers the higher score over the bigger keep', sel('111133').points, 2000);
+check('and keeps only the four dice', sel('111133').indices.length, 4);
+/* Equal points, fewer dice: keeping fewer leaves more to re-roll. */
+check('breaks ties toward fewer dice', sel('15').indices.length, 2);
+
+/* THE PROPERTY THAT MATTERS. Across every hand, the suggestion must be a
+   selection scoreSelection() accepts, must be the best available score, and
+   must exist exactly when the hand is not a bust. If this ever fails, the
+   page pre-selects dice the server then refuses, and the player is told
+   their own default is illegal. */
+let suggestInvalid = 0;
+let suggestNotBest = 0;
+let suggestMissing = 0;
+
+for (let n = 1; n <= DICE_COUNT; n++) {
+  for (const hand of allHands(n)) {
+    const s = bestSelection(hand);
+
+    if (!hasAnyScore(hand)) {
+      if (s !== null) suggestMissing++;
+      continue;
+    }
+    if (s === null) { suggestMissing++; continue; }
+
+    const chosen = s.indices.map(i => hand[i]);
+    if (!scoreSelection(chosen).valid) suggestInvalid++;
+    if (scoreSelection(chosen).points !== s.points) suggestInvalid++;
+
+    /* No subset may beat it. */
+    let top = 0;
+    for (let bits = 1; bits < (1 << n); bits++) {
+      const subset = [];
+      for (let i = 0; i < n; i++) if (bits & (1 << i)) subset.push(hand[i]);
+      const r = scoreSelection(subset);
+      if (r.valid && r.points > top) top = r.points;
+    }
+    if (s.points !== top) suggestNotBest++;
+  }
+}
+
+check('exhaustive: every suggestion is a legal keep', suggestInvalid, 0);
+check('exhaustive: every suggestion is the best available', suggestNotBest, 0);
+check('exhaustive: suggested exactly when not a bust', suggestMissing, 0);
 
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');

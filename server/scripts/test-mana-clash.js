@@ -210,6 +210,7 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
   loadDice('112346');
   let r = await post(env, 'a', { action: 'roll', code });
   check('scorable mask reaches the client', r.data.room.you.scorable, [true, true, false, false, false, false]);
+  check('and the suggested keep is pre-selected for them', r.data.room.you.suggested, [0, 1]);
   ok('awaiting a selection after a scoring roll', r.data.room.you.awaitingSelection);
   check('cannot roll again before keeping', (await post(env, 'a', { action: 'roll', code })).status, 400);
   check('cannot bank before keeping', (await post(env, 'a', { action: 'bank', code })).status, 400);
@@ -223,6 +224,7 @@ async function newRoom(env, { goal = 10000, idleMs = 30000, practice = false } =
 
   r = await post(env, 'a', { action: 'keep', code, indices: [0, 1] });
   check('two 1s are 200 pending', r.data.room.you.pending, 200);
+  check('no suggestion while not choosing', r.data.room.you.suggested, []);
   check('four dice left to roll', r.data.room.you.remaining, 4);
   ok('can bank now', r.data.room.you.canBank);
 

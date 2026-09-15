@@ -206,6 +206,41 @@ export function scorableMask(faces) {
 }
 
 /**
+ * The best keep available, as die positions.
+ *
+ * This is what the page pre-selects after a roll, so the player deselects
+ * what they DON'T want rather than assembling a keep from nothing. It must
+ * therefore be a selection the server will actually accept: "every die that
+ * lights up" is not safe for that, because a die lights up if it scores in
+ * SOME reading, and two dice can each light up under readings that exclude
+ * each other. This returns a genuine valid selection, chosen for the most
+ * points, and among equal scores the one using the FEWEST dice — the same
+ * points with more dice left to re-roll is strictly better.
+ *
+ * @returns {{indices: number[], points: number}|null} null on a bust
+ */
+export function bestSelection(faces) {
+  const n = faces.length;
+  let best = null;
+
+  for (let bits = 1; bits < (1 << n); bits++) {
+    const subset = [];
+    for (let i = 0; i < n; i++) if (bits & (1 << i)) subset.push(faces[i]);
+    const r = scoreSelection(subset);
+    if (!r.valid) continue;
+    if (best === null || r.points > best.points ||
+        (r.points === best.points && subset.length < best.size)) {
+      const indices = [];
+      for (let i = 0; i < n; i++) if (bits & (1 << i)) indices.push(i);
+      best = { indices, points: r.points, size: subset.length };
+    }
+  }
+
+  if (!best) return null;
+  return { indices: best.indices, points: best.points };
+}
+
+/**
  * Does this roll score at all? False is a MANA BURN: the turn's accumulated
  * points are lost and the turn ends.
  */

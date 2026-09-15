@@ -118,10 +118,31 @@
            display: flex; align-items: center; justify-content: center; background: #141414; cursor: default; }
     .die img { width: 34px; height: 34px; display: block; }
     .die .pip-num { position: absolute; bottom: 2px; right: 5px; font-size: 11px; font-weight: 800; color: #000; }
+    /* Scoring dice are HELD by default and drop toward the kept row; a
+       click pushes one back up to the table. Selecting what to discard beats
+       selecting what to keep, because keeping everything that scores is what
+       a player wants most of the time. */
     .die.scorable { border-color: var(--red); cursor: pointer; }
-    .die.scorable:hover { transform: translateY(-2px); }
-    .die.picked { border-color: #fff; transform: translateY(4px); }
-    .die.dead { opacity: 0.32; }
+    .die.held { border-color: #fff; transform: translateY(8px); }
+    .die.held:hover { transform: translateY(4px); }
+    .die.returned { opacity: 0.5; border-color: #444; transform: translateY(-4px); }
+    .die.returned:hover { opacity: 0.8; }
+    .die.dead { opacity: 0.28; }
+
+    /* A short, uneven rattle. Staggered per die so six dice do not move as
+       one block, which reads as the tray shaking rather than dice landing. */
+    @keyframes die-tumble {
+      0%   { transform: translateY(-14px) rotate(-16deg); opacity: 0; }
+      45%  { transform: translateY(3px) rotate(9deg); opacity: 1; }
+      70%  { transform: translateY(-2px) rotate(-4deg); }
+      100% { transform: translateY(0) rotate(0); }
+    }
+    .die.tumbling { animation: die-tumble 380ms cubic-bezier(.3,1.4,.5,1) both; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .die.tumbling { animation: none; }
+      .die, .die.held, .die.returned { transition: none; }
+    }
     .die.kept { width: 44px; height: 44px; border-color: #3a3a3a; }
     .die.kept img { width: 24px; height: 24px; }
 
@@ -135,6 +156,31 @@
     .callout { font-size: 26px; font-weight: 800; letter-spacing: 3px; text-align: center; min-height: 32px; }
     .callout.clash { color: #ffb300; }
     .callout.burn { color: var(--red); }
+
+    /* Full-screen, and ABOVE the intermission. A burn ends the round, and
+       when it is the last turn outstanding the intermission used to cover
+       the callout instantly — the turn simply vanished with no word of what
+       happened. This holds the screen long enough to read. */
+    .flash { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+             align-items: center; justify-content: center; pointer-events: none; text-align: center; }
+    .flash-word { font-size: 13vw; font-weight: 800; letter-spacing: 0.06em; line-height: 1; }
+    .flash-note { font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 12px; color: #bbb; }
+    .flash.burn { background: rgba(60,0,0,0.93); }
+    .flash.burn .flash-word { color: #ff2020; }
+    .flash.clash { background: rgba(48,32,0,0.93); }
+    .flash.clash .flash-word { color: #ffb300; }
+    @keyframes flash-in { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: scale(1); } }
+    .flash-word { animation: flash-in 260ms ease-out both; }
+    @media (prefers-reduced-motion: reduce) { .flash-word { animation: none; } }
+    @media (min-width: 900px) { .flash-word { font-size: 96px; } }
+
+    .round-progress { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+                      color: var(--dim); text-align: center; padding: 6px 14px; }
+    .round-progress b { color: #fff; }
+
+    .sound-toggle { background: none; border: 1px solid var(--line); color: var(--dim);
+                    border-radius: 3px; font-size: 11px; padding: 3px 8px; cursor: pointer; }
+    .sound-toggle:hover { color: #fff; border-color: #444; }
 
     /* ════ INTERMISSION ════ */
     .intermission { position: fixed; inset: 0; background: rgba(0,0,0,0.94); z-index: 40;
@@ -259,11 +305,13 @@
       <div>Round <span class="val" id="roundNum">1</span></div>
       <div>Target <span class="val" id="goalNum">—</span></div>
       <div>⏱ <span class="val" id="timerText">—</span></div>
+      <button class="sound-toggle" id="soundToggle" title="Dice sounds">🔊</button>
     </div>
   </div>
   <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
   <div class="final-banner" id="finalBanner" hidden>Final round — highest total wins</div>
   <div class="standings-strip" id="standingsStrip"></div>
+  <div class="round-progress" id="roundProgress"></div>
 
   <div class="play-area">
     <div class="callout" id="callout"></div>
@@ -277,12 +325,17 @@
 
     <div class="dice-controls">
       <button class="btn btn-red" id="rollBtn">Roll</button>
-      <button class="btn btn-dim" id="keepBtn" hidden>Keep</button>
+      <button class="btn btn-dim" id="keepBtn" hidden>Keep These</button>
       <button class="btn btn-dim" id="bankBtn">Bank</button>
       <span class="sel-score" id="selScore"></span>
     </div>
     <div class="feedback" id="gameFeedback"></div>
   </div>
+</div>
+
+<div class="flash" id="flash" hidden>
+  <div class="flash-word" id="flashWord"></div>
+  <div class="flash-note" id="flashNote"></div>
 </div>
 
 <!-- ════════ INTERMISSION ════════ -->
@@ -321,13 +374,95 @@ const FACE_IMG = { C: 'c.png', W: 'w.png', U: 'u.png', B: 'b.png', R: 'r.png', G
 let session = null;
 let roomCode = null;
 let state = null;
-let picked = new Set();      // indices of table dice the player has clicked
+let held = new Set();        // table dice being KEPT; everything else goes back
+let lastDiceKey = '';        // the roll the tumble animation last played for
+let flashUntil = 0;          // hold the intermission back while a flash is up
+let flashTimer = null;       // the pending hide, so a second flash can cancel it
 let pollTimer = null;
 let tickTimer = null;
 let clockOffset = 0;         // serverNow - Date.now()
 let lastEventKey = '';
 
 const $ = (id) => document.getElementById(id);
+
+/* ── Dice sound ────────────────────────────────────────────────────────
+   Synthesised rather than a file: no asset to ship, license or cache, and
+   the site has no audio anywhere else to be consistent with. A roll is a
+   handful of short filtered-noise clicks at uneven intervals — dice hitting
+   a table are many small impacts, not one sound.
+
+   The context is created on the first roll, which is a click, so it never
+   trips the browser's autoplay block. Every call is wrapped: audio is a
+   garnish and must never be able to break the game. */
+
+let audioCtx = null;
+let soundOn = true;
+try { soundOn = localStorage.getItem('mc_sound') !== 'off'; } catch { /* private mode */ }
+
+function clack(when, gain, freq) {
+  const ctx = audioCtx;
+  const len = Math.floor(ctx.sampleRate * 0.045);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    /* Noise under a steep decay — the shape of a knock. */
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 7);
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = freq;
+  bp.Q.value = 1.4;
+  const vol = ctx.createGain();
+  vol.gain.value = gain;
+  src.connect(bp); bp.connect(vol); vol.connect(ctx.destination);
+  src.start(when);
+}
+
+function playRoll(count) {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    /* One click per die, scattered over ~260ms so they never land in a
+       rhythm, quieter as they settle. */
+    for (let i = 0; i < count; i++) {
+      const at = t0 + Math.random() * 0.26;
+      clack(at, 0.11 + Math.random() * 0.09, 900 + Math.random() * 2200);
+    }
+    clack(t0 + 0.3, 0.05, 500);
+  } catch { /* no audio on this device; the game is unaffected */ }
+}
+
+function playTone(freqs, gain) {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    freqs.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + i * 0.09);
+      g.gain.exponentialRampToValueAtTime(gain, t0 + i * 0.09 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.09 + 0.36);
+      osc.connect(g); g.connect(audioCtx.destination);
+      osc.start(t0 + i * 0.09);
+      osc.stop(t0 + i * 0.09 + 0.4);
+    });
+  } catch { /* as above */ }
+}
+
+function setSound(on) {
+  soundOn = on;
+  try { localStorage.setItem('mc_sound', on ? 'on' : 'off'); } catch { /* private mode */ }
+  $('soundToggle').textContent = on ? '🔊' : '🔇';
+  $('soundToggle').title = on ? 'Dice sounds on' : 'Dice sounds off';
+}
 
 function show(screen) {
   for (const el of document.querySelectorAll('.screen')) el.classList.remove('active');
@@ -428,14 +563,25 @@ function renderDice() {
   const dice = you && you.dice ? you.dice : [];
   const mask = you && you.scorable ? you.scorable : [];
 
+  /* Play the tumble once per distinct roll, not on every poll — this
+     function runs every 1.5 seconds and re-animating would make the dice
+     twitch permanently. */
+  const diceKey = state.round + ':' + dice.join('') + ':' + (you ? you.kept.length : 0);
+  const isNewRoll = dice.length > 0 && diceKey !== lastDiceKey;
+  if (isNewRoll) lastDiceKey = diceKey;
+
   dice.forEach((face, i) => {
     const el = dieEl(face);
+    if (isNewRoll) {
+      el.classList.add('tumbling');
+      el.style.animationDelay = (i * 45) + 'ms';
+    }
     if (you.awaitingSelection) {
       if (mask[i]) {
-        el.classList.add('scorable');
-        if (picked.has(i)) el.classList.add('picked');
+        /* Held by default; clicking puts it back on the table. */
+        el.classList.add('scorable', held.has(i) ? 'held' : 'returned');
         el.addEventListener('click', () => {
-          if (picked.has(i)) picked.delete(i); else picked.add(i);
+          if (held.has(i)) held.delete(i); else held.add(i);
           renderDice();
         });
       } else {
@@ -455,8 +601,8 @@ function renderDice() {
      so a player can see a choice cost them points rather than find out
      after committing. */
   const sel = $('selScore');
-  if (you && you.awaitingSelection && picked.size) {
-    const faces = [...picked].map(i => dice[i]);
+  if (you && you.awaitingSelection && held.size) {
+    const faces = [...held].map(i => dice[i]);
     const pts = scoreFaces(faces);
     if (pts === null) {
       sel.textContent = 'Every die must score';
@@ -471,7 +617,7 @@ function renderDice() {
   }
 
   $('keepBtn').hidden = !(you && you.awaitingSelection);
-  $('keepBtn').disabled = picked.size === 0;
+  $('keepBtn').disabled = held.size === 0;
   $('rollBtn').disabled = !(you && you.canRoll);
   $('bankBtn').disabled = !(you && you.canBank);
 
@@ -480,7 +626,7 @@ function renderDice() {
   else if (you.done === 'banked') $('trayLabel').textContent = 'Banked — waiting on the others';
   else if (you.done === 'timeout') $('trayLabel').textContent = 'Time ran out — banked and waiting';
   else if (you.done === 'burned') $('trayLabel').textContent = 'Mana burned — waiting on the others';
-  else if (you.awaitingSelection) $('trayLabel').textContent = 'Pick the dice you want to keep';
+  else if (you.awaitingSelection) $('trayLabel').textContent = 'Keeping the highlighted dice — click one to put it back';
   else if (you.kept.length) $('trayLabel').textContent = 'Roll ' + you.remaining + ' again, or bank';
   else $('trayLabel').textContent = 'Roll to begin';
 }
@@ -503,6 +649,20 @@ function renderStandings() {
                    '<span class="st">' + esc(st) + '</span>';
     strip.appendChild(el);
   }
+}
+
+/* Who the round is still waiting on. With a hundred players the standings
+   strip scrolls off the side, so the one number that says whether the round
+   is nearly over belongs somewhere fixed. */
+function renderRoundProgress() {
+  const el = $('roundProgress');
+  if (state.status !== 'playing') { el.textContent = ''; return; }
+  const inRound = state.players.filter(p => p.done !== 'out');
+  const live = inRound.filter(p => !p.done);
+  if (live.length === 0) { el.textContent = 'Round over — counting up'; return; }
+  el.innerHTML = '<b>' + live.length + '</b> of <b>' + inRound.length + '</b> still rolling &middot; ' +
+    esc(live.slice(0, 4).map(p => p.name).join(', ')) +
+    (live.length > 4 ? ' and ' + (live.length - 4) + ' more' : '');
 }
 
 function standingsTable(el, players, meId) {
@@ -556,7 +716,9 @@ function renderLobby() {
 
 function renderIntermission() {
   const inter = $('intermission');
-  if (state.status !== 'intermission') { inter.hidden = true; return; }
+  /* Held back while a flash is up, so a burn is never hidden by the
+     standings screen that the burn itself triggered. */
+  if (state.status !== 'intermission' || Date.now() < flashUntil) { inter.hidden = true; return; }
   inter.hidden = false;
   $('intermissionTitle').textContent = state.tiedPlayers ? 'Tied — one more round' : 'Round ' + state.round + ' over';
   standingsTable($('intermissionTable'), state.players, state.you ? state.you.id : null);
@@ -573,16 +735,54 @@ function renderResults() {
   standingsTable($('resultsTable'), state.players, meId);
 }
 
+/* A burn ENDS the round, and when it is the last turn outstanding the
+   server moves straight to the intermission. The inline callout was
+   therefore covered by the intermission overlay the instant it appeared, so
+   a burn looked like the turn silently vanishing. The flash sits above the
+   overlay and holds the screen until it has been read. */
+function fireFlash(kind) {
+  const burn = kind === 'burn';
+  const el = $('flash');
+  const word = $('flashWord');
+
+  /* A clash can be followed by a burn inside the hold window — roll, take
+     all six, roll again, score nothing. Without cancelling, the clash's
+     pending hide fires partway through the burn and takes it off screen,
+     which is the very thing this overlay exists to prevent. */
+  if (flashTimer) clearTimeout(flashTimer);
+
+  el.className = 'flash ' + kind;
+  word.textContent = burn ? 'MANA BURN' : 'MANA CLASH';
+  $('flashNote').textContent = burn
+    ? 'Nothing scored — this turn\u2019s points are lost'
+    : 'Every die scored — take all six again';
+  el.hidden = false;
+
+  /* Restart the entry animation. Its fill mode is `both`, so an element that
+     was display:none keeps the FINISHED state and reappears at whatever
+     opacity the last run ended on — which is to say invisible. */
+  word.style.animation = 'none';
+  void word.offsetWidth;
+  word.style.animation = '';
+
+  const hold = burn ? 2600 : 1800;
+  flashUntil = Date.now() + hold;
+  playTone(burn ? [320, 240, 170] : [523, 659, 880], burn ? 0.16 : 0.12);
+  flashTimer = setTimeout(() => { flashTimer = null; el.hidden = true; render(); }, hold);
+}
+
 function renderCallout() {
   const you = state.you;
-  if (!you || !you.event) { return; }
+  if (!you || !you.event) return;
   const key = state.round + ':' + you.event + ':' + you.kept.length + ':' + you.pending;
   if (key === lastEventKey) return;
   lastEventKey = key;
+
   const el = $('callout');
   el.className = 'callout ' + you.event;
   el.textContent = you.event === 'clash' ? 'MANA CLASH!' : 'MANA BURN!';
   setTimeout(() => { if (el.textContent) { el.textContent = ''; el.className = 'callout'; } }, 2200);
+  fireFlash(you.event);
 }
 
 function render() {
@@ -607,6 +807,7 @@ function render() {
   $('goalNum').textContent = state.goal.toLocaleString();
   $('finalBanner').hidden = !state.isFinalRound;
   renderStandings();
+  renderRoundProgress();
   renderDice();
   renderCallout();
   renderIntermission();
@@ -648,10 +849,15 @@ function applyState(next) {
   if (next.you) next.you.deadlineAt = Date.now() + clockOffset + next.you.msLeft;
   next.intermissionEndsAt = Date.now() + clockOffset + next.intermissionMsLeft;
 
+  /* A poll mid-selection must not wipe what the player has clicked, but a
+     NEW roll seeds the selection from the server's suggestion — which is a
+     keep the server has already guaranteed it will accept. */
   const wasSelecting = state && state.you && state.you.awaitingSelection;
   const sameRoll = wasSelecting && next.you && next.you.awaitingSelection &&
                    JSON.stringify(state.you.dice) === JSON.stringify(next.you.dice);
-  if (!sameRoll) picked.clear();
+  if (!sameRoll) {
+    held = new Set(next.you && next.you.suggested ? next.you.suggested : []);
+  }
 
   state = next;
   render();
@@ -685,7 +891,11 @@ function leaveToSplash(msg) {
   stopPolling();
   roomCode = null;
   state = null;
-  picked.clear();
+  held.clear();
+  lastDiceKey = '';
+  if (flashTimer) { clearTimeout(flashTimer); flashTimer = null; }
+  flashUntil = 0;
+  $('flash').hidden = true;
   $('intermission').hidden = true;
   show('splashScreen');
   say('splashFeedback', msg || '');
@@ -788,11 +998,14 @@ $('leaveBtn').addEventListener('click', async () => {
   leaveToSplash('');
 });
 
-$('rollBtn').addEventListener('click', () => act({ action: 'roll', code: roomCode }, 'gameFeedback'));
+$('rollBtn').addEventListener('click', () => {
+  playRoll(state && state.you ? state.you.remaining : 6);
+  act({ action: 'roll', code: roomCode }, 'gameFeedback');
+});
 $('bankBtn').addEventListener('click', () => act({ action: 'bank', code: roomCode }, 'gameFeedback'));
 $('keepBtn').addEventListener('click', () => {
-  const indices = [...picked];
-  picked.clear();
+  const indices = [...held];
+  held.clear();
   act({ action: 'keep', code: roomCode, indices }, 'gameFeedback');
 });
 
@@ -806,6 +1019,9 @@ $('againBtn').addEventListener('click', async () => {
 });
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
+
+$('soundToggle').addEventListener('click', () => setSound(!soundOn));
+setSound(soundOn);
 
 session = typeof readPhamSession === 'function' ? readPhamSession() : null;
 if (!session) {

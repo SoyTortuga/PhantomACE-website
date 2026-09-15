@@ -17,7 +17,7 @@
    ══════════════════════════════════════════════ */
 
 import {
-  rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, DICE_COUNT,
+  rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection, DICE_COUNT,
 } from './mana-clash-scoring.js';
 
 const ROOM_TTL = 7200;
@@ -323,6 +323,16 @@ function viewFor(room, userId, now) {
       /* Computed here so the page cannot disagree with the scorer about
          which dice are keepable. The client highlights what this says. */
       scorable: t && t.dice.length ? scorableMask(t.dice) : [],
+      /* What the page pre-selects, so the player removes dice they don't
+         want rather than assembling a keep from nothing. Sent from here
+         because it must be a selection this server will accept — "every die
+         that lights up" is not: a die lights up if it scores in some
+         reading, and two dice can light up under readings that exclude each
+         other. bestSelection() returns a real one, proven legal and optimal
+         across every hand in test-scoring.js. */
+      suggested: t && t.awaitingSelection && t.dice.length
+        ? (bestSelection(t.dice) || { indices: [] }).indices
+        : [],
       kept: t ? t.kept : [],
       remaining: t ? t.remaining : DICE_COUNT,
       awaitingSelection: !!(t && t.awaitingSelection),
