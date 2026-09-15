@@ -19,7 +19,7 @@
   if (!panel) return;
 
   var wordEl = document.getElementById('ovScWord');
-  var hintEl = document.getElementById('ovScHint');
+  var catEl = document.getElementById('ovScCategory');
   var clockEl = document.getElementById('ovScClock');
   var roundEl = document.getElementById('ovScRound');
   var answeredEl = document.getElementById('ovScAnswered');
@@ -81,7 +81,7 @@
     panel.hidden = false;
     panel.classList.toggle('is-reveal', state.status === 'reveal');
     roundEl.textContent = 'Round ' + state.round;
-    hintEl.textContent = state.hint || '';
+    catEl.textContent = state.category || '';
 
     if (state.status === 'reveal') {
       /* The answer, plainly, and who got it. A round that ends without

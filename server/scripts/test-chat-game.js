@@ -101,16 +101,20 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
     WORDS.filter(w => letters(w.word) < 4).map(w => w.word), []);
   check('every word is lower case',
     WORDS.filter(w => w.word !== w.word.toLowerCase()).map(w => w.word), []);
-  check('every word has a hint',
-    WORDS.filter(w => !w.hint || !w.hint.trim()).map(w => w.word), []);
+  check('every word has a category',
+    WORDS.filter(w => !w.category || !w.category.trim()).map(w => w.word), []);
+  /* One word, because it sits beside the scramble on the overlay and
+     inside a single chat line. A sentence fits neither. */
+  check('every category is a single word',
+    WORDS.filter(w => !/^[A-Za-z]+$/.test(w.category || '')).map(w => w.word), []);
   check('no duplicates',
     WORDS.map(w => w.word).filter((w, i, a) => a.indexOf(w) !== i), []);
   check('only letters and single spaces',
     WORDS.filter(w => !/^[a-z]+( [a-z]+)*$/.test(w.word)).map(w => w.word), []);
 
-  /* A hint that contains the answer is not a hint. */
-  check('no hint gives the answer away',
-    WORDS.filter(w => normalise(w.hint).includes(normalise(w.word))).map(w => w.word), []);
+  /* A category that appears inside its own answer is not a clue. */
+  check('no category gives the answer away',
+    WORDS.filter(w => normalise(w.word).includes(normalise(w.category))).map(w => w.word), []);
 
   ok('there are enough words for a long break', WORDS.length >= 60);
 }
@@ -150,7 +154,7 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
   const shown = publicState(game);
   check('the overlay is told a round is running', shown.status, 'running');
   ok('and gets the scramble', !!shown.display);
-  ok('and the hint', !!shown.hint);
+  ok('and the category', !!shown.category);
   check('but NOT the answer', shown.word, undefined);
   check('nor the winner field', shown.winner, undefined);
 
@@ -246,7 +250,7 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
      every scramble — the game simply stopped after the first round. */
   check('the new round is announced to chat', kinds(opened), ['start']);
   ok('with the scramble in it', !!firstOf(opened, 'start').display);
-  ok('and the hint', !!firstOf(opened, 'start').hint);
+  ok('and the category', !!firstOf(opened, 'start').category);
   const g3 = read(env);
   check('the next round starts by itself', g3.status, 'running');
   check('and it is a new round', g3.round, 2);

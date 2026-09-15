@@ -309,10 +309,18 @@ html, body {
   color: #ff5a5a;
 }
 
-.ov-sc-hint {
-  font-size: 15px;
-  color: #bbb;
-  font-style: italic;
+/* The clue. One word, set as a label rather than a sentence, because that
+   is what it is now — a category that narrows the field without solving
+   the puzzle. */
+.ov-sc-category {
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffb300;
+  border: 1px solid rgba(255, 179, 0, 0.4);
+  border-radius: 4px;
+  padding: 3px 10px;
   margin-bottom: 14px;
 }
 
