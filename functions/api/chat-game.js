@@ -25,11 +25,23 @@ const REVEAL_MS = 8000;          // how long the answer stays up between rounds
 const WIN_ENTRIES = 2;
 const MAX_SCORES = 200;
 
-/* Seeded from the site's own vocabulary, so a regular viewer has an edge
-   over someone passing through — which is the point of a community game.
-   Each entry carries a hint, because a scramble with no context is a
-   crossword clue with no crossings. */
+/* ── The word list ───────────────────────────────────────────────────────
+   Three sources, deliberately mixed. The site's own vocabulary so regulars
+   have an edge over someone passing through; Magic terms because this is a
+   Commander channel and the audience already speaks it; and a few plain
+   stream words so a newcomer is never shut out of an entire round.
+
+   RULES FOR ADDING ONE. Fifteen letters maximum excluding spaces — beyond
+   that the tiles shrink past readability on the overlay, which
+   server/scripts/test-chat-game.js asserts. Lower case. The hint should
+   narrow the field without naming the answer: "the dice game on this site"
+   is a hint, "rhymes with banana slash" is a crossword clue.
+
+   Words that need channel context are the ones worth adding by hand — an
+   inside joke nobody outside the stream would guess is exactly what makes
+   this feel like PhantomACE's game rather than a generic word scramble. */
 export const WORDS = [
+  /* ── This site ──────────────────────────────────────────────────── */
   { word: 'mana clash', hint: 'The dice game on this site' },
   { word: 'phamily time', hint: 'Watch time earns it' },
   { word: 'dino park', hint: 'Hatch and raise them' },
@@ -37,24 +49,113 @@ export const WORDS = [
   { word: 'commander bingo', hint: 'A card game bingo card' },
   { word: 'phamshock', hint: 'Artillery, destructible ground' },
   { word: 'memory match', hint: 'Flip and pair them up' },
-  { word: 'hype train', hint: 'It levels up and drops codes' },
+  { word: 'phamathon', hint: 'A marathon stream with goals' },
   { word: 'mana burn', hint: 'Roll nothing and lose it all' },
+  { word: 'hot dice', hint: 'Every die scored, pick them all up' },
+  { word: 'incubator', hint: 'Where an egg waits' },
+  { word: 'mutation', hint: 'A rare twist on a hatch' },
+  { word: 'marketplace', hint: 'Buy and sell dinos' },
+  { word: 'leaderboard', hint: 'Where the best sit' },
+  { word: 'inventory', hint: 'Your badges and titles live here' },
+  { word: 'showcase', hint: 'The badges you choose to display' },
   { word: 'giveaway', hint: 'Entries go in, a winner comes out' },
+  { word: 'hype train', hint: 'It levels up and drops codes' },
+  { word: 'redeem', hint: 'What you do with a code' },
+  { word: 'check in', hint: 'Tell the site you have arrived' },
+  { word: 'streak', hint: 'Turn up enough times in a row' },
+  { word: 'overlay', hint: 'The layer on top of the stream' },
+  { word: 'channel points', hint: 'Earned by watching, spent on rewards' },
+  { word: 'punishment wheel', hint: 'Spin it and regret it' },
+  { word: 'donation goal', hint: 'A bar that fills up' },
+  { word: 'drummer', hint: 'Sticks and a kit' },
   { word: 'phantomace', hint: 'Whose channel is this' },
+
+  /* ── Magic ──────────────────────────────────────────────────────── */
+  { word: 'creature', hint: 'It can attack and block' },
+  { word: 'instant', hint: 'Cast it on their turn' },
+  { word: 'sorcery', hint: 'Your turn, main phase, empty stack' },
+  { word: 'enchantment', hint: 'It sticks around and changes things' },
+  { word: 'artifact', hint: 'Usually colourless, usually a permanent' },
+  { word: 'planeswalker', hint: 'Loyalty counters and ultimates' },
+  { word: 'commander', hint: 'The one in the zone at the start' },
+  { word: 'battlefield', hint: 'Where permanents live' },
+  { word: 'graveyard', hint: 'Where cards go when they die' },
+  { word: 'library', hint: 'You draw from it' },
+  { word: 'sideboard', hint: 'Fifteen cards for game two' },
+  { word: 'mulligan', hint: 'Shuffle back and try a smaller hand' },
+  { word: 'counterspell', hint: 'It never resolves' },
+  { word: 'removal', hint: 'Answer to a threat' },
+  { word: 'board wipe', hint: 'Everybody loses their creatures' },
+  { word: 'ramp', hint: 'More mana, faster' },
+  { word: 'exile', hint: 'Gone, and not to the graveyard' },
+  { word: 'scry', hint: 'Look, then keep or bottom' },
+  { word: 'cascade', hint: 'Cast it free off the top' },
+  { word: 'token', hint: 'A permanent with no card' },
+  { word: 'upkeep', hint: 'The step right after untap' },
+  { word: 'combat', hint: 'The phase with attackers' },
+  { word: 'the stack', hint: 'Last on, first off' },
+  { word: 'mana rock', hint: 'An artifact that taps for mana' },
+  { word: 'fetchland', hint: 'Crack it, find a land, lose a life' },
+  { word: 'legendary', hint: 'You may only control one' },
+
+  /* ── Keywords ───────────────────────────────────────────────────── */
+  { word: 'flying', hint: 'Most creatures on the ground cannot block it' },
+  { word: 'trample', hint: 'The extra damage goes through' },
+  { word: 'deathtouch', hint: 'Any damage is lethal' },
+  { word: 'lifelink', hint: 'Damage dealt, life gained' },
+  { word: 'vigilance', hint: 'Attack without tapping' },
+  { word: 'haste', hint: 'No summoning sickness' },
+  { word: 'hexproof', hint: 'Your opponents cannot target it' },
+  { word: 'menace', hint: 'It takes two to block' },
+  { word: 'first strike', hint: 'It hits before they do' },
+  { word: 'double strike', hint: 'It hits twice' },
+  { word: 'indestructible', hint: 'Damage and destroy do nothing' },
+  { word: 'ward', hint: 'Target it and pay the tax' },
+  { word: 'flashback', hint: 'Cast it once more from the graveyard' },
+  { word: 'proliferate', hint: 'Add one to every kind of counter' },
+  { word: 'convoke', hint: 'Tap creatures to help cast it' },
+  { word: 'affinity', hint: 'It costs less the more you have' },
+  { word: 'infect', hint: 'Poison counters instead of damage' },
+  { word: 'annihilator', hint: 'They sacrifice permanents on attack' },
+
+  /* ── Colours and archetypes ─────────────────────────────────────── */
+  { word: 'colorless', hint: 'The mana die worth 100' },
+  { word: 'multicolor', hint: 'More than one in the cost' },
+  { word: 'aggro', hint: 'Win before they set up' },
+  { word: 'control', hint: 'Answer everything, win late' },
+  { word: 'midrange', hint: 'Between the fast deck and the slow one' },
+  { word: 'lifegain', hint: 'The total that only goes up' },
+  { word: 'tribal', hint: 'A deck where everything shares a type' },
+  { word: 'voltron', hint: 'One creature, every aura' },
+  { word: 'stax', hint: 'Nobody gets to do anything' },
+  { word: 'group hug', hint: 'Everyone draws, everyone ramps' },
+
+  /* ── Formats and product ────────────────────────────────────────── */
+  { word: 'booster', hint: 'Fifteen cards and some hope' },
+  { word: 'draft', hint: 'Pick one, pass the rest' },
+  { word: 'sealed', hint: 'Six packs and no trading' },
+  { word: 'standard', hint: 'Only the recent sets' },
+  { word: 'modern', hint: 'Eighth edition onwards' },
+  { word: 'legacy', hint: 'Almost everything is legal' },
+  { word: 'vintage', hint: 'Restricted, not banned' },
+  { word: 'pauper', hint: 'Commons only' },
+  { word: 'planechase', hint: 'Roll the die, change the plane' },
+
+  /* ── Rarity ─────────────────────────────────────────────────────── */
+  { word: 'mythic', hint: 'The rarest tier' },
+  { word: 'uncommon', hint: 'Better than common, worse than rare' },
+
+  /* ── Stream ─────────────────────────────────────────────────────── */
   { word: 'broadcaster', hint: 'The one running the stream' },
   { word: 'moderator', hint: 'Keeps chat in order' },
   { word: 'subscriber', hint: 'Pays monthly, gets the boost' },
-  { word: 'incubator', hint: 'Where an egg waits' },
-  { word: 'mutation', hint: 'A rare twist on a hatch' },
-  { word: 'leaderboard', hint: 'Where the best sit' },
-  { word: 'inventory', hint: 'Your badges and titles live here' },
-  { word: 'marketplace', hint: 'Buy and sell dinos' },
-  { word: 'drummer', hint: 'Sticks and a kit' },
-  { word: 'raid', hint: 'Arriving in a crowd from another stream' },
+  { word: 'follower', hint: 'Clicked the heart, paid nothing' },
+  { word: 'lurker', hint: 'Watching, saying nothing' },
   { word: 'emote', hint: 'A tiny picture in chat' },
-  { word: 'redeem', hint: 'What you do with a code' },
-  { word: 'colorless', hint: 'The mana die worth 100' },
-  { word: 'mythic', hint: 'The rarest tier' },
+  { word: 'raid', hint: 'Arriving in a crowd from another stream' },
+  { word: 'clip', hint: 'Twenty seconds worth keeping' },
+  { word: 'highlight', hint: 'The bit worth watching again' },
+  { word: 'discord', hint: 'Where the chat goes when the stream ends' },
 ];
 
 function json(data, status = 200) {

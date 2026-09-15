@@ -87,6 +87,34 @@ check('empty guess', isCorrect('', 'mana clash'), false);
 check('a lone space is not an answer', isCorrect('   ', 'mana clash'), false);
 check('normalise strips everything but letters and digits', normalise('A-b C!1'), 'abc1');
 
+/* ── The word list ───────────────────────────────────────────────────────
+   Enforced rather than remembered. Adding a word is the one edit anyone
+   will make to this game without reading the rest of it, and a
+   seventeen-letter phrase does not fail — it just renders too small to read
+   on stream, which is the sort of thing nobody notices until it is live. */
+{
+  const letters = (w) => w.replace(/ /g, '').length;
+
+  check('nothing exceeds the tile budget',
+    WORDS.filter(w => letters(w.word) > 15).map(w => w.word), []);
+  check('nothing is too short to scramble',
+    WORDS.filter(w => letters(w.word) < 4).map(w => w.word), []);
+  check('every word is lower case',
+    WORDS.filter(w => w.word !== w.word.toLowerCase()).map(w => w.word), []);
+  check('every word has a hint',
+    WORDS.filter(w => !w.hint || !w.hint.trim()).map(w => w.word), []);
+  check('no duplicates',
+    WORDS.map(w => w.word).filter((w, i, a) => a.indexOf(w) !== i), []);
+  check('only letters and single spaces',
+    WORDS.filter(w => !/^[a-z]+( [a-z]+)*$/.test(w.word)).map(w => w.word), []);
+
+  /* A hint that contains the answer is not a hint. */
+  check('no hint gives the answer away',
+    WORDS.filter(w => normalise(w.hint).includes(normalise(w.word))).map(w => w.word), []);
+
+  ok('there are enough words for a long break', WORDS.length >= 60);
+}
+
 /* ── The scramble ────────────────────────────────────────────────────── */
 {
   /* Same letters, same word breaks, and NOT the original — a scramble that
