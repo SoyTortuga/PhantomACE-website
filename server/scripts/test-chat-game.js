@@ -370,6 +370,26 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
   ok('with its full window ahead of it', read(env).revealUntil > Date.now() + 5000);
 }
 
+/* ── Round length ────────────────────────────────────────────────────────
+   Three minutes, or until somebody gets it. The clock is a backstop, not a
+   pace — a correct answer must still end the round on the spot, or a long
+   timer turns every solved round into a wait. */
+{
+  const env = makeEnv();
+  await controlGame(env, 'start', {});
+  const g = read(env);
+  const minutes = (g.endsAt - g.startedAt) / 60000;
+  ok('a round runs three minutes', Math.abs(minutes - 3) < 0.01);
+
+  /* Solved after a few seconds: the round ends immediately, not in three
+     minutes' time. */
+  const before = Date.now();
+  await offerGuess(env, { userId: '7', name: 'quick', text: read(env).word });
+  const after = read(env);
+  check('a correct answer closes it at once', after.status, 'reveal');
+  ok('without waiting out the clock', after.revealUntil - before < 60000);
+}
+
 /* ── The game survives silence ───────────────────────────────────────────
    THE BUG THIS GUARDS. Rounds used to advance only on a chat message or an
    overlay poll, so a lull with no overlay open froze the game — and the

@@ -104,7 +104,14 @@
   function tick() {
     if (!state || state.status === 'idle') return;
     var left = Math.max(0, state.endsAtLocal - Date.now());
-    clockEl.textContent = state.status === 'reveal' ? '' : Math.ceil(left / 1000) + 's';
+    /* Minutes and seconds past a minute. A three-minute round counting down
+       from "180s" reads as a number rather than a clock, and nobody parses
+       "104s" as "a minute and a half left" at a glance. */
+    var secs = Math.ceil(left / 1000);
+    var label = secs >= 60
+      ? Math.floor(secs / 60) + ':' + ('0' + (secs % 60)).slice(-2)
+      : secs + 's';
+    clockEl.textContent = state.status === 'reveal' ? '' : label;
     clockEl.classList.toggle('is-low', state.status === 'running' && left < 10000);
   }
 

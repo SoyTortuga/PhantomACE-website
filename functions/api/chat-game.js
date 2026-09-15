@@ -20,8 +20,15 @@
    ══════════════════════════════════════════════ */
 
 const KEY = 'chat_scramble';
-const ROUND_MS = 45000;
-const REVEAL_MS = 8000;          // how long the answer stays up between rounds
+/* Three minutes, or until somebody gets it — a correct answer ends the
+   round on the spot, which is most of what makes the clock a backstop
+   rather than a pace. Long enough that a hard scramble is a puzzle
+   people chew on during a break rather than a reflex test. */
+const ROUND_MS = 180000;
+/* Longer than it was, to match. At forty-five seconds a round the answer
+   flashed past; at three minutes there is no hurry, and people who spent
+   the whole round on it deserve to see what it was. */
+const REVEAL_MS = 12000;
 const WIN_ENTRIES = 2;
 const MAX_SCORES = 200;
 
