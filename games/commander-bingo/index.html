@@ -161,7 +161,7 @@
       padding: 0 2px;
     }
 
-    .card-info { font-size: 11px; color: #666; }
+    .card-info { font-size: 11px; color: #fff; }
     .card-info span { color: #ff0000; }
 
     .mode-badge {
@@ -213,7 +213,11 @@
       padding: 3px;
       font-size: clamp(7px, 2.2vw, 10px);
       line-height: 1.2;
-      color: #666;
+      /* White, not grey. At 8px on a phone, #666 on near-black was legible
+         only if you already knew what it said — and an unmarked square is
+         exactly the one still being read. Marked squares stay distinct by
+         their red tint and border rather than by being brighter. */
+      color: #fff;
       transition: background 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.3s;
       position: relative;
       overflow: hidden;
@@ -245,7 +249,6 @@
     .bingo-cell.practice:not(.free):not(.marked) { cursor: pointer; }
     .bingo-cell.practice:not(.free):not(.marked):hover {
       border-color: #333;
-      color: #aaa;
       background: #0f0f0f;
     }
 
@@ -276,7 +279,7 @@
       border-radius: 4px;
     }
 
-    .score-item { font-size: 11px; color: #555; }
+    .score-item { font-size: 11px; color: #fff; }
     .score-item span { color: #fff; font-weight: bold; }
     .score-item.bingo-count span { color: #ff0000; font-size: 18px; }
 
