@@ -3,7 +3,10 @@
    Watch time tracking, levels, rewards, stats
    ══════════════════════════════════════════════ */
 
-const BOOST_RATES = { visitor: 1, follower: 1, sub_tier1: 1.33, sub_tier2: 1.67, sub_tier3: 2, broadcaster: 2 };
+/* Keyed by TIER, not by role name. Keyed by role it had no entry for
+   'moderator', so a moderator paying for Tier 1 silently got 1x instead of
+   1.33x — the lookup fell through `|| 1` and nothing anywhere said so. */
+const BOOST_RATES = [1, 1.33, 1.67, 2];
 const MAX_LEVEL = 150;
 const GRACE_DAYS = 7;
 
@@ -58,8 +61,8 @@ function isInGracePeriod(now) {
   return now.getUTCDate() <= GRACE_DAYS;
 }
 
-function getBoostRate(role) {
-  return BOOST_RATES[role] || 1;
+function getBoostRate(session) {
+  return BOOST_RATES[getSubTier(session)] || 1;
 }
 
 /* ── Live-status gate ──────────────────────────
@@ -76,7 +79,16 @@ async function isChannelLive(env) {
   return (await getStreamInfo(env)).live;
 }
 
-function getSubTier(role) {
+/* Reads the session's own subTier. Deriving it from `role` was the bug:
+   role is a display ladder on which moderator outranks every sub tier, so a
+   subscribing moderator derived to 0 and lost the boost they pay for.
+
+   The role fallback is for cookies issued before subTier existed; those are
+   upgraded the next time /api/auth/recheck-roles runs, which this page calls
+   on load. */
+function getSubTier(session) {
+  if (session && typeof session.subTier === 'number') return session.subTier;
+  const role = session && session.role;
   if (role === 'sub_tier1') return 1;
   if (role === 'sub_tier2') return 2;
   if (role === 'sub_tier3' || role === 'broadcaster') return 3;
@@ -134,8 +146,8 @@ export async function onRequestGet(context) {
   if (action === 'status') {
     const data = await getUserData(env, session.user_id, mk);
     const allTime = await getAllTimeStats(env, session.user_id);
-    const boostRate = getBoostRate(session.role);
-    const subTier = getSubTier(session.role);
+    const boostRate = getBoostRate(session);
+    const subTier = getSubTier(session);
 
     let prevData = null;
     if (isInGracePeriod(now)) {
@@ -264,7 +276,7 @@ async function handleHeartbeat(env, session, mk, now) {
     reason = 'gap';
   } else {
     const elapsed = Math.min(gap, MAX_GAP) / 3600000;
-    const boosted = elapsed * getBoostRate(session.role);
+    const boosted = elapsed * getBoostRate(session);
     data.hours = Math.min(data.hours + boosted, MAX_LEVEL);
     data.level = Math.min(Math.floor(data.hours), MAX_LEVEL);
 
@@ -295,7 +307,7 @@ async function handleHeartbeat(env, session, mk, now) {
     /* What this beat did, for the accrual indicator. */
     reason,
     creditedSeconds,
-    boostRate: getBoostRate(session.role),
+    boostRate: getBoostRate(session),
     /* So the page can say when to expect the next one instead of leaving a
        viewer wondering whether anything is still happening. */
     nextBeatMs: INTERVAL,

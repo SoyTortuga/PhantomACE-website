@@ -96,6 +96,13 @@ export async function onRequestGet(context) {
     }
 
     let role = 'visitor';
+    /* Sub tier is its own fact, not something to read back out of `role`.
+       They are INDEPENDENT: a moderator can be a Tier 1 subscriber, and
+       encoding both in one string meant whichever was written last erased
+       the other. Being made a moderator was silently costing people their
+       subscriber benefits — a 1x Phamily Time boost instead of 1.33x, and
+       three Dino Park incubator slots instead of six. */
+    let subTier = 0;
     let followedAt = null;
     let subscribedAt = null;
     let subExpiresAt = null;
@@ -110,6 +117,7 @@ export async function onRequestGet(context) {
        through. A name is not an identity. */
     if (broadcasterId && String(user.id) === String(broadcasterId)) {
       role = 'broadcaster';
+      subTier = 3;                 // the broadcaster gets every sub benefit
     } else if (broadcasterId) {
       try {
         const followRes = await fetch(
@@ -149,9 +157,9 @@ export async function onRequestGet(context) {
           if (subData.data?.length > 0) {
             const sub = subData.data[0];
             const tier = sub.tier;
-            if (tier === '3000') role = 'sub_tier3';
-            else if (tier === '2000') role = 'sub_tier2';
-            else role = 'sub_tier1';
+            if (tier === '3000') { role = 'sub_tier3'; subTier = 3; }
+            else if (tier === '2000') { role = 'sub_tier2'; subTier = 2; }
+            else { role = 'sub_tier1'; subTier = 1; }
           }
         }
       } catch {}
@@ -169,6 +177,9 @@ export async function onRequestGet(context) {
       try {
         const { getModerators } = await import('../admin/moderators.js');
         const { userIds } = await getModerators(env);
+        /* Only `role` changes here. subTier is deliberately left alone — the
+           whole point of keeping it separate is that becoming a moderator
+           does not stop someone being a subscriber. */
         if (userIds.includes(String(user.id))) role = 'moderator';
       } catch { /* a failure here must not block a login */ }
     }
@@ -179,6 +190,10 @@ export async function onRequestGet(context) {
       profile_image: user.profile_image_url,
       login: user.login,
       role,
+      /* Carried separately so that role — which is a display ladder, and on
+         which moderator outranks every sub tier — cannot cost a subscribing
+         moderator the thing they are paying for. */
+      subTier,
       followedAt,
       subscribedAt,
       subExpiresAt,

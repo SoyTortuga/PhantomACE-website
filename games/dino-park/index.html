@@ -4308,6 +4308,15 @@ function getPlayerSession() {
    left the broadcaster on subTier 0 — the base 3 incubator slots rather than
    12, despite outranking every subscriber everywhere else on the site. */
 function applySubTierFromSession(session) {
+  /* The session carries subTier as its own field now. Deriving it from
+     `role` meant a moderator who subscribes resolved to 0 — three incubator
+     slots and 10 energy instead of six and 12 — because moderator outranks
+     every sub tier on the display ladder and overwrote it.
+
+     The role branches remain as a fallback for cookies issued before the
+     field existed; /api/auth/recheck-roles reissues those on the next page
+     load that calls it. */
+  if (session && typeof session.subTier === 'number') { state.subTier = session.subTier; return; }
   if (session?.role === 'sub_tier1') state.subTier = 1;
   else if (session?.role === 'sub_tier2') state.subTier = 2;
   else if (session?.role === 'sub_tier3' || session?.role === 'broadcaster') state.subTier = 3;

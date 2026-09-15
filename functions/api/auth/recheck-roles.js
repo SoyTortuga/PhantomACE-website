@@ -102,8 +102,27 @@ export async function onRequestGet(context) {
        the current role means a failed check leaves things exactly as they
        were; only a successful check can change anything. */
     let role = session.role || 'visitor';
-    let subTier = role === 'sub_tier3' ? 3 : role === 'sub_tier2' ? 2 : role === 'sub_tier1' ? 1 : 0;
+    /* Prefer the session's own subTier. Deriving it from `role` is exactly
+       what broke moderators: role is a display ladder on which moderator
+       outranks every sub tier, so a subscribing moderator derived to 0 and
+       lost their benefits. The fallback is for cookies issued before subTier
+       existed, and is corrected by the live check below. */
+    let subTier = typeof session.subTier === 'number'
+      ? session.subTier
+      : (role === 'sub_tier3' ? 3 : role === 'sub_tier2' ? 2 : role === 'sub_tier1' ? 1 : 0);
     let verified = false;          // did ANY check actually succeed?
+
+    /* Whether they hold a rank that a subscription must not overwrite.
+       Re-read from the list rather than trusted from the cookie, so someone
+       removed as a moderator loses it here too. */
+    let privileged = role === 'broadcaster';
+    if (!privileged) {
+      try {
+        const { getModerators } = await import('../admin/moderators.js');
+        const { userIds } = await getModerators(env);
+        privileged = userIds.includes(String(session.user_id));
+      } catch { /* leave privileged false; a failure must not grant rank */ }
+    }
 
     try {
       const subRes = await fetch(
@@ -115,20 +134,37 @@ export async function onRequestGet(context) {
         const subData = await subRes.json();
         if (subData.data?.length > 0) {
           const tier = subData.data[0].tier;
-          if (tier === '3000') { role = 'sub_tier3'; subTier = 3; }
-          else if (tier === '2000') { role = 'sub_tier2'; subTier = 2; }
-          else { role = 'sub_tier1'; subTier = 1; }
+          subTier = tier === '3000' ? 3 : tier === '2000' ? 2 : 1;
+          role = subTier === 3 ? 'sub_tier3' : subTier === 2 ? 'sub_tier2' : 'sub_tier1';
         } else if (role.startsWith('sub_')) {
           /* Checked successfully and genuinely not subscribed any more. A
              downgrade here is a real result rather than a failure, so it is
              allowed to stand. */
           role = 'follower';
           subTier = 0;
+        } else {
+          /* Checked successfully, not subscribed. A privileged account keeps
+             its rank; only the tier goes. */
+          subTier = 0;
         }
       } else {
         console.warn(`[recheck-roles] subscription check unavailable (${subRes.status}) — leaving role as ${role}`);
       }
     } catch {}
+
+    /* THE FIX. Rank is re-applied AFTER the subscription check, because the
+       check above sets `role` from the subscription alone.
+
+       Without this, a moderator who subscribes was demoted to sub_tier1 the
+       moment any page called this endpoint — and Phamily Time calls it on
+       load. They logged in as a moderator, opened a page, and every
+       moderator-only control vanished, because the reissued cookie now said
+       sub_tier1. A subscription is not a demotion.
+
+       Doing it here rather than guarding the check above also means a
+       moderator whose cookie predates the change, or who was added to the
+       list since they last logged in, is corrected without logging out. */
+    if (privileged && role !== 'broadcaster') role = 'moderator';
 
     if (role === 'visitor') {
       try {
@@ -151,7 +187,7 @@ export async function onRequestGet(context) {
       return json({ role, subTier, verified: false, reason: 'Twitch role check unavailable' });
     }
 
-    const updatedSession = { ...session, role };
+    const updatedSession = { ...session, role, subTier };
     const url = new URL(request.url);
     /* Must sign, exactly as the login flow does. An unsigned cookie issued
        here would be rejected by the server's session gate on the very next
