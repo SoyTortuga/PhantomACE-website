@@ -374,12 +374,14 @@
 
     .leaderboard {
       width: 100%;
-      max-width: 450px;
+      /* Wider than it was: the prize column needs a tier select and a
+         button beside the existing four. */
+      max-width: 660px;
     }
 
     .lb-header {
       display: grid;
-      grid-template-columns: 40px 1fr 80px 80px;
+      grid-template-columns: 34px 1fr 58px 62px 172px;
       padding: 8px 12px;
       font-size: 9px;
       text-transform: uppercase;
@@ -390,7 +392,7 @@
 
     .lb-row {
       display: grid;
-      grid-template-columns: 40px 1fr 80px 80px;
+      grid-template-columns: 34px 1fr 58px 62px 172px;
       padding: 10px 12px;
       border-bottom: 1px solid #0f0f0f;
       align-items: center;
@@ -398,6 +400,47 @@
     }
 
     .lb-row:first-of-type { background: rgba(255, 0, 0, 0.05); }
+
+    /* ── Prize column ── */
+    .lb-award { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+
+    .lb-award-tier {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 10px;
+      padding: 4px 5px;
+      max-width: 104px;
+    }
+
+    .lb-award-btn {
+      background: #ff0000;
+      border: none;
+      border-radius: 3px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 5px 9px;
+      cursor: pointer;
+    }
+
+    .lb-award-btn:hover:not(:disabled) { background: #d40000; }
+    .lb-award-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .lb-award-done {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6ac46a;
+    }
+
+    .lb-award-na { font-size: 10px; color: #444; }
 
     .lb-rank {
       font-weight: bold;
@@ -515,6 +558,7 @@
         <div>Player</div>
         <div style="text-align:center">Bingos</div>
         <div style="text-align:center">Marked</div>
+        <div style="text-align:right">Prize</div>
       </div>
       <div id="lbBody"></div>
     </div>
@@ -527,6 +571,24 @@
 
   <script src="events.js"></script>
   <script>
+    /* ── Prize tiers ───────────────────────────────────────────────────────
+       Declared up here, not beside the code that uses it. A `const` in the
+       middle of the file is in its temporal dead zone until execution
+       reaches it, and awardControl() is reachable from showResults(), which
+       appears earlier — so a call that arrived before the declaration
+       evaluated threw "cannot access RARITIES before initialization" rather
+       than simply working.
+
+       Values match TIER_INFO in functions/api/bot/send-chat.js, so a mythic
+       bingo prize is worth exactly a mythic chat drop. The server is the
+       authority on the number; this list only labels the dropdown. */
+    const RARITIES = [
+      { id: 'common',   label: 'Common',   entries: 2 },
+      { id: 'uncommon', label: 'Uncommon', entries: 5 },
+      { id: 'rare',     label: 'Rare',     entries: 15 },
+      { id: 'mythic',   label: 'Mythic',   entries: 50 },
+    ];
+
     let gameCode = null;
     let calledEvents = new Set();
     let currentCat = 'all';
@@ -746,7 +808,9 @@
         const cardEvents = p.cardIds.map(id => id === 0 ? 'free' : id);
         const marked = cardEvents.filter(id => id === 'free' || calledEvents.has(id));
         const bingos = countBingos(cardEvents);
-        return { name: p.name, bingos, marked: marked.length };
+        /* The id comes through so a prize can be awarded to a player rather
+           than to a display name, which two people can share. */
+        return { id: p.id, name: p.name, bingos, marked: marked.length };
       });
 
       results.sort((a, b) => b.bingos - a.bingos || b.marked - a.marked);
@@ -786,11 +850,69 @@
           '<div class="lb-name">' + escHtml(r.name) + '</div>' +
           '<div class="lb-bingos">' + r.bingos + '</div>' +
           '<div class="lb-marked">' + r.marked + '/25</div>' +
+          awardControl(r) +
           '</div>'
         ).join('');
+        wireAwards();
       }
 
       showScreen('resultsScreen');
+    }
+
+    function awardControl(r) {
+      /* Only players with an account can be credited. A guest record from
+         before login was required has nothing to pay into. */
+      if (!r.id || !String(r.id).startsWith('u_')) {
+        return '<div class="lb-award"><span class="lb-award-na">no account</span></div>';
+      }
+      const opts = RARITIES.map(t =>
+        '<option value="' + t.id + '">' + t.label + ' · ' + t.entries + '</option>').join('');
+      return '<div class="lb-award">' +
+        '<select class="lb-award-tier" data-id="' + escAttr(r.id) + '">' + opts + '</select>' +
+        '<button class="lb-award-btn" data-id="' + escAttr(r.id) + '" data-name="' + escAttr(r.name) + '">Award</button>' +
+        '</div>';
+    }
+
+    function wireAwards() {
+      document.querySelectorAll('.lb-award-btn').forEach(btn => {
+        btn.addEventListener('click', () => awardPrize(btn));
+      });
+    }
+
+    async function awardPrize(btn) {
+      const id = btn.dataset.id;
+      const row = btn.closest('.lb-award');
+      const rarity = row.querySelector('.lb-award-tier').value;
+      const tier = RARITIES.find(t => t.id === rarity);
+
+      if (!window.confirm('Award ' + btn.dataset.name + ' a ' + tier.label +
+                          ' prize (' + tier.entries + ' giveaway entries)?')) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Awarding...';
+      try {
+        const res = await fetch('/api/bingo/award', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ code: gameCode, playerId: id, rarity }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not award it.');
+        /* Replaced rather than re-enabled: one prize per player per game,
+           and a button that comes back inviting a second click is the thing
+           the server then has to refuse. */
+        row.innerHTML = '<span class="lb-award-done">' + escHtml(tier.label) +
+                        ' · +' + data.entries + '</span>';
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Award';
+        window.alert(err.message);
+      }
+    }
+
+    function escAttr(str) {
+      return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function escHtml(str) {

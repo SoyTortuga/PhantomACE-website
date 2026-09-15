@@ -18,7 +18,8 @@
     "test-media-about": "node scripts/test-media-about.js",
     "test-roles": "node scripts/test-roles.js",
     "test-chat-game": "node scripts/test-chat-game.js",
-    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js && node scripts/test-roles.js && node scripts/test-chat-game.js"
+    "test-bingo": "node scripts/test-bingo.js",
+    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js && node scripts/test-roles.js && node scripts/test-chat-game.js && node scripts/test-bingo.js"
   },
   "engines": {
     "node": ">=20"

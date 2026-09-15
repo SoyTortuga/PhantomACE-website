@@ -4,8 +4,17 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+
+function getSession(request) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(/pham_session=([^;]+)/);
+  if (!match) return null;
+  try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
+  const session = getSession(request);
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
@@ -18,7 +27,15 @@ export async function onRequestPost(context) {
   if (!raw) return json({ error: 'Game not found' }, 404);
 
   const game = JSON.parse(raw);
+
+  /* Unauthenticated before this, so any player could end the host's game
+     mid-stream. */
+  if (!session || String(session.user_id) !== String(game.host)) {
+    return json({ error: 'Only the host can end the game.' }, 403);
+  }
+
   game.status = 'ended';
+  game.endedAt = Date.now();
 
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
   return json({ success: true, players: game.players });

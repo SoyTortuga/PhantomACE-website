@@ -18,6 +18,14 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
+  /* A host has to be someone. An anonymous host cannot be checked when a
+     prize is awarded later, and 'anonymous' as an id meant every anonymous
+     game shared one — so anybody could call events in, or end, a game they
+     had never opened. */
+  if (!session || !session.user_id) {
+    return json({ error: 'Log in with Twitch to host a game.' }, 401);
+  }
+
   const code = (body.code || '').toUpperCase().trim();
   if (!code || code.length < 3 || code.length > 6) return json({ error: 'Invalid code' }, 400);
 
@@ -27,7 +35,8 @@ export async function onRequestPost(context) {
 
   const game = {
     code,
-    host: session ? session.user_id : 'anonymous',
+    host: String(session.user_id),
+    hostName: session.display_name || '',
     status: 'active',
     calledEvents: [],
     players: [],

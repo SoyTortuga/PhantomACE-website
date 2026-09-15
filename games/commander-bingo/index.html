@@ -123,6 +123,14 @@
       background: #222;
     }
 
+    .join-gate {
+      font-size: 11px;
+      color: #aaa;
+      line-height: 1.6;
+      text-align: center;
+      max-width: 300px;
+    }
+
     .practice-btn {
       padding: 10px 24px;
       background: transparent;
@@ -511,6 +519,14 @@
       <input class="join-input code-input" id="codeInput" placeholder="CODE" maxlength="4" autocomplete="off">
       <input class="join-input" id="nameInput" placeholder="Display Name" maxlength="20" autocomplete="off">
       <button class="join-btn" id="joinBtn" onclick="joinGame()">Join Game</button>
+      <!-- Shown instead of the join button when nobody is logged in. Prizes
+           ride on identity, so a guest cannot be credited one. Practice mode
+           below stays open to everyone. -->
+      <a class="join-btn" id="bingoLoginBtn" hidden href="/api/auth/twitch">Log In with Twitch</a>
+      <p class="join-gate" id="bingoGate" hidden>
+        Commander Bingo needs a Twitch login — the host can award giveaway
+        entries to a winner, and there is no account to credit a guest.
+      </p>
       <div class="join-error" id="joinError"></div>
       <div class="divider">or</div>
       <button class="practice-btn" onclick="startPractice()">Practice Mode</button>
@@ -569,11 +585,34 @@
     </div>
   </div>
 
+  <script src="/js/session-read.js"></script>
   <script src="events.js"></script>
   <script>
     let gameMode = null;
     let gameCode = null;
     let playerName = null;
+    const phamSession = typeof readPhamSession === 'function' ? readPhamSession() : null;
+
+    /* Applied on load. Practice mode stays open to everyone — it is local
+       and pays nothing, so there is nothing to protect. */
+    document.addEventListener('DOMContentLoaded', () => {
+      const gate = document.getElementById('bingoGate');
+      const loginBtn = document.getElementById('bingoLoginBtn');
+      const joinBtn = document.getElementById('joinBtn');
+      const nameInput = document.getElementById('nameInput');
+      if (!gate) return;
+
+      if (phamSession) {
+        if (nameInput && !nameInput.value) nameInput.value = phamSession.display_name || '';
+        return;
+      }
+      gate.hidden = false;
+      joinBtn.hidden = true;
+      if (nameInput) nameInput.hidden = true;
+      loginBtn.hidden = false;
+      loginBtn.href = '/api/auth/twitch?return_to=' +
+        encodeURIComponent(window.location.pathname + window.location.search);
+    });
     let card = [];
     let markedSet = new Set();
     let previousBingos = 0;
@@ -651,6 +690,10 @@
         shakeEl('nameInput');
         return;
       }
+      if (!phamSession) {
+        errorEl.textContent = 'Log in with Twitch to join a live game.';
+        return;
+      }
 
       errorEl.textContent = '';
       gameCode = code;
@@ -665,9 +708,21 @@
         const res = await fetch('/api/bingo/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, name, guestId })
+          body: JSON.stringify({ code, name })
         });
 
+        /* A refusal is NOT a reason to drop into offline mode. Falling
+           through on any failure meant a logged-out player, or one with a
+           bad code, was quietly given a local card the host could never
+           see — they would sit there marking squares in a game nobody knew
+           they were in. */
+        if (res.status === 401 || res.status === 403 || res.status === 404) {
+          const err = await res.json().catch(() => ({}));
+          errorEl.textContent = err.error || 'Could not join that game.';
+          btn.disabled = false;
+          btn.textContent = 'Join Game';
+          return;
+        }
         if (!res.ok) throw new Error('not found');
         const data = await res.json();
         card = idsToCard(data.cardIds);

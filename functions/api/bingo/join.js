@@ -31,12 +31,23 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
-  const code = (body.code || '').toUpperCase().trim();
-  const name = (body.name || '').trim().slice(0, 30);
-  const guestId = (body.guestId || '').trim().slice(0, 40);
-  if (!code || !name) return json({ error: 'Missing code or name' }, 400);
+  /* LOGIN REQUIRED, for the same reason Mana Clash requires it: prizes ride
+     on identity. A guest id is free to mint, so a guest could take a prize
+     and come back as somebody else for another — and there is nobody to
+     credit entries to afterwards.
 
-  const playerId = session ? 'u_' + session.user_id : (guestId ? 'g_' + guestId : null);
+     It also closes a smaller hole. A player with neither a session nor a
+     guest id got id: null, and every such player collided on that one id:
+     the second one to join was handed the first one's card. */
+  if (!session || !session.user_id) {
+    return json({ error: 'Log in with Twitch to play Commander Bingo.' }, 401);
+  }
+
+  const code = (body.code || '').toUpperCase().trim();
+  const name = (body.name || '').trim().slice(0, 30) || session.display_name || 'Player';
+  if (!code) return json({ error: 'Missing code' }, 400);
+
+  const playerId = 'u_' + session.user_id;
 
   const key = `bingo_${code}`;
   const raw = await env.MARKETPLACE.get(key);
@@ -45,13 +56,11 @@ export async function onRequestPost(context) {
   const game = JSON.parse(raw);
   if (game.status === 'ended') return json({ error: 'Game has ended' }, 400);
 
-  if (playerId) {
-    const existing = game.players.find(p => p.id === playerId);
-    if (existing) {
-      if (existing.name !== name) existing.name = name;
-      await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
-      return json({ cardIds: existing.cardIds, calledEvents: game.calledEvents });
-    }
+  const existing = game.players.find(p => p.id === playerId);
+  if (existing) {
+    if (existing.name !== name) existing.name = name;
+    await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+    return json({ cardIds: existing.cardIds, calledEvents: game.calledEvents });
   }
 
   const cardIds = generateCard();
