@@ -20,11 +20,12 @@
    with the `item_code_` prefix, and on KV the list() loop needed a hardcoded
    skip to avoid treating the queue as a code record. */
 export const SINGLETONS = {
-  // leaderboards (six arrays, max 50 entries each)
+  // leaderboards (seven arrays, max 50 entries each)
   sc_leaderboard:        { table: 'singletons', expiry: 'none' },
   lb_memory_match:       { table: 'singletons', expiry: 'none' },
   lb_bingo:              { table: 'singletons', expiry: 'none' },
   lb_mana_clash:         { table: 'singletons', expiry: 'none' },
+  lb_mana_clash_wins:    { table: 'singletons', expiry: 'none' },
   lb_shell_shock:        { table: 'singletons', expiry: 'none' },
   lb_phamily_time:       { table: 'singletons', expiry: 'none' },
 

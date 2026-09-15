@@ -11,7 +11,9 @@
     "dump-kv": "node scripts/dump-kv.js",
     "load-kv": "node scripts/load-kv.js",
     "verify-migration": "node scripts/verify-migration.js",
-    "test-scoring": "node scripts/test-scoring.js"
+    "test-scoring": "node scripts/test-scoring.js",
+    "test-mana-clash": "node scripts/test-mana-clash.js",
+    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js"
   },
   "engines": {
     "node": ">=20"

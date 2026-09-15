@@ -12,7 +12,13 @@ const BOARDS = {
   'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc' },
   'memory-match':     { key: 'lb_memory_match', label: 'Best Moves',  sort: 'asc' },
   'commander-bingo':  { key: 'lb_bingo',        label: 'Bingos',      sort: 'desc' },
-  'mana-clash':       { key: 'lb_mana_clash',   label: 'High Score',  sort: 'desc' },
+  /* Both Mana Clash boards are written by the game server from the
+     finished room, never by a player's browser — see recordResult() in
+     mana-clash.js. serverOnly refuses the POST below, because a board
+     that carries a monthly prize and can be incremented with one curl
+     is not a leaderboard. */
+  'mana-clash':       { key: 'lb_mana_clash',   label: 'High Score',  sort: 'desc', serverOnly: true },
+  'mana-clash-wins':  { key: 'lb_mana_clash_wins', label: 'Wins',     sort: 'desc', mode: 'increment', serverOnly: true },
   'pham-shock':      { key: 'lb_shell_shock',  label: 'Wins',        sort: 'desc', mode: 'increment' },
   'phamily-time':     { key: 'lb_phamily_time', label: 'Hours',       sort: 'desc' },
 };
@@ -31,7 +37,8 @@ const MONTHLY_GAME_LABELS = {
   'skull-clicker':   'Skull Clicker',
   'memory-match':    'Memory Match',
   'commander-bingo': 'Commander Bingo',
-  'mana-clash':      'Mana Clash',
+  'mana-clash':      'Mana Clash High Score',
+  'mana-clash-wins': 'Mana Clash Wins',
   'pham-shock':      'PhamShock',
 };
 
@@ -175,6 +182,10 @@ export async function onRequestPost(context) {
   if (!player) return json({ error: 'Not authenticated' }, 401);
 
   const board = BOARDS[game];
+
+  if (board.serverOnly) {
+    return json({ error: 'That board is written by the game server, not by clients.' }, 403);
+  }
 
   /* Increment-mode boards (e.g. PhamShock wins) count occurrences rather
      than track a best single score — every valid POST means "this
