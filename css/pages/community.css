@@ -529,6 +529,23 @@
 }
 
 .leaderboard-panels { padding-bottom: 48px; }
+
+/* The Mana Clash tab carries two boards — most wins and highest score — so
+   each needs a heading. Every other tab has one board and no subhead. */
+.lb-subhead {
+  font-family: var(--font-gothic);
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin: 28px 0 4px;
+}
+.leaderboard-panel > .lb-subhead:first-child { margin-top: 0; }
+.lb-subnote {
+  font-size: 0.8rem;
+  color: #8a8a8a;
+  margin-bottom: 10px;
+}
 .leaderboard-panel { display: none; }
 .leaderboard-panel.active { display: block; }
 

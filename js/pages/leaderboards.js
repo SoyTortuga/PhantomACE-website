@@ -1,5 +1,8 @@
 (function () {
-  var BOARDS = ['skull-clicker', 'memory-match', 'commander-bingo', 'mana-clash', 'pham-shock'];
+  /* mana-clash-wins shares the Mana Clash TAB with mana-clash — two boards,
+     one tab — so it has no tab button of its own. */
+  var BOARDS = ['skull-clicker', 'memory-match', 'commander-bingo',
+                'mana-clash', 'mana-clash-wins', 'pham-shock'];
 
   function esc(s) {
     var d = document.createElement('div');
@@ -14,7 +17,9 @@
   }
 
   function populateBoard(game, entries) {
-    var panel = document.getElementById('board-' + game);
+    /* Scoped to the TABLE, not the panel. A panel holding two boards would
+       otherwise have the first board fill both tables' rows. */
+    var panel = document.getElementById('table-' + game) || document.getElementById('board-' + game);
     if (!panel) return;
     var rows = panel.querySelectorAll('.lb-row');
     var empty = panel.querySelector('.lb-empty');
