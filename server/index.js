@@ -166,6 +166,49 @@ async function main() {
       .catch(err => console.error('[announce]', err.message));
   }, 60000).unref();
 
+  /* ── Chat scramble ──────────────────────────────────────────────────────
+     THE GAME NEEDS A HEARTBEAT. Rounds were advanced lazily, on whatever
+     request happened to arrive — a chat message or an overlay poll. That
+     works for a room in Mana Clash, where the only people who care are the
+     ones sending the requests. It does not work here, and the failure is
+     self-reinforcing: the moment chat goes quiet with no overlay open,
+     nothing moves the clock, so the round never ends, so nothing is
+     announced, so chat has nothing to answer and stays quiet. The game ran
+     a few rounds and stopped dead at the first lull.
+
+     A game that speaks to chat on its own schedule cannot be driven only by
+     people talking to it.
+
+     The cadence follows the game: once a second while a round is live so a
+     45-second timer ends on time, and every ten seconds otherwise, which is
+     one small indexed read. An idle tick writes nothing — the mutator
+     returns undefined when there is nothing to advance. A game started while
+     idling is noticed within ten seconds, long before its first round could
+     end.
+
+     Safe as a single interval for the same reason the announcement ticker
+     above is: one process is a design requirement here, and two would
+     double-announce. */
+  let scrambleBusy = false;
+  let scrambleFast = false;
+  let scrambleTicks = 0;
+
+  setInterval(() => {
+    if (scrambleBusy) return;                     // a slow tick must not stack
+    scrambleTicks++;
+    if (!scrambleFast && scrambleTicks % 10 !== 0) return;
+
+    scrambleBusy = true;
+    import('../functions/api/chat-game.js')
+      .then(async (m) => {
+        const { game, announce } = await m.tickGame(env);
+        scrambleFast = !!(game && game.status && game.status !== 'idle');
+        for (const a of announce) await m.announceGame(env, a);
+      })
+      .catch(err => console.error('[scramble]', err.message))
+      .finally(() => { scrambleBusy = false; });
+  }, 1000).unref();
+
   /* ── Broadcast log ──────────────────────────────────────────────────────
      Records each stream as it goes live, so check-in streaks know what the
      previous broadcast was. Written here rather than on a check-in

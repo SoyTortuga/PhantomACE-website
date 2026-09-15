@@ -370,6 +370,43 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
   ok('with its full window ahead of it', read(env).revealUntil > Date.now() + 5000);
 }
 
+/* ── The game survives silence ───────────────────────────────────────────
+   THE BUG THIS GUARDS. Rounds used to advance only on a chat message or an
+   overlay poll, so a lull with no overlay open froze the game — and the
+   freeze was self-reinforcing, because a frozen game announces nothing and
+   a chat with nothing to answer stays quiet. It ran a few rounds and
+   stopped. The server now ticks it; these assert that tickGame alone,
+   with no guesses at all, carries a game through round after round. */
+{
+  const env = makeEnv();
+  await controlGame(env, 'start', {});
+
+  const words = [read(env).word];
+  const announced = [];
+
+  /* Ten rounds, nobody ever guessing. Each round is wound past its
+     deadline rather than waited out. */
+  for (let i = 0; i < 10; i++) {
+    let g = read(env);
+    g.endsAt = Date.now() - 1;
+    write(env, g);
+    announced.push(...kinds((await tickGame(env)).announce));
+
+    g = read(env);
+    g.revealUntil = Date.now() - 1;
+    write(env, g);
+    announced.push(...kinds((await tickGame(env)).announce));
+
+    words.push(read(env).word);
+  }
+
+  check('ten silent rounds still run', read(env).status, 'running');
+  check('and reach round eleven', read(env).round, 11);
+  check('every round announced its answer', announced.filter(k => k === 'timeout').length, 10);
+  check('and every new round announced itself', announced.filter(k => k === 'start').length, 10);
+  check('with no round left behind', new Set(words).size, 11);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {
