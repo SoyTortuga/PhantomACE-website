@@ -22,8 +22,14 @@
 
 import {
   normalise, isCorrect, scramble, publicState, advance,
-  offerGuess, controlGame, WORDS,
+  offerGuess, controlGame, tickGame, WORDS,
 } from '../../functions/api/chat-game.js';
+
+/* offerGuess returns a LIST of things to announce — a round timing out and
+   the next one opening arrive together — or null when there is nothing to
+   say, which is the overwhelmingly common case. */
+const kinds = (r) => (r || []).map(a => a.kind);
+const firstOf = (r, kind) => (r || []).find(a => a.kind === kind) || null;
 
 let passed = 0;
 const failures = [];
@@ -144,7 +150,7 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
       offerGuess(env, { userId: String(100 + i), name: 'p' + i, text: word }))
   );
 
-  const wins = results.filter(r => r && r.kind === 'win');
+  const wins = results.filter(r => firstOf(r, 'win'));
   check('exactly one of them wins', wins.length, 1);
   check('and the rest are told nothing', results.filter(r => r === null).length, 11);
 
@@ -197,15 +203,22 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
   write(env, game);
 
   const r = await offerGuess(env, { userId: '9', name: 'late', text: 'anything' });
-  check('a round that ran out announces the answer', r && r.kind, 'timeout');
-  check('and says what it was', r.word, game.word);
+  check('a round that ran out announces the answer', kinds(r), ['timeout']);
+  check('and says what it was', firstOf(r, 'timeout').word, game.word);
   check('the game moves to reveal', read(env).status, 'reveal');
 
   /* The reveal elapsing starts the next round, on whatever request lands. */
   const g2 = read(env);
   g2.revealUntil = Date.now() - 1;
   write(env, g2);
-  await offerGuess(env, { userId: '9', name: 'late', text: 'anything' });
+  const opened = await offerGuess(env, { userId: '9', name: 'late', text: 'anything' });
+  /* THE GAP THIS CLOSES. An auto-advanced round used to announce nothing, so
+     only round one ever reached chat. With an overlay that was a missing
+     nudge; without one — and the overlay is optional, since the bot posts
+     every scramble — the game simply stopped after the first round. */
+  check('the new round is announced to chat', kinds(opened), ['start']);
+  ok('with the scramble in it', !!firstOf(opened, 'start').display);
+  ok('and the hint', !!firstOf(opened, 'start').hint);
   const g3 = read(env);
   check('the next round starts by itself', g3.status, 'running');
   check('and it is a new round', g3.round, 2);
@@ -271,6 +284,58 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
     seen.push(read(env).word);
   }
   check('ten rounds give ten different words', new Set(seen).size, 10);
+}
+
+/* ── The clock runs without anyone typing ────────────────────────────────
+   Most of a round has nobody speaking. If only a guess could move the
+   clock, a round with no chatter would hang until someone said something. */
+{
+  const env = makeEnv();
+  await controlGame(env, 'start', {});
+  const first = read(env).word;
+
+  let g = read(env);
+  g.endsAt = Date.now() - 1;
+  write(env, g);
+
+  const t1 = await tickGame(env);
+  check('a poll closes a round that ran out', kinds(t1.announce), ['timeout']);
+  check('and says what it was', firstOf(t1.announce, 'timeout').word, first);
+
+  g = read(env);
+  g.revealUntil = Date.now() - 1;
+  write(env, g);
+
+  const t2 = await tickGame(env);
+  check('and a poll opens the next one', kinds(t2.announce), ['start']);
+  check('the game is running again', read(env).status, 'running');
+
+  /* Polled again immediately, nothing has changed and nothing is said —
+     the overlay polls once a second and must not re-announce each time. */
+  const t3 = await tickGame(env);
+  check('a poll with nothing to do says nothing', t3.announce, []);
+}
+
+{
+  /* A LATE poll must not skip the reveal. If the overlay was closed, or the
+     server was busy, a round can run out long before anything notices —
+     and closing it always grants the full reveal window rather than racing
+     straight into the next scramble. Everyone still gets to see the answer
+     they spent forty-five seconds on. */
+  const env = makeEnv();
+  await controlGame(env, 'start', {});
+  const first = read(env).word;
+
+  const g = read(env);
+  g.endsAt = Date.now() - 20000;        // ran out twenty seconds ago
+  g.revealUntil = Date.now() - 1;       // a stale value from before
+  write(env, g);
+
+  const t = await tickGame(env);
+  check('a very late poll still announces the answer', kinds(t.announce), ['timeout']);
+  check('and only the answer', firstOf(t.announce, 'timeout').word, first);
+  check('the reveal is still showing', read(env).status, 'reveal');
+  ok('with its full window ahead of it', read(env).revealUntil > Date.now() + 5000);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

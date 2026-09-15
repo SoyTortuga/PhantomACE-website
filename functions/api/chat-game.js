@@ -194,12 +194,23 @@ function endRound(game, now) {
  * rooms in Mana Clash do: a scheduler would tie game state to the lifetime
  * of the process.
  *
- * Returns { changed, closed } — `closed` is the round that just ran out of
- * time, which is the only thing the caller needs to announce.
+ * Returns { changed, closed, opened }. `closed` is a round that ran out of
+ * time; `opened` is a round that started on its own.
+ *
+ * `opened` exists because the overlay is OPTIONAL. The bot posts each
+ * scramble to chat, so the game is playable with no overlay at all — but a
+ * round that auto-advanced used to announce nothing, so only round one ever
+ * reached chat and every round after it opened in silence. With an overlay
+ * that merely meant no nudge; without one the game simply stopped after the
+ * first round.
+ *
+ * The transition happens inside the caller's lock, so exactly one caller
+ * ever sees `opened` for a given round and it cannot be announced twice.
  */
 export function advance(game, now = Date.now()) {
   let changed = false;
   let closed = null;
+  let opened = null;
 
   if (game.status === 'running' && now >= game.endsAt) {
     endRound(game, now);
@@ -208,12 +219,16 @@ export function advance(game, now = Date.now()) {
   }
 
   if (game.status === 'reveal' && now >= game.revealUntil) {
-    if (game.autoContinue) startRound(game, now);
-    else game.status = 'idle';
+    if (game.autoContinue) {
+      startRound(game, now);
+      opened = { hint: game.hint, display: game.display, round: game.round };
+    } else {
+      game.status = 'idle';
+    }
     changed = true;
   }
 
-  return { changed, closed };
+  return { changed, closed, opened };
 }
 
 function freshGame() {
@@ -222,6 +237,32 @@ function freshGame() {
     startedAt: null, endsAt: null, revealUntil: null,
     answered: [], winner: null, scores: {}, recent: [], autoContinue: true,
   };
+}
+
+/* ── The chat scramble ───────────────────────────────────────────────────
+   Announcements only, never a reply to a guess. The bot is capped at
+   roughly twenty messages per thirty seconds as a non-moderator, so a line
+   per guess would silence it within seconds of a busy round — and a
+   throttled message comes back as HTTP 200 with is_sent false, so it would
+   fail without saying so. Live state goes on the overlay instead. */
+export async function announceGame(env, announce) {
+  if (!announce) return;
+  const { sendChatMessage } = await import('./bot/send-chat.js');
+
+  if (announce.kind === 'start') {
+    await sendChatMessage(env, `Unscramble it: ${announce.display}  —  ${announce.hint}. Type your answer in chat!`);
+  } else if (announce.kind === 'win') {
+    await sendChatMessage(env, `@${announce.name} got it — ${announce.word.toUpperCase()}! +2 giveaway entries.`);
+  } else if (announce.kind === 'timeout') {
+    await sendChatMessage(env, `Time! It was ${announce.word.toUpperCase()}. Next one coming up.`);
+  } else if (announce.kind === 'skip') {
+    await sendChatMessage(env, `Skipped — it was ${announce.word.toUpperCase()}.`);
+  } else if (announce.kind === 'stop') {
+    const top = Object.values(announce.scores || {})
+      .sort((a, b) => b.points - a.points).slice(0, 3)
+      .map((s, i) => `${i + 1}. ${s.name} (${s.points})`).join('  ');
+    await sendChatMessage(env, top ? `Scramble over! ${top}` : 'Scramble over!');
+  }
 }
 
 /* ══ Called from the chat webhook ═══════════════════════════════════════ */
@@ -237,14 +278,15 @@ function freshGame() {
 export async function offerGuess(env, { userId, name, text }) {
   if (!userId) return null;
 
-  let announce = null;
+  const announce = [];
   let credited = null;
 
   await env.MARKETPLACE.mutate(KEY, (current) => {
     const game = current && current.status ? current : freshGame();
     const now = Date.now();
-    const { changed, closed } = advance(game, now);
-    if (closed) announce = { kind: 'timeout', word: closed.word };
+    const { changed, closed, opened } = advance(game, now);
+    if (closed) announce.push({ kind: 'timeout', word: closed.word });
+    if (opened) announce.push({ kind: 'start', hint: opened.hint, display: opened.display });
 
     if (game.status !== 'running') return changed ? game : undefined;
 
@@ -278,7 +320,7 @@ export async function offerGuess(env, { userId, name, text }) {
     }
 
     endRound(game, now);
-    announce = { kind: 'win', word: game.word, name, points: game.scores[id].points };
+    announce.push({ kind: 'win', word: game.word, name, points: game.scores[id].points });
     credited = { id, name };
     return game;
   });
@@ -297,7 +339,30 @@ export async function offerGuess(env, { userId, name, text }) {
     }
   }
 
-  return announce;
+  return announce.length ? announce : null;
+}
+
+/**
+ * Move the clock without a guess, and report anything chat should be told.
+ *
+ * Called from the state poll, so the game keeps running while nobody is
+ * typing — which is most of a round. Without it the clock would only ever
+ * advance when somebody spoke, and a round with no chatter would hang until
+ * one did.
+ */
+export async function tickGame(env) {
+  const announce = [];
+  let game = null;
+
+  await env.MARKETPLACE.mutate(KEY, (current) => {
+    game = current && current.status ? current : freshGame();
+    const { changed, closed, opened } = advance(game, Date.now());
+    if (closed) announce.push({ kind: 'timeout', word: closed.word });
+    if (opened) announce.push({ kind: 'start', hint: opened.hint, display: opened.display });
+    return changed ? game : undefined;
+  });
+
+  return { game, announce };
 }
 
 /* ══ Routes ═════════════════════════════════════════════════════════════ */
@@ -307,12 +372,19 @@ export async function onRequestGet(context) {
 
   /* The poll is what moves the clock. The overlay polls once a second while
      a game runs, so rounds close on time without anything scheduled. */
-  let game = null;
-  await env.MARKETPLACE.mutate(KEY, (current) => {
-    game = current && current.status ? current : freshGame();
-    const { changed } = advance(game, Date.now());
-    return changed ? game : undefined;
-  });
+  const { game, announce } = await tickGame(env);
+
+  /* The poll is also what tells chat a new round has opened, because the
+     overlay is optional and the bot's message is the only prompt a
+     chat-only game gets. Exactly one caller sees each transition — it
+     happens under the row's lock — so this cannot double-post. */
+  if (announce.length) {
+    try {
+      for (const a of announce) await announceGame(env, a);
+    } catch (err) {
+      console.error('[chat-scramble] announce failed:', err.message);
+    }
+  }
 
   return json(publicState(game));
 }

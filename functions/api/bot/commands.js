@@ -108,32 +108,6 @@ function parseCommand(event) {
   return { command, rest };
 }
 
-/* ── The chat scramble ───────────────────────────────────────────────────
-   Announcements only, never a reply to a guess. The bot is capped at
-   roughly twenty messages per thirty seconds as a non-moderator, so a line
-   per guess would silence it within seconds of a busy round — and a
-   throttled message comes back as HTTP 200 with is_sent false, so it would
-   fail without saying so. Live state goes on the overlay instead. */
-async function announceGame(env, announce) {
-  if (!announce) return;
-  const { sendChatMessage } = await import('./send-chat.js');
-
-  if (announce.kind === 'start') {
-    await sendChatMessage(env, `Unscramble it: ${announce.display}  —  ${announce.hint}. Type your answer in chat!`);
-  } else if (announce.kind === 'win') {
-    await sendChatMessage(env, `@${announce.name} got it — ${announce.word.toUpperCase()}! +2 giveaway entries.`);
-  } else if (announce.kind === 'timeout') {
-    await sendChatMessage(env, `Time! It was ${announce.word.toUpperCase()}. Next one coming up.`);
-  } else if (announce.kind === 'skip') {
-    await sendChatMessage(env, `Skipped — it was ${announce.word.toUpperCase()}.`);
-  } else if (announce.kind === 'stop') {
-    const top = Object.values(announce.scores || {})
-      .sort((a, b) => b.points - a.points).slice(0, 3)
-      .map((s, i) => `${i + 1}. ${s.name} (${s.points})`).join('  ');
-    await sendChatMessage(env, top ? `Scramble over! ${top}` : 'Scramble over!');
-  }
-}
-
 async function handleChatMessage(env, event) {
   const parsed = parseCommand(event);
 
@@ -147,12 +121,15 @@ async function handleChatMessage(env, event) {
      chatter it has already counted. */
   if (!parsed) {
     try {
-      const { offerGuess } = await import('../chat-game.js');
-      await announceGame(env, await offerGuess(env, {
+      const { offerGuess, announceGame } = await import('../chat-game.js');
+      const said = await offerGuess(env, {
         userId: event.chatter_user_id,
         name: event.chatter_user_name || event.chatter_user_login,
         text: event.message && event.message.text,
-      }));
+      });
+      /* A guess can produce more than one line — a round timing out and the
+         next one opening land together. */
+      for (const a of (said || [])) await announceGame(env, a);
     } catch (err) {
       /* A broken game must not break chat commands. */
       console.error('[chat-game]', err.message);
@@ -193,7 +170,7 @@ async function handleChatMessage(env, event) {
      Runnable from chat so the game can be started from a phone while the
      BRB screen is already up, without opening the control panel. */
   if (parsed.command === '!scramble') {
-    const { controlGame } = await import('../chat-game.js');
+    const { controlGame, announceGame } = await import('../chat-game.js');
     const word = parsed.rest.toLowerCase().split(' ')[0];
     const action = word === 'stop' ? 'stop' : word === 'skip' ? 'skip' : 'start';
     const result = await controlGame(env, action, {});
