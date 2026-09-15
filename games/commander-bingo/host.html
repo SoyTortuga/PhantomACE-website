@@ -21,6 +21,7 @@
     /* ── SCREENS ─────────────────────────── */
     .screen { display: none; width: 100%; max-width: 600px; }
     .screen.active { display: flex; flex-direction: column; }
+    #hostScreen { max-width: 1200px; }
 
     /* ── CREATE SCREEN ───────────────────── */
     .create-screen {
@@ -212,34 +213,43 @@
     .search-input:focus { border-color: #ff0000; }
     .search-input::placeholder { color: #333; }
 
-    /* ── EVENT LIST ──────────────────────── */
+    /* ── EVENT CARD GRID ─────────────────── */
     .events-list {
       flex: 1;
       overflow-y: auto;
-      max-height: calc(100vh - 300px);
+      max-height: calc(100vh - 260px);
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      align-content: start;
+      gap: 8px;
+      padding: 8px;
       border: 1px solid #1a1a1a;
       border-radius: 4px;
       background: #050505;
     }
 
-    .event-item {
+    .event-card {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid #0f0f0f;
-      transition: background 0.15s;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      background: #0a0a0a;
+      transition: border-color 0.15s, background 0.15s;
     }
 
-    .event-item:last-child { border-bottom: none; }
-    .event-item:hover { background: #0a0a0a; }
+    .event-card:hover { border-color: #333; }
 
-    .event-left {
+    .event-card.called {
+      border-color: rgba(255, 0, 0, 0.4);
+      background: rgba(152, 9, 10, 0.12);
+    }
+
+    .event-card-top {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex: 1;
-      min-width: 0;
+      gap: 6px;
     }
 
     .event-dot {
@@ -252,23 +262,14 @@
       transition: all 0.2s;
     }
 
-    .event-item.called .event-dot {
+    .event-card.called .event-dot {
       background: #ff0000;
       border-color: #ff0000;
       box-shadow: 0 0 6px rgba(255, 0, 0, 0.3);
     }
 
-    .event-text {
-      font-size: 12px;
-      color: #777;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .event-item.called .event-text { color: #fff; }
-
     .event-cat {
+      margin-left: auto;
       font-size: 8px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -281,8 +282,16 @@
     .event-cat.gameplay { color: #cc88ff; border-color: rgba(204, 136, 255, 0.2); }
     .event-cat.social { color: #ffaa00; border-color: rgba(255, 170, 0, 0.2); }
 
+    .event-text {
+      font-size: 12px;
+      color: #fff;
+      line-height: 1.35;
+      flex: 1;
+    }
+
     .event-call-btn {
-      padding: 4px 14px;
+      padding: 5px 0;
+      width: 100%;
       border-radius: 3px;
       font-size: 10px;
       font-weight: bold;
@@ -291,8 +300,7 @@
       cursor: pointer;
       transition: all 0.2s;
       font-family: inherit;
-      flex-shrink: 0;
-      margin-left: 8px;
+      margin-top: auto;
     }
 
     .btn-call {
@@ -585,14 +593,14 @@
       const list = document.getElementById('eventsList');
       list.innerHTML = BINGO_EVENTS.map(evt => {
         const isCalled = calledEvents.has(evt.id);
-        return '<div class="event-item' + (isCalled ? ' called' : '') +
+        return '<div class="event-card' + (isCalled ? ' called' : '') +
                '" data-id="' + evt.id + '" data-cat="' + evt.cat +
                '" data-text="' + evt.text.toLowerCase() + '">' +
-               '<div class="event-left">' +
+               '<div class="event-card-top">' +
                '<div class="event-dot"></div>' +
-               '<span class="event-text">' + evt.text + '</span>' +
                '<span class="event-cat ' + evt.cat + '">' + evt.cat + '</span>' +
                '</div>' +
+               '<span class="event-text">' + evt.text + '</span>' +
                '<button class="event-call-btn ' + (isCalled ? 'btn-undo' : 'btn-call') +
                '" onclick="toggleEvent(' + evt.id + ')">' +
                (isCalled ? 'Undo' : 'Call') + '</button>' +
@@ -632,7 +640,7 @@
         }
       }
 
-      const item = document.querySelector('.event-item[data-id="' + id + '"]');
+      const item = document.querySelector('.event-card[data-id="' + id + '"]');
       if (item) {
         const btn = item.querySelector('.event-call-btn');
         if (wasCalled) {
@@ -660,7 +668,7 @@
 
     function filterEvents() {
       const search = document.getElementById('searchInput').value.toLowerCase().trim();
-      document.querySelectorAll('.event-item').forEach(item => {
+      document.querySelectorAll('.event-card').forEach(item => {
         const text = item.dataset.text;
         const cat = item.dataset.cat;
         const matchSearch = !search || text.includes(search);
