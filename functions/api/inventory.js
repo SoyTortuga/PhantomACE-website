@@ -49,7 +49,15 @@ export async function onRequestGet(context) {
       result[uid] = showcaseIds
         .map(id => inv.items.find(i => i.id === id && i.type === 'badge'))
         .filter(Boolean)
-        .map(i => ({ id: i.id, name: i.name, rarity: i.rarity || 'common' }));
+        /* Artwork included so a surface showing someone's showcase can draw
+           the badge rather than a rarity glyph. It was already stored for
+           every imported Twitch badge and returned to nobody. */
+        .map(i => ({
+          id: i.id,
+          name: i.name,
+          rarity: i.rarity || 'common',
+          image: (i.meta && (i.meta.image || i.meta.imageUrl2x || i.meta.imageUrl1x)) || null,
+        }));
     }
 
     return json(result);
@@ -120,6 +128,12 @@ async function handleGrant(env, session, body) {
     quantity: body.item.quantity || 1,
     grantedAt: Date.now(),
     source: body.source || 'phamily-time',
+    /* Carried through, because meta is where a badge's ARTWORK lives —
+       `image` for a site badge, Twitch's own URLs for an imported one.
+       Dropping it here meant a granted badge could never show its art no
+       matter what the grant supplied, and the tile would silently fall back
+       to the slot emoji. */
+    meta: (body.item.meta && typeof body.item.meta === 'object') ? body.item.meta : undefined,
   });
 
   await saveInventory(env, session.user_id, inv);

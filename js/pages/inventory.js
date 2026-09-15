@@ -141,7 +141,7 @@ function renderActiveTabGrid() {
     html += `
       <div class="collection-item ${isEquipped ? 'equipped' : ''} rarity-${item.rarity || 'common'}" data-id="${escAttr(item.id)}" data-slot="${slot.slot}">
         ${isEquipped ? '<div class="wearing-pill">Wearing</div>' : ''}
-        <div class="item-icon-swatch">${slot.icon}</div>
+        ${itemSwatch(item, slot)}
         <div class="item-rarity-tag">${item.rarity || 'common'}</div>
         <div class="item-name">${escName(item.name)}</div>
         <div class="item-desc">${escName(itemDescription(item, slot))}</div>
@@ -152,6 +152,29 @@ function renderActiveTabGrid() {
   }
   html += '</div></div>';
   return html;
+}
+
+/* Artwork for an item, or null if it has none.
+   Two sources, because badges arrive two ways: imported Twitch badges bring
+   Twitch's own URLs, site-granted ones carry a local path. Both already had
+   somewhere to live in `meta` and neither was ever displayed — the tile drew
+   the SLOT's emoji, which is identical for every item in the slot, so a
+   badge with real art looked exactly like one without. */
+function itemArtwork(item) {
+  const meta = item.meta || {};
+  return meta.image || meta.imageUrl4x || meta.imageUrl2x || meta.imageUrl1x || null;
+}
+
+const BADGE_SLOT = PROFILE_SLOTS.find(s => s.slot === 'badge') || PROFILE_SLOTS[0];
+
+/* The tile face: the item's own art at 48px when it has any, otherwise the
+   slot emoji exactly as before. */
+function itemSwatch(item, slot) {
+  const art = itemArtwork(item);
+  if (!art) return `<div class="item-icon-swatch">${(slot || BADGE_SLOT).icon}</div>`;
+  return `<div class="item-icon-swatch has-art">` +
+         `<img src="${escAttr(art)}" alt="" loading="lazy">` +
+         `</div>`;
 }
 
 function itemDescription(item, slot) {
@@ -179,6 +202,7 @@ function renderShowcaseSection() {
     html += `
       <div class="collection-item showcase-item ${isSelected ? 'equipped' : ''} rarity-${item.rarity || 'common'}">
         ${isSelected ? '<div class="wearing-pill">Showing</div>' : ''}
+        ${itemSwatch(item, BADGE_SLOT)}
         <div class="item-rarity-tag">${item.rarity || 'common'}</div>
         <div class="item-name">${escName(item.name)}</div>
         <button class="pill-btn item-equip-btn" ${atMax ? 'disabled' : ''} onclick="toggleShowcaseBadge('${escAttr(item.id)}')">

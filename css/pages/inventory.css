@@ -156,6 +156,23 @@
   margin-bottom: 2px;
 }
 
+/* 48px is the display size; the file is 144px so it stays crisp at 2x and
+   3x. The height is fixed so a tile with art and a tile with an emoji line
+   up on the same grid row. */
+.item-icon-swatch.has-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  margin-bottom: 6px;
+}
+
+.item-icon-swatch.has-art img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
 .wearing-pill {
   position: absolute;
   top: 10px;
