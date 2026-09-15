@@ -4,14 +4,14 @@
    Chat is the controller, the overlay is the screen. The bot posts at most
    twice a round: one line when a round opens and one when it closes.
 
-   THE BOT DOES NOT REPLY TO PLAYERS, and that is a hard design rule rather
-   than a stylistic one. A non-moderator account is capped at roughly twenty
-   chat messages per thirty seconds, and this bot is deliberately not a
-   moderator. A game that answered each guess would hit that within seconds
-   of a busy round and then go silent — and send-chat.js already documents
-   that Twitch reports a filtered message as HTTP 200 with is_sent false, so
-   the failure would be invisible. Everything live — the scramble, the clock,
-   how many have guessed, the scoreboard — is state the overlay polls.
+   THE BOT DOES NOT REPLY TO PLAYERS. The bot account is a moderator, which
+   Twitch rates at 100 messages per 30 seconds, so the rate limit is no
+   longer the reason — but a line per guess would still bury the channel in
+   bot output during exactly the minutes people are talking, and a throttled
+   message comes back as HTTP 200 with is_sent false, so the failure would
+   be invisible if it ever did bite. Everything live — the scramble, the
+   clock, how many have guessed, the scoreboard — is state the overlay
+   polls, which costs no messages at all.
 
    THE ANSWER NEVER LEAVES THE SERVER while a round is open. publicState()
    builds what the overlay receives, and the word is not in it. The overlay
@@ -847,11 +847,11 @@ function freshGame() {
 }
 
 /* ── The chat scramble ───────────────────────────────────────────────────
-   Announcements only, never a reply to a guess. The bot is capped at
-   roughly twenty messages per thirty seconds as a non-moderator, so a line
-   per guess would silence it within seconds of a busy round — and a
-   throttled message comes back as HTTP 200 with is_sent false, so it would
-   fail without saying so. Live state goes on the overlay instead. */
+   Announcements only, never a reply to a guess. Not a rate-limit rule any
+   more — the bot is a moderator, rated at 100 messages per 30 seconds — but
+   a line per guess would bury the channel in bot output during the minutes
+   people are actually talking. Live state goes on the overlay instead,
+   which costs no messages. */
 export async function announceGame(env, announce) {
   if (!announce) return;
   const { sendChatMessage } = await import('./bot/send-chat.js');

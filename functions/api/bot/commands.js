@@ -84,9 +84,9 @@ async function handleEntriesCommand(env, event) {
   const mine = (summary.you && summary.you.entries) || 0;
   const stats = await getCheckinStats(env, userId);
 
-  /* No link. This fires many times a stream, and a bot posting a URL on
-     every reply is both spammy and the thing a non-moderator link filter
-     blocks — which would make the command fail silently for everyone. */
+  /* No link. The bot is a moderator now, so a link filter would not block
+     it — but this fires many times a stream, and a URL on every reply is
+     still noise nobody asked for. */
   let msg = `@${name} — ${mine} ${mine === 1 ? 'entry' : 'entries'} in this month's giveaway`;
   if (stats.streak > 0) {
     msg += ` · ${stats.streak}-stream check-in streak`;

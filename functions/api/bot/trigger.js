@@ -54,7 +54,7 @@ export async function onRequestPost(context) {
   const actor = session.display_name || 'broadcaster';
 
   if (body.action === 'drop') {
-    const result = await dropCodeAction(env, body.rarity, actor);
+    const result = await dropCodeAction(env, body.rarity, actor, { count: body.count });
     return json(result, result.success ? 200 : 400);
   }
 

@@ -256,6 +256,13 @@ async function fireBotAction(payload, button) {
          chat" then would be the same lie sendChatMessage used to tell. */
       if (data.sent === false) {
         showBotStatus('Code created, but Twitch did not post it to chat — check AutoMod and the link filter.', true);
+      } else if (payload.action === 'drop' && data.codes && data.codes.length > 1) {
+        /* Says how many actually went out, not how many were asked for. A
+           pool that ran dry midway is the one thing worth knowing here, and
+           reporting the request rather than the result would hide it. */
+        var note = data.codes.length + ' codes dropped to chat.';
+        if (data.short) note += ' Pool ran out ' + data.short + ' short.';
+        showBotStatus(note, !!data.short);
       } else {
         showBotStatus(messages[payload.action] || 'Done.', false);
       }
@@ -562,7 +569,9 @@ function initGiveawayPanel() {
 function initBotControlPanel() {
   document.querySelectorAll('.bot-drop-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      fireBotAction({ action: 'drop', rarity: btn.dataset.rarity }, btn);
+      var countEl = document.getElementById('botDropCount');
+      var count = countEl ? Math.max(1, Math.min(10, parseInt(countEl.value, 10) || 1)) : 1;
+      fireBotAction({ action: 'drop', rarity: btn.dataset.rarity, count: count }, btn);
     });
   });
 

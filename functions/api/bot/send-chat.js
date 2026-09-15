@@ -21,7 +21,23 @@ const ACTION_LOG_KEY = 'bot_action_log';
 const ACTION_LOG_MAX = 20;
 const ACTION_LOG_TTL = 604800; // 7 days
 
-const DROP_COOLDOWN_SECONDS = 15;
+/* Half a second. The bot account is a MODERATOR, which Twitch rates at 100
+   messages per 30 seconds rather than the 20 a normal account gets — so the
+   floor here is about 0.3s and this leaves headroom.
+
+   It is not zero, and should not be: each drop pulls from a finite code
+   pool, and a held-down button with no gate at all empties a rarity in
+   seconds with nothing to confirm it. The cooldown stopped being about the
+   rate limit and became about the pool.
+
+   DEPENDS ON THE BOT STAYING A MODERATOR. If that is ever revoked the limit
+   silently drops back to 20/30s, and Twitch reports a throttled message as
+   HTTP 200 with is_sent false — so drops would vanish from chat while the
+   panel reported success. */
+const DROP_COOLDOWN_SECONDS = 0.5;
+/* Left at 15. Item codes come from a hand-curated queue rather than a pool
+   of interchangeable codes, so firing them off rapidly burns through
+   prepared rewards in the wrong order with no way back. */
 const DROPITEM_COOLDOWN_SECONDS = 15;
 const ANNOUNCE_COOLDOWN_SECONDS = 5;
 const ANNOUNCE_MAX_LENGTH = 450;
@@ -91,7 +107,7 @@ export async function sendChatMessage(env, message) {
      successful send: the panel said "Code dropped to chat", the action log
      recorded it, and chat showed nothing. That mattered little while the bot
      was the broadcaster, who is exempt from all of it. It matters a great
-     deal for a bot account that is not a moderator — and every drop message
+     deal for a bot account without moderator status — and every drop message
      contains a phantomace.tv link, which is exactly what those filters
      catch. */
   let result = null;
@@ -212,6 +228,25 @@ export async function getBotActionLog(env) {
 /* ── Shared actions — used by both commands.js
    (chat-triggered) and trigger.js (panel-triggered) ── */
 
+export const MAX_DROP_COUNT = 10;
+
+/**
+ * Drop one or more giveaway codes.
+ *
+ * ONE MESSAGE PER CODE, not one message listing several. A line carrying
+ * four codes is one thing to miss: it scrolls past as a single unit, and a
+ * viewer who was typing when it landed has lost all four. Separate messages
+ * each get their own moment in chat, and with a moderator bot at 100
+ * messages per 30 seconds there is no reason to economise.
+ *
+ * `count` consumes ONE cooldown for the whole action rather than one per
+ * code — the gate exists to stop a held button draining a pool, and a
+ * deliberate request for five codes is a single decision.
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.count]    how many codes, 1..MAX_DROP_COUNT
+ * @param {string} [opts.headline] why it fired, for milestone drops
+ */
 export async function dropCodeAction(env, rarity, actorLabel, opts = {}) {
   const tier = (rarity || '').toLowerCase();
   const info = TIER_INFO[tier];
@@ -219,41 +254,75 @@ export async function dropCodeAction(env, rarity, actorLabel, opts = {}) {
     return { success: false, error: `Unknown rarity "${rarity}". Use common, uncommon, rare, or mythic.` };
   }
 
+  /* Anything unusable means ONE, never the maximum. Infinity survives a
+     plain min/max and comes out as 10 — and a broken caller that asks for
+     "as many as possible" should not be handed the most expensive answer. */
+  const asked = Number(opts.count);
+  const requested = Number.isFinite(asked)
+    ? Math.max(1, Math.min(MAX_DROP_COUNT, Math.floor(asked)))
+    : 1;
+
   const canProceed = await checkAndSetCooldown(env, 'bot_cooldown_drop', DROP_COOLDOWN_SECONDS);
   if (!canProceed) {
-    return { success: false, error: 'Drop is on cooldown — try again in a few seconds.' };
+    return { success: false, error: 'Drop is on cooldown — try again in a moment.' };
   }
 
-  const code = await pullGiveawayCode(env, tier);
-  if (!code) {
+  /* Pull everything first. A pool that runs dry midway then yields fewer
+     codes than asked for, which is reported rather than passed off as the
+     number requested — "I asked for five and got three" is only confusing
+     if nothing says so. */
+  const codes = [];
+  for (let i = 0; i < requested; i++) {
+    const code = await pullGiveawayCode(env, tier);
+    if (!code) break;
+    codes.push(code);
+  }
+
+  if (codes.length === 0) {
     return { success: false, error: `No codes left in the ${tier} pool.` };
   }
 
-  /* Register it before announcing it. Announce-then-register would leave a
-     window where the fastest viewer in chat gets "that code is not valid",
-     which is the worst possible first impression of a drop. */
+  /* Register before announcing. Announce-then-register would leave a window
+     where the fastest viewer in chat gets "that code is not valid", which is
+     the worst possible first impression of a drop. */
   const { registerDropCode } = await import('../giveaway-entries.js');
-  await registerDropCode(env, code, tier, info.entries, { source: 'manual' });
+  for (const code of codes) {
+    await registerDropCode(env, code, tier, info.entries, { source: 'manual' });
+  }
 
   /* Optional headline so a milestone drop can say WHY it fired — "thanks for
      the sub" reads very differently from a bare BONUS DROP, and the reason is
      the whole point of tying a drop to an event. */
   const headline = (opts.headline || 'BONUS DROP!').slice(0, 120);
 
-  const msg = `${info.emoji} ${headline} ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
-    `${info.entries} bonus entries! Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
-
-  const sent = await sendChatMessage(env, msg);
+  let sentCount = 0;
+  for (const code of codes) {
+    const msg = `${info.emoji} ${headline} ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
+      `${info.entries} bonus entries! Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
+    if (await sendChatMessage(env, msg)) sentCount++;
+  }
 
   await logBotAction(env, {
     type: 'drop',
     rarity: tier,
-    code,
+    code: codes.join(', '),
+    count: codes.length,
     actor: actorLabel || 'unknown',
-    sent,
+    sent: sentCount === codes.length,
   });
 
-  return { success: true, rarity: tier, code, sent, expiresAt: Date.now() + (CODE_EXPIRY_SECONDS * 1000) };
+  return {
+    success: true,
+    rarity: tier,
+    code: codes[0],
+    codes,
+    requested,
+    /* Told plainly when the pool could not cover the request. */
+    short: codes.length < requested ? requested - codes.length : 0,
+    sent: sentCount === codes.length,
+    sentCount,
+    expiresAt: Date.now() + (CODE_EXPIRY_SECONDS * 1000),
+  };
 }
 
 /* Drops an item code — either a specific one (`code` given) or the next

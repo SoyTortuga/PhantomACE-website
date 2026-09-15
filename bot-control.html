@@ -54,7 +54,10 @@
 
       <div class="card bot-section">
         <h2>Drop a Code</h2>
-        <p class="bot-section-desc">Pulls the next code from that tier's pool and posts it to chat, same as a hype train drop.</p>
+        <p class="bot-section-desc">Pulls codes from that tier's pool and posts them to chat, one message each, same as a hype train drop.</p>
+        <label class="bot-drop-count">How many
+          <input type="number" id="botDropCount" min="1" max="10" value="1">
+        </label>
         <div class="bot-tier-buttons">
           <button class="btn-secondary bot-drop-btn" data-rarity="common">Common</button>
           <button class="btn-secondary bot-drop-btn" data-rarity="uncommon">Uncommon</button>

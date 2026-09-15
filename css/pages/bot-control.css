@@ -669,6 +669,36 @@
 
 /* ── Dino egg drop ─────────────────────────── */
 
+/* How many codes one drop sends. Each goes out as its own chat message —
+   a line carrying four codes is one thing to miss, and the bot account is a
+   moderator, so the message budget is not the constraint it was. */
+.bot-drop-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bot-drop-count input {
+  width: 62px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-pri);
+  font-family: var(--font-system);
+  font-size: 0.9rem;
+  padding: 5px 8px;
+}
+
+.bot-drop-count input:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
 .bot-egg-mutation {
   display: inline-flex;
   align-items: center;

@@ -146,14 +146,25 @@ async function handleHypeTrainProgress(env, event) {
     });
   }
 
-  const codeList = codes.join(' | ');
-  const plural = codes.length > 1 ? 'codes' : 'code';
-  const msg = `${reward.emoji} HYPE TRAIN LEVEL ${level}! ${reward.emoji} ` +
-    `${codes.length} bonus ${plural}: ${codeList} — ` +
-    `${reward.entries} bonus entries each! ` +
-    `Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
+  /* ONE MESSAGE PER CODE. These used to go out pipe-joined on a single line
+     — "4 bonus codes: ABC1 | DEF2 | GHI3 | JKL4" — which made all four of
+     them one thing to miss: the line scrolls past as a unit, and a viewer
+     who happened to be typing lost the lot. A level 5 train drops four
+     commons, so that was four rewards riding on one glance at chat.
 
-  await sendChatMessage(env, msg);
+     Affordable because the bot account is a moderator, which Twitch rates
+     at 100 messages per 30 seconds; four is nothing against that. The first
+     line carries the level announcement, the rest are bare codes so the
+     train does not shout four times. */
+  for (let i = 0; i < codes.length; i++) {
+    const lead = i === 0
+      ? `${reward.emoji} HYPE TRAIN LEVEL ${level}! ${reward.emoji} `
+      : '';
+    const msg = `${lead}${reward.rarity.toUpperCase()} code: ${codes[i]} — ` +
+      `${reward.entries} bonus entries! ` +
+      `Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
+    await sendChatMessage(env, msg);
+  }
 }
 
 async function handleHypeTrainBegin(env, event) {
