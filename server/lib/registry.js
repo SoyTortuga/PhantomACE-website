@@ -31,6 +31,7 @@ export const SINGLETONS = {
 
   media_index:           { table: 'singletons', expiry: 'none' },
   about_content:         { table: 'singletons', expiry: 'none' },
+  chat_scramble:         { table: 'singletons', expiry: 'none' },
   item_code_queue:       { table: 'singletons', expiry: 'none' },
   bridge_pending_actions:{ table: 'singletons', expiry: 'none' },
   eventsub_subscriptions:{ table: 'singletons', expiry: 'none' },

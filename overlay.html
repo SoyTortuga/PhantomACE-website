@@ -24,6 +24,24 @@
        banner because one poll blipped. -->
   <div class="ov-fault" id="ovFault" hidden>overlay disconnected</div>
 
+  <!-- The chat scramble. Hidden entirely while no game is running, so this
+       overlay stays a transparent alert layer the rest of the time and can
+       live in every scene rather than only the BRB one. -->
+  <div class="ov-scramble" id="ovScramble" hidden>
+    <div class="ov-sc-head">
+      <span class="ov-sc-label">Unscramble</span>
+      <span class="ov-sc-round" id="ovScRound"></span>
+      <span class="ov-sc-clock" id="ovScClock"></span>
+    </div>
+    <div class="ov-sc-word" id="ovScWord"></div>
+    <div class="ov-sc-hint" id="ovScHint"></div>
+    <div class="ov-sc-foot">
+      <span class="ov-sc-answered" id="ovScAnswered"></span>
+      <ol class="ov-sc-scores" id="ovScScores"></ol>
+    </div>
+  </div>
+
   <script src="/js/pages/overlay.js" defer></script>
+  <script src="/js/pages/overlay-scramble.js" defer></script>
 </body>
 </html>

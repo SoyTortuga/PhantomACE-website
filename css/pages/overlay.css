@@ -219,3 +219,131 @@ html, body {
 .ov-mark.is-fallback {
   border-radius: 4px;
 }
+
+/* ══ CHAT SCRAMBLE ═══════════════════════════════════════════════════════
+   A standing panel, not an alert. It sits bottom-left so it never collides
+   with the alert stage, and it is hidden entirely between games so this
+   overlay can live in every scene rather than only the BRB one. */
+
+.ov-scramble {
+  position: fixed;
+  left: 48px;
+  bottom: 48px;
+  width: min(620px, 46vw);
+  padding: 22px 26px 20px;
+  background: rgba(10, 10, 10, 0.96);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 0, 0, 0.55);
+  border-radius: 12px;
+  color: #fff;
+}
+
+.ov-sc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ov-sc-label {
+  font-family: 'GodOfWar', 'Cinzel Decorative', serif;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ff0000;
+}
+
+.ov-sc-round {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+}
+
+.ov-sc-clock {
+  margin-left: auto;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.ov-sc-clock.is-low { color: #ffb300; }
+
+/* Loose tiles rather than a word: a scramble set as ordinary text reads as
+   a typo, which is the wrong invitation. */
+.ov-sc-word {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.ov-sc-group {
+  display: flex;
+  gap: 6px;
+}
+
+.ov-sc-tile {
+  min-width: 46px;
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #151515;
+}
+
+/* Set by JS from the letter count — see renderWord(). */
+.ov-sc-word.is-long .ov-sc-tile { min-width: 38px; font-size: 25px; padding: 7px 3px; }
+.ov-sc-word.is-long { gap: 12px; }
+.ov-sc-word.is-tiny .ov-sc-tile { min-width: 31px; font-size: 21px; padding: 6px 2px; }
+.ov-sc-word.is-tiny { gap: 10px; }
+.ov-sc-word.is-tiny .ov-sc-group { gap: 4px; }
+
+.ov-scramble.is-reveal .ov-sc-tile {
+  border-color: rgba(255, 0, 0, 0.7);
+  background: #200404;
+  color: #ff5a5a;
+}
+
+.ov-sc-hint {
+  font-size: 15px;
+  color: #bbb;
+  font-style: italic;
+  margin-bottom: 14px;
+}
+
+.ov-sc-foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  border-top: 1px solid #262626;
+  padding-top: 10px;
+}
+
+.ov-sc-answered {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+  white-space: nowrap;
+}
+
+.ov-sc-scores {
+  display: flex;
+  gap: 14px;
+  margin-left: auto;
+  font-size: 13px;
+  list-style: none;
+}
+
+.ov-sc-scores li { display: flex; gap: 6px; }
+.ov-sc-name { color: #ddd; }
+.ov-sc-pts { color: #ff0000; font-weight: 800; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ov-scramble { backdrop-filter: none; }
+}
