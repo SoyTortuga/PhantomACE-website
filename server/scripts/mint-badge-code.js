@@ -53,6 +53,16 @@ const BADGES = {
     image: '/assets/badges/dino-park-beta.png',
     blurb: 'For everyone who broke Dino Park before it was finished.',
   },
+
+  'agate-hunt': {
+    id: 'agate-hunt',
+    game: 'profile',
+    type: 'badge',
+    name: 'Agate Hunt',
+    rarity: 'rare',
+    image: '/assets/badges/agate-hunt.png',
+    blurb: 'For everyone who came rock hunting.',
+  },
 };
 
 function arg(name, fallback = null) {
