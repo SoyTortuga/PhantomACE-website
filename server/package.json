@@ -13,7 +13,9 @@
     "verify-migration": "node scripts/verify-migration.js",
     "test-scoring": "node scripts/test-scoring.js",
     "test-mana-clash": "node scripts/test-mana-clash.js",
-    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js"
+    "test-badge-code": "node scripts/test-badge-code.js",
+    "mint-badge-code": "node scripts/mint-badge-code.js",
+    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js"
   },
   "engines": {
     "node": ">=20"

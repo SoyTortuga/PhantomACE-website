@@ -53,6 +53,14 @@ function validateItemShape(item) {
   if (item.guaranteedMutation && !(item.game === 'dino-park' && item.type === 'egg')) {
     return 'guaranteedMutation only applies to Dino Park egg items';
   }
+  /* Artwork must be a path on this site. A code record is rendered in a
+     viewer's browser, so an off-site URL here would be an image address of
+     someone else's choosing loaded by everyone who redeems. */
+  if (item.image !== undefined && item.image !== null) {
+    if (typeof item.image !== 'string' || !item.image.startsWith('/') || item.image.startsWith('//')) {
+      return 'item.image must be a site-relative path beginning with a single /';
+    }
+  }
   return null;
 }
 
@@ -235,6 +243,11 @@ export async function createItemCode(env, item, opts = {}) {
       consumable: item.consumable || false,
       quantity: item.quantity || 1,
       guaranteedMutation: item.guaranteedMutation || false,
+      /* Carried explicitly, like every other field here. Badges are the only
+         items with art of their own, and without this a badge redeemed from
+         a code lands in the inventory with nothing to draw — it falls back
+         to the slot emoji and reads as a missing asset. */
+      image: item.image || null,
     },
     active: false,
     createdAt: Date.now(),
@@ -322,6 +335,10 @@ async function handleRedeem(env, session, body) {
       quantity: record.item.quantity || 1,
       grantedAt: Date.now(),
       source: 'item-code',
+      /* meta is where the inventory looks for artwork, matching imported
+         Twitch badges. Omitted entirely when there is none, so items without
+         art keep the shape they have always had. */
+      ...(record.item.image ? { meta: { image: record.item.image } } : {}),
     });
     await saveInventory(env, userId, inv);
   }
