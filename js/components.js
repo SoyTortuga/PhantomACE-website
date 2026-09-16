@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           onclick="refreshMyRole()" title="Re-check with Twitch">Refresh</button>
                 </div>
                 <div class="account-role-msg" id="accountRoleMsg"></div>
-                <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Profile <span class="account-menu-soon">Soon</span></a>
+                <a href="/profile" class="account-menu-item" id="accountMenuProfile">Profile</a>
                 <a href="/redeem.html" class="account-menu-item">Redeems</a>
                 <a href="/inventory.html" class="account-menu-item">Inventory</a>
                 <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Settings <span class="account-menu-soon">Soon</span></a>

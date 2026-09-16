@@ -67,9 +67,65 @@ function placingIn(rows, userId, board) {
   };
 }
 
+/* ── Finding somebody ──────────────────────────────────────────────────
+   GET /api/profile?q=<term>
+
+   Matches on login and display name. Public, because a profile is public
+   and a directory nobody can search is a directory nobody can use.
+
+   Returns only what a result row needs — name and avatar — never the
+   profile itself, so searching is not a way to enumerate what people own.
+
+   Two characters minimum: one would match most of the channel and turn
+   every keystroke into a full scan. */
+async function search(env, term) {
+  const q = term.toLowerCase();
+  const rows = await env.MARKETPLACE.listValues({ prefix: 'loginidx_' });
+
+  const hits = [];
+  for (const row of rows) {
+    const login = String(row.name || '').slice('loginidx_'.length);
+    if (login.includes(q)) hits.push({ login, id: String(row.value).trim() });
+    if (hits.length >= 200) break;          // a scan, not an index — bound it
+  }
+
+  /* Exact first, then by where the match falls: "sam" should offer samii
+     before mrsamuel. */
+  hits.sort((a, b) => {
+    if (a.login === q) return -1;
+    if (b.login === q) return 1;
+    return a.login.indexOf(q) - b.login.indexOf(q) || a.login.localeCompare(b.login);
+  });
+
+  const out = [];
+  for (const hit of hits.slice(0, 10)) {
+    const p = await env.MARKETPLACE.get(`profile_${hit.id}`, 'json');
+    if (!p) continue;
+    /* The index can outlive the name it points at — see the stale-login
+       check below. A result that no longer matches is not a result. */
+    if (String(p.login || '').toLowerCase() !== hit.login) continue;
+    out.push({
+      login: p.login,
+      displayName: p.displayName || p.login,
+      avatar: p.avatar || '',
+    });
+  }
+  return out;
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
+
+  const q = (url.searchParams.get('q') || '').trim();
+  if (q) {
+    if (q.length < 2) return json({ results: [] });
+    /* Matched as a literal substring, never as a pattern: the term reaches
+       a filter here rather than a query, but keeping the charset tight
+       means it cannot become one if this is ever moved into SQL. */
+    if (!/^[a-zA-Z0-9_]{2,30}$/.test(q)) return json({ results: [] });
+    return json({ results: await search(env, q) });
+  }
 
   const userId = await resolveUserId(env, url);
   if (!userId) return json({ error: 'No such profile' }, 404);

@@ -68,6 +68,11 @@ function applyRole() {
     if (userInfo) userInfo.style.display = 'flex';
     if (userName) userName.textContent = session.display_name;
     if (menuName) menuName.textContent = session.display_name;
+    /* Point the menu at the canonical URL rather than /profile, so the link
+       someone copies out of it is the one they can share. /profile still
+       works and redirects itself, but only after the page has loaded. */
+    const menuProfile = document.getElementById('accountMenuProfile');
+    if (menuProfile && session.login) menuProfile.href = '/user/' + session.login;
     renderRoleBadge(session.role);
     if (userAvatar && session.profile_image) {
       userAvatar.src = session.profile_image;
