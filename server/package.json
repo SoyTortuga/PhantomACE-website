@@ -29,7 +29,8 @@
     "test-mtgbbb-rooms": "node scripts/test-mtgbbb-rooms.js",
     "test-mtgbbb-engagement": "node scripts/test-mtgbbb-engagement.js",
     "test-eventsub-verify": "node scripts/test-eventsub-verify.js",
-    "test-sub-badges": "node scripts/test-sub-badges.js"
+    "test-sub-badges": "node scripts/test-sub-badges.js",
+    "check-sub-months": "node scripts/check-sub-months.js"
   },
   "engines": {
     "node": ">=20"
