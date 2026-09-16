@@ -284,7 +284,7 @@ async function saveAbout(env, who, content) {
   const r = await saveAbout(env, 'broadcaster', { bioTitle: 'x'.repeat(500) });
   check('a long field is truncated to its limit', r.data.content.bioTitle.length, 60);
 
-  const ctrl = await saveAbout(env, 'broadcaster', { subtitle: 'a bc' });
+  const ctrl = await saveAbout(env, 'broadcaster', { subtitle: 'a\u0000bc' });
   check('control characters are stripped', ctrl.data.content.subtitle, 'abc');
 
   const oneLine = await saveAbout(env, 'broadcaster', { subtitle: 'one\ntwo' });
