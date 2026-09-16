@@ -1,0 +1,6175 @@
+{
+ "v": 1,
+ "cell": 128,
+ "packs": {
+  "gaming-room": "Gaming Room Interiors MegaPack"
+ },
+ "categories": {
+  "floor": {
+   "layer": "floor",
+   "tier": "basic"
+  },
+  "wall": {
+   "layer": "wall",
+   "tier": "basic"
+  },
+  "desks": {
+   "layer": "prop",
+   "tier": "basic"
+  },
+  "pc-towers": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "keyboards": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "chairs": {
+   "layer": "prop",
+   "tier": "basic"
+  },
+  "monitors": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "led-strips": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "streaming": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "shelves": {
+   "layer": "prop",
+   "tier": "basic"
+  },
+  "neon": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "sofas": {
+   "layer": "prop",
+   "tier": "basic"
+  },
+  "snacks": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "consoles": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "posters": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "rugs": {
+   "layer": "rug",
+   "tier": "basic"
+  },
+  "plants": {
+   "layer": "prop",
+   "tier": "basic"
+  },
+  "smart": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "studio-lights": {
+   "layer": "prop",
+   "tier": "unlock"
+  },
+  "decor": {
+   "layer": "prop",
+   "tier": "basic"
+  }
+ },
+ "pieces": [
+  {
+   "id": "floor-r1c1",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c2",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c3",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c4",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c5",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c6",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c7",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c8",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r1c9",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c1",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c2",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c3",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c4",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c5",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c6",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c7",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c8",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r2c9",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c1",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c2",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c3",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c4",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c5",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c6",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c7",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c8",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r3c9",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c1",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c2",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c3",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c4",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c5",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c6",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c7",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c8",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r4c9",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c1",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c2",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c3",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c4",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c5",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c6",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c7",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c8",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "floor-r5c9",
+   "pack": "gaming-room",
+   "category": "floor",
+   "layer": "floor",
+   "tier": "basic",
+   "w": 128,
+   "h": 128
+  },
+  {
+   "id": "wall-r1c1",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c2",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c3",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c4",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c5",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c6",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c7",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r1c8",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c1",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c2",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c3",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c4",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c5",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c6",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c7",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r2c8",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c1",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c2",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c3",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c4",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c5",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c6",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c7",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "wall-r3c8",
+   "pack": "gaming-room",
+   "category": "wall",
+   "layer": "wall",
+   "tier": "basic",
+   "w": 128,
+   "h": 176
+  },
+  {
+   "id": "desks-r1c1",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 221,
+   "h": 241
+  },
+  {
+   "id": "desks-r1c2",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 220,
+   "h": 242
+  },
+  {
+   "id": "desks-r1c3",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 218,
+   "h": 233
+  },
+  {
+   "id": "desks-r1c4",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 216,
+   "h": 235
+  },
+  {
+   "id": "desks-r1c5",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 222,
+   "h": 235
+  },
+  {
+   "id": "desks-r1c6",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 216,
+   "h": 235
+  },
+  {
+   "id": "desks-r2c1",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 224,
+   "h": 165
+  },
+  {
+   "id": "desks-r2c2",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 213,
+   "h": 163
+  },
+  {
+   "id": "desks-r2c3",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 202,
+   "h": 163
+  },
+  {
+   "id": "desks-r2c4",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 222,
+   "h": 165
+  },
+  {
+   "id": "desks-r2c5",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 212,
+   "h": 165
+  },
+  {
+   "id": "desks-r2c6",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 216,
+   "h": 164
+  },
+  {
+   "id": "desks-r3c1",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 229,
+   "h": 213
+  },
+  {
+   "id": "desks-r3c2",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 228,
+   "h": 215
+  },
+  {
+   "id": "desks-r3c3",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 225,
+   "h": 215
+  },
+  {
+   "id": "desks-r3c4",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 224,
+   "h": 213
+  },
+  {
+   "id": "desks-r3c5",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 228,
+   "h": 215
+  },
+  {
+   "id": "desks-r3c6",
+   "pack": "gaming-room",
+   "category": "desks",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 230,
+   "h": 210
+  },
+  {
+   "id": "pc-towers-r1c1",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 136,
+   "h": 322
+  },
+  {
+   "id": "pc-towers-r1c2",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 128,
+   "h": 322
+  },
+  {
+   "id": "pc-towers-r1c3",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 135,
+   "h": 322
+  },
+  {
+   "id": "pc-towers-r1c4",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 137,
+   "h": 322
+  },
+  {
+   "id": "pc-towers-r1c5",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 140,
+   "h": 319
+  },
+  {
+   "id": "pc-towers-r1c6",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 135,
+   "h": 323
+  },
+  {
+   "id": "pc-towers-r1c7",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 138,
+   "h": 324
+  },
+  {
+   "id": "pc-towers-r1c8",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 136,
+   "h": 319
+  },
+  {
+   "id": "pc-towers-r2c1",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 143,
+   "h": 285
+  },
+  {
+   "id": "pc-towers-r2c2",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 142,
+   "h": 284
+  },
+  {
+   "id": "pc-towers-r2c3",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 143,
+   "h": 284
+  },
+  {
+   "id": "pc-towers-r2c4",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 285
+  },
+  {
+   "id": "pc-towers-r2c5",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 155,
+   "h": 284
+  },
+  {
+   "id": "pc-towers-r2c6",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 284
+  },
+  {
+   "id": "pc-towers-r2c7",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 153,
+   "h": 284
+  },
+  {
+   "id": "pc-towers-r2c8",
+   "pack": "gaming-room",
+   "category": "pc-towers",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 152,
+   "h": 284
+  },
+  {
+   "id": "keyboards-r1c1",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 243,
+   "h": 125
+  },
+  {
+   "id": "keyboards-r1c2",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 229,
+   "h": 124
+  },
+  {
+   "id": "keyboards-r1c3",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 216,
+   "h": 124
+  },
+  {
+   "id": "keyboards-r1c4",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 221,
+   "h": 125
+  },
+  {
+   "id": "keyboards-r1c5",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 218,
+   "h": 124
+  },
+  {
+   "id": "keyboards-r1c6",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 222,
+   "h": 124
+  },
+  {
+   "id": "keyboards-r2c1",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 240,
+   "h": 127
+  },
+  {
+   "id": "keyboards-r2c2",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 223,
+   "h": 126
+  },
+  {
+   "id": "keyboards-r2c3",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 220,
+   "h": 126
+  },
+  {
+   "id": "keyboards-r2c4",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 224,
+   "h": 126
+  },
+  {
+   "id": "keyboards-r2c5",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 220,
+   "h": 126
+  },
+  {
+   "id": "keyboards-r2c6",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 223,
+   "h": 126
+  },
+  {
+   "id": "keyboards-r3c1",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 242,
+   "h": 117
+  },
+  {
+   "id": "keyboards-r3c2",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 225,
+   "h": 117
+  },
+  {
+   "id": "keyboards-r3c3",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 220,
+   "h": 117
+  },
+  {
+   "id": "keyboards-r3c4",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 230,
+   "h": 116
+  },
+  {
+   "id": "keyboards-r3c5",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 221,
+   "h": 116
+  },
+  {
+   "id": "keyboards-r3c6",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 224,
+   "h": 116
+  },
+  {
+   "id": "keyboards-r4c1",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 243,
+   "h": 130
+  },
+  {
+   "id": "keyboards-r4c2",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 225,
+   "h": 130
+  },
+  {
+   "id": "keyboards-r4c3",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 221,
+   "h": 127
+  },
+  {
+   "id": "keyboards-r4c4",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 228,
+   "h": 128
+  },
+  {
+   "id": "keyboards-r4c5",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 224,
+   "h": 127
+  },
+  {
+   "id": "keyboards-r4c6",
+   "pack": "gaming-room",
+   "category": "keyboards",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 225,
+   "h": 127
+  },
+  {
+   "id": "chairs-r1c1",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 144,
+   "h": 179
+  },
+  {
+   "id": "chairs-r1c2",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 180
+  },
+  {
+   "id": "chairs-r1c3",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 142,
+   "h": 179
+  },
+  {
+   "id": "chairs-r1c4",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 142,
+   "h": 180
+  },
+  {
+   "id": "chairs-r1c5",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 144,
+   "h": 180
+  },
+  {
+   "id": "chairs-r1c6",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 143,
+   "h": 180
+  },
+  {
+   "id": "chairs-r1c7",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 179
+  },
+  {
+   "id": "chairs-r1c8",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 144,
+   "h": 180
+  },
+  {
+   "id": "chairs-r2c1",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 137,
+   "h": 179
+  },
+  {
+   "id": "chairs-r2c2",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 180
+  },
+  {
+   "id": "chairs-r2c3",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 180
+  },
+  {
+   "id": "chairs-r2c4",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 140,
+   "h": 179
+  },
+  {
+   "id": "chairs-r2c5",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 179
+  },
+  {
+   "id": "chairs-r2c6",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 180
+  },
+  {
+   "id": "chairs-r2c7",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 180
+  },
+  {
+   "id": "chairs-r2c8",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 180
+  },
+  {
+   "id": "chairs-r3c1",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 178
+  },
+  {
+   "id": "chairs-r3c2",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 177
+  },
+  {
+   "id": "chairs-r3c3",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 140,
+   "h": 178
+  },
+  {
+   "id": "chairs-r3c4",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 178
+  },
+  {
+   "id": "chairs-r3c5",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 178
+  },
+  {
+   "id": "chairs-r3c6",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 178
+  },
+  {
+   "id": "chairs-r3c7",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 178
+  },
+  {
+   "id": "chairs-r3c8",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 177
+  },
+  {
+   "id": "chairs-r4c1",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 178
+  },
+  {
+   "id": "chairs-r4c2",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 140,
+   "h": 178
+  },
+  {
+   "id": "chairs-r4c3",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 178
+  },
+  {
+   "id": "chairs-r4c4",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 178
+  },
+  {
+   "id": "chairs-r4c5",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 178
+  },
+  {
+   "id": "chairs-r4c6",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 178
+  },
+  {
+   "id": "chairs-r4c7",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 137,
+   "h": 182
+  },
+  {
+   "id": "chairs-r4c8",
+   "pack": "gaming-room",
+   "category": "chairs",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 140,
+   "h": 178
+  },
+  {
+   "id": "monitors-r1c1",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 179,
+   "h": 183
+  },
+  {
+   "id": "monitors-r1c2",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 211,
+   "h": 178
+  },
+  {
+   "id": "monitors-r1c3",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 172,
+   "h": 220
+  },
+  {
+   "id": "monitors-r1c4",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 226,
+   "h": 178
+  },
+  {
+   "id": "monitors-r1c5",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 226,
+   "h": 184
+  },
+  {
+   "id": "monitors-r1c6",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 206,
+   "h": 212
+  },
+  {
+   "id": "monitors-r2c1",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 232,
+   "h": 168
+  },
+  {
+   "id": "monitors-r2c2",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 188,
+   "h": 188
+  },
+  {
+   "id": "monitors-r2c3",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 268,
+   "h": 158
+  },
+  {
+   "id": "monitors-r2c4",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 268,
+   "h": 168
+  },
+  {
+   "id": "monitors-r2c5",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 328,
+   "h": 173
+  },
+  {
+   "id": "monitors-r3c1",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 203,
+   "h": 191
+  },
+  {
+   "id": "monitors-r3c2",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 304,
+   "h": 165
+  },
+  {
+   "id": "monitors-r3c3",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 243,
+   "h": 198
+  },
+  {
+   "id": "monitors-r3c4",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 237,
+   "h": 190
+  },
+  {
+   "id": "monitors-r3c5",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 297,
+   "h": 192
+  },
+  {
+   "id": "monitors-r4c1",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 225,
+   "h": 168
+  },
+  {
+   "id": "monitors-r4c2",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 256,
+   "h": 158
+  },
+  {
+   "id": "monitors-r4c3",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 299,
+   "h": 158
+  },
+  {
+   "id": "monitors-r4c4",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 259,
+   "h": 181
+  },
+  {
+   "id": "monitors-r4c5",
+   "pack": "gaming-room",
+   "category": "monitors",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 307,
+   "h": 181
+  },
+  {
+   "id": "led-strips-r1c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 142,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 139,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 140,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 140,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 141,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 141,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 142,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 142,
+   "h": 140
+  },
+  {
+   "id": "led-strips-r1c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 146,
+   "h": 141
+  },
+  {
+   "id": "led-strips-r2c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 34
+  },
+  {
+   "id": "led-strips-r2c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r2c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 36
+  },
+  {
+   "id": "led-strips-r3c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 34
+  },
+  {
+   "id": "led-strips-r3c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r3c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r3c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r3c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r3c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 32
+  },
+  {
+   "id": "led-strips-r3c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 33
+  },
+  {
+   "id": "led-strips-r3c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 33
+  },
+  {
+   "id": "led-strips-r3c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 36
+  },
+  {
+   "id": "led-strips-r4c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 87,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 86,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 86,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 87,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 88,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 90,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 87,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 86,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 87,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r4c10",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 89,
+   "h": 62
+  },
+  {
+   "id": "led-strips-r5c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 98,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r5c10",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 63
+  },
+  {
+   "id": "led-strips-r6c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 76,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 76,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r6c10",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 76
+  },
+  {
+   "id": "led-strips-r7c1",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 59,
+   "h": 123
+  },
+  {
+   "id": "led-strips-r7c2",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 33,
+   "h": 120
+  },
+  {
+   "id": "led-strips-r7c3",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 34,
+   "h": 113
+  },
+  {
+   "id": "led-strips-r7c4",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 66,
+   "h": 100
+  },
+  {
+   "id": "led-strips-r7c5",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 93,
+   "h": 122
+  },
+  {
+   "id": "led-strips-r7c6",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 53,
+   "h": 107
+  },
+  {
+   "id": "led-strips-r7c7",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 40,
+   "h": 77
+  },
+  {
+   "id": "led-strips-r7c8",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 203,
+   "h": 65
+  },
+  {
+   "id": "led-strips-r7c9",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 112,
+   "h": 181
+  },
+  {
+   "id": "led-strips-r7c10",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 111,
+   "h": 181
+  },
+  {
+   "id": "led-strips-r7c11",
+   "pack": "gaming-room",
+   "category": "led-strips",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 203,
+   "h": 91
+  },
+  {
+   "id": "streaming-r1c1",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 94,
+   "h": 202
+  },
+  {
+   "id": "streaming-r1c2",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 196
+  },
+  {
+   "id": "streaming-r1c3",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 93,
+   "h": 196
+  },
+  {
+   "id": "streaming-r1c4",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 196
+  },
+  {
+   "id": "streaming-r1c5",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 195
+  },
+  {
+   "id": "streaming-r1c6",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 79,
+   "h": 185
+  },
+  {
+   "id": "streaming-r1c7",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 211,
+   "h": 179
+  },
+  {
+   "id": "streaming-r1c8",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 103,
+   "h": 177
+  },
+  {
+   "id": "streaming-r1c9",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 147,
+   "h": 205
+  },
+  {
+   "id": "streaming-r2c1",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 128,
+   "h": 84
+  },
+  {
+   "id": "streaming-r2c2",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 133,
+   "h": 89
+  },
+  {
+   "id": "streaming-r2c3",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 117,
+   "h": 119
+  },
+  {
+   "id": "streaming-r2c4",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 115,
+   "h": 139
+  },
+  {
+   "id": "streaming-r2c5",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 161,
+   "h": 115
+  },
+  {
+   "id": "streaming-r2c6",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 151,
+   "h": 113
+  },
+  {
+   "id": "streaming-r2c7",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 154,
+   "h": 96
+  },
+  {
+   "id": "streaming-r2c8",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 189,
+   "h": 157
+  },
+  {
+   "id": "streaming-r3c1",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 101,
+   "h": 159
+  },
+  {
+   "id": "streaming-r3c2",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 124,
+   "h": 147
+  },
+  {
+   "id": "streaming-r3c3",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 96,
+   "h": 170
+  },
+  {
+   "id": "streaming-r3c4",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 103,
+   "h": 192
+  },
+  {
+   "id": "streaming-r3c5",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 161,
+   "h": 137
+  },
+  {
+   "id": "streaming-r3c6",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 167
+  },
+  {
+   "id": "streaming-r3c7",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 142,
+   "h": 153
+  },
+  {
+   "id": "streaming-r3c8",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 174,
+   "h": 145
+  },
+  {
+   "id": "streaming-r4c1",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 141,
+   "h": 146
+  },
+  {
+   "id": "streaming-r4c2",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 91
+  },
+  {
+   "id": "streaming-r4c3",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 140,
+   "h": 146
+  },
+  {
+   "id": "streaming-r4c4",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 120,
+   "h": 103
+  },
+  {
+   "id": "streaming-r4c5",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 154,
+   "h": 106
+  },
+  {
+   "id": "streaming-r4c6",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 145
+  },
+  {
+   "id": "streaming-r4c7",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 178,
+   "h": 86
+  },
+  {
+   "id": "streaming-r4c8",
+   "pack": "gaming-room",
+   "category": "streaming",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 123,
+   "h": 136
+  },
+  {
+   "id": "shelves-r1c1",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 302,
+   "h": 143
+  },
+  {
+   "id": "shelves-r1c2",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 261,
+   "h": 118
+  },
+  {
+   "id": "shelves-r1c3",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 276,
+   "h": 136
+  },
+  {
+   "id": "shelves-r1c4",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 246,
+   "h": 130
+  },
+  {
+   "id": "shelves-r1c5",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 185,
+   "h": 156
+  },
+  {
+   "id": "shelves-r2c1",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 294,
+   "h": 143
+  },
+  {
+   "id": "shelves-r2c2",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 229,
+   "h": 124
+  },
+  {
+   "id": "shelves-r2c3",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 251,
+   "h": 126
+  },
+  {
+   "id": "shelves-r2c4",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 270,
+   "h": 120
+  },
+  {
+   "id": "shelves-r2c5",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 185,
+   "h": 155
+  },
+  {
+   "id": "shelves-r3c1",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 134
+  },
+  {
+   "id": "shelves-r3c2",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 245,
+   "h": 166
+  },
+  {
+   "id": "shelves-r3c3",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 240,
+   "h": 133
+  },
+  {
+   "id": "shelves-r3c4",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 222,
+   "h": 150
+  },
+  {
+   "id": "shelves-r3c5",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 240,
+   "h": 147
+  },
+  {
+   "id": "shelves-r3c6",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 110,
+   "h": 172
+  },
+  {
+   "id": "shelves-r4c1",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 64,
+   "h": 103
+  },
+  {
+   "id": "shelves-r4c2",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 68,
+   "h": 101
+  },
+  {
+   "id": "shelves-r4c3",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 99,
+   "h": 69
+  },
+  {
+   "id": "shelves-r4c4",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 73,
+   "h": 103
+  },
+  {
+   "id": "shelves-r4c5",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 154,
+   "h": 101
+  },
+  {
+   "id": "shelves-r4c6",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 45,
+   "h": 112
+  },
+  {
+   "id": "shelves-r4c7",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 115,
+   "h": 84
+  },
+  {
+   "id": "shelves-r4c8",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 74,
+   "h": 86
+  },
+  {
+   "id": "shelves-r4c9",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 50,
+   "h": 111
+  },
+  {
+   "id": "shelves-r4c10",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 78,
+   "h": 97
+  },
+  {
+   "id": "shelves-r4c11",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 61,
+   "h": 108
+  },
+  {
+   "id": "shelves-r5c1",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 103,
+   "h": 153
+  },
+  {
+   "id": "shelves-r5c2",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 103,
+   "h": 153
+  },
+  {
+   "id": "shelves-r5c3",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 111,
+   "h": 154
+  },
+  {
+   "id": "shelves-r5c4",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 109,
+   "h": 153
+  },
+  {
+   "id": "shelves-r5c5",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 105,
+   "h": 153
+  },
+  {
+   "id": "shelves-r5c6",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 108,
+   "h": 154
+  },
+  {
+   "id": "shelves-r5c7",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 120,
+   "h": 178
+  },
+  {
+   "id": "shelves-r5c8",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 120,
+   "h": 178
+  },
+  {
+   "id": "shelves-r5c9",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 118,
+   "h": 178
+  },
+  {
+   "id": "shelves-r5c10",
+   "pack": "gaming-room",
+   "category": "shelves",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 119,
+   "h": 178
+  },
+  {
+   "id": "neon-r1c1",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 188,
+   "h": 124
+  },
+  {
+   "id": "neon-r1c2",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 137,
+   "h": 140
+  },
+  {
+   "id": "neon-r1c3",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 182,
+   "h": 135
+  },
+  {
+   "id": "neon-r1c4",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 199,
+   "h": 132
+  },
+  {
+   "id": "neon-r1c5",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 140
+  },
+  {
+   "id": "neon-r1c6",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 139,
+   "h": 107
+  },
+  {
+   "id": "neon-r1c7",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 180,
+   "h": 129
+  },
+  {
+   "id": "neon-r2c1",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 167
+  },
+  {
+   "id": "neon-r2c2",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 166,
+   "h": 116
+  },
+  {
+   "id": "neon-r2c3",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 171,
+   "h": 136
+  },
+  {
+   "id": "neon-r2c4",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 188,
+   "h": 127
+  },
+  {
+   "id": "neon-r2c5",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 151,
+   "h": 139
+  },
+  {
+   "id": "neon-r2c6",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 134,
+   "h": 148
+  },
+  {
+   "id": "neon-r2c7",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 132,
+   "h": 148
+  },
+  {
+   "id": "neon-r3c1",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 141,
+   "h": 139
+  },
+  {
+   "id": "neon-r3c2",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 119,
+   "h": 144
+  },
+  {
+   "id": "neon-r3c3",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 102,
+   "h": 143
+  },
+  {
+   "id": "neon-r3c4",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 158,
+   "h": 154
+  },
+  {
+   "id": "neon-r3c5",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 168,
+   "h": 117
+  },
+  {
+   "id": "neon-r3c6",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 145,
+   "h": 134
+  },
+  {
+   "id": "neon-r3c7",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 126,
+   "h": 140
+  },
+  {
+   "id": "neon-r4c1",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 202,
+   "h": 104
+  },
+  {
+   "id": "neon-r4c2",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 127,
+   "h": 111
+  },
+  {
+   "id": "neon-r4c3",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 118
+  },
+  {
+   "id": "neon-r4c4",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 123,
+   "h": 124
+  },
+  {
+   "id": "neon-r4c5",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 126,
+   "h": 129
+  },
+  {
+   "id": "neon-r4c6",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 144
+  },
+  {
+   "id": "neon-r4c7",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 149,
+   "h": 141
+  },
+  {
+   "id": "neon-r5c1",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 215,
+   "h": 109
+  },
+  {
+   "id": "neon-r5c2",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 121,
+   "h": 124
+  },
+  {
+   "id": "neon-r5c3",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 147,
+   "h": 129
+  },
+  {
+   "id": "neon-r5c4",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 120,
+   "h": 126
+  },
+  {
+   "id": "neon-r5c5",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 217,
+   "h": 95
+  },
+  {
+   "id": "neon-r5c6",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 220,
+   "h": 106
+  },
+  {
+   "id": "neon-r5c7",
+   "pack": "gaming-room",
+   "category": "neon",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 180,
+   "h": 110
+  },
+  {
+   "id": "sofas-r1c1",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 215,
+   "h": 127
+  },
+  {
+   "id": "sofas-r1c2",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 229,
+   "h": 124
+  },
+  {
+   "id": "sofas-r1c3",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 232,
+   "h": 125
+  },
+  {
+   "id": "sofas-r1c4",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 213,
+   "h": 121
+  },
+  {
+   "id": "sofas-r1c5",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 203,
+   "h": 121
+  },
+  {
+   "id": "sofas-r1c6",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 259,
+   "h": 123
+  },
+  {
+   "id": "sofas-r2c1",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 117,
+   "h": 111
+  },
+  {
+   "id": "sofas-r2c2",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 116,
+   "h": 113
+  },
+  {
+   "id": "sofas-r2c3",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 110,
+   "h": 115
+  },
+  {
+   "id": "sofas-r2c4",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 112,
+   "h": 115
+  },
+  {
+   "id": "sofas-r2c5",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 112,
+   "h": 116
+  },
+  {
+   "id": "sofas-r2c6",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 116,
+   "h": 114
+  },
+  {
+   "id": "sofas-r2c7",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 106,
+   "h": 105
+  },
+  {
+   "id": "sofas-r2c8",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 107,
+   "h": 106
+  },
+  {
+   "id": "sofas-r3c1",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 169,
+   "h": 118
+  },
+  {
+   "id": "sofas-r3c2",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 172,
+   "h": 114
+  },
+  {
+   "id": "sofas-r3c3",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 175,
+   "h": 114
+  },
+  {
+   "id": "sofas-r3c4",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 172,
+   "h": 112
+  },
+  {
+   "id": "sofas-r3c5",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 174,
+   "h": 112
+  },
+  {
+   "id": "sofas-r3c6",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 134,
+   "h": 135
+  },
+  {
+   "id": "sofas-r3c7",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 135,
+   "h": 129
+  },
+  {
+   "id": "sofas-r4c1",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 249,
+   "h": 136
+  },
+  {
+   "id": "sofas-r4c2",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 232,
+   "h": 132
+  },
+  {
+   "id": "sofas-r4c3",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 224,
+   "h": 132
+  },
+  {
+   "id": "sofas-r4c4",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 219,
+   "h": 133
+  },
+  {
+   "id": "sofas-r4c5",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 211,
+   "h": 133
+  },
+  {
+   "id": "sofas-r4c6",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 159,
+   "h": 144
+  },
+  {
+   "id": "sofas-r5c1",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 87,
+   "h": 177
+  },
+  {
+   "id": "sofas-r5c2",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 197,
+   "h": 169
+  },
+  {
+   "id": "sofas-r5c3",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 106,
+   "h": 162
+  },
+  {
+   "id": "sofas-r5c4",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 121,
+   "h": 164
+  },
+  {
+   "id": "sofas-r5c5",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 139,
+   "h": 175
+  },
+  {
+   "id": "sofas-r5c6",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 188,
+   "h": 172
+  },
+  {
+   "id": "sofas-r5c7",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 236,
+   "h": 177
+  },
+  {
+   "id": "sofas-r5c8",
+   "pack": "gaming-room",
+   "category": "sofas",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 152,
+   "h": 202
+  },
+  {
+   "id": "snacks-r1c1",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c2",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c3",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c4",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c5",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c6",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c7",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c8",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 122
+  },
+  {
+   "id": "snacks-r1c9",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 95,
+   "h": 127
+  },
+  {
+   "id": "snacks-r1c10",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 94,
+   "h": 127
+  },
+  {
+   "id": "snacks-r1c11",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 93,
+   "h": 126
+  },
+  {
+   "id": "snacks-r1c12",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 93,
+   "h": 125
+  },
+  {
+   "id": "snacks-r1c13",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 97,
+   "h": 125
+  },
+  {
+   "id": "snacks-r2c1",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 121
+  },
+  {
+   "id": "snacks-r2c2",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 120
+  },
+  {
+   "id": "snacks-r2c3",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 121
+  },
+  {
+   "id": "snacks-r2c4",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 121
+  },
+  {
+   "id": "snacks-r2c5",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 120
+  },
+  {
+   "id": "snacks-r2c6",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 107,
+   "h": 121
+  },
+  {
+   "id": "snacks-r2c7",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 108,
+   "h": 121
+  },
+  {
+   "id": "snacks-r2c8",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 78,
+   "h": 126
+  },
+  {
+   "id": "snacks-r2c9",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 126
+  },
+  {
+   "id": "snacks-r2c10",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 128
+  },
+  {
+   "id": "snacks-r2c11",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 77,
+   "h": 126
+  },
+  {
+   "id": "snacks-r2c12",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 78,
+   "h": 126
+  },
+  {
+   "id": "snacks-r2c13",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 79,
+   "h": 126
+  },
+  {
+   "id": "snacks-r3c1",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 127
+  },
+  {
+   "id": "snacks-r3c2",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 101,
+   "h": 127
+  },
+  {
+   "id": "snacks-r3c3",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 101,
+   "h": 127
+  },
+  {
+   "id": "snacks-r3c4",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 101,
+   "h": 127
+  },
+  {
+   "id": "snacks-r3c5",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 100,
+   "h": 128
+  },
+  {
+   "id": "snacks-r3c6",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 80,
+   "h": 116
+  },
+  {
+   "id": "snacks-r3c7",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 80,
+   "h": 116
+  },
+  {
+   "id": "snacks-r3c8",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 116
+  },
+  {
+   "id": "snacks-r3c9",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 116
+  },
+  {
+   "id": "snacks-r3c10",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 116
+  },
+  {
+   "id": "snacks-r3c11",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 116
+  },
+  {
+   "id": "snacks-r3c12",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 80,
+   "h": 115
+  },
+  {
+   "id": "snacks-r3c13",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 95,
+   "h": 115
+  },
+  {
+   "id": "snacks-r4c1",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 125
+  },
+  {
+   "id": "snacks-r4c2",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 125
+  },
+  {
+   "id": "snacks-r4c3",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 125
+  },
+  {
+   "id": "snacks-r4c4",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 125
+  },
+  {
+   "id": "snacks-r4c5",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 125
+  },
+  {
+   "id": "snacks-r4c6",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 124
+  },
+  {
+   "id": "snacks-r4c7",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 80,
+   "h": 124
+  },
+  {
+   "id": "snacks-r4c8",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 124
+  },
+  {
+   "id": "snacks-r4c9",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 124
+  },
+  {
+   "id": "snacks-r4c10",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 124
+  },
+  {
+   "id": "snacks-r4c11",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 122
+  },
+  {
+   "id": "snacks-r4c12",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 83,
+   "h": 124
+  },
+  {
+   "id": "snacks-r4c13",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 82,
+   "h": 125
+  },
+  {
+   "id": "snacks-r5c1",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 70,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c2",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 71,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c3",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 71,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c4",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 70,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c5",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 71,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c6",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 70,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c7",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 69,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c8",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 70,
+   "h": 132
+  },
+  {
+   "id": "snacks-r5c9",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 71,
+   "h": 133
+  },
+  {
+   "id": "snacks-r5c10",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 75,
+   "h": 138
+  },
+  {
+   "id": "snacks-r6c1",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 105,
+   "h": 105
+  },
+  {
+   "id": "snacks-r6c2",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 103,
+   "h": 104
+  },
+  {
+   "id": "snacks-r6c3",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 104,
+   "h": 104
+  },
+  {
+   "id": "snacks-r6c4",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 104,
+   "h": 104
+  },
+  {
+   "id": "snacks-r6c5",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 90,
+   "h": 125
+  },
+  {
+   "id": "snacks-r6c6",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 87,
+   "h": 124
+  },
+  {
+   "id": "snacks-r6c7",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 86,
+   "h": 126
+  },
+  {
+   "id": "snacks-r6c8",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 85,
+   "h": 124
+  },
+  {
+   "id": "snacks-r6c9",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 85,
+   "h": 123
+  },
+  {
+   "id": "snacks-r6c10",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 121
+  },
+  {
+   "id": "snacks-r6c11",
+   "pack": "gaming-room",
+   "category": "snacks",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 180,
+   "h": 173
+  },
+  {
+   "id": "consoles-r1c1",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 169,
+   "h": 171
+  },
+  {
+   "id": "consoles-r1c2",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 166
+  },
+  {
+   "id": "consoles-r1c3",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 189,
+   "h": 164
+  },
+  {
+   "id": "consoles-r1c4",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 211,
+   "h": 156
+  },
+  {
+   "id": "consoles-r1c5",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 203,
+   "h": 155
+  },
+  {
+   "id": "consoles-r1c6",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 140,
+   "h": 164
+  },
+  {
+   "id": "consoles-r1c7",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 103,
+   "h": 182
+  },
+  {
+   "id": "consoles-r2c1",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 173,
+   "h": 87
+  },
+  {
+   "id": "consoles-r2c2",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 176,
+   "h": 82
+  },
+  {
+   "id": "consoles-r2c3",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 171,
+   "h": 105
+  },
+  {
+   "id": "consoles-r2c4",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 175,
+   "h": 108
+  },
+  {
+   "id": "consoles-r2c5",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 161,
+   "h": 130
+  },
+  {
+   "id": "consoles-r2c6",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 112
+  },
+  {
+   "id": "consoles-r2c7",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 180,
+   "h": 70
+  },
+  {
+   "id": "consoles-r3c1",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 152,
+   "h": 170
+  },
+  {
+   "id": "consoles-r3c2",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 176,
+   "h": 164
+  },
+  {
+   "id": "consoles-r3c3",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 73,
+   "h": 192
+  },
+  {
+   "id": "consoles-r3c4",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 144,
+   "h": 191
+  },
+  {
+   "id": "consoles-r3c5",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 160,
+   "h": 170
+  },
+  {
+   "id": "consoles-r3c6",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 189,
+   "h": 160
+  },
+  {
+   "id": "consoles-r3c7",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 233,
+   "h": 136
+  },
+  {
+   "id": "consoles-r4c1",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 171,
+   "h": 107
+  },
+  {
+   "id": "consoles-r4c2",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 114
+  },
+  {
+   "id": "consoles-r4c3",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 151,
+   "h": 113
+  },
+  {
+   "id": "consoles-r4c4",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 165,
+   "h": 108
+  },
+  {
+   "id": "consoles-r4c5",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 169,
+   "h": 109
+  },
+  {
+   "id": "consoles-r4c6",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 185,
+   "h": 114
+  },
+  {
+   "id": "consoles-r4c7",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 172,
+   "h": 115
+  },
+  {
+   "id": "consoles-r5c1",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 97,
+   "h": 144
+  },
+  {
+   "id": "consoles-r5c2",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 97,
+   "h": 144
+  },
+  {
+   "id": "consoles-r5c3",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 185,
+   "h": 101
+  },
+  {
+   "id": "consoles-r5c4",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 191,
+   "h": 99
+  },
+  {
+   "id": "consoles-r5c5",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 135,
+   "h": 145
+  },
+  {
+   "id": "consoles-r5c6",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 146,
+   "h": 147
+  },
+  {
+   "id": "consoles-r5c7",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 174,
+   "h": 99
+  },
+  {
+   "id": "consoles-r5c8",
+   "pack": "gaming-room",
+   "category": "consoles",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 187,
+   "h": 102
+  },
+  {
+   "id": "posters-r1c1",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 208
+  },
+  {
+   "id": "posters-r1c2",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 164,
+   "h": 208
+  },
+  {
+   "id": "posters-r1c3",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 154,
+   "h": 208
+  },
+  {
+   "id": "posters-r1c4",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 207
+  },
+  {
+   "id": "posters-r1c5",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 153,
+   "h": 207
+  },
+  {
+   "id": "posters-r1c6",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 152,
+   "h": 207
+  },
+  {
+   "id": "posters-r1c7",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 208
+  },
+  {
+   "id": "posters-r1c8",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 162,
+   "h": 207
+  },
+  {
+   "id": "posters-r2c1",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 158,
+   "h": 205
+  },
+  {
+   "id": "posters-r2c2",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 165,
+   "h": 204
+  },
+  {
+   "id": "posters-r2c3",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 154,
+   "h": 204
+  },
+  {
+   "id": "posters-r2c4",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 152,
+   "h": 204
+  },
+  {
+   "id": "posters-r2c5",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 204
+  },
+  {
+   "id": "posters-r2c6",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 155,
+   "h": 205
+  },
+  {
+   "id": "posters-r2c7",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 148,
+   "h": 204
+  },
+  {
+   "id": "posters-r2c8",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 178,
+   "h": 204
+  },
+  {
+   "id": "posters-r3c1",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 153,
+   "h": 133
+  },
+  {
+   "id": "posters-r3c2",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 157,
+   "h": 134
+  },
+  {
+   "id": "posters-r3c3",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 153,
+   "h": 133
+  },
+  {
+   "id": "posters-r3c4",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 152,
+   "h": 133
+  },
+  {
+   "id": "posters-r3c5",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 153,
+   "h": 133
+  },
+  {
+   "id": "posters-r3c6",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 134
+  },
+  {
+   "id": "posters-r3c7",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 146,
+   "h": 134
+  },
+  {
+   "id": "posters-r3c8",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 168,
+   "h": 134
+  },
+  {
+   "id": "posters-r4c1",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 121,
+   "h": 144
+  },
+  {
+   "id": "posters-r4c2",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 127,
+   "h": 143
+  },
+  {
+   "id": "posters-r4c3",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 126,
+   "h": 143
+  },
+  {
+   "id": "posters-r4c4",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 128,
+   "h": 143
+  },
+  {
+   "id": "posters-r4c5",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 186,
+   "h": 145
+  },
+  {
+   "id": "posters-r4c6",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 200,
+   "h": 146
+  },
+  {
+   "id": "posters-r4c7",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 182,
+   "h": 146
+  },
+  {
+   "id": "posters-r4c8",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 263,
+   "h": 271
+  },
+  {
+   "id": "posters-r5c1",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 112
+  },
+  {
+   "id": "posters-r5c2",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 165,
+   "h": 106
+  },
+  {
+   "id": "posters-r5c3",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 155,
+   "h": 108
+  },
+  {
+   "id": "posters-r5c4",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 181,
+   "h": 110
+  },
+  {
+   "id": "posters-r5c5",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 183,
+   "h": 110
+  },
+  {
+   "id": "posters-r5c6",
+   "pack": "gaming-room",
+   "category": "posters",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 170,
+   "h": 109
+  },
+  {
+   "id": "rugs-r1c1",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 258,
+   "h": 164
+  },
+  {
+   "id": "rugs-r1c2",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 221,
+   "h": 159
+  },
+  {
+   "id": "rugs-r1c3",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 210,
+   "h": 160
+  },
+  {
+   "id": "rugs-r1c4",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 224,
+   "h": 159
+  },
+  {
+   "id": "rugs-r1c5",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 229,
+   "h": 160
+  },
+  {
+   "id": "rugs-r1c6",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 184,
+   "h": 160
+  },
+  {
+   "id": "rugs-r2c1",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 241,
+   "h": 168
+  },
+  {
+   "id": "rugs-r2c2",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 208,
+   "h": 170
+  },
+  {
+   "id": "rugs-r2c3",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 221,
+   "h": 171
+  },
+  {
+   "id": "rugs-r2c4",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 212,
+   "h": 171
+  },
+  {
+   "id": "rugs-r2c5",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 222,
+   "h": 169
+  },
+  {
+   "id": "rugs-r2c6",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 221,
+   "h": 172
+  },
+  {
+   "id": "rugs-r3c1",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 293,
+   "h": 144
+  },
+  {
+   "id": "rugs-r3c2",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 243,
+   "h": 144
+  },
+  {
+   "id": "rugs-r3c3",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 245,
+   "h": 143
+  },
+  {
+   "id": "rugs-r3c4",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 276,
+   "h": 144
+  },
+  {
+   "id": "rugs-r3c5",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 314,
+   "h": 145
+  },
+  {
+   "id": "rugs-r4c1",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 258,
+   "h": 137
+  },
+  {
+   "id": "rugs-r4c2",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 245,
+   "h": 139
+  },
+  {
+   "id": "rugs-r4c3",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 182,
+   "h": 139
+  },
+  {
+   "id": "rugs-r4c4",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 218,
+   "h": 148
+  },
+  {
+   "id": "rugs-r4c5",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 211,
+   "h": 148
+  },
+  {
+   "id": "rugs-r4c6",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 212,
+   "h": 148
+  },
+  {
+   "id": "rugs-r5c1",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 350,
+   "h": 116
+  },
+  {
+   "id": "rugs-r5c2",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 360,
+   "h": 116
+  },
+  {
+   "id": "rugs-r5c3",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 341,
+   "h": 115
+  },
+  {
+   "id": "rugs-r5c4",
+   "pack": "gaming-room",
+   "category": "rugs",
+   "layer": "rug",
+   "tier": "basic",
+   "w": 366,
+   "h": 114
+  },
+  {
+   "id": "plants-r1c1",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 122,
+   "h": 142
+  },
+  {
+   "id": "plants-r1c2",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 127,
+   "h": 151
+  },
+  {
+   "id": "plants-r1c3",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 137,
+   "h": 155
+  },
+  {
+   "id": "plants-r1c4",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 135,
+   "h": 155
+  },
+  {
+   "id": "plants-r1c5",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 154,
+   "h": 155
+  },
+  {
+   "id": "plants-r1c6",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 144,
+   "h": 159
+  },
+  {
+   "id": "plants-r1c7",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 146,
+   "h": 165
+  },
+  {
+   "id": "plants-r1c8",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 160,
+   "h": 197
+  },
+  {
+   "id": "plants-r2c1",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 126,
+   "h": 163
+  },
+  {
+   "id": "plants-r2c2",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 154,
+   "h": 177
+  },
+  {
+   "id": "plants-r2c3",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 142,
+   "h": 158
+  },
+  {
+   "id": "plants-r2c4",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 143,
+   "h": 166
+  },
+  {
+   "id": "plants-r2c5",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 155,
+   "h": 165
+  },
+  {
+   "id": "plants-r2c6",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 147,
+   "h": 164
+  },
+  {
+   "id": "plants-r2c7",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 173,
+   "h": 176
+  },
+  {
+   "id": "plants-r2c8",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 160,
+   "h": 168
+  },
+  {
+   "id": "plants-r3c1",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 230,
+   "h": 149
+  },
+  {
+   "id": "plants-r3c2",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 236,
+   "h": 141
+  },
+  {
+   "id": "plants-r3c3",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 200,
+   "h": 138
+  },
+  {
+   "id": "plants-r3c4",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 196,
+   "h": 152
+  },
+  {
+   "id": "plants-r3c5",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 177,
+   "h": 179
+  },
+  {
+   "id": "plants-r3c6",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 235,
+   "h": 141
+  },
+  {
+   "id": "plants-r4c1",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 145,
+   "h": 216
+  },
+  {
+   "id": "plants-r4c2",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 148,
+   "h": 222
+  },
+  {
+   "id": "plants-r4c3",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 142,
+   "h": 220
+  },
+  {
+   "id": "plants-r4c4",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 229,
+   "h": 160
+  },
+  {
+   "id": "plants-r4c5",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 187,
+   "h": 188
+  },
+  {
+   "id": "plants-r4c6",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 214,
+   "h": 206
+  },
+  {
+   "id": "plants-r4c7",
+   "pack": "gaming-room",
+   "category": "plants",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 186,
+   "h": 210
+  },
+  {
+   "id": "smart-r1c1",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 161,
+   "h": 170
+  },
+  {
+   "id": "smart-r1c2",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 149,
+   "h": 165
+  },
+  {
+   "id": "smart-r1c3",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 99,
+   "h": 160
+  },
+  {
+   "id": "smart-r1c4",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 89,
+   "h": 170
+  },
+  {
+   "id": "smart-r1c5",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 222,
+   "h": 160
+  },
+  {
+   "id": "smart-r1c6",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 150,
+   "h": 160
+  },
+  {
+   "id": "smart-r1c7",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 156,
+   "h": 157
+  },
+  {
+   "id": "smart-r2c1",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 101,
+   "h": 176
+  },
+  {
+   "id": "smart-r2c2",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 122,
+   "h": 164
+  },
+  {
+   "id": "smart-r2c3",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 275,
+   "h": 102
+  },
+  {
+   "id": "smart-r2c4",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 160,
+   "h": 162
+  },
+  {
+   "id": "smart-r2c5",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 120,
+   "h": 195
+  },
+  {
+   "id": "smart-r2c6",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 98,
+   "h": 190
+  },
+  {
+   "id": "smart-r2c7",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 102,
+   "h": 146
+  },
+  {
+   "id": "smart-r3c1",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 185,
+   "h": 184
+  },
+  {
+   "id": "smart-r3c2",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 205,
+   "h": 175
+  },
+  {
+   "id": "smart-r3c3",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 112,
+   "h": 185
+  },
+  {
+   "id": "smart-r3c4",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 83,
+   "h": 189
+  },
+  {
+   "id": "smart-r3c5",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 160,
+   "h": 158
+  },
+  {
+   "id": "smart-r3c6",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 120,
+   "h": 128
+  },
+  {
+   "id": "smart-r3c7",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 136,
+   "h": 146
+  },
+  {
+   "id": "smart-r4c1",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 106,
+   "h": 124
+  },
+  {
+   "id": "smart-r4c2",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 122,
+   "h": 181
+  },
+  {
+   "id": "smart-r4c3",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 163,
+   "h": 201
+  },
+  {
+   "id": "smart-r4c4",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 160,
+   "h": 182
+  },
+  {
+   "id": "smart-r4c5",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 127,
+   "h": 205
+  },
+  {
+   "id": "smart-r4c6",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 161,
+   "h": 209
+  },
+  {
+   "id": "smart-r4c7",
+   "pack": "gaming-room",
+   "category": "smart",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 161,
+   "h": 166
+  },
+  {
+   "id": "studio-lights-r1c1",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 131,
+   "h": 208
+  },
+  {
+   "id": "studio-lights-r1c2",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 119,
+   "h": 191
+  },
+  {
+   "id": "studio-lights-r1c3",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 147,
+   "h": 160
+  },
+  {
+   "id": "studio-lights-r1c4",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 128,
+   "h": 175
+  },
+  {
+   "id": "studio-lights-r1c5",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 143,
+   "h": 167
+  },
+  {
+   "id": "studio-lights-r1c6",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 155,
+   "h": 180
+  },
+  {
+   "id": "studio-lights-r1c7",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 151,
+   "h": 196
+  },
+  {
+   "id": "studio-lights-r2c1",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 138,
+   "h": 172
+  },
+  {
+   "id": "studio-lights-r2c2",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 124,
+   "h": 162
+  },
+  {
+   "id": "studio-lights-r2c3",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 81,
+   "h": 196
+  },
+  {
+   "id": "studio-lights-r2c4",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 79,
+   "h": 196
+  },
+  {
+   "id": "studio-lights-r2c5",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 191,
+   "h": 194
+  },
+  {
+   "id": "studio-lights-r2c6",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 137,
+   "h": 182
+  },
+  {
+   "id": "studio-lights-r2c7",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 151,
+   "h": 183
+  },
+  {
+   "id": "studio-lights-r3c1",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 131,
+   "h": 159
+  },
+  {
+   "id": "studio-lights-r3c2",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 132,
+   "h": 165
+  },
+  {
+   "id": "studio-lights-r3c3",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 164,
+   "h": 161
+  },
+  {
+   "id": "studio-lights-r3c4",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 130,
+   "h": 140
+  },
+  {
+   "id": "studio-lights-r3c5",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 167,
+   "h": 139
+  },
+  {
+   "id": "studio-lights-r3c6",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 85,
+   "h": 158
+  },
+  {
+   "id": "studio-lights-r3c7",
+   "pack": "gaming-room",
+   "category": "studio-lights",
+   "layer": "prop",
+   "tier": "unlock",
+   "w": 170,
+   "h": 138
+  },
+  {
+   "id": "decor-r1c1",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 143,
+   "h": 175
+  },
+  {
+   "id": "decor-r1c2",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 125,
+   "h": 176
+  },
+  {
+   "id": "decor-r1c3",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 211,
+   "h": 178
+  },
+  {
+   "id": "decor-r1c4",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 262,
+   "h": 150
+  },
+  {
+   "id": "decor-r1c5",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 138,
+   "h": 172
+  },
+  {
+   "id": "decor-r1c6",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 236,
+   "h": 164
+  },
+  {
+   "id": "decor-r2c1",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 174,
+   "h": 144
+  },
+  {
+   "id": "decor-r2c2",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 84,
+   "h": 145
+  },
+  {
+   "id": "decor-r2c3",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 134,
+   "h": 154
+  },
+  {
+   "id": "decor-r2c4",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 238,
+   "h": 130
+  },
+  {
+   "id": "decor-r2c5",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 173,
+   "h": 136
+  },
+  {
+   "id": "decor-r2c6",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 104,
+   "h": 142
+  },
+  {
+   "id": "decor-r2c7",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 136,
+   "h": 135
+  },
+  {
+   "id": "decor-r3c1",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 81,
+   "h": 137
+  },
+  {
+   "id": "decor-r3c2",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 73,
+   "h": 121
+  },
+  {
+   "id": "decor-r3c3",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 98,
+   "h": 138
+  },
+  {
+   "id": "decor-r3c4",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 163,
+   "h": 95
+  },
+  {
+   "id": "decor-r3c5",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 72,
+   "h": 138
+  },
+  {
+   "id": "decor-r3c6",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 122,
+   "h": 114
+  },
+  {
+   "id": "decor-r3c7",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 114,
+   "h": 115
+  },
+  {
+   "id": "decor-r3c8",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 224,
+   "h": 134
+  },
+  {
+   "id": "decor-r4c1",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 131,
+   "h": 110
+  },
+  {
+   "id": "decor-r4c2",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 143,
+   "h": 110
+  },
+  {
+   "id": "decor-r4c3",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 141,
+   "h": 110
+  },
+  {
+   "id": "decor-r4c4",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 128,
+   "h": 110
+  },
+  {
+   "id": "decor-r4c5",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 239,
+   "h": 107
+  },
+  {
+   "id": "decor-r4c6",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 161,
+   "h": 122
+  },
+  {
+   "id": "decor-r4c7",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 235,
+   "h": 104
+  },
+  {
+   "id": "decor-r5c1",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 137,
+   "h": 128
+  },
+  {
+   "id": "decor-r5c2",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 152,
+   "h": 128
+  },
+  {
+   "id": "decor-r5c3",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 145,
+   "h": 128
+  },
+  {
+   "id": "decor-r5c4",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 114,
+   "h": 129
+  },
+  {
+   "id": "decor-r5c5",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 153,
+   "h": 138
+  },
+  {
+   "id": "decor-r5c6",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 182,
+   "h": 137
+  },
+  {
+   "id": "decor-r5c7",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 166,
+   "h": 138
+  },
+  {
+   "id": "decor-r5c8",
+   "pack": "gaming-room",
+   "category": "decor",
+   "layer": "prop",
+   "tier": "basic",
+   "w": 169,
+   "h": 138
+  }
+ ]
+}
