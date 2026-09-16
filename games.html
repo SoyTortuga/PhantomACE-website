@@ -162,18 +162,26 @@
         </div>
       </div>
 
-      <!-- MTGBBB — Magic: The Gathering Booster Box Bingo. The short name is
-           the real one; the long form appears once, here, so the card still
-           reads to someone who has never seen the acronym. -->
-      <div class="card game-card" style="opacity: 0.5;">
+      <!-- MTGBBB — the banner carries the full name, so the description
+           leads with what the game is rather than spelling the acronym out
+           a second time. -->
+      <div class="card game-card">
+        <div class="game-card-thumb">
+          <img src="/assets/images/game-mtgbbb.png" alt="MTGBBB — Magic: The Gathering Booster Box Bingo">
+          <div class="game-card-thumb-overlay"></div>
+        </div>
         <div class="game-card-body">
           <div class="game-card-title">MTGBBB</div>
-          <div class="game-card-desc">Magic: The Gathering &mdash; Booster Box Bingo. Grab a card, then watch a sealed box get cracked live. Mark what gets pulled and call it before chat does.</div>
+          <div class="game-card-desc">Grab a card, then watch a sealed booster box get cracked live. Mark what gets pulled, chase the treatments, and call a bingo before chat does.</div>
           <div class="game-card-footer">
             <div class="game-card-tags">
               <span class="game-tag game-tag-multiplayer">Live</span>
+              <span class="game-live-badge" data-live="mtgbbb" hidden></span>
             </div>
-            <button class="btn-primary game-play-btn" disabled>Coming Soon</button>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-primary game-play-btn" onclick="launchGame('MTGBBB', '/games/mtgbbb/')">Join</button>
+              <button class="btn-primary game-play-btn role-moderator" onclick="launchGame('MTGBBB Host', '/games/mtgbbb/host')">Host</button>
+            </div>
           </div>
         </div>
       </div>

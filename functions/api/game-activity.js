@@ -35,15 +35,20 @@ async function countRoomPlayers(env, prefix, playersField) {
 export async function onRequestGet(context) {
   const { env } = context;
 
-  const [bingo, manaClash, phamShock] = await Promise.all([
+  const [bingo, manaClash, phamShock, mtgbbb] = await Promise.all([
     countRoomPlayers(env, 'bingo_', 'players'),
     countRoomPlayers(env, 'mc_room_', 'players'),
     countRoomPlayers(env, 'ps_room_', 'players'),
+    /* Resolves to the mtgbbb_rooms table alone: mtgbbb_set_* and
+       mtgbbb_current live in other tables, so the cached Scryfall pools --
+       the largest values in the store -- are never scanned by this poll. */
+    countRoomPlayers(env, 'mtgbbb_', 'players'),
   ]);
 
   return json({
     'commander-bingo': bingo,
     'mana-clash': manaClash,
     'pham-shock': phamShock,
+    'mtgbbb': mtgbbb,
   });
 }
