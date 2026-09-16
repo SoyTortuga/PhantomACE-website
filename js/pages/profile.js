@@ -65,7 +65,8 @@
      smoothed — the same treatment Dino Park's sprites get. */
   function badgeTile(b) {
     var art = b.image
-      ? '<img src="' + esc(b.image) + '" alt="" class="prof-badge-art">'
+      ? '<img src="' + esc(b.image) + '" alt="" class="prof-badge-art" data-glyph="' +
+        (b.founder ? '★' : '◆') + '">'
       : '<span class="prof-badge-fallback">' + (b.founder ? '★' : '◆') + '</span>';
     return '<div class="prof-badge" title="' + esc(b.name) + '">' +
       art +
@@ -207,6 +208,20 @@
       section('Showcase', showcase) +
       section('Favourite dino', dino) +
       section('Standings', standings);
+
+    /* A badge can name artwork that is not there yet — the milestone ranks
+       point at a file per level, and a level whose art has not landed would
+       otherwise draw a broken image. Swapped for the glyph instead, so an
+       absent file looks the way it did before rather than worse. */
+    var arts = body.querySelectorAll('.prof-badge-art[data-glyph]');
+    for (var a = 0; a < arts.length; a++) {
+      arts[a].addEventListener('error', function () {
+        var span = document.createElement('span');
+        span.className = 'prof-badge-fallback';
+        span.textContent = this.dataset.glyph || '◆';
+        if (this.parentNode) this.parentNode.replaceChild(span, this);
+      });
+    }
 
     body.hidden = false;
     state.hidden = true;

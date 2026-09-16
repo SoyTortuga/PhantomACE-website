@@ -539,10 +539,22 @@ async function handleClaimMilestone(env, session, mk, body) {
      milestone bonus they had paid for. */
   const isSub = getSubTier(session) > 0;
 
+  /* The artwork, by milestone level. Every badge granted here used to carry
+     no image at all, so ten ranks across a hundred and fifty levels all
+     rendered as the same grey diamond wherever a badge is drawn.
+
+     Pointed at a file rather than gated on one existing: a missing image
+     falls back to the rarity glyph at render, so the art can land later
+     without this needing to know whether it has. */
   await grantItem(env, session.user_id, {
     id: `ms_${milestoneLevel}_badge_${mk}`,
     game: 'profile', type: 'badge', consumable: false,
     name: milestoneTitle + ' Badge', rarity: milestoneLevel >= 120 ? 'mythic' : milestoneLevel >= 60 ? 'rare' : 'uncommon',
+    meta: {
+      image: `/assets/badges/milestones/ms-${milestoneLevel}.png`,
+      milestoneLevel,
+      rank: milestoneTitle,
+    },
   });
   await grantItem(env, session.user_id, {
     id: `ms_${milestoneLevel}_title_${mk}`,
