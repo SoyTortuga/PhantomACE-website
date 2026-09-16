@@ -57,6 +57,12 @@ const NON_ROUTE_MODULES = new Set([
   /* MTGBBB scoring rules. Pure functions, no handler. Covered by
      server/scripts/test-mtgbbb.js. */
   'api/mtgbbb-scoring.js',
+
+  /* MTGBBB set data — the Scryfall fetch, the permanent cache, the pool
+     filter and the treatment table. Library, no handler; /api/mtgbbb/sets
+     is the route that exposes it. Covered by
+     server/scripts/test-mtgbbb-sets.js against a captured fixture. */
+  'api/mtgbbb-scryfall.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

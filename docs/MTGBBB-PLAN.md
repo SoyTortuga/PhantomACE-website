@@ -1,6 +1,7 @@
 # MTGBBB — Magic: The Gathering Booster Box Bingo
 
-**Status:** design agreed. Scoring engine built and tested; everything else outstanding.
+**Status:** steps 1–2 built and tested (scoring engine, Scryfall data layer).
+Steps 3–7 outstanding.
 **Agent:** `game-mtgbbb`.
 
 Chat plays along while the broadcaster cracks a sealed booster box on stream.
@@ -64,9 +65,17 @@ treatment, not how often one comes out of a pack.
 
 What remains from that design, and still matters:
 
-- The treatment list is **derived per set** from the booster pool, so only
-  treatments genuinely possible in that set and product are offered. Serialized
-  cards do not appear in Play Boosters and so will not appear at all.
+- The treatment list is **derived per set**, so only treatments genuinely
+  possible in that set are offered. Serialized cards do not appear in Play
+  Boosters and so will not appear at all.
+- **It is derived by baseline, not by a list of known treatments.** Scryfall’s
+  `frame_effects` and `promo_types` are mostly not treatments at all: `legendary`
+  sits on 75 Avatar prints, `universesbeyond` tags every card in two sets, and
+  Final Fantasy carries sixteen tags `ffi` through `ffxvi` on ordinary cards. So
+  the deriver reads what the set’s own *plain* printings carry — black border,
+  not full art, not textless, no `boosterfun` — and treats anything a plain card
+  has as, by definition, not a treatment. A hardcoded ignore list would have
+  rotted on the next set; this self-corrects for sets that do not exist yet.
 - The list is shown to the moderator at room creation and **can be adjusted**.
 - It is then **frozen into the room**. Scores must never move because an
   upstream data source changed mid-game.
@@ -103,14 +112,39 @@ set boosters" is a real query rather than a hand-curated list.
 - **A square is a card *name*.** Modern sets print one card in several versions;
   those collapse to one square, and how it came out of the pack is the separate
   treatment axis. This is exactly the shape the game already assumes.
+- **Query with `unique=prints`, not `unique=cards`.** `unique=cards` returns one
+  printing per card, which destroys the treatment axis — treatments exist only
+  *across* printings. Fetch every print and collapse to names locally; that
+  yields the pool and the treatment table from a single query.
 - A set is fetched **once**, when the first room for it is created, and cached
   under `mtgbbb_set_<SETCODE>` permanently. A set's contents never change.
   **Nothing touches Scryfall during a live game.**
 - The set dropdown lists `CODE — Set Name`, newest release first, restricted to
   real paper sets that actually have boosters.
+- **`booster: true` is right about the pool and lies about treatments.** For the
+  pool it is exact — Bloomburrow gives 60 rares and 20 mythics, correctly
+  dropping six rares that exist only in starter decks and would otherwise be
+  permanently unmarkable squares. For treatments it is unusable: **all 87
+  Bloomburrow Booster Fun prints are flagged `booster: false`** despite
+  unquestionably coming out of Play Boosters, while the same variants in Avatar
+  and Lost Caverns are flagged `true`. The flag tracks the base numbered set,
+  not the product. **So the pool comes from `booster: true`, and the treatment
+  table from every print of a pooled name.** Step 3 must not re-derive
+  treatments from the flag.
+- **Scryfall cannot say which product a variant came from.** There is no
+  Play-Booster-versus-Collector field, so the `collectorOnly` marking is curated
+  judgement. It only decides whether a chip starts ticked in the moderator’s
+  adjustable list, so a wrong guess costs a click and never a point.
 - **A set with fewer than 25 rare/mythics cannot fill a card.** Room creation
-  refuses it with a clear reason rather than building a broken grid. No recent
-  set is anywhere near this, but the guard is three lines.
+  refuses it rather than building a broken grid. The guard fires on a real set
+  today, but not for the reason expected: TMT has 158 prints and **zero** flagged
+  in-booster, because Scryfall has not published its pack data yet. The trigger
+  is **unreleased** sets, not small ones — so the refusal distinguishes the two,
+  and an unplayable set is deliberately **not cached**, since caching "forever"
+  would freeze that gap for a set that will be fine next week.
+- Images: read `image_uris`, falling back to `card_faces[0].image_uris`. Both
+  occur — adventure and split cards keep one top-level image while transform
+  and modal cards split theirs — so reading only one blanks a chunk of the grid.
 
 Card images are Wizards of the Coast property served from Scryfall's CDN.
 Hotlinking is how every client renders them; hammering is not. Small images on
@@ -254,8 +288,10 @@ host** to award a prize.
 1. ~~**Scoring module and its tests.**~~ **Done.** `functions/api/mtgbbb-scoring.js`
    and `server/scripts/test-mtgbbb.js` — 77 assertions, wired into
    `npm --prefix server test`.
-2. **Set data** — Scryfall fetch, cache, pool filter, the under-25 guard, the
-   treatment table.
+2. ~~**Set data.**~~ **Done.** `functions/api/mtgbbb-scryfall.js`,
+   `functions/api/mtgbbb/sets.js`, `server/sql/003_mtgbbb.sql`, and
+   `server/scripts/test-mtgbbb-sets.js` — 154 assertions against captured
+   fixtures, so the suite runs offline and never hammers a free service.
 3. **Room lifecycle** — create, join, card generation, state, end.
 4. **Moderator panel.**
 5. **Player page**, including one-away.
@@ -269,4 +305,10 @@ Steps 1–5 are the game. Everything after is addition.
 ## 12. Open items
 
 - Call-your-shot: whether the common-tier code volume is sustainable.
+- **`lb_mtgbbb_<YYYY-MM>` is not registered** in `server/lib/registry.js`. Every
+  existing leaderboard is an exact singleton, so a per-month family needs its own
+  table; registering it against one that does not exist would break the first
+  write. Nothing writes it until step 7 — register it then, with a migration.
+- **`server/sql/003_mtgbbb.sql` must be applied on the rig** before any MTGBBB
+  route is hit on the self-hosted server. It is idempotent.
 - Collector Booster support, and the odds work it needs.

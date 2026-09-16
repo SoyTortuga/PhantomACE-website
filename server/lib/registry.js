@@ -78,6 +78,15 @@ export const SINGLETONS = {
      the next stream begins. */
   checkin_current:       { table: 'singletons', expiry: 'none' },
 
+  /* The MTGBBB set dropdown, cached for a day. An EXACT key, deliberately
+     NOT `mtgbbb_set_INDEX`: that would sit inside the `mtgbbb_set_` family
+     below while holding something else entirely and expiring on a different
+     clock, which is the item_code_queue-inside-item_code_ trap. Exact keys
+     resolve before any prefix, so this one cannot be mistaken for a set.
+     'real' expiry IS the rule here — the row going away is what makes the
+     list refetch when a new set is announced. */
+  mtgbbb_sets_index:     { table: 'singletons', expiry: 'real' },
+
   /* Moderator allowlist. expiry 'none' is load-bearing: if this row expired
      every moderator would silently lose access, and the only symptom would
      be a mod saying "the drop button stopped working". */
@@ -122,6 +131,22 @@ export const FAMILIES = [
      "claimable for five minutes only" rule. No handler has to check a
      clock — an expired code simply reads as a code that does not exist. */
   { prefix: 'gwc_',            table: 'giveaway_drop_codes', expiry: 'real' },
+
+  /* MTGBBB, and the reason this list is ordered longest prefix first.
+     `mtgbbb_set_` MUST be tested before `mtgbbb_`, or every cached Scryfall
+     set pool would be filed as a game room — and then expired out from
+     under itself, since rooms have a real TTL and a set pool is permanent.
+     Two families, two tables, no shared key space.
+
+     mtgbbb_set_{SETCODE} — the pool and treatment table for one set, kept
+     forever because a set's contents never change. 'none': an expiring row
+     would mean a live game's set data could vanish, and refetching it is
+     precisely what must never happen while a box is being opened.
+
+     mtgbbb_{CODE} — a game room. 'real', exactly like bingo_ and mc_room_:
+     the TTL IS the rule that ends an abandoned game. */
+  { prefix: 'mtgbbb_set_',     table: 'mtgbbb_sets',      expiry: 'none' },
+  { prefix: 'mtgbbb_',         table: 'mtgbbb_rooms',     expiry: 'real' },
 
   { prefix: 'cp_skull_boost_', table: 'cp_skull_boosts',  expiry: 'none' },
   { prefix: 'pt_alltime_',     table: 'phamily_alltime',  expiry: 'none' },
@@ -176,5 +201,5 @@ export function resolveKey(key) {
 /** Every table the DAL may touch — used to build the reaper's sweep list. */
 export const TABLES_WITH_REAL_EXPIRY = [
   'cp_queues', 'listings', 'bingo_rooms', 'mc_rooms', 'ps_rooms', 'singletons',
-  'giveaway_drop_codes',
+  'giveaway_drop_codes', 'mtgbbb_rooms',
 ];

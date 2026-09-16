@@ -21,9 +21,10 @@
     "test-bingo": "node scripts/test-bingo.js",
     "test-bot-drops": "node scripts/test-bot-drops.js",
     "test-phamily-rewards": "node scripts/test-phamily-rewards.js",
-    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js && node scripts/test-roles.js && node scripts/test-chat-game.js && node scripts/test-bingo.js && node scripts/test-bot-drops.js && node scripts/test-phamily-rewards.js && node scripts/test-overlay-resume.js && node scripts/test-mtgbbb.js",
+    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js && node scripts/test-roles.js && node scripts/test-chat-game.js && node scripts/test-bingo.js && node scripts/test-bot-drops.js && node scripts/test-phamily-rewards.js && node scripts/test-overlay-resume.js && node scripts/test-mtgbbb.js && node scripts/test-mtgbbb-sets.js",
     "test-overlay-resume": "node scripts/test-overlay-resume.js",
-    "test-mtgbbb": "node scripts/test-mtgbbb.js"
+    "test-mtgbbb": "node scripts/test-mtgbbb.js",
+    "test-mtgbbb-sets": "node scripts/test-mtgbbb-sets.js"
   },
   "engines": {
     "node": ">=20"
