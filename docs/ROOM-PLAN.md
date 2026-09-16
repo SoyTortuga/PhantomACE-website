@@ -1,12 +1,14 @@
 # My Room — plan
 
-**Status:** proposed. Nothing built. Awaiting answers to §10.
-**Owner:** `cosmetics` agent for the profile section; `asset-manager` for the atlas.
+**Status:** decisions taken (§10). Awaiting a go before step 1.
+**Owner:** `cosmetics` agent for the profile section and unlocks;
+`asset-manager` for the atlas.
 
 A top-down pixel-art room that each member builds from the *Gaming Room
 Interiors MegaPack* and shows on their profile at `/user/<login>`: floor tiles
-on a grid, walls around it, and furniture, lights, posters and gear placed
-freely and scaled to taste.
+on a grid, walls along the back and sides, and furniture, lights, posters and
+gear placed on a snap grid and scaled in steps. Everyone starts with the basic
+pieces; the rest — and extra rooms — are unlocked around the site.
 
 ---
 
@@ -17,7 +19,7 @@ one named. It is **20 sheets, each 1536×1024 RGBA, ~600 pieces in all**:
 
 | # | sheet | pieces | typical size | notes |
 |---|---|---|---|---|
-| 1 | Floor tiles | 45 | ~128×128 | clean 5×9 grid; the "pack 1" floor |
+| 1 | Floor tiles | 45 | ~128×128 | clean 5×9 grid; the floor |
 | 2 | Wall tiles | 24 | ~170×194 | taller than wide: top-down wall faces |
 | 3 | Gaming desk setups | 18 | ~235×228 | desk + chair as one piece |
 | 4 | RGB PC towers | 16 | ~154×333 | tall |
@@ -42,16 +44,14 @@ Facts that shape the design:
 
 - **Backgrounds are transparent.** They render black in a viewer, but 35–68% of
   each sheet is alpha 0 and the stray pixels around pieces are alpha ≤ 3. So
-  pieces can be cut out by connected components, not by colour keying.
-- **Every sheet has a title banner** across the top ~210 px. It is not an asset
-  and must be excluded.
-- **Pieces are not on a regular grid** except sheet 1. Sizes vary within a
-  sheet by 2–3×, so slicing is "find each blob's bounding box", not "cut every
-  N px". Three sheets (8, 13, 15) have blobs that touch; those need a smaller
-  merge distance or hand-drawn boxes.
-- **Floor tiles are ~128 px in the source.** 100 px is a 0.78× downscale, which
-  is not an integer ratio: nearest-neighbour will drop rows unevenly and
-  bilinear will blur. See §10 Q3.
+  pieces are cut out by connected components, not by colour keying.
+- **Every sheet has a title banner** across the top ~210 px. Not an asset;
+  excluded.
+- **Pieces are not on a regular grid** except sheet 1. Slicing is "find each
+  blob's bounding box", not "cut every N px". Three sheets (8, 13, 15) have
+  blobs that touch; those get a smaller merge distance or hand-drawn boxes.
+- **Floor tiles are 128 px** and stay 128 px: the cell is the tile. No
+  resampling of pixel art anywhere.
 
 ---
 
@@ -62,189 +62,202 @@ A build script, run on the dev box, whose output is committed:
 ```
 tools/build-room-atlas.py            Pillow + scipy (both already used here)
 assets/room/pieces/<sheet>/<n>.png   one file per piece, trimmed to its box
-assets/room/catalog.json             what exists, with sizes and categories
+assets/room/catalog.json             what exists: id, pack, category, w, h, layer, tier
 ```
 
 - Cuts every sheet below the banner into connected components (alpha > 0,
   dilated a few px so a chair's legs join its seat), trims each to its box,
-  saves it, and records `{ id, sheet, category, w, h, layer }`.
-- Per-sheet overrides in the script for the three merging sheets: a smaller
-  dilation, a minimum/maximum box size, or explicit boxes.
+  saves it, and records it.
+- Per-sheet overrides for the three merging sheets: a smaller dilation, a
+  minimum/maximum box size, or explicit boxes.
 - Emits a contact sheet per category for a **human review pass** before the
   catalog is trusted — a merged blob or a split piece is obvious to an eye and
   invisible to a test.
+- Ids come from sheet + position, not enumeration order, so a rebuild does not
+  renumber pieces that people have already placed.
 - `server/scripts/test-room-catalog.js` asserts every catalog entry's file
-  exists, every file is in the catalog, sizes are within sane bounds, floor
-  tiles are square, and ids are stable across rebuilds (ids come from sheet +
-  position, not from enumeration order).
+  exists, every file is in the catalog, sizes are within bounds, floor tiles
+  are square, and every category has a `tier`.
 
-Floor tiles are additionally emitted **pre-scaled to the cell size** (§10 Q3)
-so the page never resizes pixel art at runtime.
-
-The catalog carries a `pack` field from day one so a second pack (there are
-eight more in that folder) is a second build, not a redesign.
+The catalog carries `pack` from day one. The other eight MegaPacks in that
+folder are a later build each, not a redesign (§10 Q15).
 
 ---
 
 ## 3. The room
 
-**Grid.** Cells of 100 px. Base **12 × 8 cells = 1200 × 800 px** of floor,
-plus a wall band along the top (and optionally the sides). That is roomy at
-desktop width and scales down to phone width with one CSS transform. (§10 Q2.)
+**Cell = 128 px.** Three sizes, chosen per room:
+
+| size | cells | pixels |
+|---|---|---|
+| S | 9 × 6 | 1152 × 768 |
+| M | 12 × 8 | 1536 × 1024 |
+| L | 15 × 10 | 1920 × 1280 |
+
+*Assumption (Q2):* your answer named 15×10 as the top; S and M are my proposals
+beneath it, and **size is a free choice**, not a reward. Say so if you want
+sizes unlocked.
+
+**Walls** run along the back (top edge) and both sides, one wall tile per edge
+cell, from sheet 2. The front edge is open, as top-down rooms are.
 
 **Three layers, stored separately because they behave differently:**
 
 | layer | what | placement |
 |---|---|---|
-| floor | one tile id per cell (or one default for the whole floor) | grid only |
-| walls | one wall tile id per top-edge cell; optional side walls | grid only |
-| props | rugs, furniture, lights, posters, gear | free: `x, y, scale, z` |
+| floor | one tile id per cell, over a room-wide default | grid |
+| walls | one wall tile id per back/side edge cell | grid |
+| props | rugs, furniture, lights, posters, gear | **snapped to a 32 px sub-grid** (¼ cell) |
 
-A prop record: `{ id, x, y, scale, flip }` — `x, y` in room pixels (top-left),
-`scale` clamped (0.5–2.0 proposed, §10 Q5), `flip` horizontal only (no
-rotation: these are top-down sprites drawn for one orientation), and draw
-order = array order, with "bring forward / send back" in the editor. Rugs
-default to the bottom of the order. **No text anywhere in the room** — that
-is what keeps it moderation-free (§10 Q11).
+*Assumption (Q12):* snap is always on, at 32 px rather than 128 — a keyboard
+or a can snapped to whole cells could only sit in the middle of a tile.
 
-**Limits, server-enforced:** at most N props (60 proposed), positions within
-the room (a piece may overhang the edge by up to half its size so things can
-sit against walls), ids must exist in the catalog.
+A prop: `{ id, x, y, scale, flip }` — `x, y` in room pixels on the 32 px
+grid, `scale` one of **0.5, 0.75, 1, 1.5, 2**, `flip` horizontal only, draw
+order = array order with "bring forward / send back". Rugs default to the
+bottom. **No text anywhere in the room.** The room's name is the owner's
+display name + "'s Room", generated, never typed.
+
+**Limits, server-enforced:** **100 props**, positions within the room (a piece
+may overhang an edge by up to half its size), every id in the catalog, every
+id in a category the owner has (§4).
 
 ---
 
-## 4. Storage
+## 4. Who has what
 
-One document per person, `room_<userId>`, through the KV shim — the same
-shape as `dino_park_<userId>` and `inv_<userId>`. It is written whole by its
-owner and read whole by everyone else; that is exactly what the shim is for.
-Migration `007_rooms.sql` adds the `rooms` table and registry entry
-`{ prefix: 'room_', table: 'rooms', expiry: 'none' }` (`room_` collides with
-nothing: `mc_room_` and `ps_room_` are different prefixes).
+**Everyone starts with the basic categories.** The rest are unlocked around
+the site through the inventory that already exists.
 
-The document, ~2–6 KB:
+*Assumption (Q7), the split I would start with:*
+
+| tier | categories |
+|---|---|
+| **basic** (everyone) | floor tiles, wall tiles, gaming desk setups, gaming chairs, sofas and lounge, rugs and carpets, shelves and decor, plants and greenery, room and modular decor |
+| **unlockable** | RGB PC towers, mechanical keyboards, multimonitor setups, LED strip lights, streaming equipment, neon signs, snack and drinks, consoles and controllers, posters and wall art, smart devices, studio lights |
+
+Unlocks are **per category, not per piece** — an inventory item of type
+`room-set` with `meta.category`, granted the way badges and titles already are
+(Phamily Time milestones, sub tiers, giveaways, drops, codes). The validator
+refuses a prop whose category the owner has not got. Which reward grants
+which category is a table, not code, and is yours to fill in.
+
+**Extra rooms** are an inventory item of type `room-slot`. Everyone has one
+room; each slot is one more. One room is *public* at a time; the others are
+kept. (Q13.)
+
+---
+
+## 5. Storage
+
+One document per person, `rooms_<userId>`, through the KV shim — the same
+shape as `dino_park_<userId>` and `inv_<userId>`: written whole by its owner,
+read whole by everyone else. Migration `007_rooms.sql` adds the `rooms` table
+and registry entry `{ prefix: 'rooms_', table: 'rooms', expiry: 'none' }`
+(`rooms_` collides with nothing).
 
 ```json
-{ "v": 1, "w": 12, "h": 8, "floor": "f01", "cells": { "3,4": "f12" },
-  "walls": { "top": "w03" },
-  "props": [ { "id": "desk07", "x": 220, "y": 140, "scale": 1, "flip": false } ],
-  "updatedAt": 1758000000000 }
+{ "v": 1, "public": 0,
+  "rooms": [
+    { "size": "M", "floor": "f01", "cells": { "3,4": "f12" },
+      "walls": { "back": ["w03","w03"], "left": ["w03"], "right": ["w03"] },
+      "props": [ { "id": "desk07", "x": 224, "y": 128, "scale": 1, "flip": false } ],
+      "updatedAt": 1758000000000 }
+  ] }
 ```
 
-**The server validates every field against the catalog and the limits** and
-refuses the whole save on any bad value. A room is public content composed
-entirely of known images, so once validated there is nothing in it a viewer
-can be harmed by — no free text, no URLs.
+**The server validates every field against the catalog, the limits and the
+owner's inventory** and refuses the whole save on any bad value. A room is
+public content composed entirely of known images: no free text, no URLs,
+nothing for a moderator to look at.
 
 ---
 
-## 5. Pages
+## 6. Pages
 
 - **`/user/<login>`** — a **Room** section under Showcase, rendered read-only
   by `js/pages/profile-room.js` on the same `profile:rendered` event the
-  comment wall uses. Renderer: absolutely-positioned `<img>` elements inside a
-  1200×800 box with `image-rendering: pixelated`, scaled to fit the column.
-  A member with no room shows nothing (§10 Q9).
-- **`/room/edit`** (`room-editor.html`, owner only) — the same renderer plus:
-  a palette down the side with the 20 categories, a search box, click-to-place,
-  drag to move, a scale slider and flip button on the selected piece,
-  forward/back/delete, undo (client-side stack), and Save. Floor and wall
-  cells are painted by choosing a tile and clicking cells. Autosaves nothing:
-  Save is explicit and confirms.
+  comment wall uses. Absolutely-positioned `<img>` elements in a room-sized
+  box with `image-rendering: pixelated`, scaled to fit the column. A member
+  with no room shows an **empty default floor**; the owner sees a **"Build
+  yours"** button on it, everyone else sees just the floor. (Q9.)
+- **`/room/edit`** (`room-editor.html`, owner only): the same renderer plus a
+  palette down the side with the categories (locked ones shown greyed with
+  how to unlock them), search, click-to-place, drag to move on the snap grid,
+  scale steps and flip on the selected piece, forward/back/delete, floor and
+  wall painting by tile-then-click, undo (client-side stack), room size and
+  room switcher, and an explicit Save. (Q14.)
 
-Both pages get the header scripts (the boot check enforces it).
+Both pages get the header scripts; the boot check enforces it.
 
 ---
 
-## 6. API
+## 7. API
 
 `functions/api/room.js`:
 
 | | |
 |---|---|
-| `GET ?id=<userId>` | the room, or 404. Public. |
-| `POST` `{ room }` | validate against the catalog, write `room_<me>` via `mutate()`. Session required. |
-| `POST` `{ action: 'clear' }` | delete `room_<me>`. |
+| `GET ?id=<userId>` | the public room, or the empty default. Public. |
+| `GET ?mine=1` | all of the owner's rooms and their unlocked categories and slots. |
+| `POST { room, index }` | validate, write `rooms_<me>` via `mutate()`. |
+| `POST { action: 'public', index }` | choose which room the profile shows. |
+| `POST { action: 'clear', index }` | empty one room. |
 
 `functions/api/room-catalog.js` (library, `NON_ROUTE_MODULES`) loads
-`catalog.json` once and exposes `validateRoom(room)` — pure, so it is tested
-one bad field at a time and mutation-checked like the forum rules.
+`catalog.json` once and exposes `validateRoom(room, owned)` — pure, tested one
+bad field at a time and mutation-checked like the forum rules.
 
 ---
 
-## 7. Build order
+## 8. Build order
 
-0. **Answers to §10.** Q1 and Q3 change the pipeline; Q2 and Q5 change the
-   validator; the rest change pages.
-1. **Atlas** — script, overrides, contact sheets, review, catalog test.
+Each step names its gate.
+
+1. **Atlas** — script, overrides, contact sheets, **your review of the contact
+   sheets**, catalog test.
 2. **Validator + storage** — `room-catalog.js`, `room.js`, migration, tests
-   including "a piece id not in the catalog is refused" and "sixty-one props
-   is refused".
-3. **Viewer** — the profile section, from a hand-written room document.
-4. **Editor** — place, move, scale, flip, order, paint floor/walls, undo, save.
-5. **Polish** — a thumbnail on the profile head, keyboard nudging, snap toggle.
+   including "an id not in the catalog", "a category not owned", "101 props",
+   "a step scale of 1.3", "off the snap grid" — each refused, each
+   mutation-checked.
+3. **Viewer** — the profile section from a hand-written room, the empty
+   default, the Build-yours prompt.
+4. **Editor** — place, move, scale, flip, order, paint, size, undo, save.
+5. **Unlocks** — `room-set` and `room-slot` items in the inventory, the locked
+   palette, and the reward table you fill in.
+6. **Polish** — thumbnail on the profile head, keyboard nudging.
 
 ---
 
-## 8. What this deliberately is not
+## 9. What this deliberately is not
 
-- Not a game: nothing moves, nothing is collected, nothing costs anything
-  (unless §10 Q7 says otherwise).
-- Not a canvas drawing tool: only pieces from the catalog, no colours, no text.
+- Not a game: nothing moves, nothing is collected inside it.
+- Not a canvas tool: only catalog pieces, no colours, no text.
 - Not isometric: the pack is top-down and is drawn as such.
+- Not a gallery (yet): profiles only. (Q10.)
 
 ---
 
-## 9. Risks
+## 10. Decisions
 
-- **The pack's licence.** Slicing and serving the pieces as individual files
-  on a public site is redistribution of a kind; most itch.io asset licences
-  allow use "in a project" and forbid redistribution "as assets". Serving them
-  behind our own editor is a grey area worth one read of the licence text
-  before anything ships. (§10 Q1.)
-- **Slicing quality.** Three sheets will need hand attention; budget for it.
-- **Page weight.** ~600 small PNGs is fine on demand (only placed pieces load
-  on a profile), but the editor palette should lazy-load per category.
+| # | question | decision |
+|---|---|---|
+| 1 | Licence | Allows it. |
+| 2 | Room size | S 9×6, M 12×8, **L 15×10**; a free choice. *(S/M my proposal.)* |
+| 3 | Floor cell | **128 px**, native. No resampling. |
+| 4 | Walls | **Back and sides**; front open. |
+| 5 | Scale | **0.5–2×, stepped**: 0.5, 0.75, 1, 1.5, 2. |
+| 6 | Flip / rotate | Flip yes, rotate no. |
+| 7 | Who gets what | **Basic categories for everyone; the rest unlocked** via inventory `room-set` items. *(Split in §4 is my proposal.)* |
+| 8 | Prop cap | **100**. |
+| 9 | Empty profiles | **Empty floor + "Build yours"** for the owner. |
+| 10 | Where shown | **Profiles only** for now. |
+| 11 | Text | None. Name is **"<name>'s Room"**, generated. |
+| 12 | Snap | **Always on**, at a 32 px sub-grid. *(Sub-grid my proposal.)* |
+| 13 | Rooms per person | One, **more via `room-slot` rewards**; one public at a time. |
+| 14 | Editor | **Dedicated page**, `/room/edit`. |
+| 15 | Other packs | **After everything else**; catalog carries `pack` from day one. |
 
----
-
-## 10. Questions before building
-
-1. **Licence.** Does the pack's licence allow the pieces to be served as
-   individual image files on the website (which is what any web editor needs)?
-   If there is a licence file or the itch.io page's terms, I need its wording.
-2. **Room size.** 12 × 8 cells at 100 px (1200 × 800) as the base — right
-   size? Fixed for everyone, or a choice of sizes (S/M/L)?
-3. **The 100 px floor.** Source tiles are ~128 px; 100 px is a non-integer
-   downscale and will look slightly soft or uneven. Options: (a) 100 px as
-   asked, bilinear, accept the softness; (b) **96 px** — an exact 3/4, crisp
-   with nearest-neighbour, room becomes 1152 × 768; (c) keep 128 px cells and
-   make the room 10 × 6. Which?
-4. **Walls.** Top edge only (classic top-down), or all four sides? Sheet 2
-   has 24 wall tiles, taller than wide, drawn as a face — they read best along
-   the top.
-5. **Prop scale range.** 0.5× to 2.0× proposed. Wider? Narrower? Should
-   scaling snap to steps (0.5, 0.75, 1, 1.5, 2) or be continuous?
-6. **Flip / rotate.** Horizontal flip yes; rotation no (the sprites have one
-   drawn orientation). Agree?
-7. **Who gets a room, and are pieces unlockable?** Everyone logged in, all
-   ~600 pieces free? Or some categories (neon signs, RGB towers…) as Phamily
-   Time / subscriber / milestone rewards — the inventory already exists for
-   that. This decides whether the validator checks ownership.
-8. **Item cap.** 60 props proposed. Fine?
-9. **Empty rooms.** Show nothing on a profile with no room, or an empty default
-   floor with a "build yours" prompt to the owner?
-10. **Where else is it shown?** Profile only, or also a **Rooms gallery** page
-    on Community, a "room of the week" on the overlay, or a thumbnail in the
-    member search results?
-11. **Any text?** A room name or caption? It is the only thing that would
-    need moderation; without it a room can't contain anything a moderator has
-    to look at.
-12. **Snap.** Props free-placed (as asked) with an optional snap-to-grid
-    toggle, or always free?
-13. **One room per person**, or several with one chosen as public?
-14. **Editor location.** A dedicated `/room/edit` page (proposed), or edit in
-    place on your own profile?
-15. **Other packs.** The folder holds eight more MegaPacks (Haunted Victorian,
-    Dragon Kingdom, Atlantis…). Is "themes" a later goal? It costs nothing now
-    to design the catalog for it and I would rather not retrofit.
+Three items above are marked as my proposals filling gaps in the answers: the
+S and M sizes, the basic/unlockable split, and the 32 px snap. Overrule any of
+them and the plan changes in one place each.
