@@ -99,7 +99,8 @@ export async function onRequestPost(context) {
      The broadcaster is checked by id rather than by the role string, the
      way admin/moderators.js does it: identity, not a claim. */
   const { isBroadcaster } = await import('./admin/moderators.js');
-  const isSub = Number(session.subTier) > 0 || isBroadcaster(env, session);
+  const owner = isBroadcaster(env, session);
+  const isSub = Number(session.subTier) > 0 || owner;
   if (!isSub) {
     return json({ error: 'Only subscribers have loyalty badges to import' }, 403);
   }
@@ -137,11 +138,18 @@ export async function onRequestPost(context) {
     const decoded = decodeBadgeVersion(version.id);
     if (!decoded) continue;
 
-    /* Both gates, not either. Duration alone would hand a Tier 1 subscriber
-       the Tier 3 artwork; tier alone would hand a new Tier 3 subscriber the
-       eight-year badge. */
-    if (decoded.months > subMonths) continue;
-    if (decoded.tier > subTier) continue;
+    /* THE BROADCASTER CANNOT SUBSCRIBE TO THEMSELVES, so they wear a
+       broadcaster badge in their own chat and never a subscriber one. No
+       duration can ever be recorded for them, and gating on one would deny
+       the channel's owner every badge the channel has — permanently, with
+       "say something in chat first" as the only explanation. They get the
+       whole set. It is their artwork.
+
+       Both gates apply to everyone else, not either: duration alone would
+       hand a Tier 1 subscriber the Tier 3 artwork, and tier alone would
+       hand a brand new Tier 3 subscriber the eight-year badge. */
+    if (!owner && decoded.months > subMonths) continue;
+    if (!owner && decoded.tier > subTier) continue;
 
     const badgeId = `twitch_sub_badge_t${decoded.tier}_${decoded.months}`;
     /* The old scheme keyed on the raw version id and so could not tell
@@ -187,7 +195,9 @@ export async function onRequestPost(context) {
     tier: subTier,
     /* False means the duration store could not be read at all, which is
        what an unapplied migration looks like from in here. */
-    durationKnown: durationReadable && !!seen,
+    /* The broadcaster's duration is not unknown, it is not applicable —
+       so the button must not tell them to go and post in chat. */
+    durationKnown: owner || (durationReadable && !!seen),
     /* How many of the channel's badges they qualify for, so "nothing new"
        can distinguish "you have them all" from "you qualify for one". */
     eligible: subBadgeSet.versions.reduce((n, v) => {
