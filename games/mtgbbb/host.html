@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTGBBB - Host</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000; color: #fff; font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px;
+    }
+
+    .screen { display: none; width: 100%; max-width: 640px; }
+    .screen.active { display: flex; flex-direction: column; }
+    #hostScreen { max-width: 1100px; }
+
+    /* ── CREATE SCREEN ───────────────────── */
+    .create-screen { align-items: center; padding-top: 24px; }
+    .host-title { font-size: 28px; color: #ff0000; text-align: center; margin-bottom: 4px; }
+    .host-subtitle { font-size: 11px; color: #444; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 28px; text-align: center; }
+
+    .gate-msg { font-size: 12px; color: #aaa; text-align: center; max-width: 360px; line-height: 1.6; }
+
+    .create-form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+    .form-row { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; }
+
+    .form-input, .form-select {
+      width: 100%; padding: 10px 12px; background: #111; border: 1px solid #222; border-radius: 4px;
+      color: #fff; font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.2s;
+    }
+    .form-input:focus, .form-select:focus { border-color: #ff0000; }
+    .form-hint { font-size: 10px; color: #444; }
+
+    .treatment-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .treat-chip {
+      padding: 5px 10px; border: 1px solid #222; border-radius: 12px; font-size: 10px;
+      color: #666; cursor: pointer; user-select: none; transition: all 0.15s; background: transparent;
+    }
+    .treat-chip.on { border-color: #ff0000; color: #ff0000; background: rgba(255, 0, 0, 0.06); }
+    .treat-chip .collector-tag { opacity: 0.6; font-size: 9px; }
+
+    .create-btn {
+      padding: 12px 24px; background: #ff0000; color: #fff; border: none; border-radius: 4px;
+      font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-family: inherit;
+    }
+    .create-btn:hover:not(:disabled) { background: #cc0000; }
+    .create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .create-error { font-size: 11px; color: #ff0000; min-height: 14px; text-align: center; }
+
+    /* ── HOST PANEL HEADER ───────────────── */
+    .host-header {
+      display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 16px;
+      background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; margin-bottom: 12px;
+      flex-wrap: wrap; gap: 12px;
+    }
+    .code-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; margin-bottom: 4px; }
+    .code-display { font-size: 28px; font-weight: bold; letter-spacing: 0.2em; color: #ff0000; line-height: 1; }
+    .code-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .mini-btn {
+      padding: 4px 12px; background: transparent; border: 1px solid #222; border-radius: 3px; color: #555;
+      font-size: 10px; cursor: pointer; transition: border-color 0.2s, color 0.2s; font-family: inherit;
+    }
+    .mini-btn:hover { border-color: #ff0000; color: #fff; }
+    .mini-btn.copied { border-color: #00cc66; color: #00cc66; }
+
+    .host-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .stat-row { font-size: 11px; color: #555; }
+    .stat-row span { color: #fff; font-weight: bold; }
+
+    .pack-adjust { display: flex; align-items: center; gap: 6px; }
+    .pack-btn {
+      width: 22px; height: 22px; border-radius: 3px; border: 1px solid #222; background: transparent;
+      color: #999; font-size: 13px; cursor: pointer; line-height: 1; font-family: inherit;
+    }
+    .pack-btn:hover { border-color: #ff0000; color: #fff; }
+
+    /* ── SEARCH + MARK ────────────────────── */
+    .mark-panel { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+    .search-input {
+      width: 100%; padding: 10px 12px; background: #111; border: 1px solid #222; border-radius: 4px;
+      color: #fff; font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: #ff0000; }
+
+    .search-results { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; }
+    .search-result {
+      display: flex; justify-content: space-between; align-items: center; padding: 7px 10px;
+      border: 1px solid #1a1a1a; border-radius: 3px; cursor: pointer; font-size: 12px; transition: border-color 0.15s;
+    }
+    .search-result:hover, .search-result.active { border-color: #ff0000; background: rgba(255, 0, 0, 0.05); }
+    .search-result .sr-rarity { font-size: 9px; color: #666; text-transform: uppercase; }
+
+    .mark-confirm { margin-top: 10px; padding: 10px; border: 1px solid #222; border-radius: 4px; display: none; }
+    .mark-confirm.show { display: block; }
+    .mark-confirm-name { font-size: 13px; font-weight: bold; margin-bottom: 8px; }
+    .mark-confirm-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .confirm-btn {
+      padding: 8px 20px; background: #ff0000; color: #fff; border: none; border-radius: 3px;
+      font-size: 11px; font-weight: bold; cursor: pointer; font-family: inherit;
+    }
+    .confirm-btn:hover { background: #cc0000; }
+    .cancel-btn {
+      padding: 8px 16px; background: transparent; border: 1px solid #222; border-radius: 3px; color: #555;
+      font-size: 11px; cursor: pointer; font-family: inherit;
+    }
+    .cancel-btn:hover { border-color: #444; color: #fff; }
+
+    /* ── RECENT PULLS ─────────────────────── */
+    .recent-panel { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; padding: 12px; }
+    .panel-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; margin-bottom: 8px; }
+    .pull-row {
+      display: flex; justify-content: space-between; align-items: center; padding: 7px 4px;
+      border-bottom: 1px solid #0f0f0f; font-size: 12px;
+    }
+    .pull-row:last-child { border-bottom: none; }
+    .pull-main { color: #fff; }
+    .pull-main .pull-treat { color: #999; font-size: 10px; margin-left: 6px; }
+    .pull-meta { color: #333; font-size: 10px; }
+    .undo-btn {
+      padding: 3px 10px; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.3);
+      border-radius: 3px; color: #ff0000; font-size: 10px; cursor: pointer; font-family: inherit;
+    }
+    .undo-btn:hover { background: rgba(255, 0, 0, 0.2); }
+    .no-pulls { text-align: center; padding: 16px; color: #333; font-size: 11px; }
+
+    .host-footer {
+      display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px solid #1a1a1a;
+    }
+    .end-game-btn {
+      padding: 8px 24px; background: transparent; border: 1px solid #ff0000; border-radius: 3px; color: #ff0000;
+      font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+      transition: background 0.2s; font-family: inherit;
+    }
+    .end-game-btn:hover { background: rgba(255, 0, 0, 0.1); }
+
+    /* ── RESULTS ──────────────────────────── */
+    .results-panel { align-items: center; }
+    .results-title { font-size: 24px; color: #ff0000; margin-bottom: 4px; text-align: center; }
+    .results-sub { font-size: 12px; color: #555; margin-bottom: 20px; text-align: center; }
+    .leaderboard { width: 100%; max-width: 660px; }
+    .lb-header, .lb-row {
+      display: grid; grid-template-columns: 34px 1fr 58px 62px 172px; padding: 9px 12px; font-size: 12px;
+    }
+    .lb-header { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #444; border-bottom: 1px solid #1a1a1a; }
+    .lb-row { border-bottom: 1px solid #0f0f0f; align-items: center; }
+    .lb-row:first-of-type { background: rgba(255, 0, 0, 0.05); }
+    .lb-rank { font-weight: bold; color: #555; }
+    .lb-row:first-of-type .lb-rank { color: #ff0000; }
+    .lb-name { color: #ccc; overflow: hidden; text-overflow: ellipsis; }
+    .lb-blackout { color: #ff0000; text-align: center; font-weight: bold; font-size: 10px; }
+    .lb-points { color: #fff; text-align: center; font-weight: bold; }
+    .lb-award { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+    .lb-award-tier { background: #111; border: 1px solid #2a2a2a; border-radius: 3px; color: #fff; font-family: inherit; font-size: 10px; padding: 4px 5px; max-width: 104px; }
+    .lb-award-btn { background: #ff0000; border: none; border-radius: 3px; color: #fff; font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; cursor: pointer; }
+    .lb-award-btn:hover:not(:disabled) { background: #d40000; }
+    .lb-award-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .lb-award-done { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6ac46a; }
+    .no-players { text-align: center; padding: 24px; color: #333; font-size: 12px; }
+    .results-actions { margin-top: 20px; }
+    .back-btn {
+      padding: 10px 20px; background: transparent; border: 1px solid #222; border-radius: 4px; color: #555;
+      font-size: 12px; cursor: pointer; transition: border-color 0.2s, color 0.2s; font-family: inherit;
+    }
+    .back-btn:hover { border-color: #ff0000; color: #fff; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ════ CREATE SCREEN ════ -->
+  <div class="screen active create-screen" id="createScreen">
+    <h1 class="host-title">MTGBBB</h1>
+    <p class="host-subtitle">Moderator Control Panel</p>
+
+    <p class="gate-msg" id="gateMsg" hidden></p>
+
+    <form class="create-form" id="createForm" hidden onsubmit="return false;">
+      <div class="form-row">
+        <label class="form-label" for="setSelect">MTG Set</label>
+        <select class="form-select" id="setSelect" onchange="onSetChange()"></select>
+        <span class="form-hint" id="poolHint"></span>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label" for="boxesInput">Boxes (Play Booster, 30 packs each)</label>
+        <input class="form-input" id="boxesInput" type="number" min="1" max="12" value="1">
+      </div>
+
+      <div class="form-row">
+        <label class="form-label" for="codeInput">Room Code</label>
+        <input class="form-input" id="codeInput" maxlength="6" style="text-transform:uppercase; letter-spacing:0.2em;">
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">Treatments (adjust before creating — frozen once the room opens)</label>
+        <div class="treatment-list" id="treatmentList"></div>
+      </div>
+
+      <div class="create-error" id="createError"></div>
+      <button class="create-btn" id="createBtn" onclick="createRoom()">Open Room</button>
+    </form>
+  </div>
+
+  <!-- ════ HOST PANEL ════ -->
+  <div class="screen" id="hostScreen">
+    <div class="host-header">
+      <div>
+        <div class="code-label">Room Code</div>
+        <div class="code-display" id="codeDisplay"></div>
+        <div class="code-actions">
+          <button class="mini-btn" id="copyCodeBtn" onclick="copyCode()">Copy Code</button>
+          <button class="mini-btn" id="copyLinkBtn" onclick="copyLink()">Copy Join Link</button>
+        </div>
+      </div>
+      <div class="host-stats">
+        <div class="stat-row"><span id="setNameStat"></span></div>
+        <div class="stat-row">Players: <span id="playerCount">0</span></div>
+        <div class="stat-row">Pulls: <span id="pullCount">0</span></div>
+        <div class="stat-row pack-adjust">
+          Packs:
+          <button class="pack-btn" onclick="adjustPack(-1)">−</button>
+          <span id="packDisplay">0 / 0</span>
+          <button class="pack-btn" onclick="adjustPack(1)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mark-panel">
+      <input class="search-input" id="searchInput" type="text" placeholder="Search a card name…" autocomplete="off">
+      <div class="search-results" id="searchResults"></div>
+
+      <div class="mark-confirm" id="markConfirm">
+        <div class="mark-confirm-name" id="markConfirmName"></div>
+        <div class="treatment-list" id="markTreatments"></div>
+        <div class="mark-confirm-actions">
+          <button class="confirm-btn" onclick="submitMark()">Mark Pull</button>
+          <button class="cancel-btn" onclick="cancelMark()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-panel">
+      <div class="panel-title">Recent Pulls</div>
+      <div id="recentPulls"><div class="no-pulls">No pulls yet.</div></div>
+    </div>
+
+    <div class="host-footer">
+      <button class="end-game-btn" onclick="endGame()">End Game</button>
+    </div>
+  </div>
+
+  <!-- ════ RESULTS SCREEN ════ -->
+  <div class="screen results-panel" id="resultsScreen">
+    <h2 class="results-title">Game Over</h2>
+    <p class="results-sub" id="resultsSub"></p>
+
+    <div class="leaderboard" id="leaderboard">
+      <div class="lb-header">
+        <div>#</div><div>Player</div><div style="text-align:center">Blackout</div>
+        <div style="text-align:center">Points</div><div style="text-align:right">Prize</div>
+      </div>
+      <div id="lbBody"></div>
+    </div>
+
+    <div class="results-actions">
+      <button class="back-btn" onclick="backToCreate()">Back</button>
+    </div>
+  </div>
+
+  <script src="/js/session-read.js"></script>
+  <script>
+    const RARITIES = [
+      { id: 'common',   label: 'Common',   entries: 2 },
+      { id: 'uncommon', label: 'Uncommon', entries: 5 },
+      { id: 'rare',     label: 'Rare',     entries: 15 },
+      { id: 'mythic',   label: 'Mythic',   entries: 50 },
+    ];
+
+    const phamSession = typeof readPhamSession === 'function' ? readPhamSession() : null;
+
+    let roomCode = null;
+    let roomPool = [];
+    let roomTreatments = [];
+    let pendingTreatments = new Set();
+    let pendingCard = null;
+    let hostPollTimer = null;
+
+    /* ── Gate + set dropdown ──────────────── */
+    async function init() {
+      if (!phamSession) {
+        document.getElementById('gateMsg').hidden = false;
+        document.getElementById('gateMsg').textContent = 'Log in with Twitch to open a room.';
+        return;
+      }
+      try {
+        const res = await fetch('/api/mtgbbb/sets', { credentials: 'same-origin' });
+        if (res.status === 401 || res.status === 403) {
+          document.getElementById('gateMsg').hidden = false;
+          document.getElementById('gateMsg').textContent =
+            'Only the broadcaster and moderators can open an MTGBBB room.';
+          return;
+        }
+        const data = await res.json();
+        const select = document.getElementById('setSelect');
+        select.innerHTML = data.sets.map(s => `<option value="${s.code}">${escHtml(s.label)}</option>`).join('');
+        document.getElementById('createForm').hidden = false;
+        document.getElementById('codeInput').value = generateCode();
+        if (data.sets.length) onSetChange();
+      } catch {
+        document.getElementById('gateMsg').hidden = false;
+        document.getElementById('gateMsg').textContent = 'Could not reach the server. Try reloading.';
+      }
+    }
+
+    function generateCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+
+    let selectedTreatmentIds = new Set();
+
+    async function onSetChange() {
+      const code = document.getElementById('setSelect').value;
+      const hint = document.getElementById('poolHint');
+      hint.textContent = 'Loading pool…';
+      try {
+        const res = await fetch('/api/mtgbbb/sets?set=' + code, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok) { hint.textContent = data.error || 'Could not load this set.'; return; }
+
+        hint.textContent = `${data.set.counts.total} cards in the pool (${data.set.counts.rare} rare, ${data.set.counts.mythic} mythic).`;
+        selectedTreatmentIds = new Set(data.set.treatments.filter(t => !t.collectorOnly).map(t => t.id));
+
+        document.getElementById('treatmentList').innerHTML = data.set.treatments.map(t => `
+          <button type="button" class="treat-chip ${selectedTreatmentIds.has(t.id) ? 'on' : ''}" data-id="${t.id}" onclick="toggleTreatment(this)">
+            ${escHtml(t.label)}${t.collectorOnly ? ' <span class="collector-tag">(Collector)</span>' : ''}
+          </button>`).join('');
+      } catch {
+        hint.textContent = 'Could not load this set.';
+      }
+    }
+
+    function toggleTreatment(btn) {
+      const id = btn.dataset.id;
+      if (selectedTreatmentIds.has(id)) { selectedTreatmentIds.delete(id); btn.classList.remove('on'); }
+      else { selectedTreatmentIds.add(id); btn.classList.add('on'); }
+    }
+
+    /* ── Create room ──────────────────────── */
+    async function createRoom() {
+      const errorEl = document.getElementById('createError');
+      errorEl.textContent = '';
+      const btn = document.getElementById('createBtn');
+      btn.disabled = true;
+
+      const body = {
+        code: document.getElementById('codeInput').value.trim().toUpperCase(),
+        setCode: document.getElementById('setSelect').value,
+        boxes: parseInt(document.getElementById('boxesInput').value, 10),
+        treatments: [...selectedTreatmentIds],
+      };
+
+      try {
+        const res = await fetch('/api/mtgbbb/create', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { errorEl.textContent = data.error || 'Could not create the room.'; return; }
+
+        roomCode = body.code;
+        roomTreatments = data.treatments;
+        document.getElementById('codeDisplay').textContent = roomCode;
+        document.getElementById('setNameStat').textContent = data.setName;
+        showScreen('hostScreen');
+        await hostPoll();
+        hostPollTimer = setInterval(hostPoll, 2000);
+      } catch {
+        errorEl.textContent = 'Network error — try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ── Host panel polling ───────────────── */
+    async function hostPoll() {
+      try {
+        const res = await fetch('/api/mtgbbb/state?code=' + roomCode, { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        roomPool = data.pool;
+        roomTreatments = data.treatments;
+
+        document.getElementById('playerCount').textContent = data.playerCount;
+        document.getElementById('pullCount').textContent = data.pullCount;
+        document.getElementById('packDisplay').textContent = `${data.packsOpened} / ${data.packCount}`;
+
+        renderRecentPulls(data.recentPulls);
+
+        if (data.status === 'ended') {
+          clearInterval(hostPollTimer);
+          hostPollTimer = null;
+          showResults(data);
+        }
+      } catch { /* try again next tick */ }
+    }
+
+    function renderRecentPulls(pulls) {
+      const el = document.getElementById('recentPulls');
+      if (!pulls.length) { el.innerHTML = '<div class="no-pulls">No pulls yet.</div>'; return; }
+      el.innerHTML = pulls.map(p => `
+        <div class="pull-row">
+          <div class="pull-main">${escHtml(p.card)}${p.treatments.length ? `<span class="pull-treat">${p.treatments.map(treatmentLabel).join(', ')}</span>` : ''}</div>
+          <div>
+            <span class="pull-meta">${escHtml(p.by)}</span>
+            <button class="undo-btn" onclick="undoPull('${escAttr(p.id)}')">Undo</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function treatmentLabel(id) {
+      const t = roomTreatments.find(x => x.id === id);
+      return t ? t.label : id;
+    }
+
+    /* ── Search + mark ─────────────────────── */
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', renderSearch);
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const first = document.querySelector('.search-result');
+        if (first) selectCard(first.dataset.name);
+      }
+    });
+
+    function renderSearch() {
+      const q = searchInput.value.trim().toLowerCase();
+      const results = document.getElementById('searchResults');
+      if (!q) { results.innerHTML = ''; return; }
+
+      const matches = roomPool.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
+      results.innerHTML = matches.map(c => `
+        <div class="search-result" data-name="${escAttr(c.name)}" onclick="selectCard('${escAttr(c.name)}')">
+          <span>${escHtml(c.name)}</span>
+          <span class="sr-rarity">${c.rarity}</span>
+        </div>`).join('');
+    }
+
+    function selectCard(name) {
+      pendingCard = name;
+      pendingTreatments = new Set();
+      document.getElementById('markConfirmName').textContent = name;
+      document.getElementById('markTreatments').innerHTML = roomTreatments.map(t => `
+        <button type="button" class="treat-chip" data-id="${t.id}" onclick="togglePendingTreatment(this)">${escHtml(t.label)}</button>
+      `).join('');
+      document.getElementById('markConfirm').classList.add('show');
+      document.getElementById('searchResults').innerHTML = '';
+      searchInput.value = '';
+    }
+
+    function togglePendingTreatment(btn) {
+      const id = btn.dataset.id;
+      if (pendingTreatments.has(id)) { pendingTreatments.delete(id); btn.classList.remove('on'); }
+      else { pendingTreatments.add(id); btn.classList.add('on'); }
+    }
+
+    function cancelMark() {
+      pendingCard = null;
+      document.getElementById('markConfirm').classList.remove('show');
+    }
+
+    async function submitMark() {
+      if (!pendingCard) return;
+      try {
+        const res = await fetch('/api/mtgbbb/mark', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: roomCode, action: 'mark', card: pendingCard, treatments: [...pendingTreatments] }),
+        });
+        if (!res.ok) {
+          /* Left open rather than dismissed — a moderator mid-box needs to
+             see the mark did NOT land, not have it silently vanish. */
+          const data = await res.json().catch(() => ({}));
+          alert(data.error || 'Could not record that pull.');
+          return;
+        }
+      } catch {
+        alert('Network error — that pull was not recorded. Try again.');
+        return;
+      }
+      cancelMark();
+      hostPoll();
+    }
+
+    async function undoPull(pullId) {
+      try {
+        await fetch('/api/mtgbbb/mark', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: roomCode, action: 'undo', pullId }),
+        });
+      } catch {}
+      hostPoll();
+    }
+
+    async function adjustPack(delta) {
+      try {
+        await fetch('/api/mtgbbb/mark', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: roomCode, action: 'pack', delta }),
+        });
+      } catch {}
+      hostPoll();
+    }
+
+    /* ── Copy helpers ─────────────────────── */
+    function copyCode() {
+      navigator.clipboard.writeText(roomCode).then(() => flashBtn('copyCodeBtn', 'Copied!')).catch(() => {});
+    }
+    function copyLink() {
+      const base = window.location.href.replace(/host\.html.*/, 'index.html');
+      navigator.clipboard.writeText(base + '?code=' + roomCode).then(() => flashBtn('copyLinkBtn', 'Copied!')).catch(() => {});
+    }
+    function flashBtn(id, text) {
+      const btn = document.getElementById(id);
+      const orig = btn.textContent;
+      btn.textContent = text;
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    }
+
+    /* ── End game ─────────────────────────── */
+    async function endGame() {
+      if (!confirm('End the game and settle final standings?')) return;
+      try {
+        const res = await fetch('/api/mtgbbb/end', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: roomCode }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) showResults({ standings: data.standings, status: 'ended' });
+      } catch {}
+    }
+
+    function showResults(data) {
+      if (hostPollTimer) { clearInterval(hostPollTimer); hostPollTimer = null; }
+      const standings = data.standings || [];
+      document.getElementById('resultsSub').textContent = `${standings.length} players`;
+
+      const body = document.getElementById('lbBody');
+      if (!standings.length) {
+        body.innerHTML = '<div class="no-players">No players joined this game.</div>';
+      } else {
+        body.innerHTML = standings.map((p, i) => `
+          <div class="lb-row">
+            <div class="lb-rank">${i + 1}</div>
+            <div class="lb-name">${escHtml(p.name)}</div>
+            <div class="lb-blackout">${p.blackout ? 'YES' : ''}</div>
+            <div class="lb-points">${p.points}</div>
+            ${awardControl(p)}
+          </div>`).join('');
+        wireAwards();
+      }
+      showScreen('resultsScreen');
+    }
+
+    function awardControl(p) {
+      const opts = RARITIES.map(t => `<option value="${t.id}">${t.label} · ${t.entries}</option>`).join('');
+      return `<div class="lb-award">
+        <select class="lb-award-tier" data-id="${escAttr(p.id)}">${opts}</select>
+        <button class="lb-award-btn" data-id="${escAttr(p.id)}" data-name="${escAttr(p.name)}">Award</button>
+      </div>`;
+    }
+
+    function wireAwards() {
+      document.querySelectorAll('.lb-award-btn').forEach(btn => btn.addEventListener('click', () => awardPrize(btn)));
+    }
+
+    async function awardPrize(btn) {
+      const id = btn.dataset.id;
+      const row = btn.closest('.lb-award');
+      const rarity = row.querySelector('.lb-award-tier').value;
+      const tier = RARITIES.find(t => t.id === rarity);
+
+      if (!confirm(`Award ${btn.dataset.name} a ${tier.label} prize (${tier.entries} giveaway entries)?`)) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Awarding…';
+      try {
+        const res = await fetch('/api/mtgbbb/award', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: roomCode, playerId: id, rarity }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not award it.');
+        row.innerHTML = `<span class="lb-award-done">${escHtml(tier.label)} · +${data.entries}</span>`;
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Award';
+        alert(err.message);
+      }
+    }
+
+    function backToCreate() {
+      /* A fresh code, not the one just used — that room's key still exists
+         in KV until its TTL expires (ended or not), so reusing it would
+         hit create.js's "code already in use" refusal on the very next
+         click. */
+      document.getElementById('codeInput').value = generateCode();
+      document.getElementById('createError').textContent = '';
+      showScreen('createScreen');
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+    function escAttr(str) { return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window.parent !== window) {
+        window.parent.postMessage('close-game', '*');
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

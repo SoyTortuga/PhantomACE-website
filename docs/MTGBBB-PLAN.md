@@ -1,7 +1,12 @@
 # MTGBBB — Magic: The Gathering Booster Box Bingo
 
-**Status:** steps 1–2 built and tested (scoring engine, Scryfall data layer).
-Steps 3–7 outstanding.
+**Status:** steps 1–5 built (scoring engine, Scryfall data layer, room
+lifecycle, moderator panel, player page) — the whole playable game, per this
+document's own build order. The server-side pieces (steps 1–3) are covered
+by an offline test suite; the two pages (steps 4–5) are code-reviewed but
+have NOT had a live browser pass — `wrangler pages dev` is currently broken
+sitewide for an unrelated reason (see the build order note below). Steps
+6–7 outstanding.
 **Agent:** `game-mtgbbb`.
 
 Chat plays along while the broadcaster cracks a sealed booster box on stream.
@@ -292,13 +297,37 @@ host** to award a prize.
    `functions/api/mtgbbb/sets.js`, `server/sql/003_mtgbbb.sql`, and
    `server/scripts/test-mtgbbb-sets.js` — 154 assertions against captured
    fixtures, so the suite runs offline and never hammers a free service.
-3. **Room lifecycle** — create, join, card generation, state, end.
-4. **Moderator panel.**
-5. **Player page**, including one-away.
+3. ~~**Room lifecycle.**~~ **Done.** `functions/api/mtgbbb/{create,join,mark,
+   state,end,award}.js`. Authorization is deliberately NOT Commander Bingo's
+   shape: create/mark/end are moderator-or-broadcaster (any of them, not only
+   the room's creator — a mod's panel dying mid-box must not lock the game),
+   award is moderator AND that room's host, exactly like bingo. Scoring is
+   computed live in state.js from mtgbbb-scoring's pure functions on every
+   poll, never stored, so there is exactly one place it can be wrong. The
+   pool and treatment table are snapshotted into the room at creation rather
+   than read live from the mtgbbb_set_ cache, so a future DATA_VERSION bump
+   can never change cards out from under a game in progress.
+   `server/scripts/test-mtgbbb-rooms.js` — 67 assertions, offline (a stubbed
+   `fetch` throws on any call, so a set code escaping the KV cache fails
+   loudly instead of hitting Scryfall).
+4. ~~**Moderator panel.**~~ **Built**, not yet browser-verified. `games/mtgbbb/host.html`.
+5. ~~**Player page**, including one-away.~~ **Built**, not yet browser-verified. `games/mtgbbb/index.html`.
 6. **Overlay events.**
 7. **Engagement** — call your shot, heat map, season standings, badges.
 
 Steps 1–5 are the game. Everything after is addition.
+
+**Steps 4 and 5 have not had a live browser pass.** `npx wrangler pages dev`
+— this project's documented local dev server — currently fails to boot at
+all: `functions/api/milestones.js` imports `server/lib/eventsub.js`, which
+uses `node:crypto`, and `wrangler.toml` has no `nodejs_compat` compatibility
+flag. This predates MTGBBB (introduced by the milestone-drops and Postgres
+migration commits) and blocks local preview for every page on the site, not
+just this one. Flagged as a separate task rather than fixed here, since
+`wrangler.toml` governs the real Cloudflare Pages deployment and is not
+MTGBBB's to change. Until it's fixed, verify host.html and index.html by
+reading them against the route responses above, or via the self-hosted
+server once `server/sql/003_mtgbbb.sql` is applied on the rig.
 
 ---
 
@@ -312,3 +341,12 @@ Steps 1–5 are the game. Everything after is addition.
 - **`server/sql/003_mtgbbb.sql` must be applied on the rig** before any MTGBBB
   route is hit on the self-hosted server. It is idempotent.
 - Collector Booster support, and the odds work it needs.
+- **`games.html` does not list MTGBBB yet.** Every other game gets a card
+  there via `launchGame(title, path)` plus an `/assets/images/game-*.png`.
+  Not done here — it needs an actual image asset, which is outside this
+  agent's scope (asset-manager's, or whoever supplies game art).
+- **Local browser verification is blocked**, not by MTGBBB: `wrangler pages
+  dev` fails to boot at all (`node:crypto` from `server/lib/eventsub.js`,
+  imported by `functions/api/milestones.js`, with no `nodejs_compat` flag in
+  `wrangler.toml`). See step 11's note. Flagged separately; host.html and
+  index.html (steps 4–5) still want a real browser pass once it's fixed.

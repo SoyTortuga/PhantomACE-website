@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTGBBB</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      user-select: none;
+    }
+
+    .screen { display: none; width: 100%; max-width: 560px; }
+    .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+    /* ── JOIN SCREEN ─────────────────────── */
+    .game-title { font-size: 28px; color: #ff0000; text-align: center; margin-bottom: 4px; letter-spacing: 0.02em; }
+    .game-subtitle {
+      font-size: 11px; color: #444; text-transform: uppercase; letter-spacing: 0.12em;
+      margin-bottom: 32px; text-align: center;
+    }
+
+    .join-form { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 12px; }
+
+    .join-input {
+      width: 100%; padding: 12px 16px; background: #111; border: 1px solid #222; border-radius: 4px;
+      color: #fff; font-size: 14px; font-family: inherit; text-align: center; outline: none;
+      transition: border-color 0.2s;
+    }
+    .join-input:focus { border-color: #ff0000; }
+    .join-input::placeholder { color: #444; }
+    .join-input.code-input { font-size: 24px; letter-spacing: 0.3em; text-transform: uppercase; font-weight: bold; }
+
+    .join-btn {
+      padding: 12px 24px; background: #ff0000; color: #fff; border: none; border-radius: 4px;
+      font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-family: inherit;
+    }
+    .join-btn:hover { background: #cc0000; }
+    .join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .join-gate { font-size: 11px; color: #aaa; line-height: 1.6; text-align: center; max-width: 300px; }
+    .join-error { font-size: 11px; color: #ff0000; text-align: center; min-height: 16px; margin-top: 4px; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    /* ── CARD SCREEN ─────────────────────── */
+    .card-header {
+      width: 100%; display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 10px; padding: 0 2px; gap: 8px;
+    }
+    .card-info { font-size: 11px; color: #999; line-height: 1.5; }
+    .card-info b { color: #fff; }
+    .card-info .set-name { color: #ff0000; }
+
+    .rank-badge { text-align: right; font-size: 11px; color: #999; }
+    .rank-badge .rank-num { color: #ff0000; font-size: 20px; font-weight: bold; display: block; line-height: 1; }
+
+    .pack-bar-wrap { width: 100%; margin-bottom: 10px; }
+    .pack-bar-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; margin-bottom: 4px; }
+    .pack-bar-label span { color: #ff0000; }
+    .pack-bar { width: 100%; height: 4px; background: #111; border-radius: 2px; overflow: hidden; }
+    .pack-bar-fill { height: 100%; background: #ff0000; transition: width 0.4s ease; }
+
+    .mtg-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; width: 100%;
+    }
+
+    .mtg-cell {
+      aspect-ratio: 5 / 7; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 4px;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      text-align: center; overflow: hidden; position: relative;
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .mtg-cell img {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.55;
+      transition: opacity 0.3s;
+    }
+
+    .mtg-cell .mtg-name {
+      position: relative; z-index: 1; font-size: clamp(6px, 1.9vw, 9px); line-height: 1.2;
+      color: #fff; padding: 3px; background: rgba(0, 0, 0, 0.55); width: 100%;
+      word-break: break-word; hyphens: auto;
+    }
+
+    .mtg-cell .mtg-rarity {
+      position: absolute; top: 2px; right: 3px; z-index: 1; font-size: 7px; font-weight: bold;
+      color: #666; text-transform: uppercase;
+    }
+    .mtg-cell.mythic .mtg-rarity { color: #ff8800; }
+
+    .mtg-cell.marked { border-color: rgba(255, 0, 0, 0.5); background: rgba(152, 9, 10, 0.15); }
+    .mtg-cell.marked img { opacity: 0.85; }
+
+    .mtg-cell.one-away:not(.marked) {
+      border-color: rgba(255, 170, 0, 0.5);
+      /* filter, not box-shadow — a permanent rule for this project's CSS. */
+      filter: drop-shadow(0 0 4px rgba(255, 170, 0, 0.35));
+    }
+
+    .mtg-cell.just-marked { animation: cell-flash 0.6s ease-out; }
+    @keyframes cell-flash {
+      0% { background: rgba(255, 0, 0, 0.55); }
+      100% { background: rgba(152, 9, 10, 0.15); }
+    }
+
+    /* ── SCORE BAR ───────────────────────── */
+    .score-bar {
+      width: 100%; display: flex; justify-content: space-between; align-items: center;
+      margin-top: 10px; padding: 10px 14px; background: #0a0a0a; border: 1px solid #1a1a1a;
+      border-radius: 4px; flex-wrap: wrap; gap: 6px;
+    }
+    .score-item { font-size: 11px; color: #999; }
+    .score-item span { color: #fff; font-weight: bold; }
+    .score-item.total span { color: #ff0000; font-size: 18px; }
+
+    .bingo-alert {
+      display: none; width: 100%; text-align: center; padding: 10px; margin-top: 8px;
+      font-size: 16px; font-weight: bold; color: #ff0000; text-transform: uppercase;
+      letter-spacing: 0.12em; animation: bingo-pulse 0.8s ease-in-out infinite;
+    }
+    .bingo-alert.show { display: block; }
+    @keyframes bingo-pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+    }
+
+    .last-pull { width: 100%; margin-top: 8px; font-size: 11px; color: #555; text-align: center; min-height: 14px; }
+    .last-pull b { color: #fff; }
+
+    .card-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .back-btn {
+      padding: 8px 18px; background: transparent; border: 1px solid #222; border-radius: 3px;
+      color: #555; font-size: 11px; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+    .back-btn:hover { border-color: #ff0000; color: #fff; }
+
+    /* ── RESULTS ─────────────────────────── */
+    .results-title { font-size: 24px; color: #ff0000; margin-bottom: 4px; }
+    .results-subtitle { font-size: 12px; color: #555; margin-bottom: 24px; }
+    .results-card {
+      width: 100%; max-width: 400px; padding: 24px; background: #0a0a0a; border: 1px solid #1a1a1a;
+      border-radius: 6px; text-align: center;
+    }
+    .results-big { font-size: 48px; font-weight: bold; color: #ff0000; line-height: 1; }
+    .results-label { font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; margin-bottom: 20px; }
+    .results-breakdown { list-style: none; text-align: left; }
+    .results-breakdown li { padding: 6px 0; border-bottom: 1px solid #111; font-size: 12px; color: #999; display: flex; justify-content: space-between; }
+    .results-breakdown li span:last-child { color: #fff; font-weight: bold; }
+    .results-actions { margin-top: 20px; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ════ JOIN SCREEN ════ -->
+  <div class="screen active" id="joinScreen">
+    <h1 class="game-title">MTGBBB</h1>
+    <p class="game-subtitle">Booster Box Bingo</p>
+
+    <div class="join-form">
+      <input class="join-input code-input" id="codeInput" placeholder="CODE" maxlength="6" autocomplete="off">
+      <input class="join-input" id="nameInput" placeholder="Display Name" maxlength="30" autocomplete="off">
+      <button class="join-btn" id="joinBtn" onclick="joinGame()">Join Game</button>
+      <a class="join-btn" id="loginBtn" hidden href="/api/auth/twitch">Log In with Twitch</a>
+      <p class="join-gate" id="loginGate" hidden>
+        MTGBBB needs a Twitch login — the moderator can award giveaway entries
+        to a winner, and there is no account to credit a guest.
+      </p>
+      <div class="join-error" id="joinError"></div>
+    </div>
+  </div>
+
+  <!-- ════ CARD SCREEN ════ -->
+  <div class="screen" id="cardScreen">
+    <div class="card-header">
+      <div class="card-info">
+        <span class="set-name" id="setNameInfo"></span><br>
+        Code: <b id="codeInfo"></b>
+      </div>
+      <div class="rank-badge">
+        <span class="rank-num" id="rankNum">—</span>
+        of <span id="rankTotal">0</span>
+      </div>
+    </div>
+
+    <div class="pack-bar-wrap">
+      <div class="pack-bar-label">Packs opened: <span id="packLabel">0 / 0</span></div>
+      <div class="pack-bar"><div class="pack-bar-fill" id="packBarFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="mtg-grid" id="mtgGrid"></div>
+
+    <div class="bingo-alert" id="bingoAlert">Bingo!</div>
+    <div class="last-pull" id="lastPull"></div>
+
+    <div class="score-bar">
+      <div class="score-item">Marks: <span id="marksCount">0</span>/25</div>
+      <div class="score-item">Treatments: <span id="treatCount">0</span></div>
+      <div class="score-item">Lines: <span id="linesCount">0</span></div>
+      <div class="score-item total">Points: <span id="pointsCount">0</span></div>
+    </div>
+
+    <div class="card-actions">
+      <button class="back-btn" onclick="leaveGame()">Leave</button>
+    </div>
+  </div>
+
+  <!-- ════ RESULTS SCREEN ════ -->
+  <div class="screen" id="resultsScreen">
+    <h2 class="results-title">Game Over</h2>
+    <p class="results-subtitle" id="resultsSubtitle"></p>
+
+    <div class="results-card">
+      <div class="results-big" id="resultsPoints">0</div>
+      <div class="results-label">Points</div>
+      <ul class="results-breakdown" id="resultsBreakdown"></ul>
+    </div>
+
+    <div class="results-actions">
+      <button class="back-btn" onclick="backToJoin()">Back</button>
+    </div>
+  </div>
+
+  <script src="/js/session-read.js"></script>
+  <script>
+    const phamSession = typeof readPhamSession === 'function' ? readPhamSession() : null;
+    let gameCode = null;
+    let pollTimer = null;
+    let previousLines = 0;
+    let previousPulls = 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const gate = document.getElementById('loginGate');
+      const loginBtn = document.getElementById('loginBtn');
+      const joinBtn = document.getElementById('joinBtn');
+      const nameInput = document.getElementById('nameInput');
+
+      if (phamSession) {
+        if (nameInput && !nameInput.value) nameInput.value = phamSession.display_name || '';
+        return;
+      }
+      gate.hidden = false;
+      joinBtn.hidden = true;
+      nameInput.hidden = true;
+      loginBtn.hidden = false;
+      loginBtn.href = '/api/auth/twitch?return_to=' +
+        encodeURIComponent(window.location.pathname + window.location.search);
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('code')) document.getElementById('codeInput').value = params.get('code').toUpperCase();
+
+    document.getElementById('codeInput').addEventListener('input', function () {
+      this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+
+    async function joinGame() {
+      const code = document.getElementById('codeInput').value.trim().toUpperCase();
+      const name = document.getElementById('nameInput').value.trim();
+      const errorEl = document.getElementById('joinError');
+
+      if (!code || code.length < 3) { errorEl.textContent = 'Enter the room code'; shakeEl('codeInput'); return; }
+      if (!phamSession) { errorEl.textContent = 'Log in with Twitch to join.'; return; }
+
+      errorEl.textContent = '';
+      const btn = document.getElementById('joinBtn');
+      btn.disabled = true;
+      btn.textContent = 'Joining…';
+
+      try {
+        const res = await fetch('/api/mtgbbb/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ code, name }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { errorEl.textContent = data.error || 'Could not join that game.'; return; }
+
+        gameCode = code;
+        previousLines = 0;
+        previousPulls = 0;
+        document.getElementById('codeInfo').textContent = code;
+        showScreen('cardScreen');
+        await pollState();
+        pollTimer = setInterval(pollState, 2000);
+      } catch {
+        errorEl.textContent = 'Network error — try again.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Join Game';
+      }
+    }
+
+    async function pollState() {
+      try {
+        const res = await fetch('/api/mtgbbb/state?code=' + gameCode, { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        render(data);
+        if (data.status === 'ended') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          showResults(data);
+        }
+      } catch { /* silent — try again next tick */ }
+    }
+
+    function render(data) {
+      document.getElementById('setNameInfo').textContent = data.setName || '';
+      const pct = data.packCount ? Math.min(100, (data.packsOpened / data.packCount) * 100) : 0;
+      document.getElementById('packLabel').textContent = `${data.packsOpened || 0} / ${data.packCount || 0}`;
+      document.getElementById('packBarFill').style.width = pct + '%';
+
+      const you = data.you;
+      if (!you) return;
+
+      const rank = data.standings.findIndex(p => p.id === you.id) + 1;
+      document.getElementById('rankNum').textContent = rank || '—';
+      document.getElementById('rankTotal').textContent = data.standings.length;
+
+      renderGrid(you);
+
+      document.getElementById('marksCount').textContent = you.marks;
+      document.getElementById('treatCount').textContent = you.treatments;
+      document.getElementById('linesCount').textContent = you.lines.length;
+      document.getElementById('pointsCount').textContent = you.points;
+
+      if (you.lines.length > previousLines && you.lines.length > 0) {
+        const alert = document.getElementById('bingoAlert');
+        alert.textContent = you.blackout ? 'Blackout!' : 'Bingo!';
+        alert.classList.add('show');
+        setTimeout(() => alert.classList.remove('show'), 3000);
+      }
+      previousLines = you.lines.length;
+
+      if (data.recentPulls && data.recentPulls.length && data.pullCount !== previousPulls) {
+        const p = data.recentPulls[0];
+        const onCard = you.card.some(c => c.name === p.card);
+        document.getElementById('lastPull').innerHTML = onCard
+          ? `Just pulled: <b>${escHtml(p.card)}</b> — on your card!`
+          : `Just pulled: <b>${escHtml(p.card)}</b>`;
+      }
+      previousPulls = data.pullCount;
+    }
+
+    let gridBuilt = false;
+    function renderGrid(you) {
+      const grid = document.getElementById('mtgGrid');
+      const oneAway = new Set(you.oneAway || []);
+
+      if (!gridBuilt || grid.children.length !== you.card.length) {
+        grid.innerHTML = you.card.map((c, i) => `
+          <div class="mtg-cell" data-index="${i}">
+            ${c.image ? `<img src="${escAttr(c.image)}" alt="" loading="lazy">` : ''}
+            <span class="mtg-rarity"></span>
+            <span class="mtg-name">${escHtml(c.name)}</span>
+          </div>`).join('');
+        gridBuilt = true;
+      }
+
+      you.card.forEach((c, i) => {
+        const cell = grid.children[i];
+        if (!cell) return;
+        const wasMarked = cell.classList.contains('marked');
+        cell.classList.toggle('mythic', c.rarity === 'mythic');
+        const rarityEl = cell.querySelector('.mtg-rarity');
+        if (rarityEl) rarityEl.textContent = c.rarity === 'mythic' ? 'M' : c.rarity === 'rare' ? 'R' : '';
+        cell.classList.toggle('one-away', oneAway.has(i) && !c.marked);
+        if (c.marked && !wasMarked) {
+          cell.classList.add('marked', 'just-marked');
+          setTimeout(() => cell.classList.remove('just-marked'), 600);
+        } else {
+          cell.classList.toggle('marked', c.marked);
+        }
+      });
+    }
+
+    function showResults(data) {
+      const you = data.you;
+      if (!you) { showScreen('resultsScreen'); return; }
+
+      document.getElementById('resultsPoints').textContent = you.points;
+      const rank = data.standings.findIndex(p => p.id === you.id) + 1;
+      document.getElementById('resultsSubtitle').textContent =
+        `Finished #${rank} of ${data.standings.length}`;
+
+      const b = you.breakdown;
+      document.getElementById('resultsBreakdown').innerHTML = [
+        ['Marks', b.marks], ['Treatments', b.treatments],
+        ['Bingo lines', b.bingo], ['Blackout', b.blackout],
+      ].map(([label, val]) => `<li><span>${label}</span><span>${val}</span></li>`).join('');
+
+      showScreen('resultsScreen');
+    }
+
+    function leaveGame() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+      backToJoin();
+    }
+
+    function backToJoin() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+      gridBuilt = false;
+      showScreen('joinScreen');
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function shakeEl(id) {
+      const el = document.getElementById(id);
+      el.style.borderColor = '#ff0000';
+      el.style.animation = 'shake 0.3s';
+      setTimeout(() => { el.style.animation = ''; el.style.borderColor = ''; }, 300);
+    }
+
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+    function escAttr(str) { return String(str).replace(/"/g, '&quot;'); }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window.parent !== window) {
+        window.parent.postMessage('close-game', '*');
+      }
+    });
+  </script>
+</body>
+</html>
