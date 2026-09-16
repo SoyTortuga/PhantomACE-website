@@ -108,6 +108,24 @@ function parseCommand(event) {
   return { command, rest };
 }
 
+/* Which badge in a chat message carries a subscription length.
+
+   Twitch gives the channel's earliest subscribers a FOUNDER badge instead
+   of a subscriber one, so looking only for set_id 'subscriber' misses them
+   — and they are precisely the people with the most months behind them.
+   The cumulative count sits in `info` either way; only the set id differs.
+
+   Subscriber is preferred when both somehow appear, because its version id
+   carries the tier as well. */
+export function pickSubBadge(badges) {
+  const list = Array.isArray(badges) ? badges : [];
+  const sub = list.find(b => b && b.set_id === 'subscriber');
+  if (sub) return { badge: sub, isFounder: false };
+  const founder = list.find(b => b && b.set_id === 'founder');
+  if (founder) return { badge: founder, isFounder: true };
+  return null;
+}
+
 /* THE ONLY PLACE CUMULATIVE MONTHS EVER APPEAR.
 
    Twitch's subscriptions endpoint hands back a tier and no duration, so
@@ -122,11 +140,21 @@ async function recordSubMonths(env, event) {
   const userId = event && event.chatter_user_id;
   if (!userId) return;
 
-  const badge = (event.badges || []).find(b => b && b.set_id === 'subscriber');
-  if (!badge) return;
+  /* FOUNDERS WEAR A DIFFERENT BADGE. Twitch gives the channel's earliest
+     subscribers a founder badge INSTEAD of a subscriber one, so a lookup for
+     set_id 'subscriber' misses them completely — and they are precisely the
+     people with the most months behind them. The cumulative count is still
+     in `info`; only the set id differs. */
+  const picked = pickSubBadge(event.badges);
+  if (!picked) return;
+  const { badge, isFounder } = picked;
 
   const { decodeBadgeVersion } = await import('../import-badges.js');
-  const decoded = decodeBadgeVersion(badge.id);
+  /* A founder badge's version is not a month ladder — it is 0 for everyone —
+     so its months come from `info` alone and its tier is not knowable here.
+     Recording tier 1 is a floor rather than a claim: the importer prefers
+     the tier on the session, and the write below only ever raises. */
+  const decoded = isFounder ? { tier: 1, months: NaN } : decodeBadgeVersion(badge.id);
   /* `info` is the authoritative count; the version id only carries the
      threshold the badge is drawn for. Prefer info, fall back to the id. */
   const fromInfo = parseInt(badge.info, 10);
@@ -140,12 +168,18 @@ async function recordSubMonths(env, event) {
     await env.MARKETPLACE.mutate(`sub_months_${userId}`, (cur) => {
       const hadMonths = cur ? Number(cur.months) || 0 : 0;
       const hadTier = cur ? Number(cur.tier) || 0 : 0;
-      if (hadMonths >= months && hadTier >= tier) return undefined;   // nothing new
+      const knownFounder = !!(cur && cur.founder);
+      if (hadMonths >= months && hadTier >= tier && knownFounder === isFounder) {
+        return undefined;   // nothing new
+      }
       return {
         userId: String(userId),
         name: event.chatter_user_name || (cur && cur.name) || '',
         months: Math.max(months, hadMonths),
         tier: Math.max(tier, hadTier),
+        /* Sticky: someone is a founder for good, and a lapsed founder who
+           returns still wears the badge. */
+        founder: isFounder || !!(cur && cur.founder),
         at: Date.now(),
       };
     });

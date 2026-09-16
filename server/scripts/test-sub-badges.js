@@ -21,6 +21,7 @@
    ══════════════════════════════════════════════ */
 
 import { decodeBadgeVersion, badgeRarity, badgeName } from '../../functions/api/import-badges.js';
+import { pickSubBadge } from '../../functions/api/bot/commands.js';
 
 let passed = 0;
 const failures = [];
@@ -142,6 +143,42 @@ const LADDER = [0, 2, 3, 6, 12, 24, 36, 48, 60, 72, 84, 96];
   const all = [...LADDER, ...LADDER.map(m => 2000 + m), ...LADDER.map(m => 3000 + m)];
   const ids = all.map(idFor);
   check('every badge in the set has its own id', new Set(ids).size, ids.length);
+}
+
+/* ── Which badge carries the duration ────────────────────────────────
+   Founders wear a founder badge INSTEAD of a subscriber one. Looking only
+   for 'subscriber' missed them — and they are the channel's earliest
+   subscribers, so they have the most months and the most to lose. */
+{
+  const B = (set_id, id, info) => ({ set_id, id, info });
+
+  const sub = pickSubBadge([B('moderator', '1'), B('subscriber', '2012', '14')]);
+  check('a subscriber badge is found among others', sub.badge.id, '2012');
+  check('and is not a founder', sub.isFounder, false);
+
+  const f = pickSubBadge([B('founder', '0', '41')]);
+  ok('a founder badge is found at all', !!f);
+  check('and is flagged as one', f.isFounder, true);
+  check('carrying the months in info', f.badge.info, '41');
+
+  /* THE BUG. A founder wears no subscriber badge, so a lookup for one
+     returns nothing and forty-one months go unrecorded. */
+  check('a founder has no subscriber badge to find',
+    [B('founder', '0', '41')].filter(b => b.set_id === 'subscriber').length, 0);
+
+  /* The broadcaster cannot subscribe to themselves, so they carry neither.
+     No duration is recordable for them by design — the importer exempts
+     them rather than gating on one. */
+  check('the broadcaster carries neither', pickSubBadge([B('broadcaster', '1')]), null);
+  check('nor does a plain viewer', pickSubBadge([]), null);
+  check('and junk does not throw', pickSubBadge(null), null);
+  check('nor a malformed entry', pickSubBadge([null, undefined, {}]), null);
+
+  /* Subscriber wins when both appear: its version id carries the tier,
+     which a founder badge's does not. */
+  const both = pickSubBadge([B('founder', '0', '41'), B('subscriber', '3036', '41')]);
+  check('subscriber is preferred over founder', both.badge.set_id, 'subscriber');
+  check('so the tier stays readable', decodeBadgeVersion(both.badge.id).tier, 3);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
