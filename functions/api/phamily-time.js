@@ -337,7 +337,17 @@ const REWARD_ITEM_MAP = {
   },
   wildcard: () => ({ game:'commander-bingo', type:'wildcard', consumable:true, quantity:1 }),
   dice: (rarity, name) => ({ game:'mana-clash', type:'dice-pack', consumable:false }),
-  cosmetic: (rarity, name) => ({ game:'skull-clicker', type:'cosmetic', consumable:false }),
+  /* THE MISMATCH THIS FIXES. These granted `type:'cosmetic'`, and Skull
+     Clicker reads 'skull-skin' and 'click-effect' — so a claimed reward
+     landed in the inventory as a type the game had no category for and
+     never showed. It also carried the reward key as its id, where the game
+     equips by the theme's own id, so even a corrected type would not have
+     applied. Both halves are the id: grantReward passes cosmeticId through
+     and the mapper makes it the item's id. */
+  'skull-skin': (rarity, name, cosmeticId) =>
+    ({ id: cosmeticId, game:'skull-clicker', type:'skull-skin', consumable:false }),
+  'click-effect': (rarity, name, cosmeticId) =>
+    ({ id: cosmeticId, game:'skull-clicker', type:'click-effect', consumable:false }),
   badge: () => ({ game:'profile', type:'badge', consumable:false }),
   title: () => ({ game:'profile', type:'title', consumable:false }),
   banner: () => ({ game:'profile', type:'banner', consumable:false }),
@@ -365,7 +375,7 @@ const REWARD_ITEM_MAP = {
  * their own level, so there is nobody to prove anything to and no reason for
  * the code to exist.
  */
-async function grantReward(env, session, { id, type, rarity, name }) {
+async function grantReward(env, session, { id, type, rarity, name, cosmeticId }) {
   if (!type) return;
 
   if (type === 'giveaway') {
@@ -377,7 +387,7 @@ async function grantReward(env, session, { id, type, rarity, name }) {
 
   const mapper = REWARD_ITEM_MAP[type];
   if (!mapper) return;
-  await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name) });
+  await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name, cosmeticId) });
 }
 
 /**

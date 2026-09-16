@@ -48,8 +48,9 @@
       name:'Rare Card Back', desc:'An exclusive card back for Memory Match' });
     r.push({ level:65, rarity:'rare', type:'bingo', icon:REWARD_ICONS.bingo,
       name:'Bonus Bingo Card', desc:'An extra bingo card for Commander Bingo' });
-    r.push({ level:85, rarity:'rare', type:'cosmetic', icon:REWARD_ICONS.cosmetic,
-      name:'Skull Skin', desc:'A cosmetic skull skin for Skull Clicker' });
+    r.push({ level:85, rarity:'rare', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
+      cosmeticId:'blood',
+      name:'Skull Skin', desc:'The Blood Skull theme for Skull Clicker' });
     r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
       name:'Bone Dice', desc:'Cosmetic bone-themed dice for Mana Clash' });
     return r.sort((a,b) => a.level - b.level);
@@ -87,16 +88,19 @@
       name:'Chaos Dice Pack', desc:'Cosmetic chaos-themed dice for Mana Clash' });
     r.push({ level:55, rarity:'rare', type:'cardback', icon:REWARD_ICONS.cardback,
       name:'Legendary Card Back', desc:'A rare card back for Memory Match' });
-    r.push({ level:65, rarity:'rare', type:'cosmetic', icon:REWARD_ICONS.cosmetic,
-      name:'Dark Altar Skin', desc:'An exclusive building skin for Skull Clicker' });
-    r.push({ level:85, rarity:'rare', type:'cosmetic', icon:REWARD_ICONS.cosmetic,
-      name:'Void Click Effect', desc:'A cosmetic click effect for Skull Clicker' });
+    r.push({ level:65, rarity:'rare', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
+      cosmeticId:'void',
+      name:'Dark Altar Skin', desc:'The Void Skull theme for Skull Clicker' });
+    r.push({ level:85, rarity:'rare', type:'click-effect', icon:REWARD_ICONS.cosmetic,
+      cosmeticId:'void',
+      name:'Void Click Effect', desc:'The Void Click effect for Skull Clicker' });
     r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
       name:'Phantom Dice Pack', desc:'Cosmetic phantom-themed dice for Mana Clash' });
     r.push({ level:105, rarity:'mythic', type:'egg', icon:REWARD_ICONS.egg,
       name:'Guaranteed Mutant Egg', desc:'A Dino Park egg — guaranteed mutant dinosaur' });
-    r.push({ level:115, rarity:'mythic', type:'cosmetic', icon:REWARD_ICONS.cosmetic,
-      name:'Eternal Darkness Skin', desc:'A mythic building skin for Skull Clicker' });
+    r.push({ level:115, rarity:'mythic', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
+      cosmeticId:'eternal',
+      name:'Eternal Darkness Skin', desc:'The Eternal Darkness theme for Skull Clicker' });
     r.push({ level:130, rarity:'mythic', type:'dice', icon:REWARD_ICONS.dice,
       name:'Reality Fracture Dice', desc:'Mythic animated dice for Mana Clash' });
     return r.sort((a,b) => a.level - b.level);

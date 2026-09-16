@@ -108,7 +108,55 @@ function parseCommand(event) {
   return { command, rest };
 }
 
+/* THE ONLY PLACE CUMULATIVE MONTHS EVER APPEAR.
+
+   Twitch's subscriptions endpoint hands back a tier and no duration, so
+   nothing at login can say how long someone has subscribed. The badge they
+   wear in chat carries it, in `info`, and it is correct by construction:
+   Twitch decides what badge to attach, not us.
+
+   Recorded monotonically. A viewer who lapses and resubscribes should not
+   lose the eight years they already earned, and a badge can only ever be
+   worn at or above what was earned. */
+async function recordSubMonths(env, event) {
+  const userId = event && event.chatter_user_id;
+  if (!userId) return;
+
+  const badge = (event.badges || []).find(b => b && b.set_id === 'subscriber');
+  if (!badge) return;
+
+  const { decodeBadgeVersion } = await import('../import-badges.js');
+  const decoded = decodeBadgeVersion(badge.id);
+  /* `info` is the authoritative count; the version id only carries the
+     threshold the badge is drawn for. Prefer info, fall back to the id. */
+  const fromInfo = parseInt(badge.info, 10);
+  const months = Number.isFinite(fromInfo) && fromInfo >= 0
+    ? fromInfo
+    : (decoded ? decoded.months : NaN);
+  if (!Number.isFinite(months)) return;
+  const tier = decoded ? decoded.tier : 1;
+
+  try {
+    await env.MARKETPLACE.mutate(`sub_months_${userId}`, (cur) => {
+      const hadMonths = cur ? Number(cur.months) || 0 : 0;
+      const hadTier = cur ? Number(cur.tier) || 0 : 0;
+      if (hadMonths >= months && hadTier >= tier) return undefined;   // nothing new
+      return {
+        userId: String(userId),
+        name: event.chatter_user_name || (cur && cur.name) || '',
+        months: Math.max(months, hadMonths),
+        tier: Math.max(tier, hadTier),
+        at: Date.now(),
+      };
+    });
+  } catch (err) {
+    /* A chat message must never fail over a bookkeeping write. */
+    console.error('[bot] could not record sub months:', err.message);
+  }
+}
+
 async function handleChatMessage(env, event) {
+  await recordSubMonths(env, event);
   const parsed = parseCommand(event);
 
   /* ORDINARY CHAT REACHES THE GAME. Every message used to stop here unless

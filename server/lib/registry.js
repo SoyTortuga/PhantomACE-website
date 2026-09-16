@@ -162,6 +162,10 @@ export const FAMILIES = [
 
      mtgbbb_{CODE} — a game room. 'real', exactly like bingo_ and mc_room_:
      the TTL IS the rule that ends an abandoned game. */
+  /* sub_months_{userId} — how long someone has actually subscribed, learned
+     from the badge they wear in chat because no API returns it. 'none': this
+     is the only record of it and losing it loses the duration. */
+  { prefix: 'sub_months_',     table: 'sub_months',       expiry: 'none' },
   { prefix: 'mtgbbb_set_',     table: 'mtgbbb_sets',      expiry: 'none' },
   { prefix: 'mtgbbb_',         table: 'mtgbbb_rooms',     expiry: 'real' },
 

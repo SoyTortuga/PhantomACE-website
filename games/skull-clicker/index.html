@@ -785,7 +785,11 @@
     const COSMETIC_DEFS = {
       'skull-skin': { slot: 'skull-theme', icon: '💀', category: 'Skull Themes' },
       'click-effect': { slot: 'click-effect', icon: '✨', category: 'Click Effects' },
-      'building-skin': { slot: 'building-skin', icon: '🏰', category: 'Building Skins' },
+      /* 'building-skin' was declared here with no BUILDING_SKINS table to
+         draw from, so the category existed and could never hold anything.
+         The two rewards that granted building skins now grant skull themes,
+         which is why it is gone rather than filled in. */
+      'badge-skull': { slot: 'skull-image', icon: '🎖️', category: 'Loyalty Skulls' },
     };
 
     const SKULL_THEMES = {
@@ -805,7 +809,8 @@
     };
 
     let ownedCosmetics = [];
-    let equippedCosmetics = { 'skull-theme': 'default', 'click-effect': 'default' };
+    let badgeSkulls = [];
+    let equippedCosmetics = { 'skull-theme': 'default', 'click-effect': 'default', 'skull-image': 'default' };
 
     async function loadCosmetics() {
       try {
@@ -817,8 +822,38 @@
           if (data.equips['skull-theme']) equippedCosmetics['skull-theme'] = data.equips['skull-theme'];
           if (data.equips['click-effect']) equippedCosmetics['click-effect'] = data.equips['click-effect'];
         }
-        applyCosmetics();
       } catch {}
+
+      /* LOYALTY SKULLS. A subscriber's Twitch badges are already imported
+         into the profile inventory with their artwork, already gated by how
+         long they have actually subscribed, and already ranked by rarity.
+         Nothing needs granting — the badge someone earned by subscribing
+         becomes the skull they click.
+
+         They stay in the profile inventory rather than being copied here:
+         equipping under game 'profile' passes the ownership check as it
+         stands, and the list grows on its own as their badges do. */
+      try {
+        const res = await fetch('/api/inventory?game=profile');
+        if (res.ok) {
+          const prof = await res.json();
+          badgeSkulls = (prof.items || [])
+            .filter(i => i.type === 'badge' && i.meta && i.meta.imageUrl4x)
+            .sort((a, b) => (b.meta.monthThreshold || 0) - (a.meta.monthThreshold || 0));
+          if (prof.equips && prof.equips['skull-image']) {
+            equippedCosmetics['skull-image'] = prof.equips['skull-image'];
+          }
+        }
+      } catch {}
+
+      applyCosmetics();
+    }
+
+    /* The frame and the face are separate things. A theme styles the button
+       — border and gradient — and a loyalty skull replaces the image inside
+       it, so the two combine rather than competing for one slot. */
+    function badgeSkullFor(id) {
+      return badgeSkulls.find(b => b.id === id) || null;
     }
 
     function applyCosmetics() {
@@ -833,17 +868,34 @@
       const effectId = equippedCosmetics['click-effect'] || 'default';
       const effect = CLICK_EFFECTS[effectId];
       if (effect && effect.cssClass) area.classList.add(effect.cssClass);
+
+      const img = btn.querySelector('img');
+      if (img) {
+        if (!img.dataset.defaultSrc) img.dataset.defaultSrc = img.getAttribute('src') || '';
+        const badge = badgeSkullFor(equippedCosmetics['skull-image']);
+        /* A Twitch badge is 72px at its largest and the skull renders at
+           91px, so it upscales by about a quarter. Rendered pixelated
+           rather than smoothed, the way Dino Park's sprites and the
+           overlay's eggs already are, so the edge reads as deliberate. */
+        img.src = badge ? badge.meta.imageUrl4x : img.dataset.defaultSrc;
+        img.style.imageRendering = badge ? 'pixelated' : '';
+        img.alt = badge ? badge.name : 'Skull';
+      }
     }
 
     async function equipCosmetic(slot, itemId) {
       equippedCosmetics[slot] = itemId;
       applyCosmetics();
       render();
+      /* Loyalty skulls belong to the profile inventory, so they equip
+         against 'profile'. Sending them as 'skull-clicker' would fail the
+         ownership check, which only matches an item within its own game. */
+      const ownerGame = slot === 'skull-image' ? 'profile' : 'skull-clicker';
       try {
         await fetch('/api/inventory', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'equip', game: 'skull-clicker', slot, itemId: itemId === 'default' ? 'none' : itemId }),
+          body: JSON.stringify({ action: 'equip', game: ownerGame, slot, itemId: itemId === 'default' ? 'none' : itemId }),
         });
       } catch {}
     }
@@ -860,8 +912,17 @@
     function renderCosmetics() {
       const el = document.getElementById('tab-cosmetics');
 
-      const themes = ownedCosmetics.filter(i => i.name && (i.name.toLowerCase().includes('skin') || i.name.toLowerCase().includes('skull') || i.name.toLowerCase().includes('theme')));
-      const effects = ownedCosmetics.filter(i => i.name && (i.name.toLowerCase().includes('effect') || i.name.toLowerCase().includes('click')));
+      /* Type first. These used to be sorted by matching words in the item's
+         name, because every reward arrived as type 'cosmetic' and the name
+         was the only thing that distinguished a skull skin from a click
+         effect. Rewards now carry the real type; the name test stays as a
+         fallback so anything granted under the old scheme still appears. */
+      const legacyName = (i, words) =>
+        i.type === 'cosmetic' && i.name && words.some(w => i.name.toLowerCase().includes(w));
+      const themes = ownedCosmetics.filter(i =>
+        i.type === 'skull-skin' || legacyName(i, ['skin', 'skull', 'theme']));
+      const effects = ownedCosmetics.filter(i =>
+        i.type === 'click-effect' || legacyName(i, ['effect', 'click']));
 
       let html = '<div class="section-label">Skull Themes</div>';
       html += cosmeticOptionRow('skull-theme', 'default', SKULL_THEMES['default'], 'common');
@@ -879,8 +940,26 @@
         html += cosmeticOptionRow('click-effect', eid, def, item.rarity || 'common');
       }
 
-      if (themes.length === 0 && effects.length === 0) {
-        html += '<div class="cosmetic-empty">No cosmetics unlocked yet.<br>Earn them through Phamily Time rewards!</div>';
+      if (badgeSkulls.length) {
+        html += '<div class="section-label">Loyalty Skulls</div>';
+        html += cosmeticOptionRow('skull-image', 'default',
+          { name: 'Default', desc: 'The classic bone skull' }, 'common');
+        for (const b of badgeSkulls) {
+          const months = b.meta.monthThreshold || 0;
+          html += cosmeticOptionRow('skull-image', b.id, {
+            name: b.name,
+            desc: months > 0
+              ? `Your ${months}-month subscriber badge, worn as a skull`
+              : 'Your subscriber badge, worn as a skull',
+            img: b.meta.imageUrl4x,
+          }, b.rarity || 'common');
+        }
+      }
+
+      if (themes.length === 0 && effects.length === 0 && badgeSkulls.length === 0) {
+        html += '<div class="cosmetic-empty">No cosmetics unlocked yet.<br>'
+          + 'Earn them through Phamily Time rewards, or import your Twitch '
+          + 'subscriber badges from your inventory to wear them as skulls.</div>';
       }
 
       el.innerHTML = html;
@@ -889,7 +968,9 @@
     function cosmeticOptionRow(slot, id, def, rarity) {
       const isEquipped = equippedCosmetics[slot] === id;
       return `<div class="cosmetic-row ${isEquipped ? 'equipped' : ''}" onclick="equipCosmetic('${slot}','${id}')">
-        <div class="cosmetic-icon">${slot === 'skull-theme' ? '💀' : '✨'}</div>
+        <div class="cosmetic-icon">${def.img
+          ? `<img src="${def.img}" alt="" style="width:28px;height:28px;image-rendering:pixelated">`
+          : (slot === 'click-effect' ? '✨' : '💀')}</div>
         <div class="cosmetic-info">
           <div class="cosmetic-name">${def.name} ${id !== 'default' ? `<span class="cosmetic-badge badge-${rarity}">${rarity}</span>` : ''}</div>
           <div class="cosmetic-desc">${def.desc}</div>

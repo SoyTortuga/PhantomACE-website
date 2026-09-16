@@ -25,14 +25,38 @@ async function saveInventory(env, userId, inv) {
   await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
 }
 
-const BADGE_TIER_MAP = {
-  1: { rarity: 'common', name: 'Tier 1 Sub Badge' },
-  3: { rarity: 'uncommon', name: '3-Month Sub Badge' },
-  6: { rarity: 'uncommon', name: '6-Month Sub Badge' },
-  12: { rarity: 'rare', name: '1-Year Sub Badge' },
-  24: { rarity: 'rare', name: '2-Year Sub Badge' },
-  36: { rarity: 'mythic', name: '3-Year Sub Badge' },
-};
+/* TWITCH ENCODES THE TIER IN THE VERSION ID. A plain number is Tier 1;
+   2000+ is Tier 2 and 3000+ is Tier 3, with the months as the remainder.
+   PhantomACE's set runs 0/2/3/6/12/24/36/48/60/72/84/96 at Tier 1 and the
+   same ladder again at 2000+ and 3000+.
+
+   Read naively, version 2012 is "two thousand and twelve months" — larger
+   than anyone's subscription, so every Tier 2 and Tier 3 badge was silently
+   skipped and only Tier 1 was ever granted. */
+export function decodeBadgeVersion(id) {
+  const n = parseInt(id, 10);
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (n >= 3000) return { tier: 3, months: n - 3000 };
+  if (n >= 2000) return { tier: 2, months: n - 2000 };
+  return { tier: 1, months: n };
+}
+
+/* Rarity tracks the duration, because that is what the badge is for. Tier
+   raises the floor a little: a Tier 3 subscriber at six months is paying
+   more than a Tier 1 at six months and the shelf should say so. */
+export function badgeRarity(months, tier) {
+  let r = months >= 36 ? 'mythic' : months >= 12 ? 'rare' : months >= 3 ? 'uncommon' : 'common';
+  if (tier === 3 && r === 'common') r = 'uncommon';
+  return r;
+}
+
+/* Twitch's own title — "6-Month Subscriber" — is the duration in the
+   channel's own words, so it is preferred over anything reconstructed
+   here. It does not mention the tier, so tiers above the first say so. */
+export function badgeName(months, tier, title) {
+  const base = title || (months > 0 ? `${months}-Month Subscriber` : 'Subscriber');
+  return tier > 1 ? `Tier ${tier} \u00b7 ${base}` : base;
+}
 
 async function getAppAccessToken(env) {
   /* Shared cached token — see functions/api/auth/app-token.js. Minting one
@@ -70,37 +94,55 @@ export async function onRequestPost(context) {
   const isSub = subRole.startsWith('sub_') || subRole === 'broadcaster';
   if (!isSub) return json({ error: 'Must be a subscriber to import badges' }, 403);
 
-  const subMonths = session.sub_months || 1;
+  /* HOW LONG THEY HAVE ACTUALLY SUBSCRIBED.
+
+     Helix returns a tier and no duration, so `session.sub_months` was never
+     set by anything — it read undefined, fell back to 1, and the loop then
+     granted the zero-month badge and nothing else. Every click of Import
+     Badges returned one badge no matter how long someone had subscribed.
+
+     The real number only ever appears in the badge a subscriber wears in
+     chat, which the bot records as they speak. Someone who has never typed
+     in chat has no record, and gets the entry-level badge until they do. */
+  const seen = await env.MARKETPLACE.get(`sub_months_${session.user_id}`, 'json');
+  const subMonths = seen && Number.isFinite(Number(seen.months)) ? Number(seen.months) : 0;
+  const subTier = Number(session.subTier) || (seen ? Number(seen.tier) : 0) || 1;
 
   const inv = await getInventory(env, session.user_id);
   let imported = 0;
 
   for (const version of subBadgeSet.versions) {
-    const monthThreshold = parseInt(version.id, 10);
-    if (isNaN(monthThreshold) || monthThreshold > subMonths) continue;
+    const decoded = decodeBadgeVersion(version.id);
+    if (!decoded) continue;
 
-    const badgeId = `twitch_sub_badge_${monthThreshold}`;
-    if (inv.items.find(i => i.id === badgeId)) continue;
+    /* Both gates, not either. Duration alone would hand a Tier 1 subscriber
+       the Tier 3 artwork; tier alone would hand a new Tier 3 subscriber the
+       eight-year badge. */
+    if (decoded.months > subMonths) continue;
+    if (decoded.tier > subTier) continue;
 
-    const tierInfo = BADGE_TIER_MAP[monthThreshold] || {
-      rarity: monthThreshold >= 24 ? 'rare' : monthThreshold >= 6 ? 'uncommon' : 'common',
-      name: `${monthThreshold}-Month Sub Badge`,
-    };
+    const badgeId = `twitch_sub_badge_t${decoded.tier}_${decoded.months}`;
+    /* The old scheme keyed on the raw version id and so could not tell
+       Tier 2 at twelve months from Tier 1 at twelve months. Checked too, so
+       re-importing does not hand anyone a duplicate of what they hold. */
+    const legacyId = `twitch_sub_badge_${version.id}`;
+    if (inv.items.find(i => i.id === badgeId || i.id === legacyId)) continue;
 
     inv.items.push({
       id: badgeId,
       game: 'profile',
       type: 'badge',
       consumable: false,
-      name: tierInfo.name,
-      rarity: tierInfo.rarity,
+      name: badgeName(decoded.months, decoded.tier, version.title),
+      rarity: badgeRarity(decoded.months, decoded.tier),
       grantedAt: Date.now(),
       source: 'twitch-import',
       meta: {
         imageUrl1x: version.image_url_1x,
         imageUrl2x: version.image_url_2x,
         imageUrl4x: version.image_url_4x,
-        monthThreshold,
+        monthThreshold: decoded.months,
+        subTier: decoded.tier,
         description: version.description || '',
       },
     });
