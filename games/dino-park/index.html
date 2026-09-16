@@ -346,6 +346,14 @@
     .pbadge-epic { background: #9b59b622; color: #9b59b6; }
     .pbadge-legendary { background: #f39c1222; color: #f39c12; }
     .pbadge-diet { background: #ffffff0a; color: #888; }
+    .panel-fav {
+      background: none; border: none; cursor: pointer;
+      font-size: 22px; line-height: 1; padding: 0 6px;
+      color: #6f6f6f; transition: color 0.15s;
+    }
+    .panel-fav:hover { color: #ffb300; }
+    .panel-fav.is-fav { color: #ffb300; }
+
     .panel-close {
       background: transparent; border: 1px solid #333; color: #666;
       width: 24px; height: 24px; border-radius: 4px; font-size: 14px;
@@ -2195,6 +2203,61 @@ function getSprite(specId, size, mutation) {
   return url;
 }
 
+/* ══ FAVOURITE ══════════════════════════════════════════════════════
+   One dino, shown on the player's public profile.
+
+   Sprites here are composed in the browser — recoloured per species and
+   mutation, sometimes drawn to a canvas outright — so there is no URL a
+   profile page could simply point at. Rather than export the whole
+   pipeline, the favourite stores the RESOLVED image: an absolute path into
+   this game's asset tree, or an inline sprite for the species that have no
+   file of their own.
+
+   Absolute, because the profile is not served from this directory and the
+   relative paths in ASSET_MAP would resolve against the wrong one. The
+   server refuses anything outside this tree, so the prefix is load-bearing
+   rather than cosmetic. */
+function resolveFavoriteSprite(specId, mutation) {
+  const asset = ASSET_MAP[specId];
+  if (asset && asset.icon) {
+    const mut = mutation ? getMutFilter(specId, mutation) : '';
+    const corr = (!mut && asset.ic && asset.portrait) ? asset.ic : '';
+    return { src: '/games/dino-park/' + asset.icon, filter: corr || mut || '' };
+  }
+  return { src: getSprite(specId, 96, mutation), filter: '' };
+}
+
+/* Matched on what the dino IS rather than on its index, which changes every
+   time one is released or the park is re-ordered. */
+function isFavorite(dino) {
+  const f = state.favorite;
+  if (!f || !dino) return false;
+  return f.specId === dino.speciesId
+      && (f.mutation || '') === (dino.mutation || '')
+      && (f.nickname || '') === (dino.nickname || '');
+}
+
+function toggleFavorite(idx) {
+  const dino = state.park[idx];
+  if (!dino) return;
+
+  if (isFavorite(dino)) {
+    state.favorite = null;
+  } else {
+    const spec = getRosterById(dino.speciesId);
+    const resolved = resolveFavoriteSprite(dino.speciesId, dino.mutation);
+    state.favorite = {
+      specId: dino.speciesId,
+      mutation: dino.mutation || '',
+      nickname: dino.nickname || (spec ? spec.name : ''),
+      src: resolved.src,
+      filter: resolved.filter,
+    };
+  }
+  renderBottomPanel();
+  save();
+}
+
 function spriteImg(specId, size, cls, mutation) {
   const asset = ASSET_MAP[specId];
   if (asset) {
@@ -3879,6 +3942,10 @@ function renderBottomPanel() {
           <span class="panel-badge pbadge-diet">${stage}</span>
         </div>
       </div>
+      <button class="panel-fav${isFavorite(dino) ? ' is-fav' : ''}"
+        onclick="toggleFavorite(${idx})"
+        title="${isFavorite(dino) ? 'Showing on your profile' : 'Show this one on your profile'}"
+        aria-pressed="${isFavorite(dino) ? 'true' : 'false'}">${isFavorite(dino) ? '★' : '☆'}</button>
       <button class="panel-close" onclick="selectedDinoIdx=-1;renderBottomPanel();document.querySelectorAll('.park-dino').forEach(e=>e.classList.remove('selected'));">✕</button>
     </div>
     <div class="panel-stats">
