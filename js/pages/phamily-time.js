@@ -204,6 +204,11 @@
   function getRewardState(reward, track) {
     const key = rewardKey(reward, track);
     if (claimedRewards.includes(key)) return 'claimed';
+    /* The phamily track is the subscriber bonus on top of the follower
+       track, not a second track viewers pick between — so it stays locked
+       for non-subs no matter their level. The follower track has no such
+       gate; everyone, subs included, earns it. */
+    if (track === 'phamily' && !userIsSub) return 'locked';
     if (reward.level <= userLevel) return 'ready';
     return 'locked';
   }
@@ -443,7 +448,9 @@
       statusEl.textContent = 'Claimed';
     } else {
       claimBtn.hidden = true;
-      statusEl.textContent = 'Reach level ' + reward.level + ' to unlock';
+      statusEl.textContent = (track === 'phamily' && !userIsSub)
+        ? 'Subscribe to unlock the Phamily track'
+        : 'Reach level ' + reward.level + ' to unlock';
     }
 
     positionPopover(e);
@@ -566,10 +573,15 @@
   function updateClaimAllBtn() {
     const btn = document.getElementById('ptClaimAllBtn');
     if (!btn) return;
-    const track = userIsSub ? 'phamily' : 'follower';
-    const list = userIsSub ? phamilyRewards : followerRewards;
-    const ready = list.filter(r => r.level <= userLevel && !claimedRewards.includes(rewardKey(r, track))).length
-      + milestones.filter(m => m.level <= userLevel && !claimedMilestones.includes(m.level)).length;
+    /* Follower track counts for everyone; phamily is the subscriber bonus
+       on top of it, so it only adds to the count for subs. */
+    let ready = followerRewards.filter(r =>
+      r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'follower'))).length;
+    if (userIsSub) {
+      ready += phamilyRewards.filter(r =>
+        r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'phamily'))).length;
+    }
+    ready += milestones.filter(m => m.level <= userLevel && !claimedMilestones.includes(m.level)).length;
     btn.hidden = ready === 0;
     btn.textContent = ready === 1 ? 'Claim 1' : `Claim All (${ready})`;
     btn.disabled = false;
@@ -717,8 +729,12 @@
 
     const readyFollower = followerRewards.filter(r =>
       r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'follower')));
-    const readyPhamily = phamilyRewards.filter(r =>
-      r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'phamily')));
+    /* Same gate as getRewardState: the phamily track requires a CURRENT
+       subscription, not whatever the viewer's status was last month. */
+    const readyPhamily = userIsSub
+      ? phamilyRewards.filter(r =>
+          r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'phamily')))
+      : [];
     const readyMilestones = milestones.filter(ms =>
       ms.level <= prevMonth.level && !prevMonth.claimedMilestones.includes(ms.level));
 

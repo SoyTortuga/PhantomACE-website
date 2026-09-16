@@ -395,7 +395,7 @@ async function handleClaimReward(env, session, mk, body) {
   const rewardKey = String(body.rewardKey || '');
   if (!rewardKey) return json({ error: 'Missing reward key' }, 400);
 
-  const { findReward, trackFor } = await import('./phamily-rewards.js');
+  const { findReward } = await import('./phamily-rewards.js');
   const reward = findReward(rewardKey);
   if (!reward) return json({ error: 'No such reward' }, 400);
 
@@ -407,11 +407,14 @@ async function handleClaimReward(env, session, mk, body) {
   if (reward.level > data.level) {
     return json({ error: 'Level not reached' }, 400);
   }
-  /* The track is part of the key, and was never checked — so a follower
-     could claim the phamily-track version of a reward, which is a tier
-     higher at the same level. */
-  if (reward.track !== trackFor(getSubTier(session))) {
-    return json({ error: 'That reward is on the other track' }, 403);
+  /* The follower track is open to everyone. The phamily track is the
+     subscriber bonus ON TOP of it — a subscriber earns BOTH tracks at a
+     given level, not one instead of the other. This used to route through
+     trackFor(), which picks a single track per viewer and rejected anyone
+     claiming the "other" one — so a subscriber could not claim their own
+     follower-track rewards at all. Only the phamily track itself is gated. */
+  if (reward.track === 'phamily' && getSubTier(session) <= 0) {
+    return json({ error: 'Phamily track rewards require an active subscription' }, 403);
   }
 
   data.claimedRewards.push(rewardKey);
@@ -449,14 +452,16 @@ async function handleClaimReward(env, session, mk, body) {
  * plainly that three of five landed.
  */
 async function handleClaimAll(env, session, mk) {
-  const { earnedRewards, earnedMilestones, rewardKeyFor, trackFor } =
+  const { earnedRewards, earnedMilestones, rewardKeyFor } =
     await import('./phamily-rewards.js');
 
   const data = await getUserData(env, session.user_id, mk);
-  const track = trackFor(getSubTier(session));
+  /* Everyone earns the follower track; subscribers earn the phamily track
+     on top of it, not instead of it — see handleClaimReward. */
+  const tracks = getSubTier(session) > 0 ? ['follower', 'phamily'] : ['follower'];
 
-  const rewards = earnedRewards(track, data.level)
-    .map(r => rewardKeyFor(r, track))
+  const rewards = tracks
+    .flatMap(track => earnedRewards(track, data.level).map(r => rewardKeyFor(r, track)))
     .filter(key => !data.claimedRewards.includes(key));
 
   const milestones = earnedMilestones(data.level)
