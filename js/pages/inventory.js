@@ -60,16 +60,26 @@ async function loadInventory() {
 
 function renderCollection(container) {
   const session = getSession();
-  const isSub = session && session.role && (session.role.startsWith('sub_') || session.role === 'broadcaster');
+  /* subTier, not role. A subscribing MODERATOR has role 'moderator' — the
+     role field is a display ladder where moderator outranks every sub tier —
+     so testing role hid this button from the subscribers most likely to be
+     in chat earning badges. */
+  const isSub = session && (Number(session.subTier) > 0 || session.role === 'broadcaster');
   const hasTwitchBadges = profileItems.some(i => i.source === 'twitch-import');
 
   let html = '';
 
-  if (isSub && !hasTwitchBadges) {
+  /* Shown whenever they are a subscriber, not only before their first
+     import. Badges accrue: a new one arrives every few months, and the
+     button used to vanish the moment a single badge landed — which stranded
+     everyone who imported while the grant was broken and received exactly
+     one. There is nothing to protect against, since importing again only
+     ever adds what is missing. */
+  if (isSub) {
     html += `
       <div class="import-badges-bar">
         <button class="btn-secondary import-badges-btn" id="importBadgesBtn" onclick="importTwitchBadges()">
-          Import Twitch Sub Badges
+          ${hasTwitchBadges ? 'Check for New Sub Badges' : 'Import Twitch Sub Badges'}
         </button>
       </div>`;
   }
