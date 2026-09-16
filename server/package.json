@@ -31,7 +31,8 @@
     "test-eventsub-verify": "node scripts/test-eventsub-verify.js",
     "test-sub-badges": "node scripts/test-sub-badges.js",
     "check-sub-months": "node scripts/check-sub-months.js",
-    "test-profile": "node scripts/test-profile.js"
+    "test-profile": "node scripts/test-profile.js",
+    "backfill-milestone-badges": "node scripts/backfill-milestone-badges.js"
   },
   "engines": {
     "node": ">=20"
