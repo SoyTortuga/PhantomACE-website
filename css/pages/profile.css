@@ -341,3 +341,8 @@
   .prof-badge { width: calc(50% - 6px); }
   .prof-unit { display: none; }
 }
+
+/* Comment wall (drawn by profile-comments.js with community.css classes). */
+.prof-comments-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-sec); margin-bottom: 12px; cursor: pointer; }
+.prof-comments-switch input { accent-color: var(--red); }
+.prof-comments-empty { padding: 20px; }

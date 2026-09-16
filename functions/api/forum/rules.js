@@ -58,6 +58,18 @@ export function replyRule({ session, staff, category, thread, recentPosts = 0 })
   return ok;
 }
 
+/** Leaving a comment on somebody's profile. `owner` is the profile record
+    (null if nobody is there); `enabled` is their comments switch, on
+    unless they turned it off. Turning it off refuses everyone, the owner
+    included — a switch with exceptions is not one. */
+export function commentRule({ session, owner, enabled = true, recentPosts = 0 }) {
+  if (!session || !session.user_id) return no('Log in to leave a comment.', 401);
+  if (!owner) return no('There is nobody by that name.', 404);
+  if (!enabled) return no('They have turned comments off.', 403);
+  if (recentPosts >= POSTS_PER_MINUTE) return no('Slow down: a few posts a minute is plenty.', 429);
+  return ok;
+}
+
 /** Anything under /api/forum/moderate. `staff` is the moderator-list
     answer; the session is only consulted to tell "not logged in" from
     "logged in but not staff", which get different messages. */

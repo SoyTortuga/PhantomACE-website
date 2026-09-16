@@ -17,7 +17,9 @@ You are the specialist agent for the community forums and chat system on the Pha
 You own these files exclusively:
 - `community.html` — Forums page shell (boards, and one board's topics via `?c=`)
 - `thread.html` — one topic, served at `/thread/<id>` by a rewrite in `server/static.js`
-- `functions/api/forum/` — the forum routes, `queries.js` and `authors.js`
+- `functions/api/forum/` — the forum routes, `queries.js`, `rules.js` and `authors.js`
+- `js/pages/profile-comments.js` — the comment wall under a profile; it listens for
+  `profile:rendered` from `profile.js` (the cosmetics agent's) and never edits it
 - `server/sql/006_forum.sql` — the forum schema; `server/scripts/test-forum-*.js` — its tests
 - `community-leaderboards.html` — Community leaderboards page
 - `community-stats.html` — Community stats page

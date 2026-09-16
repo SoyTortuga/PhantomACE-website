@@ -207,7 +207,10 @@
       stats +
       section('Showcase', showcase) +
       section('Favourite dino', dino) +
-      section('Standings', standings);
+      section('Standings', standings) +
+      /* Filled by profile-comments.js once this page has said who the
+         person is — the wall is the forum's, not the profile's. */
+      section('Comments', '<div id="profComments"><div class="forum-empty card"><p>Loading comments…</p></div></div>');
 
     /* A badge can name artwork that is not there yet — the milestone ranks
        point at a file per level, and a level whose art has not landed would
@@ -226,6 +229,10 @@
     body.hidden = false;
     state.hidden = true;
     document.title = p.displayName + ' | PhantomACE';
+
+    /* Anything that hangs off the profile but is not the profile — the
+       comment wall — waits for this rather than re-resolving the login. */
+    document.dispatchEvent(new CustomEvent('profile:rendered', { detail: p }));
   }
 
   var who = wanted();

@@ -6,7 +6,10 @@ five routes are live, with 242 assertions across four suites. People can start
 topics, reply, edit or delete their own posts, and report a post; moderators
 can pin, lock, remove any post or topic with a reason (recorded, and queued as
 a `moderation` notification for the author), restore, and work the report
-queue at `/community?view=reports`. Profile comments (step 5) are next.
+queue at `/community?view=reports`. Every profile at `/user/<login>` has a
+comment wall (`/api/forum/comments`, 36 assertions): the owner can switch it
+off, and each comment queues a `comment` notification for them. Mentions and
+the bell's server-side source (step 6) are next.
 **Owner:** `chat-system` agent (per CLAUDE.md).
 
 **Revision note.** The first draft of this plan was reviewed by executing its

@@ -430,6 +430,42 @@ export async function resolveReports(tx, { postId, byUserId }) {
   return rows.length;
 }
 
+/* ── Profile comments ───────────────────────────────────────────────── */
+
+/** One page of a profile's wall, newest first. Removed comments are left
+    out: nothing on a wall replies to anything else, so there is no hole
+    to mark, and the partial index serves exactly this query. */
+export async function listComments(db, profileId, page = 1, perPage = PER_PAGE) {
+  const { rows } = await db.query(`
+    SELECT id, user_id, body, edited_at, created_at, count(*) OVER() AS total
+    FROM forum_posts
+    WHERE profile_id = $1 AND deleted_at IS NULL
+    ORDER BY created_at DESC, id DESC
+    LIMIT $2 OFFSET $3`, [String(profileId), perPage, (page - 1) * perPage]);
+  let total = rows.length ? Number(rows[0].total) : 0;
+  if (!rows.length) total = await commentCount(db, profileId);
+  return { comments: rows.map(shapePost), total, pages: Math.max(1, Math.ceil(total / perPage)) };
+}
+
+export async function commentCount(db, profileId) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n FROM forum_posts WHERE profile_id = $1 AND deleted_at IS NULL`, [String(profileId)]);
+  return rows[0].n;
+}
+
+/** A comment, and the owner told about it in the same transaction — unless
+    they wrote it themselves. */
+export async function createComment(tx, { profileId, userId, body }) {
+  const p = await tx.query(
+    `INSERT INTO forum_posts (profile_id, user_id, body) VALUES ($1, $2, $3) RETURNING id`,
+    [String(profileId), String(userId), body]);
+  const postId = String(p.rows[0].id);
+  if (String(profileId) !== String(userId)) {
+    await tx.query(`INSERT INTO notifications (user_id, kind, post_id) VALUES ($1, 'comment', $2)`, [String(profileId), postId]);
+  }
+  return { postId };
+}
+
 /** The distinct authors on a page, for the caller to turn into identities. */
 export function authorIds(...lists) {
   const out = new Set();
