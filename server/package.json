@@ -22,7 +22,7 @@
     "test-bot-drops": "node scripts/test-bot-drops.js",
     "test-phamily-rewards": "node scripts/test-phamily-rewards.js",
     "test-phamily-time-claims": "node scripts/test-phamily-time-claims.js",
-    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js && node scripts/test-roles.js && node scripts/test-chat-game.js && node scripts/test-bingo.js && node scripts/test-bot-drops.js && node scripts/test-phamily-rewards.js && node scripts/test-phamily-time-claims.js && node scripts/test-overlay-resume.js && node scripts/test-mtgbbb.js && node scripts/test-mtgbbb-sets.js && node scripts/test-mtgbbb-rooms.js && node scripts/test-mtgbbb-engagement.js && node scripts/test-eventsub-verify.js && node scripts/test-sub-badges.js && node scripts/test-profile.js && node scripts/test-forum-schema.js && node scripts/test-forum-queries.js && node scripts/test-forum-posting.js",
+    "test": "node scripts/test-scoring.js && node scripts/test-mana-clash.js && node scripts/test-badge-code.js && node scripts/test-media-about.js && node scripts/test-roles.js && node scripts/test-chat-game.js && node scripts/test-bingo.js && node scripts/test-bot-drops.js && node scripts/test-phamily-rewards.js && node scripts/test-phamily-time-claims.js && node scripts/test-overlay-resume.js && node scripts/test-mtgbbb.js && node scripts/test-mtgbbb-sets.js && node scripts/test-mtgbbb-rooms.js && node scripts/test-mtgbbb-engagement.js && node scripts/test-eventsub-verify.js && node scripts/test-sub-badges.js && node scripts/test-profile.js && node scripts/test-forum-schema.js && node scripts/test-forum-queries.js && node scripts/test-forum-posting.js && node scripts/test-forum-moderation.js",
     "test-overlay-resume": "node scripts/test-overlay-resume.js",
     "test-mtgbbb": "node scripts/test-mtgbbb.js",
     "test-mtgbbb-sets": "node scripts/test-mtgbbb-sets.js",
@@ -35,6 +35,7 @@
     "test-forum-schema": "node scripts/test-forum-schema.js",
     "test-forum-queries": "node scripts/test-forum-queries.js",
     "test-forum-posting": "node scripts/test-forum-posting.js",
+    "test-forum-moderation": "node scripts/test-forum-moderation.js",
     "backfill-milestone-badges": "node scripts/backfill-milestone-badges.js"
   },
   "engines": {

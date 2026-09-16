@@ -1,10 +1,12 @@
 # Community Forum — plan
 
-**Status:** steps 0–3 of §9 done. `006_forum.sql` is applied on the rig; the
-query layer (`queries.js`, 73 assertions), the rules (`rules.js`, pure, 64
-assertions in `test-forum-posting.js`, mutation-checked) and four routes are
-live. People can start topics, reply, and edit or delete their own posts, with
-the rate limits and caps from §5. Moderation (step 4) is next.
+**Status:** steps 0–4 of §9 done. `006_forum.sql` is applied on the rig; the
+query layer (`queries.js`), the rules (`rules.js`, pure, mutation-checked) and
+five routes are live, with 242 assertions across four suites. People can start
+topics, reply, edit or delete their own posts, and report a post; moderators
+can pin, lock, remove any post or topic with a reason (recorded, and queued as
+a `moderation` notification for the author), restore, and work the report
+queue at `/community?view=reports`. Profile comments (step 5) are next.
 **Owner:** `chat-system` agent (per CLAUDE.md).
 
 **Revision note.** The first draft of this plan was reviewed by executing its

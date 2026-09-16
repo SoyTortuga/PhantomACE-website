@@ -58,8 +58,40 @@ export function replyRule({ session, staff, category, thread, recentPosts = 0 })
   return ok;
 }
 
+/** Anything under /api/forum/moderate. `staff` is the moderator-list
+    answer; the session is only consulted to tell "not logged in" from
+    "logged in but not staff", which get different messages. */
+export function staffRule({ session, staff }) {
+  if (!session || !session.user_id) return no('Log in first.', 401);
+  if (!staff) return no('Moderators only.', 403);
+  return ok;
+}
+
+/** Reporting a post to the queue. Anyone logged in, about anyone else's
+    live post. Reporting your own is refused rather than ignored, because
+    the person pressed a button and deserves to know what happened. */
+export function reportRule({ session, post }) {
+  if (!session || !session.user_id) return no('Log in to report a post.', 401);
+  if (!post) return no('That post is not here.', 404);
+  if (post.deleted) return no('That post has already been removed.', 410);
+  if (String(post.userId) === String(session.user_id)) return no('That is your own post. You can delete it.', 400);
+  return ok;
+}
+
+export const REASON_MAX = 500;
+
+/** A moderator's reason for removing something, or a reporter's reason
+    for flagging it. Required: a removal with no reason is one the author
+    cannot learn from and the queue cannot judge. */
+export function validateReason(raw) {
+  const value = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+  if (!value) return { error: 'Give a reason.' };
+  if (value.length > REASON_MAX) return { error: `Reasons are at most ${REASON_MAX} characters.` };
+  return { value };
+}
+
 /** Editing and deleting your own post — the same conditions. Deleting
-    somebody else's is moderation, and arrives with step 4. */
+    somebody else's is moderation: see moderate.js and staffRule. */
 export function ownPostRule({ session, post }) {
   if (!session || !session.user_id) return no('Log in first.', 401);
   if (!post) return no('That post is not here.', 404);

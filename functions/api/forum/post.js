@@ -11,8 +11,8 @@
    ══════════════════════════════════════════════ */
 
 import { getPool, withTransaction } from '../../../server/lib/db.js';
-import { parseId, validateBody, getPost, editPost, deleteOwnPost } from './queries.js';
-import { ownPostRule } from './rules.js';
+import { parseId, validateBody, getPost, editPost, deleteOwnPost, reportPost } from './queries.js';
+import { ownPostRule, reportRule, validateReason } from './rules.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -36,7 +36,7 @@ export async function onRequestPost(context) {
   try { payload = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
   if (!payload || typeof payload !== 'object') return json({ error: 'Bad request' }, 400);
 
-  const action = payload.action === 'edit' || payload.action === 'delete' ? payload.action : null;
+  const action = ['edit', 'delete', 'report'].includes(payload.action) ? payload.action : null;
   if (!action) return json({ error: 'Bad request' }, 400);
   const id = parseId(payload.id);
   if (!id) return json({ error: 'That post is not here.' }, 404);
@@ -46,12 +46,28 @@ export async function onRequestPost(context) {
     body = validateBody(payload.body);
     if (body.error) return json({ error: body.error }, 400);
   }
+  let reason = null;
+  if (action === 'report') {
+    reason = validateReason(payload.reason);
+    if (reason.error) return json({ error: reason.error }, 400);
+  }
 
   let db;
   try { db = getPool(); } catch { return json({ error: 'Forum unavailable' }, 503); }
 
   try {
     const post = await getPost(db, id);
+
+    /* Reporting is anybody's; the rest is the author's. */
+    if (action === 'report') {
+      const rule = reportRule({ session, post });
+      if (!rule.ok) return json({ error: rule.error }, rule.status);
+      const fresh = await withTransaction(tx => reportPost(tx, { postId: id, reporterId: session.user_id, reason: reason.value }));
+      /* A second report from the same person is not an error to them —
+         the post is in the queue either way. */
+      return json({ ok: true, duplicate: !fresh });
+    }
+
     const rule = ownPostRule({ session, post });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 

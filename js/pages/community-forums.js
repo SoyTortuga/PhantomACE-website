@@ -2,8 +2,9 @@
    COMMUNITY FORUM — client
 
    Two pages share this file and are told apart by which view element is
-   present: community.html has #forumView (boards, then one board's
-   topics); thread.html has #threadView (one topic, paged).
+   present: community.html has #forumView (boards, one board's topics, or
+   the moderation queue via ?view=reports); thread.html has #threadView
+   (one topic, paged).
 
    Everything comes from /api/forum/*. The localStorage prototype that used
    to live here is gone, not kept as a fallback — a fallback that silently
@@ -11,9 +12,9 @@
 
    Who you are comes from getSession() in auth.js — the same cookie the
    header reads. It decides what to DRAW: a composer, a reply box, edit
-   and delete on your own posts. It decides nothing about what is
-   ALLOWED; the server refuses on its own terms and the refusal is shown
-   as written. Moderation (pin, lock, delete-any) is step 4.
+   and delete on your own posts, the moderation controls if your role
+   says staff. It decides nothing about what is ALLOWED; the server
+   refuses on its own terms and the refusal is shown as written.
    ══════════════════════════════════════════════ */
 
 (function () {
@@ -21,6 +22,7 @@
 
   var TITLE_MAX = 120;
   var BODY_MAX = 8000;
+  var REASON_MAX = 500;
 
   function esc(s) {
     var d = document.createElement('div');
@@ -115,6 +117,18 @@
     el.hidden = false;
   }
 
+  /** A one-line reason form, used for removals and reports. Which action
+      it performs is on the form; wireReasonForms() sends it. */
+  function reasonForm(act, id, placeholder, submitLabel) {
+    return '<form class="forum-reason-form" data-reason-act="' + esc(act) + '" data-id="' + esc(id) + '" hidden>' +
+      '<input type="text" class="forum-input" maxlength="' + REASON_MAX + '" placeholder="' + esc(placeholder) + '" required>' +
+      '<div class="forum-error" hidden></div>' +
+      '<div class="forum-form-actions">' +
+        '<button class="btn-primary" type="submit">' + esc(submitLabel) + '</button>' +
+        '<button class="pill-btn" type="button" data-act="cancel-reason">Cancel</button>' +
+      '</div></form>';
+  }
+
   /* ── The boards ──────────────────────────────────────────────────── */
 
   function renderHome(view) {
@@ -122,7 +136,10 @@
     api('/api/forum/categories').then(function (r) {
       if (!r.ok) return failed(view, r.data.error || 'The forum is unavailable right now.');
       var authors = r.data.authors || {};
-      view.innerHTML = '<div class="forum-categories">' + r.data.categories.map(function (c) {
+      var staffBar = looksLikeStaff(me())
+        ? '<div class="forum-staff-bar"><a href="/community?view=reports">Moderation queue</a></div>'
+        : '';
+      view.innerHTML = staffBar + '<div class="forum-categories">' + r.data.categories.map(function (c) {
         var newest = c.newest
           ? '<div class="forum-category-newest">' +
               '<a href="/thread/' + esc(c.newest.id) + '">' + esc(c.newest.title) + '</a>' +
@@ -243,28 +260,35 @@
 
   /* ── One topic ───────────────────────────────────────────────────── */
 
-  function postHtml(p, authors, mine, op) {
+  function postHtml(p, authors, ctx, op) {
+    var mine = !!ctx.myId && String(p.userId) === ctx.myId;
+    var controls = [];
     if (p.deleted) {
-      return '<div class="card forum-post forum-post-tombstone" id="post-' + esc(p.id) + '">' +
+      if (ctx.staff) controls.push('<button type="button" data-act="mod" data-mod="restore-post" data-id="' + esc(p.id) + '">Restore</button>');
+      return '<div class="card forum-post forum-post-tombstone" id="post-' + esc(p.id) + '" data-post="' + esc(p.id) + '">' +
         '<div class="forum-post-header">' + authorLine(authors, p.userId) +
-          '<span class="forum-post-time">' + timeAgo(p.createdAt) + '</span></div>' +
+          '<span class="forum-post-time">' + timeAgo(p.createdAt) + '</span>' +
+          (controls.length ? '<span class="forum-post-actions">' + controls.join('') + '</span>' : '') + '</div>' +
         '<div class="forum-post-body forum-post-removed">' +
           (p.deleted === 'moderator' ? 'Removed by a moderator.' : 'Removed by the author.') + '</div>' +
+        '<div class="forum-error" hidden></div>' +
       '</div>';
     }
-    var actions = mine
-      ? '<span class="forum-post-actions">' +
-          '<button type="button" data-act="edit" data-id="' + esc(p.id) + '">Edit</button>' +
-          '<button type="button" data-act="delete" data-id="' + esc(p.id) + '">Delete</button>' +
-        '</span>'
-      : '';
+    if (mine && !ctx.locked) {
+      controls.push('<button type="button" data-act="edit">Edit</button>');
+      controls.push('<button type="button" data-act="delete">Delete</button>');
+    }
+    if (ctx.myId && !mine) controls.push('<button type="button" data-act="show-reason" data-form="report">Report</button>');
+    if (ctx.staff && !mine) controls.push('<button type="button" data-act="show-reason" data-form="delete-post" class="forum-mod-btn">Remove</button>');
     return '<div class="card forum-post' + (op ? ' forum-post-op' : '') + '" id="post-' + esc(p.id) + '" data-post="' + esc(p.id) + '">' +
       '<div class="forum-post-header">' + authorLine(authors, p.userId) +
         '<span class="forum-post-time">' + timeAgo(p.createdAt) +
           ' <span class="forum-post-edited"' + (p.editedAt ? '' : ' hidden') + '>(edited)</span></span>' +
-        actions + '</div>' +
+        (controls.length ? '<span class="forum-post-actions">' + controls.join('') + '</span>' : '') + '</div>' +
       '<div class="forum-post-body">' + esc(p.body).replace(/\n/g, '<br>') + '</div>' +
       '<div class="forum-error" hidden></div>' +
+      (ctx.myId && !mine ? reasonForm('report', p.id, 'Why should a moderator look at this?', 'Send report') : '') +
+      (ctx.staff && !mine ? reasonForm('delete-post', p.id, 'Reason (the author will see it)', 'Remove post') : '') +
     '</div>';
   }
 
@@ -282,6 +306,18 @@
     '</form>';
   }
 
+  /** The strip of moderator controls under a topic's title. */
+  function modBarHtml(t) {
+    return '<div class="forum-mod-bar">' +
+      '<span class="forum-mod-label">Moderate</span>' +
+      '<button type="button" data-act="mod" data-mod="' + (t.pinned ? 'unpin' : 'pin') + '" data-id="' + esc(t.id) + '">' + (t.pinned ? 'Unpin' : 'Pin') + '</button>' +
+      '<button type="button" data-act="mod" data-mod="' + (t.locked ? 'unlock' : 'lock') + '" data-id="' + esc(t.id) + '">' + (t.locked ? 'Unlock' : 'Lock') + '</button>' +
+      '<button type="button" data-act="show-reason" data-form="delete-thread" class="forum-mod-btn">Remove topic</button>' +
+      '<div class="forum-error" hidden></div>' +
+      reasonForm('delete-thread', t.id, 'Reason for removing the whole topic', 'Remove topic') +
+    '</div>';
+  }
+
   function renderThread(view, id, page) {
     api('/api/forum/thread?id=' + encodeURIComponent(id) + '&page=' + page).then(function (r) {
       if (!r.ok) {
@@ -291,7 +327,11 @@
       }
       var d = r.data, t = d.thread, authors = d.authors || {};
       var sess = me();
-      var myId = sess && sess.user_id != null ? String(sess.user_id) : null;
+      var ctx = {
+        myId: sess && sess.user_id != null ? String(sess.user_id) : null,
+        staff: looksLikeStaff(sess),
+        locked: !!t.locked,
+      };
       document.title = t.title + ' | PhantomACE';
       crumbs([{ text: t.categoryName, href: '/community?c=' + encodeURIComponent(t.categoryId) }, { text: t.title }]);
       var hrefFor = function (p) { return '/thread/' + encodeURIComponent(id) + (p > 1 ? '?page=' + p : ''); };
@@ -301,10 +341,8 @@
         (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
         (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
         '<h2 class="forum-post-title">' + esc(t.title) + '</h2></div>';
-      html += d.posts.map(function (p, i) {
-        var mine = !!myId && String(p.userId) === myId && !t.locked;
-        return postHtml(p, authors, mine, d.page === 1 && i === 0);
-      }).join('');
+      if (ctx.staff) html += modBarHtml(t);
+      html += d.posts.map(function (p, i) { return postHtml(p, authors, ctx, d.page === 1 && i === 0); }).join('');
       html += pager(d.page, d.pages, hrefFor);
       html += replyBoxHtml(t);
       view.innerHTML = html + '</div>';
@@ -327,7 +365,11 @@
       if (a === 'edit' && card) return startEdit(card);
       if (a === 'delete' && card) return deletePost(card);
       if (a === 'cancel-edit' && card) return endEdit(card);
+      if (a === 'mod') return moderate(act, act.getAttribute('data-mod'), act.getAttribute('data-id'), null);
+      if (a === 'show-reason') return showReason(act);
+      if (a === 'cancel-reason') { var f = act.closest('.forum-reason-form'); if (f) f.hidden = true; }
     });
+    wireReasonForms(view);
 
     var form = view.querySelector('#replyForm');
     if (form) {
@@ -350,6 +392,61 @@
     }
   }
 
+  /* Reveal the reason form that belongs to the button: the nearest one
+     of the named kind inside the same card or bar. */
+  function showReason(btn) {
+    var scope = btn.closest('[data-post], .forum-mod-bar, .forum-report');
+    if (!scope) return;
+    var form = scope.querySelector('.forum-reason-form[data-reason-act="' + btn.getAttribute('data-form') + '"]');
+    if (!form) return;
+    form.hidden = false;
+    form.querySelector('input').focus();
+  }
+
+  /* Every reason form in the view submits the same way: its action and
+     id are on it, and where the answer goes depends on which it was. */
+  function wireReasonForms(view) {
+    view.addEventListener('submit', function (e) {
+      var form = e.target.closest('.forum-reason-form');
+      if (!form) return;
+      e.preventDefault();
+      var act = form.getAttribute('data-reason-act');
+      var id = form.getAttribute('data-id');
+      var reason = form.querySelector('input').value;
+      var err = form.querySelector('.forum-error');
+      var submit = form.querySelector('button[type=submit]');
+      err.hidden = true;
+      submit.disabled = true;
+      if (act === 'report') {
+        api('/api/forum/post', { action: 'report', id: id, reason: reason }).then(function (r) {
+          if (!r.ok) { submit.disabled = false; return showError(err, r); }
+          form.outerHTML = '<div class="forum-reported">Reported. A moderator will take a look.</div>';
+          var b = view.querySelector('[data-post="' + id + '"] [data-form="report"]');
+          if (b) b.remove();
+        }).catch(function () { submit.disabled = false; showError(err, null); });
+        return;
+      }
+      moderate(submit, act, id, reason, err);
+    });
+  }
+
+  /* One moderation action, then reload so the page reflects the server
+     rather than a guess about it. A removed topic goes back to its board. */
+  function moderate(btn, action, id, reason, errEl) {
+    var err = errEl || (btn.closest('[data-post], .forum-mod-bar, .forum-report') || document).querySelector('.forum-error');
+    if (err) err.hidden = true;
+    btn.disabled = true;
+    api('/api/forum/moderate', { action: action, id: id, reason: reason }).then(function (r) {
+      if (!r.ok) { btn.disabled = false; if (err) showError(err, r); return; }
+      if (action === 'delete-thread') {
+        var crumb = document.querySelector('#forumBreadcrumb a[href^="/community?c="]');
+        location.href = crumb ? crumb.getAttribute('href') : '/community';
+        return;
+      }
+      location.reload();
+    }).catch(function () { btn.disabled = false; if (err) showError(err, null); });
+  }
+
   /* Editing happens in place: the body becomes a textarea, Save posts it,
      the rendered body comes back with the "(edited)" mark. */
   function startEdit(card) {
@@ -370,6 +467,7 @@
     editor.querySelector('textarea').focus();
     editor.addEventListener('submit', function (e) {
       e.preventDefault();
+      e.stopPropagation();
       var err = card.querySelector('.forum-error');
       err.hidden = true;
       var submit = editor.querySelector('button[type=submit]');
@@ -401,6 +499,54 @@
     }).catch(function () { showError(err, null); });
   }
 
+  /* ── The moderation queue ────────────────────────────────────────── */
+
+  function renderQueue(view) {
+    crumbs([{ text: 'Moderation queue' }]);
+    api('/api/forum/moderate').then(function (r) {
+      if (!r.ok) return failed(view, r.data.error || 'The queue is unavailable right now.');
+      var authors = r.data.authors || {};
+      var reports = r.data.reports || [];
+      if (!reports.length) {
+        view.innerHTML = '<div class="forum-empty card"><p>Nothing reported. Quiet is good.</p></div>';
+        return;
+      }
+      view.innerHTML = '<div class="forum-thread-header"><h3>Reports</h3>' +
+        '<span class="forum-thread-count">' + reports.length + ' open</span></div>' +
+        reports.map(function (rep) {
+          var where = rep.threadId
+            ? '<a href="/thread/' + esc(rep.threadId) + '#post-' + esc(rep.postId) + '">' + esc(rep.threadTitle || 'topic') + '</a>'
+            : '<span>a profile comment</span>';
+          return '<div class="card forum-report" data-report="' + esc(rep.id) + '">' +
+            '<div class="forum-report-head">' +
+              '<span class="forum-report-by">' + authorLine(authors, rep.reporterId, 'forum-author-sm') + ' reported</span>' +
+              '<span class="forum-thread-time">' + timeAgo(rep.at) + '</span></div>' +
+            '<div class="forum-report-reason">' + esc(rep.reason) + '</div>' +
+            '<div class="forum-report-post">' +
+              '<div class="forum-report-meta">' + authorLine(authors, rep.authorId, 'forum-author-sm') + ' in ' + where +
+                (rep.postDeleted ? ' <span class="forum-flag forum-flag-locked">Already removed</span>' : '') + '</div>' +
+              '<div class="forum-report-excerpt">' + esc(rep.excerpt || '') + '</div>' +
+            '</div>' +
+            '<div class="forum-error" hidden></div>' +
+            '<div class="forum-form-actions">' +
+              (rep.postDeleted ? '' : '<button type="button" class="pill-btn forum-mod-btn" data-act="show-reason" data-form="delete-post">Remove post</button>') +
+              '<button type="button" class="pill-btn" data-act="mod" data-mod="resolve" data-id="' + esc(rep.postId) + '">Dismiss</button>' +
+            '</div>' +
+            (rep.postDeleted ? '' : reasonForm('delete-post', rep.postId, 'Reason (the author will see it)', 'Remove post')) +
+          '</div>';
+        }).join('');
+      view.addEventListener('click', function (e) {
+        var act = e.target.closest('[data-act]');
+        if (!act) return;
+        var a = act.getAttribute('data-act');
+        if (a === 'mod') return moderate(act, act.getAttribute('data-mod'), act.getAttribute('data-id'), null);
+        if (a === 'show-reason') return showReason(act);
+        if (a === 'cancel-reason') { var f = act.closest('.forum-reason-form'); if (f) f.hidden = true; }
+      });
+      wireReasonForms(view);
+    }).catch(function () { failed(view, 'The queue is unavailable right now.'); });
+  }
+
   /* ── Which page am I ─────────────────────────────────────────────── */
 
   /* A card with data-href goes where its title link goes when the click
@@ -427,6 +573,7 @@
 
     var view = document.getElementById('forumView');
     if (!view) return;
+    if (q.get('view') === 'reports') return renderQueue(view);
     var c = (q.get('c') || '').toLowerCase();
     if (c) renderBoard(view, c, page); else renderHome(view);
   });

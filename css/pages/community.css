@@ -787,3 +787,27 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 @media (max-width: 600px) {
   .forum-thread-header { flex-wrap: wrap; gap: 10px; }
 }
+
+/* ── Moderation ──────────────────────────────── */
+.forum-staff-bar { display: flex; justify-content: flex-end; padding: 12px 0 0; font-size: 0.85rem; }
+.forum-staff-bar a { color: var(--text-sec); text-decoration: none; border: 1px solid var(--border-mid); padding: 4px 12px; border-radius: 3px; }
+.forum-staff-bar a:hover { color: var(--red); border-color: var(--red); }
+.forum-mod-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; padding: 8px 12px; border: 1px dashed var(--border-mid); }
+.forum-mod-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-right: 4px; }
+.forum-mod-bar button, .forum-mod-btn { background: none; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.75rem; padding: 2px 9px; border-radius: 3px; cursor: pointer; font-family: var(--font-system); }
+.forum-mod-bar button:hover, .forum-mod-btn:hover { border-color: var(--red); color: var(--red); }
+.forum-mod-bar .forum-error, .forum-mod-bar .forum-reason-form { flex-basis: 100%; }
+.forum-post-actions .forum-mod-btn { border-color: var(--red-dim); }
+.forum-reason-form { margin-top: 10px; }
+.forum-reason-form[hidden] { display: none; }
+.forum-reason-form .forum-input { width: 100%; }
+.forum-reported { margin-top: 10px; color: var(--text-sec); font-size: 0.85rem; font-style: italic; }
+.forum-report { padding: 14px 20px; margin-bottom: 8px; }
+.forum-report-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.forum-report-by { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-sec); }
+.forum-report-reason { color: var(--text-pri); margin-bottom: 10px; }
+.forum-report-post { border-left: 3px solid var(--border-mid); padding: 6px 12px; margin-bottom: 8px; }
+.forum-report-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-sec); margin-bottom: 4px; }
+.forum-report-meta a { color: var(--text-pri); text-decoration: none; }
+.forum-report-meta a:hover { color: var(--red); }
+.forum-report-excerpt { font-size: 0.9rem; color: var(--text-sec); white-space: pre-wrap; word-break: break-word; }

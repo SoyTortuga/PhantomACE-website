@@ -306,6 +306,130 @@ export async function pageOfPost(db, threadId, postId, perPage = PER_PAGE) {
   return Math.max(1, Math.ceil(rows[0].n / perPage));
 }
 
+/* ── Moderation ─────────────────────────────────────────────────────── */
+
+/** Pin, unpin, lock, unlock. Only the flags given are touched. */
+export async function setThreadFlags(tx, id, { pinned, locked }) {
+  const sets = [];
+  const params = [id];
+  if (typeof pinned === 'boolean') { params.push(pinned); sets.push(`pinned = $${params.length}`); }
+  if (typeof locked === 'boolean') { params.push(locked); sets.push(`locked = $${params.length}`); }
+  if (!sets.length) return false;
+  const { rows } = await tx.query(
+    `UPDATE forum_threads SET ${sets.join(', ')} WHERE id = $1 AND deleted_at IS NULL RETURNING id`, params);
+  return rows.length === 1;
+}
+
+/** A whole topic, off the board. Its posts are untouched: restoring the
+    thread brings them all back exactly as they were. */
+export async function deleteThread(tx, { id, byUserId }) {
+  const { rows } = await tx.query(
+    `UPDATE forum_threads SET deleted_at = now(), deleted_by = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+    [id, String(byUserId)]);
+  return rows.length === 1;
+}
+
+export async function restoreThread(tx, { id }) {
+  const { rows } = await tx.query(
+    `UPDATE forum_threads SET deleted_at = NULL, deleted_by = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id`, [id]);
+  return rows.length === 1;
+}
+
+/** A moderator removing a post. Records who and why, gives a reply's
+    count back to its thread, and tells the author — in the same
+    transaction, so the notification exists only if the removal does.
+    A moderator removing their OWN post is an author delete and is not
+    notified about it. */
+export async function moderateDeletePost(tx, { id, byUserId, reason }) {
+  const { rows } = await tx.query(`
+    UPDATE forum_posts SET deleted_at = now(), deleted_by = $2, delete_reason = $3
+    WHERE id = $1 AND deleted_at IS NULL
+    RETURNING user_id, thread_id,
+      (thread_id IS NOT NULL AND id = (SELECT min(id) FROM forum_posts x WHERE x.thread_id = forum_posts.thread_id)) AS is_opening`,
+    [id, String(byUserId), reason]);
+  if (rows.length !== 1) return false;
+  const r = rows[0];
+  if (r.thread_id != null && !r.is_opening) {
+    await tx.query(`UPDATE forum_threads SET reply_count = GREATEST(reply_count - 1, 0) WHERE id = $1`, [r.thread_id]);
+  }
+  if (String(r.user_id) !== String(byUserId)) {
+    await tx.query(`INSERT INTO notifications (user_id, kind, post_id) VALUES ($1, 'moderation', $2)`, [String(r.user_id), id]);
+  }
+  return true;
+}
+
+/** Undo a removal, whoever made it. The count comes back with it. */
+export async function restorePost(tx, { id }) {
+  const { rows } = await tx.query(`
+    UPDATE forum_posts SET deleted_at = NULL, deleted_by = NULL, delete_reason = NULL
+    WHERE id = $1 AND deleted_at IS NOT NULL
+    RETURNING thread_id,
+      (thread_id IS NOT NULL AND id = (SELECT min(id) FROM forum_posts x WHERE x.thread_id = forum_posts.thread_id)) AS is_opening`,
+    [id]);
+  if (rows.length !== 1) return false;
+  const r = rows[0];
+  if (r.thread_id != null && !r.is_opening) {
+    await tx.query(`UPDATE forum_threads SET reply_count = reply_count + 1 WHERE id = $1`, [r.thread_id]);
+  }
+  return true;
+}
+
+/** One person flagging one post. A second press by the same person is
+    the UNIQUE constraint's business and comes back as `false`, not an
+    error. */
+export async function reportPost(tx, { postId, reporterId, reason }) {
+  const { rows } = await tx.query(`
+    INSERT INTO forum_reports (post_id, reporter_id, reason) VALUES ($1, $2, $3)
+    ON CONFLICT (post_id, reporter_id) DO NOTHING RETURNING id`,
+    [postId, String(reporterId), reason]);
+  return rows.length === 1;
+}
+
+/** The queue, oldest first, one row per report, with enough of the post
+    to judge it without opening the thread. Reports on posts that have
+    since been removed stay in the queue until resolved: somebody still
+    has to say the matter is closed. */
+export async function listOpenReports(db, limit = 50) {
+  const { rows } = await db.query(`
+    SELECT r.id, r.post_id, r.reporter_id, r.reason, r.created_at,
+           p.user_id AS author_id, p.thread_id, p.profile_id, p.deleted_at AS post_deleted_at,
+           left(p.body, 240) AS excerpt,
+           t.title AS thread_title
+    FROM forum_reports r
+    JOIN forum_posts p ON p.id = r.post_id
+    LEFT JOIN forum_threads t ON t.id = p.thread_id
+    WHERE r.resolved_at IS NULL
+    ORDER BY r.created_at, r.id
+    LIMIT $1`, [limit]);
+  return rows.map(r => ({
+    id: String(r.id),
+    postId: String(r.post_id),
+    reporterId: String(r.reporter_id),
+    reason: r.reason,
+    at: iso(r.created_at),
+    authorId: String(r.author_id),
+    threadId: r.thread_id == null ? null : String(r.thread_id),
+    threadTitle: r.thread_title || null,
+    profileId: r.profile_id == null ? null : String(r.profile_id),
+    postDeleted: !!r.post_deleted_at,
+    excerpt: r.excerpt,
+  }));
+}
+
+export async function openReportCount(db) {
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM forum_reports WHERE resolved_at IS NULL`);
+  return rows[0].n;
+}
+
+/** Close one report. Resolving a post's other reports too is deliberate:
+    a moderator who has looked at a post has looked at it. */
+export async function resolveReports(tx, { postId, byUserId }) {
+  const { rows } = await tx.query(`
+    UPDATE forum_reports SET resolved_at = now(), resolved_by = $2
+    WHERE post_id = $1 AND resolved_at IS NULL RETURNING id`, [postId, String(byUserId)]);
+  return rows.length;
+}
+
 /** The distinct authors on a page, for the caller to turn into identities. */
 export function authorIds(...lists) {
   const out = new Set();
