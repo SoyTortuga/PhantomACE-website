@@ -104,7 +104,17 @@ export async function onRequestPost(context) {
      The real number only ever appears in the badge a subscriber wears in
      chat, which the bot records as they speak. Someone who has never typed
      in chat has no record, and gets the entry-level badge until they do. */
-  const seen = await env.MARKETPLACE.get(`sub_months_${session.user_id}`, 'json');
+  let seen = null;
+  try {
+    seen = await env.MARKETPLACE.get(`sub_months_${session.user_id}`, 'json');
+  } catch (err) {
+    /* The duration record is an enhancement, not a prerequisite. If the
+       store cannot answer -- the table missing on a server that has not run
+       the migration yet is the obvious case -- import what can be proven
+       from the session instead of failing outright. Fewer badges, never
+       none, and never a dead end the viewer cannot act on. */
+    console.error('[import-badges] could not read sub duration:', err.message);
+  }
   const subMonths = seen && Number.isFinite(Number(seen.months)) ? Number(seen.months) : 0;
   const subTier = Number(session.subTier) || (seen ? Number(seen.tier) : 0) || 1;
 
