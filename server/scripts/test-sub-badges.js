@@ -20,8 +20,8 @@
    appear is the badge worn in chat, which the bot now records.
    ══════════════════════════════════════════════ */
 
-import { decodeBadgeVersion, badgeRarity, badgeName, founderBadgeItem } from '../../functions/api/import-badges.js';
-import { pickSubBadge } from '../../functions/api/bot/commands.js';
+import { decodeBadgeVersion, badgeRarity, badgeName, founderBadgeItem, vipBadgeItem } from '../../functions/api/import-badges.js';
+import { pickSubBadge, hasVipBadge } from '../../functions/api/bot/commands.js';
 
 let passed = 0;
 const failures = [];
@@ -213,6 +213,44 @@ const LADDER = [0, 2, 3, 6, 12, 24, 36, 48, 60, 72, 84, 96];
 
   check('a missing version grants nothing', founderBadgeItem(null), null);
   check('and so does an absent set', founderBadgeItem(undefined), null);
+}
+
+/* ── VIP ─────────────────────────────────────────────────────────────
+   Chat is the only place VIP is visible to this site, so it is found the
+   same way founder is — and unlike everything else here it can be taken
+   away again. */
+{
+  const B = (set_id, id, info) => ({ set_id, id, info });
+
+  ok('a VIP badge is found', hasVipBadge([B('vip', '1'), B('subscriber', '12', '12')]));
+  ok('alongside a founder badge', hasVipBadge([B('founder', '0', '41'), B('vip', '1')]));
+  check('a non-VIP is not one', hasVipBadge([B('subscriber', '12', '12')]), false);
+  check('nor an empty badge list', hasVipBadge([]), false);
+  check('and junk does not throw', hasVipBadge(null), false);
+  /* A moderator is not a VIP: Twitch treats them as separate badges and so
+     must this, or every moderator would be handed a VIP badge. */
+  check('a moderator is not a VIP', hasVipBadge([B('moderator', '1')]), false);
+
+  const V = { image_url_1x: 'https://cdn/v1', image_url_2x: 'https://cdn/v2',
+              image_url_4x: 'https://cdn/v4', description: 'VIP' };
+  const item = vipBadgeItem(V, false);
+  check('it lands in the profile inventory', item.game, 'profile');
+  check('called VIP', item.name, 'VIP');
+  check('at rare', item.rarity, 'rare');
+  check('carrying its artwork', item.meta.imageUrl4x, 'https://cdn/v4');
+  check('flagged as a VIP badge', item.meta.vip, true);
+  check('and noted as Twitch default art', item.meta.custom, false);
+  check('custom channel art is noted too', vipBadgeItem(V, true).meta.custom, true);
+
+  /* Sorting: VIP sits above the whole month ladder and below Founder, so a
+     showcase orders them the way the channel ranks them. */
+  const founder = founderBadgeItem(V);
+  ok('VIP sorts above every month badge',
+    item.meta.monthThreshold > Math.max(...LADDER));
+  ok('and below Founder', item.meta.monthThreshold < founder.meta.monthThreshold);
+
+  ok('its id is its own', item.id !== founder.id);
+  check('a missing version grants nothing', vipBadgeItem(null), null);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

@@ -136,9 +136,20 @@ export function pickSubBadge(badges) {
    Recorded monotonically. A viewer who lapses and resubscribes should not
    lose the eight years they already earned, and a badge can only ever be
    worn at or above what was earned. */
+/* VIP is a status the broadcaster grants by hand, and chat is the only
+   place it is visible to us — Helix has no "is this person a VIP" call the
+   site is authorised for. Unlike a subscription it can be taken away, so
+   this records what chat last showed rather than the high-water mark the
+   months use. */
+export function hasVipBadge(badges) {
+  return (Array.isArray(badges) ? badges : []).some(b => b && b.set_id === 'vip');
+}
+
 async function recordSubMonths(env, event) {
   const userId = event && event.chatter_user_id;
   if (!userId) return;
+
+  const isVip = hasVipBadge(event.badges);
 
   /* FOUNDERS WEAR A DIFFERENT BADGE. Twitch gives the channel's earliest
      subscribers a founder badge INSTEAD of a subscriber one, so a lookup for
@@ -146,7 +157,12 @@ async function recordSubMonths(env, event) {
      people with the most months behind them. The cumulative count is still
      in `info`; only the set id differs. */
   const picked = pickSubBadge(event.badges);
-  if (!picked) return;
+  if (!picked) {
+    /* A VIP who does not subscribe still has something worth recording, so
+       this cannot return early on the subscription badge alone. */
+    if (isVip) await markVip(env, userId, event.chatter_user_name);
+    return;
+  }
   const { badge, isFounder } = picked;
 
   const { decodeBadgeVersion } = await import('../import-badges.js');
@@ -169,7 +185,9 @@ async function recordSubMonths(env, event) {
       const hadMonths = cur ? Number(cur.months) || 0 : 0;
       const hadTier = cur ? Number(cur.tier) || 0 : 0;
       const knownFounder = !!(cur && cur.founder);
-      if (hadMonths >= months && hadTier >= tier && knownFounder === isFounder) {
+      const knownVip = !!(cur && cur.vip);
+      if (hadMonths >= months && hadTier >= tier &&
+          knownFounder === isFounder && knownVip === isVip) {
         return undefined;   // nothing new
       }
       return {
@@ -180,12 +198,36 @@ async function recordSubMonths(env, event) {
         /* Sticky: someone is a founder for good, and a lapsed founder who
            returns still wears the badge. */
         founder: isFounder || !!(cur && cur.founder),
+        /* NOT sticky. VIP is given and taken away, so this is what chat
+           last showed rather than the best it ever showed. */
+        vip: isVip,
         at: Date.now(),
       };
     });
   } catch (err) {
     /* A chat message must never fail over a bookkeeping write. */
     console.error('[bot] could not record sub months:', err.message);
+  }
+}
+
+/* A VIP who is not a subscriber has no months and no tier, so they get a
+   record that carries only what is true about them. */
+async function markVip(env, userId, name) {
+  try {
+    await env.MARKETPLACE.mutate(`sub_months_${userId}`, (cur) => {
+      if (cur && cur.vip === true) return undefined;
+      return {
+        userId: String(userId),
+        name: name || (cur && cur.name) || '',
+        months: cur ? Number(cur.months) || 0 : 0,
+        tier: cur ? Number(cur.tier) || 0 : 0,
+        founder: !!(cur && cur.founder),
+        vip: true,
+        at: Date.now(),
+      };
+    });
+  } catch (err) {
+    console.error('[bot] could not record VIP:', err.message);
   }
 }
 

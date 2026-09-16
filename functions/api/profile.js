@@ -191,6 +191,10 @@ export async function onRequestGet(context) {
         months: Number(seen.months) || 0,
         tier: Number(seen.tier) || 1,
         founder: !!seen.founder,
+        /* The CURRENT standing, unlike the badge in their inventory. VIP is
+           granted and revoked, so the item records that it happened and
+           this records whether it still holds. */
+        vip: !!seen.vip,
       };
     }
   } catch { /* the store cannot answer; a profile without tenure still renders */ }

@@ -78,6 +78,10 @@
     if (!t) return '';
     var bits = [];
     if (t.founder) bits.push('<span class="prof-founder">Founder</span>');
+    /* Current standing rather than a possession — see the tenure comment in
+       the API. Someone who was VIP and is not any more keeps the badge in
+       their inventory and loses this. */
+    if (t.vip) bits.push('<span class="prof-vip">VIP</span>');
     if (t.months > 0) {
       bits.push(esc(t.months) + (t.months === 1 ? ' month' : ' months'));
     }

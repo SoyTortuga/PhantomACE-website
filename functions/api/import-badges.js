@@ -84,6 +84,42 @@ export function founderBadgeItem(version) {
   };
 }
 
+/* THE VIP BADGE, which differs from Founder in two ways that matter.
+
+   It can be CUSTOM: a channel may upload its own VIP artwork, so the
+   channel's badge set is checked before the global one, and a channel with
+   custom art gets its own rather than Twitch's default.
+
+   And it can be TAKEN AWAY. Everything else here is permanent — a month
+   subscribed stays subscribed, a founder stays a founder — so an inventory
+   item is a fair record of it. VIP is a standing the broadcaster grants and
+   revokes, which an item cannot express. It is granted as a badge like the
+   rest, and the live standing is on the profile record instead; the item
+   says "was made a VIP", not "is one". */
+export function vipBadgeItem(version, custom) {
+  if (!version) return null;
+  return {
+    id: 'twitch_vip_badge',
+    game: 'profile',
+    type: 'badge',
+    consumable: false,
+    name: 'VIP',
+    rarity: 'rare',
+    source: 'twitch-import',
+    meta: {
+      imageUrl1x: version.image_url_1x,
+      imageUrl2x: version.image_url_2x,
+      imageUrl4x: version.image_url_4x,
+      /* Above the subscriber ladder but below Founder, so the showcase
+         sorts VIP between the two rather than among the month badges. */
+      monthThreshold: 9000,
+      vip: true,
+      custom: !!custom,
+      description: version.description || 'Named a VIP by the broadcaster.',
+    },
+  };
+}
+
 export function badgeName(months, tier, title) {
   const base = title || (months > 0 ? `${months}-Month Subscriber` : 'Subscriber');
   return tier > 1 ? `Tier ${tier} \u00b7 ${base}` : base;
@@ -229,6 +265,30 @@ export async function onRequestPost(context) {
       }
     } catch (err) {
       console.error('[import-badges] could not fetch the founder badge:', err.message);
+    }
+  }
+
+  /* THE VIP BADGE. Channel art first, Twitch's default second — a channel
+     that has uploaded its own should hand out its own. */
+  if (seen && seen.vip && !inv.items.find(i => i.id === 'twitch_vip_badge')) {
+    try {
+      let vipSet = (badgeData.data || []).find(b => b.set_id === 'vip');
+      let custom = !!vipSet;
+      if (!vipSet) {
+        const globalRes = await fetch('https://api.twitch.tv/helix/chat/badges/global',
+          { headers: { 'Client-Id': env.TWITCH_CLIENT_ID, 'Authorization': `Bearer ${token}` } });
+        if (globalRes.ok) {
+          const globalData = await globalRes.json();
+          vipSet = (globalData.data || []).find(b => b.set_id === 'vip');
+        }
+      }
+      const item = vipBadgeItem(vipSet && vipSet.versions && vipSet.versions[0], custom);
+      if (item) {
+        inv.items.push({ ...item, grantedAt: Date.now() });
+        imported++;
+      }
+    } catch (err) {
+      console.error('[import-badges] could not fetch the VIP badge:', err.message);
     }
   }
 
