@@ -69,6 +69,9 @@ const NON_ROUTE_MODULES = new Set([
      Covered by server/scripts/test-forum-queries.js against pglite. */
   'api/forum/queries.js',
   'api/forum/authors.js',
+  /* Who may post where. Pure functions; covered by test-forum-posting.js
+     including a mutation check that the rate limit is load-bearing. */
+  'api/forum/rules.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

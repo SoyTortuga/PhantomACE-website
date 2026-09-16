@@ -1,9 +1,10 @@
 # Community Forum — plan
 
-**Status:** steps 0–2 of §9 done. `006_forum.sql` is applied on the rig; the
-query layer (`functions/api/forum/queries.js`, 73 assertions) and three read-only
-routes are live; `community.html` shows the boards and `/thread/<id>` shows a
-topic. Nothing can be posted yet — step 3 is next.
+**Status:** steps 0–3 of §9 done. `006_forum.sql` is applied on the rig; the
+query layer (`queries.js`, 73 assertions), the rules (`rules.js`, pure, 64
+assertions in `test-forum-posting.js`, mutation-checked) and four routes are
+live. People can start topics, reply, and edit or delete their own posts, with
+the rate limits and caps from §5. Moderation (step 4) is next.
 **Owner:** `chat-system` agent (per CLAUDE.md).
 
 **Revision note.** The first draft of this plan was reviewed by executing its

@@ -9,13 +9,18 @@
    to live here is gone, not kept as a fallback — a fallback that silently
    swallowed posts when the API was down would be worse than an error.
 
-   Read-only for now: posting, replying and moderation arrive with the
-   next steps of docs/FORUM-PLAN.md, and the page says so rather than
-   showing a form that goes nowhere.
+   Who you are comes from getSession() in auth.js — the same cookie the
+   header reads. It decides what to DRAW: a composer, a reply box, edit
+   and delete on your own posts. It decides nothing about what is
+   ALLOWED; the server refuses on its own terms and the refusal is shown
+   as written. Moderation (pin, lock, delete-any) is step 4.
    ══════════════════════════════════════════════ */
 
 (function () {
   'use strict';
+
+  var TITLE_MAX = 120;
+  var BODY_MAX = 8000;
 
   function esc(s) {
     var d = document.createElement('div');
@@ -36,15 +41,26 @@
     return new Date(t).toLocaleDateString();
   }
 
+  function me() {
+    try { return typeof getSession === 'function' ? getSession() : null; } catch (e) { return null; }
+  }
+  /* Display only. The server decides with the moderator list. */
+  function looksLikeStaff(sess) {
+    return !!sess && (sess.role === 'moderator' || sess.role === 'broadcaster');
+  }
+  function login() {
+    if (typeof loginWithTwitch === 'function') loginWithTwitch();
+    else location.href = '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname + location.search);
+  }
+
   /** The author line every post and topic row carries: avatar, name linked
-      to their profile, equipped title, equipped badge. `authors` is the map
+      to their profile, equipped badge, equipped title. `authors` is the map
       the API sends alongside the page. */
   function authorLine(authors, userId, cls) {
     var a = (authors && authors[userId]) || { displayName: 'Someone', login: '', avatar: '', title: null, badge: null };
-    var name = esc(a.displayName);
     var inner =
       (a.avatar ? '<img class="forum-author-avatar" src="' + esc(a.avatar) + '" alt="">' : '<span class="forum-author-avatar forum-author-blank"></span>') +
-      '<span class="forum-author-name">' + name + '</span>' +
+      '<span class="forum-author-name">' + esc(a.displayName) + '</span>' +
       (a.badge ? badgeArt(a.badge) : '') +
       (a.title ? '<span class="forum-author-title">' + esc(a.title.name) + '</span>' : '');
     return a.login
@@ -75,9 +91,12 @@
     view.innerHTML = '<div class="forum-empty card"><p>' + esc(what) + '</p></div>';
   }
 
-  function api(path) {
-    return fetch(path, { cache: 'no-store' }).then(function (r) {
-      return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
+  function api(path, body) {
+    var opts = body
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' }
+      : { cache: 'no-store' };
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
     });
   }
 
@@ -90,8 +109,11 @@
     return html + '</nav>';
   }
 
-  var readOnlyNote =
-    '<div class="forum-readonly-note">Reading is open to everyone. Posting arrives with the next update.</div>';
+  /* Any request that failed, said plainly where the person is looking. */
+  function showError(el, r) {
+    el.textContent = (r && r.data && r.data.error) || 'Something went wrong. Try again.';
+    el.hidden = false;
+  }
 
   /* ── The boards ──────────────────────────────────────────────────── */
 
@@ -126,11 +148,32 @@
             '<div class="forum-stat"><span class="forum-stat-val">' + c.postCount + '</span><span class="forum-stat-label">Posts</span></div>' +
           '</div>' +
         '</div>';
-      }).join('') + '</div>' + readOnlyNote;
+      }).join('') + '</div>';
     }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
   }
 
   /* ── One board ───────────────────────────────────────────────────── */
+
+  function composerHtml(category) {
+    var sess = me();
+    if (!sess) {
+      return '<button class="btn-primary forum-new-btn" type="button" data-act="login">Log in to post</button>';
+    }
+    if (category.staffOnly && !looksLikeStaff(sess)) return '';
+    return '<button class="btn-primary forum-new-btn" type="button" data-act="new-topic">New Topic</button>';
+  }
+
+  function composerForm() {
+    return '<form id="newThreadForm" class="forum-new-form" hidden>' +
+      '<input type="text" id="newThreadTitle" class="forum-input" placeholder="Topic title" maxlength="' + TITLE_MAX + '" required>' +
+      '<textarea id="newThreadBody" class="forum-textarea" placeholder="What is on your mind?" rows="5" maxlength="' + BODY_MAX + '" required></textarea>' +
+      '<div class="forum-error" id="newThreadError" hidden></div>' +
+      '<div class="forum-form-actions">' +
+        '<button class="btn-primary" type="submit">Post topic</button>' +
+        '<button class="pill-btn" type="button" data-act="cancel-topic">Cancel</button>' +
+      '</div>' +
+    '</form>';
+  }
 
   function renderBoard(view, categoryId, page) {
     api('/api/forum/threads?category=' + encodeURIComponent(categoryId) + '&page=' + page).then(function (r) {
@@ -142,9 +185,10 @@
       crumbs([{ text: d.category.name }]);
       var hrefFor = function (p) { return '/community?c=' + encodeURIComponent(categoryId) + (p > 1 ? '&page=' + p : ''); };
       var html = '<div class="forum-thread-header"><h3>' + esc(d.category.name) + '</h3>' +
-        '<span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span></div>';
+        '<div class="forum-thread-header-right"><span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span>' +
+        composerHtml(d.category) + '</div></div>' + composerForm();
       if (!d.threads.length) {
-        html += '<div class="forum-empty card"><p>No topics here yet.</p></div>';
+        html += '<div class="forum-empty card"><p>No topics here yet.' + (me() ? ' Start one.' : '') + '</p></div>';
       } else {
         html += '<div class="forum-thread-list">' + d.threads.map(function (t) {
           var href = '/thread/' + esc(t.id);
@@ -161,11 +205,82 @@
           '</div>';
         }).join('') + '</div>';
       }
-      view.innerHTML = html + pager(d.page, d.pages, hrefFor) + readOnlyNote;
+      view.innerHTML = html + pager(d.page, d.pages, hrefFor);
+      wireComposer(view, categoryId);
     }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
   }
 
+  function wireComposer(view, categoryId) {
+    var form = view.querySelector('#newThreadForm');
+    if (!form) return;
+    var title = form.querySelector('#newThreadTitle');
+    var body = form.querySelector('#newThreadBody');
+    var err = form.querySelector('#newThreadError');
+    var submit = form.querySelector('button[type=submit]');
+
+    view.addEventListener('click', function (e) {
+      var act = e.target.closest('[data-act]');
+      if (!act) return;
+      var a = act.getAttribute('data-act');
+      if (a === 'login') login();
+      if (a === 'new-topic') { form.hidden = false; title.focus(); act.hidden = true; }
+      if (a === 'cancel-topic') {
+        form.hidden = true; title.value = ''; body.value = ''; err.hidden = true;
+        var btn = view.querySelector('[data-act=new-topic]'); if (btn) btn.hidden = false;
+      }
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      err.hidden = true;
+      submit.disabled = true;
+      api('/api/forum/threads', { category: categoryId, title: title.value, body: body.value }).then(function (r) {
+        if (!r.ok) { submit.disabled = false; return showError(err, r); }
+        location.href = '/thread/' + encodeURIComponent(r.data.id);
+      }).catch(function () { submit.disabled = false; showError(err, null); });
+    });
+  }
+
   /* ── One topic ───────────────────────────────────────────────────── */
+
+  function postHtml(p, authors, mine, op) {
+    if (p.deleted) {
+      return '<div class="card forum-post forum-post-tombstone" id="post-' + esc(p.id) + '">' +
+        '<div class="forum-post-header">' + authorLine(authors, p.userId) +
+          '<span class="forum-post-time">' + timeAgo(p.createdAt) + '</span></div>' +
+        '<div class="forum-post-body forum-post-removed">' +
+          (p.deleted === 'moderator' ? 'Removed by a moderator.' : 'Removed by the author.') + '</div>' +
+      '</div>';
+    }
+    var actions = mine
+      ? '<span class="forum-post-actions">' +
+          '<button type="button" data-act="edit" data-id="' + esc(p.id) + '">Edit</button>' +
+          '<button type="button" data-act="delete" data-id="' + esc(p.id) + '">Delete</button>' +
+        '</span>'
+      : '';
+    return '<div class="card forum-post' + (op ? ' forum-post-op' : '') + '" id="post-' + esc(p.id) + '" data-post="' + esc(p.id) + '">' +
+      '<div class="forum-post-header">' + authorLine(authors, p.userId) +
+        '<span class="forum-post-time">' + timeAgo(p.createdAt) +
+          ' <span class="forum-post-edited"' + (p.editedAt ? '' : ' hidden') + '>(edited)</span></span>' +
+        actions + '</div>' +
+      '<div class="forum-post-body">' + esc(p.body).replace(/\n/g, '<br>') + '</div>' +
+      '<div class="forum-error" hidden></div>' +
+    '</div>';
+  }
+
+  function replyBoxHtml(t) {
+    if (t.locked) return '<div class="forum-readonly-note">This topic is locked.</div>';
+    var sess = me();
+    if (!sess) {
+      return '<div class="forum-reply-prompt card"><p>Log in to reply to this topic.</p>' +
+        '<button class="btn-primary" type="button" data-act="login">Log In</button></div>';
+    }
+    return '<form id="replyForm" class="forum-reply-form">' +
+      '<textarea id="replyBody" class="forum-textarea" placeholder="Write a reply" rows="4" maxlength="' + BODY_MAX + '" required></textarea>' +
+      '<div class="forum-error" id="replyError" hidden></div>' +
+      '<div class="forum-form-actions"><button class="btn-primary" type="submit">Reply</button></div>' +
+    '</form>';
+  }
 
   function renderThread(view, id, page) {
     api('/api/forum/thread?id=' + encodeURIComponent(id) + '&page=' + page).then(function (r) {
@@ -175,6 +290,8 @@
         return failed(view, r.status === 404 ? 'That topic is not here. It may have been removed.' : (r.data.error || 'The forum is unavailable right now.'));
       }
       var d = r.data, t = d.thread, authors = d.authors || {};
+      var sess = me();
+      var myId = sess && sess.user_id != null ? String(sess.user_id) : null;
       document.title = t.title + ' | PhantomACE';
       crumbs([{ text: t.categoryName, href: '/community?c=' + encodeURIComponent(t.categoryId) }, { text: t.title }]);
       var hrefFor = function (p) { return '/thread/' + encodeURIComponent(id) + (p > 1 ? '?page=' + p : ''); };
@@ -184,41 +301,114 @@
         (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
         (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
         '<h2 class="forum-post-title">' + esc(t.title) + '</h2></div>';
-
       html += d.posts.map(function (p, i) {
-        var op = d.page === 1 && i === 0;
-        if (p.deleted) {
-          return '<div class="card forum-post forum-post-tombstone">' +
-            '<div class="forum-post-header">' + authorLine(authors, p.userId) +
-              '<span class="forum-post-time">' + timeAgo(p.createdAt) + '</span></div>' +
-            '<div class="forum-post-body forum-post-removed">' +
-              (p.deleted === 'moderator' ? 'Removed by a moderator.' : 'Removed by the author.') + '</div>' +
-          '</div>';
-        }
-        return '<div class="card forum-post' + (op ? ' forum-post-op' : '') + '">' +
-          '<div class="forum-post-header">' + authorLine(authors, p.userId) +
-            '<span class="forum-post-time">' + timeAgo(p.createdAt) +
-              (p.editedAt ? ' <span class="forum-post-edited">(edited)</span>' : '') + '</span></div>' +
-          '<div class="forum-post-body">' + esc(p.body).replace(/\n/g, '<br>') + '</div>' +
-        '</div>';
+        var mine = !!myId && String(p.userId) === myId && !t.locked;
+        return postHtml(p, authors, mine, d.page === 1 && i === 0);
       }).join('');
-
       html += pager(d.page, d.pages, hrefFor);
-      html += t.locked
-        ? '<div class="forum-readonly-note">This topic is locked.</div>'
-        : readOnlyNote;
+      html += replyBoxHtml(t);
       view.innerHTML = html + '</div>';
+      wireThread(view, id);
+
+      if (location.hash && /^#post-[0-9]+$/.test(location.hash)) {
+        var target = document.getElementById(location.hash.slice(1));
+        if (target) target.scrollIntoView();
+      }
     }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
+  }
+
+  function wireThread(view, threadId) {
+    view.addEventListener('click', function (e) {
+      var act = e.target.closest('[data-act]');
+      if (!act) return;
+      var a = act.getAttribute('data-act');
+      if (a === 'login') return login();
+      var card = act.closest('[data-post]');
+      if (a === 'edit' && card) return startEdit(card);
+      if (a === 'delete' && card) return deletePost(card);
+      if (a === 'cancel-edit' && card) return endEdit(card);
+    });
+
+    var form = view.querySelector('#replyForm');
+    if (form) {
+      var body = form.querySelector('#replyBody');
+      var err = form.querySelector('#replyError');
+      var submit = form.querySelector('button[type=submit]');
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        err.hidden = true;
+        submit.disabled = true;
+        api('/api/forum/thread', { id: threadId, body: body.value }).then(function (r) {
+          if (!r.ok) { submit.disabled = false; return showError(err, r); }
+          /* Land on the reply, wherever it paged to. A same-page hash
+             change does not reload, so force it. */
+          var url = '/thread/' + encodeURIComponent(threadId) + (r.data.page > 1 ? '?page=' + r.data.page : '') + '#post-' + r.data.postId;
+          location.href = url;
+          if (location.pathname + location.search === url.split('#')[0]) location.reload();
+        }).catch(function () { submit.disabled = false; showError(err, null); });
+      });
+    }
+  }
+
+  /* Editing happens in place: the body becomes a textarea, Save posts it,
+     the rendered body comes back with the "(edited)" mark. */
+  function startEdit(card) {
+    if (card.querySelector('textarea')) return;
+    var bodyEl = card.querySelector('.forum-post-body');
+    var current = bodyEl.innerHTML.replace(/<br\s*\/?>/g, '\n');
+    var tmp = document.createElement('div'); tmp.innerHTML = current;
+    var text = tmp.textContent;
+    bodyEl.hidden = true;
+    var editor = document.createElement('form');
+    editor.className = 'forum-edit-form';
+    editor.innerHTML =
+      '<textarea class="forum-textarea" rows="5" maxlength="' + BODY_MAX + '" required></textarea>' +
+      '<div class="forum-form-actions"><button class="btn-primary" type="submit">Save</button>' +
+      '<button class="pill-btn" type="button" data-act="cancel-edit">Cancel</button></div>';
+    editor.querySelector('textarea').value = text;
+    bodyEl.insertAdjacentElement('afterend', editor);
+    editor.querySelector('textarea').focus();
+    editor.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var err = card.querySelector('.forum-error');
+      err.hidden = true;
+      var submit = editor.querySelector('button[type=submit]');
+      submit.disabled = true;
+      api('/api/forum/post', { action: 'edit', id: card.getAttribute('data-post'), body: editor.querySelector('textarea').value })
+        .then(function (r) {
+          if (!r.ok) { submit.disabled = false; return showError(err, r); }
+          bodyEl.innerHTML = esc(r.data.body).replace(/\n/g, '<br>');
+          card.querySelector('.forum-post-edited').hidden = false;
+          endEdit(card);
+        }).catch(function () { submit.disabled = false; showError(err, null); });
+    });
+  }
+
+  function endEdit(card) {
+    var editor = card.querySelector('.forum-edit-form');
+    if (editor) editor.remove();
+    card.querySelector('.forum-post-body').hidden = false;
+    card.querySelector('.forum-error').hidden = true;
+  }
+
+  function deletePost(card) {
+    if (!window.confirm('Remove this post? It will show as removed by you.')) return;
+    var err = card.querySelector('.forum-error');
+    err.hidden = true;
+    api('/api/forum/post', { action: 'delete', id: card.getAttribute('data-post') }).then(function (r) {
+      if (!r.ok) return showError(err, r);
+      location.reload();
+    }).catch(function () { showError(err, null); });
   }
 
   /* ── Which page am I ─────────────────────────────────────────────── */
 
   /* A card with data-href goes where its title link goes when the click
-     lands anywhere else on it. A click on a real link inside — the title,
-     an author — is that link's own business. */
+     lands anywhere else on it. A click on a real link or control inside
+     is that element's own business. */
   document.addEventListener('click', function (e) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    if (e.target.closest('a, button, input, textarea')) return;
+    if (e.target.closest('a, button, input, textarea, form')) return;
     var card = e.target.closest('[data-href]');
     if (card) location.href = card.getAttribute('data-href');
   });

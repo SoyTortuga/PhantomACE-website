@@ -236,6 +236,76 @@ export async function createReply(tx, { threadId, userId, body }) {
   return { postId: String(p.rows[0].id) };
 }
 
+/* ── One post, for editing or deleting ──────────────────────────────── */
+
+/** A post with what the rules need to know about where it hangs. Deleted
+    posts and posts in deleted threads are returned (marked), not hidden:
+    the rule decides what to say about them. */
+export async function getPost(db, id) {
+  const { rows } = await db.query(`
+    SELECT p.id, p.thread_id, p.profile_id, p.user_id, p.body, p.deleted_at, p.edited_at, p.created_at,
+           t.locked AS thread_locked, t.deleted_at AS thread_deleted_at, t.category_id,
+           (p.thread_id IS NOT NULL AND p.id = (SELECT min(id) FROM forum_posts WHERE thread_id = p.thread_id)) AS is_opening
+    FROM forum_posts p LEFT JOIN forum_threads t ON t.id = p.thread_id
+    WHERE p.id = $1`, [id]);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: String(r.id),
+    threadId: r.thread_id == null ? null : String(r.thread_id),
+    profileId: r.profile_id == null ? null : String(r.profile_id),
+    categoryId: r.category_id || null,
+    userId: String(r.user_id),
+    body: r.body,
+    deleted: !!r.deleted_at,
+    editedAt: iso(r.edited_at),
+    createdAt: iso(r.created_at),
+    threadLocked: !!r.thread_locked,
+    threadDeleted: !!r.thread_deleted_at,
+    isOpening: !!r.is_opening,
+  };
+}
+
+/** Replace the body and stamp edited_at. False if the post was deleted
+    between the rule check and here. */
+export async function editPost(tx, { id, body }) {
+  const { rows } = await tx.query(
+    `UPDATE forum_posts SET body = $2, edited_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+    [id, body]);
+  return rows.length === 1;
+}
+
+/** Soft-delete your own post. deleted_by = the author, which is what makes
+    the tombstone read "removed by the author". A reply also gives back its
+    count on the thread; the opening post does not, since it was never
+    counted as one. */
+export async function deleteOwnPost(tx, { id, userId }) {
+  const { rows } = await tx.query(`
+    UPDATE forum_posts SET deleted_at = now(), deleted_by = $2
+    WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+    RETURNING thread_id,
+      (thread_id IS NOT NULL AND id = (SELECT min(id) FROM forum_posts x WHERE x.thread_id = forum_posts.thread_id)) AS is_opening`,
+    [id, String(userId)]);
+  if (rows.length !== 1) return false;
+  const r = rows[0];
+  if (r.thread_id != null && !r.is_opening) {
+    await tx.query(
+      `UPDATE forum_threads SET reply_count = GREATEST(reply_count - 1, 0) WHERE id = $1`, [r.thread_id]);
+  }
+  return true;
+}
+
+/** Which page of its thread a post is on, so a reply can land the person
+    on the post they just wrote. Tombstones count: they occupy a slot. */
+export async function pageOfPost(db, threadId, postId, perPage = PER_PAGE) {
+  const { rows } = await db.query(`
+    SELECT count(*)::int AS n FROM forum_posts
+    WHERE thread_id = $1
+      AND (created_at, id) <= (SELECT created_at, id FROM forum_posts WHERE id = $2)`,
+    [threadId, postId]);
+  return Math.max(1, Math.ceil(rows[0].n / perPage));
+}
+
 /** The distinct authors on a page, for the caller to turn into identities. */
 export function authorIds(...lists) {
   const out = new Set();
