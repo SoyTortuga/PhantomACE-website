@@ -166,6 +166,12 @@ export const FAMILIES = [
      from the badge they wear in chat because no API returns it. 'none': this
      is the only record of it and losing it loses the duration. */
   { prefix: 'sub_months_',     table: 'sub_months',       expiry: 'none' },
+  /* Who someone is, publicly: display name, avatar, login. Written at every
+     login. 'none' — losing it makes every profile anonymous.
+     `loginidx_` is deliberately NOT `profile_login_`, which would sit inside
+     the `profile_` family and need longest-prefix care to stay out of it. */
+  { prefix: 'profile_',        table: 'profiles',         expiry: 'none' },
+  { prefix: 'loginidx_',       table: 'profiles',         expiry: 'none' },
   { prefix: 'mtgbbb_set_',     table: 'mtgbbb_sets',      expiry: 'none' },
   { prefix: 'mtgbbb_',         table: 'mtgbbb_rooms',     expiry: 'real' },
 

@@ -199,6 +199,35 @@ export async function onRequestGet(context) {
       subExpiresAt,
     };
 
+    /* WHO SOMEONE IS, RECORDED PUBLICLY.
+
+       Until now a display name and avatar existed only inside that person's
+       own session cookie, so no page could render anyone but the viewer.
+       Leaderboards worked around it by storing a name alongside each score,
+       which is why the same person appears under whatever name they had
+       when each one was written.
+
+       Keyed by user id, which Twitch guarantees stable, with a separate
+       index from login because logins can be changed and reused. The index
+       is verified against the record on read: a login that has moved to
+       somebody else resolves to nothing rather than to the wrong person. */
+    try {
+      await env.MARKETPLACE.put(`profile_${user.id}`, JSON.stringify({
+        userId: String(user.id),
+        login: user.login,
+        displayName: user.display_name,
+        avatar: user.profile_image_url || '',
+        role,
+        subTier,
+        firstSeen: Date.now(),
+        updatedAt: Date.now(),
+      }));
+      await env.MARKETPLACE.put(`loginidx_${user.login.toLowerCase()}`, String(user.id));
+    } catch (err) {
+      /* A login must never fail over a directory write. */
+      console.error('[auth] could not record profile:', err.message);
+    }
+
     /* Signed, so it cannot be edited in a browser. See session-crypto.js —
        the payload stays readable for the frontend; only forgery is closed. */
     const { signSession } = await import('./session-crypto.js');
