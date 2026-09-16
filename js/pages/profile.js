@@ -208,6 +208,8 @@
       section('Showcase', showcase) +
       section('Favourite dino', dino) +
       section('Standings', standings) +
+      /* Filled by profile-room.js on the same event as the comments. */
+      section('Room', '<div id="profRoom"><p class="rm-state">Loading room…</p></div>') +
       /* Filled by profile-comments.js once this page has said who the
          person is — the wall is the forum's, not the profile's. */
       section('Comments', '<div id="profComments"><div class="forum-empty card"><p>Loading comments…</p></div></div>');

@@ -1,0 +1,31 @@
+/* ══════════════════════════════════════════════
+   MY ROOM — shared by the profile section and the editor
+
+   The stage is drawn at native pixel size and scaled as a whole by
+   PhamRoom.fit(); nothing in here resizes a piece. Pixel art stays
+   pixel art: image-rendering: pixelated on every piece and every tiled
+   background. Border-based hierarchy, no shadows.
+   ══════════════════════════════════════════════ */
+
+.rm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rm-name { font-family: var(--font-gothic); font-size: 16px; color: var(--text-pri); margin: 0; }
+.rm-subhead { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-sec); margin: 16px 0 8px; }
+.rm-edit-btn { text-decoration: none; padding: 8px 18px; font-size: 13px; }
+.rm-state { color: var(--text-dim); font-size: 13px; margin: 8px 0 0; }
+
+/* The host is what the page lays out; the stage inside is scaled to it. */
+.rm-host { position: relative; width: 100%; overflow: hidden; border: 1px solid var(--border-mid); background: #050505; }
+.rm-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+.rm-piece, .rm-floor, .rm-corner, .rm-setup-wall, .rm-setup-desk { position: absolute; display: block; }
+.rm-piece { image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none; user-select: none; }
+.rm-wall-left, .rm-wall-right { transform-origin: 50% 50%; }
+
+.rm-floor { background-repeat: repeat; background-size: 128px 128px; image-rendering: pixelated; }
+.rm-corner { background: #0b0b0d; border-bottom: 1px solid #1a1a1e; }
+
+.rm-setup-wall { background-repeat: repeat-x; background-size: 128px 176px; background-position: 0 100%; background-color: #0b0b0d; image-rendering: pixelated; }
+.rm-setup-desk {
+  background: linear-gradient(#2b2320, #201a17 12%, #1a1512);
+  border-top: 6px solid #3a2e28;
+}

@@ -2,8 +2,11 @@
 
 **Status:** steps 1–2 built. 676 pieces in `assets/room/` with a tested
 catalog; `room-catalog.js` validates every save (pure, mutation-checked) and
-`/api/room` stores rooms in `rooms_<userId>` (migration `007_rooms.sql`, to be
-applied on the rig). Next: step 3, the viewer on the profile.
+`/api/room` stores rooms in `rooms_<userId>` (migration `007_rooms.sql`,
+applied). Step 3 built: `js/room-render.js` is the one renderer (32
+assertions on its geometry), and every profile has a Room section — the
+built room and its desk setup, or the empty default with "Build yours" for
+the owner. Next: step 4, the editor at `/room/edit`.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 
