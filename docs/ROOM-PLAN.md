@@ -1,6 +1,7 @@
 # My Room — plan
 
-**Status:** decisions taken (§10). Awaiting a go before step 1.
+**Status:** step 1 built — 676 pieces in `assets/room/`, catalog tested (59
+assertions), review sheets sent. **Awaiting the human review** before step 2.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 
