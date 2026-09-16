@@ -76,8 +76,12 @@
   font-size: 11px;
 }
 
+/* Keyed off a data attribute rather than a role-* class: those are the
+   site's visibility gates, not labels, and borrowing one made this stretch
+   for moderators and disappear for everyone else. */
 .prof-role {
   display: inline-block;
+  width: auto;
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -86,6 +90,10 @@
   border-radius: 3px;
   padding: 2px 8px;
 }
+.prof-role[data-role="moderator"]   { color: #2ecc71; border-color: #2ecc71; }
+.prof-role[data-role="broadcaster"] { color: var(--red); border-color: var(--red); }
+.prof-role[data-role^="sub_"]       { color: #9b59b6; border-color: #9b59b6; }
+.prof-role[data-role="follower"]    { color: #3498db; border-color: #3498db; }
 
 /* ── Counts ───────────────────────────────────────────────────── */
 .prof-stats {

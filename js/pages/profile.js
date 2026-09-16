@@ -102,7 +102,12 @@
           '<h1 class="prof-name">' + esc(p.displayName) + '</h1>' +
           (title ? '<p class="prof-title">' + esc(title) + '</p>' : '') +
           tenureLine(p.tenure) +
-          '<span class="prof-role role-' + esc(p.role) + '">' + esc(p.role.replace(/_/g, ' ')) + '</span>' +
+          /* A data attribute, NOT a role-* class. Those are the site's
+             visibility gates — .role-moderator is display:none unless the
+             VIEWER is a moderator — so styling this label with one made it
+             stretch for moderators and vanish for everybody else. */
+          '<span class="prof-role" data-role="' + esc(p.role) + '">' +
+            esc(p.role.replace(/_/g, ' ')) + '</span>' +
         '</div>' +
       '</header>';
 
