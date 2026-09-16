@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A PhantomACE community profile - badges, loyalty, and standings.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Profile | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/profile.css">
+</head>
+<body data-page="profile">
+
+  <div id="site-header"></div>
+
+  <!-- Everything below is drawn from /api/profile. The page ships empty on
+       purpose: a profile is somebody else's, so there is nothing sensible to
+       render before we know whose it is. -->
+  <section class="page-container prof-wrap">
+    <div class="prof-state" id="profState">Loading profile…</div>
+    <div id="profBody" hidden></div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/pages/profile.js" defer></script>
+</body>
+</html>
