@@ -8,8 +8,17 @@ can pin, lock, remove any post or topic with a reason (recorded, and queued as
 a `moderation` notification for the author), restore, and work the report
 queue at `/community?view=reports`. Every profile at `/user/<login>` has a
 comment wall (`/api/forum/comments`, 36 assertions): the owner can switch it
-off, and each comment queues a `comment` notification for them. Mentions and
-the bell's server-side source (step 6) are next.
+off, and each comment queues a `comment` notification for them.
+
+**All eight steps are done.** Step 6 landed last: `@login` mentions are parsed
+at post time (`mentions.js`, 49 assertions), resolved through `loginidx_` with
+the stale-login check, written to `forum_mentions` with a `mention`
+notification in the post's transaction, and linked on render only where they
+resolved; the owner's "Let people @mention me" switch sits beside the comments
+one. `createReply` now writes the `reply` notification §6 promised.
+`/api/forum/notifications` feeds the existing bell — read once per page load,
+marked read when the panel opens. Step 7 (retiring the prototype's data layer)
+was folded into step 2. What remains is §11.
 **Owner:** `chat-system` agent (per CLAUDE.md).
 
 **Revision note.** The first draft of this plan was reviewed by executing its

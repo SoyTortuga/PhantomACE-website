@@ -811,3 +811,7 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 .forum-report-meta a { color: var(--text-pri); text-decoration: none; }
 .forum-report-meta a:hover { color: var(--red); }
 .forum-report-excerpt { font-size: 0.9rem; color: var(--text-sec); white-space: pre-wrap; word-break: break-word; }
+
+/* ── Mentions ────────────────────────────────── */
+.forum-mention { color: var(--red); text-decoration: none; font-weight: 600; }
+.forum-mention:hover { text-decoration: underline; }

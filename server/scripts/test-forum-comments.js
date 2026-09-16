@@ -73,7 +73,7 @@ const WALL = '500';
 
   const { comments, total } = await listComments(db, WALL);
   check('two comments, newest first', [total, comments.map(c => c.body)], [2, ['thanks all', 'gg last night']]);
-  check('shaped like posts', Object.keys(comments[0]).sort(), ['body', 'createdAt', 'editedAt', 'id', 'userId']);
+  check('shaped like posts', Object.keys(comments[0]).sort(), ['body', 'createdAt', 'editedAt', 'id', 'mentions', 'userId']);
 
   /* A comment is a post: the rules and queries for replies apply. */
   const p = await getPost(db, c1.postId);

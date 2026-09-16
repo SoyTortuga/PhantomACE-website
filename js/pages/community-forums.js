@@ -23,6 +23,9 @@
   var TITLE_MAX = 120;
   var BODY_MAX = 8000;
   var REASON_MAX = 500;
+  /* The identities the current page arrived with, so an edit that names
+     somebody new can link them without a reload. */
+  var currentAuthors = {};
 
   function esc(s) {
     var d = document.createElement('div');
@@ -74,6 +77,23 @@
     return b.image
       ? '<img class="forum-author-badge" src="' + esc(b.image) + '" alt="" title="' + esc(b.name) + '">'
       : '<span class="forum-author-badge forum-author-badge-fallback" title="' + esc(b.name) + '">' + (b.founder ? '★' : '◆') + '</span>';
+  }
+
+  /* A body, escaped, with the @names the SERVER resolved turned into
+     profile links — those and no others, so a name that resolved to
+     nobody, or to somebody who opted out, stays plain text. Escaped
+     first, then linked, so a name cannot carry markup. */
+  function linkMentions(post, authors) {
+    var html = esc(post.body).replace(/\n/g, '<br>');
+    var ids = post.mentions || [];
+    if (!ids.length) return html;
+    var byLogin = {};
+    ids.forEach(function (id) { var a = authors && authors[id]; if (a && a.login) byLogin[a.login.toLowerCase()] = a; });
+    return html.replace(/(^|[^A-Za-z0-9_\/.])@([A-Za-z0-9_]{3,25})(?![A-Za-z0-9_])/g, function (m, pre, name) {
+      var a = byLogin[name.toLowerCase()];
+      if (!a) return m;
+      return pre + '<a class="forum-mention" href="/user/' + encodeURIComponent(a.login) + '">@' + esc(name) + '</a>';
+    });
   }
 
   function crumbs(parts) {
@@ -285,7 +305,7 @@
         '<span class="forum-post-time">' + timeAgo(p.createdAt) +
           ' <span class="forum-post-edited"' + (p.editedAt ? '' : ' hidden') + '>(edited)</span></span>' +
         (controls.length ? '<span class="forum-post-actions">' + controls.join('') + '</span>' : '') + '</div>' +
-      '<div class="forum-post-body">' + esc(p.body).replace(/\n/g, '<br>') + '</div>' +
+      '<div class="forum-post-body">' + linkMentions(p, authors) + '</div>' +
       '<div class="forum-error" hidden></div>' +
       (ctx.myId && !mine ? reasonForm('report', p.id, 'Why should a moderator look at this?', 'Send report') : '') +
       (ctx.staff && !mine ? reasonForm('delete-post', p.id, 'Reason (the author will see it)', 'Remove post') : '') +
@@ -326,6 +346,7 @@
         return failed(view, r.status === 404 ? 'That topic is not here. It may have been removed.' : (r.data.error || 'The forum is unavailable right now.'));
       }
       var d = r.data, t = d.thread, authors = d.authors || {};
+      currentAuthors = authors;
       var sess = me();
       var ctx = {
         myId: sess && sess.user_id != null ? String(sess.user_id) : null,
@@ -475,7 +496,8 @@
       api('/api/forum/post', { action: 'edit', id: card.getAttribute('data-post'), body: editor.querySelector('textarea').value })
         .then(function (r) {
           if (!r.ok) { submit.disabled = false; return showError(err, r); }
-          bodyEl.innerHTML = esc(r.data.body).replace(/\n/g, '<br>');
+          Object.assign(currentAuthors, r.data.authors || {});
+          bodyEl.innerHTML = linkMentions({ body: r.data.body, mentions: r.data.mentions || [] }, currentAuthors);
           card.querySelector('.forum-post-edited').hidden = false;
           endEdit(card);
         }).catch(function () { submit.disabled = false; showError(err, null); });

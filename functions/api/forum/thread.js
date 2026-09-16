@@ -15,10 +15,11 @@ import { getPool, withTransaction } from '../../../server/lib/db.js';
 import { isModerator } from '../admin/moderators.js';
 import {
   ForumError, parseId, parsePage, validateBody,
-  getThread, getCategory, listPosts, createReply, recentPostCount, pageOfPost, authorIds,
+  getThread, getCategory, listPosts, createReply, recentPostCount, pageOfPost, addMentions, authorIds,
 } from './queries.js';
 import { replyRule } from './rules.js';
 import { authorsFor } from './authors.js';
+import { parseMentions, resolveMentions } from './mentions.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -59,9 +60,14 @@ export async function onRequestPost(context) {
     const rule = replyRule({ session, staff, category, thread, recentPosts });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
+    const mentioned = await resolveMentions(env, parseMentions(body.value));
     let made;
     try {
-      made = await withTransaction(tx => createReply(tx, { threadId: id, userId: session.user_id, body: body.value }));
+      made = await withTransaction(async (tx) => {
+        const out = await createReply(tx, { threadId: id, userId: session.user_id, body: body.value });
+        await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+        return out;
+      });
     } catch (err) {
       if (err instanceof ForumError) return json({ error: err.message }, err.status);
       throw err;

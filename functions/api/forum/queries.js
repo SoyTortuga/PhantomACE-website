@@ -88,14 +88,24 @@ function shapeThread(r) {
   };
 }
 
-/** A deleted post is a tombstone: who removed it, never what it said. */
+/** A deleted post is a tombstone: who removed it, never what it said.
+    `mentions` is who the post @named, resolved at post time — the client
+    links exactly those names and no others. */
 function shapePost(r) {
   const base = { id: String(r.id), userId: String(r.user_id), createdAt: iso(r.created_at) };
   if (r.deleted_at) {
     return { ...base, deleted: r.deleted_by && String(r.deleted_by) !== String(r.user_id) ? 'moderator' : 'author' };
   }
-  return { ...base, body: r.body, editedAt: iso(r.edited_at) };
+  return {
+    ...base,
+    body: r.body,
+    editedAt: iso(r.edited_at),
+    mentions: Array.isArray(r.mention_ids) ? r.mention_ids.map(String) : [],
+  };
 }
+
+/** The subquery every post listing carries for shapePost's `mentions`. */
+const MENTION_IDS = `(SELECT array_agg(m.user_id ORDER BY m.user_id) FROM forum_mentions m WHERE m.post_id = forum_posts.id) AS mention_ids`;
 
 /* ── Reads ──────────────────────────────────────────────────────────── */
 
@@ -177,7 +187,7 @@ export async function getThread(db, id) {
 export async function listPosts(db, threadId, page = 1, perPage = PER_PAGE) {
   const { rows } = await db.query(`
     SELECT id, user_id, body, edited_at, deleted_at, deleted_by, created_at,
-           count(*) OVER() AS total
+           count(*) OVER() AS total, ${MENTION_IDS}
     FROM forum_posts
     WHERE thread_id = $1
     ORDER BY created_at, id
@@ -224,16 +234,22 @@ export async function createThread(tx, { categoryId, userId, title, body }) {
     landing at the same moment is seen rather than raced. */
 export async function createReply(tx, { threadId, userId, body }) {
   const t = await tx.query(
-    `SELECT locked, deleted_at FROM forum_threads WHERE id = $1 FOR UPDATE`, [threadId]);
+    `SELECT user_id, locked, deleted_at FROM forum_threads WHERE id = $1 FOR UPDATE`, [threadId]);
   const row = t.rows[0];
   if (!row || row.deleted_at) throw new ForumError('gone', 'That topic is no longer here.', 404);
   if (row.locked) throw new ForumError('locked', 'That topic is locked.', 403);
   const p = await tx.query(
     `INSERT INTO forum_posts (thread_id, user_id, body) VALUES ($1, $2, $3) RETURNING id`,
     [threadId, String(userId), body]);
+  const postId = String(p.rows[0].id);
   await tx.query(
     `UPDATE forum_threads SET reply_count = reply_count + 1, last_post_at = now() WHERE id = $1`, [threadId]);
-  return { postId: String(p.rows[0].id) };
+  /* The person who started the topic hears about replies to it — unless
+     the reply is their own. */
+  if (String(row.user_id) !== String(userId)) {
+    await tx.query(`INSERT INTO notifications (user_id, kind, post_id) VALUES ($1, 'reply', $2)`, [String(row.user_id), postId]);
+  }
+  return { postId };
 }
 
 /* ── One post, for editing or deleting ──────────────────────────────── */
@@ -437,7 +453,7 @@ export async function resolveReports(tx, { postId, byUserId }) {
     to mark, and the partial index serves exactly this query. */
 export async function listComments(db, profileId, page = 1, perPage = PER_PAGE) {
   const { rows } = await db.query(`
-    SELECT id, user_id, body, edited_at, created_at, count(*) OVER() AS total
+    SELECT id, user_id, body, edited_at, created_at, count(*) OVER() AS total, ${MENTION_IDS}
     FROM forum_posts
     WHERE profile_id = $1 AND deleted_at IS NULL
     ORDER BY created_at DESC, id DESC
@@ -466,12 +482,89 @@ export async function createComment(tx, { profileId, userId, body }) {
   return { postId };
 }
 
-/** The distinct authors on a page, for the caller to turn into identities. */
+/* ── Mentions and notifications ─────────────────────────────────────── */
+
+/** Record who a post @named and tell each of them — in the post's own
+    transaction, so a mention exists only if the post does. Naming
+    yourself is not a mention; naming the same person twice is one. */
+export async function addMentions(tx, { postId, byUserId, userIds }) {
+  let added = 0;
+  for (const raw of userIds || []) {
+    const userId = String(raw);
+    if (userId === String(byUserId)) continue;
+    const { rows } = await tx.query(
+      `INSERT INTO forum_mentions (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING post_id`,
+      [postId, userId]);
+    if (!rows.length) continue;
+    await tx.query(`INSERT INTO notifications (user_id, kind, post_id) VALUES ($1, 'mention', $2)`, [userId, postId]);
+    added++;
+  }
+  return added;
+}
+
+/** What has happened to this person, newest first, with enough of the
+    cause to say it in one line: who did it, where, and — for a removal —
+    why. A notification whose post has since been removed still lists;
+    the client says so rather than linking to a tombstone. */
+export async function listNotifications(db, userId, limit = 30) {
+  const { rows } = await db.query(`
+    SELECT n.id, n.kind, n.post_id, n.read_at, n.created_at,
+           p.user_id AS actor_id, p.thread_id, p.profile_id, p.deleted_at AS post_deleted_at,
+           p.delete_reason, left(p.body, 120) AS excerpt,
+           t.title AS thread_title
+    FROM notifications n
+    LEFT JOIN forum_posts p ON p.id = n.post_id
+    LEFT JOIN forum_threads t ON t.id = p.thread_id
+    WHERE n.user_id = $1
+    ORDER BY n.created_at DESC, n.id DESC
+    LIMIT $2`, [String(userId), limit]);
+  return rows.map(r => ({
+    id: String(r.id),
+    kind: r.kind,
+    postId: r.post_id == null ? null : String(r.post_id),
+    actorId: r.actor_id == null ? null : String(r.actor_id),
+    threadId: r.thread_id == null ? null : String(r.thread_id),
+    threadTitle: r.thread_title || null,
+    profileId: r.profile_id == null ? null : String(r.profile_id),
+    postDeleted: !!r.post_deleted_at,
+    reason: r.delete_reason || null,
+    excerpt: r.excerpt || '',
+    read: !!r.read_at,
+    at: iso(r.created_at),
+  }));
+}
+
+export async function unreadCount(db, userId) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL`, [String(userId)]);
+  return rows[0].n;
+}
+
+/** Mark read: the ids given, or everything unread when none are. Scoped
+    to the user, so one person's ids cannot mark another's. */
+export async function markNotificationsRead(tx, userId, ids = null) {
+  const params = [String(userId)];
+  let where = `user_id = $1 AND read_at IS NULL`;
+  if (Array.isArray(ids) && ids.length) {
+    params.push(ids.map(String));
+    where += ` AND id = ANY($2::bigint[])`;
+  }
+  const { rows } = await tx.query(`UPDATE notifications SET read_at = now() WHERE ${where} RETURNING id`, params);
+  return rows.length;
+}
+
+/** The distinct people on a page, for the caller to turn into identities:
+    authors, the newest-thread author on a board, actors on notifications,
+    and everyone a post @named — mentioned names are linked by login, so
+    the client needs those identities too. */
 export function authorIds(...lists) {
   const out = new Set();
   for (const list of lists) for (const x of list || []) {
-    const id = x && (x.userId || (x.newest && x.newest.userId));
-    if (id) out.add(String(id));
+    if (!x) continue;
+    if (x.userId) out.add(String(x.userId));
+    if (x.actorId) out.add(String(x.actorId));
+    if (x.newest && x.newest.userId) out.add(String(x.newest.userId));
+    if (Array.isArray(x.mentions)) for (const m of x.mentions) out.add(String(m));
   }
   return [...out];
 }

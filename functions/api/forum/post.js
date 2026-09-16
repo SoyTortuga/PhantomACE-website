@@ -11,8 +11,10 @@
    ══════════════════════════════════════════════ */
 
 import { getPool, withTransaction } from '../../../server/lib/db.js';
-import { parseId, validateBody, getPost, editPost, deleteOwnPost, reportPost } from './queries.js';
+import { parseId, validateBody, getPost, editPost, deleteOwnPost, reportPost, addMentions } from './queries.js';
 import { ownPostRule, reportRule, validateReason } from './rules.js';
+import { parseMentions, resolveMentions } from './mentions.js';
+import { authorsFor } from './authors.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -29,7 +31,7 @@ function getSession(request) {
 }
 
 export async function onRequestPost(context) {
-  const { request } = context;
+  const { request, env } = context;
   const session = getSession(request);
 
   let payload;
@@ -72,9 +74,19 @@ export async function onRequestPost(context) {
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
     if (action === 'edit') {
-      const done = await withTransaction(tx => editPost(tx, { id, body: body.value }));
+      /* An edit can name somebody new. Anyone already named is a no-op
+         through the mentions PK, so nobody is told twice. */
+      const mentioned = await resolveMentions(env, parseMentions(body.value));
+      const done = await withTransaction(async (tx) => {
+        const ok = await editPost(tx, { id, body: body.value });
+        if (ok) await addMentions(tx, { postId: id, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+        return ok;
+      });
       if (!done) return json({ error: 'That post has already been removed.' }, 410);
-      return json({ ok: true, body: body.value });
+      /* The identities of anyone newly named, so the page can link them
+         without a reload. */
+      const ids = mentioned.map(m => m.userId);
+      return json({ ok: true, body: body.value, mentions: ids, authors: await authorsFor(env, ids) });
     }
 
     const done = await withTransaction(tx => deleteOwnPost(tx, { id, userId: session.user_id }));

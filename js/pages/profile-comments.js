@@ -78,6 +78,25 @@
       : '<span class="forum-author">' + inner + '</span>';
   }
 
+  /* The identities the wall arrived with, so an edit that names somebody
+     new can link them without a reload. */
+  var currentAuthors = {};
+
+  /* A body, escaped, with the @names the SERVER resolved turned into
+     profile links — those and no others. Escaped first, then linked. */
+  function linkMentions(post, authors) {
+    var html = esc(post.body).replace(/\n/g, '<br>');
+    var ids = post.mentions || [];
+    if (!ids.length) return html;
+    var byLogin = {};
+    ids.forEach(function (id) { var a = authors && authors[id]; if (a && a.login) byLogin[a.login.toLowerCase()] = a; });
+    return html.replace(/(^|[^A-Za-z0-9_\/.])@([A-Za-z0-9_]{3,25})(?![A-Za-z0-9_])/g, function (m, pre, name) {
+      var a = byLogin[name.toLowerCase()];
+      if (!a) return m;
+      return pre + '<a class="forum-mention" href="/user/' + encodeURIComponent(a.login) + '">@' + esc(name) + '</a>';
+    });
+  }
+
   function reasonForm(act, id, placeholder, submitLabel) {
     return '<form class="forum-reason-form" data-reason-act="' + esc(act) + '" data-id="' + esc(id) + '" hidden>' +
       '<input type="text" class="forum-input" maxlength="' + REASON_MAX + '" placeholder="' + esc(placeholder) + '" required>' +
@@ -102,7 +121,7 @@
         '<span class="forum-post-time">' + timeAgo(c.createdAt) +
           ' <span class="forum-post-edited"' + (c.editedAt ? '' : ' hidden') + '>(edited)</span></span>' +
         (controls.length ? '<span class="forum-post-actions">' + controls.join('') + '</span>' : '') + '</div>' +
-      '<div class="forum-post-body">' + esc(c.body).replace(/\n/g, '<br>') + '</div>' +
+      '<div class="forum-post-body">' + linkMentions(c, authors) + '</div>' +
       '<div class="forum-error" hidden></div>' +
       (ctx.myId && !mine ? reasonForm('report', c.id, 'Why should a moderator look at this?', 'Send report') : '') +
       (ctx.staff && !mine ? reasonForm('delete-post', c.id, 'Reason (the author will see it)', 'Remove comment') : '') +
@@ -125,11 +144,13 @@
     '</form>';
   }
 
-  /** The owner's switch, shown only to the owner. */
+  /** The owner's switches, shown only to the owner. */
   function switchHtml(d) {
     return '<label class="prof-comments-switch">' +
-      '<input type="checkbox" id="commentsSwitch"' + (d.enabled ? ' checked' : '') + '> Allow comments on my profile' +
-      '<span class="forum-error" id="commentsSwitchError" hidden></span></label>';
+      '<input type="checkbox" data-setting="commentsEnabled"' + (d.enabled ? ' checked' : '') + '> Allow comments on my profile</label>' +
+      '<label class="prof-comments-switch">' +
+      '<input type="checkbox" data-setting="mentionsEnabled"' + (d.mentionsEnabled !== false ? ' checked' : '') + '> Let people @mention me</label>' +
+      '<div class="forum-error" id="settingsError" hidden></div>';
   }
 
   function render(host, userId, page) {
@@ -139,6 +160,7 @@
         return;
       }
       var d = r.data, authors = d.authors || {};
+      currentAuthors = authors;
       var sess = me();
       var ctx = {
         myId: sess && sess.user_id != null ? String(sess.user_id) : null,
@@ -168,13 +190,16 @@
   }
 
   function wire(host, userId, page) {
-    var sw = host.querySelector('#commentsSwitch');
-    if (sw) {
-      sw.addEventListener('change', function () {
-        var err = host.querySelector('#commentsSwitchError');
+    var switches = host.querySelectorAll('input[data-setting]');
+    for (var s = 0; s < switches.length; s++) {
+      switches[s].addEventListener('change', function () {
+        var sw = this;
+        var err = host.querySelector('#settingsError');
         err.hidden = true;
         sw.disabled = true;
-        api('/api/forum/comments', { action: 'settings', commentsEnabled: sw.checked }).then(function (r) {
+        var patch = { action: 'settings' };
+        patch[sw.getAttribute('data-setting')] = sw.checked;
+        api('/api/forum/comments', patch).then(function (r) {
           if (!r.ok) { sw.checked = !sw.checked; sw.disabled = false; return showError(err, r); }
           render(host, userId, page);
         }).catch(function () { sw.checked = !sw.checked; sw.disabled = false; showError(err, null); });
@@ -266,7 +291,8 @@
       api('/api/forum/post', { action: 'edit', id: card.getAttribute('data-post'), body: editor.querySelector('textarea').value })
         .then(function (r) {
           if (!r.ok) { submit.disabled = false; return showError(err, r); }
-          bodyEl.innerHTML = esc(r.data.body).replace(/\n/g, '<br>');
+          Object.assign(currentAuthors, r.data.authors || {});
+          bodyEl.innerHTML = linkMentions({ body: r.data.body, mentions: r.data.mentions || [] }, currentAuthors);
           card.querySelector('.forum-post-edited').hidden = false;
           endEdit(card);
         }).catch(function () { submit.disabled = false; showError(err, null); });

@@ -6,6 +6,57 @@ const MAX_NOTIFICATIONS = 50;
 let notifPanelOpen = false;
 let lastLiveState = null;
 
+/* ── The server's list ─────────────────────────────────────────────────
+   Everything above this is the local list: live/offline events kept in
+   localStorage. This is the second source — replies, mentions, comments
+   on your profile, a moderator's removal — read from /api/forum/
+   notifications once per page load when there is a session, and merged
+   into the same panel. It is not polled; the next page you open shows
+   what is new. */
+let serverNotifs = [];
+let serverAuthors = {};
+let serverUnread = 0;
+
+function hasSessionCookie() {
+  return /(?:^|; )pham_session=/.test(document.cookie);
+}
+
+function loadServerNotifications() {
+  if (!hasSessionCookie()) return;
+  fetch('/api/forum/notifications', { cache: 'no-store' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      if (!d) return;
+      serverNotifs = Array.isArray(d.notifications) ? d.notifications : [];
+      serverAuthors = d.authors || {};
+      serverUnread = Number(d.unread) || 0;
+      updateBadge();
+      if (notifPanelOpen) renderNotifPanel();
+    })
+    .catch(() => {});
+}
+
+/** One line per server notification, and where it points. */
+function describeServerNotif(n) {
+  const who = (serverAuthors[n.actorId] || {}).displayName || 'Someone';
+  const where = n.threadTitle ? `“${n.threadTitle}”` : 'your profile';
+  let text, href = null;
+  switch (n.kind) {
+    case 'reply':      text = `${who} replied to ${where}`; break;
+    case 'mention':    text = `${who} mentioned you in ${where}`; break;
+    case 'comment':    text = `${who} commented on your profile`; break;
+    case 'moderation': text = 'A moderator removed your post' + (n.reason ? `: ${n.reason}` : ''); break;
+    default:           text = 'Something happened on the forum';
+  }
+  if (n.postDeleted && n.kind !== 'moderation') text += ' (since removed)';
+  else if (n.threadId && n.postId) href = `/thread/${n.threadId}#post-${n.postId}`;
+  else if (n.kind === 'comment') {
+    const me = (typeof getSession === 'function' ? getSession() : null) || {};
+    if (me.login) href = `/user/${encodeURIComponent(me.login)}`;
+  }
+  return { text, href };
+}
+
 function getNotifications() {
   try {
     return JSON.parse(localStorage.getItem(PA_NOTIF_KEY) || '[]');
@@ -28,6 +79,15 @@ function markAllRead() {
   try {
     localStorage.setItem(PA_NOTIF_READ_KEY, String(Date.now()));
   } catch {}
+  /* The server's unread are read once the panel has shown them. The
+     highlight stays for this opening — the count is what clears. */
+  if (serverUnread > 0) {
+    serverUnread = 0;
+    fetch('/api/forum/notifications', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'read' }), cache: 'no-store',
+    }).then(() => { serverNotifs.forEach(n => { n.read = true; }); }).catch(() => {});
+  }
   updateBadge();
 }
 
@@ -46,7 +106,7 @@ function addNotification(notification) {
 
 function getUnreadCount() {
   const lastRead = getLastReadTime();
-  return getNotifications().filter(n => n.time > lastRead).length;
+  return getNotifications().filter(n => n.time > lastRead).length + serverUnread;
 }
 
 function updateBadge() {
@@ -81,6 +141,10 @@ function getNotifIcon(type) {
     case 'sub_expiring': return '⏰';
     case 'raid': return '⚔️';
     case 'system': return '🔔';
+    case 'reply': return '💬';
+    case 'mention': return '@';
+    case 'comment': return '✍️';
+    case 'moderation': return '🛡️';
     default: return '📢';
   }
 }
@@ -97,10 +161,25 @@ function renderNotifPanel() {
     <button class="notif-clear-btn" onclick="clearAllNotifications()" title="Clear all">Clear</button>
   </div>`;
 
-  if (notifications.length === 0) {
+  if (notifications.length === 0 && serverNotifs.length === 0) {
     html += `<div class="notif-empty">No notifications yet</div>`;
   } else {
     html += `<div class="notif-list">`;
+    /* The forum's first: they are about you specifically, and they carry
+       a place to go. Unread ones stay highlighted until the panel has
+       been opened once with them in it. */
+    serverNotifs.forEach(n => {
+      const d = describeServerNotif(n);
+      const unread = n.read ? '' : ' notif-unread';
+      const inner = `<span class="notif-icon">${getNotifIcon(n.kind)}</span>
+        <div class="notif-content">
+          <div class="notif-message">${escNotifHtml(d.text)}</div>
+          <div class="notif-time">${timeAgoNotif(Date.parse(n.at) || Date.now())}</div>
+        </div>`;
+      html += d.href
+        ? `<a class="notif-item notif-link${unread}" href="${escNotifHtml(d.href)}">${inner}</a>`
+        : `<div class="notif-item${unread}">${inner}</div>`;
+    });
     notifications.forEach(n => {
       const unread = n.time > lastRead ? ' notif-unread' : '';
       html += `<div class="notif-item${unread}">
@@ -253,3 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setTimeout(requestDesktopPermission, 5000);
 });
+
+/* The server's list, once per page load. Nothing else here waits for the
+   DOM: the bell markup arrives from components.js, and updateBadge() is
+   a no-op until it has. */
+document.addEventListener('DOMContentLoaded', loadServerNotifications);

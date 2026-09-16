@@ -15,10 +15,11 @@ import { getPool, withTransaction } from '../../../server/lib/db.js';
 import { isModerator } from '../admin/moderators.js';
 import {
   parseCategoryId, parsePage, validateTitle, validateBody,
-  getCategory, listThreads, createThread, recentThreadCount, recentPostCount, authorIds,
+  getCategory, listThreads, createThread, recentThreadCount, recentPostCount, addMentions, authorIds,
 } from './queries.js';
 import { threadRule } from './rules.js';
 import { authorsFor } from './authors.js';
+import { parseMentions, resolveMentions } from './mentions.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -61,9 +62,13 @@ export async function onRequestPost(context) {
     const rule = threadRule({ session, staff, category, recentThreads, recentPosts });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
-    const made = await withTransaction(tx => createThread(tx, {
-      categoryId, userId: session.user_id, title: title.value, body: body.value,
-    }));
+    /* Resolved before the transaction (KV reads), written inside it. */
+    const mentioned = await resolveMentions(env, parseMentions(body.value));
+    const made = await withTransaction(async (tx) => {
+      const out = await createThread(tx, { categoryId, userId: session.user_id, title: title.value, body: body.value });
+      await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+      return out;
+    });
     return json({ id: made.threadId }, 201);
   } catch (err) {
     console.error('[forum/threads] post:', err.message);

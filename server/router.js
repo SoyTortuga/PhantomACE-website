@@ -72,6 +72,9 @@ const NON_ROUTE_MODULES = new Set([
   /* Who may post where. Pure functions; covered by test-forum-posting.js
      including a mutation check that the rate limit is load-bearing. */
   'api/forum/rules.js',
+  /* @mention parsing and resolution. Library, no handler; covered by
+     test-forum-mentions.js. */
+  'api/forum/mentions.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

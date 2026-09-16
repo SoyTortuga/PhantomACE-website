@@ -687,3 +687,7 @@
 @media (max-width: 640px) {
   .member-search { display: none; }
 }
+
+/* Forum notifications in the bell carry a place to go. */
+a.notif-item.notif-link { text-decoration: none; color: inherit; display: flex; }
+a.notif-item.notif-link:hover .notif-message { color: var(--red); }

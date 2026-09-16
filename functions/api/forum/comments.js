@@ -24,9 +24,10 @@
    ══════════════════════════════════════════════ */
 
 import { getPool, withTransaction } from '../../../server/lib/db.js';
-import { parsePage, validateBody, listComments, createComment, recentPostCount, authorIds } from './queries.js';
+import { parsePage, validateBody, listComments, createComment, recentPostCount, addMentions, authorIds } from './queries.js';
 import { commentRule } from './rules.js';
 import { authorsFor } from './authors.js';
+import { parseMentions, resolveMentions } from './mentions.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -56,6 +57,7 @@ async function ownerOf(env, id) {
     login: p.login || '',
     displayName: p.displayName || p.login || '',
     commentsEnabled: p.commentsEnabled !== false,
+    mentionsEnabled: p.mentionsEnabled !== false,
   };
 }
 
@@ -79,6 +81,7 @@ export async function onRequestGet(context) {
     return json({
       owner: { userId: owner.userId, login: owner.login, displayName: owner.displayName },
       enabled: owner.commentsEnabled,
+      mentionsEnabled: owner.mentionsEnabled,
       comments, page, pages, total, authors,
       viewer: { isOwner: !!session && String(session.user_id) === id },
     });
@@ -96,18 +99,22 @@ export async function onRequestPost(context) {
   try { payload = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
   if (!payload || typeof payload !== 'object') return json({ error: 'Bad request' }, 400);
 
-  /* The owner's switch. No database: the record is a KV document. */
+  /* The owner's switches — comments on their wall, being @mentioned. No
+     database: the record is a KV document. Either or both may be sent. */
   if (payload.action === 'settings') {
     if (!session || !session.user_id) return json({ error: 'Log in first.' }, 401);
-    if (typeof payload.commentsEnabled !== 'boolean') return json({ error: 'Bad request' }, 400);
+    const patch = {};
+    if (typeof payload.commentsEnabled === 'boolean') patch.commentsEnabled = payload.commentsEnabled;
+    if (typeof payload.mentionsEnabled === 'boolean') patch.mentionsEnabled = payload.mentionsEnabled;
+    if (!Object.keys(patch).length) return json({ error: 'Bad request' }, 400);
     try {
       const me = String(session.user_id);
       const after = await env.MARKETPLACE.mutate(`profile_${me}`, (p) => {
         if (!p) return undefined;                       // no record: nothing to switch
-        return { ...p, commentsEnabled: payload.commentsEnabled };
+        return { ...p, ...patch };
       });
       if (!after) return json({ error: 'There is no profile to change yet. Log in again.' }, 404);
-      return json({ ok: true, commentsEnabled: after.commentsEnabled !== false });
+      return json({ ok: true, commentsEnabled: after.commentsEnabled !== false, mentionsEnabled: after.mentionsEnabled !== false });
     } catch (err) {
       console.error('[forum/comments] settings:', err.message);
       return json({ error: 'Forum unavailable' }, 503);
@@ -128,7 +135,12 @@ export async function onRequestPost(context) {
     const rule = commentRule({ session, owner, enabled: owner ? owner.commentsEnabled : true, recentPosts });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
-    const made = await withTransaction(tx => createComment(tx, { profileId: id, userId: session.user_id, body: body.value }));
+    const mentioned = await resolveMentions(env, parseMentions(body.value));
+    const made = await withTransaction(async (tx) => {
+      const out = await createComment(tx, { profileId: id, userId: session.user_id, body: body.value });
+      await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+      return out;
+    });
     return json({ postId: made.postId }, 201);
   } catch (err) {
     console.error('[forum/comments] post:', err.message);
