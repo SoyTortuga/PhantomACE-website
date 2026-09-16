@@ -116,16 +116,47 @@
       ? '<div class="prof-badges">' + p.showcase.map(badgeTile).join('') + '</div>'
       : '';
 
+    /* The same stat block the game shows when you select a species in the
+       collection: the portrait, the name, era and habitat, the badges, and
+       the description. Every field was capped and escaped server-side and
+       is escaped again here. */
     var dino = '';
     if (p.favoriteDino) {
       var d = p.favoriteDino;
-      /* The filter was whitelisted server-side to the characters CSS filter
-         functions are built from — see sanitizeFavorite in dino-park.js. */
-      var style = d.filter ? ' style="filter:' + esc(d.filter) + '"' : '';
+      /* Both filters were whitelisted server-side to the characters CSS
+         filter functions are built from — see sanitizeFavorite. */
+      var art = d.portrait || d.src;
+      var artFilter = d.portrait ? d.portraitFilter : d.filter;
+      var style = artFilter ? ' style="filter:' + esc(artFilter) + '"' : '';
+
+      var badges = '';
+      if (d.rarity) badges += '<span class="prof-dino-badge r-' + esc(d.rarity) + '">' + esc(d.rarity) + '</span>';
+      if (d.diet) badges += '<span class="prof-dino-badge">' + esc(d.diet) + '</span>';
+      if (d.build) badges += '<span class="prof-dino-badge">' + esc(d.build) + '</span>';
+      if (d.mutationLabel) {
+        badges += '<span class="prof-dino-badge is-mut">' + esc(d.mutationLabel) + '</span>';
+      }
+
+      /* A nickname the player never changed is the species name, and
+         printing it twice reads as a mistake. */
+      var nick = d.nickname || d.species || d.specId;
+      var sub = [];
+      if (d.era) sub.push(esc(d.era));
+      if (d.habitat) sub.push(esc(d.habitat));
+      var speciesLine = (d.species && d.species !== nick) ? esc(d.species) : '';
+
       dino =
         '<div class="prof-dino">' +
-          '<img src="' + esc(d.src) + '" alt="" class="prof-dino-art"' + style + '>' +
-          '<span class="prof-dino-name">' + esc(d.nickname || d.specId) + '</span>' +
+          '<div class="prof-dino-portrait">' +
+            '<img src="' + esc(art) + '" alt=""' + style + '>' +
+          '</div>' +
+          '<div class="prof-dino-info">' +
+            '<div class="prof-dino-name">' + esc(nick) + '</div>' +
+            (speciesLine ? '<div class="prof-dino-species">' + speciesLine + '</div>' : '') +
+            (sub.length ? '<div class="prof-dino-sub">' + sub.join(' <span class="prof-dot">·</span> ') + '</div>' : '') +
+            (badges ? '<div class="prof-dino-badges">' + badges + '</div>' : '') +
+            (d.desc ? '<p class="prof-dino-desc">“' + esc(d.desc) + '”</p>' : '') +
+          '</div>' +
         '</div>';
     }
 

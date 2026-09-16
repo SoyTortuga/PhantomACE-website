@@ -224,6 +224,16 @@ export async function onRequestGet(context) {
         nickname: fav.nickname || '',
         src: fav.src,
         filter: fav.filter || '',
+        portrait: fav.portrait || '',
+        portraitFilter: fav.portraitFilter || '',
+        species: fav.species || '',
+        rarity: fav.rarity || '',
+        diet: fav.diet || '',
+        habitat: fav.habitat || '',
+        era: fav.era || '',
+        build: fav.build || '',
+        desc: fav.desc || '',
+        mutationLabel: fav.mutationLabel || '',
       };
     }
   } catch { /* a profile without a dino still renders */ }

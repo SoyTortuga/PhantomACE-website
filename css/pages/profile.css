@@ -198,27 +198,90 @@
 .prof-rarity.r-rare     { color: #cc88ff; }
 .prof-rarity.r-mythic   { color: var(--amber, #ffb300); }
 
-/* ── Favourite dino ───────────────────────────────────────────── */
+/* ── Favourite dino ───────────────────────────────────────────────
+   The collection's own stat block, in this page's palette: portrait left,
+   identity right, description underneath. */
 .prof-dino {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 18px 12px 12px;
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--gray-lo);
+  max-width: 560px;
+  flex-wrap: wrap;
 }
 
-.prof-dino-art {
-  width: 72px;
-  height: 72px;
+.prof-dino-portrait {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0d0d0d;
+}
+
+.prof-dino-portrait img {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
   image-rendering: pixelated;
 }
 
+.prof-dino-info { flex: 1 1 220px; min-width: 0; }
+
 .prof-dino-name {
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-pri);
+  line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+.prof-dino-species {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.prof-dino-sub {
+  font-size: 12px;
+  color: var(--text-sec);
+  margin-top: 4px;
+}
+
+.prof-dino-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.prof-dino-badge {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  padding: 2px 7px;
+}
+.prof-dino-badge.r-uncommon  { color: #2ecc71; border-color: #2ecc7144; }
+.prof-dino-badge.r-rare      { color: #3498db; border-color: #3498db44; }
+.prof-dino-badge.r-epic      { color: #9b59b6; border-color: #9b59b644; }
+.prof-dino-badge.r-legendary { color: var(--amber, #ffb300); border-color: #ffb30044; }
+.prof-dino-badge.is-mut      { color: var(--red); border-color: var(--red); }
+
+.prof-dino-desc {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin: 10px 0 0;
 }
 
 /* ── Standings ────────────────────────────────────────────────── */

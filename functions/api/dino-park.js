@@ -226,6 +226,24 @@ export function sanitizeFavorite(fav) {
   const filterSafe = FAV_FILTER_OK.test(filter) &&
     !/url\(|;|\}|<|expression/i.test(filter);
 
+  /* The portrait is a second image on the same terms as the first: it is
+     rendered on the same public page, so an unchecked one is the same hole
+     twice. A portrait that fails validation is dropped rather than fatal —
+     the stat block reads fine without it, and the icon still stands in. */
+  const portrait = String(fav.portrait || '');
+  const portraitOk = portrait.length <= FAV_SRC_MAX &&
+    (FAV_SRC_ASSET.test(portrait) || FAV_SRC_INLINE.test(portrait));
+
+  const pFilter = String(fav.portraitFilter || '');
+  const pFilterSafe = FAV_FILTER_OK.test(pFilter) &&
+    !/url\(|;|\}|<|expression/i.test(pFilter);
+
+  /* The stat block is the game's own copy, not the player's, so it is
+     capped rather than pattern-matched — a species name or an era is prose
+     and refusing one for containing a hyphen would be worse than useless.
+     Every one of these is escaped at render like the nickname. */
+  const text = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
+
   return {
     specId,
     mutation: FAV_ID.test(mutation) ? mutation : '',
@@ -234,6 +252,16 @@ export function sanitizeFavorite(fav) {
     nickname: String(fav.nickname || '').trim().slice(0, 24),
     src,
     filter: filterSafe ? filter : '',
+    portrait: portraitOk ? portrait : '',
+    portraitFilter: portraitOk && pFilterSafe ? pFilter : '',
+    species: text(fav.species, 40),
+    rarity: text(fav.rarity, 20),
+    diet: text(fav.diet, 20),
+    habitat: text(fav.habitat, 20),
+    era: text(fav.era, 30),
+    build: text(fav.build, 20),
+    desc: text(fav.desc, 300),
+    mutationLabel: text(fav.mutationLabel, 30),
     at: Date.now(),
   };
 }

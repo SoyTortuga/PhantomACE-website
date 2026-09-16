@@ -2227,6 +2227,21 @@ function resolveFavoriteSprite(specId, mutation) {
   return { src: getSprite(specId, 96, mutation), filter: '' };
 }
 
+/* The PORTRAIT, which is a different asset from the grid icon and what the
+   collection shows when you select a species. Same fallback ladder as
+   portraitImg: portrait, then icon, then a drawn one. */
+function resolveFavoritePortrait(specId, mutation) {
+  const asset = ASSET_MAP[specId];
+  const mut = mutation ? getMutFilter(specId, mutation) : '';
+  if (asset && asset.portrait) {
+    return { src: '/games/dino-park/' + asset.portrait, filter: mut || '' };
+  }
+  if (asset && asset.icon) {
+    return { src: '/games/dino-park/' + asset.icon, filter: mut || '' };
+  }
+  return { src: getPortrait(specId, 96, mutation), filter: '' };
+}
+
 /* Matched on what the dino IS rather than on its index, which changes every
    time one is released or the park is re-ordered. */
 function isFavorite(dino) {
@@ -2244,14 +2259,35 @@ function toggleFavorite(idx) {
   if (isFavorite(dino)) {
     state.favorite = null;
   } else {
-    const spec = getRosterById(dino.speciesId);
+    const spec = getRosterById(dino.speciesId) || {};
     const resolved = resolveFavoriteSprite(dino.speciesId, dino.mutation);
+    const portrait = resolveFavoritePortrait(dino.speciesId, dino.mutation);
+    const def = SPECIES_DEF[dino.speciesId] || {};
+    const mut = dino.mutation ? resolveSpeciesMut(dino.speciesId, dino.mutation) : null;
+
+    /* THE STAT BLOCK, SNAPSHOTTED. The profile page has none of this file's
+       roster, species definitions or mutation tables, and giving it them
+       would couple a public page to a five-thousand-line game. The fields
+       are static per species, so a copy taken at the moment of choosing is
+       as good as a lookup — and if the roster is ever re-tiered, the worst
+       case is a profile describing a dino the way it was when its owner
+       picked it, which is arguably the honest answer anyway. */
     state.favorite = {
       specId: dino.speciesId,
       mutation: dino.mutation || '',
-      nickname: dino.nickname || (spec ? spec.name : ''),
+      nickname: dino.nickname || spec.name || '',
       src: resolved.src,
       filter: resolved.filter,
+      portrait: portrait.src,
+      portraitFilter: portrait.filter,
+      species: spec.name || '',
+      rarity: spec.rarity || '',
+      diet: spec.diet || '',
+      habitat: spec.habitat || '',
+      era: spec.era || '',
+      build: def.t || '',
+      desc: spec.desc || '',
+      mutationLabel: mut ? (mut.label || '') : '',
     };
   }
   renderBottomPanel();

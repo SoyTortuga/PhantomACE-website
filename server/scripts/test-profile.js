@@ -152,7 +152,71 @@ const good = (over = {}) => sanitizeFavorite({
     onclick: 'alert(1)', html: '<script>', __proto__: { polluted: true },
   });
   check('unknown fields are not carried through',
-    Object.keys(f).sort(), ['at', 'filter', 'mutation', 'nickname', 'specId', 'src']);
+    Object.keys(f).sort(),
+    ['at', 'build', 'desc', 'diet', 'era', 'filter', 'habitat', 'mutation',
+     'mutationLabel', 'nickname', 'portrait', 'portraitFilter', 'rarity',
+     'specId', 'species', 'src']);
+}
+
+/* ── The stat block ──────────────────────────────────────────────────
+   The favourite carries what the collection shows when you select a
+   species: a portrait, the species name, era, habitat, rarity, diet, build
+   and the description. All of it is rendered publicly, so all of it is
+   bounded — and the portrait is a second image on exactly the same terms
+   as the first, which means the same hole if it is left open. */
+{
+  const PORTRAIT = '/games/dino-park/assets/AncientBeastsPack/Rex-72x72.png';
+  const full = (over = {}) => sanitizeFavorite({
+    specId: 'rex', src: ASSET, portrait: PORTRAIT,
+    portraitFilter: 'hue-rotate(40deg)',
+    species: 'Tyrannosaurus', rarity: 'legendary', diet: 'Carnivore',
+    habitat: 'Land', era: 'Cretaceous', build: 'theropod',
+    desc: 'The tyrant lizard king.', mutationLabel: 'Albino', ...over,
+  });
+
+  const f = full();
+  check('the portrait is kept', f.portrait, PORTRAIT);
+  check('with its own filter', f.portraitFilter, 'hue-rotate(40deg)');
+  check('the species name', f.species, 'Tyrannosaurus');
+  check('the rarity', f.rarity, 'legendary');
+  check('the era', f.era, 'Cretaceous');
+  check('the build', f.build, 'theropod');
+  check('the mutation label', f.mutationLabel, 'Albino');
+  check('and the description', f.desc, 'The tyrant lizard king.');
+
+  /* THE SAME HOLE, TWICE. An unchecked portrait is an external image
+     request made by everyone who loads the profile, exactly as src was. */
+  check('an external portrait is dropped',
+    full({ portrait: 'https://evil.example/track.gif' }).portrait, '');
+  check('and an svg data URL portrait',
+    full({ portrait: 'data:image/svg+xml;base64,PHN2Zz4=' }).portrait, '');
+  check('and one escaping the asset tree',
+    full({ portrait: '/games/dino-park/assets/../../server/.env' }).portrait, '');
+
+  /* A bad portrait costs the portrait, not the dino — the icon still
+     stands in and the stat block reads fine without it. */
+  const noPortrait = full({ portrait: 'https://evil.example/x.png' });
+  ok('the favourite survives a refused portrait', !!noPortrait.specId);
+  check('and keeps its sprite', noPortrait.src, ASSET);
+
+  check('a portrait filter that escapes the attribute is dropped',
+    full({ portraitFilter: '" onload="alert(1)' }).portraitFilter, '');
+  check('and one smuggling a url()',
+    full({ portraitFilter: 'url(https://evil.example/x.svg)' }).portraitFilter, '');
+  /* A dropped portrait takes its filter with it: a filter applied to
+     nothing is meaningless, and carrying it forward invites it being
+     applied to whatever stands in. */
+  check('a refused portrait drops its filter too', noPortrait.portraitFilter, '');
+
+  /* Prose is capped rather than pattern-matched — refusing a species name
+     for containing a hyphen would be worse than useless — and every field
+     is escaped at render. */
+  check('a runaway description is cut', full({ desc: 'x'.repeat(900) }).desc.length, 300);
+  check('and a runaway species name', full({ species: 'y'.repeat(200) }).species.length, 40);
+  check('markup in prose is stored as text, not stripped',
+    full({ species: '<b>Rex</b>' }).species, '<b>Rex</b>');
+  check('missing prose becomes empty, never undefined',
+    sanitizeFavorite({ specId: 'rex', src: ASSET }).species, '');
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
