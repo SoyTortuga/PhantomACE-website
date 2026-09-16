@@ -41,7 +41,23 @@
     </div>
   </div>
 
+  <!-- MTGBBB standings. Like the scramble panel, hidden entirely unless a
+       game is actually running, so this overlay can live in every scene. -->
+  <div class="ov-mtg" id="ovMtg" hidden>
+    <div class="ov-mtg-head">
+      <span class="ov-mtg-label">MTGBBB</span>
+      <span class="ov-mtg-set" id="ovMtgSet"></span>
+    </div>
+    <div class="ov-mtg-pack">
+      <span id="ovMtgPack"></span>
+      <span class="ov-mtg-players" id="ovMtgPlayers"></span>
+    </div>
+    <div class="ov-mtg-track"><i id="ovMtgBar"></i></div>
+    <ol class="ov-mtg-top" id="ovMtgTop"></ol>
+  </div>
+
   <script src="/js/pages/overlay.js" defer></script>
   <script src="/js/pages/overlay-scramble.js" defer></script>
+  <script src="/js/pages/overlay-mtgbbb.js" defer></script>
 </body>
 </html>

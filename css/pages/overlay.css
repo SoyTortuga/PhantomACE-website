@@ -355,3 +355,160 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .ov-scramble { backdrop-filter: none; }
 }
+
+
+/* ════════════════════════════════════════════════
+   MTGBBB
+
+   Bottom-left, opposite the scramble panel, so the two can be on screen at
+   once without a collision — MTGBBB runs during gameplay and the scramble
+   during a BRB, but nothing enforces that and an overlay that breaks when
+   both appear would break on air.
+   ════════════════════════════════════════════════ */
+.ov-mtg {
+  position: fixed;
+  left: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  width: 268px;
+  padding: 14px 16px 12px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid #2a2a2a;
+  border-left: 3px solid #ff0000;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+}
+
+.ov-mtg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ov-mtg-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff0000;
+}
+
+.ov-mtg-set {
+  font-size: 11px;
+  color: #8a8a8a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-mtg-pack {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: #ddd;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-mtg-players { color: #6f6f6f; }
+
+/* The box emptying, as a shape. Watching the bar run out is most of what
+   makes the last few packs tense. */
+.ov-mtg-track {
+  height: 3px;
+  background: #1c1c1c;
+  border-radius: 2px;
+  margin: 7px 0 10px;
+  overflow: hidden;
+}
+
+.ov-mtg-track i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ff0000;
+  transition: width 0.4s ease;
+}
+
+.ov-mtg-top {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ov-mtg-top li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: #eee;
+}
+
+.ov-mtg-rank {
+  width: 14px;
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6f6f6f;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-mtg-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-mtg-pts {
+  flex: none;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-mtg-empty {
+  font-size: 12px;
+  color: #6f6f6f;
+  font-style: italic;
+}
+
+/* A pulled card is portrait and is the alert, so it gets more room than an
+   emote mark and keeps its aspect ratio rather than being squared off. */
+.ov-mark.is-card {
+  width: auto;
+  height: 132px;
+  aspect-ratio: 488 / 680;
+  object-fit: contain;
+  border-radius: 5px;
+}
+
+/* Treatments on the card that was just pulled. Each is worth a point, so
+   they are information, not decoration. */
+.ov-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.ov-chip {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffb300;
+  border: 1px solid #4a3a10;
+  background: #191307;
+  border-radius: 3px;
+  padding: 2px 7px;
+}
+
+/* The file already honours this for the scramble panel. A progress bar that
+   slides is exactly the kind of motion it is asked to stop. */
+@media (prefers-reduced-motion: reduce) {
+  .ov-mtg-track i { transition: none; }
+}

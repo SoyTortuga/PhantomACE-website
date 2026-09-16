@@ -131,6 +131,13 @@
     return ev.kind === 'item' && /egg/i.test(ev.itemName || '');
   }
 
+  /* A booster box is opened at pace — thirty-odd rares in forty minutes,
+     sometimes three in a row while the moderator catches up. At the normal
+     seven seconds a burst would queue and the alerts would drift behind the
+     card actually in the broadcaster's hand, which is worse than showing
+     less. Pulls get four. */
+  var PULL_MS = 4000;
+
   /* ── What each event looks like on screen ── */
   function describe(ev) {
     if (ev.type === 'drop') {
@@ -173,6 +180,47 @@
     if (ev.type === 'hype-level') {
       return { art: ART.hype, kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
     }
+
+    /* ── MTGBBB ──────────────────────────────────────────────────────
+       The card that just came out of the pack, and how much of the room
+       was holding it. That second number is the point: it turns a pull
+       into something the whole chat reacts to at once, and it reads just
+       as loudly at 3 of 62 as at 58 of 62. */
+    if (ev.type === 'mtgbbb-pull') {
+      var held = Number(ev.holders);
+      var total = Number(ev.players);
+      var line;
+      if (!Number.isFinite(held) || !Number.isFinite(total) || total <= 0) {
+        line = 'Pulled';                       // counts missing: say nothing false
+      } else if (held === 0) {
+        line = 'Nobody had this one';
+      } else if (held === total) {
+        line = 'Everyone had this — all ' + total + ' cards';
+      } else {
+        line = held + ' of ' + total + ' cards had this';
+      }
+
+      return {
+        art: ev.image || FALLBACK, card: true, ms: PULL_MS,
+        kind: (ev.rarity === 'mythic' ? 'Mythic' : 'Rare') + ' Pull',
+        title: esc(ev.card || 'Unknown card'),
+        sub: line,
+        chips: Array.isArray(ev.treatments) ? ev.treatments : [],
+        rarity: ev.rarity === 'mythic' ? 'mythic' : 'rare',
+      };
+    }
+
+    if (ev.type === 'mtgbbb-bingo') {
+      var blackout = /blackout/i.test(ev.pattern || '');
+      return {
+        art: blackout ? ART.love3 : ART.hype,
+        kind: blackout ? 'BLACKOUT' : 'Bingo',
+        title: esc(ev.who) + (blackout ? ' blacked out!' : ' got a bingo!'),
+        sub: (blackout ? 'All twenty-five' : esc(ev.pattern || 'A line')) +
+             (Number.isFinite(Number(ev.points)) ? ' — ' + ev.points + ' pts' : ''),
+        rarity: blackout ? 'mythic' : 'rare',
+      };
+    }
     return null;
   }
 
@@ -186,7 +234,7 @@
     card.dataset.rarity = d.rarity || 'common';
 
     var img = document.createElement('img');
-    img.className = 'ov-mark' + (d.pixel ? ' is-pixel' : '');
+    img.className = 'ov-mark' + (d.pixel ? ' is-pixel' : '') + (d.card ? ' is-card' : '');
     img.alt = '';
     img.src = d.art;
     /* One retry to the local mark, then give up. Without the guard a
@@ -202,10 +250,22 @@
     text.className = 'ov-text';
     /* Titles mix fixed wording with Twitch display names; the event-derived
        pieces are escaped inside describe(). */
+    /* Chips are event-derived, so each is escaped individually rather than
+       trusted because the surrounding markup is ours. */
+    var chips = '';
+    if (d.chips && d.chips.length) {
+      chips = '<div class="ov-chips">';
+      for (var c = 0; c < d.chips.length; c++) {
+        chips += '<span class="ov-chip">' + esc(d.chips[c]) + '</span>';
+      }
+      chips += '</div>';
+    }
+
     text.innerHTML =
       '<span class="ov-kind">' + esc(d.kind) + '</span>' +
       '<p class="ov-title">' + d.title + '</p>' +
       '<p class="ov-sub">' + esc(d.sub) + '</p>' +
+      chips +
       (d.code ? '<div class="ov-code">' + esc(d.code) + '</div>' : '');
 
     card.appendChild(img);
@@ -219,7 +279,7 @@
         showing = false;
         setTimeout(pump, GAP_MS);
       }, 340);
-    }, SHOW_MS);
+    }, d.ms || SHOW_MS);
 
     return true;
   }
