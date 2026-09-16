@@ -1,6 +1,6 @@
 # MTGBBB — Magic: The Gathering Booster Box Bingo
 
-**Status:** design agreed, not yet built.
+**Status:** design agreed. Scoring engine built and tested; everything else outstanding.
 **Agent:** `game-mtgbbb`.
 
 Chat plays along while the broadcaster cracks a sealed booster box on stream.
@@ -30,7 +30,7 @@ twelve. Their card is random either way, so this costs no fairness.
 | | Points |
 |---|---|
 | Mark — the card was pulled | **1** |
-| Each treatment on a pulled card | **1–3** (see below) |
+| Each treatment on a pulled card | **1** |
 | Bingo — any completed pattern | **5** |
 | Blackout — all 25 marked | **25** |
 
@@ -56,23 +56,20 @@ within a single physical card — a borderless foil is two treatments.
 
 ### Treatment values
 
-Treatments are worth 1, 2 or 3 points, **ranked per set**: the treatment carried
-by the fewest rare/mythics in that set's booster pool is worth the most.
+**Every treatment is worth 1 point, flat.** A frequency-ranked ladder was
+considered and rejected: treatments stack, so a ladder makes one lucky pack
+outweigh a completed line, and the ranking would have rested on a proxy that
+cannot actually measure pull rates — Scryfall knows how many cards carry a
+treatment, not how often one comes out of a pack.
 
-This is a proxy and should be understood as one. Scryfall can say how many cards
-carry a treatment; it cannot say how often you pull one. Those correlate but are
-not the same thing. So:
+What remains from that design, and still matters:
 
-- The computed table is shown to the moderator at room creation and **can be
-  adjusted** before the game starts. They know the set.
-- The final table is **frozen into the room**. Scores must never move because an
+- The treatment list is **derived per set** from the booster pool, so only
+  treatments genuinely possible in that set and product are offered. Serialized
+  cards do not appear in Play Boosters and so will not appear at all.
+- The list is shown to the moderator at room creation and **can be adjusted**.
+- It is then **frozen into the room**. Scores must never move because an
   upstream data source changed mid-game.
-- The ladder is **capped at 3 tiers**. Treatments stack, so on a 1-2-3 ladder a
-  borderless foil is already 4 points — near a bingo. A deeper ladder lets one
-  lucky pack outweigh a completed line.
-
-Serialized cards do not appear in Play Boosters and so will not appear in the
-table for this product.
 
 ---
 
@@ -186,15 +183,31 @@ idle.
 
 Additive. None of them can break scoring if they land later.
 
-**Call your shot.** Before the first pack, each player names a mythic they think
-will be pulled. A specific mythic comes out of one box about 23% of the time —
-frequent enough to chase, rare enough to matter — and it is the only decision a
-player makes all night.
+**Call your shot — press your luck.** Each player names a mythic they think will
+be pulled, and chooses how specific to be. The more they commit to, the better
+the giveaway code:
 
-> **Open item.** At 60 players that is roughly 14 giveaway codes per box. If the
-> pools do not support that, the fix that keeps it exciting rather than merely
-> capping it is to call **card *and* treatment** — "Sheoldred, foil" — or to
-> tier it: right card scores points, right card and right treatment earns a code.
+| The call | Reward | Roughly |
+|---|---|---|
+| Card | Common code | ~23% per box |
+| Card + foil | Uncommon code | ~5% |
+| Card + foil + a named treatment | Rare code | ~1–2% |
+
+**All or nothing.** Call a borderless foil, watch it come out plain foil, and
+you get nothing — that is what makes it a wager rather than a guess. This is
+the only decision a player makes all night, so it should cost something.
+
+Two rules that keep it honest:
+
+- The picker only offers combinations that **actually exist in that set**.
+  Nobody wagers a rare code on a printing that was never possible.
+- A late joiner **can** still call a shot, but only on cards not yet pulled, and
+  it counts forward only. Retroactive credit would make arriving late a
+  guaranteed win. Fewer packs remain, so a late shot is strictly worse — which
+  is fair, and self-balancing.
+
+> **Watch the volume.** At 60 players a common-tier call lands ~14 codes per
+> box. Pressing up thins that out, but the safe play is still the common one.
 
 **Heat map.** Once the box opens, show the three cards appearing on the most
 player cards, so the room has a collective rooting interest before a pack is
@@ -238,9 +251,9 @@ host** to award a prize.
 
 ## 11. Build order
 
-1. **Scoring module and its tests.** Pure functions, no room, no session, no
-   network. Everything else depends on this being right, and it is the one part
-   that can be proven correct in isolation.
+1. ~~**Scoring module and its tests.**~~ **Done.** `functions/api/mtgbbb-scoring.js`
+   and `server/scripts/test-mtgbbb.js` — 77 assertions, wired into
+   `npm --prefix server test`.
 2. **Set data** — Scryfall fetch, cache, pool filter, the under-25 guard, the
    treatment table.
 3. **Room lifecycle** — create, join, card generation, state, end.
@@ -255,5 +268,5 @@ Steps 1–5 are the game. Everything after is addition.
 
 ## 12. Open items
 
-- Call-your-shot reward: giveaway code volume, or the card+treatment variant.
+- Call-your-shot: whether the common-tier code volume is sustainable.
 - Collector Booster support, and the odds work it needs.

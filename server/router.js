@@ -53,6 +53,10 @@ const NON_ROUTE_MODULES = new Set([
      Library, no handler. It is the server's answer to "what is this reward
      worth", which used to come from the request body. */
   'api/phamily-rewards.js',
+
+  /* MTGBBB scoring rules. Pure functions, no handler. Covered by
+     server/scripts/test-mtgbbb.js. */
+  'api/mtgbbb-scoring.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */
