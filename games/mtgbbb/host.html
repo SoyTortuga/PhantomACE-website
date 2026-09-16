@@ -347,6 +347,16 @@
         if (!res.ok) { hint.textContent = data.error || 'Could not load this set.'; return; }
 
         hint.textContent = `${data.set.counts.total} cards in the pool (${data.set.counts.rare} rare, ${data.set.counts.mythic} mythic).`;
+        /* Scryfall publishes no pack contents for some released sets, so the
+           pool is every rare and mythic instead of only the ones it flags as
+           in-booster. The game plays the same; a square could be a card that
+           is not actually in packs, and the person holding the box is the one
+           who can judge that. */
+        if (data.set.provisional) {
+          hint.textContent += ' Scryfall has no pack list for this set, so this is'
+            + ' every rare and mythic in it — a few squares may be cards that do'
+            + ' not come in packs.';
+        }
         selectedTreatmentIds = new Set(data.set.treatments.filter(t => !t.collectorOnly).map(t => t.id));
 
         document.getElementById('treatmentList').innerHTML = data.set.treatments.map(t => `

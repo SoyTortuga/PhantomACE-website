@@ -314,15 +314,53 @@ export function deriveSetData(prints, setInfo = {}) {
      by name, because a square is a name and the variant printings of one
      card are the same square. Lowest collector number wins the image, which
      is the base printing rather than whichever variant sorted first. */
-  const byName = new Map();
-  for (const c of all) {
-    if (!c.booster) continue;
-    const prev = byName.get(c.name);
-    const n = parseInt(c.collector_number, 10);
-    const num = Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER;
-    if (prev && prev.num <= num) continue;
-    byName.set(c.name, { card: c, num });
-  }
+  const collapse = (accept) => {
+    const out = new Map();
+    for (const c of all) {
+      if (!accept(c)) continue;
+      const prev = out.get(c.name);
+      const n = parseInt(c.collector_number, 10);
+      const num = Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER;
+      if (prev && prev.num <= num) continue;
+      out.set(c.name, { card: c, num });
+    }
+    return out;
+  };
+
+  let byName = collapse(c => !!c.booster);
+
+  /* WHEN SCRYFALL HAS NO BOOSTER DATA AT ALL, fall back to every rare and
+     mythic in the set.
+
+     `booster` is right when it is populated and simply absent for some
+     sets: The Hobbit, Marvel Super Heroes, Secrets of Strixhaven and
+     Teenage Mutant Ninja Turtles are all released paper expansions with
+     real Play Booster boxes and not one card flagged. Four of the last
+     twenty-two expansions, including the three most recent. Refusing them
+     means refusing the newest set on the shelf — the one most likely to be
+     cracked on camera.
+
+     The fallback is deliberately narrow:
+
+       - only when the flag yields NOTHING. A set with partial data keeps
+         its filtered pool, which is what correctly drops the six
+         Bloomburrow rares that exist only in starter decks.
+       - only for a set with NO parent_set_code. A bonus sheet like The Big
+         Score has thirty rares and no boxes of its own, and its parent is
+         exactly what says so.
+       - only for a set that has actually been released. Before release the
+         card list is a spoiler season in progress, and a pool that grows
+         under a live game is worse than no game.
+
+     It is a wider net than `booster: true`, so it can include a card that
+     never appears in a pack — a dead square nobody can mark. The result is
+     flagged `provisional` and the moderator is told, because that is a
+     judgement for the person holding the box. */
+  const parentless = !setInfo.parent_set_code;
+  const released = !!setInfo.released_at &&
+    setInfo.released_at <= new Date().toISOString().slice(0, 10);
+  const provisional = byName.size === 0 && parentless && released;
+  if (provisional) byName = collapse(() => true);
 
   const cards = [...byName.entries()]
     .map(([name, { card }]) => ({
@@ -381,6 +419,11 @@ export function deriveSetData(prints, setInfo = {}) {
     treatments,
     counts: { rare, mythic, total: cards.length, prints: all.length },
     playable: cards.length >= MIN_POOL,
+    /* True when the pool came from every rare and mythic in the set rather
+       than from Scryfall's booster flag. The game plays identically; the
+       moderator is told because a square for a card that is not in packs
+       can never be marked. */
+    provisional,
   };
 }
 
@@ -388,8 +431,19 @@ export function deriveSetData(prints, setInfo = {}) {
 export function unplayableReason(data) {
   const n = data && data.counts ? data.counts.total : 0;
   if (!n) {
-    return 'Scryfall has no booster-pool rares or mythics for this set yet. ' +
-      'Unreleased sets often have no pack data until release day — pick another set.';
+    /* Reaching here now means the fallback did not apply, so say which of
+       its conditions failed rather than guessing at "unreleased" — that
+       guess was wrong for Teenage Mutant Ninja Turtles, a set six months
+       on the shelf when it was shown. */
+    const released = data && data.releasedAt &&
+      data.releasedAt <= new Date().toISOString().slice(0, 10);
+    if (!released) {
+      return 'This set has no rares or mythics listed yet. Cards usually ' +
+        'appear during spoiler season — try again nearer release.';
+    }
+    return 'This set has no rares or mythics of its own. Bonus sheets and ' +
+      'supplements are listed separately from the set whose packs they come ' +
+      'in — pick the main set instead.';
   }
   return `This set has only ${n} rare/mythic cards in its booster pool and ` +
     `MTGBBB needs ${MIN_POOL} to fill a card. Pick a different set.`;

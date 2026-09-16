@@ -330,14 +330,70 @@ const has = (data, id) => ids(data).includes(id);
 
 /* ── The under-25 guard ──────────────────────────────────────────────── */
 {
-  /* TMT is a real set whose pack data Scryfall has not published: 158
-     prints in the set, zero flagged as in-booster. Without this guard the
-     room would open, buildCard would throw on the first join, and the
-     moderator would find out with the stream live. */
-  check('a set with no booster data has no pool', TMT.cards.length, 0);
-  check('and is not playable', TMT.playable, false);
-  ok('and the refusal says why, not just "too small"',
-    /unreleased/i.test(M.unplayableReason(TMT)));
+  /* TMT is a real released set whose pack data Scryfall has not published:
+     zero prints flagged as in-booster. It used to be refused outright. It
+     now falls back to every rare and mythic in the set — this fixture is a
+     trimmed copy, so the fallback still lands under a full grid and is
+     still refused, but for the honest reason. */
+  ok('a set with no booster data falls back to its whole rare pool',
+    TMT.cards.length > 0);
+  ok('and says so', TMT.provisional);
+  check('the trimmed fixture is still too small to play', TMT.playable, false);
+  ok('and the refusal now names the shortfall rather than guessing',
+    M.unplayableReason(TMT).includes(String(TMT.counts.total)));
+
+  /* THE BUG THIS FIXES. The old message blamed the set for being
+     unreleased. TMT released on 2026-03-06 and was shown that message six
+     months later, so a moderator was told to "pick another set" about a set
+     that was sitting on the shelf. */
+  ok('nothing calls a released set unreleased',
+    !/unreleased/i.test(M.unplayableReason(TMT)));
+
+  /* The fallback has to actually produce a playable game, which the
+     trimmed fixture cannot show. Real hob/msh/sos/tmt carry 68-85 names. */
+  const wide = M.deriveSetData(
+    Array.from({ length: 30 }, (_, i) => ({
+      name: 'Fallback Card ' + i, rarity: i % 4 === 0 ? 'mythic' : 'rare',
+      collector_number: String(i + 1), booster: false,
+      image_uris: { normal: 'x.jpg', art_crop: 'y.jpg' },
+    })),
+    { code: 'zzz', name: 'Zed', released_at: '2020-01-01', set_type: 'expansion' });
+  check('a released parentless set with no flags plays', wide.playable, true);
+  check('on its whole rare pool', wide.counts.total, 30);
+  ok('flagged provisional, because a square may not be in packs', wide.provisional);
+
+  /* A BONUS SHEET MUST STILL BE REFUSED. The Big Score has thirty rares and
+     no boxes of its own; its parent_set_code is what says so. Without that
+     condition the fallback would happily open a room for it. */
+  const bonus = M.deriveSetData(
+    Array.from({ length: 30 }, (_, i) => ({
+      name: 'Sheet Card ' + i, rarity: 'rare', collector_number: String(i + 1),
+      booster: false, image_uris: { normal: 'x.jpg', art_crop: 'y.jpg' },
+    })),
+    { code: 'big', name: 'The Big Score', released_at: '2024-04-19',
+      set_type: 'expansion', parent_set_code: 'otj' });
+  check('a bonus sheet gets no fallback', bonus.cards.length, 0);
+  check('and is refused', bonus.playable, false);
+  ok('with a reason that points at the main set',
+    /main set/i.test(M.unplayableReason(bonus)));
+
+  /* Nor an unreleased one: mid-spoiler-season the card list is still
+     growing, and a pool that changes under a live game is worse than no
+     game. */
+  const soon = M.deriveSetData(
+    Array.from({ length: 30 }, (_, i) => ({
+      name: 'Spoiler ' + i, rarity: 'rare', collector_number: String(i + 1),
+      booster: false, image_uris: { normal: 'x.jpg', art_crop: 'y.jpg' },
+    })),
+    { code: 'fut', name: 'Not Out Yet', released_at: '2099-01-01', set_type: 'expansion' });
+  check('an unreleased set gets no fallback', soon.cards.length, 0);
+  ok('and is told to come back nearer release',
+    /spoiler season|nearer release/i.test(M.unplayableReason(soon)));
+
+  /* AND THE FALLBACK MUST NOT FIRE WHEN THE FLAG WORKS. Bloomburrow has six
+     rares that exist only in starter decks; including them would put
+     squares on cards that cannot come out of a pack. */
+  ok('a set with real booster data keeps its filtered pool', !DSK.provisional);
 
   check('the threshold is a full grid', M.MIN_POOL, SQUARES);
   ok('a real set clears it', DSK.playable);
