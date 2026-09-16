@@ -90,9 +90,19 @@ export async function onRequestPost(context) {
   const subBadgeSet = (badgeData.data || []).find(s => s.set_id === 'subscriber');
   if (!subBadgeSet) return json({ error: 'No subscriber badges found' }, 404);
 
-  const subRole = session.role || '';
-  const isSub = subRole.startsWith('sub_') || subRole === 'broadcaster';
-  if (!isSub) return json({ error: 'Must be a subscriber to import badges' }, 403);
+  /* subTier, not role. `role` is a DISPLAY ladder in which moderator
+     outranks every sub tier, so a subscribing moderator carries
+     role 'moderator' and was refused their own badges here — the same
+     confusion that once cost a subscribing moderator their boost rate, and
+     that the inventory page's own button had until a moment ago.
+
+     The broadcaster is checked by id rather than by the role string, the
+     way admin/moderators.js does it: identity, not a claim. */
+  const { isBroadcaster } = await import('./admin/moderators.js');
+  const isSub = Number(session.subTier) > 0 || isBroadcaster(env, session);
+  if (!isSub) {
+    return json({ error: 'Only subscribers have loyalty badges to import' }, 403);
+  }
 
   /* HOW LONG THEY HAVE ACTUALLY SUBSCRIBED.
 
