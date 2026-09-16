@@ -321,7 +321,22 @@ async function importTwitchBadges() {
     if (data.imported > 0) {
       await loadInventory();
     } else if (btn) {
-      btn.textContent = 'No new badges found';
+      /* "No new badges" is true and useless on its own: it reads the same
+         whether someone holds everything they have earned or their
+         subscription length was never recorded. Say which. */
+      if (!data.durationKnown) {
+        btn.textContent = 'Say something in chat first, then try again';
+        btn.title = 'Your subscription length is read from the badge you wear '
+          + 'in chat — Twitch offers it nowhere else. Until you post a message '
+          + 'there is nothing to go on.';
+      } else if (data.eligible > 0 && data.eligible === data.totalBadges) {
+        btn.textContent = `Up to date — all ${data.totalBadges} badges imported`;
+        btn.title = `${data.months} months at Tier ${data.tier}.`;
+      } else {
+        btn.textContent = 'No new badges yet';
+        btn.title = `You are recorded at ${data.months} months, Tier ${data.tier}.`;
+      }
+      btn.disabled = false;
     }
   } catch (err) {
     if (btn) {

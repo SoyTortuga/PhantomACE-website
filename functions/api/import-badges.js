@@ -115,9 +115,11 @@ export async function onRequestPost(context) {
      chat, which the bot records as they speak. Someone who has never typed
      in chat has no record, and gets the entry-level badge until they do. */
   let seen = null;
+  let durationReadable = true;
   try {
     seen = await env.MARKETPLACE.get(`sub_months_${session.user_id}`, 'json');
   } catch (err) {
+    durationReadable = false;
     /* The duration record is an enhancement, not a prerequisite. If the
        store cannot answer -- the table missing on a server that has not run
        the migration yet is the obvious case -- import what can be proven
@@ -173,9 +175,24 @@ export async function onRequestPost(context) {
     await saveInventory(env, session.user_id, inv);
   }
 
+  /* WHY NOTHING WAS IMPORTED IS THE USEFUL PART. Zero is the expected
+     answer for someone already holding everything they have earned, and
+     also the answer when their duration was never recorded — the two look
+     identical from the button, and the second one is fixable. */
   return json({
     success: true,
     imported,
     totalBadges: inv.items.filter(i => i.source === 'twitch-import').length,
+    months: subMonths,
+    tier: subTier,
+    /* False means the duration store could not be read at all, which is
+       what an unapplied migration looks like from in here. */
+    durationKnown: durationReadable && !!seen,
+    /* How many of the channel's badges they qualify for, so "nothing new"
+       can distinguish "you have them all" from "you qualify for one". */
+    eligible: subBadgeSet.versions.reduce((n, v) => {
+      const d = decodeBadgeVersion(v.id);
+      return n + (d && d.months <= subMonths && d.tier <= subTier ? 1 : 0);
+    }, 0),
   });
 }
