@@ -184,6 +184,25 @@ export function createStatic(root) {
       return { kind: 'redirect', location: '/' + search, status: 308 };
     }
 
+    /* /user/<login> — a profile, served from profile.html.
+
+       The page is real and the name is not: there is no file per person, so
+       this is the one route on the site that resolves to a page by shape
+       rather than by path. It sits BEFORE the allowlist because 'user' is
+       not a served directory and never should be — nothing is read from
+       disk here beyond the one enumerated page.
+
+       The login is not decoded, looked up or passed on. It is matched only
+       tightly enough to tell a profile request from a typo, and the page
+       reads the real name from its own URL. A name that matches nothing
+       still serves the page, which then says nobody is there — the same
+       answer any other absent profile gets, and one that does not leak
+       which logins exist by returning 404 for some and 200 for others. */
+    if (segments.length === 2 && segments[0] === 'user' &&
+        /^[A-Za-z0-9_]{1,30}$/.test(segments[1]) && exists('profile.html')) {
+      return { kind: 'file', relPath: 'profile.html' };
+    }
+
     if (!isAllowed(segments)) return { kind: 'notfound' };
 
     const rel = segments.join('/');

@@ -29,6 +29,11 @@
   /* Whose profile. Falls back to the signed-in viewer so /profile with no
      query is "mine" rather than an error. */
   function wanted() {
+    /* /user/<login> is the canonical form. ?u= still works, because links
+       to it exist and a URL that once worked should keep working. */
+    var m = location.pathname.match(/^\/user\/([A-Za-z0-9_]{1,30})\/?$/);
+    if (m) return { param: 'u', value: m[1] };
+
     var q = new URLSearchParams(location.search);
     var u = (q.get('u') || '').trim();
     if (u) return { param: 'u', value: u };
@@ -38,7 +43,14 @@
        where auth.js failed to load at all. */
     try {
       var sess = (typeof getSession === 'function') ? getSession() : null;
-      if (sess && sess.login) return { param: 'u', value: sess.login };
+      if (sess && sess.login) {
+        /* Put the viewer on the canonical URL, so the address bar shows the
+           page they can share rather than the one they happened to open. */
+        if (location.pathname === '/profile' || location.pathname === '/profile.html') {
+          history.replaceState(null, '', '/user/' + sess.login);
+        }
+        return { param: 'u', value: sess.login };
+      }
       if (sess && sess.user_id) return { param: 'id', value: String(sess.user_id) };
     } catch (e) { /* not signed in */ }
     return null;
