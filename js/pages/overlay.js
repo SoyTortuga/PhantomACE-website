@@ -8,10 +8,19 @@
    but the last would hide the generosity that earned the alert. They queue
    and play in order, so the screen stays readable and nothing is lost.
 
-   A RELOAD REPLAYS NOTHING. OBS reloads a browser source whenever the scene
-   changes, the stream restarts, or someone clicks refresh. The first poll
-   sends no cursor and the server answers with its position only, so a reload
-   mid-stream does not dump the last hour of alerts on air.
+   IT SURVIVES A RELOAD. OBS reloads a browser source whenever the scene
+   changes, the stream restarts, or someone clicks refresh — and it shuts
+   the source down entirely while its scene is hidden, unless told not to.
+   The overlay remembers where it was and picks up from there, so a sub that
+   lands during the BRB scene still gets its alert when the scene comes back.
+
+   BUT IT DOES NOT REPLAY A BACKLOG. Resuming from a position that is hours
+   old would dump yesterday's alerts on air the moment OBS opens. Anything
+   older than the replay window is counted as seen and dropped, so the
+   overlay catches up across a scene switch and never across a night off.
+
+   Covered by server/scripts/test-overlay-resume.js — cold start, resume and
+   stale-drop are three behaviours that any two-out-of-three change breaks.
 
    IT FAILS QUIETLY. A stream must never carry a debug banner because one
    poll blipped, so the disconnect notice appears only after several
@@ -31,7 +40,30 @@
   if (!stage) return;
 
   var key = new URLSearchParams(location.search).get('key') || '';
+  /* How far back a reload will replay. OBS shuts a browser source down when
+     its scene is not visible unless told otherwise, and a page that skips
+     straight to "now" on every load drops every alert that fired while it
+     was down — a sub during the BRB scene simply never appears.
+
+     Not unlimited, though: starting the overlay at the top of a stream
+     should not dump an hour of yesterday's alerts on screen. Two minutes is
+     long enough to cover a scene switch or a reload and short enough that
+     nothing stale arrives. */
+  var MAX_REPLAY_MS = 120000;
+  var CURSOR_KEY = 'ov_cursor';
+
+  /* Resumed from the last run rather than starting blind. Wrapped because
+     storage throws in a private window and is simply absent in some embedded
+     browsers — an overlay must not fail to start over a convenience. */
   var cursor = null;           // null = "tell me where we are, send nothing"
+  try {
+    var saved = parseInt(window.localStorage.getItem(CURSOR_KEY), 10);
+    if (Number.isFinite(saved) && saved > 0) cursor = saved;
+  } catch (e) { /* no storage; behaves as it did before */ }
+
+  function rememberCursor(seq) {
+    try { window.localStorage.setItem(CURSOR_KEY, String(seq)); } catch (e) {}
+  }
   var queue = [];
   var showing = false;
   var faults = 0;
@@ -220,11 +252,28 @@
       .then(function (data) {
         faults = 0;
         setFault(false);
-        /* First reply establishes the position without replaying. */
-        if (cursor === null) { cursor = data.latestSeq || 0; return; }
+
+        /* No stored position — a genuinely first run. Take the current
+           place and show nothing, or every alert since the server started
+           would arrive at once. */
+        if (cursor === null) {
+          cursor = data.latestSeq || 0;
+          rememberCursor(cursor);
+          return;
+        }
+
         if (data.events && data.events.length) {
-          for (var i = 0; i < data.events.length; i++) queue.push(data.events[i]);
+          var now = Date.now();
+          for (var i = 0; i < data.events.length; i++) {
+            var ev = data.events[i];
+            /* Anything older than the replay window is counted as seen and
+               dropped. This is what stops a resumed cursor from replaying a
+               backlog after the overlay has been closed for hours. */
+            if (ev.at && now - ev.at > MAX_REPLAY_MS) continue;
+            queue.push(ev);
+          }
           cursor = data.latestSeq;
+          rememberCursor(cursor);
           pump();
         }
       })
