@@ -108,7 +108,7 @@ export async function onRequestPost(context) {
      first produces a different digest and every webhook 403s. */
   const rawBody = await request.text();
 
-  const check = verifyEventSub(request, env.TWITCH_EVENTSUB_SECRET, rawBody);
+  const check = await verifyEventSub(request, env.TWITCH_EVENTSUB_SECRET, rawBody);
   if (!check.ok) {
     return new Response(check.reason, { status: check.status });
   }
