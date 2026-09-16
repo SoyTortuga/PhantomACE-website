@@ -46,6 +46,12 @@
   <script src="/js/auth.js" defer></script>
   <script src="/js/components.js" defer></script>
   <script src="/js/nav.js" defer></script>
+  <!-- The header is shared, so it needs the scripts that drive it: twitch.js
+       fills the LIVE indicator and notifications.js the bell. Without them
+       the header still renders, just permanently offline and silent — which
+       is how this page shipped. -->
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
   <script src="/js/pages/profile.js" defer></script>
 </body>
 </html>
