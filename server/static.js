@@ -243,5 +243,40 @@ export function createStatic(root) {
     return true;
   }
 
-  return { resolve, assertPrivatePathsUnreachable, rootHtmlFiles, root };
+  /* ── The shared header's dependencies ───────────────────────────────
+     #site-header is a shared component whose BEHAVIOUR is not shared: each
+     page opts in by loading the scripts that drive it. A page that forgets
+     still renders a header that looks correct and reports nothing — the
+     LIVE dot stuck offline, the bell permanently empty. Nothing throws,
+     nothing 404s, and it ships.
+
+     That happened to profile.html, and the sweep afterwards found
+     bot-control.html had been missing notifications for however long.
+
+     WARNS RATHER THAN EXITS, unlike the allowlist assertion above. That one
+     guards against serving a secret; this one guards against a silent bell.
+     Refusing to serve the whole site over a cosmetic regression would be
+     the wrong trade — but shipping it unnoticed twice is why it is checked
+     at all. */
+  const HEADER_SCRIPTS = [
+    '/js/auth.js',
+    '/js/components.js',
+    '/js/nav.js',
+    '/js/notifications.js',
+    '/js/twitch.js',
+  ];
+
+  function checkHeaderScripts() {
+    const problems = [];
+    for (const file of rootHtmlFiles) {
+      let html;
+      try { html = fs.readFileSync(path.join(root, file), 'utf8'); } catch { continue; }
+      if (!html.includes('id="site-header"')) continue;      // no header, no dependency
+      const missing = HEADER_SCRIPTS.filter(src => !html.includes(`src="${src}"`));
+      if (missing.length) problems.push({ file, missing });
+    }
+    return problems;
+  }
+
+  return { resolve, assertPrivatePathsUnreachable, checkHeaderScripts, rootHtmlFiles, root };
 }

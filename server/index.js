@@ -118,6 +118,20 @@ async function main() {
   statik.assertPrivatePathsUnreachable();
   console.log(`[boot] static allowlist OK (${statik.rootHtmlFiles.size} root pages)`);
 
+  /* Loud, not fatal — a page with a half-wired header is still a page worth
+     serving, but it has shipped twice now without anyone noticing. */
+  const headerGaps = statik.checkHeaderScripts();
+  if (headerGaps.length) {
+    console.warn('[boot] WARNING: pages mount the shared header without the');
+    console.warn('[boot] scripts that drive it. The header will render and');
+    console.warn('[boot] silently report nothing — no LIVE status, no bell:');
+    for (const g of headerGaps) {
+      console.warn(`[boot]    ${g.file} — missing ${g.missing.join(', ')}`);
+    }
+  } else {
+    console.log('[boot] shared header wired on every page that mounts it');
+  }
+
   const table = await buildRoutes(FUNCTIONS_DIR);
   console.log(`[boot] mounted ${table.count} routes from functions/`);
 
