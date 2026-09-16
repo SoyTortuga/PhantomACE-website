@@ -211,6 +211,12 @@ export function createStatic(root) {
       return { kind: 'file', relPath: 'thread.html' };
     }
 
+    /* /room/edit — the My Room editor, served from room-editor.html.
+       Fixed, not by shape: there is exactly one editor page. */
+    if (segments.length === 2 && segments[0] === 'room' && segments[1] === 'edit' && exists('room-editor.html')) {
+      return { kind: 'file', relPath: 'room-editor.html' };
+    }
+
     if (!isAllowed(segments)) return { kind: 'notfound' };
 
     const rel = segments.join('/');

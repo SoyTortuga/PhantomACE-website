@@ -6,7 +6,13 @@ catalog; `room-catalog.js` validates every save (pure, mutation-checked) and
 applied). Step 3 built: `js/room-render.js` is the one renderer (32
 assertions on its geometry), and every profile has a Room section — the
 built room and its desk setup, or the empty default with "Build yours" for
-the owner. Next: step 4, the editor at `/room/edit`.
+the owner. Step 4 built: the editor at `/room/edit` — palette with locked
+categories, floor and wall painting, place/drag/scale/flip/order/delete on
+the 32 px grid, S/M/L, the Desk setup tab, undo, explicit Save through the
+server's validator, a room switcher and "Show on profile" for people with
+more than one slot. `js/room-edit-core.js` holds its arithmetic (44
+assertions, every result re-checked against the validator). Next: step 5,
+unlocks — `room-set` and `room-slot` items and the reward table.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 

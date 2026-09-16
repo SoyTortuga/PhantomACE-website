@@ -1,0 +1,67 @@
+/* ══════════════════════════════════════════════
+   MY ROOM — the editor
+
+   Palette on the left, stage on the right, toolbar above it, inspector
+   under it. Selection is an outline, not a shadow. Pieces on the stage
+   accept the pointer here (the shared renderer turns it off for the
+   read-only profile).
+   ══════════════════════════════════════════════ */
+
+.re-wrap { padding-block: 24px 64px; }
+.re-state { color: var(--text-sec); font-size: 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+.re-app { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 860px) { .re-app { grid-template-columns: 1fr; } }
+
+/* Palette */
+.re-palette { border: 1px solid var(--border-mid); background: #070707; max-height: 78vh; overflow: auto; }
+.re-cats { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); }
+.re-cat { background: none; border: 0; border-left: 3px solid transparent; color: var(--text-sec); font-family: var(--font-system); font-size: 12px; text-align: left; padding: 8px 12px; cursor: pointer; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center; }
+.re-cat:hover { color: var(--text-pri); }
+.re-cat.active { color: var(--red); border-left-color: var(--red); background: #0c0c0c; }
+.re-cat.locked { color: var(--text-dim); }
+.re-lock { font-size: 10px; }
+.re-pieces { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
+.re-pieces.locked .re-piece { opacity: 0.35; cursor: not-allowed; }
+.re-hint { flex-basis: 100%; font-size: 11px; color: var(--text-dim); margin: 0 0 4px; line-height: 1.5; }
+.re-piece { width: 68px; height: 68px; background: #0f0f0f; border: 1px solid var(--border); padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.re-piece:hover { border-color: var(--border-mid); }
+.re-piece.active { border-color: var(--red); }
+.re-piece img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+
+/* Toolbar */
+.re-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 12px; color: var(--text-sec); }
+.re-field { display: inline-flex; align-items: center; gap: 6px; }
+.re-field select { background: #0f0f0f; color: var(--text-pri); border: 1px solid var(--border-mid); padding: 4px 6px; font-family: var(--font-system); font-size: 12px; }
+.re-tabs { display: inline-flex; border: 1px solid var(--border-mid); }
+.re-tab { background: none; border: 0; color: var(--text-sec); font-family: var(--font-system); font-size: 12px; padding: 5px 12px; cursor: pointer; }
+.re-tab.active { color: var(--red); background: #140606; }
+.re-spacer { flex: 1; }
+.re-save { padding: 6px 18px; }
+.re-toolbar .pill-btn[disabled] { opacity: 0.4; cursor: default; }
+
+/* Stage */
+.re-stagewrap { border: 1px solid var(--border-mid); }
+.rm-editor { border: 0; touch-action: none; }
+.rm-editor .rm-prop { pointer-events: auto; cursor: grab; }
+.rm-editor.re-painting .rm-prop { pointer-events: none; }
+.rm-editor.re-painting { cursor: crosshair; }
+.rm-editor .rm-selected { outline: 3px solid var(--red); outline-offset: 2px; }
+
+/* Inspector */
+.re-inspector { margin-top: 10px; border: 1px solid var(--border); padding: 8px 12px; font-size: 12px; color: var(--text-sec); min-height: 40px; }
+.re-insp-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.re-insp-row b { color: var(--text-pri); font-weight: 600; }
+.re-insp-label { color: var(--text-dim); text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+.re-insp-group { display: inline-flex; align-items: center; gap: 4px; }
+.re-insp-group button { background: #0f0f0f; border: 1px solid var(--border-mid); color: var(--text-pri); font-family: var(--font-system); font-size: 12px; padding: 3px 9px; cursor: pointer; }
+.re-insp-group button:hover, .re-inspector .pill-btn:hover { border-color: var(--red); color: var(--red); }
+.re-scale { min-width: 40px; text-align: center; color: var(--text-pri); }
+.re-danger { border-color: var(--red-dim); }
+.re-count { margin-left: auto; color: var(--text-dim); }
+.re-insp-empty { color: var(--text-dim); }
+
+/* Status line */
+.re-status { margin-top: 8px; font-size: 12px; padding: 6px 10px; border-left: 3px solid var(--border-mid); color: var(--text-sec); }
+.re-status-ok { border-left-color: var(--green); }
+.re-status-err { border-left-color: var(--red); color: var(--red); }

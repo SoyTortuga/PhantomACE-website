@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Build your room - PhantomACE community.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>My Room | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/room.css">
+  <link rel="stylesheet" href="/css/pages/room-editor.css">
+</head>
+<body data-page="profile">
+
+  <div id="site-header"></div>
+
+  <!-- Served at /room/edit by a rewrite in server/static.js. Everything in
+       here is drawn by room-editor.js once it knows who you are and what
+       you have; the page ships as a frame. -->
+  <section class="page-container re-wrap">
+    <div class="re-state" id="reState">Loading your room…</div>
+    <div class="re-app" id="reApp" hidden>
+      <aside class="re-palette" id="rePalette"></aside>
+      <div class="re-main">
+        <div class="re-toolbar" id="reToolbar"></div>
+        <div class="re-stagewrap"><div class="rm-host rm-editor" id="reStage"></div></div>
+        <div class="re-inspector" id="reInspector"></div>
+        <div class="re-status" id="reStatus" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/room-render.js" defer></script>
+  <script src="/js/room-edit-core.js" defer></script>
+  <script src="/js/pages/room-editor.js" defer></script>
+</body>
+</html>

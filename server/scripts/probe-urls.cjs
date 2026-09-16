@@ -33,6 +33,8 @@ const PATHS = [
   '/thread/1',                 // thread.html
   '/thread/abc',               // not an id -> 404, not the page
   '/thread/1/extra',           // too many segments -> 404
+  '/room/edit',                // room-editor.html
+  '/room/other',               // not the editor -> 404
   // Static asset headers
   '/css/base.css',
   '/assets/images/favicon.ico',
