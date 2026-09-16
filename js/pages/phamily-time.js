@@ -11,6 +11,51 @@
 
   /* ── Reward Definitions ──────────────────────── */
 
+  /* ── REWARD ARTWORK ────────────────────────────────────────────────
+     Every tile used to be an emoji in a rounded square, so a track of
+     seventy rewards read as seventy identical boxes distinguished only by
+     border colour. These are the site's own images and PhantomACE's own
+     emotes — nothing bought, nothing licensed, nothing new to draw.
+
+     Presentation only, and deliberately NOT on the reward objects: those
+     are duplicated server-side and compared entry-for-entry by
+     test-phamily-rewards.js, and a picture is not something the server has
+     any opinion about.
+
+     Emotes come from Twitch's CDN, hotlinkable by design — it is how every
+     chat client renders them. Anything that fails to load falls back to the
+     emoji that was there before, so a tile is never empty. */
+  const EMOTE = (id, fmt) =>
+    `https://static-cdn.jtvnw.net/emoticons/v2/${id}/${fmt || 'static'}/dark/2.0`;
+
+  const REWARD_ART = {
+    /* The coin roll IS the giveaway currency, and it is animated, so the
+       most common reward on the track is also the one that moves. */
+    giveaway:       EMOTE('emotesv2_26bf7acbf75644e69473adf3952110b7', 'animated'),
+    emote:          EMOTE('121671'),        // phamPham — an emote, for an emote
+    wildcard:       EMOTE('152733'),        // phamHype
+    bingo:          EMOTE('121673'),        // phamHi
+    'click-effect': EMOTE('120782'),        // phamLit
+    'skull-skin':   '/assets/images/skull.png',
+    cardback:       '/assets/images/game-memory-match.png',
+    dice:           '/games/mana-clash/assets/r.png',
+  };
+
+  /* Eggs are the one reward whose art already exists per rarity, so a
+     mythic egg looks like a mythic egg rather than like a common one. */
+  const EGG_ART = {
+    common:   '/assets/images/eggs/egg-common.png',
+    uncommon: '/assets/images/eggs/egg-uncommon.png',
+    rare:     '/assets/images/eggs/egg-rare.png',
+    mythic:   '/assets/images/eggs/egg-mythic.png',
+  };
+
+  function rewardArt(reward) {
+    if (!reward) return null;
+    if (reward.type === 'egg') return EGG_ART[reward.rarity] || EGG_ART.common;
+    return REWARD_ART[reward.type] || null;
+  }
+
   const REWARD_ICONS = {
     giveaway: '🎫',
     egg: '🥚',
@@ -331,6 +376,9 @@
         const node = document.createElement('div');
         node.className = `pt-reward-node pt-rarity-${reward.rarity}`;
         node.dataset.state = state;
+        /* Read by the stylesheet: egg sprites are small pixel art and want
+           pixelated scaling, where the emotes and banners do not. */
+        node.dataset.type = reward.type;
         node.dataset.tier = (i % 2 === 0) ? 'near' : 'far';
         node.style.left = (xFor(reward.level) + offset - 22) + 'px';
 
@@ -339,7 +387,23 @@
 
         const iconEl = document.createElement('div');
         iconEl.className = 'pt-reward-icon';
-        iconEl.textContent = reward.icon;
+        const artUrl = rewardArt(reward);
+        if (artUrl) {
+          const img = document.createElement('img');
+          img.className = 'pt-reward-art';
+          img.src = artUrl;
+          img.alt = '';
+          img.loading = 'lazy';
+          /* One retry to the emoji, then stop. Without removing the handler
+             a fallback that also failed would loop forever. */
+          img.addEventListener('error', function handler() {
+            img.removeEventListener('error', handler);
+            iconEl.textContent = reward.icon;
+          });
+          iconEl.appendChild(img);
+        } else {
+          iconEl.textContent = reward.icon;
+        }
 
         /* The state badge is its own element rather than a ::after on the
            icon. The old one was absolutely positioned inside a non-relative
@@ -778,19 +842,40 @@
     const itemsWrap = document.createElement('div');
     itemsWrap.className = 'pt-grace-items';
 
-    function addItem(iconText, name, rarity, onClick) {
+    function addItem(icon, name, rarity, onClick) {
       const el = document.createElement('div');
       el.className = `pt-grace-item pt-rarity-${rarity}`;
-      el.innerHTML = `<span class="pt-grace-item-icon">${iconText}</span><span class="pt-grace-item-name">${name}</span>`;
+
+      const iconEl = document.createElement('span');
+      iconEl.className = 'pt-grace-item-icon';
+      /* `icon` is now either a URL or an emoji. Built as nodes rather than
+         interpolated into innerHTML, so a name with an ampersand in it
+         cannot become markup. */
+      if (typeof icon === 'string' && (icon.startsWith('/') || icon.startsWith('https://'))) {
+        const img = document.createElement('img');
+        img.className = 'pt-reward-art';
+        img.src = icon;
+        img.alt = '';
+        iconEl.appendChild(img);
+      } else {
+        iconEl.textContent = icon;
+      }
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'pt-grace-item-name';
+      nameEl.textContent = name;
+
+      el.appendChild(iconEl);
+      el.appendChild(nameEl);
       el.addEventListener('click', onClick);
       itemsWrap.appendChild(el);
     }
 
     for (const r of readyFollower) {
-      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'follower', true));
+      addItem(rewardArt(r) || r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'follower', true));
     }
     for (const r of readyPhamily) {
-      addItem(r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'phamily', true));
+      addItem(rewardArt(r) || r.icon, r.name, r.rarity, (e) => showPopover(e, r, 'ready', 'phamily', true));
     }
     for (const ms of readyMilestones) {
       addItem('💀', ms.title, 'mythic', (e) => showMilestonePopover(e, ms, 'ready', true));
