@@ -75,9 +75,14 @@ const FAKE_SET_DATA = {
   playable: true,
 };
 
-function makeEnv({ moderators = [] } = {}) {
+function makeEnv({ moderators = [], failWrites = null } = {}) {
   const store = new Map();
   const chains = new Map();
+  /* `failWrites` is a predicate over the key. Awarding writes the room and
+     then the entry ledger, and the whole point of the rollback path is what
+     happens when the second write fails while the first has landed — which
+     cannot be provoked without being able to break one key and not the
+     other. */
   store.set('site_moderators', JSON.stringify({
     entries: moderators.map(id => ({ userId: String(id), name: 'Mod', addedBy: 'test' })),
   }));
@@ -91,6 +96,7 @@ function makeEnv({ moderators = [] } = {}) {
       async mutate(k, fn) {
         const prev = chains.get(k) || Promise.resolve();
         const run = prev.then(async () => {
+          if (failWrites && failWrites(k)) throw new Error(`store unavailable: ${k}`);
           const cur = store.has(k) ? JSON.parse(store.get(k)) : null;
           const next = await fn(cur);
           if (next === undefined) return cur;
@@ -316,6 +322,66 @@ const createBody = (code, extra = {}) => ({ code, setCode: FAKE_SET_CODE, boxes:
   check('exactly one award succeeds', results.filter(r => r.status === 200).length, 1);
   check('the rest are refused', results.filter(r => r.status === 409).length, 5);
   check('and only one prize is recorded', room(env, 'AWD2').prizes.length, 1);
+}
+
+/* ── A failed entry credit leaves nothing behind ───────────────────────
+
+   Awarding writes the room, then the entry ledger. If the second write
+   fails the player used to be left marked as awarded with no entries, and
+   the duplicate guard then refused every retry — unfixable from the panel,
+   at the loudest moment in the game. */
+{
+  const env = makeEnv({ moderators: ['101'], failWrites: (k) => k.startsWith('gwe_') });
+  await post(create, env, 'mod', createBody('FAIL'));
+  await post(join, env, 'player', { code: 'FAIL', name: 'Gus' });
+
+  const r = await post(award, env, 'mod', { code: 'FAIL', playerId: 'u_303', rarity: 'rare' });
+
+  check('a credit failure is a 503, not a silent success', r.status, 503);
+  check('and does not claim the prize was awarded', r.data.awarded, false);
+  ok('and says to try again', /try again/i.test(r.data.error || ''));
+
+  /* THE ACTUAL BUG: this used to be 1, and the guard then refused forever. */
+  check('no prize is left on the room', room(env, 'FAIL').prizes.length, 0);
+
+  /* And so the retry works. Same store, entries now writable again. */
+  const env2 = makeEnv({ moderators: ['101'] });
+  await post(create, env2, 'mod', createBody('FAIL2'));
+  await post(join, env2, 'player', { code: 'FAIL2', name: 'Gus' });
+  let broken = true;
+  const envFlaky = { ...env2, MARKETPLACE: {
+    ...env2.MARKETPLACE,
+    async mutate(k, fn, o) {
+      if (broken && k.startsWith('gwe_')) throw new Error('store unavailable');
+      return env2.MARKETPLACE.mutate(k, fn, o);
+    },
+  } };
+
+  const first = await post(award, envFlaky, 'mod', { code: 'FAIL2', playerId: 'u_303', rarity: 'rare' });
+  check('the first attempt fails', first.status, 503);
+  broken = false;
+  const second = await post(award, envFlaky, 'mod', { code: 'FAIL2', playerId: 'u_303', rarity: 'rare' });
+  check('and awarding again then succeeds', second.status, 200);
+  check('crediting the entries once', second.data.total > 0, true);
+  check('with exactly one prize recorded', room(env2, 'FAIL2').prizes.length, 1);
+}
+
+/* ── A successful award records what it paid ──────────────────────── */
+{
+  const env = makeEnv({ moderators: ['101'] });
+  await post(create, env, 'mod', createBody('PAID'));
+  await post(join, env, 'player', { code: 'PAID', name: 'Gus' });
+
+  const r = await post(award, env, 'mod', { code: 'PAID', playerId: 'u_303', rarity: 'mythic' });
+  check('the award succeeds', r.status, 200);
+  ok('and credits entries', r.data.total > 0);
+
+  const prize = room(env, 'PAID').prizes[0];
+  check('the prize names the player', prize.name, 'Gus');
+  check('at the rarity the host chose', prize.rarity, 'mythic');
+  /* Entries come from TIER_INFO server-side, never from the request body —
+     the shape of the Phamily Time claim bug. */
+  ok('with an entry count the request never supplied', prize.entries > 0);
 }
 
 /* ── Concurrent joins do not lose a player ───────────────────────────────── */

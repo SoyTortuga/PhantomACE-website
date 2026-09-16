@@ -9,6 +9,23 @@
 
    One prize per player per room, decided inside the mutate() lock so a
    double click or two moderators awarding at once cannot pay twice.
+
+   AWARDING IS TWO WRITES, AND THE GAP BETWEEN THEM IS THE WHOLE PROBLEM.
+   The prize is recorded on the room; the giveaway entries live in a
+   separate per-user ledger. Recording the prize and then failing to credit
+   left the player marked as awarded with nothing to show for it — and the
+   duplicate guard then refused every retry, so it could not be fixed from
+   the panel, at the loudest moment in the game.
+
+   The prize is therefore UNWOUND if the credit fails: the record comes back
+   off the room and the host is told to award again. That keeps the two
+   writes all-or-nothing without weakening the duplicate guard, which is
+   what actually stops a double click — and a guard that had to tell a
+   retry apart from a second click would be a guard that lets one through.
+
+   It costs the record of a failed attempt. That is the right trade: an
+   attempt that credited nothing is not an award, and the log line is
+   enough to know it happened.
    ══════════════════════════════════════════════ */
 
 const GAME_TTL = 14400;
@@ -95,6 +112,35 @@ export async function onRequestPost(context) {
     total = await addEntries(env, userId, awarded.name, entries, `mtgbbb:${rarity}`);
   } catch (err) {
     console.error('[mtgbbb/award] entry credit failed:', err.message);
+
+    /* Unwind, so the duplicate guard does not lock out the retry. Found by
+       id rather than by a reference held across the first mutate — the
+       store re-parses on write, so that object is a detached copy. */
+    let unwound = false;
+    try {
+      await env.MARKETPLACE.mutate(`mtgbbb_${code}`, (room) => {
+        if (!room || !Array.isArray(room.prizes)) return undefined;
+        const i = room.prizes.findIndex(pr => pr.playerId === playerId);
+        if (i === -1) return undefined;
+        room.prizes.splice(i, 1);
+        unwound = true;
+        return room;
+      }, { expirationTtl: GAME_TTL });
+    } catch (rollbackErr) {
+      console.error('[mtgbbb/award] rollback failed:', rollbackErr.message);
+    }
+
+    /* 503, not 500: the request was fine, the store blinked. The two
+       messages differ because the fix differs — one is "press it again",
+       the other needs someone to look. */
+    return json({
+      error: unwound
+        ? `${awarded.name}'s entries did not go through. Nothing was awarded — try again.`
+        : `${awarded.name}'s entries did not go through and the prize could not be ` +
+          'cleared. Check their entry count before awarding again.',
+      awarded: false,
+      needsAttention: !unwound,
+    }, 503);
   }
 
   return json({ success: true, ...awarded, total });
