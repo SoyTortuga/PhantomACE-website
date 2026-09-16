@@ -37,7 +37,13 @@
     bingo:          EMOTE('121673'),        // phamHi
     'click-effect': EMOTE('120782'),        // phamLit
     'skull-skin':   '/assets/images/skull.png',
-    cardback:       '/assets/images/game-memory-match.png',
+    /* Memory Match has no card-back image: the face-down side is a CSS
+       surface and the faces are channel emotes. A card back is a crest, and
+       this mark already renders as a square badge with its own red-black
+       ground — which is exactly what the back of a PhantomACE card would
+       be. The games-page banner was here first and was 940x330, so a 44px
+       tile showed an unreadable strip of it. */
+    cardback:       '/assets/images/phantomace-logo.png',
     dice:           '/games/mana-clash/assets/r.png',
   };
 

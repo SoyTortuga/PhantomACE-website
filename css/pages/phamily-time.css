@@ -923,9 +923,9 @@
 
 
 /* Reward artwork, in place of the emoji that used to sit in every tile.
-   Contained rather than cropped: the set mixes square emotes, portrait egg
-   sprites and a wide game banner, and object-fit:contain is what stops the
-   banner being shown as a slice of its own middle. */
+   Contained rather than cropped: the set mixes square emotes with taller
+   egg sprites, and contain is what keeps an egg an egg rather than a
+   centre crop of one. */
 .pt-reward-art {
   width: 100%;
   height: 100%;
