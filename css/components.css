@@ -615,12 +615,16 @@
   color: var(--text-pri);
   font-family: inherit;
   font-size: 12px;
-  transition: width 0.18s, border-color 0.18s;
+  /* Fixed width. It grew to 210px on focus, which looked tidy in isolation
+     and pushed the field out past the edge of the bar the moment anyone
+     clicked it — there is no spare room in a rail to grow into. */
+  min-width: 0;
+  max-width: 100%;
+  transition: border-color 0.18s;
 }
 .member-search-input::placeholder { color: var(--text-dim); }
 .member-search-input:focus {
   outline: none;
-  width: 210px;
   border-color: var(--red);
 }
 
@@ -673,7 +677,6 @@
 
 @media (max-width: 900px) {
   .member-search-input { width: 108px; }
-  .member-search-input:focus { width: 150px; }
 }
 
 /* Below this the rail already carries a bell, a login control and the
