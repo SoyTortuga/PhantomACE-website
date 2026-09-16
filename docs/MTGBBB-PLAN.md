@@ -1,12 +1,11 @@
 # MTGBBB — Magic: The Gathering Booster Box Bingo
 
-**Status:** steps 1–5 built (scoring engine, Scryfall data layer, room
-lifecycle, moderator panel, player page) — the whole playable game, per this
-document's own build order. The server-side pieces (steps 1–3) are covered
-by an offline test suite; the two pages (steps 4–5) are code-reviewed but
-have NOT had a live browser pass — `wrangler pages dev` is currently broken
-sitewide for an unrelated reason (see the build order note below). Steps
-6–7 outstanding.
+**Status:** all seven build-order steps are built — the whole game plus
+overlay and engagement. 989 assertions across 16 offline test files, green;
+the two pages and the overlay contract have real browser verification too
+(see the build order note). Remaining: a per-room winner badge needs
+artwork, not code; `games.html` needs an image asset to list the game;
+`server/sql/003_mtgbbb.sql` needs applying on the rig.
 **Agent:** `game-mtgbbb`.
 
 Chat plays along while the broadcaster cracks a sealed booster box on stream.
@@ -252,13 +251,32 @@ Two rules that keep it honest:
 player cards, so the room has a collective rooting interest before a pack is
 cracked.
 
-**Season standings.** A leaderboard across box openings. **A season is a calendar
-month**, matching the site's existing monthly leaderboards and awards so this
-rides machinery that already exists rather than needing its own clock.
+**Season standings.** ~~A leaderboard across box openings, `lb_mtgbbb_<YYYY-MM>`.~~
+**Built, but not as a per-month key** — that shape was this document guessing
+at what "the site's existing monthly leaderboards and awards" actually look
+like, and it guessed wrong. The real system (`functions/api/leaderboards.js`)
+keeps exactly ONE rolling board per game — `lb_bingo`, `lb_mana_clash`, and now
+`lb_mtgbbb` — and on the last day of the month pays the top 3 and wipes it back
+to empty (`maybeRunMonthlyAwards()`). There is no per-month key anywhere in
+that system, for any game. `end.js` writes every player's best session score
+into `lb_mtgbbb` the same way `mana-clash.js` writes `lb_mana_clash`; the rest
+— the monthly reset, the top-3 whisper, the badge — is two map entries in
+`leaderboards.js` (`BOARDS`, `MONTHLY_GAME_LABELS`) and needed no new code at
+all.
 
-**Badges.** A winner badge, and season badges for the top three each month,
-through the existing event badge system. A "first blackout" badge is worth
-minting even though it may never be earned.
+**Badges.** ~~A winner badge, and season badges for the top three each month,
+through the existing event badge system.~~ **Half already covered, half is not
+code.** The season top-3 badges are automatic now that MTGBBB is in
+`leaderboards.js` — `maybeRunMonthlyAwards()` mints one via `createItemCode()`
+for every registered game, MTGBBB included. A per-room **winner** badge is a
+different thing, and turns out not to be a code path anywhere in this project:
+every existing event badge (Agate Hunt, Dino Park Beta) is hand-minted by a
+human running `server/scripts/mint-badge-code.js --badge <id> --confirm` on
+the rig, against real artwork the script refuses to run without. There is
+nothing here for an agent to wire up automatically — award.js already lets a
+host hand out any prize tier to anyone; a badge on top of that is an art asset
+plus a `mint-badge-code.js` entry, both blocked on artwork. Flagged in the
+open items below rather than invented.
 
 ---
 
@@ -272,7 +290,8 @@ minting even though it may never be earned.
 | Tests | `server/scripts/test-mtgbbb.js`, wired into `npm --prefix server test` |
 | Rooms | `mtgbbb_<CODE>` |
 | Set cache | `mtgbbb_set_<SETCODE>` |
-| Season | `lb_mtgbbb_<YYYY-MM>` |
+| Live room pointer | `mtgbbb_current` (exact singleton — set on create, cleared on end, read by the overlay) |
+| Season board | `lb_mtgbbb` (exact singleton — see step 9; NOT `lb_mtgbbb_<YYYY-MM>`) |
 
 Commander Bingo already owns `games/commander-bingo/`, `/api/bingo/*` and the
 `bingo_` prefix. MTGBBB shares none of them.
@@ -310,43 +329,97 @@ host** to award a prize.
    `server/scripts/test-mtgbbb-rooms.js` — 67 assertions, offline (a stubbed
    `fetch` throws on any call, so a set code escaping the KV cache fails
    loudly instead of hitting Scryfall).
-4. ~~**Moderator panel.**~~ **Built**, not yet browser-verified. `games/mtgbbb/host.html`.
-5. ~~**Player page**, including one-away.~~ **Built**, not yet browser-verified. `games/mtgbbb/index.html`.
-6. **Overlay events.**
-7. **Engagement** — call your shot, heat map, season standings, badges.
+4. ~~**Moderator panel.**~~ **Done, browser-verified** (against a mocked
+   `fetch` — see the note on step 3's testing limits below). `games/mtgbbb/host.html`,
+   now including the call-your-shot toggle and cap at room creation.
+5. ~~**Player page**, including one-away.~~ **Done, browser-verified.**
+   `games/mtgbbb/index.html`, now including a call-your-shot panel.
+6. ~~**Overlay events.**~~ **Done, split as planned.** The server half
+   (this agent): `mark.js` pushes one `mtgbbb-pull` event per pull (card,
+   treatment labels, how many player cards hold it, room size) and one
+   `mtgbbb-bingo` event per pattern newly completed, diffed before/after per
+   player inside the same mutate() that records the pull — a blackout emits
+   once, not once-plus-fourteen. `mtgbbb_current` is the pointer the overlay
+   polls via `GET /api/mtgbbb/state?current=1`; verified live, end to end,
+   against the manager's actual `overlay-mtgbbb.js` panel in a real browser
+   (screenshot: room appeared with correct set name, pack count and player
+   count within one poll of creation, no manual wiring). The rendering half
+   (manager): `js/pages/overlay.js`, `js/pages/overlay-mtgbbb.js`,
+   `overlay.html`, `css/pages/overlay.css`.
+7. ~~**Engagement**~~ **Done: call-your-shot and heat map are new code;
+   season standings and the season-badge half of badges ride existing
+   machinery (see step 9's corrected write-up). The per-room winner badge is
+   an art/ops task, not code — see open items.**
+   - `functions/api/mtgbbb/shot.js` — set a shot. Off by default per room,
+     with an optional cap, both chosen at creation. One shot per player,
+     mythics only, refused on a card already pulled (uniformly, not just for
+     late joiners — see the file's header for why the plan's late-joiner
+     framing was really a general rule in disguise).
+   - Resolution lives in `mark.js`, not `shot.js`: a shot can only resolve
+     against a pull, and `mark.js` already holds the room's lock at the
+     moment one is recorded. All-or-nothing against that one pull's own
+     treatments. A win pulls a code from the same tiered pool chat drops use
+     (`pullGiveawayCode`) and hands it back through `state.js`'s `you.shot` —
+     no chat race, since the winner is already known.
+   - Heat map: `hottest()` (already existed in mtgbbb-scoring.js) surfaced
+     as `heatMap` in `state.js`. No UI built for it yet — see open items.
+   - `server/scripts/test-mtgbbb-engagement.js` — 43 assertions, offline.
 
-Steps 1–5 are the game. Everything after is addition.
+Steps 1–7 are all built now. `npm --prefix server test` is 989 assertions
+across 16 files, green.
 
-**Steps 4 and 5 have not had a live browser pass.** `npx wrangler pages dev`
-— this project's documented local dev server — currently fails to boot at
-all: `functions/api/milestones.js` imports `server/lib/eventsub.js`, which
-uses `node:crypto`, and `wrangler.toml` has no `nodejs_compat` compatibility
-flag. This predates MTGBBB (introduced by the milestone-drops and Postgres
-migration commits) and blocks local preview for every page on the site, not
-just this one. Flagged as a separate task rather than fixed here, since
-`wrangler.toml` governs the real Cloudflare Pages deployment and is not
-MTGBBB's to change. Until it's fixed, verify host.html and index.html by
-reading them against the route responses above, or via the self-hosted
-server once `server/sql/003_mtgbbb.sql` is applied on the rig.
+**Testing note carried over from steps 3-5, now resolved for `wrangler pages
+dev` itself but not for everything it can reach.** The `node:crypto` boot
+failure (`functions/api/milestones.js` → `server/lib/eventsub.js`, no
+`nodejs_compat`) is fixed — the manager's step 6 commit moved eventsub.js to
+Web Crypto. `wrangler pages dev` now boots and served live, real traffic for
+create.js, sets.js, and `state.js?current=1` during this step, confirmed
+against the real Scryfall API and a real (if local) KV binding. **What it
+still cannot exercise is `env.MARKETPLACE.mutate()` and
+`env.MARKETPLACE.pullGiveawayCode()`** — both are Postgres-DAL-only
+extensions (`server/lib/kv.js`) with no equivalent on an actual Cloudflare KV
+namespace, so every mutate-based route 500s under `wrangler pages dev`,
+`bingo/award.js` included — this is not new and not MTGBBB's. `join.js`,
+`mark.js`, `end.js`, `award.js` and `shot.js` were verified through the 989-
+assertion offline suite and, for the two UI pages, by intercepting `fetch`
+with realistic response shapes and driving the real page code (search,
+select, mark, undo, pack +/-, end, award, call-a-shot, all three shot
+outcomes) — genuine DOM and interaction coverage, just not through the real
+mutate-backed server. A true end-to-end pass needs either a fix to the first
+gap (flagged separately, task_8b31b0bb) or the self-hosted rig with
+`003_mtgbbb.sql` applied.
 
 ---
 
 ## 12. Open items
 
-- Call-your-shot: whether the common-tier code volume is sustainable.
-- **`lb_mtgbbb_<YYYY-MM>` is not registered** in `server/lib/registry.js`. Every
-  existing leaderboard is an exact singleton, so a per-month family needs its own
-  table; registering it against one that does not exist would break the first
-  write. Nothing writes it until step 7 — register it then, with a migration.
+- **Call-your-shot code volume** is still the user's call, not resolved —
+  it now has a room-level off switch and cap, chosen at creation, so the
+  volume question is a setting rather than a code change.
+- **A per-room winner badge has no art and needs none of this agent's code**
+  to exist once it does — see step 9. Suggested: `mtgbbb-winner`, rare or
+  mythic rarity to taste, minted by the broadcaster per game the same way
+  Agate Hunt was, registered in `server/scripts/mint-badge-code.js` once the
+  artwork lands in `assets/badges/`.
 - **`server/sql/003_mtgbbb.sql` must be applied on the rig** before any MTGBBB
-  route is hit on the self-hosted server. It is idempotent.
+  route is hit on the self-hosted server. It is idempotent. `lb_mtgbbb` and
+  `mtgbbb_current` need no new table — both are ordinary rows in the
+  `singletons` table 001_schema.sql already creates.
 - Collector Booster support, and the odds work it needs.
+- **No heat-map UI yet.** `state.js` returns `heatMap` (top 3 pulled-most
+  cards by player-card count); nothing on host.html, index.html or the
+  overlay displays it. A reasonable next stop for whoever picks up polish.
 - **`games.html` does not list MTGBBB yet.** Every other game gets a card
   there via `launchGame(title, path)` plus an `/assets/images/game-*.png`.
   Not done here — it needs an actual image asset, which is outside this
   agent's scope (asset-manager's, or whoever supplies game art).
-- **Local browser verification is blocked**, not by MTGBBB: `wrangler pages
-  dev` fails to boot at all (`node:crypto` from `server/lib/eventsub.js`,
-  imported by `functions/api/milestones.js`, with no `nodejs_compat` flag in
-  `wrangler.toml`). See step 11's note. Flagged separately; host.html and
-  index.html (steps 4–5) still want a real browser pass once it's fixed.
+- **`wrangler pages dev` still cannot exercise a mutate-based route** —
+  `env.MARKETPLACE.mutate()` and `.pullGiveawayCode()` exist only in the
+  Postgres DAL (`server/lib/kv.js`), not on a real Cloudflare KV namespace,
+  so `join`/`mark`/`end`/`award`/`shot` all 500 under local Cloudflare Pages
+  dev. `bingo/award.js` has the identical gap already — not new, not
+  MTGBBB's. Worth its own fix (a local KV-compatible `mutate`/
+  `pullGiveawayCode` shim) if local end-to-end testing under Cloudflare Pages
+  dev needs to work for any mutate-based game, but not attempted here since
+  it is infrastructure well outside this feature's scope. See step 11's note
+  for exactly what this session verified instead.

@@ -49,6 +49,7 @@ You own these files exclusively:
 - `functions/api/mtgbbb/end.js` — close the room and settle
 - `functions/api/mtgbbb/award.js` — host awards a prize
 - `functions/api/mtgbbb/sets.js` — the set dropdown, from cached Scryfall data
+- `functions/api/mtgbbb/shot.js` — call-your-shot: set a wager, resolved in mark.js
 - `functions/api/mtgbbb-scoring.js` — pure scoring, no I/O
 - `server/scripts/test-mtgbbb.js` — the test suite
 
@@ -65,7 +66,10 @@ those names. Read its files for patterns if useful; do not edit them.
 - Routes: `/api/mtgbbb/*`
 - Pages: `games/mtgbbb/`
 - KV: `mtgbbb_<CODE>` rooms, `mtgbbb_set_<SETCODE>` cached set pools,
-  `lb_mtgbbb_<YYYY-MM>` season standings
+  `lb_mtgbbb` season standings — an exact singleton, NOT a per-month family.
+  `functions/api/leaderboards.js` keeps one rolling board per game and wipes
+  it after paying the monthly top three, so a dated key would sit outside
+  that machinery and get none of it.
 
 **Registry prefix trap:** `mtgbbb_` would also swallow `mtgbbb_set_`. Register
 both in `server/lib/registry.js`; longest prefix wins, so `mtgbbb_set_` must be
@@ -79,7 +83,9 @@ The card pool comes from the Scryfall API. It is free and unauthenticated, but:
   `mtgbbb_set_<SETCODE>` forever. A set's contents do not change. Nothing may
   hit Scryfall during a live game — the box is being opened on camera.
 - A bingo square is a card **name**. Variant printings collapse; treatments are
-  a separate axis scored on top. Use `unique=cards`.
+  a separate axis scored on top. Query with **`unique=prints`** and collapse to
+  names locally — `unique=cards` returns one printing per card and destroys the
+  treatment axis, since treatments exist only across printings.
 - Card images are Wizards of the Coast property served from Scryfall's CDN.
   Hotlinking is permitted; hammering is not. Prefer small images on the player
   grid and reserve larger art for the single "just pulled" card.

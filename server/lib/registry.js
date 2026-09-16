@@ -87,6 +87,23 @@ export const SINGLETONS = {
      list refetch when a new set is announced. */
   mtgbbb_sets_index:     { table: 'singletons', expiry: 'real' },
 
+  /* The pointer to whichever MTGBBB room is live, so the overlay can find
+     its own game instead of the broadcaster editing an OBS URL every
+     stream. Set on create, cleared on end. Same exact-key shape as
+     checkin_current, and for the same reason: it is a single pointer that
+     gets explicitly replaced, not a record with its own lifecycle. */
+  mtgbbb_current:        { table: 'singletons', expiry: 'none' },
+
+  /* MTGBBB's season board. NOT a `lb_mtgbbb_<YYYY-MM>` family — that was
+     this feature's own plan document guessing at a shape the existing
+     system does not use. leaderboards.js keeps ONE rolling board per game
+     and wipes it after paying the top 3 on the last day of the month
+     (maybeRunMonthlyAwards); there is no per-month key anywhere in that
+     system for any game. Registered here as an ordinary exact singleton so
+     MTGBBB rides that machinery exactly like commander-bingo's lb_bingo
+     does, rather than building a second, disconnected award system. */
+  lb_mtgbbb:             { table: 'singletons', expiry: 'none' },
+
   /* Moderator allowlist. expiry 'none' is load-bearing: if this row expired
      every moderator would silently lose access, and the only symptom would
      be a mod saying "the drop button stopped working". */

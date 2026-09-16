@@ -111,6 +111,22 @@ export async function onRequestPost(context) {
   const treatmentIdSet = new Set(treatmentIds);
   const treatments = data.treatments.filter(t => treatmentIdSet.has(t.id));
 
+  /* Call-your-shot defaults OFF. The plan itself flags the code volume as
+     unresolved product judgement, not an engineering question — a common
+     shot lands ~14 codes per 60-player box — so a brand-new feature that
+     spends real giveaway codes should not turn itself on silently. A cap
+     lets a host open it without an open-ended commitment. */
+  const cysBody = (body.callYourShot && typeof body.callYourShot === 'object') ? body.callYourShot : {};
+  const callYourShotEnabled = cysBody.enabled === true;
+  let callYourShotCap = null;
+  if (cysBody.cap !== undefined && cysBody.cap !== null) {
+    const cap = Number.isInteger(cysBody.cap) ? cysBody.cap : parseInt(cysBody.cap, 10);
+    if (!Number.isInteger(cap) || cap < 1) {
+      return json({ error: 'Call-your-shot cap must be a positive whole number, or omitted for unlimited.' }, 400);
+    }
+    callYourShotCap = cap;
+  }
+
   const room = {
     code,
     host: String(session.user_id),
@@ -129,12 +145,26 @@ export async function onRequestPost(context) {
     pulls: [],
     nextPullId: 1,
     prizes: [],
+    callYourShot: { enabled: callYourShotEnabled, cap: callYourShotCap },
+    shots: [],
     createdAt: Date.now(),
   };
 
   await env.MARKETPLACE.put(key, JSON.stringify(room), { expirationTtl: GAME_TTL });
+
+  /* The overlay's only way to find a live game without a per-stream OBS URL
+     edit. Best-effort: a miss here costs the overlay panel, not the room —
+     the game is fully playable either way. */
+  try {
+    await env.MARKETPLACE.put('mtgbbb_current', JSON.stringify({
+      code, setName: room.setName, startedAt: room.createdAt,
+    }));
+  } catch (err) {
+    console.error('[mtgbbb/create] could not set mtgbbb_current:', err.message);
+  }
+
   return json({
     success: true, code, setName: room.setName, boxes, packCount: room.packCount,
-    treatments, poolSize: room.pool.length,
+    treatments, poolSize: room.pool.length, callYourShot: room.callYourShot,
   });
 }

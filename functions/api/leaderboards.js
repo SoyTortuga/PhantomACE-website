@@ -21,6 +21,10 @@ const BOARDS = {
   'mana-clash-wins':  { key: 'lb_mana_clash_wins', label: 'Wins',     sort: 'desc', mode: 'increment', serverOnly: true },
   'pham-shock':      { key: 'lb_shell_shock',  label: 'Wins',        sort: 'desc', mode: 'increment' },
   'phamily-time':     { key: 'lb_phamily_time', label: 'Hours',       sort: 'desc' },
+  /* Written by end.js from the room's own computed scores, same shape as
+     Mana Clash's SCORE_BOARD — points come from mtgbbb-scoring, never from
+     a client, so a client POST here has nothing legitimate to submit. */
+  'mtgbbb':           { key: 'lb_mtgbbb',       label: 'Points',      sort: 'desc', serverOnly: true },
 };
 
 /* ── Monthly top-3 prizes ─────────────────────────
@@ -40,6 +44,7 @@ const MONTHLY_GAME_LABELS = {
   'mana-clash':      'Mana Clash High Score',
   'mana-clash-wins': 'Mana Clash Wins',
   'pham-shock':      'PhamShock',
+  'mtgbbb':          'MTGBBB',
 };
 
 const MONTHLY_PLACEMENTS = [

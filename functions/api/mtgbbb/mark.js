@@ -20,7 +20,31 @@
    Every write goes through mutate(): marks arrive in a burst around a pack
    opening, and a lost update here is a pull that a player never sees credit
    for.
+
+   A 'mark' ALSO does two things beyond recording the pull, both computed
+   inside the same mutate() callback for one atomic view of before-and-after,
+   but both DISPATCHED after it resolves — neither may hold the room's lock
+   open for its own I/O:
+
+     OVERLAY EVENTS. One 'mtgbbb-pull' (the card, its treatments as labels,
+     and how many player cards hold it — the number that makes a pull a
+     shared event). Then one 'mtgbbb-bingo' per pattern NEWLY completed by
+     this pull, found by diffing scoreCard() before and after per player.
+     A pull that completes nothing emits none. A pull that completes a
+     blackout emits exactly ONE event for it, not also one for every one of
+     the (up to thirteen) line patterns blackout necessarily also
+     completes — a blackout is the moment worth announcing, not fourteen
+     redundant ones in the same second. pushOverlayEvent() never throws, so
+     a miss here costs the overlay, never the mark.
+
+     CALL-YOUR-SHOT RESOLUTION. Any unresolved shot on this card resolves
+     right here, against THIS pull's own treatments — see shot.js for why
+     that is always the first and only pull that can resolve a given shot.
+     A win is recorded inside the lock; the giveaway code itself is pulled
+     afterward, same reasoning as the overlay push.
    ══════════════════════════════════════════════ */
+
+import { scoreCard, cardCounts } from '../mtgbbb-scoring.js';
 
 const GAME_TTL = 14400;
 
@@ -36,6 +60,13 @@ function getSession(request) {
   const match = cookie.match(/pham_session=([^;]+)/);
   if (!match) return null;
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
+}
+
+/** The treatment ids a shot's tier needs present on the resolving pull. */
+function shotRequirement(shot) {
+  if (shot.tier === 'rare') return ['foil', shot.treatmentId];
+  if (shot.tier === 'uncommon') return ['foil'];
+  return [];
 }
 
 export async function onRequestPost(context) {
@@ -57,6 +88,8 @@ export async function onRequestPost(context) {
 
   let failure = null;
   let response = null;
+  const overlayJobs = [];
+  const shotWins = []; // { playerId, tier }
 
   await env.MARKETPLACE.mutate(`mtgbbb_${code}`, (room) => {
     if (!room) { failure = json({ error: 'Game not found' }, 404); return undefined; }
@@ -91,6 +124,7 @@ export async function onRequestPost(context) {
     const unknown = treatments.find(id => !knownTreatments.has(id));
     if (unknown) { failure = json({ error: `Unknown treatment: ${unknown}` }, 400); return undefined; }
 
+    const pullsBefore = room.pulls;
     const pull = {
       id: String(room.nextPullId++),
       card: cardName,
@@ -98,11 +132,86 @@ export async function onRequestPost(context) {
       at: Date.now(),
       by: session.display_name || String(session.user_id),
     };
-    room.pulls.push(pull);
+    const pullsAfter = [...pullsBefore, pull];
+    room.pulls = pullsAfter;
     response = { pull };
+
+    /* THE PULL EVENT. holders comes from every player's CURRENT card, not
+       the pool — the pool tells you how many squares exist, this tells you
+       how many people are about to feel something. */
+    const poolCard = room.pool.find(c => c.name === cardName);
+    overlayJobs.push({
+      type: 'mtgbbb-pull',
+      card: cardName,
+      rarity: poolCard ? poolCard.rarity : '',
+      image: poolCard ? (poolCard.art || poolCard.image || '') : '',
+      treatments: treatments.map(id => {
+        const t = room.treatments.find(x => x.id === id);
+        return t ? t.label : id;
+      }),
+      holders: cardCounts(room.players.map(p => p.card)).get(cardName) || 0,
+      players: room.players.length,
+    });
+
+    /* THE BINGO DIFF. Every player, scored before and after this one pull,
+       so "newly completed" is a fact about this pull specifically rather
+       than a flag that has to be remembered and could go stale across an
+       undo. */
+    for (const p of room.players) {
+      const before = scoreCard(p.card, pullsBefore);
+      const after = scoreCard(p.card, pullsAfter);
+
+      if (after.blackout && !before.blackout) {
+        overlayJobs.push({ type: 'mtgbbb-bingo', who: p.name, pattern: 'Blackout', points: after.points });
+        continue; // see header: blackout stands alone, not alongside the lines it also completes
+      }
+
+      const newLines = after.lines.filter(l => !before.lines.some(bl => bl.id === l.id));
+      for (const line of newLines) {
+        overlayJobs.push({ type: 'mtgbbb-bingo', who: p.name, pattern: line.label, points: after.points });
+      }
+    }
+
+    /* CALL-YOUR-SHOT. By construction (shot.js refuses a shot on a card
+       already in room.pulls) this is always the first pull of `cardName`
+       since the shot was set, so there is nothing to iterate — each
+       unresolved shot on this card resolves exactly once, right here. */
+    for (const shot of room.shots || []) {
+      if (shot.resolved || shot.card !== cardName) continue;
+      const required = shotRequirement(shot);
+      shot.resolved = true;
+      shot.won = required.every(id => treatments.includes(id));
+      shot.resolvedAt = Date.now();
+      if (shot.won) shotWins.push({ playerId: shot.playerId, tier: shot.tier });
+    }
+
     return room;
   }, { expirationTtl: GAME_TTL });
 
   if (failure) return failure;
+
+  if (overlayJobs.length) {
+    const { pushOverlayEvent } = await import('../overlay/events.js');
+    for (const ev of overlayJobs) await pushOverlayEvent(env, ev);
+  }
+
+  if (shotWins.length) {
+    const { pullGiveawayCode } = await import('../bot/send-chat.js');
+    for (const win of shotWins) {
+      try {
+        const giveawayCode = await pullGiveawayCode(env, win.tier);
+        if (!giveawayCode) continue; // pool exhausted — the win stands, just no code to show yet
+        await env.MARKETPLACE.mutate(`mtgbbb_${code}`, (room) => {
+          if (!room) return undefined;
+          const shot = (room.shots || []).find(s => s.playerId === win.playerId);
+          if (shot) shot.code = giveawayCode;
+          return room;
+        }, { expirationTtl: GAME_TTL });
+      } catch (err) {
+        console.error('[mtgbbb/mark] call-your-shot code mint failed:', err.message);
+      }
+    }
+  }
+
   return json({ success: true, ...response });
 }

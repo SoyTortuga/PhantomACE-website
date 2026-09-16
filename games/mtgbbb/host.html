@@ -200,6 +200,18 @@
         <div class="treatment-list" id="treatmentList"></div>
       </div>
 
+      <div class="form-row">
+        <label class="form-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="cysEnabled"> Call Your Shot
+        </label>
+        <span class="form-hint">
+          Players wager on a mythic before it's pulled — the more specific, the better the code.
+          Off by default: at 60 players a common-tier call lands roughly 14 codes per box, so weigh
+          the pool before turning it on.
+        </span>
+        <input class="form-input" id="cysCap" type="number" min="1" placeholder="Cap (optional — blank is unlimited)">
+      </div>
+
       <div class="create-error" id="createError"></div>
       <button class="create-btn" id="createBtn" onclick="createRoom()">Open Room</button>
     </form>
@@ -359,11 +371,16 @@
       const btn = document.getElementById('createBtn');
       btn.disabled = true;
 
+      const capRaw = document.getElementById('cysCap').value.trim();
       const body = {
         code: document.getElementById('codeInput').value.trim().toUpperCase(),
         setCode: document.getElementById('setSelect').value,
         boxes: parseInt(document.getElementById('boxesInput').value, 10),
         treatments: [...selectedTreatmentIds],
+        callYourShot: {
+          enabled: document.getElementById('cysEnabled').checked,
+          cap: capRaw ? parseInt(capRaw, 10) : null,
+        },
       };
 
       try {
@@ -612,6 +629,8 @@
          click. */
       document.getElementById('codeInput').value = generateCode();
       document.getElementById('createError').textContent = '';
+      document.getElementById('cysEnabled').checked = false;
+      document.getElementById('cysCap').value = '';
       showScreen('createScreen');
     }
 

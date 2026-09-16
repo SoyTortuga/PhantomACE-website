@@ -2,8 +2,20 @@
    MTGBBB END — closes the room to new pulls.
 
    Any moderator or broadcaster, not only the host — same reasoning as
-   mark.js. Ending does not settle anything by itself: award.js is the
-   separate, host-locked step that actually pays out, exactly like bingo.
+   mark.js. Ending does not settle prizes: award.js is the separate,
+   host-locked step that actually pays those out, exactly like bingo.
+
+   Two side effects fire once, on the actual active-to-ended transition
+   only — never on a repeated end call, which is why they live inside the
+   `justEnded` branch rather than after every call to this route:
+
+     - mtgbbb_current is cleared, but ONLY if it still points at this room.
+       A stale end call on an old room must not blank the pointer out from
+       under a different game that started after it.
+     - Every player's final score is folded into lb_mtgbbb, the site's
+       ordinary monthly-reset leaderboard (see leaderboards.js) — the same
+       machinery commander-bingo and mana-clash already ride, not a new
+       per-month key of MTGBBB's own.
    ══════════════════════════════════════════════ */
 
 import { standings } from '../mtgbbb-scoring.js';
@@ -42,6 +54,7 @@ export async function onRequestPost(context) {
 
   let failure = null;
   let final = null;
+  let justEnded = false;
 
   await env.MARKETPLACE.mutate(`mtgbbb_${code}`, (room) => {
     if (!room) { failure = json({ error: 'Game not found' }, 404); return undefined; }
@@ -50,6 +63,7 @@ export async function onRequestPost(context) {
     room.status = 'ended';
     room.endedAt = Date.now();
     final = room;
+    justEnded = true;
     return room;
   }, { expirationTtl: GAME_TTL });
 
@@ -57,6 +71,38 @@ export async function onRequestPost(context) {
 
   const board = standings(final.players, final.pulls)
     .map(p => ({ id: p.id, name: p.name, points: p.points, marks: p.marks, blackout: p.blackout }));
+
+  if (justEnded) {
+    try {
+      const current = await env.MARKETPLACE.get('mtgbbb_current', 'json');
+      if (current && current.code === code) await env.MARKETPLACE.delete('mtgbbb_current');
+    } catch (err) {
+      console.error('[mtgbbb/end] could not clear mtgbbb_current:', err.message);
+    }
+
+    /* Every player who scored above zero, not only the winner — a strong
+       showing in a losing seat still deserves to register on the board.
+       Best score kept, exactly like Mana Clash's SCORE_BOARD. */
+    try {
+      await env.MARKETPLACE.mutate('lb_mtgbbb', (lb) => {
+        const list = Array.isArray(lb) ? lb : [];
+        for (const p of board) {
+          if (p.points <= 0) continue;
+          const row = list.find(e => e.id === p.id);
+          if (row) {
+            if (p.points > row.score) { row.score = p.points; row.updatedAt = Date.now(); }
+            row.name = p.name;
+          } else {
+            list.push({ id: p.id, name: p.name, score: p.points, updatedAt: Date.now() });
+          }
+        }
+        list.sort((a, b) => b.score - a.score);
+        return list.slice(0, 50);
+      });
+    } catch (err) {
+      console.error('[mtgbbb/end] could not update lb_mtgbbb:', err.message);
+    }
+  }
 
   return json({ success: true, standings: board });
 }

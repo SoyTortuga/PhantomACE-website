@@ -17,9 +17,15 @@
    record and updating them in mark.js) would need every write path to stay
    in sync with the scoring rules forever; recomputing from room.pulls each
    read means there is exactly one place scoring can be wrong.
+
+   `?current=1` (no code) resolves the live room from the mtgbbb_current
+   pointer — this is how the overlay finds its own game without a
+   per-stream OBS URL edit. No live room is the ORDINARY case, not a
+   fault: it is what "nothing is running right now" looks like, so it is a
+   plain 404, same as an unknown code.
    ══════════════════════════════════════════════ */
 
-import { scoreCard, oneAway, standings } from '../mtgbbb-scoring.js';
+import { scoreCard, oneAway, standings, hottest } from '../mtgbbb-scoring.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -38,7 +44,13 @@ function getSession(request) {
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
-  const code = (url.searchParams.get('code') || '').toUpperCase().trim();
+  let code = (url.searchParams.get('code') || '').toUpperCase().trim();
+
+  if (!code && url.searchParams.get('current')) {
+    const current = await env.MARKETPLACE.get('mtgbbb_current', 'json');
+    if (!current || !current.code) return json({ error: 'No MTGBBB game is live.' }, 404);
+    code = current.code;
+  }
   if (!code) return json({ error: 'Missing code' }, 400);
 
   const raw = await env.MARKETPLACE.get(`mtgbbb_${code}`, 'json');
@@ -49,6 +61,12 @@ export async function onRequestGet(context) {
     .map(p => ({ id: p.id, name: p.name, points: p.points, marks: p.marks, blackout: p.blackout }));
 
   const recentPulls = room.pulls.slice(-50).reverse();
+
+  const byName = new Map(room.pool.map(c => [c.name, c]));
+  const heatMap = hottest(room.players.map(p => p.card), 3).map(h => {
+    const c = byName.get(h.id);
+    return { name: h.id, count: h.count, rarity: c ? c.rarity : '', image: c ? c.image : '' };
+  });
 
   const out = {
     code: room.code,
@@ -66,14 +84,28 @@ export async function onRequestGet(context) {
     playerCount: room.players.length,
     standings: board,
     recentPulls,
+    heatMap,
+    /* Unique names only — the call-your-shot picker needs to know what is
+       still available, not the full pull history recentPulls already
+       caps at 50. Cheap: at most one entry per pool card. */
+    pulledCards: [...new Set(room.pulls.map(p => p.card))],
+    callYourShot: {
+      enabled: !!(room.callYourShot && room.callYourShot.enabled),
+      cap: room.callYourShot ? room.callYourShot.cap : null,
+      count: Array.isArray(room.shots) ? room.shots.length : 0,
+    },
   };
 
   const session = getSession(request);
   if (session && session.user_id) {
-    const me = room.players.find(p => p.id === 'u_' + session.user_id);
+    const myId = 'u_' + session.user_id;
+    const me = room.players.find(p => p.id === myId);
     if (me) {
       const scored = scoreCard(me.card, room.pulls);
-      const byName = new Map(room.pool.map(c => [c.name, c]));
+      /* shot.js requires a player to have joined before calling a shot, so
+         a shot can only exist here alongside a card — no separate branch
+         for "has a shot but never joined" to keep in sync with the UI. */
+      const myShot = (room.shots || []).find(s => s.playerId === myId);
       out.you = {
         id: me.id,
         name: me.name,
@@ -90,6 +122,10 @@ export async function onRequestGet(context) {
         points: scored.points,
         breakdown: scored.breakdown,
         oneAway: oneAway(scored.marked),
+        shot: myShot ? {
+          card: myShot.card, tier: myShot.tier, resolved: myShot.resolved,
+          won: myShot.won, code: myShot.won ? myShot.code : null,
+        } : null,
       };
     }
   }

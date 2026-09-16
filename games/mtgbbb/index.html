@@ -140,6 +140,30 @@
     .last-pull { width: 100%; margin-top: 8px; font-size: 11px; color: #555; text-align: center; min-height: 14px; }
     .last-pull b { color: #fff; }
 
+    /* ── CALL YOUR SHOT ──────────────────── */
+    .shot-panel {
+      width: 100%; margin-top: 10px; padding: 12px; background: #0a0a0a; border: 1px solid #1a1a1a;
+      border-radius: 4px;
+    }
+    .shot-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; margin-bottom: 8px; }
+    .shot-form { display: flex; flex-direction: column; gap: 8px; }
+    .shot-form select, .shot-form .form-input {
+      width: 100%; padding: 8px 10px; background: #111; border: 1px solid #222; border-radius: 3px;
+      color: #fff; font-size: 12px; font-family: inherit; outline: none;
+    }
+    .shot-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #999; cursor: pointer; }
+    .shot-submit {
+      padding: 8px 16px; background: #ff0000; color: #fff; border: none; border-radius: 3px;
+      font-size: 11px; font-weight: bold; cursor: pointer; font-family: inherit;
+    }
+    .shot-submit:hover:not(:disabled) { background: #cc0000; }
+    .shot-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .shot-status { font-size: 12px; color: #999; }
+    .shot-status .tier { color: #fff; font-weight: bold; text-transform: capitalize; }
+    .shot-status.won { color: #6ac46a; }
+    .shot-status .code { color: #ff0000; font-weight: bold; letter-spacing: 0.05em; }
+    .shot-error { font-size: 11px; color: #ff0000; min-height: 14px; }
+
     .card-actions { display: flex; gap: 8px; margin-top: 10px; }
     .back-btn {
       padding: 8px 18px; background: transparent; border: 1px solid #222; border-radius: 3px;
@@ -207,6 +231,8 @@
 
     <div class="bingo-alert" id="bingoAlert">Bingo!</div>
     <div class="last-pull" id="lastPull"></div>
+
+    <div class="shot-panel" id="shotPanel" hidden></div>
 
     <div class="score-bar">
       <div class="score-item">Marks: <span id="marksCount">0</span>/25</div>
@@ -357,6 +383,87 @@
           : `Just pulled: <b>${escHtml(p.card)}</b>`;
       }
       previousPulls = data.pullCount;
+
+      renderShotPanel(data);
+    }
+
+    let shotFormBuilt = false;
+    function renderShotPanel(data) {
+      const panel = document.getElementById('shotPanel');
+      const you = data.you;
+
+      if (!you || data.status !== 'active' || !data.callYourShot || !data.callYourShot.enabled) {
+        panel.hidden = true;
+        return;
+      }
+      panel.hidden = false;
+
+      if (you.shot) {
+        shotFormBuilt = false; // rebuild the form if the game somehow resets
+        const cls = you.shot.resolved ? (you.shot.won ? 'won' : '') : '';
+        const line = !you.shot.resolved
+          ? `Your shot: <span class="tier">${escHtml(you.shot.tier)}</span> on <b>${escHtml(you.shot.card)}</b> — still in the box.`
+          : you.shot.won
+            ? `You called it! <span class="tier">${escHtml(you.shot.tier)}</span> on <b>${escHtml(you.shot.card)}</b> — ` +
+              (you.shot.code ? `code <span class="code">${escHtml(you.shot.code)}</span>` : 'code coming shortly.')
+            : `Your shot on <b>${escHtml(you.shot.card)}</b> did not land this time.`;
+        panel.innerHTML = `<div class="shot-title">Call Your Shot</div><div class="shot-status ${cls}">${line}</div>`;
+        return;
+      }
+
+      if (shotFormBuilt) return; // don't fight the moderator typing into a live form on every poll
+      shotFormBuilt = true;
+
+      const mythics = (data.pool || [])
+        .filter(c => c.rarity === 'mythic' && !(data.pulledCards || []).includes(c.name))
+        .sort((a, b) => a.name < b.name ? -1 : 1);
+      const namedTreatments = (data.treatments || []).filter(t => t.id !== 'foil');
+
+      panel.innerHTML = `
+        <div class="shot-title">Call Your Shot — press your luck on a mythic</div>
+        <div class="shot-form">
+          <select id="shotCard">${mythics.map(c => `<option value="${escAttr(c.name)}">${escHtml(c.name)}</option>`).join('')}</select>
+          <label class="shot-check"><input type="checkbox" id="shotFoil" onchange="onShotFoilChange()"> + Foil</label>
+          <select id="shotTreatment" disabled>
+            <option value="">+ a named treatment (rare tier)</option>
+            ${namedTreatments.map(t => `<option value="${escAttr(t.id)}">${escHtml(t.label)}</option>`).join('')}
+          </select>
+          <div class="shot-error" id="shotError"></div>
+          <button class="shot-submit" id="shotSubmitBtn" onclick="submitShot()">Call It</button>
+        </div>`;
+    }
+
+    function onShotFoilChange() {
+      const foil = document.getElementById('shotFoil').checked;
+      const treatSel = document.getElementById('shotTreatment');
+      treatSel.disabled = !foil;
+      if (!foil) treatSel.value = '';
+    }
+
+    async function submitShot() {
+      const card = document.getElementById('shotCard').value;
+      const wantsFoil = document.getElementById('shotFoil').checked;
+      const treatmentId = wantsFoil ? document.getElementById('shotTreatment').value || null : null;
+      const errorEl = document.getElementById('shotError');
+      const btn = document.getElementById('shotSubmitBtn');
+
+      if (!card) { errorEl.textContent = 'No mythics left to call — the pool may be fully pulled.'; return; }
+
+      btn.disabled = true;
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/mtgbbb/shot', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: gameCode, card, wantsFoil, treatmentId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { errorEl.textContent = data.error || 'Could not call that shot.'; btn.disabled = false; return; }
+        shotFormBuilt = false;
+        await pollState();
+      } catch {
+        errorEl.textContent = 'Network error — try again.';
+        btn.disabled = false;
+      }
     }
 
     let gridBuilt = false;
@@ -419,6 +526,7 @@
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = null;
       gridBuilt = false;
+      shotFormBuilt = false;
       showScreen('joinScreen');
     }
 
