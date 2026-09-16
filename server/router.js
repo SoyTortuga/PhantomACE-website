@@ -63,6 +63,12 @@ const NON_ROUTE_MODULES = new Set([
      is the route that exposes it. Covered by
      server/scripts/test-mtgbbb-sets.js against a captured fixture. */
   'api/mtgbbb-scryfall.js',
+
+  /* The forum's queries and its author-identity map. Libraries, no
+     handler; the routes beside them in api/forum/ are what expose them.
+     Covered by server/scripts/test-forum-queries.js against pglite. */
+  'api/forum/queries.js',
+  'api/forum/authors.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

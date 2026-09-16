@@ -1,7 +1,9 @@
 # Community Forum — plan
 
-**Status:** schema written and tested (`server/sql/006_forum.sql`, 34 assertions in
-`server/scripts/test-forum-schema.js`). Nothing applied to the rig, nothing served.
+**Status:** steps 0–2 of §9 done. `006_forum.sql` is applied on the rig; the
+query layer (`functions/api/forum/queries.js`, 73 assertions) and three read-only
+routes are live; `community.html` shows the boards and `/thread/<id>` shows a
+topic. Nothing can be posted yet — step 3 is next.
 **Owner:** `chat-system` agent (per CLAUDE.md).
 
 **Revision note.** The first draft of this plan was reviewed by executing its

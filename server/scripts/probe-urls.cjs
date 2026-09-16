@@ -28,6 +28,11 @@ const PATHS = [
   '/games/dino-park/',
   '/games/dino-park',
   '/games/dino-park/index.html',
+  // Pages resolved by shape, not by file (server/static.js rewrites)
+  '/user/phantomace',          // profile.html
+  '/thread/1',                 // thread.html
+  '/thread/abc',               // not an id -> 404, not the page
+  '/thread/1/extra',           // too many segments -> 404
   // Static asset headers
   '/css/base.css',
   '/assets/images/favicon.ico',

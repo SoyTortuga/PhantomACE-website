@@ -154,8 +154,8 @@ const tid = (await db.query(
   const q = {
     'category listing, pinned first then newest activity':
       `SELECT id FROM forum_threads WHERE category_id = 'general' AND deleted_at IS NULL ORDER BY pinned DESC, last_post_at DESC LIMIT 20`,
-    'thread page, oldest first, offset paginated':
-      `SELECT id FROM forum_posts WHERE thread_id = ${tid} AND deleted_at IS NULL ORDER BY created_at LIMIT 20 OFFSET 40`,
+    'thread page, oldest first, tombstones included, offset paginated':
+      `SELECT id FROM forum_posts WHERE thread_id = ${tid} ORDER BY created_at, id LIMIT 20 OFFSET 40`,
     'profile wall, newest first':
       `SELECT id FROM forum_posts WHERE profile_id = 'u9' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
     'threads started by one person':

@@ -88,8 +88,13 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   created_at    timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT one_home CHECK ((thread_id IS NULL) <> (profile_id IS NULL))
 );
-CREATE INDEX IF NOT EXISTS forum_posts_thread_page
-  ON forum_posts (thread_id, created_at) WHERE deleted_at IS NULL;
+-- NOT partial, and that is deliberate. A thread page includes its deleted
+-- posts as tombstones, so the page query has no deleted_at filter and a
+-- partial index would not serve it. (An earlier revision had the partial
+-- form; the DROP retires it wherever it was applied.)
+DROP INDEX IF EXISTS forum_posts_thread_page;
+CREATE INDEX IF NOT EXISTS forum_posts_thread_order
+  ON forum_posts (thread_id, created_at, id);
 CREATE INDEX IF NOT EXISTS forum_posts_profile_wall
   ON forum_posts (profile_id, created_at DESC) WHERE deleted_at IS NULL;
 -- Not partial: the rate limit counts deleted posts too, or deleting your

@@ -706,3 +706,69 @@
   font-weight: normal;
   font-size: 11px;
 }
+
+/* ══════════════════════════════════════════════
+   FORUM — server-backed additions
+   Author lines, board "newest" rows, pagination, tombstones, flags.
+   Border-based hierarchy only; no shadows anywhere on this site.
+   ══════════════════════════════════════════════ */
+
+.forum-page { padding-top: 24px; padding-bottom: 48px; }
+
+.forum-breadcrumb { margin-bottom: 18px; font-size: 0.9rem; color: var(--text-sec); }
+.forum-breadcrumb a { color: var(--text-pri); text-decoration: none; }
+.forum-breadcrumb a:hover { color: var(--red); }
+
+/* A card carrying data-href is clickable everywhere; the title inside is
+   the real link, so it still opens in a new tab and reads to a screen
+   reader as what it is. */
+[data-href] { cursor: pointer; }
+.forum-category-name a, .forum-thread-title a { color: inherit; text-decoration: none; }
+.forum-category:hover .forum-category-name a, .forum-thread-row:hover .forum-thread-title a { color: var(--red); }
+.forum-category-newest { margin-top: 8px; font-size: 0.85rem; color: var(--text-sec); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.forum-category-newest a { color: var(--text-pri); text-decoration: none; }
+.forum-category-newest a:hover { color: var(--red); }
+.forum-category-newest-meta { display: inline-flex; gap: 10px; align-items: center; }
+.forum-category-quiet { color: var(--text-dim); font-style: italic; }
+
+.forum-thread-pinned { border-color: var(--red-dim); }
+.forum-thread-meta { flex-wrap: wrap; align-items: center; row-gap: 4px; }
+.forum-thread-time, .forum-thread-replies, .forum-post-time { white-space: nowrap; }
+.forum-thread-count { color: var(--text-sec); font-size: 0.9rem; }
+
+/* Who wrote it: avatar, name, badge, title. */
+.forum-author { display: inline-flex; align-items: center; gap: 8px; color: var(--text-pri); text-decoration: none; min-width: 0; }
+a.forum-author:hover .forum-author-name { color: var(--red); }
+.forum-author-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-mid); object-fit: cover; background: var(--gray-lo); flex: none; }
+.forum-author-blank { display: inline-block; }
+.forum-author-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.forum-author-badge { width: 20px; height: 20px; object-fit: contain; flex: none; }
+.forum-author-badge-fallback { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--text-dim); font-size: 0.8rem; }
+.forum-author-title { font-size: 0.78rem; color: var(--red); border: 1px solid var(--red-dim); padding: 1px 7px; border-radius: 3px; white-space: nowrap; }
+.forum-author-sm .forum-author-avatar { width: 20px; height: 20px; }
+.forum-author-sm .forum-author-name { font-weight: 500; }
+.forum-author-sm .forum-author-title { display: none; }
+
+.forum-post-header { gap: 12px; flex-wrap: wrap; }
+.forum-post-edited { color: var(--text-dim); font-size: 0.8rem; }
+.forum-topic-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.forum-topic-head .forum-post-title { margin: 0; }
+
+.forum-post-tombstone { border-style: dashed; border-color: var(--border); }
+.forum-post-removed { color: var(--text-dim); font-style: italic; }
+
+.forum-flag { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--red); border: 1px solid var(--red-dim); padding: 1px 6px; margin-right: 8px; border-radius: 3px; vertical-align: middle; }
+.forum-flag-locked { color: var(--text-sec); border-color: var(--border-mid); }
+
+.forum-pagination { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 20px 0 6px; font-size: 0.9rem; }
+.forum-pagination a { color: var(--text-pri); text-decoration: none; border: 1px solid var(--border-mid); padding: 5px 12px; border-radius: 3px; }
+.forum-pagination a:hover { border-color: var(--red); color: var(--red); }
+.forum-page-off { color: var(--text-dim); border: 1px solid var(--border); padding: 5px 12px; border-radius: 3px; }
+.forum-page-num { color: var(--text-sec); }
+
+.forum-readonly-note { margin-top: 18px; padding: 10px 14px; border: 1px solid var(--border); border-left: 3px solid var(--red-dim); color: var(--text-sec); font-size: 0.88rem; }
+
+@media (max-width: 600px) {
+  .forum-category-stats { display: none; }
+  .forum-author-name { max-width: 140px; }
+}

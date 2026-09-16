@@ -1,264 +1,243 @@
-const FORUM_CATEGORIES = [
-  { id: 'announcements', name: 'Announcements', icon: '\u{1F4E3}', desc: 'Stream schedules, community updates, and important news from PhantomACE.' },
-  { id: 'general', name: 'General Discussion', icon: '\u{1F4AC}', desc: 'Talk about anything — streams, games, music, life. All chaos welcome.' },
-  { id: 'gaming', name: 'Gaming', icon: '\u{1F3AE}', desc: 'MTG Commander, co-op sessions, game recommendations, and lobby invites.' },
-  { id: 'creative', name: 'Creative Corner', icon: '\u{1F3A8}', desc: 'Fan art, clips, edits, memes, and anything creative from the community.' },
-  { id: 'highlights', name: 'Stream Highlights', icon: '\u{1F4A5}', desc: 'Best moments, clutch plays, and legendary fails from the stream.' },
-  { id: 'feedback', name: 'Suggestions & Feedback', icon: '\u{1F4A1}', desc: 'Ideas for streams, events, website features, and community improvements.' },
-];
+/* ══════════════════════════════════════════════
+   COMMUNITY FORUM — client
 
-let forumState = { view: 'home', categoryId: null, threadId: null };
+   Two pages share this file and are told apart by which view element is
+   present: community.html has #forumView (boards, then one board's
+   topics); thread.html has #threadView (one topic, paged).
 
-function getForumData() {
-  try {
-    return JSON.parse(localStorage.getItem('pa_forum') || '{}');
-  } catch { return {}; }
-}
+   Everything comes from /api/forum/*. The localStorage prototype that used
+   to live here is gone, not kept as a fallback — a fallback that silently
+   swallowed posts when the API was down would be worse than an error.
 
-function saveForumData(data) {
-  try { localStorage.setItem('pa_forum', JSON.stringify(data)); } catch {}
-}
+   Read-only for now: posting, replying and moderation arrive with the
+   next steps of docs/FORUM-PLAN.md, and the page says so rather than
+   showing a form that goes nowhere.
+   ══════════════════════════════════════════════ */
 
-function getUser() {
-  return localStorage.getItem('pa_forum_user') || null;
-}
+(function () {
+  'use strict';
 
-function escHtml(s) {
-  const el = document.createElement('span');
-  el.textContent = s;
-  return el.innerHTML;
-}
-
-function timeAgo(ts) {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return mins + 'm ago';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + 'h ago';
-  const days = Math.floor(hrs / 24);
-  return days + 'd ago';
-}
-
-function forumNav(view, id) {
-  if (view === 'home') {
-    forumState = { view: 'home', categoryId: null, threadId: null };
-  } else if (view === 'category') {
-    forumState = { view: 'category', categoryId: id, threadId: null };
-  } else if (view === 'thread') {
-    forumState = { view: 'thread', categoryId: forumState.categoryId, threadId: id };
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
   }
-  renderForum();
-}
 
-function renderBreadcrumb() {
-  const bc = document.getElementById('forumBreadcrumb');
-  let html = '<a href="#" onclick="forumNav(\'home\'); return false;">Forums</a>';
-  if (forumState.categoryId) {
-    const cat = FORUM_CATEGORIES.find(c => c.id === forumState.categoryId);
-    if (cat) {
+  function timeAgo(iso) {
+    var t = Date.parse(iso || '');
+    if (!t) return '';
+    var mins = Math.floor((Date.now() - t) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    if (days < 30) return days + 'd ago';
+    return new Date(t).toLocaleDateString();
+  }
+
+  /** The author line every post and topic row carries: avatar, name linked
+      to their profile, equipped title, equipped badge. `authors` is the map
+      the API sends alongside the page. */
+  function authorLine(authors, userId, cls) {
+    var a = (authors && authors[userId]) || { displayName: 'Someone', login: '', avatar: '', title: null, badge: null };
+    var name = esc(a.displayName);
+    var inner =
+      (a.avatar ? '<img class="forum-author-avatar" src="' + esc(a.avatar) + '" alt="">' : '<span class="forum-author-avatar forum-author-blank"></span>') +
+      '<span class="forum-author-name">' + name + '</span>' +
+      (a.badge ? badgeArt(a.badge) : '') +
+      (a.title ? '<span class="forum-author-title">' + esc(a.title.name) + '</span>' : '');
+    return a.login
+      ? '<a class="forum-author ' + (cls || '') + '" href="/user/' + encodeURIComponent(a.login) + '">' + inner + '</a>'
+      : '<span class="forum-author ' + (cls || '') + '">' + inner + '</span>';
+  }
+
+  function badgeArt(b) {
+    return b.image
+      ? '<img class="forum-author-badge" src="' + esc(b.image) + '" alt="" title="' + esc(b.name) + '">'
+      : '<span class="forum-author-badge forum-author-badge-fallback" title="' + esc(b.name) + '">' + (b.founder ? '★' : '◆') + '</span>';
+  }
+
+  function crumbs(parts) {
+    var el = document.getElementById('forumBreadcrumb');
+    if (!el) return;
+    var html = '<a href="/community">Forums</a>';
+    parts.forEach(function (p, i) {
       html += ' <span class="bc-sep">/</span> ';
-      html += `<a href="#" onclick="forumNav('category', '${cat.id}'); return false;">${escHtml(cat.name)}</a>`;
-    }
-  }
-  if (forumState.threadId) {
-    const data = getForumData();
-    const threads = data[forumState.categoryId] || [];
-    const thread = threads.find(t => t.id === forumState.threadId);
-    if (thread) {
-      html += ' <span class="bc-sep">/</span> ';
-      html += `<span class="bc-current">${escHtml(thread.title)}</span>`;
-    }
-  }
-  bc.innerHTML = html;
-}
-
-function renderForum() {
-  renderBreadcrumb();
-  const view = document.getElementById('forumView');
-  if (forumState.view === 'home') {
-    view.innerHTML = renderCategoryList();
-  } else if (forumState.view === 'category') {
-    view.innerHTML = renderThreadList();
-  } else if (forumState.view === 'thread') {
-    view.innerHTML = renderThread();
-  }
-}
-
-function renderCategoryList() {
-  const data = getForumData();
-  return `<div class="forum-categories">${FORUM_CATEGORIES.map(cat => {
-    const threads = data[cat.id] || [];
-    const postCount = threads.reduce((sum, t) => sum + 1 + (t.replies || []).length, 0);
-    return `
-      <div class="card forum-category" onclick="forumNav('category', '${cat.id}')" style="cursor:pointer;">
-        <div class="forum-category-icon">${cat.icon}</div>
-        <div class="forum-category-info">
-          <div class="forum-category-name">${escHtml(cat.name)}</div>
-          <div class="forum-category-desc">${escHtml(cat.desc)}</div>
-        </div>
-        <div class="forum-category-stats">
-          <div class="forum-stat"><span class="forum-stat-val">${threads.length}</span><span class="forum-stat-label">Topics</span></div>
-          <div class="forum-stat"><span class="forum-stat-val">${postCount}</span><span class="forum-stat-label">Posts</span></div>
-        </div>
-      </div>`;
-  }).join('')}</div>`;
-}
-
-function renderThreadList() {
-  const cat = FORUM_CATEGORIES.find(c => c.id === forumState.categoryId);
-  const data = getForumData();
-  const threads = (data[forumState.categoryId] || []).sort((a, b) => b.lastActivity - a.lastActivity);
-  const user = getUser();
-
-  let html = `<div class="forum-thread-header">
-    <h3>${escHtml(cat.name)}</h3>
-    ${user ? `<button class="btn-primary forum-new-btn" onclick="showNewThread()">New Topic</button>` : `<button class="btn-primary forum-new-btn" onclick="promptLogin()">Log In to Post</button>`}
-  </div>`;
-
-  html += `<div id="newThreadForm" class="forum-new-form" style="display:none;">
-    <input type="text" id="newThreadTitle" class="forum-input" placeholder="Topic title..." maxlength="120">
-    <textarea id="newThreadBody" class="forum-textarea" placeholder="What's on your mind?" rows="4" maxlength="2000"></textarea>
-    <div class="forum-form-actions">
-      <button class="btn-primary" onclick="submitThread()">Post</button>
-      <button class="pill-btn" onclick="hideNewThread()">Cancel</button>
-    </div>
-  </div>`;
-
-  if (threads.length === 0) {
-    html += `<div class="forum-empty card">
-      <p>No topics yet. Be the first to start a discussion!</p>
-    </div>`;
-  } else {
-    html += `<div class="forum-thread-list">`;
-    html += threads.map(t => {
-      const replyCount = (t.replies || []).length;
-      return `
-        <div class="card forum-thread-row" onclick="forumNav('thread', '${t.id}')">
-          <div class="forum-thread-title">${escHtml(t.title)}</div>
-          <div class="forum-thread-meta">
-            <span class="forum-thread-author">${escHtml(t.author)}</span>
-            <span class="forum-thread-time">${timeAgo(t.created)}</span>
-            <span class="forum-thread-replies">${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}</span>
-          </div>
-        </div>`;
-    }).join('');
-    html += `</div>`;
+      html += (i === parts.length - 1 || !p.href)
+        ? '<span class="bc-current">' + esc(p.text) + '</span>'
+        : '<a href="' + esc(p.href) + '">' + esc(p.text) + '</a>';
+    });
+    el.innerHTML = html;
   }
 
-  return html;
-}
-
-function renderThread() {
-  const data = getForumData();
-  const threads = data[forumState.categoryId] || [];
-  const thread = threads.find(t => t.id === forumState.threadId);
-  if (!thread) return '<div class="forum-empty card"><p>Thread not found.</p></div>';
-
-  const user = getUser();
-  let html = `<div class="forum-thread-view">`;
-
-  html += `<div class="card forum-post forum-post-op">
-    <div class="forum-post-header">
-      <span class="forum-post-author">${escHtml(thread.author)}</span>
-      <span class="forum-post-time">${timeAgo(thread.created)}</span>
-    </div>
-    <h3 class="forum-post-title">${escHtml(thread.title)}</h3>
-    <div class="forum-post-body">${escHtml(thread.body).replace(/\n/g, '<br>')}</div>
-  </div>`;
-
-  if (thread.replies && thread.replies.length > 0) {
-    html += thread.replies.map(r => `
-      <div class="card forum-post">
-        <div class="forum-post-header">
-          <span class="forum-post-author">${escHtml(r.author)}</span>
-          <span class="forum-post-time">${timeAgo(r.created)}</span>
-        </div>
-        <div class="forum-post-body">${escHtml(r.body).replace(/\n/g, '<br>')}</div>
-      </div>`).join('');
+  function failed(view, what) {
+    view.innerHTML = '<div class="forum-empty card"><p>' + esc(what) + '</p></div>';
   }
 
-  if (user) {
-    html += `<div class="forum-reply-form">
-      <textarea id="replyBody" class="forum-textarea" placeholder="Write a reply..." rows="3" maxlength="2000"></textarea>
-      <button class="btn-primary" onclick="submitReply()">Reply</button>
-    </div>`;
-  } else {
-    html += `<div class="forum-reply-prompt card">
-      <p>Log in to reply to this topic.</p>
-      <button class="btn-primary" onclick="promptLogin()">Log In</button>
-    </div>`;
+  function api(path) {
+    return fetch(path, { cache: 'no-store' }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
+    });
   }
 
-  html += `</div>`;
-  return html;
-}
+  function pager(page, pages, hrefFor) {
+    if (pages <= 1) return '';
+    var html = '<nav class="forum-pagination" aria-label="Pages">';
+    html += page > 1 ? '<a href="' + esc(hrefFor(page - 1)) + '">&lsaquo; Newer</a>' : '<span class="forum-page-off">&lsaquo; Newer</span>';
+    html += '<span class="forum-page-num">Page ' + page + ' of ' + pages + '</span>';
+    html += page < pages ? '<a href="' + esc(hrefFor(page + 1)) + '">Older &rsaquo;</a>' : '<span class="forum-page-off">Older &rsaquo;</span>';
+    return html + '</nav>';
+  }
 
-function showNewThread() {
-  document.getElementById('newThreadForm').style.display = 'block';
-  document.getElementById('newThreadTitle').focus();
-}
+  var readOnlyNote =
+    '<div class="forum-readonly-note">Reading is open to everyone. Posting arrives with the next update.</div>';
 
-function hideNewThread() {
-  document.getElementById('newThreadForm').style.display = 'none';
-  document.getElementById('newThreadTitle').value = '';
-  document.getElementById('newThreadBody').value = '';
-}
+  /* ── The boards ──────────────────────────────────────────────────── */
 
-function submitThread() {
-  const title = document.getElementById('newThreadTitle').value.trim();
-  const body = document.getElementById('newThreadBody').value.trim();
-  const user = getUser();
-  if (!title || !body || !user) return;
+  function renderHome(view) {
+    crumbs([]);
+    api('/api/forum/categories').then(function (r) {
+      if (!r.ok) return failed(view, r.data.error || 'The forum is unavailable right now.');
+      var authors = r.data.authors || {};
+      view.innerHTML = '<div class="forum-categories">' + r.data.categories.map(function (c) {
+        var newest = c.newest
+          ? '<div class="forum-category-newest">' +
+              '<a href="/thread/' + esc(c.newest.id) + '">' + esc(c.newest.title) + '</a>' +
+              '<span class="forum-category-newest-meta">' + authorLine(authors, c.newest.userId, 'forum-author-sm') +
+              '<span class="forum-thread-time">' + timeAgo(c.newest.at) + '</span></span>' +
+            '</div>'
+          : '<div class="forum-category-newest forum-category-quiet">No topics yet</div>';
+        var flags = (c.staffOnly ? '<span class="forum-flag">Staff posts</span>' : '') +
+                    (c.subOnly ? '<span class="forum-flag">Subscribers</span>' : '');
+        /* A div, not an <a>: the author line inside is a link of its own,
+           and an anchor inside an anchor is closed by the parser at the
+           inner one — the card ends early and the rest spills out below
+           it. data-href makes the remainder of the card clickable. */
+        var href = '/community?c=' + encodeURIComponent(c.id);
+        return '<div class="card forum-category" data-href="' + esc(href) + '">' +
+          '<div class="forum-category-info">' +
+            '<div class="forum-category-name"><a href="' + esc(href) + '">' + esc(c.name) + '</a>' + flags + '</div>' +
+            '<div class="forum-category-desc">' + esc(c.description) + '</div>' +
+            newest +
+          '</div>' +
+          '<div class="forum-category-stats">' +
+            '<div class="forum-stat"><span class="forum-stat-val">' + c.threadCount + '</span><span class="forum-stat-label">Topics</span></div>' +
+            '<div class="forum-stat"><span class="forum-stat-val">' + c.postCount + '</span><span class="forum-stat-label">Posts</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>' + readOnlyNote;
+    }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
+  }
 
-  const data = getForumData();
-  if (!data[forumState.categoryId]) data[forumState.categoryId] = [];
+  /* ── One board ───────────────────────────────────────────────────── */
 
-  const thread = {
-    id: 't_' + Date.now(),
-    title,
-    body,
-    author: user,
-    created: Date.now(),
-    lastActivity: Date.now(),
-    replies: [],
-  };
+  function renderBoard(view, categoryId, page) {
+    api('/api/forum/threads?category=' + encodeURIComponent(categoryId) + '&page=' + page).then(function (r) {
+      if (!r.ok) {
+        crumbs([{ text: 'Not found' }]);
+        return failed(view, r.status === 404 ? 'There is no board by that name.' : (r.data.error || 'The forum is unavailable right now.'));
+      }
+      var d = r.data, authors = d.authors || {};
+      crumbs([{ text: d.category.name }]);
+      var hrefFor = function (p) { return '/community?c=' + encodeURIComponent(categoryId) + (p > 1 ? '&page=' + p : ''); };
+      var html = '<div class="forum-thread-header"><h3>' + esc(d.category.name) + '</h3>' +
+        '<span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span></div>';
+      if (!d.threads.length) {
+        html += '<div class="forum-empty card"><p>No topics here yet.</p></div>';
+      } else {
+        html += '<div class="forum-thread-list">' + d.threads.map(function (t) {
+          var href = '/thread/' + esc(t.id);
+          return '<div class="card forum-thread-row' + (t.pinned ? ' forum-thread-pinned' : '') + '" data-href="' + href + '">' +
+            '<div class="forum-thread-title">' +
+              (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
+              (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
+              '<a href="' + href + '">' + esc(t.title) + '</a></div>' +
+            '<div class="forum-thread-meta">' +
+              authorLine(authors, t.userId, 'forum-author-sm') +
+              '<span class="forum-thread-time">' + timeAgo(t.lastPostAt) + '</span>' +
+              '<span class="forum-thread-replies">' + t.replyCount + ' ' + (t.replyCount === 1 ? 'reply' : 'replies') + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+      }
+      view.innerHTML = html + pager(d.page, d.pages, hrefFor) + readOnlyNote;
+    }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
+  }
 
-  data[forumState.categoryId].unshift(thread);
-  saveForumData(data);
-  forumNav('thread', thread.id);
-}
+  /* ── One topic ───────────────────────────────────────────────────── */
 
-function submitReply() {
-  const body = document.getElementById('replyBody').value.trim();
-  const user = getUser();
-  if (!body || !user) return;
+  function renderThread(view, id, page) {
+    api('/api/forum/thread?id=' + encodeURIComponent(id) + '&page=' + page).then(function (r) {
+      if (!r.ok) {
+        crumbs([{ text: 'Not found' }]);
+        document.title = 'Topic | PhantomACE';
+        return failed(view, r.status === 404 ? 'That topic is not here. It may have been removed.' : (r.data.error || 'The forum is unavailable right now.'));
+      }
+      var d = r.data, t = d.thread, authors = d.authors || {};
+      document.title = t.title + ' | PhantomACE';
+      crumbs([{ text: t.categoryName, href: '/community?c=' + encodeURIComponent(t.categoryId) }, { text: t.title }]);
+      var hrefFor = function (p) { return '/thread/' + encodeURIComponent(id) + (p > 1 ? '?page=' + p : ''); };
 
-  const data = getForumData();
-  const threads = data[forumState.categoryId] || [];
-  const thread = threads.find(t => t.id === forumState.threadId);
-  if (!thread) return;
+      var html = '<div class="forum-thread-view">';
+      html += '<div class="forum-topic-head">' +
+        (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
+        (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
+        '<h2 class="forum-post-title">' + esc(t.title) + '</h2></div>';
 
-  if (!thread.replies) thread.replies = [];
-  thread.replies.push({
-    id: 'r_' + Date.now(),
-    body,
-    author: user,
-    created: Date.now(),
+      html += d.posts.map(function (p, i) {
+        var op = d.page === 1 && i === 0;
+        if (p.deleted) {
+          return '<div class="card forum-post forum-post-tombstone">' +
+            '<div class="forum-post-header">' + authorLine(authors, p.userId) +
+              '<span class="forum-post-time">' + timeAgo(p.createdAt) + '</span></div>' +
+            '<div class="forum-post-body forum-post-removed">' +
+              (p.deleted === 'moderator' ? 'Removed by a moderator.' : 'Removed by the author.') + '</div>' +
+          '</div>';
+        }
+        return '<div class="card forum-post' + (op ? ' forum-post-op' : '') + '">' +
+          '<div class="forum-post-header">' + authorLine(authors, p.userId) +
+            '<span class="forum-post-time">' + timeAgo(p.createdAt) +
+              (p.editedAt ? ' <span class="forum-post-edited">(edited)</span>' : '') + '</span></div>' +
+          '<div class="forum-post-body">' + esc(p.body).replace(/\n/g, '<br>') + '</div>' +
+        '</div>';
+      }).join('');
+
+      html += pager(d.page, d.pages, hrefFor);
+      html += t.locked
+        ? '<div class="forum-readonly-note">This topic is locked.</div>'
+        : readOnlyNote;
+      view.innerHTML = html + '</div>';
+    }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
+  }
+
+  /* ── Which page am I ─────────────────────────────────────────────── */
+
+  /* A card with data-href goes where its title link goes when the click
+     lands anywhere else on it. A click on a real link inside — the title,
+     an author — is that link's own business. */
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (e.target.closest('a, button, input, textarea')) return;
+    var card = e.target.closest('[data-href]');
+    if (card) location.href = card.getAttribute('data-href');
   });
-  thread.lastActivity = Date.now();
-  saveForumData(data);
-  renderForum();
-}
 
-function promptLogin() {
-  const name = prompt('Enter a display name to participate in the forums:');
-  if (name && name.trim()) {
-    localStorage.setItem('pa_forum_user', name.trim());
-    renderForum();
-  }
-}
+  document.addEventListener('DOMContentLoaded', function () {
+    var q = new URLSearchParams(location.search);
+    var page = Math.max(1, parseInt(q.get('page') || '1', 10) || 1);
 
-document.addEventListener('DOMContentLoaded', () => {
-  renderForum();
-});
+    var threadView = document.getElementById('threadView');
+    if (threadView) {
+      var m = location.pathname.match(/^\/thread\/([1-9][0-9]{0,17})\/?$/);
+      var id = m ? m[1] : q.get('id');
+      if (!id) { crumbs([{ text: 'Not found' }]); return failed(threadView, 'No topic was asked for.'); }
+      return renderThread(threadView, id, page);
+    }
+
+    var view = document.getElementById('forumView');
+    if (!view) return;
+    var c = (q.get('c') || '').toLowerCase();
+    if (c) renderBoard(view, c, page); else renderHome(view);
+  });
+})();

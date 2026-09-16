@@ -15,7 +15,10 @@ You are the specialist agent for the community forums and chat system on the Pha
 
 ## Your Scope
 You own these files exclusively:
-- `community.html` — Forums page shell
+- `community.html` — Forums page shell (boards, and one board's topics via `?c=`)
+- `thread.html` — one topic, served at `/thread/<id>` by a rewrite in `server/static.js`
+- `functions/api/forum/` — the forum routes, `queries.js` and `authors.js`
+- `server/sql/006_forum.sql` — the forum schema; `server/scripts/test-forum-*.js` — its tests
 - `community-leaderboards.html` — Community leaderboards page
 - `community-stats.html` — Community stats page
 - `css/pages/community.css` — Forum & community styles

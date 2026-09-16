@@ -203,6 +203,14 @@ export function createStatic(root) {
       return { kind: 'file', relPath: 'profile.html' };
     }
 
+    /* /thread/<id> — a forum topic, served from thread.html on exactly the
+       same terms: the page is real, the number is not a path, and a
+       missing topic serves the page, which then says so. */
+    if (segments.length === 2 && segments[0] === 'thread' &&
+        /^[1-9][0-9]{0,17}$/.test(segments[1]) && exists('thread.html')) {
+      return { kind: 'file', relPath: 'thread.html' };
+    }
+
     if (!isAllowed(segments)) return { kind: 'notfound' };
 
     const rel = segments.join('/');
