@@ -49,6 +49,14 @@
     .create-btn:hover:not(:disabled) { background: #cc0000; }
     .create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .create-error { font-size: 11px; color: #ff0000; min-height: 14px; text-align: center; }
+    .resume-banner { width: 100%; max-width: 360px; border: 1px solid #98090a; padding: 14px 16px; margin-bottom: 18px; text-align: center; }
+    .resume-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #ff0000; margin-bottom: 6px; }
+    .resume-code { font-size: 28px; font-weight: bold; letter-spacing: 0.2em; color: #ff0000; line-height: 1; }
+    .resume-meta { font-size: 11px; color: #aaa; margin: 6px 0 12px; }
+    .resume-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .resume-actions .create-btn { width: auto; padding: 8px 16px; }
+    .resume-end-btn { background: none; border: 1px solid #333; color: #aaa; font-size: 11px; padding: 8px 14px; cursor: pointer; font-family: inherit; }
+    .resume-end-btn:hover { border-color: #ff0000; color: #ff0000; }
 
     /* ── HOST PANEL HEADER ───────────────── */
     .host-header {
@@ -177,6 +185,20 @@
     <p class="host-subtitle">Moderator Control Panel</p>
 
     <p class="gate-msg" id="gateMsg" hidden></p>
+
+    <!-- A game the server says is still running. Shown before the create
+         form so a host who refreshed, changed device, or lost the tab can
+         get back in — or any moderator can end a game whose host is gone. -->
+    <div class="resume-banner" id="resumeBanner" hidden>
+      <div class="resume-label">Game in progress</div>
+      <div class="resume-code" id="resumeCode"></div>
+      <div class="resume-meta" id="resumeMeta"></div>
+      <div class="resume-actions">
+        <button class="create-btn" id="resumeBtn" onclick="resumeGame()">Resume as host</button>
+        <button class="resume-end-btn" id="resumeEndBtn" onclick="endInProgress()">End this game</button>
+      </div>
+      <div class="create-error" id="resumeError"></div>
+    </div>
 
     <form class="create-form" id="createForm" hidden onsubmit="return false;">
       <div class="form-row">
@@ -322,9 +344,96 @@
         document.getElementById('createForm').hidden = false;
         document.getElementById('codeInput').value = generateCode();
         if (data.sets.length) onSetChange();
+        checkInProgress();
       } catch {
         document.getElementById('gateMsg').hidden = false;
         document.getElementById('gateMsg').textContent = 'Could not reach the server. Try reloading.';
+      }
+    }
+
+    /* ── Getting back into a game ──────────────
+       The host page used to hold the room code only in memory: a refresh,
+       a crashed tab, or a second device meant the game was orphaned —
+       still running for every player, unreachable by every moderator.
+
+       Two ways back. The server's own pointer (state?current=1) names the
+       game the overlay is showing, which is the one that matters on
+       stream. If that is gone or ended, the last code THIS browser
+       hosted is tried, for a host who started a second game and wants
+       the first. Either way it is offered, not auto-resumed: a moderator
+       opening the panel to start a NEW game should not be dropped into
+       somebody else's. */
+    const HOST_ROOM_KEY = 'mtgbbb_host_room';
+    let resumable = null;
+
+    async function fetchRoom(query) {
+      try {
+        const res = await fetch('/api/mtgbbb/state?' + query, { credentials: 'same-origin' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data && data.status && data.status !== 'ended' ? data : null;
+      } catch { return null; }
+    }
+
+    async function checkInProgress() {
+      let room = await fetchRoom('current=1');
+      if (!room) {
+        let last = null;
+        try { last = localStorage.getItem(HOST_ROOM_KEY); } catch {}
+        if (last) room = await fetchRoom('code=' + encodeURIComponent(last));
+      }
+      resumable = room;
+      const banner = document.getElementById('resumeBanner');
+      if (!room) { banner.hidden = true; return; }
+      document.getElementById('resumeCode').textContent = room.code;
+      document.getElementById('resumeMeta').textContent =
+        `${room.setName} · ${room.playerCount} ${room.playerCount === 1 ? 'player' : 'players'} · ` +
+        `${room.packsOpened} / ${room.packCount} packs` + (room.hostName ? ` · opened by ${room.hostName}` : '');
+      document.getElementById('resumeError').textContent = '';
+      banner.hidden = false;
+    }
+
+    function rememberRoom(code) {
+      try { localStorage.setItem(HOST_ROOM_KEY, code); } catch {}
+    }
+    function forgetRoom() {
+      try { localStorage.removeItem(HOST_ROOM_KEY); } catch {}
+    }
+
+    async function resumeGame() {
+      if (!resumable) return;
+      roomCode = resumable.code;
+      roomTreatments = resumable.treatments;
+      roomPool = resumable.pool;
+      rememberRoom(roomCode);
+      document.getElementById('codeDisplay').textContent = roomCode;
+      document.getElementById('setNameStat').textContent = resumable.setName;
+      showScreen('hostScreen');
+      await hostPoll();
+      if (hostPollTimer) clearInterval(hostPollTimer);
+      hostPollTimer = setInterval(hostPoll, 2000);
+    }
+
+    /* Ending from the banner is ending without ever entering the host
+       screen — for the moderator cleaning up after a host who vanished. */
+    async function endInProgress() {
+      if (!resumable) return;
+      if (!confirm(`End game ${resumable.code} and settle final standings?`)) return;
+      const btn = document.getElementById('resumeEndBtn');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/mtgbbb/end', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ code: resumable.code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { document.getElementById('resumeError').textContent = data.error || 'Could not end it.'; return; }
+        roomCode = resumable.code;
+        showResults({ standings: data.standings, status: 'ended' });
+      } catch {
+        document.getElementById('resumeError').textContent = 'Network error — try again.';
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -403,6 +512,7 @@
 
         roomCode = body.code;
         roomTreatments = data.treatments;
+        rememberRoom(roomCode);
         document.getElementById('codeDisplay').textContent = roomCode;
         document.getElementById('setNameStat').textContent = data.setName;
         showScreen('hostScreen');
@@ -575,6 +685,7 @@
 
     function showResults(data) {
       if (hostPollTimer) { clearInterval(hostPollTimer); hostPollTimer = null; }
+      forgetRoom();
       const standings = data.standings || [];
       document.getElementById('resultsSub').textContent = `${standings.length} players`;
 
