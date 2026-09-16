@@ -52,6 +52,20 @@ const cat = JSON.parse(fs.readFileSync(CATALOG, 'utf8'));
   }
   ok('floor is a basic category', cat.categories.floor && cat.categories.floor.tier === 'basic');
   ok('wall is a basic category', cat.categories.wall && cat.categories.wall.tier === 'basic');
+
+  /* Every category says which surface it belongs on: the top-down room,
+     the front-on desk setup, or both. A piece with no surface could be
+     placed anywhere, which is the "keyboard lying on the floor" problem
+     the second surface exists to prevent. */
+  for (const [name, c] of Object.entries(cat.categories)) {
+    ok(`category ${name} has a surface`, ['room', 'desk', 'both'].includes(c.surface), c.surface);
+  }
+  check('floor is room-only', cat.categories.floor.surface, 'room');
+  check('walls are room-only', cat.categories.wall.surface, 'room');
+  check('keyboards are desk-only', cat.categories.keyboards.surface, 'desk');
+  check('monitors are desk-only', cat.categories.monitors.surface, 'desk');
+  ok('some categories go on the room', Object.values(cat.categories).some(c => c.surface === 'room'));
+  ok('some categories go on the desk', Object.values(cat.categories).some(c => c.surface === 'desk'));
 }
 
 /* ── Pieces ──────────────────────────────────────────────────────────── */

@@ -123,6 +123,34 @@ display name + "'s Room", generated, never typed.
 may overhang an edge by up to half its size), every id in the catalog, every
 id in a category the owner has (§4).
 
+### 3a. The desk setup — a second surface
+
+About half the pack is not drawn top-down. Keyboards, monitors, PC towers,
+consoles, snacks and smart devices are drawn **front-on**, as you would see
+them sitting at the desk; placed on a top-down floor they look like they fell
+over. So each room has **two surfaces**, edited in two tabs of the same
+editor and shown together on the profile:
+
+| surface | view | what goes on it | canvas |
+|---|---|---|---|
+| **Room** | top-down | floor, walls, desks, chairs, sofas, rugs, plants, shelves, decor, studio lights | S/M/L grid, §3 |
+| **Setup** | front-on, the desk as you sit at it | keyboards, monitors, PC towers, consoles, snacks, smart devices, streaming gear, LED strips, neon signs, posters | fixed **1024 × 576**: the room's back-wall tile repeated behind, a desk surface across the lower third |
+
+Every category in the catalog carries a **`surface`**: `room`, `desk`, or
+`both` for the few that read fine either way (posters, neon, LED strips,
+plants, decor). The palette shows only the current tab's categories, and the
+validator refuses a piece on the wrong surface the same way it refuses one
+that is not owned.
+
+The setup uses the same prop record, snap (32 px), scale steps, flip, order
+and controls as the room — it is the same editor pointed at a different
+canvas. Its own cap: **40 props**. On the profile it sits under the room as a
+second panel; a room with no setup shows the room alone.
+
+*Assumption:* the split above is my reading of the sheets; the ones I would
+double-check with you are streaming gear (mics and cameras — desk, I think)
+and LED strips (both). Move any category and it is one line in the catalog.
+
 ---
 
 ## 4. Who has what
@@ -162,7 +190,8 @@ and registry entry `{ prefix: 'rooms_', table: 'rooms', expiry: 'none' }`
   "rooms": [
     { "size": "M", "floor": "f01", "cells": { "3,4": "f12" },
       "walls": { "back": ["w03","w03"], "left": ["w03"], "right": ["w03"] },
-      "props": [ { "id": "desk07", "x": 224, "y": 128, "scale": 1, "flip": false } ],
+      "props": [ { "id": "desks-r1c1", "x": 224, "y": 128, "scale": 1, "flip": false } ],
+      "setup": { "props": [ { "id": "monitors-r2c3", "x": 320, "y": 192, "scale": 1, "flip": false } ] },
       "updatedAt": 1758000000000 }
   ] }
 ```
@@ -258,6 +287,7 @@ Each step names its gate.
 | 13 | Rooms per person | One, **more via `room-slot` rewards**; one public at a time. |
 | 14 | Editor | **Dedicated page**, `/room/edit`. |
 | 15 | Other packs | **After everything else**; catalog carries `pack` from day one. |
+| 16 | Front-on pieces | **A second surface per room, the desk setup** (§3a): fixed 1024×576, 40 props, its own editor tab and profile panel. Every category carries a `surface`. *(Category split my reading.)* |
 
 Three items above are marked as my proposals filling gaps in the answers: the
 S and M sizes, the basic/unlockable split, and the 32 px snap. Overrule any of

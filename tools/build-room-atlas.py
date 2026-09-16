@@ -49,34 +49,37 @@ ALPHA_MIN = 16          # below this a pixel is halo, not piece
 MIN_PIECE = 24          # blobs smaller than this on either axis are noise (smallest real piece is 32)
 CELL = 128
 
-# sheet number -> (category slug, layer, tier, overrides)
-#   dilate: px of growth before labelling, so a chair's legs join its seat.
-#           Lower it where separate pieces sit close together.
-#   alpha:  a higher threshold separates pieces joined only by a glow.
+# sheet number -> (category slug, layer, tier, surface, overrides)
+#   surface: 'room' for pieces drawn top-down, 'desk' for the ones drawn
+#            front-on (a keyboard on a top-down floor looks fallen over),
+#            'both' for the few that read either way. See ROOM-PLAN §3a.
+#   dilate:  px of growth before labelling, so a chair's legs join its seat.
+#            Lower it where separate pieces sit close together.
+#   alpha:   a higher threshold separates pieces joined only by a glow.
 SHEETS = {
-    1:  ('floor',         'floor', 'basic',  {}),
-    2:  ('wall',          'wall',  'basic',  {}),
-    3:  ('desks',         'prop',  'basic',  {}),
-    4:  ('pc-towers',     'prop',  'unlock', {}),
-    5:  ('keyboards',     'prop',  'unlock', {}),
-    6:  ('chairs',        'prop',  'basic',  {}),
-    7:  ('monitors',      'prop',  'unlock', {}),
+    1:  ('floor',         'floor', 'basic',  'room', {}),
+    2:  ('wall',          'wall',  'basic',  'room', {}),
+    3:  ('desks',         'prop',  'basic',  'room', {}),
+    4:  ('pc-towers',     'prop',  'unlock', 'desk', {}),
+    5:  ('keyboards',     'prop',  'unlock', 'desk', {}),
+    6:  ('chairs',        'prop',  'basic',  'room', {}),
+    7:  ('monitors',      'prop',  'unlock', 'desk', {}),
     # The two long rows are nine coloured strips drawn touching end to end;
     # there is no gap to find, so a blob that wide is cut into nine.
-    8:  ('led-strips',    'prop',  'unlock', {'dilate': 1, 'alpha': 48, 'split_wide': (600, 9)}),
-    9:  ('streaming',     'prop',  'unlock', {}),
+    8:  ('led-strips',    'prop',  'unlock', 'both', {'dilate': 1, 'alpha': 48, 'split_wide': (600, 9)}),
+    9:  ('streaming',     'prop',  'unlock', 'desk', {}),
     # Two corner shelves are drawn stacked and touching; cut the tall one in two.
-    10: ('shelves',       'prop',  'basic',  {'split_tall': (280, 2)}),
-    11: ('neon',          'prop',  'unlock', {}),
-    12: ('sofas',         'prop',  'basic',  {}),
-    13: ('snacks',        'prop',  'unlock', {'dilate': 1, 'alpha': 48}),
-    14: ('consoles',      'prop',  'unlock', {}),
-    15: ('posters',       'prop',  'unlock', {'dilate': 1, 'alpha': 48}),
-    16: ('rugs',          'rug',   'basic',  {}),
-    17: ('plants',        'prop',  'basic',  {}),
-    18: ('smart',         'prop',  'unlock', {}),
-    19: ('studio-lights', 'prop',  'unlock', {}),
-    20: ('decor',         'prop',  'basic',  {}),
+    10: ('shelves',       'prop',  'basic',  'room', {'split_tall': (280, 2)}),
+    11: ('neon',          'prop',  'unlock', 'both', {}),
+    12: ('sofas',         'prop',  'basic',  'room', {}),
+    13: ('snacks',        'prop',  'unlock', 'desk', {'dilate': 1, 'alpha': 48}),
+    14: ('consoles',      'prop',  'unlock', 'desk', {}),
+    15: ('posters',       'prop',  'unlock', 'both', {'dilate': 1, 'alpha': 48}),
+    16: ('rugs',          'rug',   'basic',  'room', {}),
+    17: ('plants',        'prop',  'basic',  'both', {}),
+    18: ('smart',         'prop',  'unlock', 'desk', {}),
+    19: ('studio-lights', 'prop',  'unlock', 'room', {}),
+    20: ('decor',         'prop',  'basic',  'both', {}),
 }
 DEFAULT_DILATE = 5
 
@@ -253,7 +256,7 @@ def main():
         REVIEW.mkdir(parents=True, exist_ok=True)
 
     for n in sorted(SHEETS):
-        category, layer, tier, ov = SHEETS[n]
+        category, layer, tier, surface, ov = SHEETS[n]
         img = Image.open(sheets[n]).convert('RGBA')
         boxes = find_pieces(img, ov.get('dilate', DEFAULT_DILATE), ov.get('alpha', ALPHA_MIN))
         if 'split_wide' in ov:
@@ -270,7 +273,7 @@ def main():
                 piece = wall_tile(piece)
             pid = f'{category}-r{row}c{col}'
             entry = {'id': pid, 'pack': PACK, 'category': category, 'layer': layer,
-                     'tier': tier, 'w': piece.width, 'h': piece.height}
+                     'tier': tier, 'surface': surface, 'w': piece.width, 'h': piece.height}
             entries.append(entry)
             images.append(piece)
             if not dry:
@@ -289,7 +292,8 @@ def main():
         OUT_CATALOG.parent.mkdir(parents=True, exist_ok=True)
         OUT_CATALOG.write_text(json.dumps({
             'v': 1, 'cell': CELL, 'packs': {PACK: 'Gaming Room Interiors MegaPack'},
-            'categories': {c: {'layer': SHEETS[n][1], 'tier': SHEETS[n][2]} for n, (c, *_r) in SHEETS.items()},
+            'categories': {c: {'layer': layer, 'tier': tier, 'surface': surface}
+                           for (c, layer, tier, surface, _ov) in SHEETS.values()},
             'pieces': catalog,
         }, indent=1) + '\n', encoding='utf-8')
         total_kb = sum(p.stat().st_size for p in OUT_PIECES.rglob('*.png')) // 1024

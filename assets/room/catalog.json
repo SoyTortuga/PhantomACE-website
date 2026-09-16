@@ -7,83 +7,103 @@
  "categories": {
   "floor": {
    "layer": "floor",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "wall": {
    "layer": "wall",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "desks": {
    "layer": "prop",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "pc-towers": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "keyboards": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "chairs": {
    "layer": "prop",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "monitors": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "led-strips": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "both"
   },
   "streaming": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "shelves": {
    "layer": "prop",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "neon": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "both"
   },
   "sofas": {
    "layer": "prop",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "snacks": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "consoles": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "posters": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "both"
   },
   "rugs": {
    "layer": "rug",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "room"
   },
   "plants": {
    "layer": "prop",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "both"
   },
   "smart": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "desk"
   },
   "studio-lights": {
    "layer": "prop",
-   "tier": "unlock"
+   "tier": "unlock",
+   "surface": "room"
   },
   "decor": {
    "layer": "prop",
-   "tier": "basic"
+   "tier": "basic",
+   "surface": "both"
   }
  },
  "pieces": [
@@ -93,6 +113,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -102,6 +123,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -111,6 +133,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -120,6 +143,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -129,6 +153,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -138,6 +163,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -147,6 +173,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -156,6 +183,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -165,6 +193,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -174,6 +203,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -183,6 +213,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -192,6 +223,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -201,6 +233,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -210,6 +243,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -219,6 +253,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -228,6 +263,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -237,6 +273,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -246,6 +283,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -255,6 +293,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -264,6 +303,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -273,6 +313,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -282,6 +323,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -291,6 +333,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -300,6 +343,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -309,6 +353,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -318,6 +363,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -327,6 +373,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -336,6 +383,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -345,6 +393,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -354,6 +403,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -363,6 +413,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -372,6 +423,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -381,6 +433,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -390,6 +443,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -399,6 +453,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -408,6 +463,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -417,6 +473,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -426,6 +483,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -435,6 +493,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -444,6 +503,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -453,6 +513,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -462,6 +523,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -471,6 +533,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -480,6 +543,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -489,6 +553,7 @@
    "category": "floor",
    "layer": "floor",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 128
   },
@@ -498,6 +563,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -507,6 +573,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -516,6 +583,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -525,6 +593,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -534,6 +603,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -543,6 +613,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -552,6 +623,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -561,6 +633,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -570,6 +643,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -579,6 +653,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -588,6 +663,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -597,6 +673,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -606,6 +683,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -615,6 +693,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -624,6 +703,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -633,6 +713,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -642,6 +723,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -651,6 +733,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -660,6 +743,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -669,6 +753,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -678,6 +763,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -687,6 +773,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -696,6 +783,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -705,6 +793,7 @@
    "category": "wall",
    "layer": "wall",
    "tier": "basic",
+   "surface": "room",
    "w": 128,
    "h": 176
   },
@@ -714,6 +803,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 221,
    "h": 241
   },
@@ -723,6 +813,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 220,
    "h": 242
   },
@@ -732,6 +823,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 218,
    "h": 233
   },
@@ -741,6 +833,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 216,
    "h": 235
   },
@@ -750,6 +843,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 222,
    "h": 235
   },
@@ -759,6 +853,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 216,
    "h": 235
   },
@@ -768,6 +863,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 224,
    "h": 165
   },
@@ -777,6 +873,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 213,
    "h": 163
   },
@@ -786,6 +883,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 202,
    "h": 163
   },
@@ -795,6 +893,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 222,
    "h": 165
   },
@@ -804,6 +903,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 212,
    "h": 165
   },
@@ -813,6 +913,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 216,
    "h": 164
   },
@@ -822,6 +923,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 229,
    "h": 213
   },
@@ -831,6 +933,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 228,
    "h": 215
   },
@@ -840,6 +943,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 225,
    "h": 215
   },
@@ -849,6 +953,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 224,
    "h": 213
   },
@@ -858,6 +963,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 228,
    "h": 215
   },
@@ -867,6 +973,7 @@
    "category": "desks",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 230,
    "h": 210
   },
@@ -876,6 +983,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 136,
    "h": 322
   },
@@ -885,6 +993,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 128,
    "h": 322
   },
@@ -894,6 +1003,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 135,
    "h": 322
   },
@@ -903,6 +1013,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 137,
    "h": 322
   },
@@ -912,6 +1023,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 140,
    "h": 319
   },
@@ -921,6 +1033,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 135,
    "h": 323
   },
@@ -930,6 +1043,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 138,
    "h": 324
   },
@@ -939,6 +1053,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 136,
    "h": 319
   },
@@ -948,6 +1063,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 143,
    "h": 285
   },
@@ -957,6 +1073,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 142,
    "h": 284
   },
@@ -966,6 +1083,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 143,
    "h": 284
   },
@@ -975,6 +1093,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 150,
    "h": 285
   },
@@ -984,6 +1103,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 155,
    "h": 284
   },
@@ -993,6 +1113,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 150,
    "h": 284
   },
@@ -1002,6 +1123,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 153,
    "h": 284
   },
@@ -1011,6 +1133,7 @@
    "category": "pc-towers",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 152,
    "h": 284
   },
@@ -1020,6 +1143,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 243,
    "h": 125
   },
@@ -1029,6 +1153,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 229,
    "h": 124
   },
@@ -1038,6 +1163,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 216,
    "h": 124
   },
@@ -1047,6 +1173,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 221,
    "h": 125
   },
@@ -1056,6 +1183,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 218,
    "h": 124
   },
@@ -1065,6 +1193,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 222,
    "h": 124
   },
@@ -1074,6 +1203,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 240,
    "h": 127
   },
@@ -1083,6 +1213,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 223,
    "h": 126
   },
@@ -1092,6 +1223,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 220,
    "h": 126
   },
@@ -1101,6 +1233,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 224,
    "h": 126
   },
@@ -1110,6 +1243,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 220,
    "h": 126
   },
@@ -1119,6 +1253,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 223,
    "h": 126
   },
@@ -1128,6 +1263,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 242,
    "h": 117
   },
@@ -1137,6 +1273,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 225,
    "h": 117
   },
@@ -1146,6 +1283,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 220,
    "h": 117
   },
@@ -1155,6 +1293,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 230,
    "h": 116
   },
@@ -1164,6 +1303,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 221,
    "h": 116
   },
@@ -1173,6 +1313,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 224,
    "h": 116
   },
@@ -1182,6 +1323,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 243,
    "h": 130
   },
@@ -1191,6 +1333,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 225,
    "h": 130
   },
@@ -1200,6 +1343,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 221,
    "h": 127
   },
@@ -1209,6 +1353,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 228,
    "h": 128
   },
@@ -1218,6 +1363,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 224,
    "h": 127
   },
@@ -1227,6 +1373,7 @@
    "category": "keyboards",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 225,
    "h": 127
   },
@@ -1236,6 +1383,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 144,
    "h": 179
   },
@@ -1245,6 +1393,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 141,
    "h": 180
   },
@@ -1254,6 +1403,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 142,
    "h": 179
   },
@@ -1263,6 +1413,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 142,
    "h": 180
   },
@@ -1272,6 +1423,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 144,
    "h": 180
   },
@@ -1281,6 +1433,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 143,
    "h": 180
   },
@@ -1290,6 +1443,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 141,
    "h": 179
   },
@@ -1299,6 +1453,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 144,
    "h": 180
   },
@@ -1308,6 +1463,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 137,
    "h": 179
   },
@@ -1317,6 +1473,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 141,
    "h": 180
   },
@@ -1326,6 +1483,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 138,
    "h": 180
   },
@@ -1335,6 +1493,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 140,
    "h": 179
   },
@@ -1344,6 +1503,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 141,
    "h": 179
   },
@@ -1353,6 +1513,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 141,
    "h": 180
   },
@@ -1362,6 +1523,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 180
   },
@@ -1371,6 +1533,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 141,
    "h": 180
   },
@@ -1380,6 +1543,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 138,
    "h": 178
   },
@@ -1389,6 +1553,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 177
   },
@@ -1398,6 +1563,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 140,
    "h": 178
   },
@@ -1407,6 +1573,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 178
   },
@@ -1416,6 +1583,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 138,
    "h": 178
   },
@@ -1425,6 +1593,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 178
   },
@@ -1434,6 +1603,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 138,
    "h": 178
   },
@@ -1443,6 +1613,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 177
   },
@@ -1452,6 +1623,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 138,
    "h": 178
   },
@@ -1461,6 +1633,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 140,
    "h": 178
   },
@@ -1470,6 +1643,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 178
   },
@@ -1479,6 +1653,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 178
   },
@@ -1488,6 +1663,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 178
   },
@@ -1497,6 +1673,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 178
   },
@@ -1506,6 +1683,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 137,
    "h": 182
   },
@@ -1515,6 +1693,7 @@
    "category": "chairs",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 140,
    "h": 178
   },
@@ -1524,6 +1703,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 179,
    "h": 183
   },
@@ -1533,6 +1713,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 211,
    "h": 178
   },
@@ -1542,6 +1723,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 172,
    "h": 220
   },
@@ -1551,6 +1733,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 226,
    "h": 178
   },
@@ -1560,6 +1743,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 226,
    "h": 184
   },
@@ -1569,6 +1753,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 206,
    "h": 212
   },
@@ -1578,6 +1763,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 232,
    "h": 168
   },
@@ -1587,6 +1773,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 188,
    "h": 188
   },
@@ -1596,6 +1783,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 268,
    "h": 158
   },
@@ -1605,6 +1793,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 268,
    "h": 168
   },
@@ -1614,6 +1803,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 328,
    "h": 173
   },
@@ -1623,6 +1813,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 203,
    "h": 191
   },
@@ -1632,6 +1823,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 304,
    "h": 165
   },
@@ -1641,6 +1833,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 243,
    "h": 198
   },
@@ -1650,6 +1843,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 237,
    "h": 190
   },
@@ -1659,6 +1853,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 297,
    "h": 192
   },
@@ -1668,6 +1863,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 225,
    "h": 168
   },
@@ -1677,6 +1873,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 256,
    "h": 158
   },
@@ -1686,6 +1883,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 299,
    "h": 158
   },
@@ -1695,6 +1893,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 259,
    "h": 181
   },
@@ -1704,6 +1903,7 @@
    "category": "monitors",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 307,
    "h": 181
   },
@@ -1713,6 +1913,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 142,
    "h": 140
   },
@@ -1722,6 +1923,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 139,
    "h": 140
   },
@@ -1731,6 +1933,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 140,
    "h": 140
   },
@@ -1740,6 +1943,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 140,
    "h": 140
   },
@@ -1749,6 +1953,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 141,
    "h": 140
   },
@@ -1758,6 +1963,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 141,
    "h": 140
   },
@@ -1767,6 +1973,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 142,
    "h": 140
   },
@@ -1776,6 +1983,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 142,
    "h": 140
   },
@@ -1785,6 +1993,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 146,
    "h": 141
   },
@@ -1794,6 +2003,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 34
   },
@@ -1803,6 +2013,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 32
   },
@@ -1812,6 +2023,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1821,6 +2033,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1830,6 +2043,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 32
   },
@@ -1839,6 +2053,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1848,6 +2063,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1857,6 +2073,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 32
   },
@@ -1866,6 +2083,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 36
   },
@@ -1875,6 +2093,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 34
   },
@@ -1884,6 +2103,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 32
   },
@@ -1893,6 +2113,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1902,6 +2123,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1911,6 +2133,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 32
   },
@@ -1920,6 +2143,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 32
   },
@@ -1929,6 +2153,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 33
   },
@@ -1938,6 +2163,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 33
   },
@@ -1947,6 +2173,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 36
   },
@@ -1956,6 +2183,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 87,
    "h": 62
   },
@@ -1965,6 +2193,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 86,
    "h": 62
   },
@@ -1974,6 +2203,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 86,
    "h": 62
   },
@@ -1983,6 +2213,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 87,
    "h": 62
   },
@@ -1992,6 +2223,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 88,
    "h": 62
   },
@@ -2001,6 +2233,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 90,
    "h": 62
   },
@@ -2010,6 +2243,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 87,
    "h": 62
   },
@@ -2019,6 +2253,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 86,
    "h": 62
   },
@@ -2028,6 +2263,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 87,
    "h": 62
   },
@@ -2037,6 +2273,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 89,
    "h": 62
   },
@@ -2046,6 +2283,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 99,
    "h": 63
   },
@@ -2055,6 +2293,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 99,
    "h": 63
   },
@@ -2064,6 +2303,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 100,
    "h": 63
   },
@@ -2073,6 +2313,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 99,
    "h": 63
   },
@@ -2082,6 +2323,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 100,
    "h": 63
   },
@@ -2091,6 +2333,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 100,
    "h": 63
   },
@@ -2100,6 +2343,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 100,
    "h": 63
   },
@@ -2109,6 +2353,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 98,
    "h": 63
   },
@@ -2118,6 +2363,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 99,
    "h": 63
   },
@@ -2127,6 +2373,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 100,
    "h": 63
   },
@@ -2136,6 +2383,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2145,6 +2393,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2154,6 +2403,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 76,
    "h": 76
   },
@@ -2163,6 +2413,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2172,6 +2423,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 76,
    "h": 76
   },
@@ -2181,6 +2433,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2190,6 +2443,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2199,6 +2453,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2208,6 +2463,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2217,6 +2473,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 75,
    "h": 76
   },
@@ -2226,6 +2483,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 59,
    "h": 123
   },
@@ -2235,6 +2493,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 33,
    "h": 120
   },
@@ -2244,6 +2503,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 34,
    "h": 113
   },
@@ -2253,6 +2513,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 66,
    "h": 100
   },
@@ -2262,6 +2523,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 93,
    "h": 122
   },
@@ -2271,6 +2533,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 53,
    "h": 107
   },
@@ -2280,6 +2543,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 40,
    "h": 77
   },
@@ -2289,6 +2553,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 203,
    "h": 65
   },
@@ -2298,6 +2563,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 112,
    "h": 181
   },
@@ -2307,6 +2573,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 111,
    "h": 181
   },
@@ -2316,6 +2583,7 @@
    "category": "led-strips",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 203,
    "h": 91
   },
@@ -2325,6 +2593,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 94,
    "h": 202
   },
@@ -2334,6 +2603,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 196
   },
@@ -2343,6 +2613,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 93,
    "h": 196
   },
@@ -2352,6 +2623,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 75,
    "h": 196
   },
@@ -2361,6 +2633,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 100,
    "h": 195
   },
@@ -2370,6 +2643,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 79,
    "h": 185
   },
@@ -2379,6 +2653,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 211,
    "h": 179
   },
@@ -2388,6 +2663,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 103,
    "h": 177
   },
@@ -2397,6 +2673,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 147,
    "h": 205
   },
@@ -2406,6 +2683,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 128,
    "h": 84
   },
@@ -2415,6 +2693,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 133,
    "h": 89
   },
@@ -2424,6 +2703,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 117,
    "h": 119
   },
@@ -2433,6 +2713,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 115,
    "h": 139
   },
@@ -2442,6 +2723,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 161,
    "h": 115
   },
@@ -2451,6 +2733,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 151,
    "h": 113
   },
@@ -2460,6 +2743,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 154,
    "h": 96
   },
@@ -2469,6 +2753,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 189,
    "h": 157
   },
@@ -2478,6 +2763,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 101,
    "h": 159
   },
@@ -2487,6 +2773,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 124,
    "h": 147
   },
@@ -2496,6 +2783,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 96,
    "h": 170
   },
@@ -2505,6 +2793,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 103,
    "h": 192
   },
@@ -2514,6 +2803,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 161,
    "h": 137
   },
@@ -2523,6 +2813,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 156,
    "h": 167
   },
@@ -2532,6 +2823,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 142,
    "h": 153
   },
@@ -2541,6 +2833,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 174,
    "h": 145
   },
@@ -2550,6 +2843,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 141,
    "h": 146
   },
@@ -2559,6 +2853,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 163,
    "h": 91
   },
@@ -2568,6 +2863,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 140,
    "h": 146
   },
@@ -2577,6 +2873,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 120,
    "h": 103
   },
@@ -2586,6 +2883,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 154,
    "h": 106
   },
@@ -2595,6 +2893,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 162,
    "h": 145
   },
@@ -2604,6 +2903,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 178,
    "h": 86
   },
@@ -2613,6 +2913,7 @@
    "category": "streaming",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 123,
    "h": 136
   },
@@ -2622,6 +2923,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 302,
    "h": 143
   },
@@ -2631,6 +2933,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 261,
    "h": 118
   },
@@ -2640,6 +2943,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 276,
    "h": 136
   },
@@ -2649,6 +2953,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 246,
    "h": 130
   },
@@ -2658,6 +2963,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 185,
    "h": 156
   },
@@ -2667,6 +2973,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 294,
    "h": 143
   },
@@ -2676,6 +2983,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 229,
    "h": 124
   },
@@ -2685,6 +2993,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 251,
    "h": 126
   },
@@ -2694,6 +3003,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 270,
    "h": 120
   },
@@ -2703,6 +3013,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 185,
    "h": 155
   },
@@ -2712,6 +3023,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 138,
    "h": 134
   },
@@ -2721,6 +3033,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 245,
    "h": 166
   },
@@ -2730,6 +3043,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 240,
    "h": 133
   },
@@ -2739,6 +3053,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 222,
    "h": 150
   },
@@ -2748,6 +3063,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 240,
    "h": 147
   },
@@ -2757,6 +3073,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 110,
    "h": 172
   },
@@ -2766,6 +3083,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 64,
    "h": 103
   },
@@ -2775,6 +3093,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 68,
    "h": 101
   },
@@ -2784,6 +3103,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 99,
    "h": 69
   },
@@ -2793,6 +3113,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 73,
    "h": 103
   },
@@ -2802,6 +3123,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 154,
    "h": 101
   },
@@ -2811,6 +3133,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 45,
    "h": 112
   },
@@ -2820,6 +3143,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 115,
    "h": 84
   },
@@ -2829,6 +3153,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 74,
    "h": 86
   },
@@ -2838,6 +3163,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 50,
    "h": 111
   },
@@ -2847,6 +3173,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 78,
    "h": 97
   },
@@ -2856,6 +3183,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 61,
    "h": 108
   },
@@ -2865,6 +3193,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 103,
    "h": 153
   },
@@ -2874,6 +3203,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 103,
    "h": 153
   },
@@ -2883,6 +3213,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 111,
    "h": 154
   },
@@ -2892,6 +3223,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 109,
    "h": 153
   },
@@ -2901,6 +3233,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 105,
    "h": 153
   },
@@ -2910,6 +3243,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 108,
    "h": 154
   },
@@ -2919,6 +3253,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 120,
    "h": 178
   },
@@ -2928,6 +3263,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 120,
    "h": 178
   },
@@ -2937,6 +3273,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 118,
    "h": 178
   },
@@ -2946,6 +3283,7 @@
    "category": "shelves",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 119,
    "h": 178
   },
@@ -2955,6 +3293,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 188,
    "h": 124
   },
@@ -2964,6 +3303,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 137,
    "h": 140
   },
@@ -2973,6 +3313,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 182,
    "h": 135
   },
@@ -2982,6 +3323,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 199,
    "h": 132
   },
@@ -2991,6 +3333,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 163,
    "h": 140
   },
@@ -3000,6 +3343,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 139,
    "h": 107
   },
@@ -3009,6 +3353,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 180,
    "h": 129
   },
@@ -3018,6 +3363,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 167
   },
@@ -3027,6 +3373,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 166,
    "h": 116
   },
@@ -3036,6 +3383,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 171,
    "h": 136
   },
@@ -3045,6 +3393,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 188,
    "h": 127
   },
@@ -3054,6 +3403,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 151,
    "h": 139
   },
@@ -3063,6 +3413,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 134,
    "h": 148
   },
@@ -3072,6 +3423,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 132,
    "h": 148
   },
@@ -3081,6 +3433,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 141,
    "h": 139
   },
@@ -3090,6 +3443,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 119,
    "h": 144
   },
@@ -3099,6 +3453,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 102,
    "h": 143
   },
@@ -3108,6 +3463,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 158,
    "h": 154
   },
@@ -3117,6 +3473,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 168,
    "h": 117
   },
@@ -3126,6 +3483,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 145,
    "h": 134
   },
@@ -3135,6 +3493,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 126,
    "h": 140
   },
@@ -3144,6 +3503,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 202,
    "h": 104
   },
@@ -3153,6 +3513,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 127,
    "h": 111
   },
@@ -3162,6 +3523,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 156,
    "h": 118
   },
@@ -3171,6 +3533,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 123,
    "h": 124
   },
@@ -3180,6 +3543,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 126,
    "h": 129
   },
@@ -3189,6 +3553,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 99,
    "h": 144
   },
@@ -3198,6 +3563,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 149,
    "h": 141
   },
@@ -3207,6 +3573,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 215,
    "h": 109
   },
@@ -3216,6 +3583,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 121,
    "h": 124
   },
@@ -3225,6 +3593,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 147,
    "h": 129
   },
@@ -3234,6 +3603,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 120,
    "h": 126
   },
@@ -3243,6 +3613,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 217,
    "h": 95
   },
@@ -3252,6 +3623,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 220,
    "h": 106
   },
@@ -3261,6 +3633,7 @@
    "category": "neon",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 180,
    "h": 110
   },
@@ -3270,6 +3643,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 215,
    "h": 127
   },
@@ -3279,6 +3653,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 229,
    "h": 124
   },
@@ -3288,6 +3663,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 232,
    "h": 125
   },
@@ -3297,6 +3673,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 213,
    "h": 121
   },
@@ -3306,6 +3683,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 203,
    "h": 121
   },
@@ -3315,6 +3693,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 259,
    "h": 123
   },
@@ -3324,6 +3703,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 117,
    "h": 111
   },
@@ -3333,6 +3713,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 116,
    "h": 113
   },
@@ -3342,6 +3723,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 110,
    "h": 115
   },
@@ -3351,6 +3733,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 112,
    "h": 115
   },
@@ -3360,6 +3743,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 112,
    "h": 116
   },
@@ -3369,6 +3753,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 116,
    "h": 114
   },
@@ -3378,6 +3763,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 106,
    "h": 105
   },
@@ -3387,6 +3773,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 107,
    "h": 106
   },
@@ -3396,6 +3783,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 169,
    "h": 118
   },
@@ -3405,6 +3793,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 172,
    "h": 114
   },
@@ -3414,6 +3803,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 175,
    "h": 114
   },
@@ -3423,6 +3813,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 172,
    "h": 112
   },
@@ -3432,6 +3823,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 174,
    "h": 112
   },
@@ -3441,6 +3833,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 134,
    "h": 135
   },
@@ -3450,6 +3843,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 135,
    "h": 129
   },
@@ -3459,6 +3853,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 249,
    "h": 136
   },
@@ -3468,6 +3863,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 232,
    "h": 132
   },
@@ -3477,6 +3873,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 224,
    "h": 132
   },
@@ -3486,6 +3883,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 219,
    "h": 133
   },
@@ -3495,6 +3893,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 211,
    "h": 133
   },
@@ -3504,6 +3903,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 159,
    "h": 144
   },
@@ -3513,6 +3913,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 87,
    "h": 177
   },
@@ -3522,6 +3923,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 197,
    "h": 169
   },
@@ -3531,6 +3933,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 106,
    "h": 162
   },
@@ -3540,6 +3943,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 121,
    "h": 164
   },
@@ -3549,6 +3953,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 139,
    "h": 175
   },
@@ -3558,6 +3963,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 188,
    "h": 172
   },
@@ -3567,6 +3973,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 236,
    "h": 177
   },
@@ -3576,6 +3983,7 @@
    "category": "sofas",
    "layer": "prop",
    "tier": "basic",
+   "surface": "room",
    "w": 152,
    "h": 202
   },
@@ -3585,6 +3993,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 122
   },
@@ -3594,6 +4003,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 122
   },
@@ -3603,6 +4013,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 122
   },
@@ -3612,6 +4023,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 122
   },
@@ -3621,6 +4033,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 122
   },
@@ -3630,6 +4043,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 122
   },
@@ -3639,6 +4053,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 122
   },
@@ -3648,6 +4063,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 122
   },
@@ -3657,6 +4073,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 95,
    "h": 127
   },
@@ -3666,6 +4083,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 94,
    "h": 127
   },
@@ -3675,6 +4093,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 93,
    "h": 126
   },
@@ -3684,6 +4103,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 93,
    "h": 125
   },
@@ -3693,6 +4113,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 97,
    "h": 125
   },
@@ -3702,6 +4123,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 121
   },
@@ -3711,6 +4133,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 120
   },
@@ -3720,6 +4143,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 121
   },
@@ -3729,6 +4153,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 121
   },
@@ -3738,6 +4163,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 120
   },
@@ -3747,6 +4173,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 107,
    "h": 121
   },
@@ -3756,6 +4183,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 108,
    "h": 121
   },
@@ -3765,6 +4193,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 78,
    "h": 126
   },
@@ -3774,6 +4203,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 75,
    "h": 126
   },
@@ -3783,6 +4213,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 75,
    "h": 128
   },
@@ -3792,6 +4223,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 77,
    "h": 126
   },
@@ -3801,6 +4233,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 78,
    "h": 126
   },
@@ -3810,6 +4243,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 79,
    "h": 126
   },
@@ -3819,6 +4253,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 99,
    "h": 127
   },
@@ -3828,6 +4263,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 101,
    "h": 127
   },
@@ -3837,6 +4273,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 101,
    "h": 127
   },
@@ -3846,6 +4283,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 101,
    "h": 127
   },
@@ -3855,6 +4293,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 100,
    "h": 128
   },
@@ -3864,6 +4303,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 80,
    "h": 116
   },
@@ -3873,6 +4313,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 80,
    "h": 116
   },
@@ -3882,6 +4323,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 116
   },
@@ -3891,6 +4333,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 116
   },
@@ -3900,6 +4343,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 116
   },
@@ -3909,6 +4353,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 116
   },
@@ -3918,6 +4363,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 80,
    "h": 115
   },
@@ -3927,6 +4373,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 95,
    "h": 115
   },
@@ -3936,6 +4383,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 125
   },
@@ -3945,6 +4393,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 125
   },
@@ -3954,6 +4403,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 125
   },
@@ -3963,6 +4413,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 125
   },
@@ -3972,6 +4423,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 125
   },
@@ -3981,6 +4433,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 124
   },
@@ -3990,6 +4443,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 80,
    "h": 124
   },
@@ -3999,6 +4453,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 124
   },
@@ -4008,6 +4463,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 124
   },
@@ -4017,6 +4473,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 124
   },
@@ -4026,6 +4483,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 81,
    "h": 122
   },
@@ -4035,6 +4493,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 83,
    "h": 124
   },
@@ -4044,6 +4503,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 82,
    "h": 125
   },
@@ -4053,6 +4513,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 70,
    "h": 133
   },
@@ -4062,6 +4523,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 71,
    "h": 133
   },
@@ -4071,6 +4533,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 71,
    "h": 133
   },
@@ -4080,6 +4543,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 70,
    "h": 133
   },
@@ -4089,6 +4553,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 71,
    "h": 133
   },
@@ -4098,6 +4563,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 70,
    "h": 133
   },
@@ -4107,6 +4573,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 69,
    "h": 133
   },
@@ -4116,6 +4583,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 70,
    "h": 132
   },
@@ -4125,6 +4593,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 71,
    "h": 133
   },
@@ -4134,6 +4603,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 75,
    "h": 138
   },
@@ -4143,6 +4613,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 105,
    "h": 105
   },
@@ -4152,6 +4623,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 103,
    "h": 104
   },
@@ -4161,6 +4633,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 104,
    "h": 104
   },
@@ -4170,6 +4643,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 104,
    "h": 104
   },
@@ -4179,6 +4653,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 90,
    "h": 125
   },
@@ -4188,6 +4663,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 87,
    "h": 124
   },
@@ -4197,6 +4673,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 86,
    "h": 126
   },
@@ -4206,6 +4683,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 85,
    "h": 124
   },
@@ -4215,6 +4693,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 85,
    "h": 123
   },
@@ -4224,6 +4703,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 156,
    "h": 121
   },
@@ -4233,6 +4713,7 @@
    "category": "snacks",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 180,
    "h": 173
   },
@@ -4242,6 +4723,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 169,
    "h": 171
   },
@@ -4251,6 +4733,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 162,
    "h": 166
   },
@@ -4260,6 +4743,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 189,
    "h": 164
   },
@@ -4269,6 +4753,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 211,
    "h": 156
   },
@@ -4278,6 +4763,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 203,
    "h": 155
   },
@@ -4287,6 +4773,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 140,
    "h": 164
   },
@@ -4296,6 +4783,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 103,
    "h": 182
   },
@@ -4305,6 +4793,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 173,
    "h": 87
   },
@@ -4314,6 +4803,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 176,
    "h": 82
   },
@@ -4323,6 +4813,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 171,
    "h": 105
   },
@@ -4332,6 +4823,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 175,
    "h": 108
   },
@@ -4341,6 +4833,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 161,
    "h": 130
   },
@@ -4350,6 +4843,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 162,
    "h": 112
   },
@@ -4359,6 +4853,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 180,
    "h": 70
   },
@@ -4368,6 +4863,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 152,
    "h": 170
   },
@@ -4377,6 +4873,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 176,
    "h": 164
   },
@@ -4386,6 +4883,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 73,
    "h": 192
   },
@@ -4395,6 +4893,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 144,
    "h": 191
   },
@@ -4404,6 +4903,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 160,
    "h": 170
   },
@@ -4413,6 +4913,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 189,
    "h": 160
   },
@@ -4422,6 +4923,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 233,
    "h": 136
   },
@@ -4431,6 +4933,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 171,
    "h": 107
   },
@@ -4440,6 +4943,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 156,
    "h": 114
   },
@@ -4449,6 +4953,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 151,
    "h": 113
   },
@@ -4458,6 +4963,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 165,
    "h": 108
   },
@@ -4467,6 +4973,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 169,
    "h": 109
   },
@@ -4476,6 +4983,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 185,
    "h": 114
   },
@@ -4485,6 +4993,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 172,
    "h": 115
   },
@@ -4494,6 +5003,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 97,
    "h": 144
   },
@@ -4503,6 +5013,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 97,
    "h": 144
   },
@@ -4512,6 +5023,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 185,
    "h": 101
   },
@@ -4521,6 +5033,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 191,
    "h": 99
   },
@@ -4530,6 +5043,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 135,
    "h": 145
   },
@@ -4539,6 +5053,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 146,
    "h": 147
   },
@@ -4548,6 +5063,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 174,
    "h": 99
   },
@@ -4557,6 +5073,7 @@
    "category": "consoles",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 187,
    "h": 102
   },
@@ -4566,6 +5083,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 156,
    "h": 208
   },
@@ -4575,6 +5093,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 164,
    "h": 208
   },
@@ -4584,6 +5103,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 154,
    "h": 208
   },
@@ -4593,6 +5113,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 150,
    "h": 207
   },
@@ -4602,6 +5123,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 153,
    "h": 207
   },
@@ -4611,6 +5133,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 152,
    "h": 207
   },
@@ -4620,6 +5143,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 150,
    "h": 208
   },
@@ -4629,6 +5153,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 162,
    "h": 207
   },
@@ -4638,6 +5163,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 158,
    "h": 205
   },
@@ -4647,6 +5173,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 165,
    "h": 204
   },
@@ -4656,6 +5183,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 154,
    "h": 204
   },
@@ -4665,6 +5193,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 152,
    "h": 204
   },
@@ -4674,6 +5203,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 156,
    "h": 204
   },
@@ -4683,6 +5213,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 155,
    "h": 205
   },
@@ -4692,6 +5223,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 148,
    "h": 204
   },
@@ -4701,6 +5233,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 178,
    "h": 204
   },
@@ -4710,6 +5243,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 153,
    "h": 133
   },
@@ -4719,6 +5253,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 157,
    "h": 134
   },
@@ -4728,6 +5263,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 153,
    "h": 133
   },
@@ -4737,6 +5273,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 152,
    "h": 133
   },
@@ -4746,6 +5283,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 153,
    "h": 133
   },
@@ -4755,6 +5293,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 150,
    "h": 134
   },
@@ -4764,6 +5303,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 146,
    "h": 134
   },
@@ -4773,6 +5313,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 168,
    "h": 134
   },
@@ -4782,6 +5323,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 121,
    "h": 144
   },
@@ -4791,6 +5333,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 127,
    "h": 143
   },
@@ -4800,6 +5343,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 126,
    "h": 143
   },
@@ -4809,6 +5353,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 128,
    "h": 143
   },
@@ -4818,6 +5363,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 186,
    "h": 145
   },
@@ -4827,6 +5373,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 200,
    "h": 146
   },
@@ -4836,6 +5383,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 182,
    "h": 146
   },
@@ -4845,6 +5393,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 263,
    "h": 271
   },
@@ -4854,6 +5403,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 150,
    "h": 112
   },
@@ -4863,6 +5413,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 165,
    "h": 106
   },
@@ -4872,6 +5423,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 155,
    "h": 108
   },
@@ -4881,6 +5433,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 181,
    "h": 110
   },
@@ -4890,6 +5443,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 183,
    "h": 110
   },
@@ -4899,6 +5453,7 @@
    "category": "posters",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "both",
    "w": 170,
    "h": 109
   },
@@ -4908,6 +5463,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 258,
    "h": 164
   },
@@ -4917,6 +5473,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 221,
    "h": 159
   },
@@ -4926,6 +5483,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 210,
    "h": 160
   },
@@ -4935,6 +5493,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 224,
    "h": 159
   },
@@ -4944,6 +5503,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 229,
    "h": 160
   },
@@ -4953,6 +5513,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 184,
    "h": 160
   },
@@ -4962,6 +5523,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 241,
    "h": 168
   },
@@ -4971,6 +5533,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 208,
    "h": 170
   },
@@ -4980,6 +5543,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 221,
    "h": 171
   },
@@ -4989,6 +5553,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 212,
    "h": 171
   },
@@ -4998,6 +5563,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 222,
    "h": 169
   },
@@ -5007,6 +5573,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 221,
    "h": 172
   },
@@ -5016,6 +5583,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 293,
    "h": 144
   },
@@ -5025,6 +5593,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 243,
    "h": 144
   },
@@ -5034,6 +5603,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 245,
    "h": 143
   },
@@ -5043,6 +5613,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 276,
    "h": 144
   },
@@ -5052,6 +5623,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 314,
    "h": 145
   },
@@ -5061,6 +5633,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 258,
    "h": 137
   },
@@ -5070,6 +5643,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 245,
    "h": 139
   },
@@ -5079,6 +5653,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 182,
    "h": 139
   },
@@ -5088,6 +5663,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 218,
    "h": 148
   },
@@ -5097,6 +5673,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 211,
    "h": 148
   },
@@ -5106,6 +5683,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 212,
    "h": 148
   },
@@ -5115,6 +5693,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 350,
    "h": 116
   },
@@ -5124,6 +5703,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 360,
    "h": 116
   },
@@ -5133,6 +5713,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 341,
    "h": 115
   },
@@ -5142,6 +5723,7 @@
    "category": "rugs",
    "layer": "rug",
    "tier": "basic",
+   "surface": "room",
    "w": 366,
    "h": 114
   },
@@ -5151,6 +5733,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 122,
    "h": 142
   },
@@ -5160,6 +5743,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 127,
    "h": 151
   },
@@ -5169,6 +5753,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 137,
    "h": 155
   },
@@ -5178,6 +5763,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 135,
    "h": 155
   },
@@ -5187,6 +5773,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 154,
    "h": 155
   },
@@ -5196,6 +5783,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 144,
    "h": 159
   },
@@ -5205,6 +5793,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 146,
    "h": 165
   },
@@ -5214,6 +5803,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 160,
    "h": 197
   },
@@ -5223,6 +5813,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 126,
    "h": 163
   },
@@ -5232,6 +5823,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 154,
    "h": 177
   },
@@ -5241,6 +5833,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 142,
    "h": 158
   },
@@ -5250,6 +5843,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 143,
    "h": 166
   },
@@ -5259,6 +5853,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 155,
    "h": 165
   },
@@ -5268,6 +5863,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 147,
    "h": 164
   },
@@ -5277,6 +5873,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 173,
    "h": 176
   },
@@ -5286,6 +5883,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 160,
    "h": 168
   },
@@ -5295,6 +5893,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 230,
    "h": 149
   },
@@ -5304,6 +5903,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 236,
    "h": 141
   },
@@ -5313,6 +5913,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 200,
    "h": 138
   },
@@ -5322,6 +5923,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 196,
    "h": 152
   },
@@ -5331,6 +5933,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 177,
    "h": 179
   },
@@ -5340,6 +5943,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 235,
    "h": 141
   },
@@ -5349,6 +5953,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 145,
    "h": 216
   },
@@ -5358,6 +5963,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 148,
    "h": 222
   },
@@ -5367,6 +5973,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 142,
    "h": 220
   },
@@ -5376,6 +5983,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 229,
    "h": 160
   },
@@ -5385,6 +5993,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 187,
    "h": 188
   },
@@ -5394,6 +6003,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 214,
    "h": 206
   },
@@ -5403,6 +6013,7 @@
    "category": "plants",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 186,
    "h": 210
   },
@@ -5412,6 +6023,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 161,
    "h": 170
   },
@@ -5421,6 +6033,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 149,
    "h": 165
   },
@@ -5430,6 +6043,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 99,
    "h": 160
   },
@@ -5439,6 +6053,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 89,
    "h": 170
   },
@@ -5448,6 +6063,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 222,
    "h": 160
   },
@@ -5457,6 +6073,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 150,
    "h": 160
   },
@@ -5466,6 +6083,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 156,
    "h": 157
   },
@@ -5475,6 +6093,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 101,
    "h": 176
   },
@@ -5484,6 +6103,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 122,
    "h": 164
   },
@@ -5493,6 +6113,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 275,
    "h": 102
   },
@@ -5502,6 +6123,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 160,
    "h": 162
   },
@@ -5511,6 +6133,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 120,
    "h": 195
   },
@@ -5520,6 +6143,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 98,
    "h": 190
   },
@@ -5529,6 +6153,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 102,
    "h": 146
   },
@@ -5538,6 +6163,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 185,
    "h": 184
   },
@@ -5547,6 +6173,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 205,
    "h": 175
   },
@@ -5556,6 +6183,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 112,
    "h": 185
   },
@@ -5565,6 +6193,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 83,
    "h": 189
   },
@@ -5574,6 +6203,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 160,
    "h": 158
   },
@@ -5583,6 +6213,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 120,
    "h": 128
   },
@@ -5592,6 +6223,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 136,
    "h": 146
   },
@@ -5601,6 +6233,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 106,
    "h": 124
   },
@@ -5610,6 +6243,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 122,
    "h": 181
   },
@@ -5619,6 +6253,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 163,
    "h": 201
   },
@@ -5628,6 +6263,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 160,
    "h": 182
   },
@@ -5637,6 +6273,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 127,
    "h": 205
   },
@@ -5646,6 +6283,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 161,
    "h": 209
   },
@@ -5655,6 +6293,7 @@
    "category": "smart",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "desk",
    "w": 161,
    "h": 166
   },
@@ -5664,6 +6303,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 131,
    "h": 208
   },
@@ -5673,6 +6313,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 119,
    "h": 191
   },
@@ -5682,6 +6323,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 147,
    "h": 160
   },
@@ -5691,6 +6333,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 128,
    "h": 175
   },
@@ -5700,6 +6343,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 143,
    "h": 167
   },
@@ -5709,6 +6353,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 155,
    "h": 180
   },
@@ -5718,6 +6363,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 151,
    "h": 196
   },
@@ -5727,6 +6373,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 138,
    "h": 172
   },
@@ -5736,6 +6383,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 124,
    "h": 162
   },
@@ -5745,6 +6393,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 81,
    "h": 196
   },
@@ -5754,6 +6403,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 79,
    "h": 196
   },
@@ -5763,6 +6413,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 191,
    "h": 194
   },
@@ -5772,6 +6423,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 137,
    "h": 182
   },
@@ -5781,6 +6433,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 151,
    "h": 183
   },
@@ -5790,6 +6443,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 131,
    "h": 159
   },
@@ -5799,6 +6453,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 132,
    "h": 165
   },
@@ -5808,6 +6463,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 164,
    "h": 161
   },
@@ -5817,6 +6473,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 130,
    "h": 140
   },
@@ -5826,6 +6483,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 167,
    "h": 139
   },
@@ -5835,6 +6493,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 85,
    "h": 158
   },
@@ -5844,6 +6503,7 @@
    "category": "studio-lights",
    "layer": "prop",
    "tier": "unlock",
+   "surface": "room",
    "w": 170,
    "h": 138
   },
@@ -5853,6 +6513,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 143,
    "h": 175
   },
@@ -5862,6 +6523,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 125,
    "h": 176
   },
@@ -5871,6 +6533,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 211,
    "h": 178
   },
@@ -5880,6 +6543,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 262,
    "h": 150
   },
@@ -5889,6 +6553,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 138,
    "h": 172
   },
@@ -5898,6 +6563,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 236,
    "h": 164
   },
@@ -5907,6 +6573,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 174,
    "h": 144
   },
@@ -5916,6 +6583,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 84,
    "h": 145
   },
@@ -5925,6 +6593,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 134,
    "h": 154
   },
@@ -5934,6 +6603,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 238,
    "h": 130
   },
@@ -5943,6 +6613,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 173,
    "h": 136
   },
@@ -5952,6 +6623,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 104,
    "h": 142
   },
@@ -5961,6 +6633,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 136,
    "h": 135
   },
@@ -5970,6 +6643,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 81,
    "h": 137
   },
@@ -5979,6 +6653,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 73,
    "h": 121
   },
@@ -5988,6 +6663,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 98,
    "h": 138
   },
@@ -5997,6 +6673,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 163,
    "h": 95
   },
@@ -6006,6 +6683,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 72,
    "h": 138
   },
@@ -6015,6 +6693,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 122,
    "h": 114
   },
@@ -6024,6 +6703,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 114,
    "h": 115
   },
@@ -6033,6 +6713,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 224,
    "h": 134
   },
@@ -6042,6 +6723,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 131,
    "h": 110
   },
@@ -6051,6 +6733,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 143,
    "h": 110
   },
@@ -6060,6 +6743,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 141,
    "h": 110
   },
@@ -6069,6 +6753,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 128,
    "h": 110
   },
@@ -6078,6 +6763,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 239,
    "h": 107
   },
@@ -6087,6 +6773,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 161,
    "h": 122
   },
@@ -6096,6 +6783,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 235,
    "h": 104
   },
@@ -6105,6 +6793,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 137,
    "h": 128
   },
@@ -6114,6 +6803,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 152,
    "h": 128
   },
@@ -6123,6 +6813,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 145,
    "h": 128
   },
@@ -6132,6 +6823,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 114,
    "h": 129
   },
@@ -6141,6 +6833,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 153,
    "h": 138
   },
@@ -6150,6 +6843,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 182,
    "h": 137
   },
@@ -6159,6 +6853,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 166,
    "h": 138
   },
@@ -6168,6 +6863,7 @@
    "category": "decor",
    "layer": "prop",
    "tier": "basic",
+   "surface": "both",
    "w": 169,
    "h": 138
   }
