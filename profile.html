@@ -27,16 +27,6 @@
        purpose: a profile is somebody else's, so there is nothing sensible to
        render before we know whose it is. -->
   <section class="page-container prof-wrap">
-    <!-- Find somebody. Sits above the profile rather than in the header
-         because it is a page people arrive at already looking for a person,
-         and it belongs where the answer will appear. -->
-    <div class="prof-search">
-      <input type="search" id="profSearch" class="prof-search-input"
-             placeholder="Find a member…" autocomplete="off"
-             aria-label="Search for a member" maxlength="30">
-      <ul class="prof-results" id="profResults" hidden></ul>
-    </div>
-
     <div class="prof-state" id="profState">Loading profile…</div>
     <div id="profBody" hidden></div>
   </section>
@@ -45,6 +35,7 @@
 
   <script src="/js/auth.js" defer></script>
   <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
   <script src="/js/nav.js" defer></script>
   <!-- The header is shared, so it needs the scripts that drive it: twitch.js
        fills the LIVE indicator and notifications.js the bell. Without them

@@ -264,6 +264,7 @@ export function createStatic(root) {
     '/js/nav.js',
     '/js/notifications.js',
     '/js/twitch.js',
+    '/js/member-search.js',
   ];
 
   function checkHeaderScripts() {

@@ -45,6 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
           </nav>
 
           <div class="header-right">
+            <!-- Find a member. Site-wide rather than on the profile page,
+                 because looking somebody up is something you do FROM
+                 anywhere, not something you do once you are already on
+                 somebody's profile. -->
+            <div class="member-search" id="memberSearch">
+              <input type="search" id="memberSearchInput" class="member-search-input"
+                     placeholder="Find a member…" autocomplete="off"
+                     aria-label="Search for a member" maxlength="30">
+              <ul class="member-results" id="memberResults" hidden></ul>
+            </div>
             <div class="header-live-status" id="headerLiveStatus">
               <span class="status-dot"></span>
               <span>Offline</span>

@@ -209,60 +209,6 @@
     document.title = p.displayName + ' | PhantomACE';
   }
 
-  /* ── Search ─────────────────────────────────────────────────────── */
-  (function searchBox() {
-    var input = document.getElementById('profSearch');
-    var list = document.getElementById('profResults');
-    if (!input || !list) return;
-
-    var timer = null;
-    var seq = 0;
-
-    function close() { list.hidden = true; list.innerHTML = ''; }
-
-    function run(term) {
-      /* Every request carries a number and only the newest one is allowed
-         to write. Without it a slow reply for "sa" can land after a fast
-         one for "samii" and replace the right answers with stale ones. */
-      var mine = ++seq;
-      fetch('/api/profile?q=' + encodeURIComponent(term), { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : { results: [] }; })
-        .then(function (d) {
-          if (mine !== seq) return;
-          var rows = d.results || [];
-          if (!rows.length) {
-            list.innerHTML = '<li class="prof-result-none">Nobody by that name</li>';
-            list.hidden = false;
-            return;
-          }
-          list.innerHTML = rows.map(function (r) {
-            return '<li><a href="/user/' + encodeURIComponent(r.login) + '">' +
-              (r.avatar ? '<img src="' + esc(r.avatar) + '" alt="">' : '<span class="prof-result-blank"></span>') +
-              '<span>' + esc(r.displayName) + '</span></a></li>';
-          }).join('');
-          list.hidden = false;
-        })
-        .catch(function () { if (mine === seq) close(); });
-    }
-
-    input.addEventListener('input', function () {
-      var term = input.value.trim();
-      clearTimeout(timer);
-      if (term.length < 2) { seq++; close(); return; }
-      /* Debounced, because this is a scan rather than an index and every
-         keystroke would otherwise start another one. */
-      timer = setTimeout(function () { run(term); }, 220);
-    });
-
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { input.value = ''; seq++; close(); }
-    });
-
-    document.addEventListener('click', function (e) {
-      if (!list.hidden && !input.contains(e.target) && !list.contains(e.target)) close();
-    });
-  })();
-
   var who = wanted();
   if (!who) {
     state.innerHTML = 'No profile asked for. Sign in to see your own, or open ' +

@@ -598,3 +598,89 @@
   border-top: 1px solid var(--border);
   margin: 32px 0;
 }
+
+
+/* ══ MEMBER SEARCH ══════════════════════════════════════════════════
+   In the header rail, so it is reachable from every page. Collapses to an
+   icon-width field on narrow screens rather than pushing the rest of the
+   rail off the edge. */
+.member-search { position: relative; }
+
+.member-search-input {
+  width: 160px;
+  padding: 6px 10px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-pri);
+  font-family: inherit;
+  font-size: 12px;
+  transition: width 0.18s, border-color 0.18s;
+}
+.member-search-input::placeholder { color: var(--text-dim); }
+.member-search-input:focus {
+  outline: none;
+  width: 210px;
+  border-color: var(--red);
+}
+
+.member-results {
+  position: absolute;
+  z-index: 300;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 230px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #0d0d0d;
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.member-results li + li { border-top: 1px solid var(--border); }
+
+.member-results a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  color: var(--text-pri);
+  text-decoration: none;
+  font-size: 13px;
+}
+.member-results a:hover { background: var(--gray-lo); color: var(--red); }
+
+.member-results img,
+.member-result-blank {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  background: #1a1a1a;
+  object-fit: cover;
+}
+
+.member-result-none {
+  padding: 9px 11px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .member-search-input { width: 108px; }
+  .member-search-input:focus { width: 150px; }
+}
+
+/* Below this the rail already carries a bell, a login control and the
+   hamburger, and the search starts eating the wordmark. Hidden rather than
+   shrunk to something nobody can type into — profiles are still reachable
+   from leaderboards and links, and a phone-sized entry point belongs in the
+   collapsed menu rather than squeezed beside it. */
+@media (max-width: 640px) {
+  .member-search { display: none; }
+}
