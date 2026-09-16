@@ -308,7 +308,14 @@ async function importTwitchBadges() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) throw new Error();
+    if (!res.ok) {
+      /* The server says why: not a subscriber, no badge set on the
+         channel, Twitch unreachable. Discarding it left one message for
+         every cause, naming none of them and suggesting no fix. */
+      let reason = '';
+      try { reason = (await res.json()).error || ''; } catch (e) { /* not JSON */ }
+      throw new Error(reason || ('Twitch returned ' + res.status));
+    }
     const data = await res.json();
 
     if (data.imported > 0) {
@@ -316,9 +323,10 @@ async function importTwitchBadges() {
     } else if (btn) {
       btn.textContent = 'No new badges found';
     }
-  } catch {
+  } catch (err) {
     if (btn) {
-      btn.textContent = 'Import failed — try again later';
+      btn.textContent = (err && err.message) || 'Import failed — try again later';
+      btn.title = (err && err.message) || '';
       btn.disabled = false;
     }
   }
