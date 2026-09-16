@@ -32,10 +32,14 @@
     var q = new URLSearchParams(location.search);
     var u = (q.get('u') || '').trim();
     if (u) return { param: 'u', value: u };
+    /* auth.js exposes getSession() as a plain global, not on a namespace.
+       Both scripts are deferred and this one is listed after it, so it is
+       defined by the time this runs — the typeof guard is for the case
+       where auth.js failed to load at all. */
     try {
-      var s = window.PhamAuth && window.PhamAuth.getSession && window.PhamAuth.getSession();
-      if (s && s.login) return { param: 'u', value: s.login };
-      if (s && s.user_id) return { param: 'id', value: String(s.user_id) };
+      var sess = (typeof getSession === 'function') ? getSession() : null;
+      if (sess && sess.login) return { param: 'u', value: sess.login };
+      if (sess && sess.user_id) return { param: 'id', value: String(sess.user_id) };
     } catch (e) { /* not signed in */ }
     return null;
   }
