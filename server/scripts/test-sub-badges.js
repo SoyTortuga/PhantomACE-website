@@ -20,7 +20,7 @@
    appear is the badge worn in chat, which the bot now records.
    ══════════════════════════════════════════════ */
 
-import { decodeBadgeVersion, badgeRarity, badgeName } from '../../functions/api/import-badges.js';
+import { decodeBadgeVersion, badgeRarity, badgeName, founderBadgeItem } from '../../functions/api/import-badges.js';
 import { pickSubBadge } from '../../functions/api/bot/commands.js';
 
 let passed = 0;
@@ -179,6 +179,40 @@ const LADDER = [0, 2, 3, 6, 12, 24, 36, 48, 60, 72, 84, 96];
   const both = pickSubBadge([B('founder', '0', '41'), B('subscriber', '3036', '41')]);
   check('subscriber is preferred over founder', both.badge.set_id, 'subscriber');
   check('so the tier stays readable', decodeBadgeVersion(both.badge.id).tier, 3);
+}
+
+/* ── The Founder badge ───────────────────────────────────────────────
+   Global Twitch artwork rather than the channel's, one version for every
+   founder everywhere, and unearnable once the window closes. */
+{
+  const V = {
+    image_url_1x: 'https://cdn/1', image_url_2x: 'https://cdn/2',
+    image_url_4x: 'https://cdn/4', description: 'Founder',
+  };
+  const item = founderBadgeItem(V);
+
+  check('it lands in the profile inventory', item.game, 'profile');
+  check('as a badge', item.type, 'badge');
+  check('called Founder', item.name, 'Founder');
+  /* Ten to fifty per channel, ever, and no amount of subscribing afterwards
+     earns one. */
+  check('at mythic', item.rarity, 'mythic');
+  check('carrying its artwork', item.meta.imageUrl4x, 'https://cdn/4');
+  check('and flagged as a founder badge', item.meta.founder, true);
+
+  /* Loyalty skulls sort by monthThreshold. A founder badge carries no
+     duration, so a naive 0 would file the rarest badge in the channel
+     alongside the one every new subscriber gets. */
+  ok('it sorts above every rung of the ladder',
+    item.meta.monthThreshold > Math.max(...LADDER));
+
+  /* Its id must not collide with the ladder, or importing one would make
+     the other look already owned. */
+  const ladderIds = LADDER.map(m => `twitch_sub_badge_t1_${m}`);
+  ok('its id is its own', !ladderIds.includes(item.id));
+
+  check('a missing version grants nothing', founderBadgeItem(null), null);
+  check('and so does an absent set', founderBadgeItem(undefined), null);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

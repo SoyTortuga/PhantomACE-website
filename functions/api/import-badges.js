@@ -53,6 +53,37 @@ export function badgeRarity(months, tier) {
 /* Twitch's own title — "6-Month Subscriber" — is the duration in the
    channel's own words, so it is preferred over anything reconstructed
    here. It does not mention the tier, so tiers above the first say so. */
+/* The Founder badge is GLOBAL Twitch artwork, not the channel's, so it
+   comes from a different endpoint and carries no month ladder — one
+   version, id '0', for every founder everywhere.
+
+   Mythic without argument: a channel has ten to fifty founders ever, the
+   window closes permanently, and no amount of subscribing afterwards can
+   earn one. */
+export function founderBadgeItem(version) {
+  if (!version) return null;
+  return {
+    id: 'twitch_founder_badge',
+    game: 'profile',
+    type: 'badge',
+    consumable: false,
+    name: 'Founder',
+    rarity: 'mythic',
+    source: 'twitch-import',
+    meta: {
+      imageUrl1x: version.image_url_1x,
+      imageUrl2x: version.image_url_2x,
+      imageUrl4x: version.image_url_4x,
+      /* Not a duration. Sorting the loyalty skulls by months would drop the
+         Founder badge to the bottom next to the zero-month one, so it is
+         given a threshold above every rung of the ladder instead. */
+      monthThreshold: 9999,
+      founder: true,
+      description: version.description || 'One of the first to subscribe to this channel.',
+    },
+  };
+}
+
 export function badgeName(months, tier, title) {
   const base = title || (months > 0 ? `${months}-Month Subscriber` : 'Subscriber');
   return tier > 1 ? `Tier ${tier} \u00b7 ${base}` : base;
@@ -177,6 +208,28 @@ export async function onRequestPost(context) {
       },
     });
     imported++;
+  }
+
+  /* THE FOUNDER BADGE. Only fetched for someone chat has actually shown
+     wearing one, so nobody else pays for the extra call, and wrapped
+     because a global-badge lookup failing must not lose the ladder that has
+     already been assembled above. */
+  if (seen && seen.founder && !inv.items.find(i => i.id === 'twitch_founder_badge')) {
+    try {
+      const globalRes = await fetch('https://api.twitch.tv/helix/chat/badges/global',
+        { headers: { 'Client-Id': env.TWITCH_CLIENT_ID, 'Authorization': `Bearer ${token}` } });
+      if (globalRes.ok) {
+        const globalData = await globalRes.json();
+        const set = (globalData.data || []).find(b => b.set_id === 'founder');
+        const item = founderBadgeItem(set && set.versions && set.versions[0]);
+        if (item) {
+          inv.items.push({ ...item, grantedAt: Date.now() });
+          imported++;
+        }
+      }
+    } catch (err) {
+      console.error('[import-badges] could not fetch the founder badge:', err.message);
+    }
   }
 
   if (imported > 0) {
