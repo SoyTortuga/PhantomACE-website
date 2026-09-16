@@ -75,6 +75,11 @@ const NON_ROUTE_MODULES = new Set([
   /* @mention parsing and resolution. Library, no handler; covered by
      test-forum-mentions.js. */
   'api/forum/mentions.js',
+
+  /* My Room: the piece catalog and the validator every save goes through.
+     Library, no handler; /api/room is the route. Covered by
+     server/scripts/test-room-validator.js. */
+  'api/room-catalog.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

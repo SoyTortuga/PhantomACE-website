@@ -172,6 +172,10 @@ export const FAMILIES = [
      the `profile_` family and need longest-prefix care to stay out of it. */
   { prefix: 'profile_',        table: 'profiles',         expiry: 'none' },
   { prefix: 'loginidx_',       table: 'profiles',         expiry: 'none' },
+  /* rooms_{userId} — everything one person built in My Room. 'none': it is
+     their work. `rooms_` is nobody's prefix — mc_room_ and ps_room_ start
+     differently — so it needs no ordering care. */
+  { prefix: 'rooms_',          table: 'rooms',            expiry: 'none' },
   { prefix: 'mtgbbb_set_',     table: 'mtgbbb_sets',      expiry: 'none' },
   { prefix: 'mtgbbb_',         table: 'mtgbbb_rooms',     expiry: 'real' },
 

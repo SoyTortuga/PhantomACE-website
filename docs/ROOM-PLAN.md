@@ -1,7 +1,9 @@
 # My Room — plan
 
-**Status:** step 1 built — 676 pieces in `assets/room/`, catalog tested (59
-assertions), review sheets sent. **Awaiting the human review** before step 2.
+**Status:** steps 1–2 built. 676 pieces in `assets/room/` with a tested
+catalog; `room-catalog.js` validates every save (pure, mutation-checked) and
+`/api/room` stores rooms in `rooms_<userId>` (migration `007_rooms.sql`, to be
+applied on the rig). Next: step 3, the viewer on the profile.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 
