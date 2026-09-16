@@ -153,6 +153,25 @@ export async function onRequestGet(context) {
     }
   } catch { /* optional */ }
 
+  /* Their favourite dino, if they have chosen one. Already sanitised when
+     the park was saved — see dino-park.js — so it is echoed rather than
+     re-checked here. The nickname is player-authored and is escaped at
+     render like any other. */
+  let favoriteDino = null;
+  try {
+    const park = await env.MARKETPLACE.get(`dino_park_${userId}`, 'json');
+    const fav = park && park.state && park.state.favorite;
+    if (fav && fav.specId && fav.src) {
+      favoriteDino = {
+        specId: fav.specId,
+        mutation: fav.mutation || '',
+        nickname: fav.nickname || '',
+        src: fav.src,
+        filter: fav.filter || '',
+      };
+    }
+  } catch { /* a profile without a dino still renders */ }
+
   /* Standings, only on boards they actually appear on. */
   const standings = [];
   for (const board of BOARDS) {
@@ -177,5 +196,6 @@ export async function onRequestGet(context) {
     tenure,
     phamilyTime,
     standings,
+    favoriteDino,
   });
 }

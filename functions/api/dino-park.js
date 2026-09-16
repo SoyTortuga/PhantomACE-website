@@ -185,6 +185,59 @@ export async function onRequestGet(context) {
 
 /* ── POST — persist the player's current state ── */
 
+/* ══ THE FAVOURITE ══════════════════════════════════════════════════
+   One dino, chosen by the player, rendered on their PUBLIC profile.
+
+   The park save is stored wholesale and never read by the server, which is
+   harmless while the document is private to one person. The favourite
+   breaks that: it is the first part of this state that other people see, so
+   it is the first part that cannot be taken on trust.
+
+   `src` is the dangerous field. Left open it accepts any URL, which puts an
+   arbitrary third-party image — a tracking pixel, or worse — on a public
+   page under somebody else's name. It is restricted to this game's own
+   asset tree or an inline image, because those are the only two things the
+   game legitimately produces.
+
+   `filter` is the subtle one. It lands in a style attribute, so anything
+   that can close that attribute or smuggle a url() is an injection. Only
+   the characters CSS filter functions are built from are allowed. */
+const FAV_ID = /^[a-z0-9_-]{1,40}$/i;
+const FAV_SRC_ASSET = /^\/games\/dino-park\/assets\/[a-z0-9/_. -]+\.(png|webp)$/i;
+const FAV_SRC_INLINE = /^data:image\/(png|webp);base64,[a-z0-9+/=]+$/i;
+const FAV_SRC_MAX = 24000;
+const FAV_FILTER_OK = /^[a-z0-9()%.,\s-]{0,200}$/i;
+
+export function sanitizeFavorite(fav) {
+  if (!fav || typeof fav !== 'object') return null;
+
+  const specId = String(fav.specId || '');
+  if (!FAV_ID.test(specId)) return null;
+
+  const src = String(fav.src || '');
+  if (src.length > FAV_SRC_MAX) return null;
+  if (!FAV_SRC_ASSET.test(src) && !FAV_SRC_INLINE.test(src)) return null;
+
+  const mutation = fav.mutation ? String(fav.mutation) : '';
+  const filter = String(fav.filter || '');
+  /* Belt and braces on the filter: the charset alone would already exclude
+     these, but they are the exact things that make it an injection and are
+     worth refusing by name rather than by implication. */
+  const filterSafe = FAV_FILTER_OK.test(filter) &&
+    !/url\(|;|\}|<|expression/i.test(filter);
+
+  return {
+    specId,
+    mutation: FAV_ID.test(mutation) ? mutation : '',
+    /* Player-authored, so it is length-capped here and escaped at render.
+       Stored as written; nothing reconstructs markup from it. */
+    nickname: String(fav.nickname || '').trim().slice(0, 24),
+    src,
+    filter: filterSafe ? filter : '',
+    at: Date.now(),
+  };
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = getSession(request);
@@ -222,6 +275,13 @@ export async function onRequestPost(context) {
       grantSeq: storedSeq,
       state: existing.state,
     }, 409);
+  }
+
+  /* Sanitised rather than trusted, because this one field leaves the
+     player's own park and appears on a page other people read. Everything
+     else in this document is private and stays opaque. */
+  if ('favorite' in body.state) {
+    body.state.favorite = sanitizeFavorite(body.state.favorite);
   }
 
   const record = { userId: session.user_id, state: body.state, savedAt: Date.now() };
