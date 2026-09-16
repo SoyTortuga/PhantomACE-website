@@ -63,6 +63,12 @@ const BADGES = {
     image: '/assets/badges/agate-hunt.png',
     blurb: 'For everyone who came rock hunting.',
   },
+  'mtgbbb-winner': {
+    name: 'Booster Box Bingo Champion',
+    description: 'Won a game of MTGBBB while a sealed box was cracked on stream.',
+    rarity: 'mythic',
+    image: '/assets/badges/mtgbbb-winner.png',
+  },
 };
 
 function arg(name, fallback = null) {
