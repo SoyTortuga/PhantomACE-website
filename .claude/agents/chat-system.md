@@ -53,19 +53,32 @@ Tab bar with links to: Forums, Leaderboards, Stats, Phamily Time
 Discord link button in the subnav
 
 ## What Needs Building
-- Server-side forum API at `functions/api/forums.js` (CRUD for threads/posts)
-- KV storage for persistent forum data
-- User attribution on posts (tied to Twitch auth)
-- Moderation tools (delete, pin, lock threads)
-- Real-time or near-real-time updates
-- Post editing and deletion
-- Thread pagination
+**Follow `docs/FORUM-PLAN.md`.** It is the design of record, and it supersedes
+everything this section used to say. In particular:
+- The forum is built on **real relational tables** (`server/sql/006_forum.sql`),
+  **not** the KV shim and **not** `functions/api/forums.js`. Handlers reach
+  them with `import { getPool, withTransaction } from '../../server/lib/db.js'`.
+- Routes live under `functions/api/forum/` (categories, threads, thread, post,
+  moderate, comments, notifications). Shared queries go in
+  `functions/api/forum/_queries.js`, registered in `NON_ROUTE_MODULES`.
+- `server/scripts/test-forum-schema.js` runs the schema against an in-process
+  Postgres (pglite). Extend it; do not stub the database for relational tests.
+- Authorisation uses `isModerator()` / `isBroadcaster()` from
+  `functions/api/admin/moderators.js` and `session.subTier`. **Never
+  `session.role`** — it is a display ladder.
+- The header bell in `js/notifications.js` already exists; the forum adds a
+  server-side source to it rather than a second bell.
+- The localStorage data layer in `community-forums.js` is deleted at the end
+  (plan §9 step 7), not kept as a fallback.
 
 ## Tech Context
-- Pages use shared header/footer loaded via `js/components.js`
-- Auth: `pham_session` cookie via Twitch OAuth
+- Pages use shared header/footer loaded via `js/components.js`; a new page
+  must include the header scripts or `checkHeaderScripts()` fails the boot
+- Auth: signed `pham_session` cookie via Twitch OAuth; forged cookies are
+  stripped at the adapter, so `user_id` / `login` / `display_name` are trusted
 - Guest users can read but not post (require login)
-- API pattern: Cloudflare Worker, KV namespace `MARKETPLACE`
+- Profiles are at `/user/<login>`; `/api/profile` returns avatar, display
+  name, equipped title/badge and showcase for any user
 
 ## Design Rules
 - Gothic dark theme: black backgrounds, red (#FF0000) accents
