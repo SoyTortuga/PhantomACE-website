@@ -95,6 +95,20 @@ const REWARD_HANDLERS = {
       streamId, startedAt, position,
     });
 
+    /* EVENT BADGES. A window that is closed grants nothing and costs one
+       comparison, so this runs on every check-in rather than being switched
+       on and off around an event — a feature that has to be remembered is
+       one that gets left on.
+
+       mutate(), not read-modify-write: the theme-unlock handler above writes
+       the same row, and a viewer redeeming both in the same moment would
+       otherwise lose one of them. */
+    const { grantOpenBadges } = await import('./checkin-badges.js');
+    await env.MARKETPLACE.mutate(inventoryKey(userId), (current) => {
+      const inv = current || { userId: String(userId), items: [], equips: {} };
+      return grantOpenBadges(inv).length ? inv : undefined;
+    });
+
     await queueRedemption(env, userId, 'pham-checkin', redemption);
   },
   'spin-the-wheel': async (env, userId, redemption) => {

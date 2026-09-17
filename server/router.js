@@ -45,6 +45,10 @@ const NON_ROUTE_MODULES = new Set([
   /* Check-in history, streaks and arrival rewards. Library, no handler. */
   'api/checkin-rewards.js',
 
+  /* Event badges earnable inside a window by checking in. Library, no
+     handler. Covered by server/scripts/test-checkin-badges.js. */
+  'api/checkin-badges.js',
+
   /* Farkle scoring rules. Pure functions, no handler. Covered by
      server/scripts/test-scoring.js. */
   'api/mana-clash-scoring.js',
