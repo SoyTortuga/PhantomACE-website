@@ -7,38 +7,12 @@
      !announce <message>
    ══════════════════════════════════════════════ */
 
+import { verifyEventSub } from '../../../server/lib/eventsub.js';
+
 import { dropCodeAction, dropItemAction, announceAction } from './send-chat.js';
-
-const HMAC_PREFIX = 'sha256=';
-
-/* Twitch recommends rejecting any message whose timestamp is more than ten
-   minutes old. Without it, a captured signed request stays replayable for
-   ever, because the signature never expires. */
-const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000;
-const TWITCH_MESSAGE_ID = 'twitch-eventsub-message-id';
-const TWITCH_MESSAGE_TIMESTAMP = 'twitch-eventsub-message-timestamp';
-const TWITCH_MESSAGE_SIGNATURE = 'twitch-eventsub-message-signature';
-const TWITCH_MESSAGE_TYPE = 'twitch-eventsub-message-type';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-}
-
-async function verifySignature(secret, request, body) {
-  const msgId = request.headers.get(TWITCH_MESSAGE_ID) || '';
-  const timestamp = request.headers.get(TWITCH_MESSAGE_TIMESTAMP) || '';
-
-  /* Reject stale messages BEFORE spending time on the HMAC. A valid
-     signature on an old message is exactly what a replay looks like. */
-  const age = Date.now() - Date.parse(timestamp);
-  if (!Number.isFinite(age) || Math.abs(age) > MAX_MESSAGE_AGE_MS) return false;
-  const expected = request.headers.get(TWITCH_MESSAGE_SIGNATURE) || '';
-
-  const message = msgId + timestamp + body;
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
-  const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return expected === HMAC_PREFIX + hex;
 }
 
 /* A sender counts as authorized if Twitch flags them as the broadcaster
@@ -309,13 +283,15 @@ export async function onRequestPost(context) {
   const { env, request } = context;
 
   const bodyText = await request.text();
-  const messageType = request.headers.get(TWITCH_MESSAGE_TYPE);
 
-  const secret = env.TWITCH_EVENTSUB_SECRET;
-  if (secret) {
-    const valid = await verifySignature(secret, request, bodyText);
-    if (!valid) return new Response('Invalid signature', { status: 403 });
-  }
+  /* FAILS CLOSED. The copy this replaced verified only `if (secret)`, so a
+     missing TWITCH_EVENTSUB_SECRET did not fail — it skipped, and this
+     endpoint accepted unsigned posts from anyone. The shared verifier
+     answers 500 instead, and also checks the headers, the replay window
+     and the signature in constant time. */
+  const check = await verifyEventSub(request, env.TWITCH_EVENTSUB_SECRET, bodyText);
+  if (!check.ok) return new Response(check.reason, { status: check.status });
+  const messageType = check.messageType;
 
   let body;
   try { body = JSON.parse(bodyText); } catch { return json({ error: 'Invalid JSON' }, 400); }
