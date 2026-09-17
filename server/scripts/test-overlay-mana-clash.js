@@ -249,6 +249,35 @@ const post = (env, body, userId) => route.onRequestPost({
   ok('with no box-shadow anywhere in it', !/box-shadow/.test(mc));
 }
 
+/* ── The card never goes quiet ──────────────────────────────── */
+{
+  /* The first version returned silently on any non-ok response and left
+     the dropdown as it found it — empty. A 404 from a service that had not
+     been restarted, a 403 from a non-moderator, and a channel with no
+     rooms were one symptom: a blank control explaining nothing. The card
+     exists to say what is available, so silence is the one behaviour it
+     cannot have. */
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  const fn = /async function loadOvMc\(\)[\s\S]*?\n\}/.exec(js);
+  ok('the loader exists', !!fn);
+  const body = fn ? fn[0] : '';
+
+  ok('a 404 is named, not swallowed', /res\.status === 404/.test(body));
+  ok('and says the server needs restarting', /restart/i.test(body));
+  ok('a 403 is named', /res\.status === 403/.test(body));
+  ok('any other failure carries its status', /HTTP ' \+ res\.status/.test(body));
+  ok('an unreachable server is reported', /Could not reach the server/.test(body));
+  /* The bug itself: a bare `return` on !ok with nothing shown. */
+  ok('no silent return on a failed response', !/if \(!res\.ok\) return;/.test(body));
+
+  const html = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
+  ok('and the picker says something before the first answer', /Loading rooms/.test(html));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

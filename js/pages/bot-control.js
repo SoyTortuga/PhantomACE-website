@@ -637,17 +637,56 @@ function renderOvMc(d) {
         if (r.practice) bits.push('practice');
         return '<option value="' + escapeBotHtml(r.code) + '">' + escapeBotHtml(bits.join(' — ')) + '</option>';
       }).join('')
-    : '<option value="">No Mana Clash rooms right now</option>';
+    /* Distinguished from every failure above: this one means the request
+       worked and the answer really is "none". Rooms are created by players
+       at /games/mana-clash and expire, so an empty list is normal. */
+    : '<option value="">No rooms open — someone has to create one first</option>';
 
   if (keep && rooms.some(function (r) { return r.code === keep; })) pick.value = keep;
 }
 
+/* WHY THIS REPORTS INSTEAD OF RETURNING.
+   The first version swallowed every failure and left the dropdown as it
+   found it — empty. A 404 because the service had not been restarted, a
+   403 because the account is not a moderator, and a channel with no rooms
+   were all one symptom: a blank control saying nothing. The whole point of
+   this card is to tell somebody what is available, so the one thing it
+   must never do is go quiet. */
+function ovMcSay(text) {
+  const pick = document.getElementById('ovMcRoomPick');
+  if (pick) pick.innerHTML = '<option value="">' + escapeBotHtml(text) + '</option>';
+}
+
 async function loadOvMc() {
+  let res;
   try {
-    const res = await fetch('/api/overlay/mana-clash?rooms=1', { credentials: 'same-origin', cache: 'no-store' });
-    if (!res.ok) return;
+    res = await fetch('/api/overlay/mana-clash?rooms=1', { credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    ovMcSay('Could not reach the server');
+    return;
+  }
+
+  if (res.status === 404) {
+    /* The route exists in the repo but not in the running process — the
+       one failure a deploy causes, and the one a blank dropdown hid. */
+    ovMcSay('Overlay route missing — restart the server');
+    showBotStatus('The Mana Clash overlay route returned 404. The server needs restarting after the last pull.', true);
+    return;
+  }
+  if (res.status === 403) {
+    ovMcSay('You need moderator access');
+    return;
+  }
+  if (!res.ok) {
+    ovMcSay('Could not load rooms (HTTP ' + res.status + ')');
+    return;
+  }
+
+  try {
     renderOvMc(await res.json());
-  } catch { /* leave the card as it is rather than blanking it */ }
+  } catch {
+    ovMcSay('Could not read the room list');
+  }
 }
 
 async function setOvMc(body, btn) {
