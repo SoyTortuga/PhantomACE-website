@@ -39,8 +39,9 @@ export const CHECKIN_BADGES = [
     rarity: 'rare',
     image: '/assets/badges/agate-hunt.png',
 
-    /* 2026-09-17 12:00 PDT → 2026-09-18 17:00 PDT */
-    from: Date.UTC(2026, 8, 17, 19, 0, 0),
+    /* 2026-09-17 10:00 PDT → 2026-09-18 17:00 PDT.
+       Opened two hours earlier than first planned, because the stream did. */
+    from: Date.UTC(2026, 8, 17, 17, 0, 0),
     to: Date.UTC(2026, 8, 19, 0, 0, 0),
   },
 ];
