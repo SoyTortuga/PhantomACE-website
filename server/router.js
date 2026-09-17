@@ -49,6 +49,10 @@ const NON_ROUTE_MODULES = new Set([
      handler. Covered by server/scripts/test-checkin-badges.js. */
   'api/checkin-badges.js',
 
+  /* The chat scramble's answers. Data, no handler — split out of
+     chat-game.js when the list passed a thousand entries. */
+  'api/chat-game-words.js',
+
   /* Farkle scoring rules. Pure functions, no handler. Covered by
      server/scripts/test-scoring.js. */
   'api/mana-clash-scoring.js',

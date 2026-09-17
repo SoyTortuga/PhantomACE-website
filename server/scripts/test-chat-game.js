@@ -20,10 +20,15 @@
        reply per guess would silence it mid-round.
    ══════════════════════════════════════════════ */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   normalise, isCorrect, scramble, publicState, advance,
   offerGuess, controlGame, tickGame, WORDS,
 } from '../../functions/api/chat-game.js';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /* offerGuess returns a LIST of things to announce — a round timing out and
    the next one opening arrive together — or null when there is nothing to
@@ -117,6 +122,49 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
     WORDS.filter(w => normalise(w.word).includes(normalise(w.category))).map(w => w.word), []);
 
   ok('there are enough words for a long break', WORDS.length >= 60);
+
+  /* A FLOOR, NOT A COUNT. Asserting the exact total would fail every time
+     somebody adds a word, which trains people to edit the test instead of
+     reading it. The floor is what actually matters: the round picker avoids
+     recent answers, so a short list repeats inside one break. */
+  ok('the list is deep enough not to repeat in a session', WORDS.length >= 1500);
+
+  /* THE CLUE HAS TO NARROW SOMETHING.
+     A category holding two answers is not a hint — it is the answer, and a
+     regular learns that after seeing it twice. Doom held two and Platformer
+     four before the list was extended.
+
+     Five is the floor rather than ten because two categories are complete
+     sets at exactly five: there are five shards and five wedges in Magic,
+     and no honest way to add a sixth. Anything else that lands this low is
+     a category that wants filling out, so the message names it. */
+  {
+    const counts = new Map();
+    for (const w of WORDS) counts.set(w.category, (counts.get(w.category) || 0) + 1);
+    const thin = [...counts].filter(([, n]) => n < 5).map(([c, n]) => `${c}:${n}`).sort();
+    check('no category is so small the clue is the answer', thin, []);
+
+    const complete = new Set(['Shard', 'Wedge']);
+    const smallButNotComplete = [...counts]
+      .filter(([c, n]) => n < 10 && !complete.has(c))
+      .map(([c, n]) => `${c}:${n}`).sort();
+    check('and only the complete sets sit under ten', smallButNotComplete, ['Rarity:8']);
+  }
+}
+
+/* ── The list lives in its own module ────────────────────────────────── */
+{
+  /* Sixteen hundred entries is data. It was split out when it started
+     drowning the two hundred lines of rules it shared a file with — but
+     every importer and this suite read WORDS from chat-game.js, so the
+     re-export is what keeps that true. */
+  const src = fs.readFileSync(path.join(REPO, 'functions/api/chat-game.js'), 'utf8');
+  ok('chat-game.js still exports WORDS', /export \{ WORDS \}/.test(src));
+  ok('and holds no inline list of its own', !/export const WORDS = \[/.test(src));
+
+  const router = fs.readFileSync(path.join(REPO, 'server/router.js'), 'utf8');
+  /* A library under functions/ that is not declared fails the boot. */
+  ok('the words module is declared a non-route', /'api\/chat-game-words\.js'/.test(router));
 }
 
 /* ── The scramble ────────────────────────────────────────────────────── */
