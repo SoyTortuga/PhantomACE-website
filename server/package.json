@@ -45,6 +45,7 @@
     "test-room-edit-core": "node scripts/test-room-edit-core.js",
     "test-repair-cosmetic-grants": "node scripts/test-repair-cosmetic-grants.js",
     "repair-cosmetic-grants": "node scripts/repair-cosmetic-grants.js",
+    "giveaway-rewards": "node scripts/giveaway-rewards.js",
     "backfill-milestone-badges": "node scripts/backfill-milestone-badges.js"
   },
   "engines": {
