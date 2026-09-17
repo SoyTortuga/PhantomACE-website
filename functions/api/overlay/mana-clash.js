@@ -28,11 +28,12 @@
 
 import { viewFor } from '../mana-clash.js';
 
+/* Registered in server/lib/registry.js with expiry 'none', which is a
+   decision and not an oversight: a pointer that expired on its own would
+   switch the panel off mid-stream with nothing to explain it. The DAL
+   ignores an expirationTtl for such a family, so none is passed below — a
+   TTL written here would describe a lifecycle that does not exist. */
 const KEY = 'overlay_mana_clash';
-/* The pointer outlives a stream but not a month. A stale pointer shows
-   nothing anyway — the room it names is long gone — but there is no reason
-   to keep it for ever. */
-const POINTER_TTL = 2592000;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -131,9 +132,7 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
   if (body.action === 'off') {
-    await env.MARKETPLACE.put(KEY, JSON.stringify({ enabled: false, code: null, at: Date.now() }), {
-      expirationTtl: POINTER_TTL,
-    });
+    await env.MARKETPLACE.put(KEY, JSON.stringify({ enabled: false, code: null, at: Date.now() }));
     return json({ success: true, enabled: false, code: null });
   }
 
@@ -148,7 +147,7 @@ export async function onRequestPost(context) {
 
     await env.MARKETPLACE.put(KEY, JSON.stringify({
       enabled: true, code, at: Date.now(), by: session.display_name || '',
-    }), { expirationTtl: POINTER_TTL });
+    }));
 
     return json({ success: true, enabled: true, code, status: room.status });
   }

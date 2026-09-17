@@ -66,6 +66,14 @@ export const SINGLETONS = {
   overlay_events:        { table: 'singletons', expiry: 'none' },
   overlay_key:           { table: 'singletons', expiry: 'none' },
 
+  /* Which Mana Clash room the overlay is showing, and whether it is on.
+     'none' for the same reason as the key above: a pointer that quietly
+     expired would switch the panel off mid-stream with nothing to explain
+     it. A STALE pointer is harmless by contrast — the room it names is
+     gone, so the panel shows nothing and says nothing, which is already the
+     switched-off behaviour. */
+  overlay_mana_clash:    { table: 'singletons', expiry: 'none' },
+
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
      slightly slower one. */
