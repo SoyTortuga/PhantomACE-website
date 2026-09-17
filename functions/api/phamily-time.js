@@ -19,8 +19,16 @@ async function saveInventory(env, userId, inv) {
 }
 async function grantItem(env, userId, item) {
   const inv = await getInventory(env, userId);
-  if (!item.consumable && inv.items.find(i => i.id === item.id)) return;
-  const existing = item.consumable && inv.items.find(i => i.id === item.id);
+  /* IDENTITY IS TYPE AND ID, NOT ID ALONE. Cosmetic ids are namespaced
+     per type by the games that read them — Skull Clicker filters on
+     `i.type === 'skull-skin'` and looks the id up in that type's own
+     table — so 'void' legitimately names both the Dark Altar skin
+     (level 65) and the Void click effect (level 85). Matching on id
+     alone made the second of those a duplicate of the first: the claim
+     was spent and nothing was granted. */
+  const same = (i) => i && i.id === item.id && i.type === item.type;
+  if (!item.consumable && inv.items.find(same)) return;
+  const existing = item.consumable && inv.items.find(same);
   if (existing) { existing.quantity = (existing.quantity || 1) + (item.quantity || 1); }
   else { inv.items.push({ ...item, grantedAt: Date.now(), source: 'phamily-time' }); }
   await saveInventory(env, userId, inv);
@@ -451,6 +459,14 @@ async function handleClaimReward(env, session, mk, body) {
     type: reward.type,
     rarity: reward.rarity,
     name: reward.name,
+    /* THE OTHER HALF OF THE SKULL-SKIN FIX, which for a long time was only
+       done on the mapper's side. Every mapper that identifies WHICH
+       cosmetic was granted — a skull theme, a click effect, a room set, a
+       room piece — reads this. Leaving it out does not fail: the mapper
+       builds an item with `undefined` in its id and its meta, grantItem
+       stores it, and it never matches anything. Both call sites in this
+       file must pass it, which test-phamily-rewards.js now asserts. */
+    cosmeticId: reward.cosmeticId,
   });
 
   const allTime = await getAllTimeStats(env, session.user_id);

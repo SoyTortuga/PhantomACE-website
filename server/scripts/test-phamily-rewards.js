@@ -154,6 +154,66 @@ const ok = (label, cond) => check(label, !!cond, true);
   check('all ten at 150', R.earnedMilestones(150).length, 10);
 }
 
+/* ── Every claim hands the mapper what it needs ──────────────────────
+   A REGRESSION GUARD FOR A BUG THAT SHIPPED TWICE.
+
+   grantReward() takes a cosmeticId and passes it to the item mapper.
+   Four reward types read it to say WHICH cosmetic was granted — a skull
+   theme, a click effect, a room set, a room piece — and leaving it out
+   does not fail. The mapper builds an item with `undefined` in its id and
+   its meta, grantItem stores it happily, and it matches nothing: the
+   reward is claimed, gone from the track, and invisible in the game.
+   Worse, grantItem dedupes non-consumables by id, so the SECOND such
+   claim is silently dropped as a duplicate of the first `undefined`.
+
+   There are two call sites in phamily-time.js — one for a reward, one for
+   a milestone bonus — and the fix was once applied to only one of them.
+   So this reads the source and insists on both, which no amount of
+   testing the table alone would have caught.
+   ─────────────────────────────────────────────────────────────────── */
+{
+  const src = fs.readFileSync(path.join(REPO, 'functions/api/phamily-time.js'), 'utf8');
+
+  /* Every `await grantReward(env, session, { ... });` in the file. */
+  const calls = [...src.matchAll(/await grantReward\(env, session, \{([\s\S]*?)\}\);/g)].map(m => m[1]);
+  check('both call sites found', calls.length, 2);
+  const without = calls.filter(body => !/cosmeticId/.test(body));
+  check('every call site passes cosmeticId', without.length, 0);
+  const notFromTable = calls.filter(body => !/cosmeticId:\s*(reward|bonus)\.cosmeticId/.test(body));
+  check('and takes it from the table, not the request', notFromTable.length, 0);
+
+  /* The mappers that read it, and the rewards that must therefore carry
+     one. A table entry missing its cosmeticId is the same bug from the
+     other end. */
+  const NEEDS_ID = ['skull-skin', 'click-effect', 'room-set', 'room-piece'];
+  const all = [...R.FOLLOWER_REWARDS, ...R.PHAMILY_REWARDS];
+  const bare = all.filter(r => NEEDS_ID.includes(r.type) && !r.cosmeticId);
+  check('every reward of an id-carrying type has one',
+    bare.map(r => `${r.level}:${r.type}`), []);
+  const bonuses = R.MILESTONES.flatMap(m => m.bonusItems || []);
+  const bareBonus = bonuses.filter(b => NEEDS_ID.includes(b.type) && !b.cosmeticId);
+  check('and every milestone bonus of one too', bareBonus.map(b => b.type), []);
+
+  /* AND IDENTITY INCLUDES THE TYPE. grantItem decides whether somebody
+     already has an item; cosmetic ids are namespaced per type by the
+     games that read them, so 'void' names both the Dark Altar skin and
+     the Void click effect. Matching on id alone made the second claim a
+     duplicate of the first — spent, and nothing granted. grantItem is
+     not exported (it needs env), so this reads the source. */
+  ok('grantItem identifies an item by type as well as id',
+    /i\.id === item\.id && i\.type === item\.type/.test(src));
+  ok('and uses that same test for the consumable branch',
+    (src.match(/inv\.items\.find\(same\)/g) || []).length === 2);
+
+  /* The mappers really do read it — if one stops, this guard is moot and
+     should be revisited rather than quietly passing. */
+  const stillRead = NEEDS_ID.filter(t => {
+    const m = new RegExp(`'${t}':[\\s\\S]{0,240}?cosmeticId`);
+    return m.test(src);
+  });
+  check('all four mappers still read cosmeticId', stillRead.length, NEEDS_ID.length);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {
