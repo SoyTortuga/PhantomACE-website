@@ -156,7 +156,9 @@
     }
     if (i == null || !list[i]) {
       els.inspector.innerHTML = '<div class="re-insp-row re-insp-empty">' +
-        (state.tab === 'desk' ? 'Pick pieces from the palette to arrange your desk.' : 'Pick pieces from the palette; click one on the floor to move, scale or flip it.') +
+        (state.tab === 'desk'
+          ? 'Pick pieces from the palette to arrange your desk.'
+          : 'Pick pieces from the palette; click one to move, turn, scale or flip it. Posters and signs can be dragged onto the walls.') +
         ' <span class="re-count">' + list.length + ' / ' + E.CAPS[state.tab] + '</span></div>';
       return;
     }
@@ -164,6 +166,9 @@
     els.inspector.innerHTML = '<div class="re-insp-row">' +
       '<b>' + esc(piece ? piece.id : p.id) + '</b>' +
       '<span class="re-insp-group">Scale <button type="button" data-act="scale" data-dir="-1">−</button><span class="re-scale">' + p.scale + '×</span><button type="button" data-act="scale" data-dir="1">+</button></span>' +
+      '<span class="re-insp-group">Turn <button type="button" data-act="rot" data-dir="-1" title="Quarter turn anticlockwise">↺</button>' +
+        '<span class="re-scale">' + (p.rot || 0) + '°</span>' +
+        '<button type="button" data-act="rot" data-dir="1" title="Quarter turn clockwise (R)">↻</button></span>' +
       '<button type="button" class="pill-btn" data-act="flip">' + (p.flip ? 'Unflip' : 'Flip') + '</button>' +
       '<span class="re-insp-group"><button type="button" class="pill-btn" data-act="order" data-dir="-1">Send back</button><button type="button" class="pill-btn" data-act="order" data-dir="1">Bring forward</button></span>' +
       '<button type="button" class="pill-btn re-danger" data-act="delete">Remove</button>' +
@@ -210,7 +215,7 @@
     var list = props();
     if (list.length >= E.CAPS[state.tab]) { status('That surface is full (' + E.CAPS[state.tab] + ' pieces).', 'err'); return; }
     snapshot();
-    list.push(E.place(piece, E.bounds(room(), state.tab)));
+    list.push(E.place(piece, E.region(room(), state.tab)));
     state.selected = list.length - 1;
     redraw();
     renderToolbar();
@@ -244,7 +249,7 @@
     if (!drag.moved) { drag.snap = JSON.stringify(room()); drag.moved = true; }
     p.x = drag.ox + (pt.x - drag.startX);
     p.y = drag.oy + (pt.y - drag.startY);
-    E.clamp(p, piece, E.bounds(room(), state.tab));
+    E.clamp(p, piece, E.region(room(), state.tab));
     var el = els.stage.querySelector('[data-index="' + drag.i + '"]');
     if (el) {
       var fx = state.tab === 'desk' ? 0 : R.WALL_H, fy = state.tab === 'desk' ? 0 : R.WALL_H;
@@ -270,7 +275,14 @@
     if (a === 'fill-floor') { snapshot(); room().floor = state.tool.paint; room().cells = {}; redraw(); renderToolbar(); return; }
     if (!p) return;
     var piece = pieceOf(p.id);
-    if (a === 'scale') { snapshot(); p.scale = E.nextScale(p.scale, Number(el.dataset.dir)); E.clamp(p, piece, E.bounds(room(), state.tab)); }
+    if (a === 'scale') { snapshot(); p.scale = E.nextScale(p.scale, Number(el.dataset.dir)); E.clamp(p, piece, E.region(room(), state.tab)); }
+    if (a === 'rot') {
+      snapshot();
+      p.rot = E.nextRot(p.rot, Number(el.dataset.dir));
+      /* Rotation turns a piece about its own centre, so it cannot move it
+         out of the region — but a clamp here keeps the record canonical. */
+      E.clamp(p, piece, E.region(room(), state.tab));
+    }
     if (a === 'flip') { snapshot(); p.flip = !p.flip; }
     if (a === 'order') { snapshot(); state.selected = E.reorder(list, i, Number(el.dataset.dir)); }
     if (a === 'delete') { snapshot(); list.splice(i, 1); state.selected = null; }
@@ -368,13 +380,18 @@
       var i = state.selected, p = i != null ? props()[i] : null;
       if (!p) return;
       if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); return act('delete'); }
+      if (ev.key === 'r' || ev.key === 'R') {
+        ev.preventDefault();
+        return act('rot', { dataset: { dir: ev.shiftKey ? '-1' : '1' } });
+      }
+      if (ev.key === 'f' || ev.key === 'F') { ev.preventDefault(); return act('flip'); }
       var dx = ev.key === 'ArrowLeft' ? -1 : ev.key === 'ArrowRight' ? 1 : 0;
       var dy = ev.key === 'ArrowUp' ? -1 : ev.key === 'ArrowDown' ? 1 : 0;
       if (!dx && !dy) return;
       ev.preventDefault();
       snapshot();
       p.x += dx * E.SNAP; p.y += dy * E.SNAP;
-      E.clamp(p, pieceOf(p.id), E.bounds(room(), state.tab));
+      E.clamp(p, pieceOf(p.id), E.region(room(), state.tab));
       redraw(); renderToolbar();
     });
 

@@ -14,7 +14,9 @@ more than one slot. `js/room-edit-core.js` holds its arithmetic (44
 assertions, every result re-checked against the validator). Step 5 built:
 `room-set`, `room-piece` and `room-slot` items, the two-grain validator,
 the partially-unlocked palette, and this month's 26-piece drip on both
-tracks. Next: step 6, polish.
+tracks. Since then: quarter-turn rotation, and the placement region opened
+into the wall band so wall-hung pieces can reach a wall. Next: step 6,
+polish.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 
@@ -126,15 +128,27 @@ cell, from sheet 2. The front edge is open, as top-down rooms are.
 *Assumption (Q12):* snap is always on, at 32 px rather than 128 — a keyboard
 or a can snapped to whole cells could only sit in the middle of a tile.
 
-A prop: `{ id, x, y, scale, flip }` — `x, y` in room pixels on the 32 px
-grid, `scale` one of **0.5, 0.75, 1, 1.5, 2**, `flip` horizontal only, draw
-order = array order with "bring forward / send back". Rugs default to the
-bottom. **No text anywhere in the room.** The room's name is the owner's
+A prop: `{ id, x, y, scale, rot, flip }` — `x, y` in room pixels on the 32 px
+grid, `scale` one of **0.5, 0.75, 1, 1.5, 2**, `rot` one of **0, 90, 180,
+270**, `flip` horizontal, draw order = array order with "bring forward / send
+back". Rugs default to the bottom. Both transforms turn a piece about its own
+centre, so neither moves it and placement never has to know about them. **No text anywhere in the room.** The room's name is the owner's
 display name + "'s Room", generated, never typed.
 
-**Limits, server-enforced:** **100 props**, positions within the room (a piece
-may overhang an edge by up to half its size), every id in the catalog, every
-id in a category the owner has (§4).
+**Where a prop may go — `placementRegion()`.** Its **centre** must be inside a
+region that is the floor **plus the wall band**: `WALL_H` (176 px) out across
+the back and down both sides, the open front edge unchanged. Half of a piece
+may therefore hang past an edge, which is what lets a shelf sit against a wall
+— and what lets posters, neon signs and shelves actually reach one. The first
+version clamped to the floor rectangle alone, so a wall-hung piece could only
+ever poke half its height above the floor and never look mounted; that was a
+bug, fixed after the editor shipped. `js/room-edit-core.js` carries the same
+function and `test-room-edit-core.js` asserts the two agree, so the editor
+cannot produce a placement the server refuses.
+
+**Limits, server-enforced:** **100 props**, the region above, every id in the
+catalog, and every id either in a category the owner has or unlocked piece by
+piece (§4).
 
 ### 3a. The desk setup — a second surface
 
@@ -307,7 +321,7 @@ Each step names its gate.
 | 3 | Floor cell | **128 px**, native. No resampling. |
 | 4 | Walls | **Back and sides**; front open. |
 | 5 | Scale | **0.5–2×, stepped**: 0.5, 0.75, 1, 1.5, 2. |
-| 6 | Flip / rotate | Flip yes, rotate no. |
+| 6 | Flip / rotate | Flip yes; **rotate yes, in quarter turns** — added after the editor shipped. The transform is `scaleX(-1) rotate(Ndeg)`, applied right to left, so Flip always reads as left-right on screen whatever the rotation. |
 | 7 | Who gets what | **Basic categories for everyone; the rest unlocked** via inventory `room-set` items. *(Split in §4 is my proposal.)* |
 | 8 | Prop cap | **100**. |
 | 9 | Empty profiles | **Empty floor + "Build yours"** for the owner. |

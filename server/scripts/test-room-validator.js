@@ -164,7 +164,7 @@ const room = (over = {}) => ({ ...defaultRoom('M'), ...over });
   const v = validateRoom(dirty, BASIC);
   ok('a dirty room validates', v.ok);
   check('only known top-level fields survive', Object.keys(v.room).sort(), ['cells', 'floor', 'props', 'setup', 'size', 'walls']);
-  check('only known prop fields survive', Object.keys(v.room.props[0]).sort(), ['flip', 'id', 'scale', 'x', 'y']);
+  check('only known prop fields survive', Object.keys(v.room.props[0]).sort(), ['flip', 'id', 'rot', 'scale', 'x', 'y']);
   check('setup keeps only its list', Object.keys(v.room.setup), ['props']);
   ok('the copy is not the input', v.room !== dirty && v.room.props !== dirty.props);
 }

@@ -27,6 +27,7 @@ export const CELL = CATALOG.cell;                       // 128
 export const WALL_H = 176;
 export const SNAP = 32;                                  // props sit on a quarter-cell grid
 export const SCALES = [0.5, 0.75, 1, 1.5, 2];
+export const ROTATIONS = [0, 90, 180, 270];
 export const SIZES = { S: { w: 9, h: 6 }, M: { w: 12, h: 8 }, L: { w: 15, h: 10 } };
 export const ROOM_PROP_CAP = 100;
 export const SETUP = { w: 1024, h: 576, cap: 40 };
@@ -130,8 +131,22 @@ function validateWallRun(run, length, owned, what, pieceIds) {
   return null;
 }
 
-/** One placed prop. `surface` is 'room' or 'desk'; `bounds` the canvas. */
-function validateProp(raw, i, surface, bounds, owned, pieceIds) {
+/** The region a prop's CENTRE may occupy, in floor-relative pixels.
+ *
+ * THE WALL BAND IS PART OF IT. This used to be the floor rectangle alone,
+ * which meant a poster or a neon sign — things drawn to hang on a wall —
+ * could only ever poke half its height above the floor's top edge and
+ * never actually reach the wall. The band is WALL_H deep across the back
+ * and down both sides, so the region opens out by that much on three
+ * sides. The front edge stays where it is: there is no wall there. */
+export function placementRegion(size, surface) {
+  if (surface === 'desk') return { x0: 0, y0: 0, x1: SETUP.w, y1: SETUP.h };
+  const d = SIZES[size] || SIZES[DEFAULT_SIZE];
+  return { x0: -WALL_H, y0: -WALL_H, x1: d.w * CELL + WALL_H, y1: d.h * CELL };
+}
+
+/** One placed prop. `surface` is 'room' or 'desk'; `region` from placementRegion. */
+function validateProp(raw, i, surface, region, owned, pieceIds) {
   const what = `Item ${i + 1}`;
   if (!plain(raw)) return { error: `${what}: not an item.` };
   const p = piece(raw.id);
@@ -150,18 +165,24 @@ function validateProp(raw, i, surface, bounds, owned, pieceIds) {
   if (typeof scale !== 'number' || !SCALES.includes(scale)) {
     return { error: `${what}: scale must be one of ${SCALES.join(', ')}.` };
   }
+  /* Absent is upright: rooms saved before rotation existed have no rot. */
+  const rot = raw.rot === undefined ? 0 : raw.rot;
+  if (typeof rot !== 'number' || !ROTATIONS.includes(rot)) {
+    return { error: `${what}: rotation must be one of ${ROTATIONS.join(', ')}.` };
+  }
   const x = raw.x, y = raw.y;
   if (!isInt(x) || !isInt(y)) return { error: `${what}: position must be whole pixels.` };
   if (x % SNAP !== 0 || y % SNAP !== 0) return { error: `${what}: position must sit on the ${SNAP}px grid.` };
-  /* A piece may overhang an edge by up to half its drawn size, so a
-     shelf can sit against a wall; further than that and it is off the
-     room. */
-  const dw = p.w * scale, dh = p.h * scale;
-  if (x < -dw / 2 || y < -dh / 2 || x + dw / 2 > bounds.w || y + dh / 2 > bounds.h) {
+  /* The centre must be inside the region. Rotation turns a piece about
+     its own centre, so it moves nothing — which is why this rule needs
+     no rotated dimensions. Half of a piece may hang outside, which is
+     what lets a shelf sit against a wall. */
+  const cx = x + (p.w * scale) / 2, cy = y + (p.h * scale) / 2;
+  if (cx < region.x0 || cx > region.x1 || cy < region.y0 || cy > region.y1) {
     return { error: `${what}: off the edge.` };
   }
   if (typeof raw.flip !== 'boolean') return { error: `${what}: flip must be true or false.` };
-  return { prop: { id: p.id, x, y, scale, flip: raw.flip } };
+  return { prop: { id: p.id, x, y, scale, rot, flip: raw.flip } };
 }
 
 /**
@@ -176,7 +197,8 @@ export function validateRoom(input, owned, pieceIds) {
   const size = String(input.size || '');
   const dims = SIZES[size];
   if (!dims) return bad(`Size must be one of ${Object.keys(SIZES).join(', ')}.`);
-  const roomW = dims.w * CELL, roomH = dims.h * CELL;
+  const roomRegion = placementRegion(size, 'room');
+  const deskRegion = placementRegion(size, 'desk');
 
   const floorErr = validateTile(input.floor, 'floor', owned, 'Floor', pieceIds);
   if (floorErr) return bad(floorErr);
@@ -205,7 +227,7 @@ export function validateRoom(input, owned, pieceIds) {
   if (input.props.length > ROOM_PROP_CAP) return bad(`At most ${ROOM_PROP_CAP} items in a room.`);
   const props = [];
   for (let i = 0; i < input.props.length; i++) {
-    const v = validateProp(input.props[i], i, 'room', { w: roomW, h: roomH }, owned, pieceIds);
+    const v = validateProp(input.props[i], i, 'room', roomRegion, owned, pieceIds);
     if (v.error) return bad(v.error);
     props.push(v.prop);
   }
@@ -215,7 +237,7 @@ export function validateRoom(input, owned, pieceIds) {
   if (setupIn.props.length > SETUP.cap) return bad(`At most ${SETUP.cap} items on the desk.`);
   const setup = [];
   for (let i = 0; i < setupIn.props.length; i++) {
-    const v = validateProp(setupIn.props[i], i, 'desk', { w: SETUP.w, h: SETUP.h }, owned, pieceIds);
+    const v = validateProp(setupIn.props[i], i, 'desk', deskRegion, owned, pieceIds);
     if (v.error) return bad(`Desk: ${v.error}`);
     setup.push(v.prop);
   }

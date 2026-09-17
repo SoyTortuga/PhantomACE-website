@@ -18,17 +18,22 @@
   var SNAP = 32;
   var CELL = 128;
   var SCALES = [0.5, 0.75, 1, 1.5, 2];
+  var ROTATIONS = [0, 90, 180, 270];
+  var WALL_H = 176;
   var SIZES = { S: { w: 9, h: 6 }, M: { w: 12, h: 8 }, L: { w: 15, h: 10 } };
   var SETUP = { w: 1024, h: 576 };
   var CAPS = { room: 100, desk: 40 };
 
   function snap(v) { return Math.round(v / SNAP) * SNAP; }
 
-  /** The canvas a surface's props live in. */
-  function bounds(room, surface) {
-    if (surface === 'desk') return { w: SETUP.w, h: SETUP.h };
+  /** The region a prop's CENTRE may occupy, in floor-relative pixels.
+      The room's includes the wall band — WALL_H deep across the back and
+      down both sides — so wall-hung pieces can actually reach a wall.
+      Must match placementRegion() in functions/api/room-catalog.js. */
+  function region(room, surface) {
+    if (surface === 'desk') return { x0: 0, y0: 0, x1: SETUP.w, y1: SETUP.h };
     var d = SIZES[room.size] || SIZES.M;
-    return { w: d.w * CELL, h: d.h * CELL };
+    return { x0: -WALL_H, y0: -WALL_H, x1: d.w * CELL + WALL_H, y1: d.h * CELL };
   }
 
   function list(room, surface) {
@@ -39,24 +44,32 @@
     return room.props;
   }
 
-  /** Snap a prop to the grid and keep it within the half-overhang rule
-      the server enforces: no further out than half its drawn size. */
-  function clamp(prop, piece, b) {
-    var dw = piece.w * prop.scale, dh = piece.h * prop.scale;
-    var x = snap(prop.x), y = snap(prop.y);
-    while (x < -dw / 2) x += SNAP;
-    while (x + dw / 2 > b.w) x -= SNAP;
-    while (y < -dh / 2) y += SNAP;
-    while (y + dh / 2 > b.h) y -= SNAP;
+  /** Snap a prop to the grid and keep its centre inside the region — the
+      same rule the server validates with, so the editor cannot produce a
+      placement the server refuses. */
+  function clamp(prop, piece, rg) {
+    var hw = (piece.w * prop.scale) / 2, hh = (piece.h * prop.scale) / 2;
+    var x = snap(Math.min(Math.max(prop.x + hw, rg.x0), rg.x1) - hw);
+    var y = snap(Math.min(Math.max(prop.y + hh, rg.y0), rg.y1) - hh);
+    /* Snapping can push the centre a little back out; one step fixes it. */
+    if (x + hw < rg.x0) x += SNAP;
+    if (x + hw > rg.x1) x -= SNAP;
+    if (y + hh < rg.y0) y += SNAP;
+    if (y + hh > rg.y1) y -= SNAP;
     prop.x = x;
     prop.y = y;
     return prop;
   }
 
-  /** A new prop, centred on the canvas. */
-  function place(piece, b) {
-    var prop = { id: piece.id, x: b.w / 2 - piece.w / 2, y: b.h / 2 - piece.h / 2, scale: 1, flip: false };
-    return clamp(prop, piece, b);
+  /** A new prop, centred in the region. */
+  function place(piece, rg) {
+    var prop = {
+      id: piece.id,
+      x: (rg.x0 + rg.x1) / 2 - piece.w / 2,
+      y: (rg.y0 + rg.y1) / 2 - piece.h / 2,
+      scale: 1, rot: 0, flip: false,
+    };
+    return clamp(prop, piece, rg);
   }
 
   /** The scale one step up (+1) or down (-1); the same at the ends. */
@@ -64,6 +77,13 @@
     var i = SCALES.indexOf(scale);
     if (i < 0) i = SCALES.indexOf(1);
     return SCALES[Math.max(0, Math.min(SCALES.length - 1, i + dir))];
+  }
+
+  /** A quarter turn clockwise (+1) or anticlockwise (-1), wrapping. */
+  function nextRot(rot, dir) {
+    var i = ROTATIONS.indexOf(rot || 0);
+    if (i < 0) i = 0;
+    return ROTATIONS[(i + dir + ROTATIONS.length) % ROTATIONS.length];
   }
 
   /** Move item i one step later (+1, drawn over more) or earlier (-1).
@@ -103,17 +123,18 @@
       if (m && Number(m[1]) < d.w && Number(m[2]) < d.h) kept[k] = cells[k];
     });
     room.cells = kept;
-    var b = bounds(room, 'room');
+    var rg = region(room, 'room');
     (room.props || []).forEach(function (p) {
       var piece = pieceOf(p.id);
-      if (piece) clamp(p, piece, b);
+      if (piece) clamp(p, piece, rg);
     });
     return room;
   }
 
   root.PhamRoomEdit = {
-    SNAP: SNAP, CELL: CELL, SCALES: SCALES, SIZES: SIZES, SETUP: SETUP, CAPS: CAPS,
-    snap: snap, bounds: bounds, list: list, clamp: clamp, place: place,
-    nextScale: nextScale, reorder: reorder, resizeRun: resizeRun, resize: resize,
+    SNAP: SNAP, CELL: CELL, SCALES: SCALES, ROTATIONS: ROTATIONS, WALL_H: WALL_H,
+    SIZES: SIZES, SETUP: SETUP, CAPS: CAPS,
+    snap: snap, region: region, list: list, clamp: clamp, place: place,
+    nextScale: nextScale, nextRot: nextRot, reorder: reorder, resizeRun: resizeRun, resize: resize,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

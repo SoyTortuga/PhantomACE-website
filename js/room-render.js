@@ -67,9 +67,16 @@
     if (!p) return '';
     var scale = Number(prop.scale) || 1;
     var w = Math.round(p.w * scale), h = Math.round(p.h * scale);
-    var flip = prop.flip ? ';transform:scaleX(-1)' : '';
+    /* Right to left, so the sprite is rotated first and THEN mirrored:
+       Flip always reads as left-right on screen whatever the rotation.
+       Both turn about the element's centre, so neither moves the piece —
+       which is why placement never has to know about rotation. */
+    var t = [];
+    if (prop.flip) t.push('scaleX(-1)');
+    if (prop.rot) t.push('rotate(' + prop.rot + 'deg)');
+    var transform = t.length ? ';transform:' + t.join(' ') : '';
     return '<img class="rm-piece rm-prop" src="' + esc(src(p)) + '" alt="" draggable="false" data-index="' + i + '" ' +
-      'style="left:' + (ox + prop.x) + 'px;top:' + (oy + prop.y) + 'px;width:' + w + 'px;height:' + h + 'px' + flip + '">';
+      'style="left:' + (ox + prop.x) + 'px;top:' + (oy + prop.y) + 'px;width:' + w + 'px;height:' + h + 'px' + transform + '">';
   }
 
   /** Rugs under everything, then list order. Stable, so two rugs keep
