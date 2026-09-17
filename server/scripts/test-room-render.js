@@ -124,6 +124,46 @@ const count = (html, re) => (html.match(re) || []).length;
   ok('a hostile prop id not in the catalog draws nothing', !/onerror/.test(b2.html));
 }
 
+/* ── Fitting a stage to its host ─────────────────────────────────────
+   fit() is the only part of the renderer that touches a DOM, so it gets
+   a hand-made one. The minimum scale is what makes the editor usable on
+   a phone: without it a 12x8 room fits 375px at 0.17, drawing a floor
+   tile 22px across. With it the stage overflows and the host scrolls. */
+{
+  const host = (clientWidth, w, h) => {
+    const stage = { style: { width: w + 'px', height: h + 'px', transform: '' } };
+    return { clientWidth, style: {}, dataset: {}, querySelector: () => stage, stage };
+  };
+
+  const wide = host(1888, 1888, 1200);
+  check('a host as wide as the stage draws it 1:1', R.fit(wide), 1);
+  check('and says so on the element', wide.dataset.scale, '1');
+  check('the host takes the stage height', wide.style.height, '1200px');
+
+  const half = host(944, 1888, 1200);
+  check('a half-width host halves it', R.fit(half), 0.5);
+  check('the stage is transformed, not resized', half.stage.style.transform, 'scale(0.5)');
+  check('and the host height follows', half.style.height, '600px');
+
+  const big = host(4000, 1888, 1200);
+  check('a host wider than the stage does not blow it up', R.fit(big), 1);
+
+  /* THE PHONE CASE. */
+  const phone = host(375, 1888, 1200);
+  const unbounded = R.fit(phone);
+  ok('unbounded, a phone would draw it at about a sixth', unbounded > 0.15 && unbounded < 0.2);
+  check('with a minimum it holds that instead', R.fit(phone, 0.35), 0.35);
+  check('so the stage is wider than the host and it must scroll',
+    1888 * 0.35 > 375, true);
+  check('a minimum below the fitted scale changes nothing', R.fit(half, 0.2), 0.5);
+  check('and one at exactly the fitted scale is a no-op', R.fit(half, 0.5), 0.5);
+
+  const empty = { querySelector: () => null, style: {}, dataset: {}, clientWidth: 300 };
+  check('a host with no stage in it is 1, not a crash', R.fit(empty, 0.35), 1);
+  const noWidth = host(0, 1888, 1200);
+  check('a host not yet laid out falls back to the stage width', R.fit(noWidth), 1);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

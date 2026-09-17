@@ -158,19 +158,29 @@
   }
 
   /** Put a built stage into a host element and scale it to the host's
-      width. Call again on resize. Returns the scale used. */
-  function mount(host, built) {
+      width. Call again on resize. Returns the scale used.
+
+      `minScale` stops it shrinking past the point of usefulness: on a
+      phone a 12x8 room fits 375px only at 0.17, which draws a floor tile
+      22px across and a keyboard the size of a full stop. Passing a
+      minimum makes the stage overflow its host instead, and the host
+      scrolls — the ordinary answer for a canvas bigger than the screen.
+      The profile passes none: there, small but whole is what is wanted. */
+  function mount(host, built, minScale) {
     host.innerHTML = '<div class="rm-stage" style="width:' + built.w + 'px;height:' + built.h + 'px">' + built.html + '</div>';
-    return fit(host);
+    return fit(host, minScale);
   }
 
-  function fit(host) {
+  function fit(host, minScale) {
     var stage = host.querySelector('.rm-stage');
     if (!stage) return 1;
     var w = parseFloat(stage.style.width), h = parseFloat(stage.style.height);
     var avail = host.clientWidth || w;
     var s = Math.min(1, avail / w);
+    if (minScale && s < minScale) s = minScale;
     stage.style.transform = 'scale(' + s + ')';
+    /* The height the scaled stage needs. CSS may cap it — the editor
+       does on a narrow screen — and then the host scrolls. */
     host.style.height = Math.round(h * s) + 'px';
     host.dataset.scale = String(s);
     return s;

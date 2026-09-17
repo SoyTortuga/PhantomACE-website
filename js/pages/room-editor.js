@@ -21,6 +21,9 @@
   'use strict';
 
   var R = window.PhamRoom, E = window.PhamRoomEdit;
+  /* Below this the pieces are too small to aim at with a finger, so the
+     stage overflows and the host scrolls instead. A floor tile stays 45px. */
+  var MIN_SCALE = 0.35;
   var state = {
     catalog: null, rooms: [], current: 0, publicIndex: 0, slots: 1,
     owned: new Set(),            // whole categories
@@ -77,7 +80,7 @@
   /* ── Drawing ─────────────────────────────────────────────────────── */
   function redraw() {
     var built = state.tab === 'desk' ? R.buildSetup(room(), state.catalog) : R.build(room(), state.catalog);
-    R.mount(els.stage, built);
+    R.mount(els.stage, built, MIN_SCALE);
     els.stage.dataset.floorX = built.floor ? built.floor.x : 0;
     els.stage.dataset.floorY = built.floor ? built.floor.y : 0;
     if (state.selected != null) {
@@ -395,7 +398,7 @@
       redraw(); renderToolbar();
     });
 
-    window.addEventListener('resize', function () { R.fit(els.stage); });
+    window.addEventListener('resize', function () { R.fit(els.stage, MIN_SCALE); });
     window.addEventListener('beforeunload', function (ev) { if (state.dirty) { ev.preventDefault(); ev.returnValue = ''; } });
   }
 

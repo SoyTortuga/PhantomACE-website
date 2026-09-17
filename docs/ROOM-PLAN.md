@@ -14,9 +14,10 @@ more than one slot. `js/room-edit-core.js` holds its arithmetic (44
 assertions, every result re-checked against the validator). Step 5 built:
 `room-set`, `room-piece` and `room-slot` items, the two-grain validator,
 the partially-unlocked palette, and this month's 26-piece drip on both
-tracks. Since then: quarter-turn rotation, and the placement region opened
-into the wall band so wall-hung pieces can reach a wall. Next: step 6,
-polish.
+tracks. Since then: quarter-turn rotation, the placement region opened into
+the wall band so wall-hung pieces can reach a wall, and step 6 — the editor
+made usable on a phone. **The feature is built.** What is left is in §8
+step 6 and §11.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 
@@ -299,7 +300,29 @@ Each step names its gate.
 4. **Editor** — place, move, scale, flip, order, paint, size, undo, save.
 5. **Unlocks** — `room-set` and `room-slot` items in the inventory, the locked
    palette, and the reward table you fill in.
-6. **Polish** — thumbnail on the profile head, keyboard nudging.
+6. **Polish.** Keyboard nudging shipped with the editor. The rest was
+   decided by measuring rather than by the list:
+
+   - **Done: the editor on a narrow screen.** It was unusable, and not for
+     one reason. The palette is ~630px tall, so in source order it pushed
+     the stage to y=858 — off screen, so you picked a piece and then
+     scrolled past everything to find out where it went. And a 12×8 room
+     fits 375px only at 0.17 scale, which draws a floor tile 22px across.
+     Fixed together: the stage comes first, `fit()` takes a minimum scale
+     (0.35, a 45px tile) and the host scrolls instead of shrinking past
+     it, and `touch-action` is split so dragging a piece and panning the
+     background each go to the right element. Desktop is untouched: an M
+     room fits at 0.397, above the floor, so nothing scrolls.
+   - **Not done: a thumbnail on the profile head.** The Room section is
+     already on the profile a few hundred pixels below, so this would be
+     the same picture twice. Say if you want it anyway.
+   - **Not done: palette search.** Piece ids are positional
+     (`snacks-r1c1`), so there is no descriptive text to search — it could
+     only filter the 12–13 category names already visible in a list.
+   - **Open, and the better version of both:** tapping the room on a
+     profile to open it full-screen. On a phone a room renders at 0.17 and
+     reads as a thumbnail; this is what would let someone actually look at
+     it, on any screen. Not built.
 
 ---
 

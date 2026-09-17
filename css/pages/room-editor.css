@@ -72,3 +72,31 @@
 .re-part { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .re-piece-locked { opacity: 0.28; cursor: not-allowed; filter: grayscale(1); }
 .re-piece-locked:hover { border-color: var(--border); }
+
+/* ── Narrow screens ──────────────────────────────
+   Two things make the editor unusable on a phone unless they are
+   fixed together. The palette is ~630px tall, so in source order it
+   pushes the stage completely off screen — you pick a piece and then
+   scroll past everything to see where it landed. And a 12x8 room fits
+   375px only at 0.17 scale, which is a 22px floor tile.
+
+   So: the stage comes first, it keeps a minimum scale (MIN_SCALE in
+   room-editor.js) and overflows, and the host scrolls. The palette
+   goes underneath with a height of its own rather than the page's. */
+.rm-editor { overflow: auto; }
+
+/* Dragging a piece must not be read as panning, and panning the
+   background must not be blocked. Splitting touch-action between the
+   two gives each gesture to the element it belongs to. */
+.rm-editor { touch-action: pan-x pan-y; }
+.rm-editor .rm-prop { touch-action: none; }
+
+@media (max-width: 860px) {
+  .re-app { grid-template-columns: 1fr; }
+  .re-main { order: 1; }
+  .re-palette { order: 2; max-height: 46vh; }
+  .rm-editor { max-height: 58vh; }
+  .re-toolbar { gap: 8px 10px; }
+  .re-toolbar .re-spacer { display: none; }
+  .re-piece { width: 60px; height: 60px; }
+}
