@@ -35,3 +35,6 @@ PhantomACE-Demo.zip
 # but this catches a stray one written here by hand.
 *.dump
 *.ndjson
+
+# Python bytecode from tools/ (the atlas builder)
+__pycache__/
