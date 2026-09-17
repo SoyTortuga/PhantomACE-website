@@ -36,7 +36,12 @@ export const CHECKIN_BADGES = [
     game: 'profile',
     type: 'badge',
     name: 'Agate Hunt',
-    rarity: 'rare',
+    /* EXCLUSIVE, not rare. A rarity is written INTO each granted item and
+       is never read back from here, so changing it after an event means a
+       repair script over every inventory that already holds one. It is a
+       decision that is cheap before the window opens and expensive an hour
+       later. */
+    rarity: 'exclusive',
     image: '/assets/badges/agate-hunt.png',
 
     /* 2026-09-17 10:00 PDT → 2026-09-18 17:00 PDT.

@@ -59,7 +59,10 @@ const BADGES = {
     game: 'profile',
     type: 'badge',
     name: 'Agate Hunt',
-    rarity: 'rare',
+    /* Must match checkin-badges.js — the same badge is earnable both ways,
+       and a viewer's copy should not depend on how they got it. Asserted by
+       server/scripts/test-checkin-badges.js. */
+    rarity: 'exclusive',
     image: '/assets/badges/agate-hunt.png',
     blurb: 'For everyone who came rock hunting.',
   },

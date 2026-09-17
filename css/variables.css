@@ -17,6 +17,13 @@
   --amber:      #ffaa00;
   --purple:     #cc88ff;
 
+  /* EXCLUSIVE — above every other rarity, and a token rather than a hex
+     repeated in four stylesheets. The existing four already disagree with
+     each other: rare is --purple in the inventory, #4488ff on the redeem
+     page and #cc88ff on a profile. That drift is old and is left alone
+     here, but a rarity added today has no excuse to start it. */
+  --exclusive:  #d4af37;
+
   --border:     #1a1a1a;
   --border-mid: #2a2a2a;
 

@@ -90,7 +90,7 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
   check('as a badge', item.type, 'badge');
   check('on the profile', item.game, 'profile');
   check('named for the event', item.name, 'Agate Hunt');
-  check('at its rarity', item.rarity, 'rare');
+  check('at its rarity', item.rarity, 'exclusive');
   check('not consumable', item.consumable, false);
   check('one of them', item.quantity, 1);
   check('marked as earned by checking in', item.source, 'pham-checkin');
@@ -176,6 +176,49 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
      renders as nothing, and by the time anyone notices it is in
      inventories. */
   ok('the artwork exists', fs.existsSync(path.join(REPO, AGATE.image.replace(/^\//, ''))));
+}
+
+/* ── Every rarity a badge can carry is drawn everywhere it is shown ── */
+{
+  /* A RARITY THAT IS NOT STYLED IS A RARITY THAT RENDERS AS NOTHING.
+     Four stylesheets colour a badge's rarity, on three different class
+     shapes, and a new one added to the data alone falls through every
+     selector — the tag renders in inherited grey and looks like a bug
+     nobody can reproduce, because it only affects the people who earned it.
+
+     Checked against the rarities CHECKIN_BADGES actually uses rather than a
+     hardcoded list, so the next event badge is covered by writing it. */
+  const rarities = [...new Set(CHECKIN_BADGES.map(b => b.rarity))];
+
+  const surfaces = [
+    ['inventory, equipped', 'css/pages/inventory.css', r => `.equipped-item.rarity-${r}`],
+    ['inventory, collection', 'css/pages/inventory.css', r => `.collection-item.rarity-${r}`],
+    ['inventory, the tag', 'css/pages/inventory.css', r => `.rarity-${r} .item-rarity-tag`],
+    ['redeem, text', 'css/pages/redeem.css', r => `.rarity-${r}`],
+    ['redeem, border', 'css/pages/redeem.css', r => `.rarity-border-${r}`],
+    ['profile', 'css/pages/profile.css', r => `.prof-rarity.r-${r}`],
+  ];
+
+  for (const [where, file, selector] of surfaces) {
+    const css = fs.readFileSync(path.join(REPO, file), 'utf8');
+    const missing = rarities.filter(r => !css.includes(selector(r)));
+    check(`every event rarity is styled — ${where}`, missing, []);
+  }
+
+  /* One definition of the colour, not four. The existing four rarities
+     already disagree across these files; this is the one that cannot. */
+  const vars = fs.readFileSync(path.join(REPO, 'css/variables.css'), 'utf8');
+  ok('the exclusive colour is a token', /--exclusive:\s*#[0-9a-fA-F]{3,8};/.test(vars));
+
+  /* And it sorts above everything, or it lands mid-list in a collection
+     where its whole point is being at the top. */
+  const inv = fs.readFileSync(path.join(REPO, 'js/pages/inventory.js'), 'utf8');
+  const order = /const RARITY_ORDER = \{([^}]*)\}/.exec(inv);
+  ok('the inventory ranks rarities', !!order);
+  const ranks = Object.fromEntries((order ? order[1] : '').split(',')
+    .map(p => p.split(':').map(x => x.trim())).filter(p => p.length === 2)
+    .map(([k, v]) => [k, Number(v)]));
+  check('exclusive outranks mythic', ranks.exclusive < ranks.mythic, true);
 }
 
 /* ── The handler actually calls it ───────────────────────────────────── */

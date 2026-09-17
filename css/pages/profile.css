@@ -204,6 +204,7 @@
 .prof-rarity.r-uncommon { color: #2ecc71; }
 .prof-rarity.r-rare     { color: #cc88ff; }
 .prof-rarity.r-mythic   { color: var(--amber, #ffb300); }
+.prof-rarity.r-exclusive { color: var(--exclusive); }
 
 /* ── Favourite dino ───────────────────────────────────────────────
    The collection's own stat block, in this page's palette: portrait left,

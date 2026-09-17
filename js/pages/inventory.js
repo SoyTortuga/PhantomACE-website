@@ -12,7 +12,10 @@ const PROFILE_SLOTS = [
   { slot: 'name-effect', label: 'Name Effect', type: 'name-effect', icon: '\u2728' },
 ];
 
-const RARITY_ORDER = { mythic: 0, rare: 1, uncommon: 2, common: 3 };
+/* Exclusive outranks mythic. It is not "rarer" in a drop-rate sense —
+   there is no drop rate — it means you were there, which is the one thing
+   nobody can obtain later. */
+const RARITY_ORDER = { exclusive: 0, mythic: 1, rare: 2, uncommon: 3, common: 4 };
 const SHOWCASE_MAX = 5;
 
 let profileItems = [];

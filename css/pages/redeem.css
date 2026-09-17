@@ -118,11 +118,13 @@
 .rarity-uncommon  { color: var(--green); }
 .rarity-rare      { color: #4488ff; }
 .rarity-mythic    { color: var(--purple); }
+.rarity-exclusive { color: var(--exclusive); }
 
 .rarity-border-common   { border-color: #888888; }
 .rarity-border-uncommon  { border-color: var(--green); }
 .rarity-border-rare      { border-color: #4488ff; }
 .rarity-border-mythic    { border-color: var(--purple); }
+.rarity-border-exclusive { border-color: var(--exclusive); }
 
 @media (max-width: 500px) {
   .redeem-input-row {

@@ -78,6 +78,7 @@
   font-style: italic;
 }
 
+.equipped-item.rarity-exclusive { color: var(--exclusive); }
 .equipped-item.rarity-mythic { color: #ff6600; }
 .equipped-item.rarity-rare { color: var(--purple); }
 .equipped-item.rarity-uncommon { color: var(--green); }
@@ -145,6 +146,7 @@
 }
 
 /* Rarity border accents */
+.collection-item.rarity-exclusive { border-left: 3px solid var(--exclusive); }
 .collection-item.rarity-mythic { border-left: 3px solid #ff6600; }
 .collection-item.rarity-rare { border-left: 3px solid var(--purple); }
 .collection-item.rarity-uncommon { border-left: 3px solid var(--green); }
@@ -195,6 +197,7 @@
   font-family: var(--font-system);
 }
 
+.rarity-exclusive .item-rarity-tag { color: var(--exclusive); }
 .rarity-mythic .item-rarity-tag { color: #ff6600; }
 .rarity-rare .item-rarity-tag { color: var(--purple); }
 .rarity-uncommon .item-rarity-tag { color: var(--green); }
