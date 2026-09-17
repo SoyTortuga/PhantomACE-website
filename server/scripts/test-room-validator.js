@@ -16,9 +16,10 @@
    ══════════════════════════════════════════════ */
 
 import {
-  validateRoom, defaultRoom, ownedCategories, basicCategories, roomSlots, piece, pieces, categories,
-  SNAP, SCALES, SIZES, ROOM_PROP_CAP, SETUP, CELL,
+  validateRoom, defaultRoom, ownedCategories, ownedPieces, basicCategories, roomSlots,
+  piece, pieces, categories, SNAP, SCALES, SIZES, ROOM_PROP_CAP, SETUP, CELL,
 } from '../../functions/api/room-catalog.js';
+import { FOLLOWER_REWARDS, PHAMILY_REWARDS, MILESTONES } from '../../functions/api/phamily-rewards.js';
 
 let passed = 0;
 const failures = [];
@@ -29,7 +30,7 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 /** The refusal, or 'ok'. Tests read like sentences this way. */
-const verdict = (input, owned) => { const v = validateRoom(input, owned); return v.ok ? 'ok' : v.error; };
+const verdict = (input, owned, pieceIds) => { const v = validateRoom(input, owned, pieceIds); return v.ok ? 'ok' : v.error; };
 const refuses = (label, input, owned, fragment) => {
   const r = verdict(input, owned);
   ok(`${label} → "${fragment}"`, r !== 'ok' && r.includes(fragment));
@@ -186,6 +187,83 @@ const room = (over = {}) => ({ ...defaultRoom('M'), ...over });
   check('one room plus a slot each', roomSlots(inv), 3);
   check('one room with no inventory', roomSlots(null), 1);
   check('one room with no slots', roomSlots({ items: [] }), 1);
+}
+
+/* ── Per-piece unlocks ───────────────────────────────────────────────
+   The pass drips single pieces out of sets nobody owns outright, so
+   "may they place this?" has two answers: the category, or the piece. */
+{
+  const locked = unlockRoomProp;                 // a room prop in an unlocked-only set
+  const lockedDesk = unlockDeskProp;
+  const onePiece = new Set([locked.id]);
+
+  check('no inventory: no loose pieces', [...ownedPieces(null)], []);
+  check('a room-piece item grants its piece', [...ownedPieces({ items: [
+    { id: 'x', type: 'room-piece', meta: { piece: locked.id } },
+  ] })], [locked.id]);
+  check('a piece id that is not in the catalog grants nothing', [...ownedPieces({ items: [
+    { id: 'x', type: 'room-piece', meta: { piece: 'snacks-r99c99' } },
+  ] })], []);
+  check('a room-set item grants no loose piece', [...ownedPieces({ items: [
+    { id: 'x', type: 'room-set', meta: { category: 'snacks' } },
+  ] })], []);
+  check('and a room-piece grants no category',
+    [...ownedCategories({ items: [{ id: 'x', type: 'room-piece', meta: { piece: locked.id } }] })].sort(),
+    [...BASIC].sort());
+
+  /* THE POINT OF THE WHOLE MECHANISM. */
+  refuses('a prop from a locked set with no loose pieces', room({ props: [prop(locked)] }), BASIC, 'not unlocked');
+  check('the same prop once that one piece is owned', verdict(room({ props: [prop(locked)] }), BASIC, onePiece), 'ok');
+  const sibling = pieces().find(p => p.category === locked.category && p.id !== locked.id);
+  const r = validateRoom(room({ props: [prop(sibling)] }), BASIC, onePiece);
+  ok('but not its neighbour in the same set', !r.ok && r.error.includes('not unlocked'));
+
+  check('a desk prop unlocked piece-wise',
+    verdict(room({ setup: { props: [{ id: lockedDesk.id, x: 256, y: 256, scale: 1, flip: false }] } }),
+      BASIC, new Set([lockedDesk.id])), 'ok');
+
+  /* Floors and walls take the same rule — a painted tile from a locked
+     set is a tile you were given, not a tile you own the set of. */
+  const lockedFloor = pieces().find(p => p.layer === 'floor' && !BASIC.has(p.category));
+  ok('floors are basic, so there is no locked floor to test', !lockedFloor);
+
+  ok('an empty piece set behaves exactly as none',
+    verdict(room({ props: [prop(locked)] }), BASIC, new Set()) === verdict(room({ props: [prop(locked)] }), BASIC));
+  ok('owning the whole set still works when loose pieces are also passed',
+    validateRoom(room({ props: [prop(locked)] }), ALL, new Set()).ok);
+}
+
+/* ── The pass and the catalog cannot drift apart ─────────────────────
+   Every room reward names a piece or a category by id. A rebuild of the
+   atlas that renamed something would make the pass grant items nothing
+   can match — invisibly, because a grant does not fail. */
+{
+  const all = [...FOLLOWER_REWARDS, ...PHAMILY_REWARDS];
+  const roomRewards = all.filter(r => r.type === 'room-piece' || r.type === 'room-set');
+  ok('the pass carries room rewards at all', roomRewards.length > 0);
+
+  const badPiece = all.filter(r => r.type === 'room-piece' && !piece(r.cosmeticId));
+  check('every room-piece reward names a piece in the catalog', badPiece.map(r => r.cosmeticId), []);
+  const badSet = all.filter(r => r.type === 'room-set' && !categories()[r.cosmeticId]);
+  check('every room-set reward names a category in the catalog', badSet.map(r => r.cosmeticId), []);
+
+  const milestoneBonuses = MILESTONES.flatMap(m => m.bonusItems || []);
+  const badMsSet = milestoneBonuses.filter(b => b.type === 'room-set' && !categories()[b.cosmeticId]);
+  check('every milestone room-set names a category', badMsSet.map(b => b.cosmeticId), []);
+  const msSlots = milestoneBonuses.filter(b => b.type === 'room-slot');
+  ok('every milestone room-slot carries an id, or they would collide', msSlots.every(b => !!b.cosmeticId));
+  check('the slot ids are distinct', new Set(msSlots.map(b => b.cosmeticId)).size, msSlots.length);
+
+  /* A piece may only be dripped by a set that is NOT already basic —
+     granting a piece of a set everyone has would be a dead reward. */
+  const pointless = all.filter(r => r.type === 'room-piece' && BASIC.has(piece(r.cosmeticId).category));
+  check('no reward drips a piece everybody already has', pointless.map(r => r.cosmeticId), []);
+
+  /* Nothing is granted twice on one track. */
+  for (const [name, list] of [['follower', FOLLOWER_REWARDS], ['sub', PHAMILY_REWARDS]]) {
+    const ids = list.filter(r => r.type === 'room-piece').map(r => r.cosmeticId);
+    check(`${name}: no piece dripped twice`, ids.length - new Set(ids).size, 0);
+  }
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

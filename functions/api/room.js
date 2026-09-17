@@ -18,7 +18,7 @@
    ══════════════════════════════════════════════ */
 
 import {
-  validateRoom, defaultRoom, ownedCategories, roomSlots, DEFAULT_SIZE,
+  validateRoom, defaultRoom, ownedCategories, ownedPieces, roomSlots, DEFAULT_SIZE,
 } from './room-catalog.js';
 
 function json(data, status = 200) {
@@ -71,6 +71,9 @@ export async function onRequestGet(context) {
       public: Math.min(d.public, slots - 1),
       slots,
       owned: [...ownedCategories(inv)].sort(),
+      /* Single pieces out of sets they do not own outright — the pass
+         drips these, and the palette lights them inside a locked set. */
+      ownedPieces: [...ownedPieces(inv)].sort(),
     });
   }
 
@@ -126,7 +129,7 @@ export async function onRequestPost(context) {
   }
 
   const owned = ownedCategories(inv);
-  const v = validateRoom(payload.room, owned);
+  const v = validateRoom(payload.room, owned, ownedPieces(inv));
   if (!v.ok) return json({ error: v.error }, 400);
   const room = { ...v.room, updatedAt: Date.now() };
 

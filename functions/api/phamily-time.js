@@ -348,6 +348,22 @@ const REWARD_ITEM_MAP = {
     ({ id: cosmeticId, game:'skull-clicker', type:'skull-skin', consumable:false }),
   'click-effect': (rarity, name, cosmeticId) =>
     ({ id: cosmeticId, game:'skull-clicker', type:'click-effect', consumable:false }),
+  /* MY ROOM, at two grains. A `room-set` opens a whole category, a
+     `room-piece` one piece of one, and the room validator accepts either
+     — so the Phamily Time pass can drip pieces while an event hands over
+     a set. cosmeticId carries the category or the piece id, exactly as it
+     carries a skull theme above. The id is prefixed rather than bare so a
+     set and a piece can never collide, and grantItem's dedupe means the
+     same unlock arriving twice (both tracks, or a second month) is a
+     no-op rather than a duplicate. */
+  'room-set': (rarity, name, cosmeticId) =>
+    ({ id: `room-set-${cosmeticId}`, game:'profile', type:'room-set', consumable:false,
+       meta:{ category: cosmeticId } }),
+  'room-piece': (rarity, name, cosmeticId) =>
+    ({ id: `room-piece-${cosmeticId}`, game:'profile', type:'room-piece', consumable:false,
+       meta:{ piece: cosmeticId } }),
+  'room-slot': (rarity, name, cosmeticId) =>
+    ({ id: `room-slot-${cosmeticId}`, game:'profile', type:'room-slot', consumable:false }),
   badge: () => ({ game:'profile', type:'badge', consumable:false }),
   title: () => ({ game:'profile', type:'title', consumable:false }),
   banner: () => ({ game:'profile', type:'banner', consumable:false }),
@@ -570,6 +586,11 @@ async function handleClaimMilestone(env, session, mk, body) {
         type: bonus.type,
         rarity: bonus.rarity || 'common',
         name: bonus.name || bonus.type,
+        /* THE SAME OMISSION THE SKULL SKINS HAD. Without this a bonus
+           whose mapper reads cosmeticId — a room set, a skull theme —
+           is granted with `undefined` in its id and its meta, so it
+           lands in the inventory as an item nothing can match. */
+        cosmeticId: bonus.cosmeticId,
       });
     }
   }

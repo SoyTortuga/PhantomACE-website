@@ -65,3 +65,10 @@
 .re-status { margin-top: 8px; font-size: 12px; padding: 6px 10px; border-left: 3px solid var(--border-mid); color: var(--text-sec); }
 .re-status-ok { border-left-color: var(--green); }
 .re-status-err { border-left-color: var(--red); color: var(--red); }
+
+/* A set you own pieces from but not outright: the count, and the pieces
+   you cannot use yet shown dim rather than hidden — seeing what is coming
+   is the point of a pass. */
+.re-part { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.re-piece-locked { opacity: 0.28; cursor: not-allowed; filter: grayscale(1); }
+.re-piece-locked:hover { border-color: var(--border); }

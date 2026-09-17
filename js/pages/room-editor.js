@@ -22,7 +22,9 @@
 
   var R = window.PhamRoom, E = window.PhamRoomEdit;
   var state = {
-    catalog: null, rooms: [], current: 0, publicIndex: 0, slots: 1, owned: new Set(),
+    catalog: null, rooms: [], current: 0, publicIndex: 0, slots: 1,
+    owned: new Set(),            // whole categories
+    ownedPieces: new Set(),      // single pieces out of sets they do not own
     tab: 'room',                 // 'room' | 'desk'
     category: null,              // palette category open
     tool: null,                  // null (select) | { paint: id, layer: 'floor' | 'wall' }
@@ -37,6 +39,11 @@
   function props() { return E.list(room(), state.tab); }
   function pieceOf(id) { return R.piece(state.catalog, id); }
   function surfaceOk(cat) { var s = state.catalog.categories[cat].surface; return s === 'both' || s === state.tab; }
+  /* The same two-grain rule the server validates with: a whole set, or
+     this one piece of it. */
+  function mayUse(p) { return state.owned.has(p.category) || state.ownedPieces.has(p.id); }
+  function inCategory(c) { return state.catalog.pieces.filter(function (p) { return p.category === c; }); }
+  function usableIn(c) { return inCategory(c).filter(mayUse).length; }
 
   function api(path, body) {
     var opts = body
@@ -108,22 +115,29 @@
     var cats = state.catalog.categories;
     var names = Object.keys(cats).filter(function (c) { return surfaceOk(c); });
     var html = '<div class="re-cats">' + names.map(function (c) {
-      var locked = !state.owned.has(c);
-      return '<button type="button" class="re-cat' + (state.category === c ? ' active' : '') + (locked ? ' locked' : '') + '" data-cat="' + esc(c) + '">' +
-        esc(c.replace(/-/g, ' ')) + (locked ? ' <span class="re-lock" title="Unlocked around the site">🔒</span>' : '') + '</button>';
+      var total = inCategory(c).length, have = usableIn(c);
+      var tag = have === 0
+        ? ' <span class="re-lock" title="Unlocked around the site">🔒</span>'
+        : (have < total ? ' <span class="re-part" title="' + have + ' of ' + total + ' unlocked">' + have + '/' + total + '</span>' : '');
+      return '<button type="button" class="re-cat' + (state.category === c ? ' active' : '') + (have === 0 ? ' locked' : '') + '" data-cat="' + esc(c) + '">' +
+        esc(c.replace(/-/g, ' ')) + tag + '</button>';
     }).join('') + '</div>';
 
     if (state.category) {
       var c = state.category;
-      var locked = !state.owned.has(c);
-      var list = state.catalog.pieces.filter(function (p) { return p.category === c; });
-      html += '<div class="re-pieces' + (locked ? ' locked' : '') + '">';
+      var list = inCategory(c);
+      var have = usableIn(c);
+      var locked = have === 0;
+      html += '<div class="re-pieces">';
       if (locked) html += '<p class="re-hint">Not unlocked yet. Pieces in this set are earned around the site.</p>';
+      else if (have < list.length) html += '<p class="re-hint">' + have + ' of ' + list.length + ' unlocked. The rest arrive on the Phamily Time pass.</p>';
       if (cats[c].layer === 'floor') html += '<p class="re-hint">Pick a tile, then click cells to paint them — or set it as the whole floor.</p>';
       if (cats[c].layer === 'wall') html += '<p class="re-hint">Pick a tile, then click along the back or side walls.</p>';
       html += list.map(function (p) {
         var active = state.tool && state.tool.paint === p.id;
-        return '<button type="button" class="re-piece' + (active ? ' active' : '') + '" data-piece="' + esc(p.id) + '"' + (locked ? ' disabled' : '') + ' title="' + esc(p.id) + '">' +
+        var usable = mayUse(p);
+        return '<button type="button" class="re-piece' + (active ? ' active' : '') + (usable ? '' : ' re-piece-locked') + '" data-piece="' + esc(p.id) + '"' +
+          (usable ? '' : ' disabled') + ' title="' + esc(p.id) + (usable ? '' : ' — not unlocked') + '">' +
           '<img src="' + esc(R.src(p)) + '" alt="" loading="lazy"></button>';
       }).join('') + '</div>';
     }
@@ -391,6 +405,7 @@
       state.publicIndex = mine.data.public;
       state.slots = mine.data.slots;
       state.owned = new Set(mine.data.owned);
+      state.ownedPieces = new Set(mine.data.ownedPieces || []);
       state.category = 'floor';
       els.state.hidden = true;
       els.app.hidden = false;

@@ -11,8 +11,10 @@ categories, floor and wall painting, place/drag/scale/flip/order/delete on
 the 32 px grid, S/M/L, the Desk setup tab, undo, explicit Save through the
 server's validator, a room switcher and "Show on profile" for people with
 more than one slot. `js/room-edit-core.js` holds its arithmetic (44
-assertions, every result re-checked against the validator). Next: step 5,
-unlocks — `room-set` and `room-slot` items and the reward table.
+assertions, every result re-checked against the validator). Step 5 built:
+`room-set`, `room-piece` and `room-slot` items, the two-grain validator,
+the partially-unlocked palette, and this month's 26-piece drip on both
+tracks. Next: step 6, polish.
 **Owner:** `cosmetics` agent for the profile section and unlocks;
 `asset-manager` for the atlas.
 
@@ -176,11 +178,28 @@ the site through the inventory that already exists.
 | **basic** (everyone) | floor tiles, wall tiles, gaming desk setups, gaming chairs, sofas and lounge, rugs and carpets, shelves and decor, plants and greenery, room and modular decor |
 | **unlockable** | RGB PC towers, mechanical keyboards, multimonitor setups, LED strip lights, streaming equipment, neon signs, snack and drinks, consoles and controllers, posters and wall art, smart devices, studio lights |
 
-Unlocks are **per category, not per piece** — an inventory item of type
-`room-set` with `meta.category`, granted the way badges and titles already are
-(Phamily Time milestones, sub tiers, giveaways, drops, codes). The validator
-refuses a prop whose category the owner has not got. Which reward grants
-which category is a table, not code, and is yours to fill in.
+Unlocks come at **two grains**, because a month's release is a slice of a
+set rather than a whole one:
+
+- **`room-set`** — an inventory item with `meta.category`, opening a whole
+  category. Used for the Studio Lights set (milestone 90) and for events.
+- **`room-piece`** — an item with `meta.piece`, opening exactly one piece.
+  This is what the Phamily Time pass drips.
+
+The validator accepts either (`mayUse()`), and the palette lights an
+individual piece inside a set you do not own, showing `2/24` beside it.
+
+**The monthly rule: the first tenth of each set, rounded down.** For the
+eight pass sets that is 26 pieces (snacks 7, led-strips 6, posters 3,
+consoles 3, keyboards 2, smart 2, monitors 2, pc-towers 1), interleaved so
+the sets arrive mixed, and spread across the whole pass — levels 4–142 on
+the follower track, 3–122 on the subscriber one. Next month is the next
+tenth: `slice(7, 14)` and so on.
+
+The table lives in `defineFollowerRewards()` / `definePhamilyRewards()` and
+is **duplicated in `js/pages/phamily-time.js`**; `test-phamily-rewards.js`
+compares the two entry by entry, and `test-room-validator.js` checks every
+id in it still exists in the catalog.
 
 **Extra rooms** are an inventory item of type `room-slot`. Everyone has one
 room; each slot is one more. One room is *public* at a time; the others are

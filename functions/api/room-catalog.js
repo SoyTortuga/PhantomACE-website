@@ -45,8 +45,7 @@ export function basicCategories() {
 }
 
 /** The categories THIS person has: the basic ones, plus every `room-set`
-    item in their inventory whose meta.category is real. Unlocks are per
-    category, not per piece — see ROOM-PLAN §4. */
+    item in their inventory whose meta.category is real. */
 export function ownedCategories(inventory) {
   const owned = basicCategories();
   const items = inventory && Array.isArray(inventory.items) ? inventory.items : [];
@@ -56,6 +55,29 @@ export function ownedCategories(inventory) {
     if (cat && CATEGORIES[cat]) owned.add(cat);
   }
   return owned;
+}
+
+/** Single pieces out of sets they do NOT own outright.
+ *
+ * TWO GRAINS OF UNLOCK, ON PURPOSE. A `room-set` opens a whole category;
+ * a `room-piece` opens one piece of one. The Phamily Time pass drips
+ * pieces — roughly a tenth of each set a month — so somebody working the
+ * pass owns a handful of keyboards long before they own "keyboards".
+ * Anything that asks "may they use this?" has to ask both. */
+export function ownedPieces(inventory) {
+  const out = new Set();
+  const items = inventory && Array.isArray(inventory.items) ? inventory.items : [];
+  for (const it of items) {
+    if (!it || it.type !== 'room-piece') continue;
+    const id = it.meta && it.meta.piece;
+    if (id && BY_ID.has(id)) out.add(String(id));
+  }
+  return out;
+}
+
+/** May this person place this piece? The category, or the piece itself. */
+export function mayUse(p, owned, pieceIds) {
+  return owned.has(p.category) || !!(pieceIds && pieceIds.has(p.id));
 }
 
 /** How many rooms this person may keep: one, plus a `room-slot` item each. */
@@ -90,26 +112,26 @@ const bad = (error) => ({ ok: false, error });
 const isInt = (n) => Number.isInteger(n);
 const plain = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 
-function validateTile(id, layer, owned, what) {
+function validateTile(id, layer, owned, what, pieceIds) {
   const p = piece(id);
   if (!p) return `${what}: no such piece.`;
   if (p.layer !== layer) return `${what}: ${p.id} is not a ${layer} tile.`;
-  if (!owned.has(p.category)) return `${what}: you have not unlocked ${p.category}.`;
+  if (!mayUse(p, owned, pieceIds)) return `${what}: you have not unlocked ${p.category}.`;
   return null;
 }
 
-function validateWallRun(run, length, owned, what) {
+function validateWallRun(run, length, owned, what, pieceIds) {
   if (!Array.isArray(run) || run.length !== length) return `${what} wall must have ${length} cells.`;
   for (const id of run) {
     if (id === null) continue;
-    const err = validateTile(id, 'wall', owned, `${what} wall`);
+    const err = validateTile(id, 'wall', owned, `${what} wall`, pieceIds);
     if (err) return err;
   }
   return null;
 }
 
 /** One placed prop. `surface` is 'room' or 'desk'; `bounds` the canvas. */
-function validateProp(raw, i, surface, bounds, owned) {
+function validateProp(raw, i, surface, bounds, owned, pieceIds) {
   const what = `Item ${i + 1}`;
   if (!plain(raw)) return { error: `${what}: not an item.` };
   const p = piece(raw.id);
@@ -119,7 +141,7 @@ function validateProp(raw, i, surface, bounds, owned) {
   if (cat.surface !== 'both' && cat.surface !== surface) {
     return { error: `${what}: ${p.category} does not go on the ${surface === 'desk' ? 'desk' : 'room floor'}.` };
   }
-  if (!owned.has(p.category)) return { error: `${what}: you have not unlocked ${p.category}.` };
+  if (!mayUse(p, owned, pieceIds)) return { error: `${what}: you have not unlocked ${p.category}.` };
 
   /* A number, not something that converts to one: "1" where 1 belongs is
      a client that is wrong about the format, and refusing it now is
@@ -144,9 +166,10 @@ function validateProp(raw, i, surface, bounds, owned) {
 
 /**
  * Validate a room document from a browser against the catalog, the
- * limits, and the categories the owner has. Returns a clean copy.
+ * limits, and what the owner has: `owned` the categories, `pieceIds` the
+ * single pieces out of sets they do not own. Returns a clean copy.
  */
-export function validateRoom(input, owned) {
+export function validateRoom(input, owned, pieceIds) {
   if (!plain(input)) return bad('Not a room.');
   if (!(owned instanceof Set)) return bad('No ownership given.');
 
@@ -155,7 +178,7 @@ export function validateRoom(input, owned) {
   if (!dims) return bad(`Size must be one of ${Object.keys(SIZES).join(', ')}.`);
   const roomW = dims.w * CELL, roomH = dims.h * CELL;
 
-  const floorErr = validateTile(input.floor, 'floor', owned, 'Floor');
+  const floorErr = validateTile(input.floor, 'floor', owned, 'Floor', pieceIds);
   if (floorErr) return bad(floorErr);
 
   const cells = {};
@@ -166,7 +189,7 @@ export function validateRoom(input, owned) {
       if (!m) return bad(`Cell "${key}": not a cell.`);
       const c = Number(m[1]), r = Number(m[2]);
       if (c >= dims.w || r >= dims.h) return bad(`Cell "${key}": outside a ${size} room.`);
-      const err = validateTile(id, 'floor', owned, `Cell "${key}"`);
+      const err = validateTile(id, 'floor', owned, `Cell "${key}"`, pieceIds);
       if (err) return bad(err);
       cells[`${c},${r}`] = piece(id).id;
     }
@@ -174,7 +197,7 @@ export function validateRoom(input, owned) {
 
   const w = plain(input.walls) ? input.walls : {};
   for (const [side, len] of [['back', dims.w], ['left', dims.h], ['right', dims.h]]) {
-    const err = validateWallRun(w[side], len, owned, side);
+    const err = validateWallRun(w[side], len, owned, side, pieceIds);
     if (err) return bad(err);
   }
 
@@ -182,7 +205,7 @@ export function validateRoom(input, owned) {
   if (input.props.length > ROOM_PROP_CAP) return bad(`At most ${ROOM_PROP_CAP} items in a room.`);
   const props = [];
   for (let i = 0; i < input.props.length; i++) {
-    const v = validateProp(input.props[i], i, 'room', { w: roomW, h: roomH }, owned);
+    const v = validateProp(input.props[i], i, 'room', { w: roomW, h: roomH }, owned, pieceIds);
     if (v.error) return bad(v.error);
     props.push(v.prop);
   }
@@ -192,7 +215,7 @@ export function validateRoom(input, owned) {
   if (setupIn.props.length > SETUP.cap) return bad(`At most ${SETUP.cap} items on the desk.`);
   const setup = [];
   for (let i = 0; i < setupIn.props.length; i++) {
-    const v = validateProp(setupIn.props[i], i, 'desk', { w: SETUP.w, h: SETUP.h }, owned);
+    const v = validateProp(setupIn.props[i], i, 'desk', { w: SETUP.w, h: SETUP.h }, owned, pieceIds);
     if (v.error) return bad(`Desk: ${v.error}`);
     setup.push(v.prop);
   }

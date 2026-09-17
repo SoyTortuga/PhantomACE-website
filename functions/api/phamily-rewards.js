@@ -36,6 +36,8 @@ const REWARD_ICONS = {
     title: '👑',
     banner: '🏳️',
     nameeffect: '✨',
+    room: '🛋️',
+  room: '🛋️',
 };
 
 const MILESTONE_INTERVAL = 15;
@@ -67,6 +69,33 @@ function defineFollowerRewards() {
     name:'Skull Skin', desc:'The Blood Skull theme for Skull Clicker' });
   r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
     name:'Bone Dice', desc:'Cosmetic bone-themed dice for Mana Clash' });
+  /* MY ROOM — this month's drip: the first tenth of each set, rounded
+     down, interleaved so the sets arrive mixed rather than seven snacks
+     in a row. Next month is the next tenth, and the rule carries itself.
+     Duplicated in js/pages/phamily-time.js; test-phamily-rewards.js
+     compares the two entry by entry. See docs/ROOM-PLAN.md.
+     A piece is granted as a `room-piece` item naming one piece id; a
+     whole set is a `room-set`. The room validator accepts either. */
+  const ROOM_SETS = { snacks:'Snacks', posters:'Posters', consoles:'Consoles',
+    keyboards:'Keyboards', 'led-strips':'LED Strips', monitors:'Monitors',
+    smart:'Smart Devices', 'pc-towers':'PC Towers' };
+  const ROOM_DRIP = [
+    [4,'snacks-r1c1'], [9,'posters-r1c1'], [14,'consoles-r1c1'],
+    [21,'keyboards-r1c1'], [26,'led-strips-r1c1'], [32,'monitors-r1c1'],
+    [37,'smart-r1c1'], [43,'pc-towers-r1c1'], [48,'snacks-r1c2'],
+    [54,'posters-r1c2'], [59,'consoles-r1c2'], [64,'keyboards-r1c2'],
+    [69,'led-strips-r1c2'], [76,'monitors-r1c2'], [81,'smart-r1c2'],
+    [87,'snacks-r1c3'], [92,'posters-r1c3'], [98,'consoles-r1c3'],
+    [103,'led-strips-r1c3'], [109,'snacks-r1c4'], [114,'led-strips-r1c4'],
+    [119,'snacks-r1c5'], [124,'led-strips-r1c5'], [131,'snacks-r1c6'],
+    [136,'led-strips-r1c6'], [142,'snacks-r1c7'],
+  ];
+  for (const [lvl, pieceId] of ROOM_DRIP) {
+    const label = ROOM_SETS[pieceId.replace(/-r\d+c\d+$/, '')];
+    r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
+      type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
+      name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
+  }
   return r.sort((a,b) => a.level - b.level);
 }
 
@@ -117,6 +146,33 @@ function definePhamilyRewards() {
     name:'Eternal Darkness Skin', desc:'The Eternal Darkness theme for Skull Clicker' });
   r.push({ level:130, rarity:'mythic', type:'dice', icon:REWARD_ICONS.dice,
     name:'Reality Fracture Dice', desc:'Mythic animated dice for Mana Clash' });
+  /* MY ROOM — this month's drip: the first tenth of each set, rounded
+     down, interleaved so the sets arrive mixed rather than seven snacks
+     in a row. Next month is the next tenth, and the rule carries itself.
+     Duplicated in js/pages/phamily-time.js; test-phamily-rewards.js
+     compares the two entry by entry. See docs/ROOM-PLAN.md.
+     A piece is granted as a `room-piece` item naming one piece id; a
+     whole set is a `room-set`. The room validator accepts either. */
+  const ROOM_SETS = { snacks:'Snacks', posters:'Posters', consoles:'Consoles',
+    keyboards:'Keyboards', 'led-strips':'LED Strips', monitors:'Monitors',
+    smart:'Smart Devices', 'pc-towers':'PC Towers' };
+  const ROOM_DRIP = [
+    [3,'snacks-r1c1'], [7,'posters-r1c1'], [13,'consoles-r1c1'],
+    [17,'keyboards-r1c1'], [21,'led-strips-r1c1'], [27,'monitors-r1c1'],
+    [32,'smart-r1c1'], [37,'pc-towers-r1c1'], [41,'snacks-r1c2'],
+    [46,'posters-r1c2'], [51,'consoles-r1c2'], [54,'keyboards-r1c2'],
+    [59,'led-strips-r1c2'], [64,'monitors-r1c2'], [69,'smart-r1c2'],
+    [74,'snacks-r1c3'], [79,'posters-r1c3'], [84,'consoles-r1c3'],
+    [89,'led-strips-r1c3'], [93,'snacks-r1c4'], [98,'led-strips-r1c4'],
+    [103,'snacks-r1c5'], [108,'led-strips-r1c5'], [112,'snacks-r1c6'],
+    [117,'led-strips-r1c6'], [122,'snacks-r1c7'],
+  ];
+  for (const [lvl, pieceId] of ROOM_DRIP) {
+    const label = ROOM_SETS[pieceId.replace(/-r\d+c\d+$/, '')];
+    r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
+      type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
+      name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
+  }
   return r.sort((a,b) => a.level - b.level);
 }
 
@@ -149,13 +205,15 @@ function defineMilestones() {
       { type:'egg', rarity:'uncommon', name:'Uncommon Egg' },
       { type:'dice', rarity:'rare', name:'Dice Pack' },
     ]],
-    ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Entries', [
+    ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Entries + a second Room', [
       { type:'nameeffect', rarity:'rare', name:'Name Effect' },
       { type:'giveaway', rarity:'rare', name:'Rare Giveaway Entries' },
+      { type:'room-slot', rarity:'rare', name:'Second Room', cosmeticId:'2' },
     ]],
-    ['Phantom','Badge + Title + Profile Banner + Rare Egg', [
+    ['Phantom','Badge + Title + Profile Banner + Rare Egg + the Studio Lights room set', [
       { type:'banner', rarity:'rare', name:'Profile Banner' },
       { type:'egg', rarity:'rare', name:'Rare Egg' },
+      { type:'room-set', rarity:'rare', name:'Studio Lights Set', cosmeticId:'studio-lights' },
     ]],
     ['Wraith','Badge + Title + Name Effect + Bingo Wildcard Bundle', [
       { type:'nameeffect', rarity:'mythic', name:'Name Effect' },
@@ -169,10 +227,11 @@ function defineMilestones() {
       { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
       { type:'dice', rarity:'mythic', name:'Dice Pack' },
     ]],
-    ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Entries', [
+    ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Entries + a third Room', [
       { type:'banner', rarity:'mythic', name:'Exclusive Banner' },
       { type:'nameeffect', rarity:'mythic', name:'Exclusive Name Effect' },
       { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
+      { type:'room-slot', rarity:'mythic', name:'Third Room', cosmeticId:'3' },
     ]],
   ];
   for (let i = 0; i < 10; i++) {
