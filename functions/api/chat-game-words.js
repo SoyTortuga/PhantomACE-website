@@ -9,11 +9,13 @@
 
    Library, not a route — declared in server/router.js NON_ROUTE_MODULES.
 
-   Four sources, deliberately mixed. The site's own vocabulary so regulars
-   have an edge over someone passing through; Magic terms because this is a
-   Commander channel and chat already speaks it; video games broadly, which
-   is what most of the audience is here for; and a few plain stream words so
-   a newcomer is never shut out of a round.
+   Four sources to begin with, deliberately mixed. The site's own
+   vocabulary so regulars have an edge over someone passing through; Magic
+   terms because this is a Commander channel and chat already speaks it;
+   video games broadly, which is what most of the audience is here for; and
+   a few plain stream words so a newcomer is never shut out of a round. A
+   fifth — the broadcaster's own music — was added later; the note above
+   those entries says why it earns a place the other four set the bar for.
 
    THE CLUE IS A CATEGORY, ONE WORD. It narrows the field without solving
    the puzzle — "Nintendo" tells you where to look and nothing more. It also
@@ -1744,4 +1746,176 @@ export const WORDS = [
   { word: 'sultai', category: 'Wedge' },
   { word: 'mardu', category: 'Wedge' },
   { word: 'temur', category: 'Wedge' },
+
+  /* ──────────────────────────────────────────────────────────────────
+     MUSIC — a fifth source, added on request.
+
+     The four above are the site, Magic, video games and the stream. This
+     is the broadcaster's own, which makes it the same kind of thing as the
+     Site block: answers a regular has a real shot at and a passer-by does
+     not. Three scenes rather than one bucket, because "Hardcore" covering
+     Fugazi and Lorna Shore alike would be a clue that narrows nothing.
+
+     PostHardcore is one word because the rule says a category has to be —
+     it sits beside the scramble on the overlay and inside a single chat
+     line, and the check is /^[A-Za-z]+$/. The capital H is doing the work
+     the space would have.
+     ────────────────────────────────────────────────────────────────── */
+
+  /* Hardcore — 71 */
+  { word: 'black flag', category: 'Hardcore' },
+  { word: 'minor threat', category: 'Hardcore' },
+  { word: 'bad brains', category: 'Hardcore' },
+  { word: 'circle jerks', category: 'Hardcore' },
+  { word: 'agnostic front', category: 'Hardcore' },
+  { word: 'cro mags', category: 'Hardcore' },
+  { word: 'sick of it all', category: 'Hardcore' },
+  { word: 'madball', category: 'Hardcore' },
+  { word: 'gorilla biscuits', category: 'Hardcore' },
+  { word: 'youth of today', category: 'Hardcore' },
+  { word: 'earth crisis', category: 'Hardcore' },
+  { word: 'hatebreed', category: 'Hardcore' },
+  { word: 'turnstile', category: 'Hardcore' },
+  { word: 'knocked loose', category: 'Hardcore' },
+  { word: 'code orange', category: 'Hardcore' },
+  { word: 'jesus piece', category: 'Hardcore' },
+  { word: 'harms way', category: 'Hardcore' },
+  { word: 'trapped under ice', category: 'Hardcore' },
+  { word: 'have heart', category: 'Hardcore' },
+  { word: 'integrity', category: 'Hardcore' },
+  { word: 'ringworm', category: 'Hardcore' },
+  { word: 'snapcase', category: 'Hardcore' },
+  { word: 'descendents', category: 'Hardcore' },
+  { word: 'dag nasty', category: 'Hardcore' },
+  { word: 'dead kennedys', category: 'Hardcore' },
+  { word: 'misfits', category: 'Hardcore' },
+  { word: 'discharge', category: 'Hardcore' },
+  { word: 'the exploited', category: 'Hardcore' },
+  { word: 'napalm death', category: 'Hardcore' },
+  { word: 'sheer terror', category: 'Hardcore' },
+  { word: 'biohazard', category: 'Hardcore' },
+  { word: 'leeway', category: 'Hardcore' },
+  { word: 'warzone', category: 'Hardcore' },
+  { word: 'murphys law', category: 'Hardcore' },
+  { word: 'underdog', category: 'Hardcore' },
+  { word: 'chain of strength', category: 'Hardcore' },
+  { word: 'inside out', category: 'Hardcore' },
+  { word: 'unbroken', category: 'Hardcore' },
+  { word: 'mouthpiece', category: 'Hardcore' },
+  { word: 'one step closer', category: 'Hardcore' },
+  { word: 'scowl', category: 'Hardcore' },
+  { word: 'mindforce', category: 'Hardcore' },
+  { word: 'sunami', category: 'Hardcore' },
+  { word: 'gulch', category: 'Hardcore' },
+  { word: 'magnitude', category: 'Hardcore' },
+  { word: 'pain of truth', category: 'Hardcore' },
+  { word: 'two step', category: 'Hardcore' },
+  { word: 'mosh pit', category: 'Hardcore' },
+  { word: 'circle pit', category: 'Hardcore' },
+  { word: 'wall of death', category: 'Hardcore' },
+  { word: 'stage dive', category: 'Hardcore' },
+  { word: 'crowd kill', category: 'Hardcore' },
+  { word: 'pile on', category: 'Hardcore' },
+  { word: 'straight edge', category: 'Hardcore' },
+  { word: 'youth crew', category: 'Hardcore' },
+  { word: 'beatdown', category: 'Hardcore' },
+  { word: 'powerviolence', category: 'Hardcore' },
+  { word: 'd beat', category: 'Hardcore' },
+  { word: 'blast beat', category: 'Hardcore' },
+  { word: 'crustpunk', category: 'Hardcore' },
+  { word: 'grindcore', category: 'Hardcore' },
+  { word: 'basement show', category: 'Hardcore' },
+  { word: 'demo tape', category: 'Hardcore' },
+  { word: 'seven inch', category: 'Hardcore' },
+  { word: 'split record', category: 'Hardcore' },
+  { word: 'merch table', category: 'Hardcore' },
+  { word: 'mic grab', category: 'Hardcore' },
+  { word: 'gang vocals', category: 'Hardcore' },
+  { word: 'windmill', category: 'Hardcore' },
+  { word: 'karate kick', category: 'Hardcore' },
+  { word: 'floor punch', category: 'Hardcore' },
+
+  /* Metalcore — 42 */
+  { word: 'converge', category: 'Metalcore' },
+  { word: 'botch', category: 'Metalcore' },
+  { word: 'dillinger', category: 'Metalcore' },
+  { word: 'poison the well', category: 'Metalcore' },
+  { word: 'every time i die', category: 'Metalcore' },
+  { word: 'norma jean', category: 'Metalcore' },
+  { word: 'the chariot', category: 'Metalcore' },
+  { word: 'killswitch', category: 'Metalcore' },
+  { word: 'as i lay dying', category: 'Metalcore' },
+  { word: 'all that remains', category: 'Metalcore' },
+  { word: 'shadows fall', category: 'Metalcore' },
+  { word: 'darkest hour', category: 'Metalcore' },
+  { word: 'trivium', category: 'Metalcore' },
+  { word: 'atreyu', category: 'Metalcore' },
+  { word: 'bring me horizon', category: 'Metalcore' },
+  { word: 'architects', category: 'Metalcore' },
+  { word: 'while she sleeps', category: 'Metalcore' },
+  { word: 'parkway drive', category: 'Metalcore' },
+  { word: 'the ghost inside', category: 'Metalcore' },
+  { word: 'stick to your guns', category: 'Metalcore' },
+  { word: 'of mice and men', category: 'Metalcore' },
+  { word: 'memphis may fire', category: 'Metalcore' },
+  { word: 'august burns red', category: 'Metalcore' },
+  { word: 'underoath', category: 'Metalcore' },
+  { word: 'misery signals', category: 'Metalcore' },
+  { word: 'the acacia strain', category: 'Metalcore' },
+  { word: 'emmure', category: 'Metalcore' },
+  { word: 'whitechapel', category: 'Metalcore' },
+  { word: 'thy art is murder', category: 'Metalcore' },
+  { word: 'lorna shore', category: 'Metalcore' },
+  { word: 'spiritbox', category: 'Metalcore' },
+  { word: 'invent animate', category: 'Metalcore' },
+  { word: 'currents', category: 'Metalcore' },
+  { word: 'breakdown', category: 'Metalcore' },
+  { word: 'double bass', category: 'Metalcore' },
+  { word: 'clean vocals', category: 'Metalcore' },
+  { word: 'unclean vocals', category: 'Metalcore' },
+  { word: 'pig squeal', category: 'Metalcore' },
+  { word: 'drop tuning', category: 'Metalcore' },
+  { word: 'seven string', category: 'Metalcore' },
+  { word: 'djent', category: 'Metalcore' },
+  { word: 'chug riff', category: 'Metalcore' },
+
+  /* PostHardcore — 38 */
+  { word: 'fugazi', category: 'PostHardcore' },
+  { word: 'rites of spring', category: 'PostHardcore' },
+  { word: 'quicksand', category: 'PostHardcore' },
+  { word: 'glassjaw', category: 'PostHardcore' },
+  { word: 'title fight', category: 'PostHardcore' },
+  { word: 'touche amore', category: 'PostHardcore' },
+  { word: 'la dispute', category: 'PostHardcore' },
+  { word: 'defeater', category: 'PostHardcore' },
+  { word: 'refused', category: 'PostHardcore' },
+  { word: 'at the drive in', category: 'PostHardcore' },
+  { word: 'the mars volta', category: 'PostHardcore' },
+  { word: 'thursday', category: 'PostHardcore' },
+  { word: 'thrice', category: 'PostHardcore' },
+  { word: 'saosin', category: 'PostHardcore' },
+  { word: 'circa survive', category: 'PostHardcore' },
+  { word: 'hopesfall', category: 'PostHardcore' },
+  { word: 'brand new', category: 'PostHardcore' },
+  { word: 'the used', category: 'PostHardcore' },
+  { word: 'senses fail', category: 'PostHardcore' },
+  { word: 'alexisonfire', category: 'PostHardcore' },
+  { word: 'silverstein', category: 'PostHardcore' },
+  { word: 'finch', category: 'PostHardcore' },
+  { word: 'boysetsfire', category: 'PostHardcore' },
+  { word: 'cursive', category: 'PostHardcore' },
+  { word: 'jawbox', category: 'PostHardcore' },
+  { word: 'shudder to think', category: 'PostHardcore' },
+  { word: 'drive like jehu', category: 'PostHardcore' },
+  { word: 'hot snakes', category: 'PostHardcore' },
+  { word: 'unwound', category: 'PostHardcore' },
+  { word: 'mineral', category: 'PostHardcore' },
+  { word: 'jimmy eat world', category: 'PostHardcore' },
+  { word: 'pianos become', category: 'PostHardcore' },
+  { word: 'majority rule', category: 'PostHardcore' },
+  { word: 'orchid', category: 'PostHardcore' },
+  { word: 'screamo', category: 'PostHardcore' },
+  { word: 'emo revival', category: 'PostHardcore' },
+  { word: 'twinkle riff', category: 'PostHardcore' },
+  { word: 'spoken word', category: 'PostHardcore' },
 ];
