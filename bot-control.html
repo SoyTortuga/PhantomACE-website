@@ -146,6 +146,19 @@
         </div>
       </div>
 
+      <div class="card bot-section" id="ovMcSection">
+        <h2>Mana Clash on the Overlay</h2>
+        <p class="bot-section-desc">Puts a live game in the centre of the overlay &mdash; round, goal, every player's score and their dice as they land. Games already in progress are listed first, since those are the ones worth showing. The OBS browser source never changes: the room is chosen here.</p>
+
+        <div class="ovmc-row">
+          <span class="giveaway-status" id="ovMcState">Off</span>
+          <select id="ovMcRoomPick" class="giveaway-rarity-select"></select>
+          <button class="btn-primary" id="ovMcShowBtn">Show</button>
+          <button class="btn-secondary" id="ovMcOffBtn">Hide</button>
+          <button class="btn-secondary" id="ovMcRefreshBtn">Refresh</button>
+        </div>
+      </div>
+
       <div class="card bot-section">
         <h2>Send Announcement</h2>
         <p class="bot-section-desc">Posts a custom message to chat verbatim, exactly as typed.</p>

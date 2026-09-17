@@ -272,11 +272,21 @@
     card.appendChild(text);
     stage.appendChild(card);
 
+    /* PUBLISHED, NOT ENFORCED. The standing panels — Mana Clash, the
+       scramble — are things a viewer can look at whenever; an alert is the
+       thing they must not miss. Rather than teach this file where each
+       panel sits, it says only that a card is up, and the stylesheet gets
+       out of the way. One class, and a new panel costs nothing here. */
+    document.body.classList.add('ov-alerting');
+
     setTimeout(function () {
       card.classList.add('is-leaving');
       setTimeout(function () {
         if (card.parentNode) card.parentNode.removeChild(card);
         showing = false;
+        /* Cleared in the same place `showing` is, so the two can never
+           disagree about whether anything is on screen. */
+        document.body.classList.remove('ov-alerting');
         setTimeout(pump, GAP_MS);
       }, 340);
     }, d.ms || SHOW_MS);

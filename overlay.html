@@ -56,8 +56,23 @@
     <ol class="ov-mtg-top" id="ovMtgTop"></ol>
   </div>
 
+  <!-- Mana Clash: centred, and yields to an alert rather than sitting
+       under one. Rounds are simultaneous, so every row carries its own
+       dice. -->
+  <div class="ov-mc" id="ovMc" hidden>
+    <div class="ov-mc-head">
+      <span class="ov-mc-title">MANA CLASH</span>
+      <span class="ov-mc-round" id="ovMcRound"></span>
+      <span class="ov-mc-note" id="ovMcNote"></span>
+      <span class="ov-mc-goal">to <b id="ovMcGoal"></b></span>
+    </div>
+    <div class="ov-mc-track"><i id="ovMcBar"></i></div>
+    <ol class="ov-mc-list" id="ovMcList"></ol>
+  </div>
+
   <script src="/js/pages/overlay.js" defer></script>
   <script src="/js/pages/overlay-scramble.js" defer></script>
   <script src="/js/pages/overlay-mtgbbb.js" defer></script>
+  <script src="/js/pages/overlay-mana-clash.js" defer></script>
 </body>
 </html>

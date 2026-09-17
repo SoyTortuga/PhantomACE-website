@@ -309,8 +309,8 @@ async function recordResult(env, room) {
    hand — harmless in a friendly game, but it is also how you would cheat,
    and with a hundred players it is a lot of JSON per poll. */
 
-function publicPlayer(id, p) {
-  return {
+function publicPlayer(id, p, { dice = false } = {}) {
+  const out = {
     id,
     name: p.displayName,
     avatar: p.profileImage,
@@ -323,12 +323,43 @@ function publicPlayer(id, p) {
     done: p.turn ? p.turn.done : null,
     event: p.turn ? p.turn.event : null,
   };
+
+  /* OPT-IN, and only the overlay asks. Rounds are simultaneous, so at any
+     moment several players have dice on the table — the on-stream panel
+     shows them landing, which is the whole appeal of watching. The players'
+     own payload is left exactly as it was: the game page has never needed
+     anyone else's dice, and quietly widening what every client receives to
+     serve one spectator is how a contract drifts.
+
+     Nothing here is secret. Dice are rolled face up; every one of these
+     numbers is already on the screen of the player who rolled it, and the
+     overlay is pointed at a stream where they are visible anyway. */
+  if (dice && p.turn) {
+    out.dice = Array.isArray(p.turn.dice) ? p.turn.dice.slice() : [];
+    out.kept = Array.isArray(p.turn.kept) ? p.turn.kept.slice() : [];
+    out.remaining = p.turn.remaining;
+    out.awaitingSelection = !!p.turn.awaitingSelection;
+  }
+
+  return out;
 }
 
-function viewFor(room, userId, now) {
+/**
+ * The room as one client should see it.
+ *
+ * `userId` null is a SPECTATOR: no `you` block, which is the only part of
+ * this that was ever private. Everything else — round, goal, standings,
+ * who is resting, the winner, the intermission clock — already goes to
+ * every player in the room, so the overlay needs no separate shape and
+ * there is no second view to keep in step with this one.
+ *
+ * @param {object} [opts]
+ * @param {boolean} [opts.dice] include each player's dice, for the overlay
+ */
+export function viewFor(room, userId, now, opts = {}) {
   const me = room.players[userId];
   const standings = Object.entries(room.players)
-    .map(([id, p]) => publicPlayer(id, p))
+    .map(([id, p]) => publicPlayer(id, p, opts))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   const view = {

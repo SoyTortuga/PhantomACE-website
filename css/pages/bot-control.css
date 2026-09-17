@@ -244,6 +244,22 @@
 
 /* ── Big Prize Giveaway ─────────────────────── */
 
+/* The overlay card's control row. Same shape as the giveaway one, named
+   separately so changing one does not silently restyle the other. */
+.ovmc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The room list gets the width — "ABCD — round 3 — SoyTortuga — 4 players"
+   truncated to "ABCD — rou…" would make the picker useless. */
+.ovmc-row .giveaway-rarity-select {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
 .giveaway-toggle-row {
   display: flex;
   align-items: center;

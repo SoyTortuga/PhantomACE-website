@@ -609,6 +609,85 @@ function initGiveawayPanel() {
   }, 5000);
 
   loadGiveawayState();
+  initOvMc();
+}
+
+/* ── Mana Clash on the overlay ──────────────────────────────────── */
+
+function renderOvMc(d) {
+  const state = document.getElementById('ovMcState');
+  const pick = document.getElementById('ovMcRoomPick');
+  if (!state || !pick) return;
+
+  const p = d.pointer || {};
+  state.textContent = p.enabled && p.code ? 'Showing ' + p.code : 'Off';
+  state.className = 'giveaway-status' + (p.enabled && p.code ? ' open' : '');
+
+  /* The selection survives a refresh. A moderator who re-lists rooms
+     mid-game and finds the dropdown reset to the top entry is one click
+     from putting the wrong room on stream. */
+  const keep = pick.value || (p.enabled ? p.code : '');
+  const rooms = Array.isArray(d.rooms) ? d.rooms : [];
+
+  pick.innerHTML = rooms.length
+    ? rooms.map(function (r) {
+        const bits = [r.code, r.status === 'playing' ? 'round ' + r.round : r.status];
+        if (r.host) bits.push(r.host);
+        bits.push(r.playerCount + (r.playerCount === 1 ? ' player' : ' players'));
+        if (r.practice) bits.push('practice');
+        return '<option value="' + escapeBotHtml(r.code) + '">' + escapeBotHtml(bits.join(' — ')) + '</option>';
+      }).join('')
+    : '<option value="">No Mana Clash rooms right now</option>';
+
+  if (keep && rooms.some(function (r) { return r.code === keep; })) pick.value = keep;
+}
+
+async function loadOvMc() {
+  try {
+    const res = await fetch('/api/overlay/mana-clash?rooms=1', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) return;
+    renderOvMc(await res.json());
+  } catch { /* leave the card as it is rather than blanking it */ }
+}
+
+async function setOvMc(body, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/overlay/mana-clash', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    if (d.success) {
+      showBotStatus(d.enabled ? 'Overlay is showing ' + d.code + '.' : 'Overlay panel hidden.', false);
+      await loadOvMc();
+    } else {
+      showBotStatus(d.error || 'Could not change the overlay.', true);
+    }
+  } catch {
+    showBotStatus('Network error changing the overlay.', true);
+  }
+  if (btn) btn.disabled = false;
+}
+
+function initOvMc() {
+  const show = document.getElementById('ovMcShowBtn');
+  const off = document.getElementById('ovMcOffBtn');
+  const refresh = document.getElementById('ovMcRefreshBtn');
+  const pick = document.getElementById('ovMcRoomPick');
+  if (!show) return;
+
+  show.addEventListener('click', function () {
+    const code = pick ? pick.value : '';
+    if (!code) { showBotStatus('There is no room to show.', true); return; }
+    setOvMc({ action: 'show', code: code }, show);
+  });
+  off.addEventListener('click', function () { setOvMc({ action: 'off' }, off); });
+  refresh.addEventListener('click', function () { loadOvMc(); });
+
+  loadOvMc();
 }
 
 function initBotControlPanel() {
