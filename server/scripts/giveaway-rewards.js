@@ -7,6 +7,7 @@
      node server/scripts/giveaway-rewards.js --service phantomace-web --set-cost "Enter Giveaway=1" --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --hide "Enter Giveaway" --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --fix-colours --confirm
+     node server/scripts/giveaway-rewards.js --service phantomace-web --set-cost "TTSMonster TTS=500" --force --confirm
 
    WHY A SCRIPT AND NOT THE ADMIN PAGE. Managing a channel's rewards needs
    a broadcaster token with channel:manage:redemptions. The site already
@@ -22,6 +23,13 @@
    `only_manageable_rewards`, so the listing below marks each reward
    MANAGEABLE or read-only rather than guessing, and any attempt to change
    a read-only one is refused here rather than failing at the API.
+
+   --force SENDS THE REQUEST ANYWAY. Normally a change to a read-only
+   reward is refused here, on the manageability answer Twitch gave in the
+   listing, rather than being sent and failing. --force skips that check so
+   Twitch itself answers, verbatim, and prints the whole response body. It
+   exists because "the docs say no" and "Twitch said no" are different
+   claims, and only the second one settles an argument.
 
    Dry run unless --confirm. The listing is always read-only.
    ══════════════════════════════════════════════ */
@@ -94,6 +102,7 @@ async function helix(token, clientId, method, url, body) {
 async function main() {
   const service = arg('service');
   const confirm = arg('confirm') === true;
+  const force = arg('force') === true;
 
   const databaseUrl = resolveDatabaseUrl({ service, fallback: arg('database-url') });
   if (!databaseUrl) {
@@ -206,13 +215,14 @@ async function main() {
     const cost = parseInt(pair.slice(eq + 1), 10);
     const r = byTitle.get(title.toLowerCase());
     if (!r) { console.error(`[rewards] No reward titled "${title}".`); process.exit(2); }
-    if (!manageable.has(r.id)) {
+    if (!manageable.has(r.id) && !force) {
       console.error(`[rewards] "${title}" was not created by this application — Twitch will not let us change it.`);
-      console.error('          Change the cost by hand in the Twitch creator dashboard.');
+      console.error('          Change the cost by hand in the Twitch creator dashboard, or');
+      console.error('          add --force to send the request anyway and see what Twitch says.');
       process.exit(5);
     }
     if (!Number.isInteger(cost) || cost < 1) { console.error('[rewards] Cost must be a whole number, 1 or more.'); process.exit(2); }
-    changes.push({ kind: 'update', id: r.id, title, body: { cost }, was: `${r.cost}pt` });
+    changes.push({ kind: 'update', id: r.id, title, body: { cost }, was: `${r.cost}pt`, readOnly: !manageable.has(r.id) });
   }
 
   /* --hide "Title" — disabled, not deleted, so it keeps its id and history. */
@@ -220,12 +230,13 @@ async function main() {
   if (typeof hide === 'string') {
     const r = byTitle.get(hide.toLowerCase());
     if (!r) { console.error(`[rewards] No reward titled "${hide}".`); process.exit(2); }
-    if (!manageable.has(r.id)) {
-      console.error(`[rewards] "${hide}" was not created by this application — hide it by hand instead.`);
+    if (!manageable.has(r.id) && !force) {
+      console.error(`[rewards] "${hide}" was not created by this application — hide it by hand instead,`);
+      console.error('          or add --force to send the request anyway and see what Twitch says.');
       process.exit(5);
     }
     if (!r.is_enabled) line(`  = "${hide}" is already hidden`);
-    else changes.push({ kind: 'update', id: r.id, title: hide, body: { is_enabled: false }, was: 'enabled' });
+    else changes.push({ kind: 'update', id: r.id, title: hide, body: { is_enabled: false }, was: 'enabled', readOnly: !manageable.has(r.id) });
   }
 
   if (!changes.length) {
@@ -237,7 +248,8 @@ async function main() {
   line('PLANNED CHANGES');
   for (const c of changes) {
     if (c.kind === 'create') line(`  + create "${c.spec.title}" — ${c.spec.cost}pt, ${c.spec.background_color}, hidden until a draw opens`);
-    else line(`  ~ update "${c.title}" — ${JSON.stringify(c.body)} (was ${c.was})`);
+    else line(`  ~ update "${c.title}" — ${JSON.stringify(c.body)} (was ${c.was})` +
+      (c.readOnly ? '   [READ-ONLY — forced; Twitch is expected to refuse this]' : ''));
   }
   line('');
 
@@ -260,10 +272,19 @@ async function main() {
     } else {
       const res = await helix(token, clientId, 'PATCH', `${HELIX}?broadcaster_id=${broadcasterId}&id=${c.id}`, c.body);
       if (!res.ok) {
-        line(`  ! "${c.title}" not updated: HTTP ${res.status} ${(res.data && res.data.message) || res.raw.slice(0, 160)}`);
+        line(`  ! "${c.title}" not updated: HTTP ${res.status} ${(res.data && res.data.message) || ''}`);
+        /* The WHOLE body, not a truncated message. A forced attempt exists
+           to be read, and the difference between "not created by this
+           client" and anything else is the entire answer. */
+        if (c.readOnly) {
+          line(`    Twitch said: ${res.raw || '(empty body)'}`);
+          line('    A 403 naming the client id is ownership, not permission: only the');
+          line('    application that CREATED a reward may change it, whatever scopes');
+          line('    are granted. Nothing this script can do will alter that one.');
+        }
         continue;
       }
-      line(`  ~ "${c.title}" updated`);
+      line(`  ~ "${c.title}" updated` + (c.readOnly ? '  — and Twitch ALLOWED it, so the listing was misleading' : ''));
     }
   }
 
