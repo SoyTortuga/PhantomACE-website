@@ -338,6 +338,30 @@
   color: var(--text-dim);
 }
 
+/* PHONE: PINNED TO THE VIEWPORT, NOT TO THE BELL.
+   The panel is 320px wide and right-aligned to the bell, which sits in the
+   middle of a 56px top bar — so on a 360px screen its left edge lands at
+   roughly −115px and the first third of every line is off the side of the
+   display. Fixed positioning anchors it to the screen instead, where the
+   only thing that has to fit is the screen. The 64px is the bar's own 56px
+   plus the 8px gap the absolute version got from margin-top. */
+@media (max-width: 767px) {
+  .notif-panel {
+    position: fixed;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    margin-top: 0;
+    max-height: calc(100vh - 80px);
+  }
+
+  .notif-list {
+    max-height: calc(100vh - 136px);
+  }
+}
+
 /* Desktop sidebar: panel flies out to the right */
 @media (min-width: 768px) {
   .notif-panel {

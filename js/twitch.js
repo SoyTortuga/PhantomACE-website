@@ -9,7 +9,17 @@ async function fetchTwitchStatus() {
     if (!res.ok) throw new Error(res.statusText);
     return await res.json();
   } catch {
-    return { live: false };
+    /* UNREACHABLE IS NOT OFFLINE. This returned a bare { live: false }, so
+       a dropped request — a phone changing cell, a backgrounded tab, wifi
+       handing over — read exactly like the stream ending, and the next
+       successful poll read like it starting again. On mobile data that
+       produced a stream of "PhantomACE has gone offline" / "is now LIVE!"
+       pairs all through one broadcast.
+
+       `live: false` is kept so the indicators still fall back to a dark
+       dot rather than freezing on stale state; `error` is what tells
+       anything that ANNOUNCES a change to say nothing at all. */
+    return { live: false, error: 'unreachable' };
   }
 }
 

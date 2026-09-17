@@ -5,6 +5,9 @@ const MAX_NOTIFICATIONS = 50;
 
 let notifPanelOpen = false;
 let lastLiveState = null;
+/* The broadcast we last saw running, so "gone offline" can be keyed to the
+   stream that ended rather than to the moment we noticed. */
+let lastLiveStartedAt = '';
 
 /* ── The server's list ─────────────────────────────────────────────────
    Everything above this is the local list: live/offline events kept in
@@ -91,8 +94,23 @@ function markAllRead() {
   updateBadge();
 }
 
+/**
+ * Add one notification, unless an identical event is already listed.
+ *
+ * `key` names the EVENT, not the observation — 'live:<started_at>' is the
+ * same string in every tab, on every poll, for one broadcast. Two things
+ * made duplicates before, and one key closes both: every open tab watches
+ * the status independently and writes to the same localStorage list, and a
+ * status that flapped announced the same broadcast twice.
+ *
+ * Without a key nothing is deduped, which is right for everything else
+ * here — two profile comments are two notifications.
+ *
+ * @returns {boolean} whether it was added
+ */
 function addNotification(notification) {
   const list = getNotifications();
+  if (notification.key && list.some(n => n && n.key === notification.key)) return false;
   notification.id = 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   notification.time = Date.now();
   list.unshift(notification);
@@ -102,6 +120,7 @@ function addNotification(notification) {
   if (notifPanelOpen) renderNotifPanel();
 
   showDesktopNotification(notification);
+  return true;
 }
 
 function getUnreadCount() {
@@ -261,7 +280,16 @@ function requestDesktopPermission() {
 }
 
 function handleTwitchStatusForNotifications(status) {
+  /* A LOOKUP THAT FAILED IS NOT AN ANSWER. Both the endpoint and the fetch
+     wrapper report trouble as { live: false, error }, which is fine for an
+     indicator and wrong for an announcement: treating it as "offline"
+     invents an event that did not happen, and the recovery invents a second
+     one. Say nothing and wait for the next poll. */
+  if (!status || status.error) return;
+
   const isLive = !!status.live;
+  const startedAt = String(status.started_at || '');
+  if (isLive && startedAt) lastLiveStartedAt = startedAt;
 
   if (lastLiveState === null) {
     lastLiveState = isLive;
@@ -271,9 +299,17 @@ function handleTwitchStatusForNotifications(status) {
   if (isLive && !lastLiveState) {
     let msg = 'PhantomACE is now LIVE!';
     if (status.game) msg += ` Playing ${status.game}`;
-    addNotification({ type: 'live', message: msg });
+    /* Keyed on the broadcast, so the same one is never announced twice —
+       by another tab, or after a gap in coverage. No started_at means an
+       older cached response, and no key rather than one every broadcast
+       would share. */
+    addNotification({ type: 'live', key: startedAt ? 'live:' + startedAt : null, message: msg });
   } else if (!isLive && lastLiveState) {
-    addNotification({ type: 'offline', message: 'PhantomACE has gone offline.' });
+    addNotification({
+      type: 'offline',
+      key: lastLiveStartedAt ? 'offline:' + lastLiveStartedAt : null,
+      message: 'PhantomACE has gone offline.',
+    });
   }
 
   lastLiveState = isLive;
