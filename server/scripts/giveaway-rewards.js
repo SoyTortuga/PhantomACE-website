@@ -6,6 +6,7 @@
      node server/scripts/giveaway-rewards.js --service phantomace-web --create --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --set-cost "Enter Giveaway=1" --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --hide "Enter Giveaway" --confirm
+     node server/scripts/giveaway-rewards.js --service phantomace-web --fix-colours --confirm
 
    WHY A SCRIPT AND NOT THE ADMIN PAGE. Managing a channel's rewards needs
    a broadcaster token with channel:manage:redemptions. The site already
@@ -148,7 +149,11 @@ async function main() {
   for (const r of rewards) {
     const flag = manageable.has(r.id) ? 'MANAGEABLE' : 'read-only ';
     const state = r.is_enabled ? (r.is_paused ? 'paused ' : 'enabled') : 'hidden ';
-    line(`  ${flag}  ${state}  ${String(r.cost).padStart(6)}pt  ${r.title}`);
+    /* The colour is shown because it is the ONLY thing distinguishing the
+       two entry rewards in a viewer's reward list — same title shape, same
+       one-point cost — and it is not otherwise visible from here. */
+    const colour = (r.background_color || '').toLowerCase().padEnd(7);
+    line(`  ${flag}  ${state}  ${String(r.cost).padStart(6)}pt  ${colour}  ${r.title}`);
   }
   line('');
   line(`  ${manageable.size} of ${rewards.length} were created by this application and can be changed.`);
@@ -171,6 +176,23 @@ async function main() {
         continue;
       }
       changes.push({ kind: 'create', spec });
+    }
+  }
+
+  /* --fix-colours: bring the two entry rewards back to the colours in
+     ENTRY_REWARDS. A reward created before those were settled keeps whatever
+     it was made with, and nothing else here can change it. */
+  if (arg('fix-colours') || arg('fix-colors')) {
+    for (const spec of ENTRY_REWARDS) {
+      const r = byTitle.get(spec.title.toLowerCase());
+      if (!r) { line(`  ? "${spec.title}" does not exist yet — run --create`); continue; }
+      if (!manageable.has(r.id)) { line(`  ! "${spec.title}" is read-only — change its colour by hand`); continue; }
+      const now = (r.background_color || '').toLowerCase();
+      if (now === spec.background_color.toLowerCase()) { line(`  = "${spec.title}" is already ${now}`); continue; }
+      changes.push({
+        kind: 'update', id: r.id, title: spec.title,
+        body: { background_color: spec.background_color }, was: now || 'unset',
+      });
     }
   }
 
@@ -207,7 +229,7 @@ async function main() {
   }
 
   if (!changes.length) {
-    line('Nothing to change. (Pass --create, --set-cost or --hide.)');
+    line('Nothing to change. (Pass --create, --fix-colours, --set-cost or --hide.)');
     await pool.end();
     return;
   }
