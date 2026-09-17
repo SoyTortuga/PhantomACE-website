@@ -273,58 +273,98 @@
   margin-left: auto;
 }
 
-.giveaway-wheel-wrap {
+/* ══════════════════════════════════════════════
+   THE REEL
+
+   One window, one row high. The strip inside it is translated by whole
+   rows, so .giveaway-reel-row's height must stay equal to ROW_H in
+   js/giveaway-reel.js — a disagreement puts a name half out of frame.
+   ══════════════════════════════════════════════ */
+
+.giveaway-reel-wrap {
   position: relative;
-  width: 260px;
-  height: 260px;
+  max-width: 420px;
   margin: 0 auto 20px;
 }
 
-.giveaway-wheel-pointer {
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-top: 18px solid var(--red);
-  z-index: 2;
-}
-
-.giveaway-wheel {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 3px solid var(--border-mid);
-  position: relative;
+.giveaway-reel-window {
+  height: 56px;
   overflow: hidden;
+  border: 1px solid var(--border-mid);
+  border-left: 3px solid var(--red);
+  border-radius: 6px;
   background: var(--gray-lo);
 }
 
-.giveaway-wheel-empty {
+.giveaway-reel-strip {
+  will-change: transform;
+}
+
+.giveaway-reel-row {
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: var(--text-dim);
-  font-size: 13px;
-  text-align: center;
-  padding: 0 30px;
-}
-
-.giveaway-wheel-label {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform-origin: 0 0;
-  font-size: 10px;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
   color: var(--text-pri);
   white-space: nowrap;
-  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 14px;
+}
+
+.giveaway-reel-row.empty,
+.giveaway-reel-row.idle {
+  font-size: 14px;
+  font-weight: normal;
+  color: var(--text-dim);
+  letter-spacing: normal;
+}
+
+.giveaway-reel-row.winner { color: var(--red); }
+
+/* The rails. Two hairlines at the window edges read as a mechanism the
+   names are passing through, which is the whole illusion — and they cost
+   nothing, unlike the shadow a slot machine would use. */
+.giveaway-reel-wrap::before,
+.giveaway-reel-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-mid);
   pointer-events: none;
 }
+.giveaway-reel-wrap::before { top: 0; }
+.giveaway-reel-wrap::after { bottom: 0; }
+
+.giveaway-rarity-select {
+  padding: 5px 10px;
+  background: var(--black);
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-pri);
+  font-size: 13px;
+}
+.giveaway-rarity-select:disabled { color: var(--text-dim); }
+
+/* The rarity colours here are the CHANNEL's, the ones the two entry
+   rewards carry in the Twitch panel, so a moderator reading the site and a
+   viewer reading the reward list see the same two colours. */
+.giveaway-status.rarity-rare { color: #c7a550; border-color: rgba(199, 165, 80, 0.4); }
+.giveaway-status.rarity-mythic { color: #eb6726; border-color: rgba(235, 103, 38, 0.4); }
+
+.giveaway-winner-rarity {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.giveaway-winner-rarity.rarity-rare { color: #c7a550; }
+.giveaway-winner-rarity.rarity-mythic { color: #eb6726; }
 
 .giveaway-actions {
   display: flex;

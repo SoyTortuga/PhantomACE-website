@@ -618,3 +618,83 @@
   letter-spacing: 0.05em;
   color: var(--text-dim);
 }
+
+/* ══════════════════════════════════════════════
+   GIVEAWAY WIN — the prize card
+
+   Delivery, not decoration. A whisper from an account a viewer has never
+   messaged is silently dropped by Twitch, so this card is the only thing
+   guaranteed to reach the winner. It sits above the claim box because it
+   answers the question that box would otherwise raise: "what code?"
+   ══════════════════════════════════════════════ */
+
+.prize-card {
+  border: 1px solid var(--border-mid);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--gray-lo);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.prize-card.rarity-mythic { border-left-color: #ff6600; }
+.prize-card.rarity-rare   { border-left-color: var(--purple); }
+.prize-card.rarity-uncommon { border-left-color: var(--green); }
+.prize-card.rarity-common { border-left-color: var(--text-dim); }
+
+.prize-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.prize-icon { font-size: 22px; }
+
+.prize-title {
+  font-family: var(--font-gothic);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  color: var(--text-pri);
+}
+
+.prize-rarity { text-transform: uppercase; }
+.rarity-mythic .prize-rarity { color: #ff6600; }
+.rarity-rare .prize-rarity   { color: var(--purple); }
+.rarity-uncommon .prize-rarity { color: var(--green); }
+.rarity-common .prize-rarity { color: var(--text-dim); }
+
+.prize-sub,
+.prize-done {
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-sec);
+  margin-bottom: 14px;
+}
+
+.prize-done { margin-bottom: 0; color: var(--green); }
+
+.prize-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* The code is the one thing on this card somebody has to read character by
+   character off a screen, so it gets the widest tracking on the page. */
+.prize-code {
+  font-family: var(--font-system);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--text-pri);
+  background: var(--black);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 10px 16px;
+  user-select: all;
+}

@@ -102,36 +102,46 @@
 
       <div class="card bot-section" id="giveawaySection">
         <h2>Big Prize Giveaway</h2>
-        <p class="bot-section-desc">A live, one-off drawing. Open entries, let chat redeem the "Enter Giveaway" channel points reward, spin, then whisper the winner a code. One slice per person. Reset clears the entrants for the next event — it never touches the monthly giveaway, which runs separately and keeps its own ledger.</p>
+        <p class="bot-section-desc">A live, one-off drawing. Pick a rarity and open entries — that switches on the matching channel points reward and switches the other one off, so there is only ever one draw running. Chat redeems it once each, the reel picks a name, and the winner gets a code locked to their account, waiting on their giveaway page for seven days. Reset clears the entrants for the next event — it never touches the monthly giveaway, which runs separately and keeps its own ledger.</p>
 
         <div class="giveaway-toggle-row">
           <span class="giveaway-status" id="giveawayStatus">Entries Closed</span>
+          <select id="giveawayRarity" class="giveaway-rarity-select">
+            <option value="rare">Rare draw</option>
+            <option value="mythic">Mythic draw</option>
+          </select>
           <button class="btn-secondary" id="giveawayToggleBtn">Open Entries</button>
           <span class="giveaway-entrant-count" id="giveawayEntrantCount">0 entrants</span>
         </div>
 
-        <div class="giveaway-wheel-wrap">
-          <div class="giveaway-wheel-pointer"></div>
-          <div class="giveaway-wheel" id="giveawayWheel"></div>
+        <!-- ONE SLOT, NOT A WHEEL. Everyone has exactly one chance, and a
+             wheel's whole visual language is slice size — it says "some of
+             you have better odds" about a draw where nobody does. A single
+             reel flicking through names says the true thing instead, and
+             stays readable with two hundred entrants. -->
+        <div class="giveaway-reel-wrap">
+          <div class="giveaway-reel-window">
+            <div class="giveaway-reel-strip" id="giveawayReelStrip"></div>
+          </div>
         </div>
 
         <div class="giveaway-actions">
-          <button class="btn-primary" id="giveawaySpinBtn">Spin the Wheel</button>
+          <button class="btn-primary" id="giveawaySpinBtn">Spin</button>
           <button class="btn-secondary" id="giveawayResetBtn">Reset</button>
         </div>
 
         <div class="giveaway-winner-panel" id="giveawayWinnerPanel" hidden>
-          <p>Winner: <b id="giveawayWinnerName"></b></p>
+          <p>Winner: <b id="giveawayWinnerName"></b> <span class="giveaway-winner-rarity" id="giveawayWinnerRarity"></span></p>
           <div class="giveaway-code-form">
             <select id="giveawayCodeTier">
-              <option value="">— pick a tier to auto-pull a code —</option>
+              <option value="">— the draw's own rarity —</option>
               <option value="common">Common</option>
               <option value="uncommon">Uncommon</option>
               <option value="rare">Rare</option>
               <option value="mythic">Mythic</option>
             </select>
             <input type="text" id="giveawayCodeManual" placeholder="...or paste a specific code">
-            <button class="btn-primary" id="giveawaySendCodeBtn">Whisper Code to Winner</button>
+            <button class="btn-primary" id="giveawaySendCodeBtn">Give Code to Winner</button>
           </div>
         </div>
       </div>
@@ -229,6 +239,7 @@
   <script src="/js/nav.js" defer></script>
   <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
+  <script src="/js/giveaway-reel.js" defer></script>
   <script src="/js/pages/bot-control.js" defer></script>
 </body>
 </html>

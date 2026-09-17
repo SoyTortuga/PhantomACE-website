@@ -84,6 +84,10 @@
         </div>
       </div>
 
+      <!-- A giveaway win, waiting for its owner. Hidden for everyone else,
+           because the code IS the prize. -->
+      <div class="prize-card" id="prizeCard" style="display:none;"></div>
+
       <div class="entry-claim" id="entryClaim">
         <p class="entry-claim-hint">Got a code from chat? Claim it within 5 minutes of the drop.</p>
         <div class="entry-claim-row">
@@ -279,6 +283,8 @@
           set('statEndsIn', new Date(d.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
         }
 
+        renderPrize(d.prize);
+
         const claim = document.getElementById('entryClaim');
         const login = document.getElementById('entryLogin');
         if (claim && login) {
@@ -309,14 +315,61 @@
       } catch (e) { /* leave the dashes in place rather than showing an error */ }
     }
 
-    async function claimEntryCode() {
-      const input = document.getElementById('entryCodeInput');
-      const btn = document.getElementById('entryClaimBtn');
-      const msg = document.getElementById('entryClaimMsg');
-      if (!input || !msg) return;
+    /* ── A giveaway win ────────────────────────────────────────────
+       The card, not the whisper, is how a prize is delivered. Twitch
+       silently drops whispers from an account the recipient has never
+       messaged, so the bot's message is a courtesy and this is the thing
+       that has to work. The code is locked to this account server-side —
+       showing it here is safe in a way it would not be in chat. */
+    function renderPrize(prize) {
+      const card = document.getElementById('prizeCard');
+      if (!card) return;
 
-      const code = input.value.trim().toUpperCase();
-      if (!code) return;
+      if (!prize) {
+        card.style.display = 'none';
+        card.innerHTML = '';
+        return;
+      }
+
+      const e = (v) => { const d = document.createElement('div'); d.textContent = v; return d.innerHTML; };
+      const tier = String(prize.tier || 'common');
+      card.className = 'prize-card rarity-' + e(tier);
+      card.style.display = '';
+
+      if (prize.claimed) {
+        card.innerHTML =
+          '<div class="prize-head"><span class="prize-icon">&#127942;</span>' +
+          '<span class="prize-title">Giveaway won &mdash; <span class="prize-rarity">' + e(tier) + '</span></span></div>' +
+          '<div class="prize-done">Claimed. Your ' + e(String(prize.entries)) + ' entries are in this month\'s draw.</div>';
+        return;
+      }
+
+      /* Days, not a live countdown. A week-long timer ticking down by the
+         second reads as pressure on something that is not a race. */
+      const daysLeft = Math.max(0, Math.ceil((prize.expiresAt - Date.now()) / 86400000));
+
+      card.innerHTML =
+        '<div class="prize-head"><span class="prize-icon">&#127942;</span>' +
+        '<span class="prize-title">You won a <span class="prize-rarity">' + e(tier) + '</span> giveaway!</span></div>' +
+        '<div class="prize-sub">Worth ' + e(String(prize.entries)) + ' entries. Locked to your account &mdash; ' +
+        'nobody else can claim it. Expires in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '.</div>' +
+        '<div class="prize-row">' +
+          '<span class="prize-code">' + e(prize.code) + '</span>' +
+          '<button class="btn-primary" id="prizeClaimBtn">Claim</button>' +
+        '</div>' +
+        '<div class="entry-claim-msg" id="prizeClaimMsg"></div>';
+
+      const btn = document.getElementById('prizeClaimBtn');
+      if (btn) btn.addEventListener('click', function () {
+        submitCode(prize.code, document.getElementById('prizeClaimMsg'), btn);
+      });
+    }
+
+    /* One submit path for both boxes. The claim box and the prize card ask
+       the same endpoint the same question, and two copies of this is exactly
+       the shape of bug where one of them gets fixed. */
+    async function submitCode(code, msg, btn, input) {
+      if (!code || !msg) return;
 
       if (btn) btn.disabled = true;
       msg.className = 'entry-claim-msg';
@@ -333,7 +386,7 @@
         if (res.ok && d.success) {
           msg.className = 'entry-claim-msg ok';
           msg.textContent = `+${d.entries} entries! You now have ${d.total} this month.`;
-          input.value = '';
+          if (input) input.value = '';
           loadEntryTracker();
         } else {
           msg.className = 'entry-claim-msg err';
@@ -345,6 +398,17 @@
       } finally {
         if (btn) btn.disabled = false;
       }
+    }
+
+    async function claimEntryCode() {
+      const input = document.getElementById('entryCodeInput');
+      if (!input) return;
+      await submitCode(
+        input.value.trim().toUpperCase(),
+        document.getElementById('entryClaimMsg'),
+        document.getElementById('entryClaimBtn'),
+        input
+      );
     }
 
     // Enter submits, since people paste a code and hit return.

@@ -337,101 +337,113 @@ async function loadItemQueue() {
 /* ── Big Prize Giveaway ─────────────────────── */
 
 let giveawayIsOpen = false;
+let giveawayRarity = null;
 
-/* ── THE WHEEL MUST MATCH THE ODDS ──────────────────────────────────────
-   The draw is weighted by entry count — giveaway.js walks cumulative
-   weights, so 50 entries from a mythic drop really are worth fifty times a
-   single channel-point entry. The wheel drew one EQUAL segment per entrant,
-   so it showed every viewer the same slice while the server gave them wildly
-   different chances.
+/* ── THE REEL ───────────────────────────────────────────────────────────
+   The wheel this replaced drew one segment per entrant and, at one point,
+   sized them by entry count. Both were wrong for the draw that actually
+   runs: pick-winner is a FLAT pick over this event's entrants, so every
+   slice was the same size anyway, and a wheel of forty identical slivers
+   is unreadable on a stream.
 
-   That is not cosmetic. The wheel is shown on stream as the draw happens; a
-   viewer watching a thin-sliced whale win a booster box off an equal-looking
-   wheel is watching something that looks rigged. Segments are proportional
-   to entries now, and the pointer lands inside the winner's real arc. */
-function giveawaySegments(entrants) {
-  const total = entrants.reduce(function (s, e) { return s + Math.max(1, Number(e.entries) || 1); }, 0);
-  let cursor = 0;
-  return entrants.map(function (e) {
-    const weight = Math.max(1, Number(e.entries) || 1);
-    const deg = (weight / total) * 360;
-    const seg = { start: cursor, end: cursor + deg, mid: cursor + deg / 2, deg, username: e.username };
-    cursor += deg;
-    return seg;
-  });
+   A slot reel is the honest picture of a flat pick — names go past, one
+   stops. The arithmetic is in js/giveaway-reel.js so it can be tested;
+   what is left here is the DOM.
+
+   The reel lands on the name the SERVER chose. It does not pick anything. */
+
+/* A spun reel HOLDS. Once it lands on a name that name stays under the
+   window until the draw is reset or the next one opens — the poll below
+   would otherwise snap it back to the latest entrant a few seconds after
+   the winner was announced, on a panel that is on screen. */
+var reelHeld = false;
+
+function reelRow(name, cls) {
+  const row = document.createElement('div');
+  row.className = 'giveaway-reel-row' + (cls ? ' ' + cls : '');
+  row.textContent = name;
+  return row;
 }
 
-function renderGiveawayWheel(entrants) {
-  const wheel = document.getElementById('giveawayWheel');
-  if (!wheel) return;
-  wheel.style.transition = 'none';
-  wheel.style.transform = 'rotate(0deg)';
-  wheel.innerHTML = '';
+function renderGiveawayReel(entrants) {
+  const strip = document.getElementById('giveawayReelStrip');
+  if (!strip || reelHeld) return;
+
+  strip.style.transition = 'none';
+  strip.style.transform = 'translateY(0)';
+  strip.innerHTML = '';
 
   if (!entrants || entrants.length === 0) {
-    wheel.style.background = 'var(--gray-lo)';
-    const empty = document.createElement('div');
-    empty.className = 'giveaway-wheel-empty';
-    empty.textContent = 'No entrants yet';
-    wheel.appendChild(empty);
+    strip.appendChild(reelRow('No entrants yet', 'empty'));
     return;
   }
 
-  const segs = giveawaySegments(entrants);
-  const colors = ['#1a0000', '#000000'];
-  wheel.style.background = 'conic-gradient(' + segs.map(function (s, i) {
-    return colors[i % 2] + ' ' + s.start + 'deg ' + s.end + 'deg';
-  }).join(', ') + ')';
-
-  segs.forEach(function (s) {
-    /* Only label a slice wide enough to read. A 200-entrant month makes most
-       arcs a fraction of a degree, and overlapping text is worse than none. */
-    if (s.deg < 12) return;
-    const label = document.createElement('div');
-    label.className = 'giveaway-wheel-label';
-    label.textContent = s.username;
-    label.style.transform = 'rotate(' + s.mid + 'deg) translate(90px) rotate(' + (-s.mid) + 'deg)';
-    wheel.appendChild(label);
-  });
+  /* At rest the reel shows the most recent entrant, so a moderator can see
+     redemptions arriving without spinning anything. */
+  const latest = entrants[entrants.length - 1];
+  strip.appendChild(reelRow(latest.username, 'idle'));
 }
 
-function spinGiveawayWheelTo(entrants, winnerIndex) {
-  const wheel = document.getElementById('giveawayWheel');
-  if (!wheel) return;
-  const segs = giveawaySegments(entrants);
-  const seg = segs[winnerIndex];
-  if (!seg) return;
+function spinGiveawayReelTo(entrants, winnerIndex) {
+  const strip = document.getElementById('giveawayReelStrip');
+  if (!strip || !window.PhamReel) return;
 
-  /* Land somewhere inside the winner's arc rather than dead centre, so
-     repeated draws do not stop in an identical spot and read as scripted.
-     Kept off the very edge, where rounding could show the neighbouring
-     slice under the pointer. */
-  const inset = seg.deg * 0.2;
-  const landing = seg.start + inset + Math.random() * Math.max(0.0001, seg.deg - inset * 2);
+  const plan = window.PhamReel.strip(entrants, winnerIndex);
+  if (!plan.names.length) return;
 
-  wheel.style.transition = 'transform 4s cubic-bezier(0.15, 0.85, 0.25, 1)';
+  strip.style.transition = 'none';
+  strip.style.transform = 'translateY(0)';
+  strip.innerHTML = '';
+  plan.names.forEach(function (n, i) {
+    strip.appendChild(reelRow(n, i === plan.landing ? 'winner' : ''));
+  });
+
+  reelHeld = true;
+  /* Forced reflow: without it the browser coalesces the reset and the
+     travel into one style change and the reel arrives with no animation. */
+  void strip.offsetHeight;
+
   requestAnimationFrame(function () {
-    wheel.style.transform = 'rotate(' + (360 * 6 - landing) + 'deg)';
+    strip.style.transition = 'transform 4s cubic-bezier(0.12, 0.8, 0.18, 1)';
+    strip.style.transform = 'translateY(' + plan.offset + 'px)';
   });
 }
 
-function setGiveawayOpenUI(open, entrantCount) {
+function setGiveawayOpenUI(open, entrantCount, rarity) {
   giveawayIsOpen = open;
+  if (rarity !== undefined) giveawayRarity = rarity;
+
   const statusEl = document.getElementById('giveawayStatus');
   const toggleBtn = document.getElementById('giveawayToggleBtn');
   const countEl = document.getElementById('giveawayEntrantCount');
+  const raritySel = document.getElementById('giveawayRarity');
+
   if (statusEl) {
-    statusEl.textContent = open ? 'Entries Open' : 'Entries Closed';
-    statusEl.className = 'giveaway-status' + (open ? ' open' : '');
+    statusEl.textContent = open
+      ? (giveawayRarity ? giveawayRarity.toUpperCase() + ' entries open' : 'Entries Open')
+      : 'Entries Closed';
+    statusEl.className = 'giveaway-status' + (open ? ' open rarity-' + (giveawayRarity || 'common') : '');
   }
   if (toggleBtn) toggleBtn.textContent = open ? 'Close Entries' : 'Open Entries';
+  /* Locked while a draw runs. Changing it mid-draw would change nothing on
+     Twitch and everything about what the panel claims is happening. */
+  if (raritySel) {
+    raritySel.disabled = open;
+    if (giveawayRarity) raritySel.value = giveawayRarity;
+  }
   if (countEl) countEl.textContent = (entrantCount || 0) + (entrantCount === 1 ? ' entrant' : ' entrants');
 }
 
 function showGiveawayWinner(winner) {
   const panel = document.getElementById('giveawayWinnerPanel');
   const nameEl = document.getElementById('giveawayWinnerName');
+  const rarityEl = document.getElementById('giveawayWinnerRarity');
   if (nameEl) nameEl.textContent = winner.username;
+  if (rarityEl) {
+    const r = winner.rarity || giveawayRarity || '';
+    rarityEl.textContent = r ? '\u2014 ' + r.toUpperCase() + ' draw' : '';
+    rarityEl.className = 'giveaway-winner-rarity rarity-' + (r || 'common');
+  }
   if (panel) panel.hidden = false;
 }
 
@@ -440,8 +452,8 @@ async function loadGiveawayState() {
     const res = await fetch('/api/bot/giveaway', { credentials: 'same-origin' });
     if (!res.ok) return;
     const data = await res.json();
-    setGiveawayOpenUI(data.open, data.entrantCount);
-    renderGiveawayWheel(data.entrants);
+    setGiveawayOpenUI(data.open, data.entrantCount, data.rarity);
+    renderGiveawayReel(data.entrants);
     if (data.winner) showGiveawayWinner(data.winner);
   } catch {
     /* leave panel as-is */
@@ -456,12 +468,27 @@ async function toggleGiveawayEntries() {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'toggle', open: !giveawayIsOpen }),
+      body: JSON.stringify({
+        action: 'toggle',
+        open: !giveawayIsOpen,
+        rarity: (document.getElementById('giveawayRarity') || {}).value,
+      }),
     });
     const data = await res.json();
     if (data.success) {
-      setGiveawayOpenUI(data.open, undefined);
-      showBotStatus(data.open ? 'Giveaway entries are open.' : 'Giveaway entries are closed.', false);
+      setGiveawayOpenUI(data.open, undefined, data.rarity);
+      showBotStatus(
+        data.open
+          ? String(data.rarity || '').toUpperCase() + ' entries are open \u2014 the other reward is switched off.'
+          : 'Giveaway entries are closed.',
+        false
+      );
+      /* Named rather than swallowed: a reward that would not switch off is
+         still redeemable, and the moderator is the only one who can see it. */
+      if (data.strays && data.strays.length) {
+        showBotStatus('Could not switch off: ' + data.strays.join(', ') + '. Disable it in the Twitch dashboard.', true);
+      }
+      if (data.open) { reelHeld = false; renderGiveawayReel([]); }
     } else {
       showBotStatus(data.error || 'Could not toggle entries.', true);
     }
@@ -485,11 +512,10 @@ async function spinGiveawayWheel() {
     });
     const data = await res.json();
     if (data.success) {
-      renderGiveawayWheel(data.entrants);
-      requestAnimationFrame(function () {
-        spinGiveawayWheelTo(data.entrants, data.winnerIndex);
-      });
-      setTimeout(function () { showGiveawayWinner(data.winner); }, 4100);
+      spinGiveawayReelTo(data.entrants, data.winnerIndex);
+      setTimeout(function () {
+        showGiveawayWinner(Object.assign({ rarity: data.rarity }, data.winner));
+      }, 4100);
     } else {
       showBotStatus(data.error || 'Could not pick a winner.', true);
     }
@@ -497,7 +523,7 @@ async function spinGiveawayWheel() {
     showBotStatus('Network error picking a winner.', true);
   }
 
-  if (btn) { btn.disabled = false; btn.textContent = 'Spin the Wheel'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Spin'; }
 }
 
 async function sendGiveawayCode() {
@@ -505,10 +531,9 @@ async function sendGiveawayCode() {
   const tier = document.getElementById('giveawayCodeTier').value;
   const manualCode = document.getElementById('giveawayCodeManual').value.trim();
 
-  if (!tier && !manualCode) {
-    showBotStatus('Pick a tier or paste a code first.', true);
-    return;
-  }
+  /* No longer a precondition: leaving both blank now means "the rarity of
+     the draw that was actually won", which is the right default and the one
+     that cannot be got wrong under pressure. */
 
   if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
   try {
@@ -520,7 +545,14 @@ async function sendGiveawayCode() {
     });
     const data = await res.json();
     if (data.success) {
-      showBotStatus(data.sent ? 'Code whispered to the winner.' : 'Code saved but the whisper failed to send.', !data.sent);
+      /* The card on their giveaway page IS the delivery. A failed whisper is
+         worth saying, but it is not a failure of the prize any more. */
+      showBotStatus(
+        String(data.rarity || '').toUpperCase() + ' code locked to ' + (data.winner ? data.winner.username : 'the winner') +
+        ' \u2014 waiting on their giveaway page for 7 days.' +
+        (data.whispered ? ' Whisper sent too.' : ' The whisper did not send; the page has it.'),
+        false
+      );
       await refreshDashboard();
     } else {
       showBotStatus(data.error || 'Could not send the code.', true);
@@ -528,7 +560,7 @@ async function sendGiveawayCode() {
   } catch {
     showBotStatus('Network error sending the code.', true);
   }
-  if (btn) { btn.disabled = false; btn.textContent = 'Whisper Code to Winner'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Give Code to Winner'; }
 }
 
 async function resetGiveaway() {
@@ -544,6 +576,7 @@ async function resetGiveaway() {
     document.getElementById('giveawayWinnerPanel').hidden = true;
     document.getElementById('giveawayCodeManual').value = '';
     document.getElementById('giveawayCodeTier').value = '';
+    reelHeld = false;
     await loadGiveawayState();
     showBotStatus('Giveaway reset — entrants cleared.', false);
   } catch {
@@ -562,6 +595,18 @@ function initGiveawayPanel() {
   if (spinBtn) spinBtn.addEventListener('click', spinGiveawayWheel);
   if (sendBtn) sendBtn.addEventListener('click', sendGiveawayCode);
   if (resetBtn) resetBtn.addEventListener('click', resetGiveaway);
+
+  /* WATCH THE ENTRIES ARRIVE.
+     This state was read once at page load and then only after a reset, so a
+     moderator who opened entries watched the count sit at zero for the whole
+     minute chat was redeeming. Five seconds while a draw is open and nothing
+     at all when it is closed: this panel sits open beside a running stream,
+     so an idle poll would be a cost paid all day for a feature used for two
+     minutes a night. */
+  setInterval(function () {
+    if (document.hidden || !giveawayIsOpen || reelHeld) return;
+    loadGiveawayState();
+  }, 5000);
 
   loadGiveawayState();
 }
