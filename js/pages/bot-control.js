@@ -711,6 +711,32 @@ async function setOvMc(body, btn) {
   if (btn) btn.disabled = false;
 }
 
+/* Asks every open overlay to reload. The overlay polls the event feed once
+   a second and reloads when the token changes, so this is as immediate as a
+   right-click in OBS and can be done from a phone. */
+async function reloadOverlay(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Reloading…'; }
+  try {
+    const res = await fetch('/api/overlay/events', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reload' }),
+    });
+    const d = await res.json();
+    if (d.success) {
+      /* Named as "within a second" rather than "done": the reload happens
+         on the overlay's next poll, not in this response. */
+      showBotStatus('Every open overlay will reload within a second.', false);
+    } else {
+      showBotStatus(d.error || 'Could not ask the overlay to reload.', true);
+    }
+  } catch {
+    showBotStatus('Network error asking the overlay to reload.', true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Reload OBS Overlay'; }
+}
+
 function initOvMc() {
   const show = document.getElementById('ovMcShowBtn');
   const off = document.getElementById('ovMcOffBtn');
@@ -725,6 +751,9 @@ function initOvMc() {
   });
   off.addEventListener('click', function () { setOvMc({ action: 'off' }, off); });
   refresh.addEventListener('click', function () { loadOvMc(); });
+
+  const reload = document.getElementById('ovReloadBtn');
+  if (reload) reload.addEventListener('click', function () { reloadOverlay(reload); });
 
   loadOvMc();
 }

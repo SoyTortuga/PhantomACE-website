@@ -68,6 +68,11 @@
   var showing = false;
   var faults = 0;
 
+  /* The reload token this page loaded with. `undefined` until the first
+     answer arrives; once set, any change means somebody pressed the button
+     in the control panel. */
+  var reloadToken;
+
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -322,6 +327,25 @@
       .then(function (data) {
         faults = 0;
         setFault(false);
+
+        /* RELOAD ON COMMAND. An OBS browser source holds this page open for
+           days, so without it a change to the overlay never reaches the
+           stream until somebody walks to the streaming PC.
+
+           The URL gains a cache-busting parameter rather than calling
+           location.reload(), which browsers may answer from cache — and the
+           whole point of pressing the button is usually that the cached
+           copy is the stale one. The key is preserved; nothing else in the
+           URL matters. */
+        var token = data.reloadToken || '';
+        if (reloadToken === undefined) {
+          reloadToken = token;
+        } else if (token !== reloadToken) {
+          var u = new URL(location.href);
+          u.searchParams.set('r', token || String(Date.now()));
+          location.replace(u.toString());
+          return;
+        }
 
         /* No stored position — a genuinely first run. Take the current
            place and show nothing, or every alert since the server started

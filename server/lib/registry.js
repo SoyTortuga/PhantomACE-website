@@ -74,6 +74,12 @@ export const SINGLETONS = {
      switched-off behaviour. */
   overlay_mana_clash:    { table: 'singletons', expiry: 'none' },
 
+  /* Bumped to tell the overlay to reload itself. 'none': if this expired,
+     the token would vanish, every open overlay would see a change on its
+     next poll and reload in unison — a self-inflicted refresh nobody
+     asked for, in the middle of a stream. */
+  overlay_reload:        { table: 'singletons', expiry: 'none' },
+
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
      slightly slower one. */

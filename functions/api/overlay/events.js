@@ -20,6 +20,13 @@
    replay or skip alerts whenever the two machines disagreed, and OBS runs on
    the streaming PC rather than the server.
 
+   RELOADING FROM HERE. An OBS browser source holds a page open for days,
+   so a change to overlay.html or its scripts does not reach the stream
+   until somebody walks to the streaming PC and refreshes the source. This
+   feed is already polled every second, so it carries a reload token: the
+   page remembers the token it started with, and reloads when it changes.
+   One button in the control panel, and nobody touches OBS.
+
    A FIRST LOAD REPLAYS NOTHING. Opening the overlay — or OBS reloading the
    source mid-stream, which it does — returns the current position and no
    backlog. Without that, restarting a source would dump every alert of the
@@ -61,6 +68,63 @@ export async function pushOverlayEvent(env, event) {
   }
 }
 
+const RELOAD_KEY = 'overlay_reload';
+
+/** The current reload token. Absent until somebody has asked for one. */
+async function reloadToken(env) {
+  const rec = await env.MARKETPLACE.get(RELOAD_KEY, 'json');
+  return (rec && rec.token) ? String(rec.token) : '';
+}
+
+function getSession(request) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(/pham_session=([^;]+)/);
+  if (!match) return null;
+  try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
+}
+
+/**
+ * Ask every open overlay to reload.
+ *
+ * Moderator only, and deliberately not reachable with the overlay key: the
+ * key is in an OBS URL and travels wherever that URL does, so it proves
+ * "this is the overlay", not "this person may act".
+ */
+export async function onRequestPost(context) {
+  const { env, request } = context;
+
+  const { isModerator } = await import('../admin/moderators.js');
+  const session = getSession(request);
+  if (!(await isModerator(env, session))) {
+    return new Response(JSON.stringify({ error: 'You need broadcaster or moderator access for this.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
+
+  let body;
+  try { body = await request.json(); } catch { body = {}; }
+  if (body.action !== 'reload') {
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
+
+  /* The clock, not a counter. Two moderators pressing the button a second
+     apart should produce two different tokens without either having read
+     the other's. */
+  const token = String(Date.now());
+  await env.MARKETPLACE.put(RELOAD_KEY, JSON.stringify({
+    token, at: Date.now(), by: (session && session.display_name) || '',
+  }));
+
+  return new Response(JSON.stringify({ success: true, token }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
@@ -88,7 +152,16 @@ export async function onRequestGet(context) {
     ? []
     : events.filter(e => e.seq > since);
 
-  return new Response(JSON.stringify({ events: fresh, latestSeq, serverNow: Date.now() }), {
+  return new Response(JSON.stringify({
+    events: fresh,
+    latestSeq,
+    /* Sent on every poll, including the first. The page stores what it saw
+       on load and reloads only when this differs — so pressing the button
+       once reloads every open overlay exactly once, and a page opened
+       afterwards does not reload on its first poll. */
+    reloadToken: await reloadToken(env),
+    serverNow: Date.now(),
+  }), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
