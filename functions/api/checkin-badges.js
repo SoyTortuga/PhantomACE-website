@@ -44,9 +44,12 @@ export const CHECKIN_BADGES = [
     rarity: 'exclusive',
     image: '/assets/badges/agate-hunt.png',
 
-    /* 2026-09-17 10:00 PDT → 2026-09-18 17:00 PDT.
-       Opened two hours earlier than first planned, because the stream did. */
-    from: Date.UTC(2026, 8, 17, 17, 0, 0),
+    /* 2026-09-17 08:00 PDT → 2026-09-18 17:00 PDT.
+       Moved earlier twice, both times because the stream went live ahead of
+       plan. The opening instant is deliberately BEHIND the deploy: a window
+       that opens in five minutes is a window nobody can use for five
+       minutes, and there is no cost to it having started already. */
+    from: Date.UTC(2026, 8, 17, 15, 0, 0),
     to: Date.UTC(2026, 8, 19, 0, 0, 0),
   },
 ];

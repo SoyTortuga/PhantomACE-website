@@ -6,8 +6,8 @@
 
    A window that opens an hour late, or closes an hour early, is invisible
    until the event is over and somebody says they checked in and got
-   nothing. There is no way to notice it by looking at the code: 17:00 UTC
-   is either 10:00 Pacific or it is not, and the difference is one line in a
+   nothing. There is no way to notice it by looking at the code: 15:00 UTC
+   is either 08:00 Pacific or it is not, and the difference is one line in a
    timezone table nobody re-reads.
 
    So the window is asserted from BOTH ends here — as the absolute instant
@@ -51,16 +51,16 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
   ok('the Agate Hunt window exists', !!AGATE);
 
   /* THE ASSERTION THAT CATCHES A PST/PDT SLIP. September is daylight time
-     on the west coast; an instant computed as UTC−8 reads 11:00 here, and
+     on the west coast; an instant computed as UTC−8 reads 09:00 here, and
      the event would open an hour late with nothing else to show for it. */
-  check('entries open at 10:00 Pacific on the 17th', pacific(AGATE.from), '09/17/2026, 10:00');
+  check('entries open at 08:00 Pacific on the 17th', pacific(AGATE.from), '09/17/2026, 08:00');
   check('and close at 17:00 Pacific on the 18th', pacific(AGATE.to), '09/18/2026, 17:00');
 
   /* And the same fact from the other side, so a change to one form without
      the other cannot pass. */
-  check('which is 17:00 UTC', new Date(AGATE.from).toISOString(), '2026-09-17T17:00:00.000Z');
+  check('which is 15:00 UTC', new Date(AGATE.from).toISOString(), '2026-09-17T15:00:00.000Z');
   check('to 00:00 UTC the next day', new Date(AGATE.to).toISOString(), '2026-09-19T00:00:00.000Z');
-  check('a 31-hour window', (AGATE.to - AGATE.from) / 3600000, 31);
+  check('a 33-hour window', (AGATE.to - AGATE.from) / 3600000, 33);
 }
 
 /* ── Open and shut ───────────────────────────────────────────────────── */
