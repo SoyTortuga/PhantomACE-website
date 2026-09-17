@@ -41,6 +41,16 @@ const REWARD_HANDLERS = {
      the reward), so there is no counter to reset and no scheduled job; the
      reward simply becomes redeemable again when the next stream starts.
      What is recorded here is WHEN, which is the part Twitch does not keep. */
+  /* One entry on the open draw's wheel, and nothing else — no queued
+     redemption for the site to pop up, no inventory change. The reward costs
+     a single point and its whole effect is a name on a reel. */
+  'giveaway-entry': async (env, userId, redemption) => {
+    const { entryRarityForTitle, addEntrant } = await import('./bot/giveaway-entry.js');
+    const rarity = entryRarityForTitle(redemption.reward && redemption.reward.title);
+    if (rarity === false) return;
+    await addEntrant(env, userId, redemption.user_name || redemption.user_login || 'unknown', rarity);
+  },
+
   'pham-checkin': async (env, userId, redemption) => {
     const { getStreamInfo } = await import('./stream-info.js');
     const { streamId, startedAt } = await getStreamInfo(env);
@@ -119,6 +129,19 @@ async function queueRedemption(env, userId, type, redemption) {
 
 function mapRewardTitle(title) {
   const lower = title.toLowerCase();
+  /* THE RARITY GIVEAWAY ENTRIES RIDE THIS SUBSCRIPTION ON PURPOSE.
+     "Enter Rare Giveaway" and "Enter Mythic Giveaway" have no EventSub
+     subscription of their own. Giving them one means a reward_id condition,
+     which means the admin page's create-EventSub button, which means the
+     broadcaster signed in — and creating subscriptions there is the button
+     that 409s against the live ones and reports success. This route is
+     already subscribed to EVERY redemption on the channel, so the two new
+     rewards arrive here for free.
+
+     The legacy "Enter Giveaway" is deliberately NOT matched: it has its own
+     reward_id subscription pointed at /api/bot/giveaway-entry, and routing
+     it twice would be two paths to keep in step for no gain. */
+  if (lower.includes('giveaway') && (lower.includes('rare') || lower.includes('mythic'))) return 'giveaway-entry';
   /* Before 'theme' and the rest: matched on "check" so a renamed reward
      ("Pham Check-In", "Check In!", "checkin") still routes. Titles are typed
      by hand in the Twitch dashboard and will drift. */

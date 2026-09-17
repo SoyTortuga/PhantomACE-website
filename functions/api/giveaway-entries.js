@@ -23,6 +23,20 @@ const DROP_PREFIX = 'gwc_';
 /** Codes are claimable for five minutes from the drop. */
 export const DROP_WINDOW_SECONDS = 300;
 
+/* A GIVEAWAY PRIZE IS NOT A DROP, AND ITS WINDOW SAYS SO.
+   A dropped code is a race — five minutes, first come. A prize code belongs
+   to exactly one person who has already won it, so there is nobody to race
+   and no reason for it to expire while they are asleep. Seven days is long
+   enough to survive a weekend away and short enough that the row does not
+   live for ever. */
+export const PRIZE_WINDOW_SECONDS = 7 * 86400;
+
+const PRIZE_PREFIX = 'gwp_';
+
+export function prizeKey(userId) {
+  return `${PRIZE_PREFIX}${userId}`;
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -103,31 +117,87 @@ export async function addEntries(env, userId, username, count, source) {
  */
 export async function registerDropCode(env, code, tier, entries, opts = {}) {
   if (!code) return null;
+
+  /* `lockedTo` turns a public code into one person's property. It is the
+     whole of what "user locked" means: the code is still an ordinary row in
+     the same family, claimed through the same endpoint, but redeemDropCode
+     refuses everyone else — so a winner reading their code out on stream, or
+     pasting it into the wrong window, loses nothing.
+
+     A locked code never reaches the live-drop feed, which would otherwise
+     publish a code nobody but the winner may use. */
+  const lockedTo = opts.lockedTo ? String(opts.lockedTo) : null;
+  const ttl = Math.max(60, Math.floor(Number(opts.ttlSeconds) || DROP_WINDOW_SECONDS));
+
   const record = {
     code: String(code).trim().toUpperCase(),
     tier: tier || 'common',
     entries: Math.floor(Number(entries) || 0),
     droppedAt: Date.now(),
+    expiresAt: Date.now() + ttl * 1000,
+    lockedTo,
     redeemedBy: [],
   };
   await env.MARKETPLACE.put(dropKey(record.code), JSON.stringify(record), {
-    expirationTtl: DROP_WINDOW_SECONDS,
+    expirationTtl: ttl,
   });
 
   /* Every entry-code drop flows through here, so this is the one place that
      sees all of them — hype train, panel button and !drop alike. */
-  await recordLiveDrop(env, {
-    kind: 'entries',
-    code: record.code,
-    rarity: record.tier,
-    entries: record.entries,
-    source: opts.source || 'manual',
-    level: opts.level || null,
-    expiresAt: Date.now() + DROP_WINDOW_SECONDS * 1000,
-    redeemPath: '/giveaway',
-  });
+  if (opts.announce !== false && !lockedTo) {
+    await recordLiveDrop(env, {
+      kind: 'entries',
+      code: record.code,
+      rarity: record.tier,
+      entries: record.entries,
+      source: opts.source || 'manual',
+      level: opts.level || null,
+      expiresAt: record.expiresAt,
+      redeemPath: '/giveaway',
+    });
+  }
 
   return record;
+}
+
+/**
+ * Hand a won prize code to one viewer.
+ *
+ * Two rows, deliberately. The drop row is keyed by the CODE and is what
+ * redeemDropCode checks; this one is keyed by the WINNER, so the giveaway
+ * page can show someone their prize without them having to know the code
+ * first. A whisper that never arrives — Twitch drops whispers from accounts
+ * a viewer has never messaged — then costs nothing.
+ */
+export async function recordPrize(env, userId, prize) {
+  if (!userId) return null;
+  const rec = {
+    userId: String(userId),
+    code: String(prize.code || '').trim().toUpperCase(),
+    tier: prize.tier || 'common',
+    entries: Math.floor(Number(prize.entries) || 0),
+    wonAt: Date.now(),
+    expiresAt: Date.now() + PRIZE_WINDOW_SECONDS * 1000,
+  };
+  await env.MARKETPLACE.put(prizeKey(rec.userId), JSON.stringify(rec), {
+    expirationTtl: PRIZE_WINDOW_SECONDS,
+  });
+  return rec;
+}
+
+/** The winner's prize, with whether it has been claimed yet. */
+export async function getPrize(env, userId) {
+  if (!userId) return null;
+  const rec = await env.MARKETPLACE.get(prizeKey(userId), 'json');
+  if (!rec || !rec.code) return null;
+
+  /* Claimed-ness lives on the DROP row, not here, so a claim made by typing
+     the code into the box shows up on this card too — one fact, one place.
+     A missing drop row means the code has outlived its window, which reads
+     the same way to the viewer as claimed: there is nothing left to do. */
+  const drop = await env.MARKETPLACE.get(dropKey(rec.code), 'json');
+  const claimed = !drop || (drop.redeemedBy || []).includes(String(userId));
+  return { ...rec, claimed };
 }
 
 /* ══════════════════════════════════════════════
@@ -196,7 +266,7 @@ export async function getLiveDrops(env) {
  * Claim a dropped code for one user.
  *
  * @returns {Promise<{ok: true, entries: number, total: number, tier: string}
- *                 | {ok: false, reason: 'unknown'|'already'}>}
+ *                 | {ok: false, reason: 'unknown'|'already'|'locked'}>}
  */
 export async function redeemDropCode(env, userId, username, code) {
   const key = dropKey(code);
@@ -210,6 +280,13 @@ export async function redeemDropCode(env, userId, username, code) {
   if ((existing.redeemedBy || []).includes(String(userId))) {
     return { ok: false, reason: 'already' };
   }
+  /* A prize code belongs to the person who won it. Answered distinctly from
+     'unknown' on purpose: this code IS real and its owner can see it on
+     their own page, so pretending it does not exist would be a lie they
+     could disprove in one click. */
+  if (existing.lockedTo && String(existing.lockedTo) !== String(userId)) {
+    return { ok: false, reason: 'locked' };
+  }
 
   let claimed = false;
   let tier = existing.tier;
@@ -219,6 +296,7 @@ export async function redeemDropCode(env, userId, username, code) {
     if (!current) return undefined;
     const list = current.redeemedBy || [];
     if (list.includes(String(userId))) return undefined;   // lost the race
+    if (current.lockedTo && String(current.lockedTo) !== String(userId)) return undefined;
     claimed = true;
     tier = current.tier;
     entries = current.entries;
@@ -261,6 +339,7 @@ export async function getGiveawaySummary(env, session) {
     participants,
     loggedIn: !!session,
     you: session ? (you || { entries: 0, history: [] }) : null,
+    prize: session ? await getPrize(env, session.user_id) : null,
   };
 }
 
@@ -295,6 +374,9 @@ export async function onRequestPost(context) {
   if (!result.ok) {
     if (result.reason === 'already') {
       return json({ error: 'You have already claimed this code.' }, 409);
+    }
+    if (result.reason === 'locked') {
+      return json({ error: 'That code was won in a giveaway and only its winner can claim it.' }, 403);
     }
     return json({ error: 'That code is not valid, or the 5 minutes are up.' }, 404);
   }
