@@ -53,13 +53,13 @@ export const ENTRY_REWARDS = [
   {
     title: 'Enter Rare Giveaway',
     cost: 1,
-    background_color: '#D4A017',            // gold
+    background_color: '#c7a550',            // gold
     prompt: 'Enter the Rare giveaway running now. One entry each.',
   },
   {
     title: 'Enter Mythic Giveaway',
     cost: 1,
-    background_color: '#FF7A18',            // orange
+    background_color: '#eb6726',            // orange
     prompt: 'Enter the Mythic giveaway running now. One entry each.',
   },
 ];
