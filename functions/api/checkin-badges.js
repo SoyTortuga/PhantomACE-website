@@ -89,7 +89,12 @@ export function grantOpenBadges(inv, at = Date.now(), source = 'pham-checkin') {
       rarity: b.rarity,
       consumable: false,
       quantity: 1,
-      grantedAt: Date.now(),
+      /* `at`, not Date.now(). Identical on the live path, where `at` IS
+         now — but it means a backfill can stamp a badge with the moment it
+         was actually earned rather than the moment it was repaired. Grant
+         order is the only record of who was first, and anything that ever
+         numbers these copies will read it. */
+      grantedAt: at,
       source,
       ...(b.image ? { meta: { image: b.image } } : {}),
     });

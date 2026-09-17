@@ -98,7 +98,10 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
      artwork. Without it the badge renders as a rarity glyph — which is how
      the milestone badges shipped, and needed a backfill script. */
   check('carrying its artwork', item.meta && item.meta.image, '/assets/badges/agate-hunt.png');
-  ok('and stamped with when', typeof item.grantedAt === 'number');
+  /* Stamped with WHEN IT WAS EARNED, not when the row was written. On the
+     live path those are the same instant; on a backfill they are not, and
+     grant order is the only record of who was first. */
+  check('and stamped with when it was earned', item.grantedAt, AGATE.from + 1000);
 }
 
 /* ── Never twice ─────────────────────────────────────────────────────── */
