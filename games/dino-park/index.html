@@ -635,6 +635,21 @@
       padding: 8px;
       flex-shrink: 0;
     }
+    /* Picking five is a browsing job, and the detail panel has nothing to
+       show while it happens -- so in trade-up mode the list takes the whole
+       pane and lays the cards out in a grid instead of a 140px column. */
+    .coll-layout.trading .coll-list {
+      width: 100%;
+      border-right: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+      gap: 6px;
+      align-content: start;
+    }
+    .coll-layout.trading .coll-detail { display: none; }
+    .coll-layout.trading .coll-view-toggle,
+    .coll-layout.trading .trade-bar { grid-column: 1 / -1; }
+    .coll-layout.trading .coll-card { margin-bottom: 0; }
     .coll-view-toggle {
       display: flex;
       gap: 4px;
@@ -687,6 +702,38 @@
     .coll-card-level { font-size: 8px; color: #666; margin-top: 2px; }
     .coll-card-bars { display: flex; gap: 2px; margin-top: 4px; height: 3px; }
     .coll-card-bars > div { flex: 1; border-radius: 1px; }
+
+    .trade-open {
+      width: 100%; margin-bottom: 6px; padding: 6px;
+      background: #1a1a1a; color: #aaa; border: 1px solid #ffffff1a;
+      border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .trade-open:hover { color: #fff; border-color: #ff000055; }
+    .trade-bar {
+      background: #0f0f0f; border: 1px solid #ffffff14; border-radius: 4px;
+      padding: 8px; margin-bottom: 8px;
+    }
+    .trade-count { font-size: 14px; font-weight: 700; color: #666; }
+    .trade-count.ready { color: #2ecc71; }
+    .trade-hint { font-size: 10px; color: #888; margin-top: 2px; }
+    .trade-avail { font-size: 9px; color: #555; margin-top: 4px; line-height: 1.5; }
+    .trade-btns { display: flex; gap: 6px; margin-top: 8px; }
+    .trade-btns button {
+      flex: 1; padding: 6px; border-radius: 4px; font-size: 10px;
+      font-weight: 700; cursor: pointer; text-transform: uppercase;
+    }
+    .trade-cancel { background: #1a1a1a; color: #888; border: 1px solid #ffffff1a; }
+    .trade-go { background: #ff0000; color: #fff; border: 1px solid #ff0000; }
+    .trade-go[disabled] { background: #1a1a1a; color: #444; border-color: #ffffff14; cursor: not-allowed; }
+    /* Dimmed, not hidden: a card you cannot pick should still say why it is
+       there. opacity only -- the rarity border stays readable underneath. */
+    .coll-card.tu-dim { opacity: 0.28; cursor: default; }
+    .coll-card.tu-picked { border-color: #2ecc71; background: #10200f; }
+    .trade-consume {
+      font-size: 10px; color: #888; margin: 8px 0; line-height: 1.7;
+      max-height: 120px; overflow-y: auto;
+    }
 
     .coll-detail {
       position: relative;
@@ -1738,6 +1785,104 @@ function rollMutationGuaranteed(specId){
   const gk=Object.keys(MUTATIONS);
   return gk[Math.floor(Math.random()*gk.length)];
 }
+
+/* ══════════════ TRADE-UP ══════════════
+   Five of one rarity for one of the next. Two tracks, because a mutated
+   dinosaur is worth far more than a plain one and letting them fill the
+   same five slots would make the mutated track a way of laundering junk:
+   the plain track takes five UNMUTATED and returns an unmutated one, the
+   mutated track takes five MUTATED and returns a mutated one. */
+const TRADE_UP_COST = 5;
+
+/* Legendary has nothing above it, so it trades into itself. The reward at
+   the top of the ladder is the guaranteed mutation rather than a tier --
+   which also means legendaries are never a dead end for the mutation dex,
+   the 1105-entry half of completion. */
+function tradeUpRarity(rarity) {
+  const i = RARITY_ORDER.indexOf(rarity);
+  if (i < 0) return null;
+  return RARITY_ORDER[i + 1] || RARITY_ORDER[RARITY_ORDER.length - 1];
+}
+
+/* WEIGHTED TOWARD THE RARE END, and only here. rollMutationGuaranteed
+   deliberately keeps the normal relative odds so that guaranteed-mutation
+   eggs cannot become the best source of rare mutations in the game; this
+   one is allowed to be that source because it costs five already-mutated
+   dinosaurs, each itself an 18% drop. Same bands, reweighted: rare goes
+   0.5 -> 3 of 18 (6x) and special 2.5 -> 5 (2x), taken out of the colour
+   swaps, which drop from 12 to 7. Globals are untouched at 3. */
+function rollMutationTradeUp(specId) {
+  for (let i = 0; i < 40; i++) {
+    const r = Math.random() * 18;
+    if (r < 3 && RARE_MUTS[specId]) return 'rare_' + specId;
+    if (r < 8 && SPECIAL_MUTS[specId]) return 'sp_' + specId;
+    if (r < 15) {
+      const n = pickSwaps(SPECIES_DEF[specId].p);
+      if (n && n.length) return n[Math.floor(Math.random() * n.length)].id;
+      continue;
+    }
+    const gk = Object.keys(MUTATIONS);
+    return gk[Math.floor(Math.random() * gk.length)];
+  }
+  const gk = Object.keys(MUTATIONS);
+  return gk[Math.floor(Math.random() * gk.length)];
+}
+
+/* Remove dinosaurs from the park and vault at once, by {source, idx}.
+
+   COOLDOWNS ARE KEYED BY PARK INDEX -- 'feed_3', 'play_3' -- so removing a
+   dinosaur renumbers every one after it and silently hands their cooldowns
+   to the wrong animal. The old single-removal paths deleted the departing
+   index's keys and left the rest, which was wrong but hard to notice with
+   one at a time; taking five at once would scramble a whole park. So the
+   surviving indices are remapped here, and the two older callers go
+   through this as well.
+
+   Park indices are spliced high-to-low so earlier removals cannot shift
+   the ones still to come. */
+function removeDinos(picks) {
+  const parkIdx = picks.filter(p => p.source === 'park').map(p => p.idx).sort((a, b) => b - a);
+  const vaultIdx = picks.filter(p => p.source === 'vault').map(p => p.idx).sort((a, b) => b - a);
+  const removed = [];
+
+  if (parkIdx.length) {
+    const gone = new Set(parkIdx);
+    const remap = new Map();
+    let next = 0;
+    state.park.forEach((_, i) => { if (!gone.has(i)) remap.set(i, next++); });
+
+    const moved = {};
+    Object.keys(state.cooldowns).forEach(k => {
+      const m = /^(.*)_(\d+)$/.exec(k);
+      if (!m) { moved[k] = state.cooldowns[k]; return; }
+      const to = remap.get(Number(m[2]));
+      if (to === undefined) return;      /* its dinosaur is leaving */
+      moved[m[1] + '_' + to] = state.cooldowns[k];
+    });
+    state.cooldowns = moved;
+
+    parkIdx.forEach(i => removed.push(state.park.splice(i, 1)[0]));
+    selectedDinoIdx = -1;
+  }
+  vaultIdx.forEach(i => removed.push(state.vault.splice(i, 1)[0]));
+  collSelectedIdx = -1;
+  return removed;
+}
+
+/* Everything a trade-up could consume, park and vault together, because
+   the point is to spend the collection rather than whichever half of it
+   the Collection tab happens to be showing. */
+function tradeUpEntries() {
+  const out = [];
+  state.park.forEach((d, i) => out.push({ source: 'park', idx: i, dino: d }));
+  state.vault.forEach((d, i) => out.push({ source: 'vault', idx: i, dino: d }));
+  return out;
+}
+
+function tradeUpEligible(dino, track) {
+  return track === 'mutated' ? !!dino.mutation : !dino.mutation;
+}
+
 
 const spriteCache = {};
 
@@ -4278,12 +4423,7 @@ async function confirmListDino(idx, source) {
       dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation || null, careCount: dino.careCount || 0 },
       price, listedAt: Date.now(),
     });
-    arr.splice(idx, 1);
-    if (source === 'park') {
-      selectedDinoIdx = -1;
-      Object.keys(state.cooldowns).forEach(k => { if (k.endsWith('_' + idx)) delete state.cooldowns[k]; });
-    }
-    collSelectedIdx = -1;
+    removeDinos([{ source, idx }]);
     save();
     closeSellDialog();
     renderParkWorld();
@@ -5083,6 +5223,8 @@ let collViewMode = 'park'; // 'park' (active, growing/decaying) | 'vault' (store
 function collArray() { return collViewMode === 'vault' ? state.vault : state.park; }
 
 function setCollViewMode(mode) {
+  tradeUpTrack = null;
+  tradeUpPicks = [];
   if (collViewMode === mode) return;
   collViewMode = mode;
   collSelectedIdx = -1;
@@ -5094,13 +5236,153 @@ function renderCollection() {
   renderCollDetail();
 }
 
+/* ── Trade-up: selection state and the exchange itself ──────────────── */
+let tradeUpTrack = null;      /* null | 'plain' | 'mutated' */
+let tradeUpPicks = [];        /* [{source, idx}] */
+
+function setTradeUpTrack(track) {
+  tradeUpTrack = track;
+  const layout = document.querySelector('.coll-layout');
+  if (layout) layout.classList.toggle('trading', !!track);
+  tradeUpPicks = [];
+  collSelectedIdx = -1;
+  renderCollection();
+}
+
+function tradeUpPickedRarity() {
+  if (!tradeUpPicks.length) return null;
+  const e = tradeUpEntries().find(x => x.source === tradeUpPicks[0].source && x.idx === tradeUpPicks[0].idx);
+  return e ? getRosterById(e.dino.speciesId).rarity : null;
+}
+
+/* The render dims what cannot be picked, but the RULE LIVES HERE, because
+   a dimmed card is a drawing and this is the thing that changes state. With
+   the check only in the render, a stale card or a direct call could put a
+   rare in among four commons, reach five, and light up a Trade Up button
+   that performTradeUp would then refuse -- a dead end offered to the
+   player. */
+function toggleTradeUpPick(source, idx) {
+  const at = tradeUpPicks.findIndex(p => p.source === source && p.idx === idx);
+  if (at >= 0) { tradeUpPicks.splice(at, 1); renderCollection(); return; }
+  if (tradeUpPicks.length >= TRADE_UP_COST) { showToast(`Pick ${TRADE_UP_COST}.`); return; }
+
+  const entry = tradeUpEntries().find(e => e.source === source && e.idx === idx);
+  if (!entry) return;
+  if (!tradeUpEligible(entry.dino, tradeUpTrack)) {
+    showToast(tradeUpTrack === 'mutated' ? 'That one is not mutated.' : 'That one is mutated.');
+    return;
+  }
+  const want = tradeUpPickedRarity();
+  const got = getRosterById(entry.dino.speciesId).rarity;
+  if (want && got !== want) { showToast(`Pick ${TRADE_UP_COST} of the same rarity.`); return; }
+
+  tradeUpPicks.push({ source, idx });
+  renderCollection();
+}
+
+function confirmTradeUpDialog() {
+  if (tradeUpPicks.length !== TRADE_UP_COST) return;
+  const from = tradeUpPickedRarity();
+  const to = tradeUpRarity(from);
+  const mutated = tradeUpTrack === 'mutated';
+  /* IRREVERSIBLE AND EXPENSIVE, so it is spelled out rather than confirmed
+     with a bare "are you sure": five named dinosaurs are about to stop
+     existing, and the result is random. */
+  const entries = tradeUpEntries();
+  const names = tradeUpPicks.map(p => {
+    const e = entries.find(x => x.source === p.source && x.idx === p.idx);
+    const spec = getRosterById(e.dino.speciesId);
+    return (e.dino.nickname || spec.name);
+  });
+  const overlay = document.createElement('div');
+  overlay.className = 'sell-overlay';
+  overlay.id = 'tradeUpOverlay';
+  overlay.innerHTML = `
+    <div class="sell-dialog">
+      <div class="sell-dialog-title">Trade Up</div>
+      <div class="sell-dialog-info" style="line-height:1.6">
+        <span style="color:${RARITY_COLORS[from]}">${TRADE_UP_COST} ${from}</span>
+        &rarr;
+        <span style="color:${RARITY_COLORS[to]}">1 random ${to}</span>${mutated || to === from ? ', mutated' : ''}
+      </div>
+      <div class="trade-consume">${names.map(n => `<div>${n}</div>`).join('')}</div>
+      <div class="sell-dialog-info" style="color:#ff6666">These five are consumed. This cannot be undone.</div>
+      <div class="sell-dialog-btns">
+        <button class="sell-cancel" onclick="closeTradeUpDialog()">Cancel</button>
+        <button class="sell-confirm" onclick="performTradeUp()">Trade Up</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function closeTradeUpDialog() {
+  const o = document.getElementById('tradeUpOverlay');
+  if (o) o.remove();
+}
+
+function performTradeUp() {
+  closeTradeUpDialog();
+  if (tradeUpPicks.length !== TRADE_UP_COST) return;
+
+  /* Re-resolved and re-validated against live state rather than trusting
+     what the UI collected: a rendered index is a claim about an array that
+     a background tick may have changed under it. */
+  const entries = tradeUpEntries();
+  const picked = tradeUpPicks.map(p => entries.find(x => x.source === p.source && x.idx === p.idx));
+  if (picked.some(e => !e)) { setTradeUpTrack(tradeUpTrack); showToast('Selection went stale — pick again.'); return; }
+
+  const rarities = picked.map(e => getRosterById(e.dino.speciesId).rarity);
+  const from = rarities[0];
+  if (rarities.some(r => r !== from) || picked.some(e => !tradeUpEligible(e.dino, tradeUpTrack))) {
+    setTradeUpTrack(tradeUpTrack); showToast('Those five no longer match.'); return;
+  }
+
+  const to = tradeUpRarity(from);
+  const pool = ROSTER.filter(r => r.rarity === to);
+  if (!pool.length) { showToast('Nothing to trade into.'); return; }
+  const spec = pool[Math.floor(Math.random() * pool.length)];
+
+  /* The mutated track always mutates, weighted rare. The plain track
+     normally does not -- except at legendary, where there is no tier to
+     climb and the guaranteed mutation IS the reward, at the ordinary
+     relative odds. */
+  const mutation = tradeUpTrack === 'mutated' ? rollMutationTradeUp(spec.id)
+                 : (to === from ? rollMutationGuaranteed(spec.id) : null);
+
+  removeDinos(tradeUpPicks);
+  tradeUpPicks = [];
+
+  const newDino = { speciesId: spec.id, nickname: '', hunger: 80, thirst: 80, happiness: 80,
+                    hygiene: 80, stamina: 80, careCount: 0, mutation };
+  const dest = addNewDino(newDino);
+
+  if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
+  if (mutation) {
+    const mk = spec.id + '_' + mutation;
+    if (!state.discoveredMutations) state.discoveredMutations = [];
+    if (!state.discoveredMutations.includes(mk)) state.discoveredMutations.push(mk);
+  }
+
+  save();
+  renderParkWorld();
+  renderBottomPanel();
+  renderCollection();
+  updateTopBar();
+  const mutInfo = mutation ? resolveSpeciesMut(spec.id, mutation) : null;
+  showToast(`${spec.name}${mutInfo ? ' · ' + mutInfo.label : ''} — ${dest === 'vault' ? 'sent to the vault' : 'added to the park'}!`);
+}
+
 function renderCollList() {
   const list = document.getElementById('collList');
   const arr = collArray();
+  const layout = document.querySelector('.coll-layout');
+  if (layout) layout.classList.toggle('trading', !!tradeUpTrack);
+  if (tradeUpTrack) { renderTradeUpList(list); return; }
   const toggle = `<div class="coll-view-toggle">
     <button class="${collViewMode==='park'?'active':''}" onclick="setCollViewMode('park')">Park (${state.park.length}/${MAX_ACTIVE_PARK})</button>
     <button class="${collViewMode==='vault'?'active':''}" onclick="setCollViewMode('vault')">Vault (${state.vault.length}/${MAX_VAULT_SIZE})</button>
-  </div>`;
+  </div>
+  <button class="trade-open" onclick="setTradeUpTrack('plain')">&#9650; Trade Up</button>`;
   if (arr.length === 0) {
     list.innerHTML = toggle + `<div style="color:#333;font-size:10px;text-align:center;padding:20px;">${collViewMode==='vault' ? 'Vault is empty' : 'No dinosaurs yet'}</div>`;
     return;
@@ -5125,6 +5407,67 @@ function renderCollList() {
       </div>
     </div>`;
   }).join('');
+}
+
+/* The trade-up list shows park AND vault together, which the ordinary
+   Collection list deliberately does not: picking five of a rarity is a
+   question about the whole collection, and making someone flip between two
+   tabs to find the fifth would be the worst part of the feature.
+
+   Cards that cannot join the current selection are DIMMED rather than
+   hidden, so the answer to "why can I not pick this one" is visible. */
+function renderTradeUpList(list) {
+  const entries = tradeUpEntries();
+  const track = tradeUpTrack;
+  const rarity = tradeUpPickedRarity();
+  const picked = (source, idx) => tradeUpPicks.some(p => p.source === source && p.idx === idx);
+
+  const counts = {};
+  entries.forEach(e => {
+    if (!tradeUpEligible(e.dino, track)) return;
+    const r = getRosterById(e.dino.speciesId).rarity;
+    counts[r] = (counts[r] || 0) + 1;
+  });
+
+  const to = rarity ? tradeUpRarity(rarity) : null;
+  const ready = tradeUpPicks.length === TRADE_UP_COST;
+  const head = `
+    <div class="coll-view-toggle">
+      <button class="${track==='plain'?'active':''}" onclick="setTradeUpTrack('plain')">Unmutated</button>
+      <button class="${track==='mutated'?'active':''}" onclick="setTradeUpTrack('mutated')">Mutated</button>
+    </div>
+    <div class="trade-bar">
+      <div class="trade-count ${ready?'ready':''}">${tradeUpPicks.length}/${TRADE_UP_COST}${
+        rarity ? ` <span style="color:${RARITY_COLORS[rarity]}">${rarity}</span>` : ''}</div>
+      <div class="trade-hint">${
+        ready ? `&rarr; 1 random <span style="color:${RARITY_COLORS[to]}">${to}</span>${track==='mutated'||to===rarity?', mutated':''}`
+              : rarity ? `Pick ${TRADE_UP_COST - tradeUpPicks.length} more ${rarity}`
+                       : `Pick ${TRADE_UP_COST} of one rarity`
+      }</div>
+      <div class="trade-avail">${RARITY_ORDER.filter(r => counts[r]).map(r =>
+        `<span style="color:${RARITY_COLORS[r]}">${counts[r]} ${r}</span>`).join(' · ') || 'nothing eligible'}</div>
+      <div class="trade-btns">
+        <button class="trade-cancel" onclick="setTradeUpTrack(null)">Cancel</button>
+        <button class="trade-go" ${ready?'':'disabled'} onclick="confirmTradeUpDialog()">Trade Up</button>
+      </div>
+    </div>`;
+
+  const cards = entries.map(e => {
+    const spec = getRosterById(e.dino.speciesId);
+    const isPicked = picked(e.source, e.idx);
+    const fits = tradeUpEligible(e.dino, track) && (!rarity || spec.rarity === rarity);
+    const usable = isPicked || (fits && tradeUpPicks.length < TRADE_UP_COST);
+    const mutInfo = e.dino.mutation ? resolveSpeciesMut(e.dino.speciesId, e.dino.mutation) : null;
+    return `<div class="coll-card rarity-${spec.rarity} ${isPicked?'tu-picked':''} ${usable?'':'tu-dim'}"
+      onclick="${usable?`toggleTradeUpPick('${e.source}',${e.idx})`:''}">
+      <div class="coll-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', e.dino.mutation)}</div>
+      <div class="coll-card-name">${e.dino.nickname || spec.name}</div>
+      <div class="coll-card-level">${e.source === 'vault' ? 'Vault' : 'Park'}${mutInfo ? ' · ' + mutInfo.label : ''}</div>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = head + (entries.length ? cards
+    : '<div style="color:#333;font-size:10px;text-align:center;padding:20px;">No dinosaurs yet</div>');
 }
 
 function renderCollDetail() {
@@ -5223,11 +5566,8 @@ function moveDinoToVault(idx) {
   const dino = state.park[idx];
   if (!dino) return;
   if (state.vault.length >= MAX_VAULT_SIZE) { showToast(`Vault is full (max ${MAX_VAULT_SIZE}).`); return; }
-  state.park.splice(idx, 1);
+  removeDinos([{ source: 'park', idx }]);
   state.vault.push(dino);
-  Object.keys(state.cooldowns).forEach(k => { if (k.endsWith('_' + idx)) delete state.cooldowns[k]; });
-  selectedDinoIdx = -1;
-  collSelectedIdx = -1;
   save();
   renderParkWorld();
   renderBottomPanel();
