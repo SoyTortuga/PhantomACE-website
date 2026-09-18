@@ -19,6 +19,15 @@
    So isModerator() reads the list on every call. The role field exists only
    so the UI can decide what to render. The server never trusts it.
 
+   A USERNAME IS ACCEPTED, AN ID IS STORED.
+   The list is keyed on the numeric Twitch id because names change
+   hands, and an authorisation list keyed on something renameable hands
+   somebody else's privileges to whoever claims the name next. That
+   reasoning is about STORAGE, though, and it was being charged to the
+   broadcaster: the panel demanded an id and its own hint pointed at a
+   third-party website to convert one. So the name is resolved here,
+   through Helix, and what it resolved to is what gets stored.
+
    Deliberately NOT extended to /api/admin/bot-setup. That runs the OAuth
    flows and creates channel point rewards on the broadcaster's own channel;
    "can drop a code in chat" and "can re-authorise the bot" are different
@@ -85,6 +94,49 @@ function requireBroadcaster(env, session) {
 
 /* ── GET — who is on the list ─────────────────── */
 
+/**
+ * A Twitch account, from a login or a numeric id.
+ *
+ * Helix answers both from the same endpoint, so one lookup covers whatever
+ * was typed. A numeric id is looked up too rather than trusted: an id
+ * belonging to no account would otherwise sit on the allowlist for ever,
+ * looking like somebody and matching nobody.
+ *
+ * @returns {Promise<{userId, login, displayName}|{error: string}>}
+ */
+async function resolveAccount(env, raw) {
+  const input = String(raw || '').trim().replace(/^@/, '');
+  if (!input) return { error: 'Enter a Twitch username.' };
+  if (!/^[A-Za-z0-9_]{1,25}$/.test(input)) {
+    return { error: `"${input}" is not a Twitch username — letters, numbers and underscores only.` };
+  }
+
+  const { getAppToken } = await import('../auth/app-token.js');
+  const token = await getAppToken(env);
+  if (!token) return { error: 'Could not reach Twitch to look that name up. Try again in a moment.' };
+
+  /* A login is lower-cased, an id is not. Twitch happens to treat logins
+     case-insensitively, so this changes no outcome — but a lookup whose
+     shape depends on how somebody capitalised a name is one more thing
+     that could start mattering later. */
+  const numeric = /^\d+$/.test(input);
+  const param = numeric ? 'id' : 'login';
+  const value = numeric ? input : input.toLowerCase();
+  const res = await fetch(`https://api.twitch.tv/helix/users?${param}=${encodeURIComponent(value)}`, {
+    headers: { Authorization: 'Bearer ' + token, 'Client-Id': env.TWITCH_CLIENT_ID },
+  });
+  if (!res.ok) return { error: `Twitch would not answer that lookup (HTTP ${res.status}).` };
+
+  const data = await res.json().catch(() => null);
+  const user = data && Array.isArray(data.data) ? data.data[0] : null;
+  /* An empty list is Twitch saying the account does not exist. Said plainly:
+     the likeliest cause is a typo and the next likeliest is a renamed
+     account, and the same person reading this fixes both. */
+  if (!user) return { error: `No Twitch account called "${input}".` };
+
+  return { userId: String(user.id), login: user.login, displayName: user.display_name || user.login };
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const session = getSession(request);
@@ -117,20 +169,33 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
   const action = body && body.action;
-  const userId = body && body.userId ? String(body.userId).trim() : '';
 
   if (action !== 'add' && action !== 'remove') {
     return json({ error: 'action must be add or remove' }, 400);
   }
-  if (!/^\d+$/.test(userId)) {
-    /* Twitch user ids are numeric. Taking a display name here would be
-       friendlier and wrong: names change hands, ids do not, and an
-       authorisation list keyed on something renameable is a way to hand
-       somebody else's privileges to whoever claims the name next. */
-    return json({ error: 'userId must be a numeric Twitch user ID' }, 400);
+
+  let userId = body && body.userId ? String(body.userId).trim() : '';
+  let account = null;
+
+  if (action === 'add') {
+    /* `name` is what the panel sends now; a bare `userId` still works, so
+       an old page or a script pasting an id keeps working. Either way the
+       answer comes from Twitch rather than from what was typed. */
+    const resolved = await resolveAccount(env, (body && body.name) || userId);
+    if (resolved.error) return json({ error: resolved.error }, 400);
+    account = resolved;
+    userId = resolved.userId;
+
+    if (userId === String(session.user_id)) {
+      return json({ error: 'You are the broadcaster — you already have access.' }, 400);
+    }
   }
-  if (action === 'add' && userId === String(session.user_id)) {
-    return json({ error: 'You are the broadcaster — you already have access.' }, 400);
+
+  /* Removal is by id only, and that id comes from the rendered list rather
+     than from anything typed. Resolving a name here could remove the wrong
+     row after a rename. */
+  if (action === 'remove' && !/^\d+$/.test(userId)) {
+    return json({ error: 'userId must be a numeric Twitch user ID' }, 400);
   }
 
   let result = null;
@@ -143,7 +208,11 @@ export async function onRequestPost(context) {
       if (idx !== -1) { result = { changed: false, reason: 'already on the list' }; return undefined; }
       entries.push({
         userId,
-        displayName: (body.displayName || '').slice(0, 40),
+        /* Twitch's own display name and login, not what was typed. The
+           list is read to answer "who has this power", and a nickname
+           entered in a hurry answers it badly. */
+        displayName: account.displayName,
+        login: account.login,
         addedAt: Date.now(),
         addedBy: session.display_name || 'broadcaster',
       });
@@ -162,6 +231,10 @@ export async function onRequestPost(context) {
     success: true,
     changed: !!(result && result.changed),
     note: result && result.reason ? result.reason : undefined,
+    /* Echoed back so the panel can confirm WHO was added, by name.
+       It is the one thing that makes a typo visible while it is still
+       cheap to fix. */
+    account: account || undefined,
     moderators: entries,
   });
 }

@@ -238,11 +238,10 @@
         </ul>
 
         <div class="bot-mod-add">
-          <input type="text" id="botModUserId" class="bot-mod-input" placeholder="Twitch user ID (numbers only)" inputmode="numeric">
-          <input type="text" id="botModName" class="bot-mod-input" placeholder="Name (optional, for your reference)" maxlength="40">
+          <input type="text" id="botModName" class="bot-mod-input" placeholder="Twitch username" maxlength="25" autocomplete="off" spellcheck="false">
           <button class="btn-primary" id="botModAddBtn">Add</button>
         </div>
-        <p class="bot-section-desc bot-mod-hint">This is a numeric user ID, not a username — display names can change hands, IDs can't. Look one up at <a href="https://streamscharts.com/tools/convert-username" target="_blank" rel="noopener noreferrer">streamscharts.com/tools/convert-username</a>.</p>
+        <p class="bot-section-desc bot-mod-hint">Type their Twitch username &mdash; the site looks up the account and stores its ID, so a later rename can&rsquo;t hand their access to someone else. A numeric ID still works if you have one.</p>
       </div>
 
     </div>

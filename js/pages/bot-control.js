@@ -974,10 +974,17 @@ function renderModerators(entries, canEdit) {
   }
 
   list.innerHTML = entries.map(function (m) {
-    const name = m.displayName || '(no name)';
+    /* The login as well as the display name, when they differ. Twitch
+       display names are only a capitalisation of the login for most
+       people, so showing both always would be noise — but for anyone with
+       a localised or restyled name, the login is the half you recognise. */
+    const name = m.displayName || m.login || '(no name)';
+    const alias = (m.login && m.displayName && m.login.toLowerCase() !== m.displayName.toLowerCase())
+      ? ' @' + m.login
+      : '';
     const added = m.addedAt ? new Date(m.addedAt).toLocaleDateString() : '';
     return '<li class="bot-mod-row">' +
-      '<span class="bot-mod-name">' + escapeBotHtml(name) + '</span>' +
+      '<span class="bot-mod-name">' + escapeBotHtml(name + alias) + '</span>' +
       '<span class="bot-mod-id">' + escapeBotHtml(String(m.userId)) + '</span>' +
       (added ? '<span class="bot-mod-added">added ' + escapeBotHtml(added) + '</span>' : '') +
       (canEdit ? '<button class="btn-secondary bot-mod-remove" data-user-id="' +
@@ -1003,6 +1010,10 @@ async function loadModerators() {
   }
 }
 
+/* `nameOrId` is a username for an add and an id for a remove. The server
+   resolves a name through Helix and stores what it resolved to, so nobody
+   has to go and find a numeric id — which is what the old panel demanded,
+   with a link to a third-party converter in its own hint. */
 async function changeModerator(action, userId, displayName, button) {
   if (action === 'remove' && !confirm('Remove this moderator? They lose panel access immediately.')) return;
 
@@ -1014,7 +1025,12 @@ async function changeModerator(action, userId, displayName, button) {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: action, userId: userId, displayName: displayName }),
+      /* `name` for an add, `userId` for a remove. The server accepts a
+         name or an id on either field, but sending the right one keeps the
+         request readable in a log. */
+      body: JSON.stringify(action === 'add'
+        ? { action: 'add', name: userId }
+        : { action: 'remove', userId: userId }),
     });
     const data = await res.json();
 
@@ -1023,15 +1039,20 @@ async function changeModerator(action, userId, displayName, button) {
       /* `changed: false` means the server accepted the request and did
          nothing — already on the list, or not on it. Saying "Added" there
          would be a lie about what happened. */
+      /* NAMES WHO. "Moderator added" is no use for spotting that a typo
+         resolved to a real but different account; "Added SoyTortuga" is. */
+      const who = data.account
+        ? data.account.displayName + ' (' + data.account.userId + ')'
+        : 'them';
       showBotStatus(
         data.changed
-          ? (action === 'add' ? 'Moderator added.' : 'Moderator removed.')
+          ? (action === 'add' ? 'Added ' + who + '.' : 'Moderator removed.')
           : 'No change — ' + (data.note || 'already in that state') + '.',
         false
       );
       if (action === 'add') {
-        document.getElementById('botModUserId').value = '';
-        document.getElementById('botModName').value = '';
+        const nameInput = document.getElementById('botModName');
+        if (nameInput) nameInput.value = '';
       }
     } else {
       showBotStatus(data.error || 'Could not update the moderator list.', true);
@@ -1048,19 +1069,23 @@ function initModeratorPanel() {
   if (section) section.hidden = false;
 
   const addBtn = document.getElementById('botModAddBtn');
-  const idInput = document.getElementById('botModUserId');
   const nameInput = document.getElementById('botModName');
 
-  if (addBtn && idInput) {
-    addBtn.addEventListener('click', function () {
-      const userId = idInput.value.trim();
-      if (!/^\d+$/.test(userId)) {
-        showBotStatus('That needs to be a numeric Twitch user ID, not a username.', true);
-        return;
-      }
-      changeModerator('add', userId, nameInput ? nameInput.value.trim() : '', addBtn);
-    });
+  function add() {
+    if (!nameInput) return;
+    const name = nameInput.value.trim().replace(/^@/, '');
+    if (!name) { showBotStatus('Enter a Twitch username first.', true); return; }
+    /* No format check here beyond empty. The server asks Twitch, and
+       Twitch's answer is the only one that matters — a guess in the page
+       would just be a second, worse rule to keep in step. */
+    changeModerator('add', name, '', addBtn);
   }
+
+  if (addBtn) addBtn.addEventListener('click', add);
+  /* Typing a name and pressing return is the whole interaction. */
+  if (nameInput) nameInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); add(); }
+  });
 
   loadModerators();
 }
