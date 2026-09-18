@@ -116,6 +116,60 @@ def trim(im):
     return im.crop(box) if box else im
 
 
+def keep_largest_blob(im):
+    """Strip everything that is not the main sprite, then trim tight.
+
+    THE SOURCES ARE DIRTY. Fourteen of the pack's 32 individual files carry
+    a second blob of pixels away from the animal -- scattered flecks in most,
+    and a 737-pixel fragment on Dimorphodon that belongs to nothing. Nothing
+    filtered them, because individual files never went through the sheet
+    segmenter: trim() took getbbox() over EVERY non-transparent pixel, so a
+    fleck in a far corner both appeared in the crop and inflated the
+    bounding box around it, pushing the animal off-centre inside a canvas
+    mostly full of nothing.
+
+    Flood-fill on alpha, keep the largest component, zero the rest. The
+    main blob is the whole animal in all fourteen -- checked by rendering
+    main-vs-rest side by side, not assumed.
+
+    Sheet crops arrive here already single-component by construction, so
+    this is a no-op safety net for them.
+    """
+    import numpy as np
+    arr = np.array(im.convert("RGBA"))
+    mask = arr[..., 3] > 0
+    if not mask.any():
+        return im
+
+    h, w = mask.shape
+    seen = np.zeros_like(mask)
+    best, best_px = 0, None
+    for sy in range(h):
+        for sx in range(w):
+            if not mask[sy, sx] or seen[sy, sx]:
+                continue
+            stack = [(sy, sx)]
+            seen[sy, sx] = True
+            px = []
+            while stack:
+                cy, cx = stack.pop()
+                px.append((cy, cx))
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not seen[ny, nx]:
+                            seen[ny, nx] = True
+                            stack.append((ny, nx))
+            if len(px) > best:
+                best, best_px = len(px), px
+
+    keep = np.zeros_like(mask)
+    for (cy, cx) in best_px:
+        keep[cy, cx] = True
+    arr[~keep, 3] = 0
+    return Image.fromarray(arr)
+
+
 def square(im):
     side = max(im.size)
     out = Image.new("RGBA", (side, side), (0, 0, 0, 0))
@@ -363,7 +417,7 @@ def main():
     def named(name):
         for cand in (name.lower(), name.lower().replace("_", " "), name.lower().replace("_", "")):
             if cand in individuals:
-                return individuals[cand]
+                return keep_largest_blob(individuals[cand])
         return None
 
     # ── Source 2: the sheets, cut into anonymous sprites ────────────────
@@ -467,8 +521,15 @@ def main():
             fn = f"{name}-72x72.png"
             square(im).save(os.path.join(OUT, fn))
         else:
+            # RECTANGULAR, NOT PADDED TO SQUARE. A pterosaur is three times
+            # wider than it is tall and a sauropod wider still; padding every
+            # one into a square canvas spent most of the file on transparency
+            # and, once a stray fleck had inflated the bounding box, put the
+            # animal off-centre inside it. The game sizes these to fit a
+            # square slot while preserving aspect, so the file no longer has
+            # to lie about its shape.
             fn = f"{name}.png"
-            square(trim(im)).save(os.path.join(OUT, fn))
+            trim(keep_largest_blob(im)).save(os.path.join(OUT, fn))
         chosen[name] = fn
     total = sum(os.path.getsize(os.path.join(OUT, f)) for f in os.listdir(OUT))
     print(f"wrote {len(results)} portraits to {os.path.relpath(OUT, REPO)}  ({total/1024:.0f} KB)")

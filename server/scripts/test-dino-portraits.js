@@ -75,15 +75,27 @@ const page = fs.readFileSync(path.join(GAME, 'index.html'), 'utf8');
   const wrong = [];
   for (const f of files) {
     const [w, h] = dims(path.join(FOLDER, f));
-    if (w !== h) wrong.push(`${f} is ${w}x${h}, not square`);
     if (f.endsWith('-72x72.png')) {
-      /* Pixel art, drawn nearest-neighbour: the name promises the grid. */
-      if (w !== 72) wrong.push(`${f} claims 72 and is ${w}`);
+      /* Pixel art, drawn nearest-neighbour at a whole multiple of its
+         grid, so this one IS square and the name promises the number. */
+      if (w !== 72 || h !== 72) wrong.push(`${f} claims 72x72 and is ${w}x${h}`);
     } else {
-      /* Smooth-scaled DOWN, so it must start above the 144 the page draws.
-         A large file at or below display size would be scaled UP smoothly,
-         which is the blur this whole job replaced. */
-      if (w < 145) wrong.push(`${f} is ${w}px — too small to be a smooth portrait`);
+      /* Recovered art, trimmed to its own content: NOT square, on purpose.
+         A pterosaur is three times wider than tall and squaring it meant
+         padding most of the file with transparency. What still has to hold
+         is that the long edge starts above the 144 the page draws it at --
+         below that the browser would scale it UP, which is the blur this
+         whole job existed to remove. */
+      if (Math.max(w, h) < 145) {
+        wrong.push(`${f} is ${w}x${h} — long edge too small to be a smooth portrait`);
+      }
+      /* And that the crop is a sprite rather than a sliver: a bounding box
+         gone wrong (a stray fleck surviving the blob filter, an empty
+         component) shows up as an absurd ratio long before it shows up on
+         a profile. */
+      if (Math.max(w, h) / Math.max(1, Math.min(w, h)) > 6) {
+        wrong.push(`${f} is ${w}x${h} — ratio too extreme to be a whole sprite`);
+      }
     }
   }
   check('every file honours its name', wrong, []);
