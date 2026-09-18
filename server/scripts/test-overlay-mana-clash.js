@@ -278,6 +278,77 @@ const post = (env, body, userId) => route.onRequestPost({
   ok('and the picker says something before the first answer', /Loading rooms/.test(html));
 }
 
+/* ── SWITCHED OFF AND BROKEN MUST NOT LOOK THE SAME ──────────────────
+   The panel hides itself whenever there is nothing to show, which was also
+   what it did when the key was rejected and when the route was not
+   deployed. Three very different situations, one blank screen, and no way
+   to tell them apart without opening devtools on the streaming machine.
+
+   The client file is driven here against stubbed responses, so what is
+   checked is what the overlay would actually do. */
+{
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+  const clientSrc = fs.readFileSync(path.join(REPO, 'js/pages/overlay-mana-clash.js'), 'utf8');
+
+  function drive(response) {
+    const els = {};
+    for (const id of ['ovMc', 'ovMcRound', 'ovMcGoal', 'ovMcBar', 'ovMcList', 'ovMcNote', 'ovFault']) {
+      els[id] = { id, hidden: true, textContent: '', innerHTML: '', classList: { add() {}, remove() {} } };
+    }
+    const faults = {};
+    const win = {
+      ovSetFault(src, on, label) {
+        if (on) faults[src] = label; else delete faults[src];
+        els.ovFault.hidden = Object.keys(faults).length === 0;
+        if (!els.ovFault.hidden) els.ovFault.textContent = Object.values(faults).join(' · ');
+      },
+    };
+    const doc = { getElementById: (id) => els[id] || null, createElement: () => ({ textContent: '', innerHTML: '' }) };
+    const timers = [];
+    new Function('window', 'document', 'fetch', 'setTimeout', 'clearTimeout', 'URLSearchParams', 'location', clientSrc)(
+      win, doc, () => Promise.resolve(response), (fn) => timers.push(fn), () => {},
+      URLSearchParams, { search: '?key=abc' });
+    return {
+      els,
+      async settle() {
+        for (let n = 0; n < 12; n++) {
+          await Promise.resolve();
+          const t = timers.shift();
+          if (t) t();
+          await Promise.resolve();
+        }
+      },
+    };
+  }
+
+  const denied = drive({ ok: false, status: 403 });
+  await denied.settle();
+  ok('a rejected key eventually says so', !denied.els.ovFault.hidden);
+  ok('and names the key as the cause', /key rejected/.test(denied.els.ovFault.textContent));
+
+  const missing = drive({ ok: false, status: 404 });
+  await missing.settle();
+  ok('an undeployed route says that instead', /not deployed/.test(missing.els.ovFault.textContent));
+
+  /* THE ONE THAT MUST STAY QUIET. Switched off is an ordinary answer and a
+     stream must not carry a red notice because nobody chose a room. */
+  const off = drive({ ok: true, status: 200, json: async () => ({ enabled: false, room: null }) });
+  await off.settle();
+  ok('but being switched off stays silent', off.els.ovFault.hidden);
+
+  /* One blip is not a fault: the notice waits for a run of them. */
+  const blip = drive({ ok: false, status: 403 });
+  await Promise.resolve();
+  ok('and a single failed poll says nothing yet', blip.els.ovFault.hidden);
+
+  ok('the shared indicator is published by overlay.js',
+     /window\.ovSetFault = function/.test(fs.readFileSync(path.join(REPO, 'js/pages/overlay.js'), 'utf8')));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

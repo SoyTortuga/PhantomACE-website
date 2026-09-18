@@ -128,9 +128,37 @@
     timer = setTimeout(poll, ms);
   }
 
+  /* SWITCHED OFF AND BROKEN USED TO LOOK THE SAME. A 200 saying
+     enabled:false is an ordinary answer and stays silent; a rejected key or
+     a route that is not deployed yet is not, and used to hide the panel
+     just as quietly -- leaving nothing on screen, nothing in the panel, and
+     no way to tell which of the three it was. Named so the reason is
+     legible, and only after a run of them, because one dropped request
+     during a scene change is not a fault. */
+  var FAULTS_BEFORE_NOTICE = 5;
+  var faults = 0;
+
+  function reportFault(status) {
+    faults++;
+    if (faults < FAULTS_BEFORE_NOTICE || typeof window.ovSetFault !== 'function') return;
+    window.ovSetFault('manaClash', true,
+      status === 403 ? 'mana clash: overlay key rejected'
+      : status === 404 ? 'mana clash: route not deployed'
+      : 'mana clash: unreachable');
+  }
+
+  function clearFault() {
+    faults = 0;
+    if (typeof window.ovSetFault === 'function') window.ovSetFault('manaClash', false);
+  }
+
   function poll() {
     fetch('/api/overlay/mana-clash?key=' + encodeURIComponent(key), { cache: 'no-store' })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) {
+        if (r.ok) { clearFault(); return r.json(); }
+        reportFault(r.status);
+        return null;
+      })
       .then(function (d) {
         if (!d || !d.enabled || !d.room) {
           hide();
@@ -144,8 +172,11 @@
         schedule(d.room.status === 'playing' ? POLL_MS : IDLE_POLL_MS);
       })
       .catch(function () {
-        /* Silent, and the panel keeps whatever it last had. A stream must
-           never carry a debug banner because one poll blipped. */
+        /* The panel keeps whatever it last had: a stream must never lose
+           the scoreboard because one poll blipped. Counted, though -- a
+           network that never comes back is a fault, and it took five in a
+           row to say so. */
+        reportFault(0);
         schedule(IDLE_POLL_MS);
       });
   }

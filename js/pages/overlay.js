@@ -310,9 +310,28 @@
     }
   }
 
-  function setFault(on) {
+/* ONE INDICATOR, SEVERAL REPORTERS. The alert stream is not the only thing
+   that can be broken -- a standing panel polling with a rejected key fails
+   silently and looks exactly like being switched off, which is how an
+   overlay problem becomes forty minutes of "is it just me". Each panel
+   names its own fault; the element shows while any of them is set, and its
+   text says which, so the cause is readable off the stream rather than
+   guessed at. Published on window because these files are separate IIFEs
+   loaded in one page. */
+  var faultsBySource = {};
+  window.ovSetFault = function (source, on, label) {
+    if (on) faultsBySource[source] = label || source;
+    else delete faultsBySource[source];
     if (!faultEl) return;
-    faultEl.hidden = !on;
+    var active = Object.keys(faultsBySource);
+    faultEl.hidden = active.length === 0;
+    if (active.length) {
+      faultEl.textContent = active.map(function (k) { return faultsBySource[k]; }).join(' · ');
+    }
+  };
+
+  function setFault(on) {
+    window.ovSetFault('alerts', on, 'overlay disconnected');
   }
 
   function poll() {
