@@ -1142,93 +1142,99 @@ const AB = 'assets/dino-assets/';
 const IC = AB + 'jurassic-dino-320/icons/';
 const EX = AB + 'jurassic-dino-320-expansion160/icons/';
 const BP = AB + 'AncientBeastsPack/';
+/* Rebuilt portraits, tracked in git so they deploy with a pull -- the
+   dino-assets tree is gitignored and every change to it means a hand
+   copy to the rig. Written by tools/build-dino-portraits.py, which
+   also rewrites the portrait paths below: the folder and the map are
+   two halves of one fact. */
+const PT = 'assets/portraits/';
 
 const ASSET_MAP = {
-  compy:    { icon: IC+'dinosaurs/compsognathus.png', portrait: BP+'Compsognathus-72x72.png' },
-  proto:    { icon: IC+'dinosaurs/protoceratops.png', portrait: BP+'Protoceratops-72x72.png' },
-  galli:    { icon: IC+'dinosaurs/gallimimus.png', portrait: BP+'Gallimimus-72x72.png' },
-  coelo:    { icon: EX+'more_named_species/coelophysis.png', portrait: BP+'Coelophysis-72x72.png' },
-  dimetro:  { icon: IC+'dinosaurs/dimetrodon.png', portrait: BP+'Dimetrodon-72x72.png' },
-  iguan:    { icon: IC+'dinosaurs/iguanodon.png', portrait: BP+'Iguanodon-72x72.png' },
-  dimor:    { icon: EX+'flying_marine_reptiles/dimorphodon.png', portrait: BP+'Dimorphodon-72x72.png' },
-  pachy:    { icon: IC+'dinosaurs/pachycephalosaurus.png', portrait: BP+'Pachycephalosaurus-72x72.png' },
-  kentro:   { icon: IC+'dinosaurs/kentrosaurus.png', portrait: BP+'Kentrosaurus-72x72.png' },
-  ovira:    { icon: IC+'dinosaurs/oviraptor.png', portrait: BP+'Oviraptor-72x72.png' },
-  micro:    { icon: IC+'dinosaurs/microraptor.png', portrait: BP+'Microraptor-72x72.png' },
-  archae:   { icon: IC+'dinosaurs/archaeopteryx.png', portrait: BP+'Archaeopteryx-72x72.png' },
-  dodo:     { icon: IC+'prehistoric_mammals/dodo_bird.png', portrait: BP+'Dodo-72x72.png' },
-  raptor:   { icon: IC+'dinosaurs/velociraptor.png', portrait: BP+'Raptor-72x72.png', baby: IC+'baby_eggs/baby_raptor.png' },
-  dilopho:  { icon: IC+'dinosaurs/dilophosaurus.png', portrait: BP+'Dilophosaurus-72x72.png' },
-  stego:    { icon: IC+'dinosaurs/stegosaurus.png', portrait: BP+'Stegosaurus-72x72.png', baby: IC+'baby_eggs/baby_stegosaurus.png' },
-  para:     { icon: IC+'dinosaurs/parasaurolophus.png', portrait: BP+'Parasaurolophus-72x72.png' },
-  baryo:    { icon: IC+'dinosaurs/baryonyx.png', portrait: BP+'Baryonyx-72x72.png' },
-  cory:     { icon: IC+'dinosaurs/corythosaurus.png', portrait: BP+'Corythosaurus-72x72.png' },
-  styra:    { icon: IC+'dinosaurs/styracosaurus.png', portrait: BP+'Styracosaurus-72x72.png' },
-  rhamph:   { icon: EX+'flying_marine_reptiles/rhamphorhynchus.png', portrait: BP+'Rhamphorhynchus-72x72.png' },
-  ichthy:   { icon: IC+'dinosaurs/ichthyosaur.png', portrait: BP+'Ichthyosaurus-72x72.png' },
-  megalo:   { icon: IC+'dinosaurs/megalosaurus.png', portrait: BP+'Megalosaurus-72x72.png' },
-  utah:     { icon: IC+'dinosaurs/utahraptor.png', portrait: BP+'Utahraptor-72x72.png' },
-  deino:    { icon: IC+'dinosaurs/deinonychus.png', portrait: BP+'Deinonychus-72x72.png' },
-  trike:    { icon: IC+'dinosaurs/triceratops.png', portrait: BP+'Triceratops-72x72.png', baby: IC+'baby_eggs/baby_triceratops.png' },
-  allo:     { icon: IC+'dinosaurs/allosaurus.png', portrait: BP+'Allosaurus-72x72.png' },
-  anky:     { icon: IC+'dinosaurs/ankylosaurus.png', portrait: BP+'Ankylosaurus-72x72.png', baby: IC+'baby_eggs/baby_ankylosaur.png' },
-  diplo:    { icon: IC+'dinosaurs/diplodocus.png', portrait: BP+'Diplodocus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
-  carno:    { icon: IC+'dinosaurs/carnotaurus.png', portrait: BP+'Carnotaurus-72x72.png' },
-  plesio:   { icon: IC+'dinosaurs/plesiosaurus.png', portrait: BP+'Plesiosaurus-72x72.png' },
-  pterano:  { icon: IC+'dinosaurs/pteranodon.png', portrait: BP+'Pteranodon-72x72.png', baby: IC+'baby_eggs/baby_pteranodon.png' },
-  brachio:  { icon: IC+'dinosaurs/brachiosaurus.png', portrait: BP+'Brachiosaurus-72x72.png', baby: IC+'baby_eggs/baby_brachiosaurus.png' },
-  smilo:    { icon: IC+'prehistoric_mammals/smilodon.png', portrait: BP+'Smilodon-72x72.png' },
-  therizo:  { icon: IC+'dinosaurs/therizinosaurus.png', portrait: BP+'Therizinosaurus-72x72.png' },
-  trex:     { icon: IC+'dinosaurs/tyrannosaurus_rex.png', portrait: BP+'T-Rex-72x72.png', baby: IC+'baby_eggs/baby_t_rex.png' },
-  spino:    { icon: IC+'dinosaurs/spinosaurus.png', portrait: BP+'Spinosaurus-72x72.png' },
-  apato:    { icon: IC+'dinosaurs/apatosaurus.png', portrait: BP+'Apatosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
-  gigano:   { icon: IC+'dinosaurs/giganotosaurus.png', portrait: BP+'Giganotosaurus-72x72.png' },
-  mosa:     { icon: IC+'dinosaurs/mosasaurus.png', portrait: BP+'Mosasaurus-72x72.png' },
-  bronto:   { icon: IC+'dinosaurs/brontosaurus.png', portrait: BP+'Brontosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
-  mammoth:  { icon: IC+'prehistoric_mammals/woolly_mammoth.png', portrait: BP+'Woolly_Mammoth-72x72.png' },
-  elasmo:   { icon: EX+'flying_marine_reptiles/elasmosaurus.png', portrait: BP+'Elasmosaurus-72x72.png' },
-  argent:   { icon: IC+'dinosaurs/long_neck_dinosaur.png', portrait: BP+'Argentinosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  compy:    { icon: IC+'dinosaurs/compsognathus.png', portrait: PT+'Compsognathus.png' },
+  proto:    { icon: IC+'dinosaurs/protoceratops.png', portrait: PT+'Protoceratops.png' },
+  galli:    { icon: IC+'dinosaurs/gallimimus.png', portrait: PT+'Gallimimus.png' },
+  coelo:    { icon: EX+'more_named_species/coelophysis.png', portrait: PT+'Coelophysis.png' },
+  dimetro:  { icon: IC+'dinosaurs/dimetrodon.png', portrait: PT+'Dimetrodon.png' },
+  iguan:    { icon: IC+'dinosaurs/iguanodon.png', portrait: PT+'Iguanodon.png' },
+  dimor:    { icon: EX+'flying_marine_reptiles/dimorphodon.png', portrait: PT+'Dimorphodon-72x72.png' },
+  pachy:    { icon: IC+'dinosaurs/pachycephalosaurus.png', portrait: PT+'Pachycephalosaurus.png' },
+  kentro:   { icon: IC+'dinosaurs/kentrosaurus.png', portrait: PT+'Kentrosaurus.png' },
+  ovira:    { icon: IC+'dinosaurs/oviraptor.png', portrait: PT+'Oviraptor.png' },
+  micro:    { icon: IC+'dinosaurs/microraptor.png', portrait: PT+'Microraptor.png' },
+  archae:   { icon: IC+'dinosaurs/archaeopteryx.png', portrait: PT+'Archaeopteryx.png' },
+  dodo:     { icon: IC+'prehistoric_mammals/dodo_bird.png', portrait: PT+'Dodo.png' },
+  raptor:   { icon: IC+'dinosaurs/velociraptor.png', portrait: PT+'Raptor-72x72.png', baby: IC+'baby_eggs/baby_raptor.png' },
+  dilopho:  { icon: IC+'dinosaurs/dilophosaurus.png', portrait: PT+'Dilophosaurus-72x72.png' },
+  stego:    { icon: IC+'dinosaurs/stegosaurus.png', portrait: PT+'Stegosaurus-72x72.png', baby: IC+'baby_eggs/baby_stegosaurus.png' },
+  para:     { icon: IC+'dinosaurs/parasaurolophus.png', portrait: PT+'Parasaurolophus-72x72.png' },
+  baryo:    { icon: IC+'dinosaurs/baryonyx.png', portrait: PT+'Baryonyx-72x72.png' },
+  cory:     { icon: IC+'dinosaurs/corythosaurus.png', portrait: PT+'Corythosaurus.png' },
+  styra:    { icon: IC+'dinosaurs/styracosaurus.png', portrait: PT+'Styracosaurus-72x72.png' },
+  rhamph:   { icon: EX+'flying_marine_reptiles/rhamphorhynchus.png', portrait: PT+'Rhamphorhynchus.png' },
+  ichthy:   { icon: IC+'dinosaurs/ichthyosaur.png', portrait: PT+'Ichthyosaurus-72x72.png' },
+  megalo:   { icon: IC+'dinosaurs/megalosaurus.png', portrait: PT+'Megalosaurus.png' },
+  utah:     { icon: IC+'dinosaurs/utahraptor.png', portrait: PT+'Utahraptor-72x72.png' },
+  deino:    { icon: IC+'dinosaurs/deinonychus.png', portrait: PT+'Deinonychus-72x72.png' },
+  trike:    { icon: IC+'dinosaurs/triceratops.png', portrait: PT+'Triceratops-72x72.png', baby: IC+'baby_eggs/baby_triceratops.png' },
+  allo:     { icon: IC+'dinosaurs/allosaurus.png', portrait: PT+'Allosaurus-72x72.png' },
+  anky:     { icon: IC+'dinosaurs/ankylosaurus.png', portrait: PT+'Ankylosaurus-72x72.png', baby: IC+'baby_eggs/baby_ankylosaur.png' },
+  diplo:    { icon: IC+'dinosaurs/diplodocus.png', portrait: PT+'Diplodocus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  carno:    { icon: IC+'dinosaurs/carnotaurus.png', portrait: PT+'Carnotaurus-72x72.png' },
+  plesio:   { icon: IC+'dinosaurs/plesiosaurus.png', portrait: PT+'Plesiosaurus-72x72.png' },
+  pterano:  { icon: IC+'dinosaurs/pteranodon.png', portrait: PT+'Pteranodon-72x72.png', baby: IC+'baby_eggs/baby_pteranodon.png' },
+  brachio:  { icon: IC+'dinosaurs/brachiosaurus.png', portrait: PT+'Brachiosaurus-72x72.png', baby: IC+'baby_eggs/baby_brachiosaurus.png' },
+  smilo:    { icon: IC+'prehistoric_mammals/smilodon.png', portrait: PT+'Smilodon-72x72.png' },
+  therizo:  { icon: IC+'dinosaurs/therizinosaurus.png', portrait: PT+'Therizinosaurus.png' },
+  trex:     { icon: IC+'dinosaurs/tyrannosaurus_rex.png', portrait: PT+'T-Rex-72x72.png', baby: IC+'baby_eggs/baby_t_rex.png' },
+  spino:    { icon: IC+'dinosaurs/spinosaurus.png', portrait: PT+'Spinosaurus-72x72.png' },
+  apato:    { icon: IC+'dinosaurs/apatosaurus.png', portrait: PT+'Apatosaurus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  gigano:   { icon: IC+'dinosaurs/giganotosaurus.png', portrait: PT+'Giganotosaurus.png' },
+  mosa:     { icon: IC+'dinosaurs/mosasaurus.png', portrait: PT+'Mosasaurus.png' },
+  bronto:   { icon: IC+'dinosaurs/brontosaurus.png', portrait: PT+'Brontosaurus-72x72.png', baby: IC+'baby_eggs/baby_sauropod.png' },
+  mammoth:  { icon: IC+'prehistoric_mammals/woolly_mammoth.png', portrait: PT+'Woolly_Mammoth.png' },
+  elasmo:   { icon: EX+'flying_marine_reptiles/elasmosaurus.png', portrait: PT+'Elasmosaurus.png' },
+  argent:   { icon: IC+'dinosaurs/long_neck_dinosaur.png', portrait: PT+'Argentinosaurus.png', baby: IC+'baby_eggs/baby_sauropod.png' },
   megashark:{ icon: EX+'flying_marine_reptiles/megalodon.png' },
   quetz:    { icon: IC+'dinosaurs/quetzalcoatlus.png' },
-  liopl:    { icon: EX+'flying_marine_reptiles/liopleurodon.png', portrait: BP+'Liopleurodon-72x72.png' },
-  anomal:   { icon: EX+'flying_marine_reptiles/anomalocaris.png', portrait: BP+'Anomalocaris-72x72.png' },
-  cerato:   { icon: IC+'dinosaurs/ceratosaurus.png', portrait: BP+'Ceratosaurus-72x72.png' },
-  ornitho:  { icon: IC+'dinosaurs/ornithomimus.png', portrait: BP+'Ornithomimus-72x72.png' },
-  trood:    { icon: IC+'dinosaurs/troodon.png', portrait: BP+'Troodon-72x72.png' },
-  amarg:    { icon: EX+'more_named_species/amargasaurus.png', portrait: BP+'Amargasaurus-72x72.png' },
-  concav:   { icon: EX+'more_named_species/concavenator.png', portrait: BP+'Concavenator-72x72.png' },
-  cryo:     { icon: EX+'more_named_species/cryolophosaurus.png', portrait: BP+'Cryolophosaurus-72x72.png' },
-  deinoch:  { icon: EX+'more_named_species/deinocheirus.png', portrait: BP+'Deinocheirus-72x72.png' },
-  guanl:    { icon: EX+'more_named_species/guanlong.png', portrait: BP+'Guanlong-72x72.png' },
-  hetero:   { icon: EX+'more_named_species/heterodontosaurus.png', portrait: BP+'Heterodontosaurus-72x72.png' },
-  mamen:    { icon: EX+'more_named_species/mamenchisaurus.png', portrait: BP+'Mamenchisaurus-72x72.png' },
-  plat:     { icon: EX+'more_named_species/plateosaurus.png', portrait: BP+'Plateosaurus-72x72.png' },
-  psitt:    { icon: EX+'more_named_species/psittacosaurus.png', portrait: BP+'Psittacosaurus-72x72.png' },
-  sinosaur: { icon: EX+'more_named_species/sinosauropteryx.png', portrait: BP+'Sinosauropteryx-72x72.png' },
-  stygi:    { icon: EX+'more_named_species/stygimoloch.png', portrait: BP+'Stygimoloch-72x72.png' },
-  anhan:    { icon: EX+'flying_marine_reptiles/anhanguera.png', portrait: BP+'Anhanguera-72x72.png' },
-  hatz:     { icon: EX+'flying_marine_reptiles/hatzegopteryx.png', portrait: BP+'Hatzegopteryx-72x72.png' },
-  ptdac:    { icon: EX+'flying_marine_reptiles/pterodactylus.png', portrait: BP+'Pterodactylus-72x72.png' },
-  tape:     { icon: EX+'flying_marine_reptiles/tapejara.png', portrait: BP+'Tapejara-72x72.png' },
-  nycto:    { icon: EX+'flying_marine_reptiles/nyctosaurus.png', portrait: BP+'Nyctosaurus-72x72.png' },
-  dunky:    { icon: EX+'flying_marine_reptiles/dunkleosteus.png', portrait: BP+'Dunkleosteus-72x72.png' },
-  krono:    { icon: EX+'flying_marine_reptiles/kronosaurus.png', portrait: BP+'Kronosaurus-72x72.png' },
-  tylo:     { icon: EX+'flying_marine_reptiles/tylosaurus.png', portrait: BP+'Tylosaurus-72x72.png' },
-  notho:    { icon: EX+'flying_marine_reptiles/nothosaurus.png', portrait: BP+'Nothosaurus-72x72.png' },
-  shoni:    { icon: EX+'flying_marine_reptiles/shonisaurus.png', portrait: BP+'Shonisaurus-72x72.png' },
-  archel:   { icon: EX+'flying_marine_reptiles/archelon_sea_turtle.png', portrait: BP+'Archelon-72x72.png' },
-  heli:     { icon: EX+'flying_marine_reptiles/helicoprion.png', portrait: BP+'Helicoprion-72x72.png' },
-  megarach: { icon: BP+'Megarachne-72x72.png', portrait: BP+'Megarachne-72x72.png' },
-  tbird:    { icon: IC+'prehistoric_mammals/terror_bird.png', portrait: BP+'TerrorBird-72x72.png' },
-  wrhino:   { icon: IC+'prehistoric_mammals/woolly_rhino.png', portrait: BP+'Woolly_Rhino-72x72.png' },
-  cbear:    { icon: IC+'prehistoric_mammals/cave_bear.png', portrait: BP+'CaveBear-72x72.png' },
-  clion:    { icon: IC+'prehistoric_mammals/cave_lion.png', portrait: BP+'Cave_Lion-72x72.png' },
-  dwolf:    { icon: IC+'prehistoric_mammals/prehistoric_dire_wolf.png', portrait: BP+'DireWolf-72x72.png' },
-  gsloth:   { icon: IC+'prehistoric_mammals/giant_ground_sloth.png', portrait: BP+'Giant_Ground_Sloth-72x72.png' },
-  glypto:   { icon: IC+'prehistoric_mammals/glyptodon.png', portrait: BP+'Glyptodon-72x72.png' },
-  masto:    { icon: IC+'prehistoric_mammals/mastodon.png', portrait: BP+'Mastodon-72x72.png' },
-  andrew:   { icon: IC+'prehistoric_mammals/andrewsarchus.png', portrait: BP+'Andrewsarchus-72x72.png' },
-  entelo:   { icon: IC+'prehistoric_mammals/entelodont.png', portrait: BP+'Entelodont-72x72.png' },
+  liopl:    { icon: EX+'flying_marine_reptiles/liopleurodon.png', portrait: PT+'Liopleurodon.png' },
+  anomal:   { icon: EX+'flying_marine_reptiles/anomalocaris.png', portrait: PT+'Anomalocaris.png' },
+  cerato:   { icon: IC+'dinosaurs/ceratosaurus.png', portrait: PT+'Ceratosaurus.png' },
+  ornitho:  { icon: IC+'dinosaurs/ornithomimus.png', portrait: PT+'Ornithomimus-72x72.png' },
+  trood:    { icon: IC+'dinosaurs/troodon.png', portrait: PT+'Troodon-72x72.png' },
+  amarg:    { icon: EX+'more_named_species/amargasaurus.png', portrait: PT+'Amargasaurus-72x72.png' },
+  concav:   { icon: EX+'more_named_species/concavenator.png', portrait: PT+'Concavenator.png' },
+  cryo:     { icon: EX+'more_named_species/cryolophosaurus.png', portrait: PT+'Cryolophosaurus-72x72.png' },
+  deinoch:  { icon: EX+'more_named_species/deinocheirus.png', portrait: PT+'Deinocheirus-72x72.png' },
+  guanl:    { icon: EX+'more_named_species/guanlong.png', portrait: PT+'Guanlong.png' },
+  hetero:   { icon: EX+'more_named_species/heterodontosaurus.png', portrait: PT+'Heterodontosaurus.png' },
+  mamen:    { icon: EX+'more_named_species/mamenchisaurus.png', portrait: PT+'Mamenchisaurus.png' },
+  plat:     { icon: EX+'more_named_species/plateosaurus.png', portrait: PT+'Plateosaurus.png' },
+  psitt:    { icon: EX+'more_named_species/psittacosaurus.png', portrait: PT+'Psittacosaurus.png' },
+  sinosaur: { icon: EX+'more_named_species/sinosauropteryx.png', portrait: PT+'Sinosauropteryx.png' },
+  stygi:    { icon: EX+'more_named_species/stygimoloch.png', portrait: PT+'Stygimoloch-72x72.png' },
+  anhan:    { icon: EX+'flying_marine_reptiles/anhanguera.png', portrait: PT+'Anhanguera.png' },
+  hatz:     { icon: EX+'flying_marine_reptiles/hatzegopteryx.png', portrait: PT+'Hatzegopteryx.png' },
+  ptdac:    { icon: EX+'flying_marine_reptiles/pterodactylus.png', portrait: PT+'Pterodactylus-72x72.png' },
+  tape:     { icon: EX+'flying_marine_reptiles/tapejara.png', portrait: PT+'Tapejara-72x72.png' },
+  nycto:    { icon: EX+'flying_marine_reptiles/nyctosaurus.png', portrait: PT+'Nyctosaurus.png' },
+  dunky:    { icon: EX+'flying_marine_reptiles/dunkleosteus.png', portrait: PT+'Dunkleosteus.png' },
+  krono:    { icon: EX+'flying_marine_reptiles/kronosaurus.png', portrait: PT+'Kronosaurus-72x72.png' },
+  tylo:     { icon: EX+'flying_marine_reptiles/tylosaurus.png', portrait: PT+'Tylosaurus-72x72.png' },
+  notho:    { icon: EX+'flying_marine_reptiles/nothosaurus.png', portrait: PT+'Nothosaurus.png' },
+  shoni:    { icon: EX+'flying_marine_reptiles/shonisaurus.png', portrait: PT+'Shonisaurus.png' },
+  archel:   { icon: EX+'flying_marine_reptiles/archelon_sea_turtle.png', portrait: PT+'Archelon.png' },
+  heli:     { icon: EX+'flying_marine_reptiles/helicoprion.png', portrait: PT+'Helicoprion-72x72.png' },
+  megarach: { icon: BP+'Megarachne-72x72.png', portrait: PT+'Megarachne-72x72.png' },
+  tbird:    { icon: IC+'prehistoric_mammals/terror_bird.png', portrait: PT+'TerrorBird-72x72.png' },
+  wrhino:   { icon: IC+'prehistoric_mammals/woolly_rhino.png', portrait: PT+'Woolly_Rhino.png' },
+  cbear:    { icon: IC+'prehistoric_mammals/cave_bear.png', portrait: PT+'CaveBear.png' },
+  clion:    { icon: IC+'prehistoric_mammals/cave_lion.png', portrait: PT+'Cave_Lion-72x72.png' },
+  dwolf:    { icon: IC+'prehistoric_mammals/prehistoric_dire_wolf.png', portrait: PT+'DireWolf.png' },
+  gsloth:   { icon: IC+'prehistoric_mammals/giant_ground_sloth.png', portrait: PT+'Giant_Ground_Sloth.png' },
+  glypto:   { icon: IC+'prehistoric_mammals/glyptodon.png', portrait: PT+'Glyptodon.png' },
+  masto:    { icon: IC+'prehistoric_mammals/mastodon.png', portrait: PT+'Mastodon.png' },
+  andrew:   { icon: IC+'prehistoric_mammals/andrewsarchus.png', portrait: PT+'Andrewsarchus-72x72.png' },
+  entelo:   { icon: IC+'prehistoric_mammals/entelodont.png', portrait: PT+'Entelodont.png' },
 };
 
 const EGG_ASSETS = {
@@ -3172,17 +3178,45 @@ function getPortrait(specId, size, mutation) {
   return url;
 }
 
+/* THE SIZE IS A CEILING, NOT A COMMAND.
+   Portraits are 72px pixel art and icons are 32px, drawn with
+   image-rendering: pixelated — and pixelated rendering is only clean at
+   whole multiples of the native size. Ask for 96 and a 72px portrait is
+   scaled 1.33×: every third pixel row doubles and the rest do not, which
+   is the ragged look the Dinodex had. There is nothing larger to load;
+   the source pack ships 72px and nothing else.
+
+   So the requested size is treated as a budget, and the image is drawn at
+   the LARGEST whole multiple of its native size that fits — 144 for a
+   portrait asked at 144, 128 for a 32px icon asked at the same 144. Both
+   crisp, slightly different sizes, and flex layouts absorb the
+   difference. The drawn-canvas fallback keeps the raw size: it is
+   generated at whatever resolution is asked for and never scales. */
+function snapToGrid(target, native) {
+  return Math.max(1, Math.floor(target / native)) * native;
+}
+
 function portraitImg(specId, size, cls, mutation) {
   const asset = ASSET_MAP[specId];
   if (asset && asset.portrait) {
     const filt = mutation ? getMutFilter(specId, mutation) : '';
     const filtStyle = filt ? `filter:${filt};` : '';
-    return `<img src="${asset.portrait}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+    /* The filename is the rendering contract. A -72x72 portrait is pixel
+       art and gets nearest-neighbour at a whole multiple of its grid; the
+       rebuilt portraits are 150-330px originals, larger than anything the
+       page draws, so the browser scales them DOWN, where smooth sampling
+       is the right tool and pixelated would shed detail. */
+    if (asset.portrait.indexOf('-72x72') === -1) {
+      return `<img src="${asset.portrait}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;${filtStyle}" alt="" loading="lazy">`;
+    }
+    const px = snapToGrid(size, 72);
+    return `<img src="${asset.portrait}" width="${px}" height="${px}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
   }
   if (asset && asset.icon) {
     const filt = mutation ? getMutFilter(specId, mutation) : '';
     const filtStyle = filt ? `filter:${filt};` : '';
-    return `<img src="${asset.icon}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+    const px = snapToGrid(size, 32);
+    return `<img src="${asset.icon}" width="${px}" height="${px}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
   }
   const url = getPortrait(specId, size, mutation);
   return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
@@ -5045,7 +5079,7 @@ function renderCollDetail() {
     <button class="coll-move-btn" onclick="${inVault ? `moveDinoToActive(${idx})` : `moveDinoToVault(${idx})`}" title="${inVault ? 'Bring back to the park to resume care' : 'Put in storage — stops growing and needs'}">
       ${inVault ? '🏞️ Move to Park' : '📦 Move to Vault'}
     </button>
-    <div class="coll-sprite-large">${portraitImg(spec.id, 128, 'sprite-img', dino.mutation)}</div>
+    <div class="coll-sprite-large">${portraitImg(spec.id, 144, 'sprite-img', dino.mutation)}</div>
     <div class="coll-name">${dino.nickname || spec.name}</div>
     <div class="coll-species">${spec.name} · ${spec.era}${inVault ? ' · <span style="color:#888">Vaulted</span>' : ''}</div>
     ${dino.mutation ? `<div style="font-size:11px;color:#ff0000;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em">✨ ${(resolveSpeciesMut(spec.id,dino.mutation)||{}).label||dino.mutation} Mutation</div>` : ''}
@@ -5182,7 +5216,7 @@ function renderDexDetail(specId) {
   panel.innerHTML = `<div class="dex-detail-panel">
     <button class="dex-close-btn" onclick="renderDexDetail(null)">✕ Close</button>
     <div class="dex-detail-header">
-      <div class="dex-detail-portrait">${portraitImg(specId, 96, 'sprite-img')}</div>
+      <div class="dex-detail-portrait">${portraitImg(specId, 144, 'sprite-img')}</div>
       <div class="dex-detail-info">
         <div class="dex-detail-name">${spec.name}</div>
         <div class="dex-detail-species">${spec.era} · ${spec.habitat}</div>
