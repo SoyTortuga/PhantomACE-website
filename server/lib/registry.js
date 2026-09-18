@@ -36,6 +36,14 @@ export const SINGLETONS = {
   bridge_pending_actions:{ table: 'singletons', expiry: 'none' },
   eventsub_subscriptions:{ table: 'singletons', expiry: 'none' },
   giveaway_reward_id:    { table: 'singletons', expiry: 'none' },
+  /* The rarity entry rewards' ids, resolved from Twitch by title and
+     cached. Unregistered at first, which 500'd the panel the moment a
+     Mythic draw was opened on stream: they are written via a property
+     lookup (RARITY_REWARDS[rarity].idKey), a shape the registry scan did
+     not read. 'none' like the id above them — an expired cache would just
+     re-resolve, but there is nothing gained by it expiring. */
+  giveaway_reward_rare_id:   { table: 'singletons', expiry: 'none' },
+  giveaway_reward_mythic_id: { table: 'singletons', expiry: 'none' },
   checkin_reward_id:     { table: 'singletons', expiry: 'none' },
 
   /* Rotating chat announcements: the list, the interval, and the rotation
@@ -162,6 +170,10 @@ export const FAMILIES = [
      "claimable for five minutes only" rule. No handler has to check a
      clock — an expired code simply reads as a code that does not exist. */
   { prefix: 'gwc_',            table: 'giveaway_drop_codes', expiry: 'real' },
+  /* A giveaway winner's prize, keyed by the winner. 'real': the seven-day
+     claim window IS the row's business rule — recordPrize sets the TTL and
+     the page stops offering the prize when the row is gone. */
+  { prefix: 'gwp_',            table: 'giveaway_drop_codes', expiry: 'real' },
 
   /* MTGBBB, and the reason this list is ordered longest prefix first.
      `mtgbbb_set_` MUST be tested before `mtgbbb_`, or every cached Scryfall
