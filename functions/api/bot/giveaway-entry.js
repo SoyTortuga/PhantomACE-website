@@ -89,6 +89,55 @@ export async function addEntrant(env, userId, username, rarity = null) {
   return added ? { ok: true } : { ok: false, reason: 'duplicate' };
 }
 
+/**
+ * Tell Twitch what became of an entry redemption.
+ *
+ * FULFILLED spends the point; CANCELED refunds it. This is what makes
+ * "once per giveaway" true at the till rather than only on the wheel: the
+ * server always kept one slice per person, but Twitch kept charging for
+ * every extra redemption because nothing ever answered it. The entry
+ * rewards leave the request queue open (giveaway-rewards.js COMMON) —
+ * a redemption that skips the queue is FULFILLED on arrival and Twitch
+ * refuses status changes after that, so with skip on there was nothing to
+ * refund with.
+ *
+ * Never throws: this runs inside a webhook, and a refund that could not be
+ * sent is a point lost, not a subscription worth risking. The failure is
+ * logged — it is a viewer's point — but the webhook answers 200 either way.
+ *
+ * @returns {Promise<boolean>} whether Twitch accepted the status change
+ */
+export async function settleEntryRedemption(env, event, ok) {
+  const rewardId = event && event.reward && event.reward.id;
+  const redemptionId = event && event.id;
+  if (!rewardId || !redemptionId) return false;
+
+  try {
+    const { getBroadcasterToken } = await import('./send-chat.js');
+    const token = await getBroadcasterToken(env);
+    if (!token) return false;
+
+    const url = 'https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions' +
+      `?broadcaster_id=${env.TWITCH_BROADCASTER_ID}&reward_id=${rewardId}&id=${redemptionId}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Client-Id': env.TWITCH_CLIENT_ID,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status: ok ? 'FULFILLED' : 'CANCELED' }),
+    });
+    if (!res.ok) {
+      console.error(`[giveaway-entry] could not ${ok ? 'fulfil' : 'refund'} redemption ${redemptionId}: HTTP ${res.status}`);
+    }
+    return res.ok;
+  } catch (err) {
+    console.error('[giveaway-entry] settle failed:', err.message);
+    return false;
+  }
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
 

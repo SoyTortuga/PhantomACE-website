@@ -45,10 +45,19 @@ const REWARD_HANDLERS = {
      redemption for the site to pop up, no inventory change. The reward costs
      a single point and its whole effect is a name on a reel. */
   'giveaway-entry': async (env, userId, redemption) => {
-    const { entryRarityForTitle, addEntrant } = await import('./bot/giveaway-entry.js');
+    const { entryRarityForTitle, addEntrant, settleEntryRedemption } = await import('./bot/giveaway-entry.js');
     const rarity = entryRarityForTitle(redemption.reward && redemption.reward.title);
     if (rarity === false) return;
-    await addEntrant(env, userId, redemption.user_name || redemption.user_login || 'unknown', rarity);
+    const result = await addEntrant(env, userId, redemption.user_name || redemption.user_login || 'unknown', rarity);
+
+    /* THE POINT FOLLOWS THE ANSWER. One entry per person per draw was
+       always enforced on the wheel; this enforces it at the till. A second
+       redemption — or one that arrives after the draw closed, or for the
+       wrong rarity — is cancelled, which refunds it. Twitch has no
+       "once per giveaway" cap of its own (per-stream resets between
+       broadcasts, and a Rare and a Mythic draw in one night is two
+       giveaways), so refusing-with-refund is how the rule is said. */
+    await settleEntryRedemption(env, redemption, !!(result && result.ok));
   },
 
   'pham-checkin': async (env, userId, redemption) => {

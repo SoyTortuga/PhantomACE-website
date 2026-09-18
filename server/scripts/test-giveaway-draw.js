@@ -51,11 +51,21 @@ const REWARDS = [
 
 let patches = [];       // { id, is_enabled }
 let whispers = [];      // { to, message }
+let settlements = [];   // { redemptionId, rewardId, status }
 
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
   const method = opts.method || 'GET';
 
+  if (u.includes('/helix/channel_points/custom_rewards/redemptions')) {
+    const q = new URL(u).searchParams;
+    settlements.push({
+      redemptionId: q.get('id'),
+      rewardId: q.get('reward_id'),
+      status: JSON.parse(opts.body).status,
+    });
+    return new Response(JSON.stringify({ data: [{ id: q.get('id') }] }), { status: 200 });
+  }
   if (u.includes('/helix/channel_points/custom_rewards')) {
     if (method === 'GET') {
       /* Every one of these is MANAGEABLE in the fake, so only_manageable
@@ -167,7 +177,7 @@ const entrants = (env) => {
   return rec ? JSON.parse(rec).entrants.map(e => e.username) : [];
 };
 
-const fresh = (pools) => { patches = []; whispers = []; return makeEnv(pools ? { pools } : undefined); };
+const fresh = (pools) => { patches = []; whispers = []; settlements = []; return makeEnv(pools ? { pools } : undefined); };
 
 /* ── Title → rarity ──────────────────────────────────────────────────── */
 {
@@ -248,6 +258,51 @@ const fresh = (pools) => { patches = []; whispers = []; return makeEnv(pools ? {
   /* An unrelated reward must not enter anyone. */
   await channelPoints.onRequestPost({ env, request: await redemptionRequest('Hydrate!', '4', 'dave') });
   check('an unrelated reward enters nobody', entrants(env), ['alice']);
+}
+
+/* ── THE POINT FOLLOWS THE ANSWER ────────────────────────────────────── */
+{
+  /* The wheel always held one slice per person; Twitch kept charging for
+     every extra redemption because nothing answered it. Now the first
+     entry is FULFILLED (spent) and everything refused — a duplicate, a
+     redemption after the draw closed, the wrong rarity — is CANCELED,
+     which refunds the point. This is why the entry rewards leave the
+     request queue open: a skipped-queue redemption is fulfilled on arrival
+     and can never be refunded. */
+  const env = fresh();
+  await post(env, { action: 'toggle', open: true, rarity: 'mythic' });
+  settlements = [];
+
+  await channelPoints.onRequestPost({ env, request: await redemptionRequest('Enter Mythic Giveaway', '1', 'alice') });
+  check('the first entry is fulfilled, spending the point',
+    settlements.map(s => s.status), ['FULFILLED']);
+
+  await channelPoints.onRequestPost({ env, request: await redemptionRequest('Enter Mythic Giveaway', '1', 'alice') });
+  check('a duplicate is cancelled, refunding it',
+    settlements.map(s => s.status), ['FULFILLED', 'CANCELED']);
+  check('while the wheel still holds one slice', entrants(env), ['alice']);
+
+  await channelPoints.onRequestPost({ env, request: await redemptionRequest('Enter Rare Giveaway', '2', 'bob') });
+  check('the wrong rarity is refunded too',
+    settlements[settlements.length - 1].status, 'CANCELED');
+
+  await post(env, { action: 'toggle', open: false });
+  settlements = [];
+  await channelPoints.onRequestPost({ env, request: await redemptionRequest('Enter Mythic Giveaway', '3', 'carol') });
+  check('a redemption after the draw closes is refunded',
+    settlements.map(s => s.status), ['CANCELED']);
+
+  /* The refund mechanism only exists if the rewards keep their queue open.
+     A future edit flipping COMMON back to skip would pass every test above
+     — the stub cannot tell — and silently make every CANCELED call 400
+     against real Twitch. */
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const script = fs.readFileSync(path.join(REPO, 'server/scripts/giveaway-rewards.js'), 'utf8');
+  ok('the entry rewards leave the redemption queue open',
+    /should_redemptions_skip_request_queue: false/.test(script));
 }
 
 /* ── A closed draw takes nobody ──────────────────────────────────────── */

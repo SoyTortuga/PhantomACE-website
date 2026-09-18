@@ -6,7 +6,7 @@
      node server/scripts/giveaway-rewards.js --service phantomace-web --create --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --set-cost "Enter Giveaway=1" --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --hide "Enter Giveaway" --confirm
-     node server/scripts/giveaway-rewards.js --service phantomace-web --fix-colours --confirm
+     node server/scripts/giveaway-rewards.js --service phantomace-web --sync --confirm
      node server/scripts/giveaway-rewards.js --service phantomace-web --set-cost "TTSMonster TTS=500" --force --confirm
 
    WHY A SCRIPT AND NOT THE ADMIN PAGE. Managing a channel's rewards needs
@@ -75,11 +75,23 @@ export const ENTRY_REWARDS = [
 
 /* Shared by every created reward. Disabled on creation: a reward is opened
    for a draw and closed after it, which the site already does through
-   giveaway.js. `skip_request_queue` keeps the points spent rather than
-   leaving redemptions pending for a moderator to approve one by one. */
+   giveaway.js.
+
+   THE QUEUE STAYS OPEN, and it is the whole refund mechanism. A redemption
+   that skips the queue goes straight to FULFILLED, and Twitch only allows
+   status changes on UNFULFILLED ones -- so with skip on, a viewer who
+   redeemed twice was simply charged twice, with no way to give the second
+   point back. With the queue open, the entry webhook FULFILS the first
+   entry and CANCELS duplicates, which refunds them automatically. Nobody
+   approves anything by hand; the webhook is the approver.
+
+   No per-stream cap either: Twitch resets that between broadcasts, and a
+   night with a Rare draw and a Mythic draw is two giveaways in one stream.
+   "Once per GIVEAWAY" is the server's rule to enforce, and refunding is
+   how it says no. */
 const COMMON = {
   is_enabled: false,
-  should_redemptions_skip_request_queue: true,
+  should_redemptions_skip_request_queue: false,
   is_max_per_user_per_stream_enabled: false,
 };
 
@@ -188,20 +200,36 @@ async function main() {
     }
   }
 
-  /* --fix-colours: bring the two entry rewards back to the colours in
-     ENTRY_REWARDS. A reward created before those were settled keeps whatever
-     it was made with, and nothing else here can change it. */
-  if (arg('fix-colours') || arg('fix-colors')) {
+  /* --sync (formerly --fix-colours, still accepted): bring both entry
+     rewards to the FULL spec in ENTRY_REWARDS plus COMMON's queue setting.
+     A reward created before any of those were settled keeps whatever it was
+     made with, and nothing else can change it: colour, prompt, and --
+     critically -- whether redemptions skip the queue, which is the
+     difference between a duplicate entry being refundable and a viewer
+     just losing the point. */
+  if (arg('sync') || arg('fix-colours') || arg('fix-colors')) {
     for (const spec of ENTRY_REWARDS) {
       const r = byTitle.get(spec.title.toLowerCase());
       if (!r) { line(`  ? "${spec.title}" does not exist yet — run --create`); continue; }
-      if (!manageable.has(r.id)) { line(`  ! "${spec.title}" is read-only — change its colour by hand`); continue; }
-      const now = (r.background_color || '').toLowerCase();
-      if (now === spec.background_color.toLowerCase()) { line(`  = "${spec.title}" is already ${now}`); continue; }
-      changes.push({
-        kind: 'update', id: r.id, title: spec.title,
-        body: { background_color: spec.background_color }, was: now || 'unset',
-      });
+      if (!manageable.has(r.id)) { line(`  ! "${spec.title}" is read-only — change it by hand`); continue; }
+
+      const body = {};
+      const was = [];
+      if ((r.background_color || '').toLowerCase() !== spec.background_color.toLowerCase()) {
+        body.background_color = spec.background_color;
+        was.push(`colour ${(r.background_color || 'unset').toLowerCase()}`);
+      }
+      if ((r.prompt || '') !== spec.prompt) {
+        body.prompt = spec.prompt;
+        was.push('prompt differs');
+      }
+      const skip = !!(r.should_redemptions_skip_request_queue);
+      if (skip !== !!COMMON.should_redemptions_skip_request_queue) {
+        body.should_redemptions_skip_request_queue = COMMON.should_redemptions_skip_request_queue;
+        was.push(`skip_queue ${skip}`);
+      }
+      if (!Object.keys(body).length) { line(`  = "${spec.title}" already matches the spec`); continue; }
+      changes.push({ kind: 'update', id: r.id, title: spec.title, body, was: was.join(', ') });
     }
   }
 
@@ -240,7 +268,7 @@ async function main() {
   }
 
   if (!changes.length) {
-    line('Nothing to change. (Pass --create, --fix-colours, --set-cost or --hide.)');
+    line('Nothing to change. (Pass --create, --sync, --set-cost or --hide.)');
     await pool.end();
     return;
   }
