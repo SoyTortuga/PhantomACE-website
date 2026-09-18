@@ -774,13 +774,19 @@
     .coll-desc { font-size: 10px; color: #555; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
 
     /* ======================== DINODEX ======================== */
-    .dex-stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+    .dex-stats-bar {
+      display: grid;
+      /* auto-fit rather than a fixed count: five cards fit a desktop row
+         and wrap to two or three on a phone without a breakpoint. */
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+      gap: 6px; margin-bottom: 12px;
+    }
     .dex-stat-card {
       background: #111; border: 1px solid #ffffff14; border-radius: 6px;
       padding: 8px; text-align: center;
     }
     .dex-stat-val { font-size: 18px; font-weight: 700; color: #fff; }
-    .dex-stat-lbl { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+    .dex-stat-lbl { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; line-height: 1.3; }
     .dex-progress-row { display: flex; gap: 4px; margin-bottom: 12px; align-items: center; }
     .dex-progress-bar { flex: 1; height: 6px; background: #111; border-radius: 3px; overflow: hidden; }
     .dex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
@@ -1044,7 +1050,11 @@ const CARE_COOLDOWN_LIVE_SEC = 1 * 3600;
 // whatever state it was in when it left the park. Both arrays store the
 // same dino object shape; only membership differs.
 const MAX_ACTIVE_PARK = 10;
-const MAX_VAULT_SIZE = 50;
+/* Two of most species, so a collector can keep a mutated and a plain one
+   of each without ever having to cull. The save is posted whole every 20
+   seconds and a stored dinosaur is about 130 bytes, so a completely full
+   vault is 25KB; there is no size limit on the server side. */
+const MAX_VAULT_SIZE = 200;
 const HATCH_TIMES = { common: 1800, uncommon: 3600, rare: 7200, epic: 14400, legendary: 28800 };
 const EGG_SPEEDUP_COST = 50;
 
@@ -5234,16 +5244,43 @@ function makeDots(val, cls) {
 let dexFilter = 'all';
 let dexSelectedSpec = null;
 
-function getDexMutationStats() {
-  if(!state.discoveredMutations)state.discoveredMutations=[];
-  const totalPossible = ROSTER.length * 5;
-  const totalFound = state.discoveredMutations.length;
+/* SPECIES progress, despite what the old name said. byRarity has always
+   counted species discovered per rarity -- which is what the chips under
+   the stat bar show, correctly -- while the two mutation totals it also
+   returned were never rendered anywhere. They were wrong as well:
+   ROSTER * 5 is 425 against a real 1105, counting neither the eight global
+   mutations nor the fact that a species carries three colour swaps rather
+   than five. */
+function getDexSpeciesStats() {
   const byRarity = {};
   RARITY_ORDER.forEach(r => {
     const species = ROSTER.filter(s => s.rarity === r);
     byRarity[r] = { total: species.length, found: species.filter(s => state.discovered.includes(s.id)).length };
   });
-  return { totalPossible, totalFound, byRarity };
+  return { byRarity };
+}
+
+/* COUNTED, NEVER ASSUMED. Every species carries a different number -- three
+   colour swaps picked against its own palette, a special and a rare where
+   it has them, and the eight global mutations -- so the only honest total
+   is the one the Dinodex itself would list, species by species.
+
+   Cached because renderDinodex runs on every filter click and this walks
+   the whole roster; the roster cannot change at runtime. */
+let dexMutTotalsCache = null;
+function getDexMutationTotals() {
+  if(!state.discoveredMutations)state.discoveredMutations=[];
+  if (!dexMutTotalsCache) {
+    const valid = new Set();
+    ROSTER.forEach(spec => {
+      getSpecMutStatus(spec.id).forEach(m => valid.add(spec.id + '_' + m.id));
+    });
+    dexMutTotalsCache = valid;
+  }
+  /* Filtered against what actually exists, so a mutation recorded under an
+     id the game no longer defines cannot push the count past 100%. */
+  const found = state.discoveredMutations.filter(k => dexMutTotalsCache.has(k)).length;
+  return { total: dexMutTotalsCache.size, found };
 }
 
 function getSpecMutStatus(specId) {
@@ -5313,18 +5350,22 @@ function renderDexDetail(specId) {
 function renderDinodex() {
   if(!state.discoveredMutations)state.discoveredMutations=[];
   const discCount = ROSTER.filter(r=>state.discovered.includes(r.id)).length;
-  const mutCount = state.discoveredMutations.length;
-  const totalMutsPossible = ROSTER.length * 5 + Object.keys(MUTATIONS).length * ROSTER.length;
-  const uniqueMuts = new Set(state.park.map(d=>d.mutation).filter(Boolean)).size;
+  const muts = getDexMutationTotals();
 
+  /* TWO COMPLETIONS, because they are two different games. Finding all 85
+     species is a season's work; finding all 1105 mutations is far longer,
+     and a single figure averaging them told a player neither. Species
+     completion sat at 100% here while barely a mutation had been seen. */
+  const pct = (a, b) => b ? Math.floor(a / b * 100) : 0;
   document.getElementById('dexStats').innerHTML = `
     <div class="dex-stat-card"><div class="dex-stat-val">${discCount}<span style="font-size:11px;color:#666">/${ROSTER.length}</span></div><div class="dex-stat-lbl">Species</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val" style="color:${discCount>=ROSTER.length?'#2ecc71':'#fff'}">${pct(discCount, ROSTER.length)}%</div><div class="dex-stat-lbl">Species Complete</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${muts.found}<span style="font-size:11px;color:#666">/${muts.total}</span></div><div class="dex-stat-lbl">Mutations</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val" style="color:${muts.found>=muts.total?'#2ecc71':'#fff'}">${pct(muts.found, muts.total)}%</div><div class="dex-stat-lbl">Mutations Complete</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val">${state.park.length}</div><div class="dex-stat-lbl">In Park</div></div>
-    <div class="dex-stat-card"><div class="dex-stat-val">${mutCount}</div><div class="dex-stat-lbl">Mutations</div></div>
-    <div class="dex-stat-card"><div class="dex-stat-val">${Math.floor(discCount/ROSTER.length*100)}%</div><div class="dex-stat-lbl">Complete</div></div>
   `;
 
-  const stats = getDexMutationStats();
+  const stats = getDexSpeciesStats();
   document.getElementById('dexRarityRow').innerHTML = RARITY_ORDER.map(r => {
     const s = stats.byRarity[r];
     const pct = s.total ? Math.floor(s.found/s.total*100) : 0;
