@@ -100,6 +100,20 @@ const page = fs.readFileSync(path.join(GAME, 'index.html'), 'utf8');
   }
   check('every file honours its name', wrong, []);
 
+  /* The icon fallback is the bug these closed: an ASSET_MAP entry with no
+     portrait renders a 32px icon at 144px. Asserted on the map rather than
+     the folder, because a built file nothing points at changes nothing. */
+  const mapStart = page.indexOf('const ASSET_MAP = {');
+  const mapBlock = page.slice(mapStart, page.indexOf('\n};', mapStart));
+  for (const id of ['megashark', 'quetz']) {
+    /* Scoped to ASSET_MAP: these ids are also keys in the palette and skin
+       tables further down, and matching one of those would pass forever. */
+    const line = mapBlock.split('\n').find(l => l.trim().startsWith(id + ':'));
+    ok(`${id} is in ASSET_MAP`, !!line);
+    ok(`and ${id} points at a portrait, not just an icon`,
+       !!line && line.includes('portrait: PT+'));
+  }
+
   ok('the page snaps pixel art to its grid', /snapToGrid\(size, 72\)/.test(page));
   ok('and draws everything else smooth', page.includes("indexOf('-72x72') === -1"));
 }
@@ -130,8 +144,9 @@ spec = importlib.util.spec_from_file_location('bp', ${JSON.stringify(path.join(R
 bp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bp)
 from PIL import Image
-captioned = {n for row in bp.LABELLED_NAMES for n in row if n}
-out = {'limits': {'palette': bp.PALETTE_LIMIT, 'hue': bp.MAX_HUE_DRIFT}, 'scores': {}}
+captioned = {n for sh in bp.LABELLED_SHEETS for row in sh['names'] for n in row if n}
+out = {'limits': {'palette': bp.PALETTE_LIMIT, 'hue': bp.MAX_HUE_DRIFT},
+       'scores': {}, 'unbased': [], 'no_small': sorted(bp.NO_SMALL)}
 folder = ${JSON.stringify(FOLDER)}
 old = ${JSON.stringify(OLD72)}
 for f in os.listdir(folder):
@@ -140,6 +155,9 @@ for f in os.listdir(folder):
     name = f[:-4]
     small_p = os.path.join(old, name + '-72x72.png')
     if not os.path.exists(small_p):
+        # Megalodon and Quetzalcoatlus, which never had a 72 to be judged
+        # against. Reported so the JS side can assert they shipped at all.
+        out['unbased'].append(name)
         continue
     big = Image.open(os.path.join(folder, f)).convert('RGBA')
     small = Image.open(small_p).convert('RGBA')
@@ -149,7 +167,7 @@ for f in os.listdir(folder):
         out['scores'][name] = ['palette', round(bp.palette_mse(bp.thumb(big), bp.thumb(small)))]
 print(json.dumps(out))
 `;
-  let data = { limits: {}, scores: {} };
+  let data = { limits: {}, scores: {}, unbased: [], no_small: [] };
   try {
     data = JSON.parse(execFileSync('python', ['-c', script], { encoding: 'utf8' }).trim().split(/\r?\n/).pop());
   } catch (err) {
@@ -169,6 +187,17 @@ print(json.dumps(out))
     .filter(n => scores[n][1] > LIMIT[scores[n][0]])
     .map(n => `${n} ${scores[n][0]}=${scores[n][1]} > ${LIMIT[scores[n][0]]}`);
   check('every upgraded portrait keeps its species colours', off, []);
+
+  /* THE TWO WITH NO BASELINE. Megalodon and Quetzalcoatlus have no 72 and
+     never did -- the game fell back to a 32x32 icon for them, which on a
+     legendary reveal was the most conspicuous place it could happen. They
+     are exempt from the gates above for want of anything to measure
+     against, so what is asserted is that they shipped: measured, not
+     assumed, because the exemption is exactly what would let them quietly
+     stop being built. */
+  check('the species with no 72 are the two expected',
+        (data.unbased || []).sort(), (data.no_small || []).sort());
+  check('and there are two of them', (data.no_small || []).length, 2);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

@@ -48,15 +48,14 @@ OUT = os.path.join(REPO, "games", "dino-park", "assets", "portraits")
 
 SHEETS = ["CommonDinoBatch.png", "UncommonDinoBatch.png", "moredinos.png"]
 
-# A LABELLED SHEET, and the best source in the pack. It sits one directory
-# up from the rest -- in dino-assets/ rather than AncientBeastsPack/ --
-# which is why nothing found it until it was pointed out.
+# THE LABELLED SHEETS, and the best sources in the pack. They sit one
+# directory up from the rest -- in dino-assets/ rather than
+# AncientBeastsPack/ -- which is why nothing found them until they were
+# pointed out.
 #
 # Every tile carries the species name as a caption, so identity is READ,
 # not inferred: no silhouette matching, no confidence margin, no chance of
-# shipping one dinosaur under another's name. It also covers exactly the
-# gap -- all seven species the palette gate had rejected, plus twelve more
-# that had no large art at all.
+# shipping one dinosaur under another's name.
 #
 # IT IS NEW ART, NOT THE MISSING ORIGINALS. Silhouette distance to the
 # matching 72 runs 5800-19300 where a true same-drawing pair measures
@@ -64,17 +63,73 @@ SHEETS = ["CommonDinoBatch.png", "UncommonDinoBatch.png", "moredinos.png"]
 # is a redesign rather than a recovery, and it is why these go through the
 # hue gate below instead of the correspondence-based palette check, which
 # measures pose mismatch as much as colour when the drawings differ.
-LABELLED = os.path.join(os.path.dirname(SRC), "evenmoredinos.png")
-LABELLED_GRID = (5, 4)
-LABELLED_NAMES = [
-    ["Allosaurus", "Carnotaurus", "Andrewsarchus", "Brontosaurus", "Cave_Lion"],
-    ["Cryolophosaurus", "Deinocheirus", "Diplodocus", "Kronosaurus", "Troodon"],
-    ["Utahraptor", "Deinonychus", "Tylosaurus", "Pterodactylus", "Dimorphodon"],
-    ["Tapejara", "TerrorBird", "Helicoprion", "Ornithomimus", None],
-]
-# Background is alpha 0-3 and sprites are 249-254, so the split is clean.
-# The captions are separate components and never the largest in a tile.
+#
+# Which is also why a captioned tile RANKS BELOW a named individual: same
+# certainty of identity, but the individual is the very drawing the 72 was
+# made from, so it changes nothing the player already knows. See
+# candidates() -- getting that order wrong silently redrew four species
+# that had a perfectly good original sitting in the pack.
+#
+# NAMES ARE THE SERVED NAME, NOT THE PRINTED CAPTION, where the two differ
+# ("VELOCIRAPTOR" is served as Raptor, "TYRANNOSAURUS REX" as T-Rex). The
+# caption is how identity is established; the served name is how it is
+# filed. Two entries are neither -- Megalodon and Quetzalcoatlus have no
+# 72 at all, and are handled in main().
+LABELLED_DIR = os.path.dirname(SRC)
+
+# The ASSET_MAP ids of the species with no portrait line to rewrite, since
+# they have never had one. This is the only place the link between the
+# map's "megashark" and the sheet's "Megalodon" is written down, so it is
+# written here rather than inferred from a name that does not match.
+NO_PORTRAIT_IDS = {"megashark": "Megalodon", "quetz": "Quetzalcoatlus"}
+
+# Background alpha 0-3, sprites 249-254: a clean split, and the captions
+# are separate components that are never the largest in a tile.
 LABELLED_ALPHA = 128
+
+LABELLED_SHEETS = [
+    {
+        "file": "evenmoredinos.png",
+        # Transparent background, one uniform 5x4 grid.
+        "mode": "alpha",
+        "names": [
+            ["Allosaurus", "Carnotaurus", "Andrewsarchus", "Brontosaurus", "Cave_Lion"],
+            ["Cryolophosaurus", "Deinocheirus", "Diplodocus", "Kronosaurus", "Troodon"],
+            ["Utahraptor", "Deinonychus", "Tylosaurus", "Pterodactylus", "Dimorphodon"],
+            ["Tapejara", "TerrorBird", "Helicoprion", "Ornithomimus", None],
+        ],
+    },
+    {
+        "file": "wowevenmoredinos.png",
+        # Flattened to RGB against the checkerboard and ruled into framed
+        # cells, so there is no alpha to split on and no uniform grid: the
+        # rows are 276/253/239/254 tall and the last one holds SIX tiles
+        # where the others hold five. The frame is what makes it tractable
+        # -- the dark rules are found and the cells read off them, then
+        # asserted against the shape of this table, so a future sheet with
+        # a different layout stops the build instead of slicing the
+        # dinosaurs in half.
+        "mode": "framed",
+        "names": [
+            ["Dilophosaurus", "Parasaurolophus", "Stegosaurus", "Megalodon", "Stygimoloch"],
+            ["Raptor", "Ankylosaurus", "Quetzalcoatlus", "Brachiosaurus", "Megarachne"],
+            ["Plesiosaurus", "Pteranodon", "Smilodon", "Triceratops", "Spinosaurus"],
+            ["T-Rex", "Mastodon", "Therizinosaurus", "Shonisaurus", "Hatzegopteryx", "Mosasaurus"],
+        ],
+    },
+]
+
+# Species the pack never drew at 72 either. The game falls back to their
+# 32px icon today, so the captioned sheet is the first art of any size
+# they have ever had -- and there is no 72 to pull the colours toward.
+# They ship in the artist's own colours, deliberately: the only reference
+# is a 32px icon from a different pack at saturation 0.22, too small and
+# too grey to be worth matching, and the mutation filters are global
+# hue-rotations rather than anything calibrated per species, so there is
+# no per-species expectation to honour. Mosasaurus, Shonisaurus and
+# Tylosaurus already ship at hue 182-217, so a blue shark is unremarkable
+# in this set.
+NO_SMALL = {"Megalodon", "Quetzalcoatlus"}
 
 # Hue after the transfer, weighted by saturation. THE POSE-INDEPENDENT
 # GATE, and the one that actually describes what the mutation filters
@@ -126,6 +181,11 @@ BAND_MARGIN = 1.55
 #
 # Stygimoloch's best score passes the band rule and is WRONG -- the 72 is
 # a pachycephalosaur, the sprite it claims a frilled ceratopsian.
+#
+# BOTH PINS CONSTRAIN SILHOUETTE MATCHING ONLY, which is the only part of
+# this that guesses. A captioned tile names its own species, so it is not
+# subject to either and should not be: Stygimoloch now ships from the
+# caption, which is the outcome this pin was protecting the slot for.
 FORCE_KEEP72 = {"Stygimoloch"}
 
 # And these fail the band rule and are RIGHT -- eyeballed against the 72
@@ -444,60 +504,158 @@ def hue_drift(a, b):
     return abs((ha - hb + 180) % 360 - 180)
 
 
+def _largest_blob_crop(arr, mask, keep_rgb=False):
+    """The biggest connected run of True in `mask`, cut out of `arr`.
+
+    A MASKED CROP, not a bounding box: only pixels belonging to the blob
+    are copied, so a caption sitting in the same rectangle as a tail never
+    rides along. Returns None when the mask is empty.
+
+    keep_rgb carries the colour of the pixels it drops, alpha 0, instead of
+    zeroing them -- which is what repair_interior needs to put a white fang
+    back afterwards. Without it the repair would restore black.
+    """
+    import numpy as np
+    h, w = mask.shape
+    seen = np.zeros_like(mask)
+    best = None
+    for sy in range(h):
+        for sx in range(w):
+            if not mask[sy, sx] or seen[sy, sx]:
+                continue
+            stack = [(sy, sx)]
+            seen[sy, sx] = True
+            px = []
+            while stack:
+                cy, cx = stack.pop()
+                px.append((cy, cx))
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not seen[ny, nx]:
+                            seen[ny, nx] = True
+                            stack.append((ny, nx))
+            if best is None or len(px) > len(best):
+                best = px
+    if not best:
+        return None
+    ys = [q[0] for q in best]
+    xs = [q[1] for q in best]
+    y1, y2, x1, x2 = min(ys), max(ys), min(xs), max(xs)
+    if keep_rgb:
+        crop = arr[y1:y2 + 1, x1:x2 + 1].copy()
+        crop[..., 3] = 0
+        for (py, px_) in best:
+            crop[py - y1, px_ - x1, 3] = 255
+    else:
+        crop = np.zeros((y2 - y1 + 1, x2 - x1 + 1, 4), dtype=np.uint8)
+        for (py, px_) in best:
+            crop[py - y1, px_ - x1] = arr[py, px_]
+    # .copy(), because fromarray over a numpy view hands back a readonly
+    # image and repair_interior writes into it.
+    return Image.fromarray(crop).copy()
+
+
+def _bands(flags, threshold):
+    """Contiguous runs where `flags` exceeds `threshold`, as (start, end)."""
+    out, run = [], None
+    for i, v in enumerate(flags):
+        if v > threshold and run is None:
+            run = i
+        elif v <= threshold and run is not None:
+            out.append((run, i - 1))
+            run = None
+    if run is not None:
+        out.append((run, len(flags) - 1))
+    return out
+
+
+def _framed_cells(arr, shape):
+    """Cell rectangles of a ruled sheet, READ OFF THE RULES.
+
+    The dark frame lines are the only thing on these sheets that spans a
+    whole row or column, so they are found rather than assumed -- which is
+    what lets one sheet hold rows of five and a row of six. `shape` is the
+    column count expected per row; the detected grid is asserted against
+    it, because a layout this code guessed wrong would not fail loudly, it
+    would ship half a dinosaur.
+    """
+    import numpy as np
+    dark = arr[..., :3].max(axis=2) < 110
+    rules = [(a + b) // 2 for a, b in _bands(dark.mean(axis=1), 0.80)]
+    y_edges = sorted({0, arr.shape[0]} | set(rules))
+    rows = [(a, b) for a, b in zip(y_edges, y_edges[1:]) if b - a >= 40]
+    assert len(rows) == len(shape), f"found {len(rows)} rows, table has {len(shape)}"
+
+    cells = []
+    for r, (y0, y1) in enumerate(rows):
+        inner = dark[y0 + 6:y1 - 6]
+        xs = [(a + b) // 2 for a, b in _bands(inner.mean(axis=0), 0.80)]
+        x_edges = sorted({0, arr.shape[1]} | set(xs))
+        cols = [(a, b) for a, b in zip(x_edges, x_edges[1:]) if b - a >= 40]
+        assert len(cols) == shape[r], f"row {r}: found {len(cols)} cells, table has {shape[r]}"
+        cells.append([(y0, y1, x0, x1) for x0, x1 in cols])
+    return cells
+
+
 def labelled_tiles():
-    """Every sprite on the labelled sheet, keyed by its printed caption.
+    """Every captioned sprite across the labelled sheets, keyed by species.
 
     Per tile rather than per sheet: the largest component inside one tile
     is always the animal, which drops the caption without having to read
     or erase it.
+
+    Earlier sheets win. A species that appears twice keeps the first
+    sheet's drawing, so re-running after a new sheet arrives cannot
+    silently redraw something already shipped.
     """
     import numpy as np
-    if not os.path.exists(LABELLED):
-        return {}
-    arr = np.array(Image.open(LABELLED).convert("RGBA"))
-    mask = arr[..., 3] >= LABELLED_ALPHA
-    cols, rows = LABELLED_GRID
-    H, W = mask.shape
-    tw, th = W / cols, H / rows
-
     out = {}
-    for r in range(rows):
-        for c in range(cols):
-            name = LABELLED_NAMES[r][c]
-            if not name:
-                continue
-            y0, x0 = int(r * th), int(c * tw)
-            sub = mask[y0:int((r + 1) * th), x0:int((c + 1) * tw)]
-            sh, sw = sub.shape
-            seen = np.zeros_like(sub)
-            best = None
-            for sy in range(sh):
-                for sx in range(sw):
-                    if not sub[sy, sx] or seen[sy, sx]:
-                        continue
-                    stack = [(sy, sx)]
-                    seen[sy, sx] = True
-                    px = []
-                    while stack:
-                        cy, cx = stack.pop()
-                        px.append((cy, cx))
-                        for dy in (-1, 0, 1):
-                            for dx in (-1, 0, 1):
-                                ny, nx = cy + dy, cx + dx
-                                if 0 <= ny < sh and 0 <= nx < sw and sub[ny, nx] and not seen[ny, nx]:
-                                    seen[ny, nx] = True
-                                    stack.append((ny, nx))
-                    if best is None or len(px) > len(best):
-                        best = px
-            if not best:
-                continue
-            ys = [q[0] for q in best]
-            xs = [q[1] for q in best]
-            y1, y2, x1, x2 = min(ys), max(ys), min(xs), max(xs)
-            crop = np.zeros((y2 - y1 + 1, x2 - x1 + 1, 4), dtype=np.uint8)
-            for (py, px_) in best:
-                crop[py - y1, px_ - x1] = arr[y0 + py, x0 + px_]
-            out[name] = Image.fromarray(crop)
+    for sheet in LABELLED_SHEETS:
+        path = os.path.join(LABELLED_DIR, sheet["file"])
+        if not os.path.exists(path):
+            print(f"  ! labelled sheet missing: {sheet['file']}")
+            continue
+        names = sheet["names"]
+        arr = np.array(Image.open(path).convert("RGBA"))
+        found = 0
+
+        if sheet["mode"] == "alpha":
+            mask = arr[..., 3] >= LABELLED_ALPHA
+            rows, cols = len(names), len(names[0])
+            th, tw = arr.shape[0] / rows, arr.shape[1] / cols
+            cells = [[(int(r * th), int((r + 1) * th), int(c * tw), int((c + 1) * tw))
+                      for c in range(cols)] for r in range(rows)]
+        else:
+            # Flattened against the checkerboard, so the background is a
+            # colour rather than an alpha. is_checker already knows that
+            # tone -- it was measured off the other sheets in this pack.
+            bright = arr[..., :3].min(axis=2) >= 210
+            flat = (arr[..., :3].max(axis=2) - arr[..., :3].min(axis=2)) <= 8
+            mask = ~(bright & flat)
+            cells = _framed_cells(arr, [len(r) for r in names])
+
+        for r, row in enumerate(cells):
+            for c, (y0, y1, x0, x1) in enumerate(row):
+                name = names[r][c]
+                if not name:
+                    continue
+                # Inset past the rule itself, which is dark and would
+                # otherwise be the largest "sprite" in the cell.
+                pad = 0 if sheet["mode"] == "alpha" else 5
+                sub = mask[y0 + pad:y1 - pad, x0 + pad:x1 - pad]
+                framed = sheet["mode"] != "alpha"
+                crop = _largest_blob_crop(
+                    arr[y0 + pad:y1 - pad, x0 + pad:x1 - pad], sub, keep_rgb=framed)
+                if crop is None:
+                    continue
+                if framed:
+                    # The checker rule cannot tell background from teeth,
+                    # and these sheets have plenty of both.
+                    crop = repair_interior(crop)
+                out.setdefault(name, crop)
+                found += 1
+        print(f"  {sheet['file']}: {found} captioned sprites")
     return out
 
 
@@ -584,21 +742,36 @@ def main():
     sprite_thumbs = [silhouette(s) for s in sprites]
 
     # ── Match every target to its best large source ──────────────────────
-    # THE LABELLED SHEET WINS. Its species names are read off the art, not
-    # inferred from a silhouette, so there is no confidence question to
-    # answer and no way to ship one dinosaur under another's name.
+    # A CAPTIONED TILE BEATS A SILHOUETTE MATCH. Its species name is read
+    # off the art rather than inferred from a shape, so there is no
+    # confidence question to answer and no way to ship one dinosaur under
+    # another's name. It does not beat a named individual -- see
+    # LABELLED_SHEETS.
     captioned = labelled_tiles()
-    print(f"  evenmoredinos.png: {len(captioned)} captioned sprites")
 
-    results = {}          # name -> (kind, image, score)
+    # CANDIDATES, BEST FIRST, not one winner chosen up front. A source can
+    # fail its colour gate, and when it does the next-best source should get
+    # its turn rather than the species dropping all the way back to 72.
+    #
+    # A NAMED INDIVIDUAL OUTRANKS A CAPTIONED TILE. Both identify the
+    # species with certainty -- one by filename, one by printed caption --
+    # but the individual is the same drawing the 72 was made from, so it
+    # changes nothing the player already knows, and it can be judged on
+    # pixel correspondence rather than hue alone. Ranking the caption first
+    # (which is what shipped before this) silently redrew Tylosaurus,
+    # Pterodactylus, Dimorphodon and Ornithomimus, each of which had a
+    # perfectly good original sitting in the pack.
+    results = {}          # name -> [(kind, image), ...]
     pending = []
     for name, small in served.items():
-        if name in captioned:
-            results[name] = ("labelled", keep_largest_blob(captioned[name]), 0.0)
-            continue
+        cands = []
         big = named(name)
         if big is not None:
-            results[name] = ("name", big, 0.0)
+            cands.append(("name", big))
+        if name in captioned:
+            cands.append(("labelled", keep_largest_blob(captioned[name])))
+        if cands:
+            results[name] = cands
         else:
             pending.append((name, small))
 
@@ -613,6 +786,7 @@ def main():
     scored.sort()
 
     used = set()
+    scores = {}
     for best, second, idx, name, small in scored:
         margin = second / max(best, 1.0)
         accepted = (best <= SURE_MSE) or (best <= BAND_MSE and margin >= BAND_MARGIN)             or (name in FORCE_ACCEPT)
@@ -620,28 +794,79 @@ def main():
             used.add(idx)
             cd = colour_mse(thumb(small), thumb(sprites[idx]))
             kind = "sheet" if cd <= SAME_PALETTE_MSE else "variant"
-            results[name] = (kind, sprites[idx], best)
+            results[name] = [(kind, sprites[idx])]
         else:
-            results[name] = ("kept72", small, best)
+            results[name] = [("kept72", small)]
+        scores[name] = best
 
+    raw_colours = "--raw-colours" in sys.argv
+
+    def resolve(name, cands, small):
+        """Walk the candidates, return the first that keeps its colours."""
+        rejected = []
+        for kind, im in cands:
+            if kind == "kept72" or raw_colours:
+                return kind, im, rejected
+            toned = repalette(im, small)
+            if kind == "labelled":
+                # A DIFFERENT DRAWING, so there is no pixel correspondence
+                # and palette_mse would be reading pose mismatch as colour
+                # error. Hue after the transfer is the honest question: the
+                # mutation filters are global hue-rotations, so what has to
+                # hold is that the base hue lands where the 72 had it.
+                drift, limit, unit = hue_drift(toned, small), MAX_HUE_DRIFT, "deg"
+            else:
+                drift, limit, unit = palette_mse(thumb(toned), thumb(small)), PALETTE_LIMIT, ""
+            if drift <= limit:
+                return kind, toned, rejected
+            rejected.append(f"{kind} {drift:.0f}{unit}")
+        return "kept72", small, rejected
+
+    final = {}
+    demoted = []
+    for name, cands in results.items():
+        kind, im, rejected = resolve(name, cands, served[name])
+        final[name] = (kind, im, scores.get(name, 0.0))
+        if rejected:
+            demoted.append(f"{name} ({', '.join(rejected)} -> {kind})")
+
+    # ── Species the pack never drew at 72 either ─────────────────────────
+    # Outside the loop above because that loop walks the 72s, and these have
+    # none: the captioned sheet is the first art of any size they have ever
+    # had. No repalette and no gate, for want of anything to measure
+    # against -- see NO_SMALL.
+    for name in sorted(NO_SMALL):
+        if name in captioned:
+            final[name] = ("first", keep_largest_blob(captioned[name]), 0.0)
+        else:
+            print(f"  ! {name}: no captioned tile, still icon-only")
+
+    results = final
     by_kind = {}
     for name, (kind, im, score) in sorted(results.items()):
         by_kind.setdefault(kind, []).append(name)
         tag = {"labelled": "CAPTIONED", "name": "individual", "sheet": "sheet match",
-               "variant": "RECOLOUR", "kept72": "NO LARGE ART"}[kind]
+               "variant": "RECOLOUR", "kept72": "NO LARGE ART", "first": "FIRST ART"}[kind]
         size = "x".join(map(str, im.size))
-        extra = f"  (mse {score:.0f})" if kind == "sheet" else ("" if kind == "name" else f"  (best mse {score:.0f})")
+        # Only the silhouette kinds have a distance worth printing; for the
+        # rest the species was named, not guessed at.
+        guessed = kind in ("sheet", "variant")
+        extra = (f"  (mse {score:.0f})" if kind == "sheet"
+                 else f"  (best mse {score:.0f})" if guessed else "")
         print(f"  {name:24s} {tag:12s} {size:>9s}{extra}")
 
     print()
     for kind, names in sorted(by_kind.items()):
         print(f"{kind}: {len(names)}")
+    if demoted:
+        print("\nfailed a colour gate and fell to the next source:")
+        for d in sorted(demoted):
+            print(f"  {d}")
 
     if not WRITE:
         print("\nreport only -- rerun with --write to build the folder")
         return
 
-    raw_colours = "--raw-colours" in sys.argv
     os.makedirs(OUT, exist_ok=True)
     # Wiped first, because outcomes RENAME: a species upgraded on one run
     # and kept at 72 on the next writes a different filename, and the stale
@@ -651,25 +876,11 @@ def main():
             os.remove(os.path.join(OUT, f))
 
 
+    # Colours and gates were settled in resolve() above, so the dry run
+    # reports exactly what a write would produce. All that is left is which
+    # name each file gets, which is itself the rendering contract.
     chosen = {}   # name -> filename actually written
-    demoted = []
     for name, (kind, im, _) in results.items():
-        if kind != "kept72" and not raw_colours:
-            im = repalette(im, served[name])
-            if kind == "labelled":
-                # A DIFFERENT DRAWING, so there is no pixel correspondence
-                # and palette_mse would be reading pose mismatch as colour
-                # error. Hue after the transfer is the honest question:
-                # the mutation filters are hue-rotations, so what matters
-                # is that the base hue lands where they were calibrated.
-                drift = hue_drift(im, served[name])
-                limit, unit = MAX_HUE_DRIFT, "deg"
-            else:
-                drift = palette_mse(thumb(im), thumb(served[name]))
-                limit, unit = PALETTE_LIMIT, ""
-            if drift > limit:
-                demoted.append(f"{name} ({drift:.0f}{unit})")
-                kind, im = "kept72", served[name]
         if kind == "kept72":
             # The suffix is the rendering contract: portraitImg treats a
             # -72x72 file as pixel art and everything else as smooth.
@@ -688,8 +899,7 @@ def main():
         chosen[name] = fn
     total = sum(os.path.getsize(os.path.join(OUT, f)) for f in os.listdir(OUT))
     print(f"wrote {len(results)} portraits to {os.path.relpath(OUT, REPO)}  ({total/1024:.0f} KB)")
-    if demoted:
-        print(f"kept at 72 for palette fidelity: {', '.join(sorted(demoted))}")
+
 
     patch_game(chosen)
 
@@ -730,8 +940,34 @@ def patch_game(chosen):
         counter["n"] += 1
         return f"portrait: PT+'{fn}'"
     src = re.sub(r"portrait: (?:BP|PT)\+'([A-Za-z_-]+?)(?:-72x72)?\.png'", swap, src)
+
+    # ADD, where the others are REWRITTEN. Two entries carry only an icon,
+    # so there is no path for the substitution above to find; until now the
+    # game fell back to a 32px icon for them. Skipped when the entry already
+    # has a portrait, which is what keeps a rerun idempotent.
+    # Scoped to ASSET_MAP rather than the whole file, because these ids are
+    # also keys in the palette and skin tables further down -- "megashark:{"
+    # matches three blocks, and only one of them is the map.
+    start = src.index("const ASSET_MAP = {")
+    end = src.index("\n};", start)
+    block = src[start:end]
+
+    added = 0
+    for dino_id, name in sorted(NO_PORTRAIT_IDS.items()):
+        fn = chosen.get(name)
+        if fn is None:
+            continue
+        m = re.search(r"(\b" + dino_id + r":\s*\{)([^}]*)(\})", block)
+        if not m or "portrait:" in m.group(2):
+            continue
+        body = m.group(2).rstrip().rstrip(",")
+        block = block[:m.start()] + m.group(1) + body + f", portrait: PT+'{fn}' " + m.group(3) + block[m.end():]
+        added += 1
+    src = src[:start] + block + src[end:]
+
     open(page, "w", encoding="utf-8", newline="").write(src)
-    print(f"index.html: {counter['n']} portrait paths point at the new folder")
+    print(f"index.html: {counter['n']} portrait paths point at the new folder"
+          + (f", {added} added" if added else ""))
 
 
 if __name__ == "__main__":
