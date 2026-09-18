@@ -6,7 +6,7 @@
 
    The portraits were rebuilt from the pack's original 150-330px art
    (tools/build-dino-portraits.py); the 72x72s the game used to serve were
-   downscales of it. Three facts have to stay true, and each has a way of
+   downscales of it. Four facts have to stay true, and each has a way of
    failing silently:
 
    THE MAP AND THE FOLDER AGREE. ASSET_MAP's portrait paths are rewritten
@@ -19,6 +19,11 @@
    else is larger than any size the page draws it at and is scaled DOWN
    smoothly. A large file misnamed -72x72 would render as mush; a 72 file
    without the suffix would be smoothly blurred.
+
+   THE SPRITE IS WHOLE. Some of the pack's individual PNGs are cut off by
+   their own source rectangle, and a clipped portrait passes every check
+   above: right size, right name, plausible ratio, perfect colours. It took
+   someone looking at the Dinodex to notice Mastodon had no legs.
 
    THE PALETTE IS LOAD-BEARING. The mutation system is CSS
    hue-rotate/saturate stacked on the base art, calibrated against the tan
@@ -146,7 +151,8 @@ spec.loader.exec_module(bp)
 from PIL import Image
 captioned = {n for sh in bp.LABELLED_SHEETS for row in sh['names'] for n in row if n}
 out = {'limits': {'palette': bp.PALETTE_LIMIT, 'hue': bp.MAX_HUE_DRIFT},
-       'scores': {}, 'unbased': [], 'no_small': sorted(bp.NO_SMALL)}
+       'scores': {}, 'unbased': [], 'cut': [],
+       'no_small': sorted(bp.NO_SMALL), 'trunc': bp.TRUNCATION_LIMIT}
 folder = ${JSON.stringify(FOLDER)}
 old = ${JSON.stringify(OLD72)}
 for f in os.listdir(folder):
@@ -165,9 +171,15 @@ for f in os.listdir(folder):
         out['scores'][name] = ['hue', round(bp.hue_drift(big, small), 1)]
     else:
         out['scores'][name] = ['palette', round(bp.palette_mse(bp.thumb(big), bp.thumb(small)))]
+
+for f in os.listdir(folder):
+    if f.endswith('.png') and not f.endswith('-72x72.png'):
+        run = bp.edge_run(Image.open(os.path.join(folder, f)))
+        if run > bp.TRUNCATION_LIMIT:
+            out['cut'].append([f[:-4], round(run, 2)])
 print(json.dumps(out))
 `;
-  let data = { limits: {}, scores: {}, unbased: [], no_small: [] };
+  let data = { limits: {}, scores: {}, unbased: [], cut: [], no_small: [] };
   try {
     data = JSON.parse(execFileSync('python', ['-c', script], { encoding: 'utf8' }).trim().split(/\r?\n/).pop());
   } catch (err) {
@@ -195,6 +207,21 @@ print(json.dumps(out))
      against, so what is asserted is that they shipped: measured, not
      assumed, because the exemption is exactly what would let them quietly
      stop being built. */
+  /* NOT CUT OFF BY ITS OWN SOURCE RECTANGLE. Several of the pack's
+     individual PNGs are truncated -- Mastodon lost its legs, Mosasaurus its
+     lower fins -- and every other check here passed them happily, because
+     the colours were perfect and the aspect ratio was plausible. The tell
+     is a long flat run of opaque pixels along one border where a whole
+     sprite touches its box at a few extremities.
+
+     Empty is the assertion, not a list to grow. If a future portrait lands
+     here, the question is whether it has a better source: the build demotes
+     a cut candidate only when there is one, so a species with no
+     alternative would keep its clipped art and fail this -- Yutyrannus
+     already sits at 0.27, just under. That case wants an exemption recorded
+     with its reason, not the limit quietly raised. */
+  check('no portrait is cut off at its own edge', data.cut || [], []);
+
   check('the species with no 72 are the two expected',
         (data.unbased || []).sort(), (data.no_small || []).sort());
   check('and there are two of them', (data.no_small || []).length, 2);

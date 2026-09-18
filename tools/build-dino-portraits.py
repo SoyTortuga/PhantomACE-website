@@ -66,9 +66,12 @@ SHEETS = ["CommonDinoBatch.png", "UncommonDinoBatch.png", "moredinos.png"]
 #
 # Which is also why a captioned tile RANKS BELOW a named individual: same
 # certainty of identity, but the individual is the very drawing the 72 was
-# made from, so it changes nothing the player already knows. See
-# candidates() -- getting that order wrong silently redrew four species
-# that had a perfectly good original sitting in the pack.
+# made from, so it changes nothing the player already knows. Getting that
+# order wrong silently redrew four species that had a perfectly good
+# original sitting in the pack. It is not an absolute, though: an
+# individual that is CUT OFF by its own source rectangle loses to the
+# caption, and one species loses on taste -- see TRUNCATION_LIMIT and
+# PREFER_CAPTION, both applied in resolve().
 #
 # NAMES ARE THE SERVED NAME, NOT THE PRINTED CAPTION, where the two differ
 # ("VELOCIRAPTOR" is served as Raptor, "TYRANNOSAURUS REX" as T-Rex). The
@@ -130,6 +133,26 @@ LABELLED_SHEETS = [
 # Tylosaurus already ship at hue 182-217, so a blue shark is unremarkable
 # in this set.
 NO_SMALL = {"Megalodon", "Quetzalcoatlus"}
+
+# Above this, treat a candidate as cut off by its source rectangle. Set
+# between the whole Dodo at 0.24 and the cut Therizinosaurus at 0.30.
+#
+# A SOFT GATE, unlike the colour ones: a clipped portrait is still better
+# than a 72px one, so it demotes only when there is another candidate to
+# demote TO. Yutyrannus measures 0.27 and is genuinely cut at the feet, but
+# no sheet draws it, so it keeps what it has rather than losing 200px of
+# resolution to a rule about tidiness. Colour is not like this -- a
+# portrait in the wrong hue breaks every mutation of that species, which a
+# clipped foot does not.
+TRUNCATION_LIMIT = 0.28
+
+# Hatzegopteryx is NOT truncated -- it measures 0.18, and its individual is
+# a faithful full copy of the wings-only drawing its 72 came from. It is
+# here because the drawing itself is sparse where the captioned sheet has a
+# complete standing pose, and that is a taste call rather than a defect,
+# so it is written down as one instead of being smuggled in by loosening
+# the threshold until it happened to catch.
+PREFER_CAPTION = {"Hatzegopteryx"}
 
 # Hue after the transfer, weighted by saturation. THE POSE-INDEPENDENT
 # GATE, and the one that actually describes what the mutation filters
@@ -497,6 +520,35 @@ def hue_sat(im):
     return float(mean), float(sat.mean())
 
 
+def edge_run(im):
+    """Longest unbroken opaque run along any border, as a fraction of it.
+
+    A TRUNCATION DETECTOR. Several of the pack's individual PNGs are cut
+    off by their own source rectangle -- Mastodon loses its legs, Mosasaurus
+    its lower fins -- and nothing else here notices, because the colours are
+    perfect and the aspect ratio is plausible. What gives it away is the
+    shape of the boundary: a complete sprite touches its bounding box at a
+    few extremities (feet, a fin tip), while a cut one runs flat along the
+    edge for most of its width.
+
+    Measured across the folder, that separates cleanly enough to act on.
+    Cut: Mastodon 0.80, Mosasaurus 0.63, Shonisaurus 0.49,
+    Therizinosaurus 0.30. Whole: Dodo 0.24 (a bird standing on its feet),
+    Liopleurodon 0.20, Giant Ground Sloth 0.19, Dimetrodon 0.17.
+    """
+    import numpy as np
+    a = np.array(im.convert("RGBA"))[..., 3] > 8
+    worst = 0.0
+    for line in (a[0], a[-1], a[:, 0], a[:, -1]):
+        best = run = 0
+        for v in line:
+            run = run + 1 if v else 0
+            if run > best:
+                best = run
+        worst = max(worst, best / len(line))
+    return worst
+
+
 def hue_drift(a, b):
     """Shortest angular distance between two images' mean hues."""
     ha, _ = hue_sat(a)
@@ -802,9 +854,12 @@ def main():
     raw_colours = "--raw-colours" in sys.argv
 
     def resolve(name, cands, small):
-        """Walk the candidates, return the first that keeps its colours."""
+        """Walk the candidates, return the first that survives the gates."""
         rejected = []
-        for kind, im in cands:
+        if name in PREFER_CAPTION:
+            cands = sorted(cands, key=lambda c: c[0] != "labelled")
+        for pos, (kind, im) in enumerate(cands):
+            last = pos == len(cands) - 1
             if kind == "kept72" or raw_colours:
                 return kind, im, rejected
             toned = repalette(im, small)
@@ -817,9 +872,16 @@ def main():
                 drift, limit, unit = hue_drift(toned, small), MAX_HUE_DRIFT, "deg"
             else:
                 drift, limit, unit = palette_mse(thumb(toned), thumb(small)), PALETTE_LIMIT, ""
-            if drift <= limit:
-                return kind, toned, rejected
-            rejected.append(f"{kind} {drift:.0f}{unit}")
+            if drift > limit:
+                rejected.append(f"{kind} {drift:.0f}{unit}")
+                continue
+            # Truncation last, and only with somewhere to fall: see
+            # TRUNCATION_LIMIT for why this one does not reach for the 72.
+            cut = edge_run(trim(keep_largest_blob(toned)))
+            if cut > TRUNCATION_LIMIT and not last:
+                rejected.append(f"{kind} cut {cut:.2f}")
+                continue
+            return kind, toned, rejected
         return "kept72", small, rejected
 
     final = {}
