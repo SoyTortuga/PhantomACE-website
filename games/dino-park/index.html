@@ -1302,7 +1302,25 @@ const MUTATION_FILTERS = {
   golden:     'sepia(1) brightness(1.3) saturate(2.5)',
   crystal:    'brightness(1.4) saturate(0.3) hue-rotate(180deg)',
   volcanic:   'brightness(0.7) sepia(0.6) hue-rotate(-15deg) saturate(3)',
-  phantomace: 'brightness(0.8) saturate(2.5) hue-rotate(0deg) contrast(1.2)',
+  /* BLACK BODY, RED ACCENTS -- which is what this mutation's own entry in
+     MUTATIONS says it is (p:'#0A0A0A', a:'#FF0000'), and what the old
+     filter did not do. hue-rotate(0deg) rotates nothing: it just
+     saturated whatever colour the species already was, so across the
+     roster PhantomACE came out anywhere from red to yellow-orange to
+     green -- Megalodon brown, Anomalocaris green -- a spread of 357
+     degrees at a mean luminance of 0.32, nowhere near black.
+
+     sepia(1) FIRST is what fixes it, the same trick golden uses: a full
+     sepia discards the input hue entirely, so everything downstream
+     starts from one colour no matter what the animal was. Then saturate
+     and rotate that single hue onto red, and darken hard. Measured over
+     all 85: spread 11 degrees, saturation 0.98, luminance 0.13.
+
+     The pre-rotation in getMutFilter still prepends here, and provably
+     does nothing -- sepia(1) runs after it and throws the hue away. It
+     is left in rather than special-cased because the measured effect is
+     0.01 of luminance, below anything visible. */
+  phantomace: 'sepia(1) saturate(8) hue-rotate(-40deg) brightness(0.55) contrast(1.9)',
   spectral:   'brightness(1.4) saturate(0.15) opacity(0.65)',
   toxic:      'hue-rotate(90deg) saturate(2.2) brightness(0.95)',
 };

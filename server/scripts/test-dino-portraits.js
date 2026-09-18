@@ -176,6 +176,7 @@ from PIL import Image
 captioned = {n for sh in bp.LABELLED_SHEETS for row in sh['names'] for n in row if n}
 out = {'limits': {'palette': bp.PALETTE_LIMIT, 'hue': bp.MAX_HUE_DRIFT},
        'scores': {}, 'unbased': [], 'cut': [], 'mut_off': [], 'fixed': [],
+       'ph_spread': None, 'ph_red': None, 'ph_lum': None,
        'no_small': sorted(bp.NO_SMALL), 'trunc': bp.TRUNCATION_LIMIT}
 folder = ${JSON.stringify(FOLDER)}
 old = ${JSON.stringify(OLD72)}
@@ -237,6 +238,24 @@ for m, f in sorted(FILTERS.items()):
         if e > out['mut_limit']:
             out['mut_off'].append(['%s/%s' % (sid, m), round(e)])
 out['fixed'] = sorted(FIX)
+
+# ── PhantomACE is the streamer's own mutation: black body, red accents ──
+# It has to read the same on every animal, which means it cannot depend on
+# the base hue at all. sepia(1) is what makes that true; a filter that
+# rotates the base instead ranges over the whole colour wheel.
+ph = FILTERS.get('phantomace')
+if ph:
+    hues, lums = [], []
+    for sid in sorted(amap):
+        r = apply_filter(arr(sid), mut_filter(sid, 'phantomace'))
+        im = Image.fromarray(np.rint(r * 255).astype(np.uint8), 'RGBA')
+        hues.append(bp.hue_sat(im)[0])
+        a2 = np.asarray(im, dtype=float) / 255.0
+        m2 = a2[..., 3] > 0.5
+        lums.append(float((0.213 * a2[..., 0] + 0.715 * a2[..., 1] + 0.072 * a2[..., 2])[m2].mean()))
+    out['ph_spread'] = round(max(abs((x - y + 180) % 360 - 180) for x in hues for y in hues), 1)
+    out['ph_red'] = round(max(abs((h + 180) % 360 - 180) for h in hues), 1)
+    out['ph_lum'] = round(sum(lums) / len(lums), 3)
 print(json.dumps(out))
 `;
   let data = { limits: {}, scores: {}, unbased: [], cut: [], mut_off: [], fixed: [], no_small: [] };
@@ -297,6 +316,18 @@ print(json.dumps(out))
   ok('and the correction covers the marine species',
      ['megashark', 'mosa', 'tylo', 'plesio', 'elasmo', 'liopl', 'shoni', 'dunky', 'ichthy']
        .every(id => (data.fixed || []).includes(id)));
+
+  /* PHANTOMACE IS THE STREAMER'S OWN, so it gets its own check. It is
+     defined as a near-black body with red accents, and the filter that
+     shipped before rotated by zero degrees -- it saturated whatever colour
+     the animal already was, giving a brown Megalodon and a green
+     Anomalocaris across a 357-degree spread. The fix is sepia(1) up front,
+     which discards the base hue outright, so these limits are what
+     "independent of the species" means in numbers. */
+  ok('PhantomACE renders the same hue on every species', data.ph_spread !== null && data.ph_spread <= 25);
+  ok('and that hue is red', data.ph_red !== null && data.ph_red <= 20);
+  ok('and it is dark, as a black-bodied mutation should be',
+     data.ph_lum !== null && data.ph_lum <= 0.25);
 
   check('the species with no 72 are the two expected',
         (data.unbased || []).sort(), (data.no_small || []).sort());
