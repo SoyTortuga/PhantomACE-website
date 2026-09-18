@@ -315,6 +315,40 @@ function handleTwitchStatusForNotifications(status) {
   lastLiveState = isLive;
 }
 
+/* KEYED, EVERY ONE OF THEM, because this runs on every page load and each
+   of these is a CONDITION rather than an event. "Your sub expires soon" is
+   true for three days; without a key it was re-added, and re-popped as a
+   desktop notification, on every page the subscriber opened in those three
+   days. Twelve page loads produced twelve identical notifications.
+   The keys below name the occurrence -- this year's anniversary, this
+   subscription term's day-2 warning -- so the same one is announced once
+   however many times the condition is observed. */
+/* THE BACKLOG THE BUG ALREADY MADE. Keying stops new duplicates; it does
+   nothing about the twenty copies of "your subscription expires in 3 days"
+   already sitting in a subscriber's localStorage, which is what they will
+   still open the panel to. This collapses them once, on load.
+ *
+ * Only the three CONDITION types. live and offline share their wording
+ * across broadcasts -- "PhantomACE has gone offline." is the same sentence
+ * every time -- so deduping those by message would flatten a month of
+ * stream history into a single line. The list is newest-first, so the copy
+ * that survives is the most recent one.
+ */
+function dedupeConditionNotifications() {
+  const CONDITIONS = ['follow_anniversary', 'sub_anniversary', 'sub_expiring'];
+  const list = getNotifications();
+  const seen = new Set();
+  const kept = list.filter(n => {
+    if (!n || CONDITIONS.indexOf(n.type) === -1) return true;
+    const sig = n.type + '|' + n.message;
+    if (seen.has(sig)) return false;
+    seen.add(sig);
+    return true;
+  });
+  if (kept.length !== list.length) saveNotifications(kept);
+  return list.length - kept.length;
+}
+
 function checkUserNotifications(userData) {
   if (!userData) return;
   const now = Date.now();
@@ -330,6 +364,7 @@ function checkUserNotifications(userData) {
       const years = new Date().getFullYear() - followDate.getFullYear();
       addNotification({
         type: 'follow_anniversary',
+        key: 'follow_anniversary:' + thisYearAnniv.getFullYear(),
         message: `Happy ${years}-year follow anniversary! Thanks for being part of the Phamily.`,
       });
     }
@@ -344,6 +379,7 @@ function checkUserNotifications(userData) {
       const years = new Date().getFullYear() - subDate.getFullYear();
       addNotification({
         type: 'sub_anniversary',
+        key: 'sub_anniversary:' + thisYearAnniv.getFullYear(),
         message: `Happy ${years}-year sub anniversary! You're a legend.`,
       });
     }
@@ -354,8 +390,14 @@ function checkUserNotifications(userData) {
     const remaining = expiry - now;
     if (remaining > 0 && remaining < threeDays) {
       const daysLeft = Math.ceil(remaining / oneDay);
+      /* Keyed on the expiry AND the day, so the warning comes once a day
+         for the last three rather than once per page -- and each one is
+         true when it is written. Keying on the expiry alone would leave a
+         notification reading "expires in 3 days" sitting there on the day
+         it expired. */
       addNotification({
         type: 'sub_expiring',
+        key: 'sub_expiring:' + expiry + ':' + daysLeft,
         message: `Your subscription expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew to keep your perks!`,
       });
     }
@@ -363,6 +405,7 @@ function checkUserNotifications(userData) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  dedupeConditionNotifications();
   updateBadge();
   document.addEventListener('click', closeNotifPanelOnClickOutside);
 

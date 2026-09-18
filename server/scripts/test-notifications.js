@@ -41,8 +41,22 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
+/** A clock the test can move, so "the next day" means the next day rather
+    than a different subscription. */
+function fakeClock(startMs) {
+  const ref = { ms: startMs };
+  const Real = Date;
+  const D = function (...args) { return args.length ? new Real(...args) : new Real(ref.ms); };
+  D.now = () => ref.ms;
+  D.prototype = Real.prototype;
+  D.parse = Real.parse;
+  D.UTC = Real.UTC;
+  D.advance = (ms) => { ref.ms += ms; };
+  return D;
+}
+
 /** A fresh page load, with its own empty localStorage. */
-function loadPage(sharedStore) {
+function loadPage(sharedStore, clock) {
   const store = sharedStore || new Map();
   const localStorage = {
     getItem: (k) => (store.has(k) ? store.get(k) : null),
@@ -63,11 +77,14 @@ function loadPage(sharedStore) {
 
   const src = fs.readFileSync(path.join(REPO, 'js/notifications.js'), 'utf8');
   const factory = new Function(
-    'window', 'document', 'localStorage', 'setTimeout', 'fetch', 'Notification',
-    src + '\nreturn { addNotification, getNotifications, handleTwitchStatusForNotifications };'
+    'window', 'document', 'localStorage', 'setTimeout', 'fetch', 'Notification', 'Date',
+    src + '\nreturn { addNotification, getNotifications, handleTwitchStatusForNotifications,'
+        + ' checkUserNotifications, dedupeConditionNotifications };'
   );
-  const api = factory(win, document, localStorage, noop, win.fetch, undefined);
-  return { ...api, store, messages: () => api.getNotifications().map(n => n.message) };
+  const api = factory(win, document, localStorage, noop, win.fetch, undefined, clock || Date);
+  return { ...api, store, clock,
+           keys: () => api.getNotifications().map(n => n.key),
+           messages: () => api.getNotifications().map(n => n.message) };
 }
 
 const LIVE = (startedAt, game) => ({ live: true, started_at: startedAt, game });
@@ -208,6 +225,77 @@ const T2 = '2026-09-18T15:02:00Z';
   ok('with both edges held off the sides', /left:\s*\d+px/.test(rule) && /right:\s*\d+px/.test(rule));
   /* A fixed width is what broke it; the phone rule must not reintroduce one. */
   ok('and no fixed width', /width:\s*auto/.test(rule));
+}
+
+/* ── A CONDITION IS NOT AN EVENT ──────────────────────────────────────
+   checkUserNotifications runs from auth.js on EVERY page load, and the
+   three things it can raise are conditions that stay true for a day or
+   three: an anniversary, a sub about to lapse. Unkeyed, each was re-added
+   -- and re-popped as a desktop notification -- on every page the user
+   opened while it held. Twelve page loads, twelve identical notifications.
+   That is the "stale notifications keep popping" report. */
+{
+  /* ONE subscription, and the CLOCK is what moves. An earlier version of
+     this test shortened subExpiresAt instead — which changes the key by
+     itself, so it passed even with the day left out of the key and proved
+     nothing. */
+  const clock = fakeClock(Date.parse('2026-03-01T12:00:00Z'));
+  const page = loadPage(null, clock);
+  const sub = { subExpiresAt: '2026-03-03T12:00:00Z' };
+
+  for (let i = 0; i < 12; i++) page.checkUserNotifications(sub);
+  check('twelve page loads raise one expiry warning', page.messages().length, 1);
+  ok('and it says how long is left', /expires in 2 days/.test(page.messages()[0]));
+
+  /* The next day is a DIFFERENT warning and must still arrive. Keyed on the
+     subscription alone, "expires in 2 days" would be the last thing said —
+     and would still be sitting there on the morning it expired. */
+  clock.advance(86400000);
+  for (let i = 0; i < 8; i++) page.checkUserNotifications(sub);
+  check('the next day warns again, once', page.messages().length, 2);
+  ok('with the number brought up to date', /expires in 1 day\b/.test(page.messages()[0]));
+  ok('and the two are keyed apart', page.keys()[0] !== page.keys()[1]);
+}
+
+{
+  /* Anniversaries are once a year, however many times the day is loaded. */
+  const page = loadPage();
+  const soon = new Date(Date.now() + 3600000);
+  const anniversary = new Date(soon);
+  anniversary.setFullYear(soon.getFullYear() - 4);
+  const user = { followedAt: anniversary.toISOString(), subscribedAt: anniversary.toISOString() };
+  for (let i = 0; i < 10; i++) page.checkUserNotifications(user);
+  check('ten page loads raise two anniversaries, not twenty', page.messages().length, 2);
+  ok('one for the follow', page.messages().some(m => /follow anniversary/.test(m)));
+  ok('and one for the sub', page.messages().some(m => /sub anniversary/.test(m)));
+}
+
+/* ── The backlog the bug already made ────────────────────────────────── */
+{
+  /* Keying stops new duplicates and does nothing about the pile already in
+     a subscriber's localStorage, which is what they will actually open the
+     panel to. */
+  const store = new Map();
+  const seed = [];
+  for (let i = 0; i < 9; i++) seed.push({ id: 'a' + i, type: 'sub_expiring', time: Date.now() - i * 3600e3, message: 'Your subscription expires in 2 days. Renew to keep your perks!' });
+  for (let i = 0; i < 4; i++) seed.push({ id: 'b' + i, type: 'sub_expiring', time: Date.now() - (20 + i) * 3600e3, message: 'Your subscription expires in 3 days. Renew to keep your perks!' });
+  for (let i = 0; i < 6; i++) seed.push({ id: 'c' + i, type: 'offline', time: Date.now() - (50 + i) * 3600e3, message: 'PhantomACE has gone offline.' });
+  for (let i = 0; i < 6; i++) seed.push({ id: 'd' + i, type: 'live', time: Date.now() - (51 + i) * 3600e3, message: 'PhantomACE is now LIVE!' });
+  store.set('pa_notifications', JSON.stringify(seed));
+
+  const page = loadPage(store);
+  check('the duplicates are collapsed', page.dedupeConditionNotifications(), 11);
+  const left = page.getNotifications();
+  check('one per distinct warning survives', left.filter(n => n.type === 'sub_expiring').length, 2);
+  check('and it is the most recent copy', left.find(n => n.type === 'sub_expiring').id, 'a0');
+
+  /* STREAM HISTORY IS NOT A DUPLICATE. Every "gone offline" is the same
+     sentence; collapsing those by message would flatten a month of
+     broadcasts into one line. */
+  check('every live notice is kept', left.filter(n => n.type === 'live').length, 6);
+  check('and every offline one', left.filter(n => n.type === 'offline').length, 6);
+
+  check('running it again changes nothing', page.dedupeConditionNotifications(), 0);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
