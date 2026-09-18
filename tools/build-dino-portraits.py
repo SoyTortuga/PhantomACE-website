@@ -66,11 +66,35 @@ SURE_MSE = 2500.0
 BAND_MSE = 4000.0
 BAND_MARGIN = 1.55
 
-# Judgment pins from eyeballing the review sheet. Stygimoloch's best score
-# (3141, margin 1.69) passes the band rule and is WRONG: the 72 is a
-# pachycephalosaur and the sprite it claims is a frilled ceratopsian.
-# Numbers propose, eyes dispose.
+# Judgment pins from eyeballing the review boards. Numbers propose, eyes
+# dispose, in both directions:
+#
+# Stygimoloch's best score passes the band rule and is WRONG -- the 72 is
+# a pachycephalosaur, the sprite it claims a frilled ceratopsian.
 FORCE_KEEP72 = {"Stygimoloch"}
+
+# And these fail the band rule and are RIGHT -- eyeballed against the 72
+# at full size, not merely scored, because a shared silhouette score is not
+# the same claim as a shared species. Kept to the ones with a distinctive
+# anatomical feature actually visible in both: Amargasaurus's double sail
+# of neck spikes, Styracosaurus's spiked frill, TerrorBird's oversized
+# beak, Baryonyx's crocodile snout, Helicoprion's spiral tooth whorl.
+#
+# Deinonychus and Utahraptor were LOOKED AT and left out on purpose: both
+# candidates are feathered dromaeosaurs, which is the right family, but
+# the wing pose is different enough from the 72 that "same species" is a
+# guess rather than a reading. A wrong portrait is worse than a small
+# right one, so they stay at 72 until someone who knows the source art
+# confirms them.
+#
+# Wrong-species risk is bounded twice over: distinctive-feature matching
+# here, and the palette gate below, which still has to pass before a
+# pinned sprite ships -- Helicoprion and TerrorBird are confirmed correct
+# and STILL render at 72, because their colours cannot be honestly
+# recovered (see PALETTE_LIMIT).
+FORCE_ACCEPT = {
+    "Amargasaurus", "Baryonyx", "Helicoprion", "Styracosaurus", "TerrorBird",
+}
 
 # A match is the same SHAPE; it is not always the same colours -- the pack
 # ships alternate palettes, and even some named individuals drifted from
@@ -377,7 +401,7 @@ def main():
     used = set()
     for best, second, idx, name, small in scored:
         margin = second / max(best, 1.0)
-        accepted = (best <= SURE_MSE) or (best <= BAND_MSE and margin >= BAND_MARGIN)
+        accepted = (best <= SURE_MSE) or (best <= BAND_MSE and margin >= BAND_MARGIN)             or (name in FORCE_ACCEPT)
         if idx not in used and accepted and name not in FORCE_KEEP72:
             used.add(idx)
             cd = colour_mse(thumb(small), thumb(sprites[idx]))
