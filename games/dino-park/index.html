@@ -722,7 +722,7 @@
       flex: 1; display: flex; align-items: center; justify-content: center;
       color: #333; font-size: 12px;
     }
-    .coll-sprite-large { margin-bottom: 12px; }
+    .coll-sprite-large { margin-bottom: 12px; max-width: 100%; }
     .coll-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
     .coll-species { font-size: 11px; color: #888; margin-bottom: 10px; }
     .coll-badges { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
@@ -823,9 +823,9 @@
       background: #0a0a0a; border: 1px solid #ffffff14; border-radius: 8px;
       padding: 16px; margin-bottom: 12px;
     }
-    .dex-detail-header { display: flex; gap: 16px; margin-bottom: 12px; }
-    .dex-detail-portrait { flex-shrink: 0; }
-    .dex-detail-info { flex: 1; }
+    .dex-detail-header { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
+    .dex-detail-portrait { flex-shrink: 0; max-width: 100%; }
+    .dex-detail-info { flex: 1; min-width: 200px; }
     .dex-detail-name { font-size: 18px; font-weight: 700; color: #fff; }
     .dex-detail-species { font-size: 11px; color: #666; margin-top: 2px; }
     .dex-detail-badges { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
@@ -1148,6 +1148,8 @@ const BP = AB + 'AncientBeastsPack/';
    also rewrites the portrait paths below: the folder and the map are
    two halves of one fact. */
 const PT = 'assets/portraits/';
+/* The portrait slot, landscape because the art is. See portraitImg. */
+const PORTRAIT_SLOT = [260, 150];
 
 const ASSET_MAP = {
   compy:    { icon: IC+'dinosaurs/compsognathus.png', portrait: PT+'Compsognathus.png' },
@@ -3196,7 +3198,15 @@ function snapToGrid(target, native) {
   return Math.max(1, Math.floor(target / native)) * native;
 }
 
+/* `size` is a number for a square slot, or [width, height] for a landscape
+   one. THE SLOT SHOULD MATCH THE ART, and the art is landscape: measured
+   across the 88 portraits, the median drawn height inside a 144 square was
+   91px and twelve filled under half of it -- Mamenchisaurus drew 144x40
+   with a hundred pixels of dead space above and below. Nothing is being
+   upscaled to fix that either; the median portrait is still downscaled 1.9x
+   at the larger slot, so the detail was simply not being shown. */
 function portraitImg(specId, size, cls, mutation) {
+  const [boxW, boxH] = Array.isArray(size) ? size : [size, size];
   const asset = ASSET_MAP[specId];
   if (asset && asset.portrait) {
     const filt = mutation ? getMutFilter(specId, mutation) : '';
@@ -3216,21 +3226,29 @@ function portraitImg(specId, size, cls, mutation) {
        which is the one way to preserve aspect without the page having to
        know what the aspect is. */
     if (asset.portrait.indexOf('-72x72') === -1) {
-      return `<div class="${cls||''}" style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;">` +
-        `<img src="${asset.portrait}" style="max-width:100%;max-height:100%;width:auto;height:auto;image-rendering:auto;${filtStyle}" alt="" loading="lazy">` +
-        `</div>`;
+      return slot(`<img src="${asset.portrait}" style="max-width:100%;max-height:100%;width:auto;height:auto;image-rendering:auto;${filtStyle}" alt="" loading="lazy">`);
     }
-    const px = snapToGrid(size, 72);
-    return `<img src="${asset.portrait}" width="${px}" height="${px}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+    /* Pixel art, so a whole multiple of its own grid and no larger than the
+       slot -- the short side decides, or a landscape slot would blow a
+       square sprite out of its own box. */
+    const px = snapToGrid(Math.min(boxW, boxH), 72);
+    return slot(`<img src="${asset.portrait}" width="${px}" height="${px}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`);
   }
   if (asset && asset.icon) {
     const filt = mutation ? getMutFilter(specId, mutation) : '';
     const filtStyle = filt ? `filter:${filt};` : '';
-    const px = snapToGrid(size, 32);
-    return `<img src="${asset.icon}" width="${px}" height="${px}" class="${cls||''}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`;
+    const px = snapToGrid(Math.min(boxW, boxH), 32);
+    return slot(`<img src="${asset.icon}" width="${px}" height="${px}" style="image-rendering:pixelated;${filtStyle}" alt="" loading="lazy">`);
   }
-  const url = getPortrait(specId, size, mutation);
-  return `<img src="${url}" width="${size}" height="${size}" class="${cls||''}" style="image-rendering:auto;" alt="">`;
+  const url = getPortrait(specId, Math.min(boxW, boxH), mutation);
+  return slot(`<img src="${url}" width="${Math.min(boxW, boxH)}" height="${Math.min(boxW, boxH)}" style="image-rendering:auto;" alt="">`);
+
+  /* One slot for every kind, so the layout around it never has to know
+     which one it got. max-width keeps it inside a phone. */
+  function slot(inner) {
+    return `<div class="${cls||''}" style="width:${boxW}px;height:${boxH}px;max-width:100%;` +
+      `display:flex;align-items:center;justify-content:center;">${inner}</div>`;
+  }
 }
 let state = { saveEpoch: SAVE_EPOCH, coins: 100, level: 1, xp: 0, park: [], vault: [], eggs: [], eggStorage: [], discovered: [], discoveredMutations: [], cooldowns: {}, lastTick: Date.now(), energy: 10, subTier: 0, debris: [], lastDebrisSpawn: 0, yardItems: [], lastOvergrowth: 0, parkDay: 1, lastStreamStart: 0, liveSecAccum: 0, lastDecayLiveSec: 0 };
 let isStreamLive = false;
@@ -5090,7 +5108,7 @@ function renderCollDetail() {
     <button class="coll-move-btn" onclick="${inVault ? `moveDinoToActive(${idx})` : `moveDinoToVault(${idx})`}" title="${inVault ? 'Bring back to the park to resume care' : 'Put in storage — stops growing and needs'}">
       ${inVault ? '🏞️ Move to Park' : '📦 Move to Vault'}
     </button>
-    <div class="coll-sprite-large">${portraitImg(spec.id, 144, 'sprite-img', dino.mutation)}</div>
+    <div class="coll-sprite-large">${portraitImg(spec.id, PORTRAIT_SLOT, 'sprite-img', dino.mutation)}</div>
     <div class="coll-name">${dino.nickname || spec.name}</div>
     <div class="coll-species">${spec.name} · ${spec.era}${inVault ? ' · <span style="color:#888">Vaulted</span>' : ''}</div>
     ${dino.mutation ? `<div style="font-size:11px;color:#ff0000;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em">✨ ${(resolveSpeciesMut(spec.id,dino.mutation)||{}).label||dino.mutation} Mutation</div>` : ''}
@@ -5227,7 +5245,7 @@ function renderDexDetail(specId) {
   panel.innerHTML = `<div class="dex-detail-panel">
     <button class="dex-close-btn" onclick="renderDexDetail(null)">✕ Close</button>
     <div class="dex-detail-header">
-      <div class="dex-detail-portrait">${portraitImg(specId, 144, 'sprite-img')}</div>
+      <div class="dex-detail-portrait">${portraitImg(specId, PORTRAIT_SLOT, 'sprite-img')}</div>
       <div class="dex-detail-info">
         <div class="dex-detail-name">${spec.name}</div>
         <div class="dex-detail-species">${spec.era} · ${spec.habitat}</div>

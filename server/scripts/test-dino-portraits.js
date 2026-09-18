@@ -119,7 +119,11 @@ const page = fs.readFileSync(path.join(GAME, 'index.html'), 'utf8');
        !!line && line.includes('portrait: PT+'));
   }
 
-  ok('the page snaps pixel art to its grid', /snapToGrid\(size, 72\)/.test(page));
+  ok('the page snaps pixel art to its grid', /snapToGrid\(Math\.min\(boxW, boxH\), 72\)/.test(page));
+  /* The slot is landscape because the art is; a square one wasted most
+     of its height. Asserted so a refactor cannot quietly square it. */
+  ok('the portrait slot is landscape', /const PORTRAIT_SLOT = \[260, 150\]/.test(page));
+  ok('and both call sites use it', (page.match(/portraitImg\([^)]*PORTRAIT_SLOT/g) || []).length === 2);
   ok('and draws everything else smooth', page.includes("indexOf('-72x72') === -1"));
 }
 
