@@ -106,16 +106,22 @@ const page = fs.readFileSync(path.join(GAME, 'index.html'), 'utf8');
 
 /* ── The palette is load-bearing ─────────────────────────────────────── */
 {
-  /* The build's own gate: every shipped large portrait sat within
-     PALETTE_LIMIT of its 72 on mutually solid pixels, or it was demoted to
-     the 72 itself. This re-measures the folder with the build's own
-     palette_mse, so "tan stays tan" is enforced on every future rebuild --
-     the mutation filters are hue-rotations calibrated against these
-     palettes, and a portrait that drifts breaks every mutation of its
-     species while looking perfectly fine itself. */
-  const LIMIT = 3500;
-  /* Measured via PIL through Python -- the build already requires it, and
-     the numbers here mean exactly what the build's gate meant. */
+  /* The build's own gates, re-measured on the shipped folder so "tan stays
+     tan" survives every future rebuild. TWO gates, because there are two
+     kinds of source and one metric cannot judge both:
+
+       recovered art   the same drawing the 72 was made from, so pixels
+                       correspond and palette_mse is meaningful.
+       captioned art   evenmoredinos.png, a DIFFERENT drawing of the same
+                       species -- different pose, so palette_mse would be
+                       reading pose mismatch as colour error. Hue after the
+                       transfer is the honest question there, and it is
+                       also the one the mutation filters actually care
+                       about, being hue-rotations calibrated against these
+                       palettes.
+
+     Both limits come from the build, not from a number retyped here, so
+     the test cannot drift away from what shipped. */
   const { execFileSync } = await import('node:child_process');
   const script = `
 import io, sys, os, json
@@ -124,32 +130,45 @@ spec = importlib.util.spec_from_file_location('bp', ${JSON.stringify(path.join(R
 bp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bp)
 from PIL import Image
-out = {}
+captioned = {n for row in bp.LABELLED_NAMES for n in row if n}
+out = {'limits': {'palette': bp.PALETTE_LIMIT, 'hue': bp.MAX_HUE_DRIFT}, 'scores': {}}
 folder = ${JSON.stringify(FOLDER)}
 old = ${JSON.stringify(OLD72)}
 for f in os.listdir(folder):
     if not f.endswith('.png') or f.endswith('-72x72.png'):
         continue
     name = f[:-4]
-    small = os.path.join(old, name + '-72x72.png')
-    if not os.path.exists(small):
+    small_p = os.path.join(old, name + '-72x72.png')
+    if not os.path.exists(small_p):
         continue
-    a = bp.thumb(Image.open(os.path.join(folder, f)).convert('RGBA'))
-    b = bp.thumb(Image.open(small).convert('RGBA'))
-    out[name] = round(bp.palette_mse(a, b))
+    big = Image.open(os.path.join(folder, f)).convert('RGBA')
+    small = Image.open(small_p).convert('RGBA')
+    if name in captioned:
+        out['scores'][name] = ['hue', round(bp.hue_drift(big, small), 1)]
+    else:
+        out['scores'][name] = ['palette', round(bp.palette_mse(bp.thumb(big), bp.thumb(small)))]
 print(json.dumps(out))
 `;
-  let scores = {};
+  let data = { limits: {}, scores: {} };
   try {
-    scores = JSON.parse(execFileSync('python', ['-c', script], { encoding: 'utf8' }).trim().split(/\r?\n/).pop());
+    data = JSON.parse(execFileSync('python', ['-c', script], { encoding: 'utf8' }).trim().split(/\r?\n/).pop());
   } catch (err) {
     failures.push('palette measurement failed to run: ' + err.message);
   }
+  const scores = data.scores || {};
+  const LIMIT = { palette: data.limits.palette, hue: data.limits.hue };
 
   const names = Object.keys(scores);
-  ok('the upgraded portraits were measured', names.length >= 40);
-  const offPalette = names.filter(n => scores[n] > LIMIT).map(n => `${n} (${scores[n]})`);
-  check('every upgraded portrait keeps its species colours', offPalette, []);
+  ok('the upgraded portraits were measured', names.length >= 60);
+  /* Both kinds are present, or one of the two gates is silently testing
+     nothing -- which is how a guard rots without ever failing. */
+  const kinds = new Set(names.map(n => scores[n][0]));
+  check('both kinds of source are being judged', [...kinds].sort(), ['hue', 'palette']);
+
+  const off = names
+    .filter(n => scores[n][1] > LIMIT[scores[n][0]])
+    .map(n => `${n} ${scores[n][0]}=${scores[n][1]} > ${LIMIT[scores[n][0]]}`);
+  check('every upgraded portrait keeps its species colours', off, []);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

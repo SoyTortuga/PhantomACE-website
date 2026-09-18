@@ -47,6 +47,61 @@ SERVED = os.path.join(REPO, "games", "dino-park", "assets", "dino-assets", "Anci
 OUT = os.path.join(REPO, "games", "dino-park", "assets", "portraits")
 
 SHEETS = ["CommonDinoBatch.png", "UncommonDinoBatch.png", "moredinos.png"]
+
+# A LABELLED SHEET, and the best source in the pack. It sits one directory
+# up from the rest -- in dino-assets/ rather than AncientBeastsPack/ --
+# which is why nothing found it until it was pointed out.
+#
+# Every tile carries the species name as a caption, so identity is READ,
+# not inferred: no silhouette matching, no confidence margin, no chance of
+# shipping one dinosaur under another's name. It also covers exactly the
+# gap -- all seven species the palette gate had rejected, plus twelve more
+# that had no large art at all.
+#
+# IT IS NEW ART, NOT THE MISSING ORIGINALS. Silhouette distance to the
+# matching 72 runs 5800-19300 where a true same-drawing pair measures
+# 22-2400: different poses, different drawings of the same animals. That
+# is a redesign rather than a recovery, and it is why these go through the
+# hue gate below instead of the correspondence-based palette check, which
+# measures pose mismatch as much as colour when the drawings differ.
+LABELLED = os.path.join(os.path.dirname(SRC), "evenmoredinos.png")
+LABELLED_GRID = (5, 4)
+LABELLED_NAMES = [
+    ["Allosaurus", "Carnotaurus", "Andrewsarchus", "Brontosaurus", "Cave_Lion"],
+    ["Cryolophosaurus", "Deinocheirus", "Diplodocus", "Kronosaurus", "Troodon"],
+    ["Utahraptor", "Deinonychus", "Tylosaurus", "Pterodactylus", "Dimorphodon"],
+    ["Tapejara", "TerrorBird", "Helicoprion", "Ornithomimus", None],
+]
+# Background is alpha 0-3 and sprites are 249-254, so the split is clean.
+# The captions are separate components and never the largest in a tile.
+LABELLED_ALPHA = 128
+
+# Hue after the transfer, weighted by saturation. THE POSE-INDEPENDENT
+# GATE, and the one that actually describes what the mutation filters
+# need: they are hue-rotations calibrated against the 72 palettes, so what
+# has to hold is that the base hue lands where they expect. Measured
+# across all nineteen, the transfer lands within 4 degrees every time --
+# Cryolophosaurus comes in at 249 and leaves at 29 against a target of 29.
+# 15 is generous against that and still catches a real miss.
+MAX_HUE_DRIFT = 15.0
+
+# After the transfer, measure. A species whose colours still cannot be
+# brought home is DEMOTED to its crisp 72: a regional recolour (shell
+# one way, fins another) is beyond a global moment match, and shipping
+# it wrong would break every mutation of the species -- the filters are
+# hue-rotations calibrated against these palettes. Shipped art is
+# faithful and large, or faithful and small, never wrong.
+#
+# There WAS a contrast-retention gate here too, defending against the
+# flattening the least-squares transfer used to cause. Moment matching
+# made it obsolete and then it turned actively wrong: the 72s are
+# smooth DOWNSCALES, their pixel variance is inherently below sharp
+# full-res art, so "keep the raw's contrast" condemned outputs that a
+# side-by-side board showed to be perfectly detailed. The board
+# (tan Archelon with its shell pattern, red Ceratosaurus with skin
+# texture) is what removed it; do not reinstate it from a number.
+PALETTE_LIMIT = 3500.0
+
 MIN_AREA = 900          # a real sprite; stray pixels and watermarks are smaller
 THUMB = 28              # comparison size; small enough to forgive crop noise
 
@@ -350,6 +405,102 @@ def repalette(large, small):
     return Image.fromarray(out.astype(np.uint8))
 
 
+def hue_sat(im):
+    """Saturation-weighted mean hue, and mean saturation, of solid pixels.
+
+    Weighted because a grey pixel's hue is arbitrary and would otherwise
+    drag the average somewhere meaningless. Circular mean, because hue
+    wraps: averaging 350 and 10 the naive way gives 180, the opposite
+    colour.
+    """
+    import numpy as np
+    a = np.array(im.convert("RGBA"), dtype=np.float64)
+    solid = a[..., 3] >= 200
+    if solid.sum() < 20:
+        return 0.0, 0.0
+    rgb = a[solid][:, :3] / 255.0
+    mx = rgb.max(1)
+    mn = rgb.min(1)
+    d = mx - mn
+    sat = np.where(mx > 0, d / np.maximum(mx, 1e-6), 0)
+    r, g, b = rgb[:, 0], rgb[:, 1], rgb[:, 2]
+    h = np.zeros(len(rgb))
+    nz = d > 1e-6
+    i = nz & (mx == r); h[i] = ((g - b)[i] / d[i]) % 6
+    i = nz & (mx == g); h[i] = ((b - r)[i] / d[i]) + 2
+    i = nz & (mx == b); h[i] = ((r - g)[i] / d[i]) + 4
+    deg = np.deg2rad((h * 60) % 360)
+    if sat.sum() < 1e-6:
+        return 0.0, float(sat.mean())
+    mean = np.rad2deg(np.arctan2((np.sin(deg) * sat).sum(),
+                                 (np.cos(deg) * sat).sum())) % 360
+    return float(mean), float(sat.mean())
+
+
+def hue_drift(a, b):
+    """Shortest angular distance between two images' mean hues."""
+    ha, _ = hue_sat(a)
+    hb, _ = hue_sat(b)
+    return abs((ha - hb + 180) % 360 - 180)
+
+
+def labelled_tiles():
+    """Every sprite on the labelled sheet, keyed by its printed caption.
+
+    Per tile rather than per sheet: the largest component inside one tile
+    is always the animal, which drops the caption without having to read
+    or erase it.
+    """
+    import numpy as np
+    if not os.path.exists(LABELLED):
+        return {}
+    arr = np.array(Image.open(LABELLED).convert("RGBA"))
+    mask = arr[..., 3] >= LABELLED_ALPHA
+    cols, rows = LABELLED_GRID
+    H, W = mask.shape
+    tw, th = W / cols, H / rows
+
+    out = {}
+    for r in range(rows):
+        for c in range(cols):
+            name = LABELLED_NAMES[r][c]
+            if not name:
+                continue
+            y0, x0 = int(r * th), int(c * tw)
+            sub = mask[y0:int((r + 1) * th), x0:int((c + 1) * tw)]
+            sh, sw = sub.shape
+            seen = np.zeros_like(sub)
+            best = None
+            for sy in range(sh):
+                for sx in range(sw):
+                    if not sub[sy, sx] or seen[sy, sx]:
+                        continue
+                    stack = [(sy, sx)]
+                    seen[sy, sx] = True
+                    px = []
+                    while stack:
+                        cy, cx = stack.pop()
+                        px.append((cy, cx))
+                        for dy in (-1, 0, 1):
+                            for dx in (-1, 0, 1):
+                                ny, nx = cy + dy, cx + dx
+                                if 0 <= ny < sh and 0 <= nx < sw and sub[ny, nx] and not seen[ny, nx]:
+                                    seen[ny, nx] = True
+                                    stack.append((ny, nx))
+                    if best is None or len(px) > len(best):
+                        best = px
+            if not best:
+                continue
+            ys = [q[0] for q in best]
+            xs = [q[1] for q in best]
+            y1, y2, x1, x2 = min(ys), max(ys), min(xs), max(xs)
+            crop = np.zeros((y2 - y1 + 1, x2 - x1 + 1, 4), dtype=np.uint8)
+            for (py, px_) in best:
+                crop[py - y1, px_ - x1] = arr[y0 + py, x0 + px_]
+            out[name] = Image.fromarray(crop)
+    return out
+
+
 def components(im):
     """Connected sprites in a sheet, 8-connected on alpha, iterative flood.
 
@@ -433,9 +584,18 @@ def main():
     sprite_thumbs = [silhouette(s) for s in sprites]
 
     # ── Match every target to its best large source ──────────────────────
+    # THE LABELLED SHEET WINS. Its species names are read off the art, not
+    # inferred from a silhouette, so there is no confidence question to
+    # answer and no way to ship one dinosaur under another's name.
+    captioned = labelled_tiles()
+    print(f"  evenmoredinos.png: {len(captioned)} captioned sprites")
+
     results = {}          # name -> (kind, image, score)
-    named_hits, pending = {}, []
+    pending = []
     for name, small in served.items():
+        if name in captioned:
+            results[name] = ("labelled", keep_largest_blob(captioned[name]), 0.0)
+            continue
         big = named(name)
         if big is not None:
             results[name] = ("name", big, 0.0)
@@ -467,7 +627,8 @@ def main():
     by_kind = {}
     for name, (kind, im, score) in sorted(results.items()):
         by_kind.setdefault(kind, []).append(name)
-        tag = {"name": "individual", "sheet": "sheet match", "variant": "RECOLOUR", "kept72": "NO LARGE ART"}[kind]
+        tag = {"labelled": "CAPTIONED", "name": "individual", "sheet": "sheet match",
+               "variant": "RECOLOUR", "kept72": "NO LARGE ART"}[kind]
         size = "x".join(map(str, im.size))
         extra = f"  (mse {score:.0f})" if kind == "sheet" else ("" if kind == "name" else f"  (best mse {score:.0f})")
         print(f"  {name:24s} {tag:12s} {size:>9s}{extra}")
@@ -489,31 +650,25 @@ def main():
         if f.endswith(".png"):
             os.remove(os.path.join(OUT, f))
 
-    # After the transfer, measure. A species whose colours still cannot be
-    # brought home is DEMOTED to its crisp 72: a regional recolour (shell
-    # one way, fins another) is beyond a global moment match, and shipping
-    # it wrong would break every mutation of the species -- the filters are
-    # hue-rotations calibrated against these palettes. Shipped art is
-    # faithful and large, or faithful and small, never wrong.
-    #
-    # There WAS a contrast-retention gate here too, defending against the
-    # flattening the least-squares transfer used to cause. Moment matching
-    # made it obsolete and then it turned actively wrong: the 72s are
-    # smooth DOWNSCALES, their pixel variance is inherently below sharp
-    # full-res art, so "keep the raw's contrast" condemned outputs that a
-    # side-by-side board showed to be perfectly detailed. The board
-    # (tan Archelon with its shell pattern, red Ceratosaurus with skin
-    # texture) is what removed it; do not reinstate it from a number.
-    PALETTE_LIMIT = 3500.0
 
     chosen = {}   # name -> filename actually written
     demoted = []
     for name, (kind, im, _) in results.items():
         if kind != "kept72" and not raw_colours:
             im = repalette(im, served[name])
-            drift = palette_mse(thumb(im), thumb(served[name]))
-            if drift > PALETTE_LIMIT:
-                demoted.append(f"{name} ({drift:.0f})")
+            if kind == "labelled":
+                # A DIFFERENT DRAWING, so there is no pixel correspondence
+                # and palette_mse would be reading pose mismatch as colour
+                # error. Hue after the transfer is the honest question:
+                # the mutation filters are hue-rotations, so what matters
+                # is that the base hue lands where they were calibrated.
+                drift = hue_drift(im, served[name])
+                limit, unit = MAX_HUE_DRIFT, "deg"
+            else:
+                drift = palette_mse(thumb(im), thumb(served[name]))
+                limit, unit = PALETTE_LIMIT, ""
+            if drift > limit:
+                demoted.append(f"{name} ({drift:.0f}{unit})")
                 kind, im = "kept72", served[name]
         if kind == "kept72":
             # The suffix is the rendering contract: portraitImg treats a
