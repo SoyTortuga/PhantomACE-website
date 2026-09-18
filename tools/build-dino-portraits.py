@@ -134,6 +134,33 @@ LABELLED_SHEETS = [
 # in this set.
 NO_SMALL = {"Megalodon", "Quetzalcoatlus"}
 
+# THE HUE THE MUTATION FILTERS WERE WRITTEN AGAINST. Every mutation in the
+# game is a fixed hue-rotation -- toxic is "+90 degrees", crystal is "+180"
+# -- which only produces the colour its name promises if the art underneath
+# is the tan the author was looking at. Measured, that tan is 29 degrees:
+# sixty-three of the eighty-five species sit between 6 and 60.
+#
+# It is a property of the FILTERS, not of the art, so it is pinned rather
+# than recomputed from whatever is in the folder. Re-deriving it each build
+# would let one new blue dinosaur drag the reference and silently restyle
+# every mutation in the game.
+MUT_REFERENCE_HUE = 29.0
+
+# Past this far from the reference, a species is pre-rotated to it before
+# its mutation filter runs, so the filter lands where it was designed to.
+# The line sits in a real gap: Sinosauropteryx is 47 degrees out and
+# Cave Bear 32, with nothing between. 20 species are corrected and the
+# other 65 keep byte-identical filters.
+#
+# PRE-ROTATION RATHER THAN A PER-MUTATION TABLE, because it is one number
+# per species instead of 315, and because it is correct for the filters
+# that rotate AFTER a sepia -- volcanic and copper -- where the base hue
+# barely survives to be rotated and a computed per-mutation angle would be
+# wrong. Measured across the twenty worst species and six mutations, the
+# error against what a tan dinosaur shows falls from a median of 145
+# degrees to 4.4.
+MUT_FIX_THRESHOLD = 35.0
+
 # Above this, treat a candidate as cut off by its source rectangle. Set
 # between the whole Dodo at 0.24 and the cut Therizinosaurus at 0.30.
 #
@@ -547,6 +574,30 @@ def edge_run(im):
                 best = run
         worst = max(worst, best / len(line))
     return worst
+
+
+def hue_fixes(page_src):
+    """Pre-rotation per ASSET_MAP id, for species far off the reference hue.
+
+    Reads the ids out of the page rather than taking them from `chosen`,
+    because the species name and the map id are different vocabularies
+    ("megashark" serves Megalodon.png) and the page is where they meet.
+    """
+    import re
+    k = page_src.index("const ASSET_MAP = {")
+    l = page_src.index(chr(10) + "};", k)
+    pairs = re.findall(r"^\s*([A-Za-z0-9_]+):\s*\{[^}]*portrait: PT\+'([^']+)'",
+                       page_src[k:l], re.M)
+    out = {}
+    for dino_id, fn in pairs:
+        path = os.path.join(OUT, fn)
+        if not os.path.exists(path):
+            continue
+        h, _ = hue_sat(Image.open(path).convert("RGBA"))
+        dev = (h - MUT_REFERENCE_HUE + 180) % 360 - 180
+        if abs(dev) > MUT_FIX_THRESHOLD:
+            out[dino_id] = int(round(-dev)) % 360
+    return out
 
 
 def hue_drift(a, b):
@@ -1027,9 +1078,34 @@ def patch_game(chosen):
         added += 1
     src = src[:start] + block + src[end:]
 
+    # ── The mutation hue fix ────────────────────────────────────────────
+    # Written here for the same reason the paths are: it is measured off
+    # the files this run just wrote, and a table measured somewhere else is
+    # a table that drifts.
+    fixes = hue_fixes(src)
+    body = ", ".join(f"{k}:{v}" for k, v in sorted(fixes.items()))
+    block = chr(10).join([
+        "/* Pre-rotation, in degrees, for species whose own colours sit too far",
+        "   from the tan the mutation filters were written against -- without it",
+        "   a hue-rotate lands somewhere else entirely, and 'toxic' comes out",
+        "   magenta on every blue animal in the game. Measured and written by",
+        "   tools/build-dino-portraits.py against the art it just built. */",
+        "const PORTRAIT_HUE_FIX = {" + body + "};",
+    ])
+    marker = "const PORTRAIT_HUE_FIX = {"
+    if marker in src:
+        i = src.index("/* Pre-rotation, in degrees,")
+        j = src.index("};", src.index(marker)) + 2
+        src = src[:i] + block + src[j:]
+    else:
+        anchor = "function getMutFilter(specId, mutation) {"
+        assert src.count(anchor) == 1
+        src = src.replace(anchor, block + chr(10) + chr(10) + anchor, 1)
+
     open(page, "w", encoding="utf-8", newline="").write(src)
     print(f"index.html: {counter['n']} portrait paths point at the new folder"
-          + (f", {added} added" if added else ""))
+          + (f", {added} added" if added else "")
+          + f", {len(fixes)} mutation hue fixes")
 
 
 if __name__ == "__main__":

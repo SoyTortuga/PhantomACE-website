@@ -146,6 +146,26 @@ const page = fs.readFileSync(path.join(GAME, 'index.html'), 'utf8');
      Both limits come from the build, not from a number retyped here, so
      the test cannot drift away from what shipped. */
   const { execFileSync } = await import('node:child_process');
+
+  /* Parsed here, not in the embedded Python, because backslashes do not
+     survive the template literal. */
+  const mapBody = page.slice(page.indexOf('const ASSET_MAP = {'),
+                             page.indexOf('\n};', page.indexOf('const ASSET_MAP = {')));
+  const ASSET_PORTRAITS = Object.fromEntries(
+    [...mapBody.matchAll(/^\s*([A-Za-z0-9_]+):\s*\{[^}]*portrait: PT\+'([^']+)'/gm)]
+      .map(m => [m[1], m[2]]));
+  const fixm = /const PORTRAIT_HUE_FIX = \{([^}]*)\}/.exec(page);
+  const HUE_FIX = Object.fromEntries(
+    [...(fixm ? fixm[1].matchAll(/([A-Za-z0-9_]+):(\d+)/g) : [])].map(m => [m[1], Number(m[2])]));
+  const readTable = (name) => {
+    const i = page.indexOf(`const ${name} = {`);
+    const body = page.slice(i, page.indexOf('\n};', i));
+    return Object.fromEntries([...body.matchAll(/^\s*([a-z]+):\s*'([^']+)'/gm)].map(m => [m[1], m[2]]));
+  };
+  const MUT_FILTERS = { ...readTable('MUTATION_FILTERS'), ...readTable('COLOR_SWAP_FILTERS') };
+  ok('the page still has mutation filters to check', Object.keys(MUT_FILTERS).length >= 15);
+  ok('and a hue-fix table', Object.keys(HUE_FIX).length >= 15);
+
   const script = `
 import io, sys, os, json
 import importlib.util
@@ -155,7 +175,7 @@ spec.loader.exec_module(bp)
 from PIL import Image
 captioned = {n for sh in bp.LABELLED_SHEETS for row in sh['names'] for n in row if n}
 out = {'limits': {'palette': bp.PALETTE_LIMIT, 'hue': bp.MAX_HUE_DRIFT},
-       'scores': {}, 'unbased': [], 'cut': [],
+       'scores': {}, 'unbased': [], 'cut': [], 'mut_off': [], 'fixed': [],
        'no_small': sorted(bp.NO_SMALL), 'trunc': bp.TRUNCATION_LIMIT}
 folder = ${JSON.stringify(FOLDER)}
 old = ${JSON.stringify(OLD72)}
@@ -181,9 +201,45 @@ for f in os.listdir(folder):
         run = bp.edge_run(Image.open(os.path.join(folder, f)))
         if run > bp.TRUNCATION_LIMIT:
             out['cut'].append([f[:-4], round(run, 2)])
+
+# ── What a mutation actually renders, computed the browser's way ─────
+# The page is parsed on the JS side and handed over as JSON. A regex
+# written here would sit inside a JS template literal, where its
+# backslashes are eaten before Python ever sees them -- silently, so the
+# pattern matches nothing and every assertion below passes on no data.
+sys.path.insert(0, os.path.join(${JSON.stringify(REPO)}, 'tools'))
+import numpy as np
+from css_filter import apply_filter
+amap = ${JSON.stringify(ASSET_PORTRAITS)}
+FIX = ${JSON.stringify(HUE_FIX)}
+FILTERS = ${JSON.stringify(MUT_FILTERS)}
+def mut_filter(sid, m):
+    f = FILTERS[m]
+    fx = FIX.get(sid)
+    return ('hue-rotate(%ddeg) ' % fx + f) if (fx and 'hue-rotate' in f) else f
+def arr(sid):
+    im = Image.open(os.path.join(folder, amap[sid])).convert('RGBA')
+    im.thumbnail((110, 110), Image.LANCZOS)
+    return np.asarray(im, dtype=float) / 255.0
+def out_hue(sid, f):
+    r = apply_filter(arr(sid), f)
+    return bp.hue_sat(Image.fromarray(np.rint(r * 255).astype(np.uint8), 'RGBA'))[0]
+
+REF = min(amap, key=lambda s2: abs(bp.hue_sat(Image.open(os.path.join(folder, amap[s2])).convert('RGBA'))[0] - bp.MUT_REFERENCE_HUE))
+out['ref'] = REF
+out['mut_limit'] = 45
+for m, f in sorted(FILTERS.items()):
+    if 'hue-rotate' not in f:
+        continue
+    target = out_hue(REF, f)
+    for sid in sorted(FIX):
+        e = abs((out_hue(sid, mut_filter(sid, m)) - target + 180) % 360 - 180)
+        if e > out['mut_limit']:
+            out['mut_off'].append(['%s/%s' % (sid, m), round(e)])
+out['fixed'] = sorted(FIX)
 print(json.dumps(out))
 `;
-  let data = { limits: {}, scores: {}, unbased: [], cut: [], no_small: [] };
+  let data = { limits: {}, scores: {}, unbased: [], cut: [], mut_off: [], fixed: [], no_small: [] };
   try {
     data = JSON.parse(execFileSync('python', ['-c', script], { encoding: 'utf8' }).trim().split(/\r?\n/).pop());
   } catch (err) {
@@ -225,6 +281,22 @@ print(json.dumps(out))
      already sits at 0.27, just under. That case wants an exemption recorded
      with its reason, not the limit quietly raised. */
   check('no portrait is cut off at its own edge', data.cut || [], []);
+
+  /* MUTATIONS LAND ON THE COLOUR THEY ARE NAMED AFTER. Every mutation is a
+     fixed hue-rotation, which only works if the art underneath is the tan
+     most of the roster is; on a blue animal "toxic" rendered magenta and
+     "crystal" rendered sand, ~170 degrees out. The build measures each
+     portrait and pre-rotates the far-off ones to the reference first.
+
+     Asserted by COMPUTING WHAT THE BROWSER WOULD DRAW -- tools/css_filter.py,
+     itself validated against Chromium's Canvas2D -- rather than by checking
+     that a table has the right shape. A table with the right shape and the
+     wrong numbers is the failure this is for. */
+  check('every corrected species renders its mutations like the reference does',
+        data.mut_off || [], []);
+  ok('and the correction covers the marine species',
+     ['megashark', 'mosa', 'tylo', 'plesio', 'elasmo', 'liopl', 'shoni', 'dunky', 'ichthy']
+       .every(id => (data.fixed || []).includes(id)));
 
   check('the species with no 72 are the two expected',
         (data.unbased || []).sort(), (data.no_small || []).sort());

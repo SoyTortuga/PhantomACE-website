@@ -1312,11 +1312,38 @@ const COLOR_SWAP_FILTERS = {
   copper:    'hue-rotate(25deg) sepia(0.5) saturate(2)',
 };
 
+/* Pre-rotation, in degrees, for species whose own colours sit too far
+   from the tan the mutation filters were written against -- without it
+   a hue-rotate lands somewhere else entirely, and 'toxic' comes out
+   magenta on every blue animal in the game. Measured and written by
+   tools/build-dino-portraits.py against the art it just built. */
+const PORTRAIT_HUE_FIX = {apato:286, archae:205, argent:147, bronto:153, dodo:177, dunky:172, elasmo:189, ichthy:190, liopl:183, mamen:240, megalo:102, megarach:78, megashark:168, micro:312, mosa:205, plesio:189, shoni:210, sinosaur:51, therizo:105, tylo:172};
+
 function getMutFilter(specId, mutation) {
   if (!mutation) return '';
-  if (MUTATION_FILTERS[mutation]) return MUTATION_FILTERS[mutation];
-  if (COLOR_SWAP_FILTERS[mutation]) return COLOR_SWAP_FILTERS[mutation];
-  return 'hue-rotate(30deg) saturate(1.3)';
+  const filter = MUTATION_FILTERS[mutation]
+    || COLOR_SWAP_FILTERS[mutation]
+    || 'hue-rotate(30deg) saturate(1.3)';
+
+  /* EVERY FILTER ABOVE IS A FIXED ROTATION, and a fixed rotation only lands
+     on the colour its name promises if the art underneath is the tan most
+     of the roster is. On a blue animal "toxic" came out magenta and
+     "crystal" came out sand -- a hundred and seventy degrees wrong, on
+     Megalodon and every other marine species.
+
+     So the far-off species are turned to that tan FIRST and the filter runs
+     unchanged. One number each, and it works for the filters that rotate
+     after a sepia (volcanic, copper) where a per-mutation angle would not:
+     there the base hue barely survives to be rotated at all.
+
+     Only filters that rotate are corrected. albino, melanistic, spectral,
+     obsidian, ivory and slate only lighten or drain, and a species keeping
+     its own colour through those is the point of them. */
+  const fix = PORTRAIT_HUE_FIX[specId];
+  if (fix && filter.indexOf('hue-rotate') !== -1) {
+    return 'hue-rotate(' + fix + 'deg) ' + filter;
+  }
+  return filter;
 }
 
 function preloadAssets() {
