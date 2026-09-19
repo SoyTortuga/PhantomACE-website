@@ -58,6 +58,15 @@ export const SINGLETONS = {
      as a stream and correctly breaks a streak. */
   stream_log:            { table: 'singletons', expiry: 'none' },
 
+  /* Ad breaks: the running break and the cached schedule, one row.
+
+     'none', and the reason is the point of the whole feature. The break is
+     stored as an endsAt that readers compare against, never as a flag, so
+     there is nothing for a TTL to clean up -- and a TTL that expired the
+     row mid-break would UN-suppress drops while ads were still playing,
+     which is the exact failure the design avoids. */
+  ad_state:              { table: 'singletons', expiry: 'none' },
+
   /* Milestone drop config: on/off, the rarity per event, the raid floor. */
   milestone_drops:       { table: 'singletons', expiry: 'none' },
 

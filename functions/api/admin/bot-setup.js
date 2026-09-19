@@ -124,6 +124,12 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
     'channel:manage:redemptions',
     'channel:read:hype_train',
     'channel:read:subscriptions',
+    /* Ad breaks. Listed here even though the subscription step treats it as
+       optional, and the two are not in conflict: this line is what stops the
+       page claiming Step 2 is done, while Create Subscriptions still builds
+       everything else. Silence here would be the exact failure the comment
+       above describes — a green tick over a permission never granted. */
+    'channel:read:ads',
   ];
 
   let broadcasterStatus;
@@ -189,7 +195,14 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
      Grabbing it now because the broadcaster is already re-authorizing for
      channel:read:hype_train. Adding it later would mean asking them a third
      time. */
-  const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train channel:read:subscriptions';
+  /* channel:read:ads covers BOTH ad features: the channel.ad_break.begin
+     subscription and the /helix/channels/ads schedule the countdown polls.
+     Read only — it cannot start or skip a break. Snoozing one would need
+     channel:manage:ads, which is deliberately NOT requested: nothing asks
+     for it yet, and it is a permission to act on the channel's monetisation
+     rather than observe it. */
+  const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train '
+    + 'channel:read:subscriptions channel:read:ads';
   const broadcasterAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
     `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}&state=broadcaster`;
@@ -785,10 +798,12 @@ async function createEventSubSubscriptions(env, request) {
      the broadcaster has not granted channel:read:hype_train — a message that
      says nothing about which step to go back to. Checking first turns three
      red crosses into one sentence naming the button to press. */
+  /* Hoisted, because the ad-break subscription below is added only when its
+     scope is present and re-validating would be a second round trip. */
+  let granted = null;
   {
     const stored = await env.MARKETPLACE.get('twitch_broadcaster_token', 'json');
     const bToken = stored && (stored.access_token || stored.token);
-    let granted = null;
     try {
       const vr = await fetch('https://id.twitch.tv/oauth2/validate', {
         headers: { Authorization: 'OAuth ' + bToken },
@@ -883,6 +898,20 @@ async function createEventSubSubscriptions(env, request) {
     });
   }
 
+  /* CONDITIONAL, not part of the hard gate above. channel:read:ads was added
+     after this channel was first authorised, so requiring it would refuse to
+     create ANY subscription for a broadcaster who has not re-consented —
+     breaking a working setup to add an optional feature. Absent scope is
+     reported as one failed row instead. */
+  if (granted.includes('channel:read:ads')) {
+    subscriptions.push({
+      type: 'channel.ad_break.begin',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/ad-break`,
+    });
+  }
+
   const results = [];
   if (!botUserId) {
     results.push({
@@ -896,6 +925,15 @@ async function createEventSubSubscriptions(env, request) {
       type: 'channel.channel_points_custom_reward_redemption.add (giveaway)',
       ok: false,
       error: 'No giveaway reward created yet — complete Step 3 first.',
+    });
+  }
+  if (!granted.includes('channel:read:ads')) {
+    results.push({
+      type: 'channel.ad_break.begin',
+      ok: false,
+      error: 'Needs channel:read:ads. Go back to Step 2 and click "Authorize Channel Points" '
+           + 'again — Twitch will ask you to approve a new permission — then run this step again. '
+           + 'Everything else on this page works without it.',
     });
   }
   for (const sub of subscriptions) {

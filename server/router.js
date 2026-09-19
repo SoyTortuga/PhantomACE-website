@@ -36,6 +36,10 @@ const NON_ROUTE_MODULES = new Set([
      other rather than guessed at. */
   'api/auth/session-crypto.js',
 
+  /* Ad break state: whether one is running, and when the next is due.
+     Library, no handler. Covered by server/scripts/test-ad-break.js. */
+  'api/ads/state.js',
+
   /* The shared Twitch app access token. Library, no handler. */
   'api/auth/app-token.js',
 
