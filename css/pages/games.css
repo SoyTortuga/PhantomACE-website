@@ -318,7 +318,7 @@
   color: var(--text-dim);
 }
 .sc-lb-rank.rank-1 { color: #ffcc00; }
-.sc-lb-rank.rank-2 { color: #aaaaaa; }
+.sc-lb-rank.rank-2 { color: var(--text-pri); }
 .sc-lb-rank.rank-3 { color: #cc6633; }
 .sc-lb-name {
   flex: 1;

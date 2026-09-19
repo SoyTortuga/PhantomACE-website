@@ -9,9 +9,14 @@
   --red-glow:   #FF000018;
 
   --white:      #FFFFFF;
+  /* ALL THREE ARE WHITE, on purpose and by request. The ladder used to be
+     white / #cccccc / #999999, and the names are kept rather than collapsed
+     into one: they still say what a piece of text IS, and restoring a
+     quieter tier later is a one-line change here instead of an audit of
+     338 call sites. */
   --text-pri:   #FFFFFF;
-  --text-sec:   #cccccc;
-  --text-dim:   #999999;
+  --text-sec:   #FFFFFF;
+  --text-dim:   #FFFFFF;
 
   --green:      #00cc66;
   --amber:      #ffaa00;

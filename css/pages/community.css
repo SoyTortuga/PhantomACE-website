@@ -543,7 +543,7 @@
 .leaderboard-panel > .lb-subhead:first-child { margin-top: 0; }
 .lb-subnote {
   font-size: 0.8rem;
-  color: #8a8a8a;
+  color: var(--text-pri);
   margin-bottom: 10px;
 }
 .leaderboard-panel { display: none; }

@@ -617,7 +617,7 @@
   border-radius: 2px;
 }
 
-.pt-pop-common { background: #1a1a1a; color: #888; }
+.pt-pop-common { background: #1a1a1a; color: var(--text-pri); }
 .pt-pop-uncommon { background: #0a1a0a; color: #44bb44; }
 .pt-pop-rare { background: #0a0a1e; color: #4466ee; }
 .pt-pop-mythic { background: #1a0a1a; color: #aa44ff; }

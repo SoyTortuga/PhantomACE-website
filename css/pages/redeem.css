@@ -114,13 +114,13 @@
   text-transform: capitalize;
 }
 
-.rarity-common   { color: #888888; }
+.rarity-common   { color: var(--text-pri); }
 .rarity-uncommon  { color: var(--green); }
 .rarity-rare      { color: #4488ff; }
 .rarity-mythic    { color: var(--purple); }
 .rarity-exclusive { color: var(--exclusive); }
 
-.rarity-border-common   { border-color: #888888; }
+.rarity-border-common   { border-color: var(--text-pri); }
 .rarity-border-uncommon  { border-color: var(--green); }
 .rarity-border-rare      { border-color: #4488ff; }
 .rarity-border-mythic    { border-color: var(--purple); }

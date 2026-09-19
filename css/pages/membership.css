@@ -42,7 +42,7 @@
   margin-bottom: 4px;
 }
 
-.tier-name-viewer    { color: #bbbbbb; }
+.tier-name-viewer    { color: var(--text-pri); }
 .tier-name-follower  { color: var(--green); }
 .tier-name-subscriber { color: var(--red); }
 .tier-name-vip       { color: var(--purple); }
@@ -65,7 +65,7 @@
 }
 
 .tier-badge-free {
-  color: #bbbbbb;
+  color: var(--text-pri);
   border: 1px solid rgba(153, 153, 153, 0.3);
 }
 
