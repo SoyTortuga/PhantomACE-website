@@ -22,6 +22,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CHECKIN_BADGES, badgesOpenAt, grantOpenBadges } from '../../functions/api/checkin-badges.js';
 
@@ -179,6 +180,36 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
      renders as nothing, and by the time anyone notices it is in
      inventories. */
   ok('the artwork exists', fs.existsSync(path.join(REPO, AGATE.image.replace(/^\//, ''))));
+}
+
+/* ── Every badge the minter offers, not just this one ─────────────────── */
+{
+  /* The block above pins agate-hunt field for field. It says nothing about
+     the other entries, and one of them shipped with no `id`, `game` or
+     `type` at all -- createItemCode() stores what it is handed, so that
+     would have minted a real, redeemable code granting an item with
+     `id: undefined`: unequippable, missing from every inventory filter, and
+     already in an account before anyone looked.
+
+     --confirm is not needed and no database is touched: the script now
+     validates its whole table at startup, so --list exercises the guard for
+     every badge including ones added after this test was written. */
+  const run = spawnSync(process.execPath,
+    [path.join(REPO, 'server/scripts/mint-badge-code.js'), '--list'],
+    { encoding: 'utf8' });
+  check('every mintable badge is completely defined', run.status, 0);
+  if (run.status !== 0) {
+    /* Node's own module warnings go to stderr too, and reporting the whole
+       stream buries the one line that says which badge is wrong. */
+    const said = (run.stderr || '').split('\n').map(l => l.trim())
+      .filter(l => l.startsWith('[mint-badge-code]'));
+    failures.push(`  minter said: ${said.join('; ') || (run.stderr || '').trim()}`);
+  }
+
+  /* And each one names artwork that is really there. */
+  for (const m of (run.stdout || '').matchAll(/(\/assets\/badges\/\S+)/g)) {
+    ok(`${m[1]} exists`, fs.existsSync(path.join(REPO, m[1].replace(/^\//, ''))));
+  }
 }
 
 /* ── Every rarity a badge can carry is drawn everywhere it is shown ── */

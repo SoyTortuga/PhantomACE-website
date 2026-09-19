@@ -67,12 +67,35 @@ const BADGES = {
     blurb: 'For everyone who came rock hunting.',
   },
   'mtgbbb-winner': {
+    id: 'mtgbbb-winner',
+    game: 'profile',
+    type: 'badge',
     name: 'Booster Box Bingo Champion',
-    description: 'Won a game of MTGBBB while a sealed box was cracked on stream.',
     rarity: 'mythic',
     image: '/assets/badges/mtgbbb-winner.png',
+    blurb: 'Won a game of MTGBBB while a sealed box was cracked on stream.',
   },
 };
+
+/* EVERY FIELD OR THE MINT IS SILENTLY WRONG. createItemCode() stores what it
+   is handed, so an entry missing `id` or `type` mints a perfectly valid code
+   that grants an item with `id: undefined` -- unequippable, invisible in the
+   inventory filters, and already in someone's account by the time anyone
+   looks. The script would not have thrown. This checks the whole table at
+   startup rather than the one badge being minted, so a bad entry is found by
+   the next --list rather than by whoever redeems it. */
+for (const [key, b] of Object.entries(BADGES)) {
+  const missing = ['id', 'game', 'type', 'name', 'rarity', 'image', 'blurb']
+    .filter(f => typeof b[f] !== 'string' || !b[f]);
+  if (missing.length) {
+    console.error(`[mint-badge-code] badge "${key}" is missing: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+  if (b.id !== key) {
+    console.error(`[mint-badge-code] badge "${key}" has id "${b.id}" -- they must match.`);
+    process.exit(1);
+  }
+}
 
 function arg(name, fallback = null) {
   const i = process.argv.indexOf('--' + name);
