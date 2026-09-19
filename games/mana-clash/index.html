@@ -235,6 +235,11 @@
     .chat-input:focus { outline: none; border-color: var(--red); }
     .chat-send { padding: 5px 10px; font-size: 11px; }
     .chat-note { padding: 0 10px 8px; font-size: 11px; color: var(--red); }
+
+    .room-live { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em;
+                 color: var(--red); border: 1px solid var(--red); border-radius: 2px;
+                 padding: 1px 5px; }
+    .room-row .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
     /* Collapsed keeps the header, so it can be opened again. */
     .chat.is-collapsed .chat-log,
     .chat.is-collapsed .chat-form,
@@ -1357,18 +1362,37 @@ async function loadRooms() {
     }
     list.innerHTML = '';
     for (const r of rooms) {
+      const playing = r.status === 'playing';
       const row = document.createElement('div');
       row.className = 'room-row';
+
+      /* A running game says what you would be walking into: which round,
+         and the score already on the table. Joining starts you at zero, so
+         "round 6, top 8,400" is the difference between a decision and a
+         surprise. */
+      const detail = playing
+        ? 'Round ' + r.round + ' &middot; top ' + (r.topScore || 0).toLocaleString()
+        : r.goal.toLocaleString();
+
       row.innerHTML = '<span class="room-code">' + esc(r.code) + '</span>' +
+        (playing ? '<span class="room-live">In progress</span>' : '') +
         '<span class="muted">' + esc(r.host) + ' &middot; ' + r.playerCount + '/' + r.maxPlayers +
-        ' &middot; ' + r.goal.toLocaleString() + (r.hasPassword ? ' &middot; 🔒' : '') + '</span>';
+        ' &middot; ' + detail + (r.hasPassword ? ' &middot; 🔒' : '') + '</span>';
+
       const b = document.createElement('button');
       b.className = 'btn btn-dim';
-      b.textContent = 'Join';
-      b.addEventListener('click', () => {
-        $('joinCode').value = r.code;
-        joinRoom();
-      });
+      if (r.closed) {
+        /* Shown but not offered: the server would refuse it, and a button
+           that only ever produces an error is worse than a greyed one. */
+        b.textContent = 'Last round';
+        b.disabled = true;
+      } else {
+        b.textContent = playing ? 'Join now' : 'Join';
+        b.addEventListener('click', () => {
+          $('joinCode').value = r.code;
+          joinRoom();
+        });
+      }
       row.appendChild(b);
       list.appendChild(row);
     }

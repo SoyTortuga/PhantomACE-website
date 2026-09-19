@@ -580,7 +580,14 @@ export async function onRequestGet(context) {
     const rows = await env.MARKETPLACE.listValues({ prefix: 'mc_room_' });
     const rooms = [];
     for (const { value: room } of rows) {
-      if (!room || room.status !== 'lobby' || room.practice) continue;
+      if (!room || room.practice) continue;
+      /* Games in progress are listed now that they can be joined. Finished
+         ones never were and still are not -- there is nothing to join. */
+      if (room.status !== 'lobby' && room.status !== 'playing') continue;
+      /* A last round cannot take anyone, so listing it as joinable would
+         only produce a refusal on click. */
+      const closed = room.status === 'playing' &&
+                     !!(room.isFinalRound || room.nextIsFinal || room.tiedPlayers);
       rooms.push({
         code: room.code,
         host: room.hostName,
@@ -588,6 +595,12 @@ export async function onRequestGet(context) {
         maxPlayers: MAX_PLAYERS,
         hasPassword: !!room.password,
         goal: room.goal,
+        status: room.status,
+        round: room.round || 0,
+        /* The highest score on the table, so the list can say what someone
+           starting from zero would be walking into. */
+        topScore: Object.values(room.players).reduce((m, p) => Math.max(m, p.total || 0), 0),
+        closed,
       });
     }
     return json(rooms);
@@ -688,13 +701,39 @@ export async function onRequestPost(context) {
     const { failed } = await withRoom(env, code, (room) => {
       if (room.players[userId]) return null;   // rejoining is not an error
       if (room.practice) return json({ error: 'That is a solo practice room.' }, 403);
-      if (room.status !== 'lobby') return json({ error: 'That game has already started.' }, 400);
+      if (room.status === 'finished') return json({ error: 'That game is over.' }, 400);
       if (Object.keys(room.players).length >= MAX_PLAYERS) return json({ error: 'Room is full' }, 400);
       if (room.password && body.password !== room.password) return json({ error: 'Wrong password' }, 403);
       if (Array.isArray(room.kicked) && room.kicked.includes(userId)) {
         return json({ error: 'The host removed you from this room.' }, 403);
       }
-      room.players[userId] = { displayName, profileImage, ready: false, total: 0, turn: null };
+
+      /* ── Joining a game already running ──────────────────────────────
+         From zero, and counting for the leaderboard like any other game:
+         arriving late is a disadvantage a player chooses, not something the
+         room compensates for.
+
+         NOT DURING A FINAL ROUND OR A TIEBREAK, and that is mechanical
+         rather than a matter of fairness. playersInRound restricts the
+         round to tiedPlayers when a tiebreak is running, and a final round
+         belongs to the people chasing the leader -- someone arriving into
+         either is not in the list the round is built from, so they would
+         sit through it unable to act and with no way to be told why. */
+      const running = room.status === 'playing';
+      if (running && (room.isFinalRound || room.nextIsFinal || room.tiedPlayers)) {
+        return json({ error: 'This game is on its last round — wait for the next one.' }, 409);
+      }
+
+      room.players[userId] = {
+        displayName, profileImage, ready: false, total: 0,
+        /* PARKED FOR THE ROUND IN PROGRESS. roundIsOver waits for every
+           player in the round to have a finished turn, so a null turn here
+           would stall the round for everyone, permanently. sittingOut()
+           reads as already done; startRound deals them in next round along
+           with everyone else. */
+        turn: running ? sittingOut() : null,
+      };
+      if (running) room.joinedLate = (room.joinedLate || 0) + 1;
       return null;
     });
     if (failed) return failed;

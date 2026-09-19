@@ -856,6 +856,128 @@ async function playToFinish(env, code, hands) {
   check('a player in the room does get it', player.chat.length, 1);
 }
 
+/* ── JOINING A GAME ALREADY RUNNING ──────────────────────────────────
+   From zero, counting for the leaderboard like any other game. The round
+   in progress is the hazard: roundIsOver waits for every player in the
+   round to have a finished turn, so a newcomer with a null turn would
+   stall it for everyone, permanently and with no way out. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+
+  /* Ash banks, Bry has not acted: the round is open and waiting on Bry. */
+  loadDice('111222');
+  await post(env, 'a', { action: 'roll', code });
+  await post(env, 'a', { action: 'bank', code });
+
+  const late = await post(env, 'c', { action: 'join-room', code });
+  check('a third player can walk into a running game', late.status, 200);
+
+  const seen = await get(env, 'c', `action=get-state&code=${code}`);
+  check('and lands in the game, not a lobby', seen.data.status, 'playing');
+  check('starting from zero', seen.data.you.total, 0);
+
+  /* THE STALL. Bry finishing must still end the round -- if the newcomer
+     is counted as someone the round is waiting for, it never ends. */
+  loadDice('111222');
+  await post(env, 'b', { action: 'roll', code });
+  const ended = await post(env, 'b', { action: 'bank', code });
+  ok('the round still ends with everyone done', ended.data.room.round >= 1);
+
+  const stored = JSON.parse(env._store.get('mc_room_' + code));
+  /* Read defensively: with the parking removed this is null, and
+     dereferencing it would crash the run instead of naming the failure and
+     letting the rest of the suite report. */
+  const newcomerTurn = stored.players['303'] && stored.players['303'].turn;
+  check('the newcomer sat the round out rather than blocking it',
+        newcomerTurn && newcomerTurn.done, 'out');
+
+  /* And is dealt in from the next round like anyone else. */
+  endIntermission(env, code);
+  const next = await get(env, 'c', `action=get-state&code=${code}`);
+  check('next round they are dealt in like anyone else', next.data.you && next.data.you.done, null);
+  ok('and can actually act', next.data.you && next.data.you.canRoll);
+}
+
+/* ── The last round cannot take anyone ───────────────────────────────── */
+{
+  /* Mechanical, not a matter of fairness: playersInRound builds the round
+     from tiedPlayers during a tiebreak, and a final round belongs to the
+     chasers. Someone arriving into either is not in the list the round is
+     made from, so they would sit unable to act and never be told why. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  room.isFinalRound = true;
+  env._store.set('mc_room_' + code, JSON.stringify(room));
+
+  const refused = await post(env, 'c', { action: 'join-room', code });
+  check('a final round refuses a newcomer', refused.status, 409);
+  ok('and says why', /last round/i.test(refused.data.error));
+
+  const tie = JSON.parse(env._store.get('mc_room_' + code));
+  tie.isFinalRound = false; tie.tiedPlayers = ['101', '202'];
+  env._store.set('mc_room_' + code, JSON.stringify(tie));
+  check('a tiebreak refuses one too', (await post(env, 'c', { action: 'join-room', code })).status, 409);
+}
+
+/* ── A finished game is not joinable ─────────────────────────────────── */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  room.status = 'finished';
+  env._store.set('mc_room_' + code, JSON.stringify(room));
+  check('a finished game refuses a join', (await post(env, 'b', { action: 'join-room', code })).status, 400);
+}
+
+/* ── The room list is how anyone finds one ───────────────────────────── */
+{
+  /* Without this, joining in progress only works for someone who was
+     handed the code. */
+  const env = makeEnv();
+  const lobby = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const live = await post(env, 'b', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  await post(env, 'c', { action: 'join-room', code: live.data.code });
+  for (const who of ['b', 'c']) await post(env, who, { action: 'ready', code: live.data.code, ready: true });
+  await post(env, 'b', { action: 'start-game', code: live.data.code });
+
+  const rooms = (await get(env, 'a', 'action=list-rooms')).data;
+  const byCode = Object.fromEntries(rooms.map(r => [r.code, r]));
+  /* Absent rather than wrong is the likely failure here -- a filter that
+     drops running games leaves undefined, and reaching into it would crash
+     the run rather than say which room went missing. */
+  const lobbyRow = byCode[lobby.data.code] || {};
+  const liveRow = byCode[live.data.code] || {};
+  check('the lobby is listed', lobbyRow.status, 'lobby');
+  check('and so is the running game', liveRow.status, 'playing');
+  ok('with what you would be walking into', typeof liveRow.topScore === 'number');
+  check('and it is offered', liveRow.closed, false);
+
+  /* A last round is listed but not offered -- the server would refuse it,
+     and a button that only produces an error is worse than a greyed one. */
+  const r2 = JSON.parse(env._store.get('mc_room_' + live.data.code));
+  r2.isFinalRound = true;
+  env._store.set('mc_room_' + live.data.code, JSON.stringify(r2));
+  const again = (await get(env, 'a', 'action=list-rooms')).data.find(r => r.code === live.data.code) || {};
+  check('a last round is shown as closed', again.closed, true);
+
+  /* Practice rooms are solo and were never listed. */
+  await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: true });
+  const withPractice = (await get(env, 'a', 'action=list-rooms')).data;
+  check('practice rooms stay out of the list', withPractice.length, rooms.length);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 
 console.log('');
