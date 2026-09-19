@@ -135,6 +135,31 @@ function expireTurn(env, code, userId) {
   env._store.set(key, JSON.stringify(room));
 }
 
+/* Finish a game THROUGH THE ENGINE rather than by writing 'finished' into
+   the store. settle() only records results on the TRANSITION -- it compares
+   the status before and after advance() -- so a room edited straight to
+   finished is never claimed and never reaches a leaderboard. Setting the
+   last round up and letting the next poll resolve it is the difference
+   between testing the feature and testing the fixture. */
+async function finishGame(env, code, winnerId, totals) {
+  const key = 'mc_room_' + code;
+  const room = JSON.parse(env._store.get(key));
+  room.status = 'playing';
+  room.isFinalRound = true;
+  room.restingIds = [];
+  room.tiedPlayers = null;
+  for (const [id, p] of Object.entries(room.players)) {
+    p.total = totals[id] || 0;
+    p.turn = { pending: 0, dice: [], kept: [], remaining: 0, awaitingSelection: false,
+               done: 'banked', gained: 0, event: null, deadline: null };
+  }
+  env._store.set(key, JSON.stringify(room));
+  /* The poll is what resolves it: advance() ends the round, endRound()
+     finishes the game, and get-state settles it. */
+  const r = await get(env, 'a', `action=get-state&code=${code}`);
+  return r.data;
+}
+
 function endIntermission(env, code) {
   const key = 'mc_room_' + code;
   const room = JSON.parse(env._store.get(key));
@@ -976,6 +1001,118 @@ async function playToFinish(env, code, hands) {
   await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: true });
   const withPractice = (await get(env, 'a', 'action=list-rooms')).data;
   check('practice rooms stay out of the list', withPractice.length, rooms.length);
+}
+
+/* ── REMATCH ─────────────────────────────────────────────────────────
+   Same room, same code, same people. A set of games otherwise costs
+   everyone a trip to the lobby, a code read out loud and a re-join each,
+   which is where a table loses players between games. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false, password: 'shh' });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code, password: 'shh' });
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+  await post(env, 'a', { action: 'chat', code, text: 'good game' });
+
+  const done = await finishGame(env, code, '101', { 101: 10200, 202: 7400 });
+  check('the game finishes', done.status, 'finished');
+  check('with the higher score winning', done.winner, '101');
+  check('and it reached the wins board',
+        ((await env.MARKETPLACE.get('lb_mana_clash_wins', 'json') || []).find(e => e.id === '101') || {}).score, 1);
+  let room;
+
+  const notHost = await post(env, 'b', { action: 'rematch', code });
+  check('only the host may call it', notHost.status, 403);
+
+  const again = await post(env, 'a', { action: 'rematch', code });
+  check('the host can', again.status, 200);
+  /* Defaulted, because a refusal returns an error and no room -- and if the
+     host check above ever fails, the non-host has already reset the room
+     and this call lands on a lobby. Reaching into the missing room would
+     crash the run instead of letting every assertion report. */
+  const view = again.data.room || {};
+  check('and the room is a lobby again', view.status, 'lobby');
+  check('on the same code', view.code, code);
+  check('with the same players', (view.players || []).length, 2);
+
+  room = JSON.parse(env._store.get('mc_room_' + code));
+  check('scores are wiped', Object.values(room.players).map(p => p.total), [0, 0]);
+  check('turns are cleared', Object.values(room.players).map(p => p.turn), [null, null]);
+  /* A rematch is an offer. Someone who has had enough should not be counted
+     in by a flag they set for the previous game. */
+  check('and nobody is still marked ready', Object.values(room.players).map(p => p.ready), [false, false]);
+  check('the winner is cleared', room.winner, null);
+  check('and the round counter', room.round, 0);
+
+  /* Settings are what the room IS and carry over untouched. */
+  check('the goal is kept', room.goal, 10000);
+  check('the idle timer is kept', room.idleMs, 30000);
+  check('the password is kept', room.password, 'shh');
+  check('and the chat, because it is one sitting', room.chat.map(m => m.text), ['good game']);
+}
+
+/* ── The rematch has to reach the leaderboards too ───────────────────── */
+{
+  /* THE ONE THAT WOULD HAVE GONE UNNOTICED. settle() claims a finished room
+     once, by setting resultsRecorded, and refuses to record again while it
+     is set. A rematch that left it true would play perfectly and silently
+     stop counting -- for that room, for every game after the first. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+
+  await finishGame(env, code, '101', { 101: 10200, 202: 7400 });
+  await post(env, 'a', { action: 'rematch', code });
+  check('the claim flag is released', JSON.parse(env._store.get('mc_room_' + code)).resultsRecorded, false);
+
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+  await finishGame(env, code, '202', { 101: 4000, 202: 11000 });
+
+  const wins = await env.MARKETPLACE.get('lb_mana_clash_wins', 'json') || [];
+  const byId = Object.fromEntries(wins.map(e => [e.id, e.score]));
+  check('game one still counted', byId['101'], 1);
+  check('and game two counted as well', byId['202'], 1);
+}
+
+/* ── It is only for a game that is over ──────────────────────────────── */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+
+  const inLobby = await post(env, 'a', { action: 'rematch', code });
+  check('a lobby cannot be rematched', inLobby.status, 400);
+
+  await post(env, 'a', { action: 'start-game', code });
+  const midGame = await post(env, 'a', { action: 'rematch', code });
+  /* Otherwise the host holds a reset button over a game in progress. */
+  check('nor can a game still running', midGame.status, 400);
+}
+
+/* ── Someone removed in game one stays removed ───────────────────────── */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'c', { action: 'join-room', code });
+  await post(env, 'a', { action: 'kick', userId: '303', code });
+
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+  await finishGame(env, code, '101', { 101: 10500, 202: 3000 });
+  await post(env, 'a', { action: 'rematch', code });
+
+  const back = await post(env, 'c', { action: 'join-room', code });
+  check('the kicked list survives the rematch', back.status, 403);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

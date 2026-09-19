@@ -774,6 +774,53 @@ export async function onRequestPost(context) {
     return json({ success: true, room: viewFor(room, userId, Date.now()) });
   }
 
+  /* ── rematch ──────────────────────────────────────────────────────── */
+  if (body.action === 'rematch') {
+    const { failed, room } = await withRoom(env, code, (r) => {
+      if (r.host !== userId) return json({ error: 'Only the host can start a rematch.' }, 403);
+      if (r.status !== 'finished') return json({ error: 'That game is still going.' }, 400);
+
+      /* SAME ROOM, SAME CODE, SAME PEOPLE. A set of games otherwise costs
+         everyone a trip back to the lobby, a new code to read out, and a
+         re-join each -- which is where a table loses players between games.
+
+         Settings are what the room IS and carry over untouched: goal, idle
+         timer, password, host, and the kicked list, or someone removed
+         during game one walks back in for game two. */
+      r.status = 'lobby';
+      r.round = 0;
+      r.winner = null;
+      r.finishedAt = null;
+      r.intermissionEndsAt = null;
+      r.isFinalRound = false;
+      r.nextIsFinal = false;
+      r.tiedPlayers = null;
+      r.restingIds = [];
+      r.joinedLate = 0;
+
+      /* THE ONE THAT WOULD HAVE GONE UNNOTICED. settle() claims a finished
+         room once by setting resultsRecorded, and refuses to record again
+         while it is set. Leaving it true here would not break anything
+         visible -- the rematch would play perfectly -- it would just
+         silently stop reaching the leaderboards, for this room, forever. */
+      r.resultsRecorded = false;
+
+      for (const p of Object.values(r.players)) {
+        p.total = 0;
+        p.turn = null;
+        /* Ready is deliberately reset: a rematch is an offer, and someone
+           who has had enough should not be counted in by a flag they set
+           for the previous game. */
+        p.ready = false;
+      }
+      /* Chat is kept. It is the same room and the same people, and a set of
+         games reads as one sitting. */
+      return null;
+    });
+    if (failed) return failed;
+    return json({ success: true, room: viewFor(room, userId, Date.now()) });
+  }
+
   /* ── chat ─────────────────────────────────────────────────────────── */
   if (body.action === 'chat') {
     const cleaned = cleanChat(body.text);

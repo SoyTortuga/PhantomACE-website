@@ -522,7 +522,8 @@
   <div class="results-sub" id="resultsSub"></div>
   <div class="standings-table" id="resultsTable"></div>
   <div style="display:flex;gap:8px;margin-top:20px">
-    <button class="btn btn-red" id="againBtn">Back to Rooms</button>
+    <button class="btn btn-red" id="rematchBtn" hidden>Play Again</button>
+    <button class="btn btn-dim" id="againBtn">Back to Rooms</button>
   </div>
 </div>
 
@@ -1100,6 +1101,13 @@ function renderResults() {
       (state.ranked ? '' : ' — not a ranked game, so nothing reached the boards')
     : 'No winner.';
   standingsTable($('resultsTable'), state.players, meId);
+
+  /* Only the host is offered it; everyone else is simply moved when it
+     happens, because their next poll returns a lobby and render() routes on
+     status. No "waiting for the host" state to build or keep in step. */
+  const host = !!(state.you && state.host === state.you.id);
+  $('rematchBtn').hidden = !host;
+  $('againBtn').className = host ? 'btn btn-dim' : 'btn btn-red';
 }
 
 /* A burn ENDS the round, and when it is the last turn outstanding the
@@ -1461,6 +1469,19 @@ $('keepBtn').addEventListener('click', () => {
 
 $('lobbyCode').addEventListener('click', () => {
   navigator.clipboard.writeText(state.code).then(() => say('lobbyFeedback', 'Code copied.')).catch(() => {});
+});
+
+$('rematchBtn').addEventListener('click', async () => {
+  const btn = $('rematchBtn');
+  btn.disabled = true;
+  try {
+    const d = await api({ action: 'rematch', code: roomCode });
+    if (d.room) { state = d.room; render(); }
+  } catch (err) {
+    say('resultsSub', err.message);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 $('againBtn').addEventListener('click', async () => {
