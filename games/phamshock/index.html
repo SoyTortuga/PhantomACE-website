@@ -88,7 +88,10 @@
     .aim-group input[type=range] { width: 80px; accent-color: #ff0000; }
     .aim-group .val { color: #fff; font-weight: 600; min-width: 28px; text-align: right; }
 
-    .weapon-bar { display: flex; gap: 3px; }
+    /* Wraps, because ten weapons do not fit one row at the width this
+       control strip gets -- and centred so a short second row does not
+       hang off the left. */
+    .weapon-bar { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
     .weapon-btn { padding: 3px 8px; border: 1px solid #333; border-radius: 3px; background: #1a1a1a; color: #fff; font-size: 10px; cursor: pointer; white-space: nowrap; }
     .weapon-btn.active { border-color: #ff0000; color: #fff; background: #330000; }
     .weapon-btn .ammo { color: #ff6666; font-size: 9px; }
@@ -211,12 +214,24 @@ const COLORS = [
   '#ff4444','#4488ff','#44cc44','#ffaa00','#ff44ff','#44dddd','#ff8844','#88ff44',
   '#dd44aa','#44aaff','#aadd44','#ff6688','#66ddaa','#aa66ff','#dddd44','#66aadd'
 ];
+/* MIRRORED FROM functions/api/pham-shock.js, which is the authority: it
+   flies every shell, scores the damage and records what happened. This
+   copy exists to draw the replay and to label the buttons, so radius,
+   damage, ammo and the mechanic flags must match it exactly or the
+   animation shows a different battle from the one that was scored.
+   test-phamshock-weapons.js compares the two tables field by field.
+   Only `name` and `color` are the client's own. */
 const WEAPONS = [
   { name:'Shell', radius:20, damage:25, ammo:Infinity, color:'#ff4444', splitter:false },
   { name:'Big Shell', radius:35, damage:40, ammo:3, color:'#ff8800', splitter:false },
   { name:'Sniper', radius:10, damage:35, ammo:3, color:'#44ff44', splitter:false },
   { name:'Nuke', radius:55, damage:60, ammo:1, color:'#ffff44', splitter:false },
-  { name:'Splitter', radius:15, damage:18, ammo:2, color:'#44ffff', splitter:true },
+  { name:'Splitter', radius:15, damage:18, ammo:2, color:'#44ffff', splitter:true, subs:4 },
+  { name:'Mortar', radius:28, damage:30, ammo:4, color:'#ffcc66', splitter:false },
+  { name:'Cluster Bomb', radius:12, damage:14, ammo:2, color:'#88ff88', splitter:true, subs:5, airburst:34 },
+  { name:'Bunker Buster', radius:18, damage:30, ammo:2, color:'#cc88ff', splitter:false, digs:4 },
+  { name:'Railgun', radius:6, damage:50, ammo:1, color:'#ffffff', splitter:false },
+  { name:'Firestorm', radius:14, damage:16, ammo:1, color:'#ff6622', splitter:true, subs:7 },
 ];
 
 const canvas = document.getElementById('canvas');
@@ -714,8 +729,24 @@ function updateProjectiles() {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
     p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.vx += wind * 0.003;
+    p.steps = (p.steps || 0) + 1;
 
     if (p.x < -50 || p.x > GW + 50 || p.y > GH + 50) {
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    /* AIRBURST: break up in the air, short of anything. No crater and no
+       blast here -- only the sub-shells. The burst point comes from the
+       server where it has one, so a long flight cannot drift the two
+       apart; the step count is only the fallback. */
+    const wf = WEAPONS[p.wi] || WEAPONS[0];
+    if (wf.airburst && !p.isSplit && p.steps >= wf.airburst) {
+      const bx = p.burst ? p.burst.x : p.x, by = p.burst ? p.burst.y : p.y;
+      spawnExplosion(bx, by, 6, p.color);
+      for (const sub of (p.subs || [])) {
+        projectiles.push({ x: bx, y: by, vx: sub.svx, vy: sub.svy, wi: p.wi, color: p.color, isSplit: true });
+      }
       projectiles.splice(i, 1);
       continue;
     }
@@ -725,6 +756,16 @@ function updateProjectiles() {
       digTerrain(terrain, p.x, p.y, w.radius);
       terrainDirty = true;
       spawnExplosion(p.x, p.y, w.radius, p.color);
+
+      /* The shaft, straight down. Worked out from the impact point with
+         the same rule the server used rather than replayed from a
+         recording, because there is nothing random in it. */
+      for (let d = 1; d <= (w.digs || 0); d++) {
+        const dy = p.y + d * w.radius * 0.8;
+        if (dy > GH) break;
+        digTerrain(terrain, p.x, dy, w.radius);
+        spawnExplosion(p.x, dy, w.radius, p.color);
+      }
 
       if (w.splitter && !p.isSplit && p.subs) {
         for (const sub of p.subs) {
@@ -777,6 +818,7 @@ function startResolvingAnimation(results, wind) {
       x: r.sx, y: r.sy, vx: r.vx, vy: r.vy,
       wi: r.wi, color, isSplit: false,
       subs: r.subs || [],
+      burst: r.burst || null,
     });
   }
 

@@ -6,12 +6,35 @@ const RESOLVE_MS = 6000;
 const MAX_ROUNDS = 50;
 const ROOM_TTL = 7200;
 
+/* ══ WEAPONS ═══════════════════════════════════════════════════════════
+   MIRRORED IN games/phamshock/index.html, which carries the same table
+   plus a name and a colour and re-simulates every shot to animate it. The
+   two must agree on radius, damage, ammo and the mechanic flags or the
+   replay draws a different battle from the one the server scored --
+   asserted in test-phamshock-weapons.js rather than left to discipline.
+
+   THIS IS THE AUTHORITY. Anything with randomness in it is rolled here and
+   recorded in the shot result, so the client replays what happened rather
+   than rolling its own version of it.
+
+   Four mechanics, not five sets of numbers:
+     splitter  breaks into `subs` sub-shells ON IMPACT
+     airburst  breaks up IN FLIGHT, after `fuse` steps, so it can reach
+               over a ridge that a direct shot cannot
+     digs      punches that many more craters straight down after the
+               first, for tunnelling somebody out of a hole
+     plain     radius, damage and ammo only */
 const WEAPONS = [
-  { radius: 20, damage: 25, ammo: 999, splitter: false },
-  { radius: 35, damage: 40, ammo: 3, splitter: false },
-  { radius: 10, damage: 35, ammo: 3, splitter: false },
-  { radius: 55, damage: 60, ammo: 1, splitter: false },
-  { radius: 15, damage: 18, ammo: 2, splitter: true },
+  { radius: 20, damage: 25, ammo: 999, splitter: false },                    /* Shell */
+  { radius: 35, damage: 40, ammo: 3, splitter: false },                      /* Big Shell */
+  { radius: 10, damage: 35, ammo: 3, splitter: false },                      /* Sniper */
+  { radius: 55, damage: 60, ammo: 1, splitter: false },                      /* Nuke */
+  { radius: 15, damage: 18, ammo: 2, splitter: true, subs: 4 },              /* Splitter */
+  { radius: 28, damage: 30, ammo: 4, splitter: false },                      /* Mortar */
+  { radius: 12, damage: 14, ammo: 2, splitter: true, subs: 5, airburst: 34 },/* Cluster Bomb */
+  { radius: 18, damage: 30, ammo: 2, splitter: false, digs: 4 },             /* Bunker Buster */
+  { radius: 6,  damage: 50, ammo: 1, splitter: false },                      /* Railgun */
+  { radius: 14, damage: 16, ammo: 1, splitter: true, subs: 7 },              /* Firestorm */
 ];
 
 function json(data, s = 200) {
@@ -85,7 +108,15 @@ function digTerrain(t, cx, cy, r) {
 
 function tY(t, x) { return GAME_H - t[Math.max(0, Math.min(GAME_W - 1, Math.round(x)))]; }
 
-function simShot(sx, sy, vx, vy, terrain, wind, tanks) {
+/**
+ * Fly a shell until it hits something.
+ *
+ * `fuse`, when given, stops it in mid-air at that step instead and reports
+ * where it was -- which is how an airburst reaches over a ridge. A shell
+ * that hits terrain before its fuse runs out just explodes normally, so a
+ * cluster bomb fired flat into a wall behaves like any other shell.
+ */
+function simShot(sx, sy, vx, vy, terrain, wind, tanks, fuse) {
   let x = sx, y = sy;
   for (let i = 0; i < 2000; i++) {
     x += vx; y += vy; vy += 0.15; vx += wind * 0.003;
@@ -94,6 +125,7 @@ function simShot(sx, sy, vx, vy, terrain, wind, tanks) {
     for (const tk of tanks) {
       if (Math.abs(x - tk.x) < 14 && Math.abs(y - (tY(terrain, tk.x) - 4)) < 12) return { x, y };
     }
+    if (fuse && i + 1 >= fuse) return { x, y, burst: true };
   }
   return null;
 }
@@ -127,21 +159,42 @@ function resolve(room) {
     const sy = tY(terrain, p.x) - 8 + Math.sin(aRad) * 18;
     const vx = Math.cos(aRad) * pwr, vy = Math.sin(aRad) * pwr;
 
-    const hit = simShot(sx, sy, vx, vy, terrain, room.wind, alive);
+    const hit = simShot(sx, sy, vx, vy, terrain, room.wind, alive, w.airburst);
     const r = { pid: id, sx, sy, vx, vy, wi: s.weapon, hit: !!hit, hx: hit ? hit.x : 0, hy: hit ? hit.y : 0, subs: [] };
+    /* The client counts its own steps to know when to break the shell up;
+       the point is recorded anyway so the two cannot drift apart over a
+       long flight. */
+    if (hit && hit.burst) r.burst = { x: hit.x, y: hit.y };
 
     if (hit) {
-      newExp.push({ x: hit.x, y: hit.y, r: w.radius });
-      digTerrain(terrain, hit.x, hit.y, w.radius);
-      applyDamage(hit, w, alive, terrain, dmg);
+      /* An airburst goes off in the air: no crater, no blast where it
+         split, only the sub-shells it drops. */
+      if (!hit.burst) {
+        newExp.push({ x: hit.x, y: hit.y, r: w.radius });
+        digTerrain(terrain, hit.x, hit.y, w.radius);
+        applyDamage(hit, w, alive, terrain, dmg);
+
+        /* Straight down, one crater under the last, which is what makes
+           this the answer to somebody dug into a hillside. Deterministic
+           and unrecorded: the client works out the same column from the
+           same impact point. */
+        for (let d = 1; d <= (w.digs || 0); d++) {
+          const dy = hit.y + d * w.radius * 0.8;
+          if (dy > GAME_H) break;
+          newExp.push({ x: hit.x, y: dy, r: w.radius });
+          digTerrain(terrain, hit.x, dy, w.radius);
+          applyDamage({ x: hit.x, y: dy }, w, alive, terrain, dmg);
+        }
+      }
 
       if (w.splitter) {
-        for (let j = 0; j < 4; j++) {
+        for (let j = 0; j < (w.subs || 4); j++) {
           const a2 = -Math.PI * 0.2 - Math.random() * Math.PI * 0.6;
           const dir = Math.random() > 0.5 ? 1 : -1;
           const svx = Math.cos(a2) * (2 + Math.random() * 2) * dir;
           const svy = Math.sin(a2) * (3 + Math.random() * 2);
           const sh = simShot(hit.x, hit.y - 5, svx, svy, terrain, room.wind, alive);
+          /* Sub-shells are ordinary shells: they land, crater and hurt. */
           if (sh) {
             newExp.push({ x: sh.x, y: sh.y, r: w.radius });
             digTerrain(terrain, sh.x, sh.y, w.radius);
