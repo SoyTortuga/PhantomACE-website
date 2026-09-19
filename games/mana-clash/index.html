@@ -15,7 +15,10 @@
 
     :root {
       --red: #ff0000;
-      --dim: #666;
+      /* White like the rest of the site. Every use is a label or a unit
+         -- .field-label, .tray-label, .top-bar-stats -- none of them a
+         state, which is carried by opacity here. */
+      --dim: #fff;
       --line: #2a2a2a;
       --panel: #0a0a0a;
     }
@@ -29,7 +32,7 @@
     .btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .btn-red { background: var(--red); color: #fff; }
     .btn-red:hover:not(:disabled) { background: #d40000; }
-    .btn-dim { background: #1a1a1a; color: #bbb; border-color: var(--line); }
+    .btn-dim { background: #1a1a1a; color: #fff; border-color: var(--line); }
     .btn-dim:hover:not(:disabled) { background: #242424; color: #fff; }
     .btn-lg { padding: 14px 38px; font-size: 15px; }
 
@@ -54,7 +57,7 @@
 
     .splash-body { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; }
     .gate { max-width: 460px; text-align: center; margin: 20px 0; }
-    .gate p { font-size: 13px; color: #aaa; line-height: 1.6; margin-bottom: 14px; }
+    .gate p { font-size: 13px; color: #fff; line-height: 1.6; margin-bottom: 14px; }
 
     .splash-sections { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 620px; }
     .splash-form { flex: 1 1 280px; display: flex; flex-direction: column; gap: 9px; }
@@ -105,7 +108,7 @@
     /* Three stacked lines. Total and status used to share one, which was
        fine while the status said "banked" and ran together the moment it
        started saying "+300 pts (time)". */
-    .standing .nm { color: #ddd; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .standing .nm { color: #fff; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .standing .tot { color: #fff; font-weight: 800; font-size: 14px; display: block; line-height: 1.2; }
     .standing.me { border-color: var(--red); }
     .standing.done-banked { opacity: 0.6; }
@@ -113,7 +116,7 @@
     .standing .st { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
                     display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .standing .st.gain { color: #6ac46a; font-weight: 700; }
-    .standing .st.zero { color: #8a8a8a; }
+    .standing .st.zero { color: #fff; }
     .standing .st.burn { color: #ff4040; font-weight: 700; }
     .standing .st.holding { color: #ffb300; }
 
@@ -169,7 +172,7 @@
     }
     .spectate-target { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
     .spectate-target b { display: block; font-size: 34px; color: #fff; font-weight: 800; line-height: 1.1; }
-    .spectate-sub { font-size: 13px; color: #aaa; margin: 10px 0 14px; }
+    .spectate-sub { font-size: 13px; color: #fff; margin: 10px 0 14px; }
     .spectate-list { display: flex; flex-direction: column; gap: 5px; }
     .spectate-list li {
       display: flex; align-items: center; gap: 10px;
@@ -193,7 +196,7 @@
     .flash { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
              align-items: center; justify-content: center; pointer-events: none; text-align: center; }
     .flash-word { font-size: 13vw; font-weight: 800; letter-spacing: 0.06em; line-height: 1; }
-    .flash-note { font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 12px; color: #bbb; }
+    .flash-note { font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 12px; color: #fff; }
     .flash.burn { background: rgba(60,0,0,0.93); }
     .flash.burn .flash-word { color: #ff2020; }
     .flash.clash { background: rgba(48,32,0,0.93); }
@@ -225,7 +228,7 @@
     .chat-toggle:hover { color: #fff; }
     .chat-log { list-style: none; margin: 0; padding: 8px 10px; height: 168px;
                 overflow-y: auto; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; }
-    .chat-msg { color: #cfcfcf; margin-bottom: 3px; }
+    .chat-msg { color: #fff; margin-bottom: 3px; }
     .chat-msg b { color: var(--dim); font-weight: 700; }
     .chat-msg.is-mine b { color: var(--red); }
     .chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
@@ -314,7 +317,7 @@
       padding-bottom: 5px;
     }
     .rules-h:first-child { margin-top: 0; }
-    .rules-p { font-size: 13px; color: #bbb; line-height: 1.6; margin-bottom: 8px; }
+    .rules-p { font-size: 13px; color: #fff; line-height: 1.6; margin-bottom: 8px; }
     .rules-p b { color: #fff; }
     .rules-p .burn { color: #ff0000; font-weight: 700; }
     .rules-p .clash { color: #ffb300; font-weight: 700; }
@@ -331,7 +334,7 @@
     .rules-table tr:hover td { background: #0d0d0d; }
 
     .rules-dice { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-    .rules-die { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #bbb; }
+    .rules-die { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #fff; }
     .rules-die i {
       width: 20px; height: 20px; border-radius: 4px; display: inline-block;
       border: 1px solid #333;
@@ -370,7 +373,7 @@
     .standings-table .srow .delta { font-size: 11px; width: 92px; text-align: right;
                                     text-transform: uppercase; letter-spacing: 0.06em; }
     .standings-table .srow .delta.gain { color: #6ac46a; }
-    .standings-table .srow .delta.zero { color: #8a8a8a; }
+    .standings-table .srow .delta.zero { color: #fff; }
     .standings-table .srow .delta.burn { color: #ff4040; font-weight: 700; }
     .standings-table .srow.me { border-color: var(--red); }
 

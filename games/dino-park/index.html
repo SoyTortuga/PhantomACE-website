@@ -28,17 +28,17 @@
     }
     .top-bar-title { font-size: 16px; font-weight: 700; color: #ff0000; letter-spacing: 1px; }
     .top-bar-stats { display: flex; gap: 12px; font-size: 11px; }
-    .stat-item { display: flex; align-items: center; gap: 3px; color: #999; }
+    .stat-item { display: flex; align-items: center; gap: 3px; color: #fff; }
     .stat-item .val { color: #fff; font-weight: 600; }
 
     /* Tabs */
     .tab-bar { display: flex; background: #0a0a0a; border-bottom: 1px solid #ffffff14; height: 42px; }
     .tab-btn {
-      flex: 1; padding: 6px 4px; background: transparent; border: none; color: #666;
+      flex: 1; padding: 6px 4px; background: transparent; border: none; color: #fff;
       font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
       cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s;
     }
-    .tab-btn:hover { color: #ccc; }
+    .tab-btn:hover { color: #fff; }
     .tab-btn.active { color: #ff0000; border-bottom-color: #ff0000; }
     .tab-btn .tab-icon { font-size: 13px; display: block; margin-bottom: 1px; }
 
@@ -75,7 +75,7 @@
     }
     .park-zoom-controls button {
       width: 28px; height: 28px;
-      background: rgba(0,0,0,0.75); color: #bbb;
+      background: rgba(0,0,0,0.75); color: #fff;
       border: 1px solid #ffffff14; border-radius: 4px;
       font-family: inherit; font-size: 14px; font-weight: 700;
       cursor: pointer; line-height: 1;
@@ -203,9 +203,9 @@
     .clock-text { display: flex; flex-direction: column; gap: 1px; }
     .clock-name {
       font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-      color: #ccc; line-height: 1;
+      color: #fff; line-height: 1;
     }
-    .clock-sub { font-size: 8px; color: #666; line-height: 1; }
+    .clock-sub { font-size: 8px; color: #fff; line-height: 1; }
     .park-clock.live { border-color: #FF000045; }
     .park-clock.live .clock-name { color: #FF3333; }
     .clock-live-dot {
@@ -223,7 +223,7 @@
       position: absolute; top: 22px; left: 22px; z-index: 12;
       display: flex; align-items: center; gap: 5px;
       background: rgba(0,0,0,0.75); padding: 5px 9px; border-radius: 4px;
-      border: 1px solid #ffffff14; color: #bbb; cursor: pointer;
+      border: 1px solid #ffffff14; color: #fff; cursor: pointer;
       font-family: inherit; font-size: 10px; letter-spacing: 0.06em;
       text-transform: uppercase; transition: border-color 0.15s, color 0.15s;
     }
@@ -239,9 +239,9 @@
     .yard-tray-head {
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 7px; font-size: 9px; letter-spacing: 0.1em;
-      text-transform: uppercase; color: #666;
+      text-transform: uppercase; color: #fff;
     }
-    .yard-tray-hint { color: #555; text-transform: none; letter-spacing: 0; font-size: 9px; }
+    .yard-tray-hint { color: #fff; text-transform: none; letter-spacing: 0; font-size: 9px; }
     .yard-tray-items { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
     .yard-item-btn {
       flex: 0 0 auto; width: 62px; padding: 6px 3px 5px;
@@ -253,7 +253,7 @@
     .yard-item-btn.selected { border-color: #FF0000; background: #1e0505; }
     .yard-item-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .yard-item-btn img { image-rendering: pixelated; display: block; margin: 0 auto 3px; }
-    .yard-item-name { font-size: 8px; color: #999; letter-spacing: 0.04em; display: block; }
+    .yard-item-name { font-size: 8px; color: #fff; letter-spacing: 0.04em; display: block; }
     .yard-item-cost { font-size: 9px; color: #d4a017; display: block; margin-top: 1px; }
     .yard-item-btn.selected .yard-item-name { color: #fff; }
 
@@ -267,7 +267,7 @@
     .energy-icon { font-size: 12px; }
     .energy-fill-ctr { width: 60px; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
     .energy-fill { height: 100%; background: #ffaa00; border-radius: 3px; transition: width 0.3s; }
-    .energy-text { font-size: 9px; color: #ccc; font-weight: 600; min-width: 30px; }
+    .energy-text { font-size: 9px; color: #fff; font-weight: 600; min-width: 30px; }
     .energy-refill {
       font-size: 8px; padding: 2px 6px; background: #222; border: 1px solid #ffffff28;
       border-radius: 3px; color: #ffaa00; cursor: pointer; font-weight: 600;
@@ -340,22 +340,22 @@
       font-size: 8px; padding: 1px 6px; border-radius: 3px;
       text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700;
     }
-    .pbadge-common { background: #7a7a7a33; color: #aaa; }
+    .pbadge-common { background: #7a7a7a33; color: #fff; }
     .pbadge-uncommon { background: #2ecc7122; color: #2ecc71; }
     .pbadge-rare { background: #3498db22; color: #3498db; }
     .pbadge-epic { background: #9b59b622; color: #9b59b6; }
     .pbadge-legendary { background: #f39c1222; color: #f39c12; }
-    .pbadge-diet { background: #ffffff0a; color: #888; }
+    .pbadge-diet { background: #ffffff0a; color: #fff; }
     .panel-fav {
       background: none; border: none; cursor: pointer;
       font-size: 22px; line-height: 1; padding: 0 6px;
-      color: #6f6f6f; transition: color 0.15s;
+      color: #fff; transition: color 0.15s;
     }
     .panel-fav:hover { color: #ffb300; }
     .panel-fav.is-fav { color: #ffb300; }
 
     .panel-close {
-      background: transparent; border: 1px solid #333; color: #666;
+      background: transparent; border: 1px solid #333; color: #fff;
       width: 24px; height: 24px; border-radius: 4px; font-size: 14px;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
@@ -401,7 +401,7 @@
       align-items: center;
       gap: 8px;
       font-size: 9px;
-      color: #555;
+      color: #fff;
     }
     .panel-growth-bar {
       flex: 1;
@@ -429,7 +429,7 @@
       padding: 10px 6px 8px;
       background: #0d0d0d;
       border: none;
-      color: #ccc;
+      color: #fff;
       font-size: 10px;
       font-weight: 600;
       cursor: pointer;
@@ -439,14 +439,14 @@
     .panel-action:hover:not(:disabled) { background: #1a1a1a; color: #fff; }
     .panel-action:disabled { opacity: 0.3; cursor: not-allowed; }
     .panel-action .action-icon { font-size: 16px; display: block; margin-bottom: 2px; }
-    .panel-action .action-cd { font-size: 8px; color: #666; display: block; margin-top: 1px; }
-    .panel-action.details-btn { max-width: 60px; color: #888; }
+    .panel-action .action-cd { font-size: 8px; color: #fff; display: block; margin-top: 1px; }
+    .panel-action.details-btn { max-width: 60px; color: #fff; }
     .panel-action.details-btn:hover { color: #ff0000; }
-    .panel-action.release-action { max-width: 50px; color: #555; font-size: 9px; }
+    .panel-action.release-action { max-width: 50px; color: #fff; font-size: 9px; }
     .panel-action.release-action:hover { color: #ff0000; }
 
     /* ======================== MARKETPLACE ======================== */
-    .market-login { text-align: center; padding: 40px 20px; color: #666; }
+    .market-login { text-align: center; padding: 40px 20px; color: #fff; }
     .market-login-btn {
       display: inline-block; margin-top: 12px; padding: 10px 24px;
       background: #9146FF; border: none; border-radius: 6px;
@@ -473,8 +473,8 @@
     .market-card:hover { border-color: #ffaa00; }
     .market-card-sprite { margin-bottom: 6px; }
     .market-card-name { font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 2px; }
-    .market-card-meta { font-size: 9px; color: #888; margin-bottom: 6px; }
-    .market-card-seller { font-size: 8px; color: #666; margin-bottom: 6px; }
+    .market-card-meta { font-size: 9px; color: #fff; margin-bottom: 6px; }
+    .market-card-seller { font-size: 8px; color: #fff; margin-bottom: 6px; }
     .market-card-price { font-size: 14px; font-weight: 700; color: #ffaa00; margin-bottom: 6px; }
     .market-card-buy {
       padding: 4px 16px; background: #ffaa00; border: none; border-radius: 4px;
@@ -484,12 +484,12 @@
     .market-card-buy:disabled { opacity: 0.4; cursor: default; }
     .market-card-cancel {
       padding: 4px 12px; background: transparent; border: 1px solid #ffffff28;
-      border-radius: 4px; color: #888; font-size: 9px; cursor: pointer; margin-top: 4px;
+      border-radius: 4px; color: #fff; font-size: 9px; cursor: pointer; margin-top: 4px;
     }
     .market-card-cancel:hover { border-color: #ff0000; color: #ff0000; }
     .market-empty { text-align: center; color: #444; font-size: 12px; padding: 30px; }
     .market-card .rarity-chip { display: inline-block; font-size: 8px; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
-    .market-card .rarity-common { background: #333; color: #999; }
+    .market-card .rarity-common { background: #333; color: #fff; }
     .market-card .rarity-uncommon { background: #1a3a1a; color: #4CAF50; }
     .market-card .rarity-rare { background: #1a2a4a; color: #42A5F5; }
     .market-card .rarity-epic { background: #2a1a3a; color: #AB47BC; }
@@ -507,9 +507,9 @@
     }
     .sell-dialog-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px; }
     .sell-dialog-sprite { margin-bottom: 8px; }
-    .sell-dialog-info { font-size: 10px; color: #888; margin-bottom: 12px; }
+    .sell-dialog-info { font-size: 10px; color: #fff; margin-bottom: 12px; }
     .sell-dialog-price-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
-    .sell-dialog-price-row label { font-size: 11px; color: #ccc; }
+    .sell-dialog-price-row label { font-size: 11px; color: #fff; }
     .sell-dialog-price-input {
       width: 80px; padding: 6px 10px; background: #222; border: 1px solid #ffffff28;
       border-radius: 4px; color: #ffaa00; font-size: 14px; font-weight: 700;
@@ -523,7 +523,7 @@
     }
     .sell-confirm { background: #ffaa00; color: #000; }
     .sell-confirm:hover { background: #ff8800; }
-    .sell-cancel { background: #222; color: #888; border: 1px solid #ffffff28 !important; }
+    .sell-cancel { background: #222; color: #fff; border: 1px solid #ffffff28 !important; }
     .sell-cancel:hover { color: #fff; }
 
     /* ======================== EGGS TAB ======================== */
@@ -540,7 +540,7 @@
     .egg-slot.empty { border-style: dashed; color: #333; font-size: 11px; }
     .egg-emoji { font-size: 36px; margin-bottom: 6px; animation: eggWobble 2s infinite ease-in-out; }
     @keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
-    .egg-name { font-size: 10px; color: #ccc; font-weight: 600; margin-bottom: 4px; }
+    .egg-name { font-size: 10px; color: #fff; font-weight: 600; margin-bottom: 4px; }
     .egg-timer { font-size: 18px; font-weight: 700; color: #ff0000; margin-bottom: 4px; }
     .egg-progress { width: 80%; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
     .egg-progress-fill { height: 100%; background: #ff0000; border-radius: 2px; transition: width 1s linear; }
@@ -569,8 +569,8 @@
     .egg-source.claimed, .egg-source.locked { opacity: 0.4; }
     .egg-source-icon { font-size: 30px; flex-shrink: 0; width: 40px; text-align: center; }
     .egg-source-info { flex: 1; min-width: 0; }
-    .egg-source-name { font-size: 12px; font-weight: 700; color: #ccc; margin-bottom: 2px; }
-    .egg-source-desc { font-size: 10px; color: #666; line-height: 1.4; }
+    .egg-source-name { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .egg-source-desc { font-size: 10px; color: #fff; line-height: 1.4; }
     .egg-source-timer { font-size: 10px; color: #ff0000; font-weight: 600; margin-top: 3px; }
     .egg-source-badge {
       font-size: 8px; padding: 2px 8px; border-radius: 3px; font-weight: 700;
@@ -578,7 +578,7 @@
     }
     .esbadge-ready { background: #ff000033; color: #ff4444; }
     .esbadge-claimed { background: #27ae6022; color: #2ecc71; }
-    .esbadge-waiting { background: #ffffff0a; color: #555; }
+    .esbadge-waiting { background: #ffffff0a; color: #fff; }
     .esbadge-locked { background: #ffffff0a; color: #333; }
 
     /* Random event banner */
@@ -597,7 +597,7 @@
     }
     .event-banner-icon { font-size: 32px; margin-bottom: 6px; }
     .event-banner-title { font-size: 13px; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
-    .event-banner-desc { font-size: 10px; color: #888; margin-bottom: 10px; }
+    .event-banner-desc { font-size: 10px; color: #fff; margin-bottom: 10px; }
     .event-banner-timer { font-size: 11px; color: #ff0000; font-weight: 600; margin-bottom: 8px; }
     .event-banner-btn {
       padding: 8px 24px; background: #ff0000; border: none; border-radius: 4px;
@@ -659,7 +659,7 @@
       flex: 1;
       background: #ffffff08;
       border: 1px solid #ffffff14;
-      color: #888;
+      color: #fff;
       font-family: inherit;
       font-size: 9px;
       font-weight: 700;
@@ -674,7 +674,7 @@
       border-color: #ffaa0055;
       color: #ffaa00;
     }
-    .coll-view-toggle button:hover:not(.active) { color: #ccc; border-color: #ffffff2a; }
+    .coll-view-toggle button:hover:not(.active) { color: #fff; border-color: #ffffff2a; }
     .coll-card {
       background: #111;
       border: 2px solid #ffffff14;
@@ -698,14 +698,14 @@
     .coll-card.selected.rarity-epic { border-color: #9b59b6; }
     .coll-card.selected.rarity-legendary { border-color: #f39c12; }
     .coll-card-sprite { margin: 0 auto 4px; }
-    .coll-card-name { font-size: 9px; font-weight: 600; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .coll-card-level { font-size: 8px; color: #666; margin-top: 2px; }
+    .coll-card-name { font-size: 9px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .coll-card-level { font-size: 8px; color: #fff; margin-top: 2px; }
     .coll-card-bars { display: flex; gap: 2px; margin-top: 4px; height: 3px; }
     .coll-card-bars > div { flex: 1; border-radius: 1px; }
 
     .trade-open {
       width: 100%; margin-bottom: 6px; padding: 6px;
-      background: #1a1a1a; color: #aaa; border: 1px solid #ffffff1a;
+      background: #1a1a1a; color: #fff; border: 1px solid #ffffff1a;
       border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer;
       text-transform: uppercase; letter-spacing: 0.08em;
     }
@@ -714,16 +714,16 @@
       background: #0f0f0f; border: 1px solid #ffffff14; border-radius: 4px;
       padding: 8px; margin-bottom: 8px;
     }
-    .trade-count { font-size: 14px; font-weight: 700; color: #666; }
+    .trade-count { font-size: 14px; font-weight: 700; color: #fff; }
     .trade-count.ready { color: #2ecc71; }
-    .trade-hint { font-size: 10px; color: #888; margin-top: 2px; }
-    .trade-avail { font-size: 9px; color: #555; margin-top: 4px; line-height: 1.5; }
+    .trade-hint { font-size: 10px; color: #fff; margin-top: 2px; }
+    .trade-avail { font-size: 9px; color: #fff; margin-top: 4px; line-height: 1.5; }
     .trade-btns { display: flex; gap: 6px; margin-top: 8px; }
     .trade-btns button {
       flex: 1; padding: 6px; border-radius: 4px; font-size: 10px;
       font-weight: 700; cursor: pointer; text-transform: uppercase;
     }
-    .trade-cancel { background: #1a1a1a; color: #888; border: 1px solid #ffffff1a; }
+    .trade-cancel { background: #1a1a1a; color: #fff; border: 1px solid #ffffff1a; }
     .trade-go { background: #ff0000; color: #fff; border: 1px solid #ff0000; }
     .trade-go[disabled] { background: #1a1a1a; color: #444; border-color: #ffffff14; cursor: not-allowed; }
     /* Dimmed, not hidden: a card you cannot pick should still say why it is
@@ -731,7 +731,7 @@
     .coll-card.tu-dim { opacity: 0.28; cursor: default; }
     .coll-card.tu-picked { border-color: #2ecc71; background: #10200f; }
     .trade-consume {
-      font-size: 10px; color: #888; margin: 8px 0; line-height: 1.7;
+      font-size: 10px; color: #fff; margin: 8px 0; line-height: 1.7;
       max-height: 120px; overflow-y: auto;
     }
 
@@ -763,7 +763,7 @@
     .coll-vault-note {
       margin-top: 12px; padding: 10px 14px; width: 100%;
       background: #ffffff06; border: 1px solid #ffffff14; border-radius: 4px;
-      color: #888; font-size: 11px; text-align: center;
+      color: #fff; font-size: 11px; text-align: center;
     }
     .coll-detail-empty {
       flex: 1; display: flex; align-items: center; justify-content: center;
@@ -771,7 +771,7 @@
     }
     .coll-sprite-large { margin-bottom: 12px; max-width: 100%; }
     .coll-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-    .coll-species { font-size: 11px; color: #888; margin-bottom: 10px; }
+    .coll-species { font-size: 11px; color: #fff; margin-bottom: 10px; }
     .coll-badges { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
     .coll-badge {
       font-size: 9px; padding: 3px 10px; border-radius: 3px; font-weight: 700;
@@ -783,7 +783,7 @@
       display: flex; align-items: center; gap: 8px; padding: 5px 0;
       border-bottom: 1px solid #ffffff0a;
     }
-    .coll-stat-label { font-size: 10px; color: #666; width: 70px; }
+    .coll-stat-label { font-size: 10px; color: #fff; width: 70px; }
     .coll-stat-dots { display: flex; gap: 3px; flex: 1; }
     .coll-dot {
       width: 12px; height: 12px; border-radius: 2px; background: #1a1a1a;
@@ -799,26 +799,26 @@
       display: flex; gap: 12px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap;
     }
     .coll-attr { text-align: center; }
-    .coll-attr-label { font-size: 8px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
-    .coll-attr-val { font-size: 14px; font-weight: 700; color: #ccc; }
+    .coll-attr-label { font-size: 8px; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; }
+    .coll-attr-val { font-size: 14px; font-weight: 700; color: #fff; }
 
     .coll-actions { display: flex; gap: 6px; width: 100%; max-width: 280px; }
     .coll-action {
       flex: 1; padding: 10px 6px; background: #111; border: 1px solid #ffffff14;
-      border-radius: 4px; color: #ccc; font-size: 10px; font-weight: 600;
+      border-radius: 4px; color: #fff; font-size: 10px; font-weight: 600;
       cursor: pointer; text-align: center; transition: all 0.2s;
     }
     .coll-action:hover:not(:disabled) { border-color: #ff0000; color: #fff; }
     .coll-action:disabled { opacity: 0.3; cursor: not-allowed; }
     .coll-action .ca-icon { font-size: 14px; display: block; margin-bottom: 2px; }
-    .coll-action .ca-cd { font-size: 8px; color: #666; }
+    .coll-action .ca-cd { font-size: 8px; color: #fff; }
 
     .coll-growth-section { width: 100%; max-width: 280px; margin-bottom: 16px; }
-    .coll-growth-label { font-size: 9px; color: #555; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .coll-growth-label { font-size: 9px; color: #fff; margin-bottom: 4px; display: flex; justify-content: space-between; }
     .coll-growth-bar { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
     .coll-growth-fill { height: 100%; background: linear-gradient(90deg, #ff0000, #ff4444); border-radius: 3px; transition: width 0.5s; }
 
-    .coll-desc { font-size: 10px; color: #555; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
+    .coll-desc { font-size: 10px; color: #fff; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
 
     /* ======================== DINODEX ======================== */
     .dex-stats-bar {
@@ -833,11 +833,11 @@
       padding: 8px; text-align: center;
     }
     .dex-stat-val { font-size: 18px; font-weight: 700; color: #fff; }
-    .dex-stat-lbl { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; line-height: 1.3; }
+    .dex-stat-lbl { font-size: 8px; color: #fff; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; line-height: 1.3; }
     .dex-progress-row { display: flex; gap: 4px; margin-bottom: 12px; align-items: center; }
     .dex-progress-bar { flex: 1; height: 6px; background: #111; border-radius: 3px; overflow: hidden; }
     .dex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-    .dex-progress-lbl { font-size: 9px; color: #666; min-width: 50px; }
+    .dex-progress-lbl { font-size: 9px; color: #fff; min-width: 50px; }
     .dex-rarity-row { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
     .dex-rarity-chip {
       font-size: 9px; padding: 3px 8px; border-radius: 3px; border: 1px solid;
@@ -846,10 +846,10 @@
     .dex-filters { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
     .dex-filter {
       padding: 5px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 3px;
-      color: #666; font-size: 10px; font-weight: 600; text-transform: uppercase;
+      color: #fff; font-size: 10px; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.04em; cursor: pointer; transition: all 0.2s;
     }
-    .dex-filter:hover { color: #ccc; border-color: #ffffff28; }
+    .dex-filter:hover { color: #fff; border-color: #ffffff28; }
     .dex-filter.active { color: #ff0000; border-color: #ff0000; }
     .dex-counter { font-size: 11px; color: #444; margin-bottom: 8px; }
     .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
@@ -867,8 +867,8 @@
     .dex-entry.undiscovered { opacity: 0.35; }
     .dex-emoji { font-size: 24px; flex-shrink: 0; }
     .dex-info { flex: 1; min-width: 0; }
-    .dex-name { font-size: 11px; font-weight: 600; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dex-sub { font-size: 9px; color: #666; margin-top: 1px; }
+    .dex-name { font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dex-sub { font-size: 9px; color: #fff; margin-top: 1px; }
     .dex-mut-dots { display: flex; gap: 2px; margin-top: 3px; }
     .dex-mut-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid #ffffff28; }
     .dex-mut-dot.found { box-shadow: 0 0 4px currentColor; }
@@ -880,13 +880,13 @@
     .dex-detail-portrait { flex-shrink: 0; max-width: 100%; }
     .dex-detail-info { flex: 1; min-width: 200px; }
     .dex-detail-name { font-size: 18px; font-weight: 700; color: #fff; }
-    .dex-detail-species { font-size: 11px; color: #666; margin-top: 2px; }
+    .dex-detail-species { font-size: 11px; color: #fff; margin-top: 2px; }
     .dex-detail-badges { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
     .dex-detail-badge {
       font-size: 9px; padding: 2px 8px; border-radius: 3px; text-transform: uppercase;
       font-weight: 600; letter-spacing: 0.04em;
     }
-    .dex-detail-desc { font-size: 11px; color: #888; line-height: 1.5; margin-top: 8px; font-style: italic; }
+    .dex-detail-desc { font-size: 11px; color: #fff; line-height: 1.5; margin-top: 8px; font-style: italic; }
     .dex-detail-section { margin-top: 12px; }
     .dex-detail-section-title {
       font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: 0.1em;
@@ -902,16 +902,16 @@
     .dex-mut-card .mut-swatch {
       width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; border: 1px solid #ffffff14;
     }
-    .dex-mut-label { color: #ccc; flex: 1; }
-    .dex-mut-tier { font-size: 8px; color: #666; text-transform: uppercase; }
+    .dex-mut-label { color: #fff; flex: 1; }
+    .dex-mut-tier { font-size: 8px; color: #fff; text-transform: uppercase; }
     .dex-owned-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
     .dex-owned-chip {
       background: #111; border: 1px solid #ffffff14; border-radius: 4px;
-      padding: 3px 6px; font-size: 9px; color: #aaa; display: flex; align-items: center; gap: 4px;
+      padding: 3px 6px; font-size: 9px; color: #fff; display: flex; align-items: center; gap: 4px;
     }
     .dex-close-btn {
       padding: 4px 12px; background: transparent; border: 1px solid #ffffff28; border-radius: 3px;
-      color: #888; font-size: 10px; cursor: pointer; float: right;
+      color: #fff; font-size: 10px; cursor: pointer; float: right;
     }
     .dex-close-btn:hover { color: #fff; border-color: #ff0000; }
 
@@ -925,7 +925,7 @@
     @keyframes hatchBounce { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.3); } 100% { transform: scale(1); opacity: 1; } }
     .hatch-name { font-size: 22px; font-weight: 700; color: #fff; margin-top: 16px; }
     .hatch-rarity { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
-    .hatch-desc { font-size: 13px; color: #999; margin-top: 12px; max-width: 300px; line-height: 1.5; }
+    .hatch-desc { font-size: 13px; color: #fff; margin-top: 12px; max-width: 300px; line-height: 1.5; }
     .hatch-close {
       margin-top: 24px; padding: 10px 32px; background: #ff0000; border: none;
       border-radius: 4px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
@@ -935,7 +935,7 @@
       position: fixed; bottom: 20px; left: 50%;
       transform: translateX(-50%) translateY(100px);
       background: #111; border: 1px solid #ffffff28; border-radius: 6px;
-      padding: 10px 20px; font-size: 12px; color: #ccc; z-index: 150;
+      padding: 10px 20px; font-size: 12px; color: #fff; z-index: 150;
       transition: transform 0.3s ease; white-space: nowrap;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
@@ -1012,7 +1012,7 @@
   </div>
   <div class="eggs-section">
     <div class="section-title">Redeem Egg Code</div>
-    <div style="font-size: 10px; color: #555; margin-bottom: 8px;">Mods and the broadcaster drop egg codes during stream!</div>
+    <div style="font-size: 10px; color: #fff; margin-bottom: 8px;">Mods and the broadcaster drop egg codes during stream!</div>
     <div class="redeem-row">
       <input type="text" class="redeem-input" id="redeemInput" placeholder="Enter egg code..." maxlength="20">
       <button class="redeem-btn" onclick="redeemCode()">Redeem</button>
@@ -4753,7 +4753,7 @@ async function renderMarketplace() {
       <div class="market-login">
         <div style="font-size:32px;margin-bottom:12px;">🏪</div>
         <div style="font-size:14px;color:#fff;margin-bottom:6px;">Dino Marketplace</div>
-        <div style="font-size:11px;color:#666;margin-bottom:16px;">Buy and sell dinosaurs with other players.<br>Login with Twitch to get started.</div>
+        <div style="font-size:11px;color:#fff;margin-bottom:16px;">Buy and sell dinosaurs with other players.<br>Login with Twitch to get started.</div>
         <a href="/api/auth/twitch?return_to=${returnTo}" class="market-login-btn">Login with Twitch</a>
       </div>`;
     return;
@@ -5157,7 +5157,7 @@ function renderIncubator() {
     const rem = Math.max(0, egg.hatchTime - egg.elapsed);
     const liveTag = isStreamLive
       ? '<div style="font-size:8px;color:#2ecc71;margin-top:3px;">● LIVE — Incubating</div>'
-      : '<div style="font-size:8px;color:#666;margin-top:3px;">○ Stream offline — Paused</div>';
+      : '<div style="font-size:8px;color:#fff;margin-top:3px;">○ Stream offline — Paused</div>';
     const eggSrc = ready ? EGG_ASSETS.hatching : (EGG_ASSETS[spec.rarity] || EGG_ASSETS.common);
     slots.push(`<div class="egg-slot"><div class="egg-emoji"><img src="${eggSrc}" width="40" height="40" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-name">${spec.rarity.charAt(0).toUpperCase()+spec.rarity.slice(1)} Egg</div>
@@ -5166,7 +5166,7 @@ function renderIncubator() {
         <div class="egg-progress"><div class="egg-progress-fill" style="width:${progress*100}%"></div></div>
         ${liveTag}
         ${egg.speedUpUsed
-          ? '<div style="font-size:8px;color:#666;margin-top:4px;">Already sped up</div>'
+          ? '<div style="font-size:8px;color:#fff;margin-top:4px;">Already sped up</div>'
           : `<button class="egg-speedup-btn" onclick="speedUpEgg(${i})" ${state.coins < EGG_SPEEDUP_COST ? 'disabled' : ''} title="Cut remaining time in half — once per egg">⚡ ${EGG_SPEEDUP_COST}</button>`}`}
     </div>`);
   });
@@ -5508,7 +5508,7 @@ function renderCollDetail() {
     </button>
     <div class="coll-sprite-large">${portraitImg(spec.id, PORTRAIT_SLOT, 'sprite-img', dino.mutation)}</div>
     <div class="coll-name">${dino.nickname || spec.name}</div>
-    <div class="coll-species">${spec.name} · ${spec.era}${inVault ? ' · <span style="color:#888">Vaulted</span>' : ''}</div>
+    <div class="coll-species">${spec.name} · ${spec.era}${inVault ? ' · <span style="color:#fff">Vaulted</span>' : ''}</div>
     ${dino.mutation ? `<div style="font-size:11px;color:#ff0000;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em">✨ ${(resolveSpeciesMut(spec.id,dino.mutation)||{}).label||dino.mutation} Mutation</div>` : ''}
     <div class="coll-badges">
       <span class="coll-badge pbadge-${spec.rarity}">${spec.rarity}</span>
@@ -5673,10 +5673,10 @@ function renderDexDetail(specId) {
         <div class="dex-detail-species">${spec.era} · ${spec.habitat}</div>
         <div class="dex-detail-badges">
           <span class="dex-detail-badge" style="background:${RARITY_COLORS[spec.rarity]}22;color:${RARITY_COLORS[spec.rarity]};border:1px solid ${RARITY_COLORS[spec.rarity]}44">${spec.rarity}</span>
-          <span class="dex-detail-badge" style="background:#ffffff08;color:#888;border:1px solid #ffffff14">${spec.diet}</span>
-          <span class="dex-detail-badge" style="background:#ffffff08;color:#888;border:1px solid #ffffff14">${SPECIES_DEF[specId].t}</span>
+          <span class="dex-detail-badge" style="background:#ffffff08;color:#fff;border:1px solid #ffffff14">${spec.diet}</span>
+          <span class="dex-detail-badge" style="background:#ffffff08;color:#fff;border:1px solid #ffffff14">${SPECIES_DEF[specId].t}</span>
         </div>
-        <div style="font-size:10px;color:#555;margin-top:6px">Owned: ${owned.length} · Mutations: ${foundMuts}/${totalMuts}</div>
+        <div style="font-size:10px;color:#fff;margin-top:6px">Owned: ${owned.length} · Mutations: ${foundMuts}/${totalMuts}</div>
       </div>
     </div>
     <div class="dex-detail-desc">"${spec.desc}"</div>
@@ -5716,9 +5716,9 @@ function renderDinodex() {
      completion sat at 100% here while barely a mutation had been seen. */
   const pct = (a, b) => b ? Math.floor(a / b * 100) : 0;
   document.getElementById('dexStats').innerHTML = `
-    <div class="dex-stat-card"><div class="dex-stat-val">${discCount}<span style="font-size:11px;color:#666">/${ROSTER.length}</span></div><div class="dex-stat-lbl">Species</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${discCount}<span style="font-size:11px;color:#fff">/${ROSTER.length}</span></div><div class="dex-stat-lbl">Species</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val" style="color:${discCount>=ROSTER.length?'#2ecc71':'#fff'}">${pct(discCount, ROSTER.length)}%</div><div class="dex-stat-lbl">Species Complete</div></div>
-    <div class="dex-stat-card"><div class="dex-stat-val">${muts.found}<span style="font-size:11px;color:#666">/${muts.total}</span></div><div class="dex-stat-lbl">Mutations</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${muts.found}<span style="font-size:11px;color:#fff">/${muts.total}</span></div><div class="dex-stat-lbl">Mutations</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val" style="color:${muts.found>=muts.total?'#2ecc71':'#fff'}">${pct(muts.found, muts.total)}%</div><div class="dex-stat-lbl">Mutations Complete</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val">${state.park.length}</div><div class="dex-stat-lbl">In Park</div></div>
   `;
@@ -5760,7 +5760,7 @@ function renderDinodex() {
     }).join('') : '';
     return `<div class="dex-entry ${f?'discovered rarity-'+spec.rarity:'undiscovered'}" onclick="${f?`renderDexDetail('${spec.id}')`:''}" ${dexSelectedSpec===spec.id?'style="border-color:#ff0000"':''}>
       <div class="dex-emoji">${f?spriteImg(spec.id,32,'sprite-img'):'❓'}</div><div class="dex-info">
-      <div class="dex-name">${f?spec.name:'???'}${ownedCount>0?' <span style="color:#555;font-weight:400">×'+ownedCount+'</span>':''}</div>
+      <div class="dex-name">${f?spec.name:'???'}${ownedCount>0?' <span style="color:#fff;font-weight:400">×'+ownedCount+'</span>':''}</div>
       <div class="dex-sub">${f?spec.diet+' · '+spec.habitat:spec.rarity}</div>
       ${mutDots?'<div class="dex-mut-dots">'+mutDots+'</div>':''}
       </div></div>`;
@@ -5984,7 +5984,7 @@ function renderInventoryEggSection() {
   const noRoom = state.eggs.length >= getMaxIncubatorSlots();
   let html = '<div class="section-title" style="margin-top:16px">Egg Storage</div>';
   if (noRoom) {
-    html += '<div style="font-size:10px;color:#666;margin-bottom:6px">Incubator is full — hatch one to free a slot.</div>';
+    html += '<div style="font-size:10px;color:#fff;margin-bottom:6px">Incubator is full — hatch one to free a slot.</div>';
   }
 
   /* Eggs found in-game while the incubator was full. These live in the save,
@@ -5998,7 +5998,7 @@ function renderInventoryEggSection() {
       <div><img src="${eggIcon}" width="32" height="32" style="image-rendering:pixelated;" alt=""></div>
       <div style="flex:1">
         <div style="font-size:12px;font-weight:600;color:#fff">${rarityLabel} Egg</div>
-        <div style="font-size:10px;color:#666">${egg.guaranteedMutation ? 'Mutation guaranteed • ' : ''}Found in your park</div>
+        <div style="font-size:10px;color:#fff">${egg.guaranteedMutation ? 'Mutation guaranteed • ' : ''}Found in your park</div>
       </div>
       <div style="font-size:9px;color:#ff0000;text-transform:uppercase;letter-spacing:0.05em">Incubate</div>
     </div>`;
@@ -6013,7 +6013,7 @@ function renderInventoryEggSection() {
       <div><img src="${eggIcon}" width="32" height="32" style="image-rendering:pixelated;" alt=""></div>
       <div style="flex:1">
         <div style="font-size:12px;font-weight:600;color:#fff">${egg.name || rarityLabel + ' Egg'}</div>
-        <div style="font-size:10px;color:#666">${egg.meta?.guaranteed ? 'Guaranteed ' : ''}${egg.meta?.mutant ? 'Mutant ' : ''}${rarityLabel} • x${qty}</div>
+        <div style="font-size:10px;color:#fff">${egg.meta?.guaranteed ? 'Guaranteed ' : ''}${egg.meta?.mutant ? 'Mutant ' : ''}${rarityLabel} • x${qty}</div>
       </div>
       <div style="font-size:9px;color:#ff0000;text-transform:uppercase;letter-spacing:0.05em">Use</div>
     </div>`;
