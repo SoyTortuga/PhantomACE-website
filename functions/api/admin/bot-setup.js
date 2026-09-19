@@ -120,6 +120,16 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
      A status line that reports the presence of a credential rather than its
      adequacy is worse than no status line: it actively directs someone past
      the step they need. So ask Twitch what the token can really do. */
+  /* How Twitch's consent dialog words each one. Kept beside the list it
+     labels so adding a scope without a label is visible here rather than as
+     a raw API string in front of the person approving it. */
+  const SCOPE_LABELS = {
+    'channel:manage:redemptions': 'Manage Channel Points rewards',
+    'channel:read:hype_train': 'View Hype Train information',
+    'channel:read:subscriptions': 'View a list of your subscribers',
+    'channel:read:ads': 'View ads scheduled for your channel',
+  };
+
   const REQUIRED_BROADCASTER_SCOPES = [
     'channel:manage:redemptions',
     'channel:read:hype_train',
@@ -151,8 +161,13 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
       broadcasterStatus = '⚠️ Authorization stored but Twitch rejected it — re-authorize below';
     } else {
       missingScopes = REQUIRED_BROADCASTER_SCOPES.filter(sc => !granted.includes(sc));
+      /* Named the way Twitch's own consent screen names them. The raw scope
+         string is precise and meaningless to the person being asked to
+         approve it — he has to match what this page says against what the
+         Twitch dialog says, and "channel:read:ads" appears on neither. */
       broadcasterStatus = missingScopes.length
-        ? `❌ RE-AUTHORIZATION REQUIRED — missing: ${escapeHtml(missingScopes.join(', '))}`
+        ? `❌ RE-AUTHORIZATION REQUIRED — missing: `
+          + escapeHtml(missingScopes.map(sc => `${SCOPE_LABELS[sc] || sc} (${sc})`).join(', '))
         : `✅ Authorized with all ${REQUIRED_BROADCASTER_SCOPES.length} required permissions`;
     }
   }
@@ -223,6 +238,7 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   code { background: #2a2a2a; padding: 2px 6px; border-radius: 3px; }
   #result, #giveawayResult, #checkinResult { margin-top: 12px; padding: 12px; background: #1a2a1a; border-radius: 6px; display: none; }
   .locked { background: #2a1a1a; border: 1px solid #553333; padding: 12px; border-radius: 6px; color: #ffaa88; }
+  .note { background: #1a1a22; border-left: 3px solid #6688cc; padding: 12px; border-radius: 4px; }
   .section.is-locked { opacity: 0.65; }
 </style></head><body>
 <h1>🤖 Bot Setup</h1>
@@ -251,6 +267,11 @@ PhantomACE's own channel and only they can approve those, so they are shown here
   <p>Separate authorization, using the <b>broadcaster</b> account specifically — Twitch only lets the
   channel owner manage channel points rewards. This lets the site toggle the "Enter Giveaway" reward
   on/off from the bot control panel for big-prize drawings.</p>
+  ${missingScopes.length ? `<p class="note"><b>Twitch will list all ${REQUIRED_BROADCASTER_SCOPES.length}
+  permissions, not just the missing one.</b> That is normal — it re-grants the whole set every time,
+  and there is no way to approve only the new one. Nothing you already approved is being changed or
+  expanded. The one being added now is
+  <b>${escapeHtml(missingScopes.map(sc => SCOPE_LABELS[sc] || sc).join(', '))}</b>.</p>` : ''}
   ${isBroadcasterUser
     ? `<a class="btn" href="${broadcasterAuthUrl}">Authorize Channel Points</a>`
     : `<div class="locked">🔒 Broadcaster only — this grants new permissions on their channel, so it cannot be delegated. Twitch would approve whichever account is signed in, which is exactly the mistake worth preventing.</div>`}
