@@ -561,7 +561,12 @@ const API = '/api/mana-clash';
 const FACES = ['C', 'W', 'U', 'B', 'R', 'G'];
 const FACE_VALUE = { C: 1, W: 2, U: 3, B: 4, R: 5, G: 6 };
 const VALUE_FACE = { 1: 'C', 2: 'W', 3: 'U', 4: 'B', 5: 'R', 6: 'G' };
-const FACE_IMG = { C: 'c.png', W: 'w.png', U: 'u.png', B: 'b.png', R: 'r.png', G: 'g.png' };
+/* THE SUFFIXED ONES ARE THE REAL PNGs. w.png and g.png were JPEGs under a
+   .png name and b.png was a palette PNG with no tRNS chunk, so White,
+   Black and Green each rendered as an opaque white box on a coloured
+   die. The originals are left in place rather than overwritten, so the
+   comparison is still there if anyone wonders what changed. */
+const FACE_IMG = { C: 'c.png', W: 'w1.png', U: 'u.png', B: 'b1.png', R: 'r.png', G: 'g1.png' };
 /* Named rather than inline in dieEl, so the rules panel can show the same
    colours the dice are drawn in without a second copy of them. */
 const DIE_COLOUR = {
