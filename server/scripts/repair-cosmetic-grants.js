@@ -79,6 +79,33 @@ export const ITEM_FOR = {
 /** The type a wreck of this kind was stored under, where it differs. */
 const LEGACY_TYPE = { dice: 'dice-pack' };
 
+/* ── KEYS THAT NO LONGER NAME ANYTHING ────────────────────────────────
+   A reward's key is `level_track_type_rarity`, so changing any of those
+   four on an existing reward orphans every past claim of it. That has
+   happened once: 667e50b moved the Skull Clicker cosmetics off the
+   catch-all type 'cosmetic' onto 'skull-skin' and 'click-effect', which
+   was the right fix and silently invalidated four keys with it.
+
+   Anyone who claimed one of those before that commit has a spent claim
+   naming a reward findReward() cannot resolve, so the repair passed them
+   over -- they paid a level and the system can no longer say for what.
+
+   Each maps to exactly one current reward, because nothing else sits at
+   that level, track and rarity with a cosmetic type; asserted in
+   test-repair-cosmetic-grants.js rather than trusted. An orphan that
+   became ambiguous would have to be left alone instead of guessed at. */
+export const LEGACY_KEYS = {
+  '85_follower_cosmetic_rare':   '85_follower_skull-skin_rare',
+  '65_phamily_cosmetic_rare':    '65_phamily_skull-skin_rare',
+  '85_phamily_cosmetic_rare':    '85_phamily_click-effect_rare',
+  '115_phamily_cosmetic_mythic': '115_phamily_skull-skin_mythic',
+};
+
+/** findReward, but it also answers for keys that have since been renamed. */
+export function resolveClaim(key) {
+  return findReward(key) || (LEGACY_KEYS[key] ? findReward(LEGACY_KEYS[key]) : null);
+}
+
 /** Is this stored item one of the wrecks? */
 export function isBroken(it) {
   if (!it) return false;
@@ -135,12 +162,14 @@ async function main() {
   /* What each of those claims should have granted. */
   const owedByUser = new Map();
   let unknownKeys = 0;
+  let legacyKeys = 0;
   let goneCosmetics = 0;
   for (const [userId, keys] of claimsByUser) {
     const owed = [];
     for (const key of keys) {
-      const reward = findReward(key);
+      const reward = resolveClaim(key);
       if (!reward) { unknownKeys++; continue; }
+      if (!findReward(key)) legacyKeys++;
       if (!ITEM_FOR[reward.type]) continue;
       if (!reward.cosmeticId) continue;
       if (!stillReal(reward.type, reward.cosmeticId)) { goneCosmetics++; continue; }
@@ -149,6 +178,7 @@ async function main() {
     if (owed.length) owedByUser.set(userId, owed);
   }
   line(`People owed a cosmetic: ${owedByUser.size}`);
+  if (legacyKeys) line(`  (${legacyKeys} claimed under a key that has since been renamed — followed)`);
   if (unknownKeys) line(`  (${unknownKeys} claimed keys no longer name a reward — left alone)`);
   if (goneCosmetics) line(`  (${goneCosmetics} name a cosmetic no longer in the catalog — left alone)`);
   line('');

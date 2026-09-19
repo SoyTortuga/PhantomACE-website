@@ -22,7 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ITEM_FOR, isBroken } from './repair-cosmetic-grants.js';
+import { ITEM_FOR, isBroken, LEGACY_KEYS, resolveClaim } from './repair-cosmetic-grants.js';
 import { FOLLOWER_REWARDS, PHAMILY_REWARDS } from '../../functions/api/phamily-rewards.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -163,6 +163,43 @@ const ok = (label, cond) => check(label, !!cond, true);
   /* And the repair keeps the bare set id, because the game equips by it. */
   check('repaired into the id the game equips by', ITEM_FOR.dice('bone').id, 'bone');
   check('under the type the game reads', ITEM_FOR.dice('bone').type, 'dice');
+}
+
+/* ── KEYS THAT WERE RENAMED OUT FROM UNDER A CLAIM ───────────────────
+   A key is `level_track_type_rarity`, so 667e50b moving the Skull Clicker
+   cosmetics off the type 'cosmetic' invalidated every claim made before
+   it. Those people paid a level for something the system could no longer
+   name, and the repair skipped them.
+
+   THE MAPPING IS ONLY SAFE WHILE IT IS UNAMBIGUOUS. Each old key is
+   resolved by finding the one cosmetic reward at that level, track and
+   rarity -- so this checks there really is exactly one, rather than taking
+   the table's word for it. A second cosmetic arriving at the same slot
+   would make the guess a coin flip, and it should be left alone instead. */
+{
+  const R = await import('../../functions/api/phamily-rewards.js');
+
+  for (const [oldKey, newKey] of Object.entries(LEGACY_KEYS)) {
+    const target = R.findReward(newKey);
+    ok(`${oldKey} points at a reward that exists`, !!target);
+    ok(`and resolveClaim follows it`, resolveClaim(oldKey) === R.findReward(newKey));
+
+    /* The old key still carries level, track and rarity; only the type
+       moved. Those three must pick out one reward and no more. */
+    const [lvl, track, , rarity] = oldKey.split('_');
+    const list = track === 'phamily' ? R.PHAMILY_REWARDS : R.FOLLOWER_REWARDS;
+    const candidates = list.filter(r => String(r.level) === lvl && r.rarity === rarity
+                                     && ['skull-skin', 'click-effect'].includes(r.type));
+    check(`${oldKey} still resolves to exactly one reward`, candidates.length, 1);
+    check('and it is the one mapped', candidates[0] && candidates[0].type, target && target.type);
+  }
+
+  /* A key nobody has renamed must stay unresolved: guessing is how someone
+     gets handed a reward they never earned. */
+  check('an unknown key is still unknown', resolveClaim('999_phamily_dice_mythic'), null);
+  /* And a live key must not be diverted through the table. */
+  ok('a current key resolves directly',
+     resolveClaim('48_phamily_dice_rare') === R.findReward('48_phamily_dice_rare'));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
