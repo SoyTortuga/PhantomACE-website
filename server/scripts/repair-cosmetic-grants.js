@@ -112,6 +112,14 @@ export function isBroken(it) {
   /* A 'dice-pack' is broken by existing: the type was never read by
      anything, whatever its id says. */
   if (it.type === 'dice-pack') return true;
+  /* A legacy 'cosmetic' is NOT dead -- Skull Clicker still matches those by
+     name, so these people's skins do work. It is replaced rather than
+     repaired: its id is the old reward key, so the theme it stands for is
+     known exactly, and leaving it in place beside a properly typed grant
+     would list the same theme twice. Only the ones this can name are
+     touched; any other 'cosmetic' item is left alone, because the name
+     fallback may be the only thing making it work. */
+  if (it.type === 'cosmetic' && LEGACY_KEYS[it.id]) return true;
   if (!ITEM_FOR[it.type]) return false;
   if (it.id === undefined || it.id === null || it.id === '') return true;
   if (/^room-(set|piece|slot)-undefined$/.test(String(it.id))) return true;
