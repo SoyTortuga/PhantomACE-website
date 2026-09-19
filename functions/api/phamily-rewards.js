@@ -68,6 +68,7 @@ function defineFollowerRewards() {
     cosmeticId:'blood',
     name:'Skull Skin', desc:'The Blood Skull theme for Skull Clicker' });
   r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
+    cosmeticId:'bone',
     name:'Bone Dice', desc:'Cosmetic bone-themed dice for Mana Clash' });
   /* MY ROOM — this month's drip: the first tenth of each set, rounded
      down, interleaved so the sets arrive mixed rather than seven snacks
@@ -128,7 +129,8 @@ function definePhamilyRewards() {
   r.push({ level:42, rarity:'rare', type:'wildcard', icon:REWARD_ICONS.wildcard,
     name:'Wildcard Stamp', desc:'A wildcard stamp for Commander Bingo' });
   r.push({ level:48, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
-    name:'Chaos Dice Pack', desc:'Cosmetic chaos-themed dice for Mana Clash' });
+    cosmeticId:'phyrexian',
+    name:'Phyrexian Dice', desc:'Phyrexian mana symbols for Mana Clash' });
   r.push({ level:55, rarity:'rare', type:'cardback', icon:REWARD_ICONS.cardback,
     name:'Legendary Card Back', desc:'A rare card back for Memory Match' });
   r.push({ level:65, rarity:'rare', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
@@ -138,6 +140,7 @@ function definePhamilyRewards() {
     cosmeticId:'void',
     name:'Void Click Effect', desc:'The Void Click effect for Skull Clicker' });
   r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
+    cosmeticId:'phantom',
     name:'Phantom Dice Pack', desc:'Cosmetic phantom-themed dice for Mana Clash' });
   r.push({ level:105, rarity:'mythic', type:'egg', icon:REWARD_ICONS.egg,
     name:'Guaranteed Mutant Egg', desc:'A Dino Park egg — guaranteed mutant dinosaur' });
@@ -145,6 +148,7 @@ function definePhamilyRewards() {
     cosmeticId:'eternal',
     name:'Eternal Darkness Skin', desc:'The Eternal Darkness theme for Skull Clicker' });
   r.push({ level:130, rarity:'mythic', type:'dice', icon:REWARD_ICONS.dice,
+    cosmeticId:'fracture',
     name:'Reality Fracture Dice', desc:'Mythic animated dice for Mana Clash' });
   /* MY ROOM — this month's drip: the first tenth of each set, rounded
      down, interleaved so the sets arrive mixed rather than seven snacks
@@ -203,7 +207,7 @@ function defineMilestones() {
     ]],
     ['Guardian','Badge + Title + Uncommon Egg + Dice Pack', [
       { type:'egg', rarity:'uncommon', name:'Uncommon Egg' },
-      { type:'dice', rarity:'rare', name:'Dice Pack' },
+      { type:'dice', rarity:'rare', name:'Ember Dice', cosmeticId:'ember' },
     ]],
     ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Entries + a second Room', [
       { type:'nameeffect', rarity:'rare', name:'Name Effect' },
@@ -225,7 +229,7 @@ function defineMilestones() {
     ]],
     ['Specter','Badge + Title + Mythic Giveaway Entries + Dice Pack', [
       { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
-      { type:'dice', rarity:'mythic', name:'Dice Pack' },
+      { type:'dice', rarity:'mythic', name:'Eclipse Dice', cosmeticId:'eclipse' },
     ]],
     ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Entries + a third Room', [
       { type:'banner', rarity:'mythic', name:'Exclusive Banner' },

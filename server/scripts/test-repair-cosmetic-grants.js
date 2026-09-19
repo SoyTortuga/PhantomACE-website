@@ -46,8 +46,12 @@ const ok = (label, cond) => check(label, !!cond, true);
   check('a skull skin keeps the bare id the game equips by', ITEM_FOR['skull-skin']('blood'),
     { id: 'blood', game: 'skull-clicker', type: 'skull-skin', consumable: false });
   check('a click effect likewise', ITEM_FOR['click-effect']('ember').id, 'ember');
-  check('four types and no more', Object.keys(ITEM_FOR).sort(),
-    ['click-effect', 'room-piece', 'room-set', 'skull-skin']);
+  check('a dice set keeps the bare id the game equips by', ITEM_FOR.dice('phyrexian'),
+    { id: 'phyrexian', game: 'mana-clash', type: 'dice', consumable: false });
+  /* Pinned so a type cannot be added here without someone deciding it
+     belongs -- this table is what a repair run acts on. */
+  check('five types and no more', Object.keys(ITEM_FOR).sort(),
+    ['click-effect', 'dice', 'room-piece', 'room-set', 'skull-skin']);
 }
 
 /* ── …matches what a correct grant would have made ───────────────────── */
@@ -142,6 +146,23 @@ const ok = (label, cond) => check(label, !!cond, true);
   const crossType = Object.entries(byId).filter(([, types]) => types.size > 1);
   ok('at least one cosmetic id is shared across two types, so type must be part of identity',
     crossType.length > 0);
+}
+
+/* ── A DICE WRECK LOOKS HEALTHY ──────────────────────────────────────
+   Every other wreck this script repairs is missing something obvious: no
+   id, or `undefined` baked into one. A dice grant has a perfectly good id
+   -- the reward key -- under a type nothing has ever read. So it cannot be
+   spotted by looking for damage, only by knowing 'dice-pack' was never a
+   type the game understood. */
+{
+  const wreck = { id: 'f95_dice', game: 'mana-clash', type: 'dice-pack', name: 'Bone Dice', consumable: false };
+  ok('a dice-pack is recognised as a wreck', isBroken(wreck));
+  ok('even though it has a real id', !!wreck.id);
+
+  ok('a repaired dice set is not', !isBroken(ITEM_FOR.dice('bone')));
+  /* And the repair keeps the bare set id, because the game equips by it. */
+  check('repaired into the id the game equips by', ITEM_FOR.dice('bone').id, 'bone');
+  check('under the type the game reads', ITEM_FOR.dice('bone').type, 'dice');
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

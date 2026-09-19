@@ -344,7 +344,13 @@ const REWARD_ITEM_MAP = {
     return { game:'commander-bingo', type: isWildcard ? 'wildcard' : 'bonus-card', consumable:true, quantity:1 };
   },
   wildcard: () => ({ game:'commander-bingo', type:'wildcard', consumable:true, quantity:1 }),
-  dice: (rarity, name) => ({ game:'mana-clash', type:'dice-pack', consumable:false }),
+  /* SAME FAULT AS THE SKULL SKINS ABOVE, found the same way: advertised,
+     claimed, and never seen. This granted type 'dice-pack' where Mana
+     Clash now reads 'dice', and carried the reward key as its id where the
+     game keys a set by its own id -- so even a corrected type would not
+     have matched anything. Both halves are cosmeticId. */
+  dice: (rarity, name, cosmeticId) =>
+    ({ id: cosmeticId, game:'mana-clash', type:'dice', consumable:false }),
   /* THE MISMATCH THIS FIXES. These granted `type:'cosmetic'`, and Skull
      Clicker reads 'skull-skin' and 'click-effect' — so a claimed reward
      landed in the inventory as a type the game had no category for and

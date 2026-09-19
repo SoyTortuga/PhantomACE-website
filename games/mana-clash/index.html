@@ -236,6 +236,44 @@
     .chat-send { padding: 5px 10px; font-size: 11px; }
     .chat-note { padding: 0 10px 8px; font-size: 11px; color: var(--red); }
 
+    /* ════ DICE SETS ════
+       A set may restyle the body; the glyph and the number are left alone.
+       Borders and filters only -- no box-shadow anywhere. */
+    .die.set-bone { border-color: #6b6152; }
+    .die.set-bone img { filter: sepia(0.5) saturate(0.6) brightness(0.55); }
+
+    .die.set-phantom { border-color: #4a5a66; opacity: 0.88; }
+    .die.set-phantom img { filter: grayscale(0.7) brightness(1.25) contrast(0.85); }
+
+    .die.set-ember { border-color: #7a3c1e; }
+    .die.set-ember img { filter: sepia(0.8) saturate(2.6) hue-rotate(-18deg) brightness(0.7); }
+
+    .die.set-eclipse { border-color: #2e2e38; }
+    .die.set-eclipse img { filter: grayscale(0.85) brightness(1.5); }
+
+    /* The one the pass calls animated. A slow drift rather than anything
+       that twitches: these sit on screen for whole rounds, and the tumble
+       on a new roll is already doing the lively part. */
+    .die.set-fracture { border-color: #6a2f6a; animation: fracture 4.5s ease-in-out infinite; }
+    .die.set-fracture img { filter: hue-rotate(160deg) saturate(1.6) contrast(1.15); }
+    @keyframes fracture {
+      0%, 100% { background: #b9a8d8; border-color: #6a2f6a; }
+      50%      { background: #a8c4d8; border-color: #2f5a6a; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .die.set-fracture { animation: none; }
+    }
+
+    .dice-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+                   margin-bottom: 8px; }
+    .dice-picker-label { font-size: 10px; text-transform: uppercase;
+                         letter-spacing: 0.14em; color: var(--dim); }
+    .dice-chip { background: #1a1a1a; color: var(--dim); border: 1px solid var(--line);
+                 border-radius: 3px; font-size: 11px; padding: 3px 9px; cursor: pointer;
+                 font-family: inherit; }
+    .dice-chip:hover { color: #fff; border-color: #444; }
+    .dice-chip.active { color: #fff; border-color: var(--red); }
+
     .room-live { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em;
                  color: var(--red); border: 1px solid var(--red); border-radius: 2px;
                  padding: 1px 5px; }
@@ -422,7 +460,8 @@
     <div class="feedback" id="splashFeedback"></div>
 
     <div class="section-hdr" style="width:100%;max-width:620px">Open Rooms</div>
-    <div class="room-list" id="roomList"><div class="muted" style="text-align:center">Loading…</div></div>
+    <div class="dice-picker" id="dicePicker" hidden></div>
+  <div class="room-list" id="roomList"><div class="muted" style="text-align:center">Loading…</div></div>
   </div>
 </div>
 
@@ -567,6 +606,76 @@ const VALUE_FACE = { 1: 'C', 2: 'W', 3: 'U', 4: 'B', 5: 'R', 6: 'G' };
    die. The originals are left in place rather than overwritten, so the
    comparison is still there if anyone wonders what changed. */
 const FACE_IMG = { C: 'c.png', W: 'w1.png', U: 'u.png', B: 'b1.png', R: 'r.png', G: 'g1.png' };
+
+/* ══ DICE SETS ═══════════════════════════════════════════════════════════
+   The Phamily Time pass has advertised dice cosmetics since it launched
+   and handed out exactly nothing, because there was nothing here to hand
+   them to: this page read the inventory zero times and FACE_IMG was one
+   hardcoded map. The grant worked; the other end did not exist.
+
+   A set is allowed to change two things. `faces` swaps the glyph, which is
+   what Phyrexian does. `colours` and `cls` restyle the die body, which is
+   what the themed ones do -- "bone-themed", "phantom-themed" and "animated"
+   describe a finish rather than a new symbol, and CSS draws those better
+   than six more PNGs would.
+
+   IDs ARE THE CONTRACT. They are what the pass grants as cosmeticId and
+   what the inventory stores, so renaming one orphans everybody who owns
+   it. The display name can change freely; the key cannot. */
+const DICE_SETS = {
+  classic: {
+    name: 'Classic',
+    faces: FACE_IMG,
+  },
+  phyrexian: {
+    /* Colourless keeps its own symbol: Phyrexian mana has no colourless
+       face, and the five colours are told apart by the die body anyway --
+       which is exactly how the real thing reads. */
+    name: 'Phyrexian',
+    faces: { C: 'c.png', W: 'phyrexian.png', U: 'phyrexian.png',
+             B: 'phyrexian.png', R: 'phyrexian.png', G: 'phyrexian.png' },
+  },
+  bone: {
+    name: 'Bone',
+    faces: FACE_IMG,
+    cls: 'set-bone',
+    colours: { C:'#e8e2d2', W:'#f2ecd8', U:'#ded9cc', B:'#cfc8b8', R:'#e2d8c4', G:'#d9d4bf' },
+  },
+  phantom: {
+    name: 'Phantom',
+    faces: FACE_IMG,
+    cls: 'set-phantom',
+    colours: { C:'#8fa3ad', W:'#a8bcc4', U:'#7f9fb8', B:'#8b8fa8', R:'#a89099', G:'#8fa89a' },
+  },
+  ember: {
+    name: 'Ember',
+    faces: FACE_IMG,
+    cls: 'set-ember',
+    colours: { C:'#d8a88a', W:'#f0c898', U:'#c89a86', B:'#b08878', R:'#f0a070', G:'#c9a882' },
+  },
+  eclipse: {
+    name: 'Eclipse',
+    faces: FACE_IMG,
+    cls: 'set-eclipse',
+    colours: { C:'#6a6a72', W:'#84848e', U:'#5e6b80', B:'#5a5468', R:'#7a5a60', G:'#5e6e62' },
+  },
+  fracture: {
+    /* The pass calls this one "Mythic animated dice", so it is the only
+       set that moves. The animation is on the body, not the glyph. */
+    name: 'Reality Fracture',
+    faces: FACE_IMG,
+    cls: 'set-fracture',
+  },
+};
+
+/* Owned sets, and the one in use. Classic is always owned -- a player who
+   has never claimed anything still has dice. */
+let ownedDiceSets = ['classic'];
+let diceSet = 'classic';
+
+function currentSet() {
+  return DICE_SETS[diceSet] || DICE_SETS.classic;
+}
 /* Named rather than inline in dieEl, so the rules panel can show the same
    colours the dice are drawn in without a second copy of them. */
 const DIE_COLOUR = {
@@ -852,10 +961,13 @@ function initRules() {
 /* ── Rendering ─────────────────────────────────────────────────────────── */
 
 function dieEl(face, opts = {}) {
+  const set = currentSet();
   const d = document.createElement('div');
-  d.className = 'die' + (opts.kept ? ' kept' : '');
-  d.style.background = DIE_COLOUR[face] || '#141414';
-  d.innerHTML = '<img src="assets/' + FACE_IMG[face] + '" alt="' + face + '">' +
+  d.className = 'die' + (opts.kept ? ' kept' : '') + (set.cls ? ' ' + set.cls : '');
+  /* The set may recolour the body; if it does not, the face keeps the
+     colour it has always had. The number stays black and stays here. */
+  d.style.background = (set.colours || DIE_COLOUR)[face] || '#141414';
+  d.innerHTML = '<img src="assets/' + (set.faces[face] || FACE_IMG[face]) + '" alt="' + face + '">' +
                 '<span class="pip-num">' + FACE_VALUE[face] + '</span>';
   return d;
 }
@@ -1364,6 +1476,63 @@ async function act(body, feedbackId) {
   }
 }
 
+/* ── Owned dice, from the shared inventory ─────────────────────────────
+   The pass grants { game:'mana-clash', type:'dice', id:<set id> } and the
+   equipped one lives in equips['mana-clash'].dice, so both halves are the
+   inventory API's and nothing new is stored here.
+
+   Quietly optional: a logged-out visitor, a failed request or an empty
+   inventory all end at Classic. Dice are a cosmetic and must never be the
+   reason somebody cannot start a game. */
+async function loadDiceSets() {
+  try {
+    const res = await fetch('/api/inventory?game=mana-clash', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const owned = (data.items || [])
+      .filter(i => i && i.type === 'dice' && DICE_SETS[i.id])
+      .map(i => i.id);
+    ownedDiceSets = ['classic'].concat(owned.filter(id => id !== 'classic'));
+
+    const equipped = (data.equips || {}).dice;
+    if (equipped && ownedDiceSets.indexOf(equipped) !== -1) diceSet = equipped;
+  } catch {}
+  renderDicePicker();
+}
+
+async function chooseDiceSet(id) {
+  if (!DICE_SETS[id] || ownedDiceSets.indexOf(id) === -1) return;
+  diceSet = id;
+  renderDicePicker();
+  /* Redrawn straight away rather than waiting for the poll: the change is
+     the whole point of pressing it. */
+  if (state) render();
+  try {
+    await fetch('/api/inventory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      /* Equipped server-side so it follows the account rather than the
+         browser -- the same slot the profile cosmetics use. */
+      body: JSON.stringify({ action: 'equip', game: 'mana-clash', slot: 'dice', itemId: id }),
+    });
+  } catch {}
+}
+
+/* Hidden entirely for anyone with one set, which is most people: a picker
+   offering a single choice is noise. */
+function renderDicePicker() {
+  const box = $('dicePicker');
+  if (!box) return;
+  if (ownedDiceSets.length < 2) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = '<span class="dice-picker-label">Dice</span>' +
+    ownedDiceSets.map(id =>
+      '<button class="dice-chip' + (id === diceSet ? ' active' : '') + '" data-set="' + id + '">' +
+      esc(DICE_SETS[id].name) + '</button>').join('');
+  [...box.querySelectorAll('.dice-chip')].forEach(b =>
+    b.addEventListener('click', () => chooseDiceSet(b.dataset.set)));
+}
+
 async function loadRooms() {
   const list = $('roomList');
   try {
@@ -1514,6 +1683,10 @@ if (!session) {
 } else {
   $('splashBody').hidden = false;
   loadRooms();
+  /* Once, at boot. The answer cannot change while the tab is open -- a
+     reward claimed on another page needs a reload either way -- and a
+     cosmetic is not worth a second poll. */
+  loadDiceSets();
   setInterval(() => { if (!roomCode) loadRooms(); }, 8000);
 }
 </script>

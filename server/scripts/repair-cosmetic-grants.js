@@ -59,20 +59,33 @@ function arg(name, fallback = null) {
 }
 const line = (s = '') => console.log(s);
 
-/* The four types whose mapper reads cosmeticId, and the item each should
-   have become. Kept here rather than imported because phamily-time.js is
-   a route module: importing it would run its boot. These MUST match
+/* The types whose mapper reads cosmeticId, and the item each should have
+   become. Kept here rather than imported because phamily-time.js is a
+   route module: importing it would run its boot. These MUST match
    REWARD_ITEM_MAP in functions/api/phamily-time.js. */
 export const ITEM_FOR = {
   'skull-skin': (id) => ({ id, game: 'skull-clicker', type: 'skull-skin', consumable: false }),
   'click-effect': (id) => ({ id, game: 'skull-clicker', type: 'click-effect', consumable: false }),
   'room-set': (id) => ({ id: `room-set-${id}`, game: 'profile', type: 'room-set', consumable: false, meta: { category: id } }),
   'room-piece': (id) => ({ id: `room-piece-${id}`, game: 'profile', type: 'room-piece', consumable: false, meta: { piece: id } }),
+  /* DICE ARRIVED BROKEN A DIFFERENT WAY. The others were granted with
+     `undefined` where their id should be; dice were granted with a
+     perfectly valid id that named the wrong thing -- the reward key, under
+     type 'dice-pack', which nothing has ever read. The wreck therefore
+     looks healthy, and isBroken has to know the old type by name. */
+  dice: (id) => ({ id, game: 'mana-clash', type: 'dice', consumable: false }),
 };
+
+/** The type a wreck of this kind was stored under, where it differs. */
+const LEGACY_TYPE = { dice: 'dice-pack' };
 
 /** Is this stored item one of the wrecks? */
 export function isBroken(it) {
-  if (!it || !ITEM_FOR[it.type]) return false;
+  if (!it) return false;
+  /* A 'dice-pack' is broken by existing: the type was never read by
+     anything, whatever its id says. */
+  if (it.type === 'dice-pack') return true;
+  if (!ITEM_FOR[it.type]) return false;
   if (it.id === undefined || it.id === null || it.id === '') return true;
   if (/^room-(set|piece|slot)-undefined$/.test(String(it.id))) return true;
   if (it.type === 'room-piece' && !(it.meta && it.meta.piece)) return true;

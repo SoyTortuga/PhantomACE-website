@@ -185,7 +185,12 @@ const ok = (label, cond) => check(label, !!cond, true);
   /* The mappers that read it, and the rewards that must therefore carry
      one. A table entry missing its cosmeticId is the same bug from the
      other end. */
-  const NEEDS_ID = ['skull-skin', 'click-effect', 'room-set', 'room-piece'];
+  /* `dice` joined this list after the pass spent four years advertising
+     dice cosmetics and delivering none: the mapper granted a generic
+     'dice-pack' keyed by the reward key, and Mana Clash -- which read the
+     inventory not at all -- had nothing to match it against. The guard did
+     not catch it because the type was not named here. */
+  const NEEDS_ID = ['skull-skin', 'click-effect', 'room-set', 'room-piece', 'dice'];
   const all = [...R.FOLLOWER_REWARDS, ...R.PHAMILY_REWARDS];
   const bare = all.filter(r => NEEDS_ID.includes(r.type) && !r.cosmeticId);
   check('every reward of an id-carrying type has one',
@@ -208,10 +213,46 @@ const ok = (label, cond) => check(label, !!cond, true);
   /* The mappers really do read it — if one stops, this guard is moot and
      should be revisited rather than quietly passing. */
   const stillRead = NEEDS_ID.filter(t => {
-    const m = new RegExp(`'${t}':[\\s\\S]{0,240}?cosmeticId`);
+    /* Quotes optional: a key only needs them when it contains a hyphen, so
+       'skull-skin' has them and dice does not. Requiring them made this
+       guard blind to exactly the mappers least likely to be noticed. */
+    const m = new RegExp(`'?${t}'?:[\\s\\S]{0,240}?cosmeticId`);
     return m.test(src);
   });
-  check('all four mappers still read cosmeticId', stillRead.length, NEEDS_ID.length);
+  check('every id-carrying mapper still reads cosmeticId', stillRead.length, NEEDS_ID.length);
+}
+
+/* ── EVERY DICE REWARD NAMES A SET THE GAME HAS ──────────────────────
+   The whole failure was an advertised cosmetic with nothing at the other
+   end. A cosmeticId that matches no entry in DICE_SETS is exactly that
+   again, and it would look perfectly healthy from the pass's side. */
+{
+  const fs2 = await import('node:fs');
+  const path2 = await import('node:path');
+  const { fileURLToPath: f2 } = await import('node:url');
+  const REPO2 = path2.resolve(path2.dirname(f2(import.meta.url)), '../..');
+  const page = fs2.readFileSync(path2.join(REPO2, 'games/mana-clash/index.html'), 'utf8');
+
+  const block = page.slice(page.indexOf('const DICE_SETS = {'), page.indexOf('let ownedDiceSets'));
+  const sets = [...block.matchAll(/^  ([a-z]+): \{/gm)].map(m => m[1]);
+  ok('the game defines dice sets', sets.length >= 2);
+  ok('and classic is one of them', sets.includes('classic'));
+
+  const diceRewards = [...R.FOLLOWER_REWARDS, ...R.PHAMILY_REWARDS].filter(r => r.type === 'dice');
+  const diceBonuses = R.MILESTONES.flatMap(m => m.bonusItems || []).filter(b => b.type === 'dice');
+  ok('the pass still advertises dice', diceRewards.length + diceBonuses.length >= 4);
+
+  const orphans = [...diceRewards, ...diceBonuses]
+    .filter(r => !sets.includes(r.cosmeticId))
+    .map(r => `${r.name}:${r.cosmeticId}`);
+  check('every dice reward names a set the game has', orphans, []);
+
+  /* And no two award the same one, or the second is a duplicate grant --
+     spent from the track and silently doing nothing, which is the shape of
+     the original bug. */
+  const ids = [...diceRewards, ...diceBonuses].map(r => r.cosmeticId);
+  const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+  check('and no two hand out the same set', dupes, []);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
