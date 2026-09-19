@@ -4,44 +4,35 @@
 
      node server/scripts/test-health.js
 
-   This endpoint's only job is answering "is the running process the commit
-   I pushed", so the two ways it can fail are the two things worth testing:
+   WHERE THIS ENDPOINT LIVES, because it is not where you would look.
+   /api/health is NOT a file under functions/. It is intercepted directly in
+   server/index.js, ahead of the router, so that it still answers when the
+   route table or the database is the thing that is broken. A health check
+   that depends on the machinery it reports on is not a health check.
 
-     it lies     by reading .git per request, which reports the working
-                 tree — after a pull without a restart that prints the NEW
-                 sha while the OLD code runs, which is worse than having no
-                 endpoint at all
-     it leaks    by taking `context`, whose `env` is a spread of
-                 process.env and holds DATABASE_URL, SESSION_SECRET and
-                 every Twitch credential, on a route with no auth
+   That placement has a cost, and this suite exists because the cost was
+   paid: a route file added at functions/api/health.js builds, registers,
+   passes a router assertion and is never reached, because the interception
+   returns first. Anyone adding one should find this file instead.
 
-   No database is needed. getPool() throws when createPool() has never been
-   called, which is exactly the "Postgres is down" branch — so a bare test
-   process exercises the failure path for free.
-
-   THE STATIC CHECKS RUN FIRST, ON PURPOSE. A handler that has grown a
-   `context` parameter throws the moment this suite calls it with none, and
-   an earlier arrangement of this file died on that with a stack trace
-   before reaching the assertion that would have named the problem. Shape is
-   checked without invoking; every invocation after that is guarded.
+   What is worth testing is the commit field, whose only job is answering
+   "is the running process the commit I pushed". It has exactly one failure
+   mode, and it is silent: read .git per request and it reports the WORKING
+   TREE, so after a pull without a restart it prints the new sha while the
+   old code runs — worse than having no field at all.
    ══════════════════════════════════════════════ */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { onRequestGet } from '../../functions/api/health.js';
+import { COMMIT, COMMIT_SHORT, BOOTED_AT, readCommit } from '../lib/build-info.js';
 import { buildRoutes } from '../router.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
-const SRC = fs.readFileSync(path.join(REPO, 'functions/api/health.js'), 'utf8');
-
-/* Comments stripped, because the checks below are about what the file DOES.
-   The header explains at length why this route refuses `env` and never
-   touches process.env, and a naive scan of the raw source flags that prose
-   as the very leak it is describing. */
-const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const INDEX = fs.readFileSync(path.join(REPO, 'server/index.js'), 'utf8');
+const INFO = fs.readFileSync(path.join(REPO, 'server/lib/build-info.js'), 'utf8');
 
 let passed = 0;
 const failures = [];
@@ -52,108 +43,71 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
-/** Call the handler without letting a throw end the run. */
-async function call(why) {
-  try {
-    const res = await onRequestGet();
-    return { res, body: await res.json() };
-  } catch (err) {
-    failures.push(`${why}\n      the handler threw: ${err.message}`);
-    return { res: null, body: {} };
-  }
-}
-
-/* ── It cannot leak what it is never handed ──────────────────────────── */
+/* ── It reports the commit this process started on ───────────────────── */
 {
-  /* env is a spread of process.env. This route is public and unauthed, so
-     the defence is structural: a handler with no parameter cannot reach it,
-     whatever a future edit puts in the body. */
-  check('the handler takes no context', onRequestGet.length, 0);
-  ok('the code never mentions env', !/\benv\b/.test(CODE));
-  ok('nor process.env', !/process\.env/.test(CODE));
-}
-
-/* ── It is captured at boot, not recomputed ──────────────────────────── */
-{
-  /* The realistic regression is someone deciding the value looks stale and
-     moving the read into the handler to "fix" it — which breaks the
-     endpoint precisely when a pull has landed and a restart has not, the
-     one case it exists for. */
-  ok('the commit is read at module scope', /^const COMMIT = readCommit\(\);$/m.test(SRC));
-  const handler = /export async function onRequestGet\([\s\S]*$/.exec(SRC)?.[0] || '';
-  ok('and the handler does not read it again', !/readCommit\s*\(/.test(handler));
-  ok('nor stamps a fresh boot time', !/BOOTED_AT\s*=/.test(handler));
-}
-
-/* ── The query cannot outlive the check ──────────────────────────────── */
-{
-  /* Promise.race abandons the loser. An abandoned pg query that rejects
-     later is an unhandled rejection, and that can end the process — the
-     health endpoint killing the server it exists to watch. */
-  ok('the abandoned query is caught', /query\.catch\(\(\) => \{\}\)/.test(SRC));
-  ok('and the timer is always cleared', /finally \{\s*clearTimeout\(timer\);/.test(SRC));
-}
-
-/* ── The router will actually publish it ─────────────────────────────── */
-{
-  /* Asking the real router rather than reading its exclusion list. A route
-     can be absent for reasons a source scan never sees — the wrong export
-     name, a path that collides, a module the walk skips — and an endpoint
-     nobody can reach is indistinguishable from an outage to the monitor
-     that is supposed to be watching for one. */
-  const { routes } = await buildRoutes(path.join(REPO, 'functions'));
-  ok('the router publishes /api/health', routes.has('/api/health'));
-  check('as a GET', Object.keys(routes.get('/api/health') || {}), ['GET']);
-  ok('and it exports a GET handler', typeof onRequestGet === 'function');
-}
-
-/* ── It reports the commit the process booted on ─────────────────────── */
-{
-  const { body } = await call('reporting the commit');
-
   const head = spawnSync('git', ['rev-parse', 'HEAD'],
     { cwd: REPO, encoding: 'utf8' }).stdout?.trim();
 
   ok('git told us a HEAD to compare against', /^[0-9a-f]{40}$/.test(head || ''));
-  check('the endpoint reports that commit', body.commit, head);
-  check('and a short form of the same one', body.commitShort, (head || '').slice(0, 7));
+  check('build-info reports that commit', COMMIT, head);
+  check('and a short form of the same one', COMMIT_SHORT, (head || '').slice(0, 7));
 
-  /* THE ONLY FIELD ANYONE READS. A null here is honest but useless, and it
-     is what every unexpected .git layout falls back to — so if this ever
-     goes null the resolver stopped working, not the repo. */
-  ok('the commit is not unknown', typeof body.commit === 'string');
+  /* THE ONLY FIELD ANYONE READS. Null is the honest fallback for every
+     unexpected .git layout, so if this goes null the resolver stopped
+     working rather than the repo being odd. */
+  ok('the commit is not unknown', typeof COMMIT === 'string');
+  ok('the boot time parses', !Number.isNaN(Date.parse(BOOTED_AT)));
 }
 
-/* ── Two requests, one answer ────────────────────────────────────────── */
+/* ── It is captured at boot, not recomputed ──────────────────────────── */
 {
-  /* Behavioural half of the capture check. A handler that re-read .git per
-     request would still pass this while nothing changed on disk, which is
-     why the source assertions above carry the real weight. */
-  const a = await call('first of two calls');
-  const b = await call('second of two calls');
-  check('the boot time does not move between requests', a.body.bootedAt, b.body.bootedAt);
-  check('nor does the commit', a.body.commit, b.body.commit);
+  /* Behavioural half: the exported value is a constant, so a caller cannot
+     accidentally get a fresh read. readCommit() is exported only so this
+     suite can prove the resolver and the constant agree. */
+  check('the constant matches a fresh resolve, right now', COMMIT, readCommit());
+  ok('COMMIT is a module constant', /^export const COMMIT = readCommit\(\);$/m.test(INFO));
+  ok('and so is the boot time', /^export const BOOTED_AT = new Date\(\)\.toISOString\(\);$/m.test(INFO));
+
+  /* Source half, and the one that actually bites. The realistic regression
+     is someone deciding the value looks stale against the repo and moving
+     the read into the request path to "fix" it — which breaks the field
+     precisely when a pull has landed and a restart has not, the one case
+     it is for. */
+  ok('index.js does not resolve the commit per request', !/readCommit\s*\(/.test(INDEX));
+  ok('nor stamps its own boot time', !/BOOTED_AT\s*=/.test(INDEX));
 }
 
-/* ── A dead database pages, rather than reporting 200 ────────────────── */
+/* ── The handler in index.js actually serves those fields ────────────── */
 {
-  /* No createPool() has run in this process, so getPool() throws — the same
-     branch a real outage takes. A monitor watches status codes, so this
-     must not be a 200 carrying ok:false. */
-  const { res, body } = await call('the database-down branch');
+  /* build-info can be perfect and unreferenced. This pins the wiring. */
+  const block = /if \(url\.pathname === '\/api\/health'\) \{[\s\S]*?\n      \}/.exec(INDEX)?.[0] || '';
+  ok('the health branch is still in index.js', !!block);
 
-  check('an unreachable database is a 503', res?.status, 503);
-  check('and says so', body.database, 'down');
-  check('and is not ok', body.ok, false);
+  for (const field of ['commit', 'commitShort', 'bootedAt', 'uptimeSeconds', 'routes', 'database']) {
+    ok(`it answers ${field}`, new RegExp(`\\b${field}:`).test(block));
+  }
 
-  check('the answer is never cached', res?.headers.get('Cache-Control'), 'no-store');
-  check('and is JSON', res?.headers.get('Content-Type'), 'application/json');
+  ok('build-info is imported', /import \{[^}]*COMMIT[^}]*\} from '\.\/lib\/build-info\.js'/.test(INDEX));
 
-  ok('uptime is a real number of seconds', Number.isFinite(body.uptimeSeconds) && body.uptimeSeconds >= 0);
-  ok('the boot time parses', !Number.isNaN(Date.parse(body.bootedAt)));
+  /* A monitor pages on status codes, so a reachable process with a dead
+     database must not answer 200 carrying ok:false. */
+  ok('a dead database is a 503', /res\.writeHead\(dbOk \? 200 : 503/.test(block));
+  ok('it really asks Postgres', /pool\.query\('SELECT 1'\)/.test(block));
+  ok('and the answer is never cached', /'Cache-Control': 'no-store'/.test(block));
+}
 
-  check('and it answers only these fields', Object.keys(body).sort(),
-        ['bootedAt', 'commit', 'commitShort', 'database', 'ok', 'uptimeSeconds']);
+/* ── Nobody has added a route file that cannot be reached ────────────── */
+{
+  /* THE MISTAKE THIS PREVENTS, which was made. functions/api/health.js
+     builds, registers as /api/health, and passes a "the router publishes
+     it" assertion -- while the interception above returns before the route
+     table is consulted, so the file is dead code that looks alive. Catching
+     it here is cheap; catching it in production means trusting a payload
+     that no longer comes from where you think. */
+  ok('there is no shadowed route file', !fs.existsSync(path.join(REPO, 'functions/api/health.js')));
+
+  const { routes } = await buildRoutes(path.join(REPO, 'functions'));
+  ok('and the router claims no /api/health', !routes.has('/api/health'));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

@@ -27,6 +27,7 @@ import { buildRoutes, matchRoute } from './router.js';
 import { createPool, waitForDatabase } from './lib/db.js';
 import { createKVStore } from './lib/kv.js';
 import { createMediaStore } from './lib/media-store.js';
+import { COMMIT, COMMIT_SHORT, BOOTED_AT } from './lib/build-info.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -304,6 +305,13 @@ async function main() {
           database: dbOk ? 'up' : 'unreachable',
           uptimeSeconds: Math.round(process.uptime()),
           routes: table.count,
+          /* Captured at boot by build-info.js and never re-read — see the
+             header there before changing this. Answers the question uptime
+             alone cannot: not "is something running" but "is the thing
+             running the commit I pushed". */
+          commit: COMMIT,
+          commitShort: COMMIT_SHORT,
+          bootedAt: BOOTED_AT,
         }));
         return;
       }
