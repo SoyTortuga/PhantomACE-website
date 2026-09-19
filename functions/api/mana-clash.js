@@ -21,6 +21,61 @@ import {
 } from './mana-clash-scoring.js';
 
 const ROOM_TTL = 7200;
+
+/* ── Room chat ────────────────────────────────────────────────────────
+   Kept IN THE ROOM DOCUMENT rather than beside it. The page already polls
+   the room every couple of seconds and every message is a room write
+   anyway, so a separate key would double both without buying anything.
+
+   It costs the room document some size, which is why the history is short:
+   sixty lines is more than fits on screen and the document is rewritten on
+   every turn.
+
+   NEVER LEAVES THE ROOM. viewFor attaches it only for a player who is in
+   the room, which is the same gate `you` uses -- and the overlay calls
+   viewFor with a null viewer, so a spectator view cannot carry chat even
+   by accident. That is asserted in the overlay suite, not just intended:
+   unmoderated text reaching a live stream is the one failure here that
+   cannot be taken back. */
+const CHAT_KEEP = 60;
+const CHAT_MAX_LEN = 200;
+/* A turn resolves in under a second and people type reactions to it, so
+   the floor is low. The burst window is what actually stops flooding. */
+const CHAT_MIN_GAP_MS = 900;
+const CHAT_BURST = 6;
+const CHAT_BURST_MS = 10000;
+
+/** Trimmed, flattened and capped. Never trusted as markup -- the page
+ *  renders it as text, and this only decides what is worth storing. */
+function cleanChat(raw) {
+  const text = String(raw == null ? '' : raw)
+    /* Control characters, including the newlines someone pastes in to make
+       one message take up the whole panel. */
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    /* Zero-width and bidi overrides: invisible in the input, and enough to
+       scramble every line after them. */
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return { error: 'Say something first.' };
+  if (text.length > CHAT_MAX_LEN) {
+    return { error: `Messages are at most ${CHAT_MAX_LEN} characters.` };
+  }
+  return { text };
+}
+
+/** Whether this player may speak now, and the record of them doing so. */
+function chatAllowed(player, now) {
+  const recent = (Array.isArray(player.chatAt) ? player.chatAt : [])
+    .filter(t => now - t < CHAT_BURST_MS);
+  if (recent.length && now - recent[recent.length - 1] < CHAT_MIN_GAP_MS) {
+    return { error: 'Slow down a moment.' };
+  }
+  if (recent.length >= CHAT_BURST) {
+    return { error: 'Too many messages — wait a few seconds.' };
+  }
+  return { recent };
+}
 const MAX_PLAYERS = 100;
 const INTERMISSION_MS = 10000;
 const GOALS = [5000, 10000, 20000];
@@ -395,6 +450,11 @@ export function viewFor(room, userId, now, opts = {}) {
      anyone else and never showed the Start button. Being in the room is the
      fact the page needs; having a turn is not. */
   if (me) {
+    /* Inside this gate on purpose: the same condition that decides whether
+       `you` is safe to send decides whether chat is. The overlay passes a
+       null viewer and therefore never reaches here. */
+    view.chat = (room.chat || []).slice(-CHAT_KEEP);
+
     const t = me.turn;
     view.you = {
       id: userId,
@@ -672,6 +732,45 @@ export async function onRequestPost(context) {
       return null;
     });
     if (failed) return failed;
+    return json({ success: true, room: viewFor(room, userId, Date.now()) });
+  }
+
+  /* ── chat ─────────────────────────────────────────────────────────── */
+  if (body.action === 'chat') {
+    const cleaned = cleanChat(body.text);
+    if (cleaned.error) return json({ error: cleaned.error }, 400);
+
+    let rejected = null;
+    const { failed, room } = await withRoom(env, code, (r) => {
+      const p = r.players[userId];
+      /* BEING IN THE ROOM IS THE WHOLE PERMISSION. Anyone holding a code
+         can poll get-state, so membership has to be checked against the
+         room rather than inferred from knowing where to post. */
+      if (!p) return json({ error: 'Join the room first.' }, 403);
+
+      const now = Date.now();
+      const gate = chatAllowed(p, now);
+      if (gate.error) { rejected = gate.error; return null; }
+
+      p.chatAt = gate.recent.concat(now);
+      r.chat = Array.isArray(r.chat) ? r.chat : [];
+      r.chat.push({
+        id: 'm' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+        at: now,
+        by: userId,
+        name: p.displayName,
+        text: cleaned.text,
+      });
+      /* Trimmed here rather than on read: the document is what grows, and
+         a room that ran for an hour would otherwise carry every line of it
+         through every turn's write. */
+      if (r.chat.length > CHAT_KEEP) r.chat = r.chat.slice(-CHAT_KEEP);
+      return null;
+    });
+    if (failed) return failed;
+    /* Refused for pace, not for content -- 429 so the page can tell the
+       difference between "too fast" and "not allowed". */
+    if (rejected) return json({ error: rejected }, 429);
     return json({ success: true, room: viewFor(room, userId, Date.now()) });
   }
 

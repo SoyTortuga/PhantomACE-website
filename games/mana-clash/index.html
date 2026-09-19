@@ -207,6 +207,46 @@
                       color: var(--dim); text-align: center; padding: 6px 14px; }
     .round-progress b { color: #fff; }
 
+    /* ════ ROOM CHAT ════
+       Parked in a corner rather than in the column: the lobby, the game and
+       the results table are three different layouts and chat has to sit
+       beside all of them without being part of any. Borders only -- the
+       house rule is no box-shadow anywhere. */
+    .chat { position: fixed; right: 12px; bottom: 12px; z-index: 40;
+            width: 270px; max-width: calc(100vw - 24px);
+            background: var(--panel); border: 1px solid var(--line);
+            border-radius: 4px; display: flex; flex-direction: column; }
+    .chat-head { display: flex; align-items: center; justify-content: space-between;
+                 padding: 6px 10px; border-bottom: 1px solid var(--line);
+                 font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em;
+                 color: var(--dim); }
+    .chat-toggle { background: none; border: none; color: var(--dim); cursor: pointer;
+                   font-size: 15px; line-height: 1; padding: 0 4px; }
+    .chat-toggle:hover { color: #fff; }
+    .chat-log { list-style: none; margin: 0; padding: 8px 10px; height: 168px;
+                overflow-y: auto; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; }
+    .chat-msg { color: #cfcfcf; margin-bottom: 3px; }
+    .chat-msg b { color: var(--dim); font-weight: 700; }
+    .chat-msg.is-mine b { color: var(--red); }
+    .chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+    .chat-input { flex: 1; min-width: 0; background: #0b0b0b; color: #fff;
+                  border: 1px solid var(--line); border-radius: 3px;
+                  padding: 5px 8px; font-size: 12px; font-family: inherit; }
+    .chat-input:focus { outline: none; border-color: var(--red); }
+    .chat-send { padding: 5px 10px; font-size: 11px; }
+    .chat-note { padding: 0 10px 8px; font-size: 11px; color: var(--red); }
+    /* Collapsed keeps the header, so it can be opened again. */
+    .chat.is-collapsed .chat-log,
+    .chat.is-collapsed .chat-form,
+    .chat.is-collapsed .chat-note { display: none; }
+
+    @media (max-width: 720px) {
+      /* Full width along the bottom, and short: on a phone the dice are the
+         page and chat must not cover them. */
+      .chat { left: 12px; right: 12px; width: auto; }
+      .chat-log { height: 96px; }
+    }
+
     .sound-toggle { background: none; border: 1px solid var(--line); color: var(--dim);
                     border-radius: 3px; font-size: 11px; padding: 3px 8px; cursor: pointer; }
     .sound-toggle:hover { color: #fff; border-color: #444; }
@@ -479,6 +519,23 @@
   <div style="display:flex;gap:8px;margin-top:20px">
     <button class="btn btn-red" id="againBtn">Back to Rooms</button>
   </div>
+</div>
+
+<!-- Deliberately not a .screen: show() hides every one of those when it
+     switches, and chat has to survive the lobby becoming a game becoming a
+     results table. Hidden until there is a room to talk in. -->
+<div class="chat" id="chat" hidden>
+  <div class="chat-head">
+    <span>Room Chat</span>
+    <button class="chat-toggle" id="chatToggle" aria-expanded="true">&minus;</button>
+  </div>
+  <ol class="chat-log" id="chatLog" aria-live="polite"></ol>
+  <form class="chat-form" id="chatForm">
+    <input class="chat-input" id="chatInput" maxlength="200" autocomplete="off"
+           placeholder="Say something&hellip;" aria-label="Room chat message">
+    <button class="btn btn-red chat-send" type="submit">Send</button>
+  </form>
+  <div class="chat-note" id="chatNote" hidden></div>
 </div>
 
 <script src="/js/session-read.js"></script>
@@ -1090,8 +1147,46 @@ function renderCallout() {
   fireFlash(you.event);
 }
 
+/* ── Room chat ─────────────────────────────────────────────────────────
+   The server sends the last sixty lines with every poll, so there is no
+   separate feed to keep in step: what is drawn is whatever the room says,
+   and a message someone else sent arrives on the next poll like any other
+   state. Rendered only when it CHANGES, because the poll is every couple
+   of seconds and redrawing the list under someone mid-scroll, or while
+   they have text selected, is worse than a slight delay. */
+let chatSeen = '';
+let chatCollapsed = false;
+
+function renderChat() {
+  const box = $('chat');
+  /* No chat array means the server did not consider us in the room. */
+  if (!state || !Array.isArray(state.chat)) { box.hidden = true; return; }
+  box.hidden = false;
+
+  const log = $('chatLog');
+  const sig = state.chat.length ? state.chat[state.chat.length - 1].id + ':' + state.chat.length : '0';
+  if (sig === chatSeen) return;
+  chatSeen = sig;
+
+  const mine = state.you ? state.you.id : null;
+  log.innerHTML = state.chat.map(m =>
+    '<li class="chat-msg' + (m.by === mine ? ' is-mine' : '') + '">' +
+      '<b>' + esc(m.name) + '</b> ' + esc(m.text) +
+    '</li>').join('');
+  /* Pinned to the newest unless the reader has scrolled up to catch up. */
+  if (!chatCollapsed) log.scrollTop = log.scrollHeight;
+}
+
+function chatNote(text) {
+  const note = $('chatNote');
+  note.textContent = text || '';
+  note.hidden = !text;
+  if (text) setTimeout(() => { if (note.textContent === text) note.hidden = true; }, 4000);
+}
+
 function render() {
   if (!state) return;
+  renderChat();
 
   if (state.status === 'lobby') {
     $('intermission').hidden = true;
@@ -1168,6 +1263,32 @@ function applyState(next) {
   render();
   tick();
 }
+
+$('chatForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = $('chatInput');
+  const text = input.value;
+  if (!text.trim()) return;
+  /* Cleared straight away: a chat box that keeps your text while the round
+     trip lands reads as though it failed, and people send it twice. */
+  input.value = '';
+  try {
+    const d = await api({ action: 'chat', code: roomCode, text });
+    if (d.room) { state = d.room; render(); }
+  } catch (err) {
+    /* Put back, so a refusal for pace does not eat what they typed. */
+    input.value = text;
+    chatNote(err.message);
+  }
+});
+
+$('chatToggle').addEventListener('click', () => {
+  chatCollapsed = !chatCollapsed;
+  $('chat').classList.toggle('is-collapsed', chatCollapsed);
+  $('chatToggle').textContent = chatCollapsed ? '+' : '\u2212';
+  $('chatToggle').setAttribute('aria-expanded', String(!chatCollapsed));
+  if (!chatCollapsed) { chatSeen = ''; renderChat(); }
+});
 
 async function poll() {
   if (!roomCode) return;

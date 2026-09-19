@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as scoring from '../../functions/api/mana-clash-scoring.js';
-import { onRequestGet, onRequestPost } from '../../functions/api/mana-clash.js';
+import { onRequestGet, onRequestPost, viewFor } from '../../functions/api/mana-clash.js';
 
 let passed = 0;
 const failures = [];
@@ -728,6 +728,132 @@ async function playToFinish(env, code, hands) {
   check('only the joinable room is listed', r.data.length, 1);
   check('and it is the open one', r.data[0].code, open);
   check('with its goal shown', r.data[0].goal, 20000);
+}
+
+/* ── ROOM CHAT ────────────────────────────────────────────────────────
+   Lives in the room document and rides the poll everyone is already
+   making. Three things have to hold, and the third is the one that cannot
+   be taken back if it breaks. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+
+  const said = await post(env, 'a', { action: 'chat', code, text: 'good luck' });
+  check('a player in the room can speak', said.status, 200);
+  check('and the room carries it back', said.data.room.chat.map(m => m.text), ['good luck']);
+  check('attributed to them', said.data.room.chat[0].name, 'Ash');
+  check('with their id, so the page can mark its own', said.data.room.chat[0].by, '101');
+
+  /* Everyone in the room sees it, not just the sender. */
+  const seen = await get(env, 'b', `action=get-state&code=${code}`);
+  check('the other player sees it on their next poll', seen.data.chat.map(m => m.text), ['good luck']);
+
+  /* BEING IN THE ROOM IS THE PERMISSION. Anyone can learn a code. */
+  const outsider = await post(env, 'c', { action: 'chat', code, text: 'hello' });
+  check('someone who has not joined cannot speak', outsider.status, 403);
+  const stillOne = await get(env, 'a', `action=get-state&code=${code}`);
+  check('and nothing of theirs is stored', stillOne.data.chat.length, 1);
+}
+
+/* ── What gets stored ─────────────────────────────────────────────────── */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+
+  /* The pace limit is real and tested below, where it belongs; here it
+     would only get in the way. Each send starts from a clean slate so that
+     these assertions are about what gets STORED, not how fast it arrived. */
+  const say = async (text) => {
+    const r = JSON.parse(env._store.get('mc_room_' + code));
+    delete r.players['101'].chatAt;
+    env._store.set('mc_room_' + code, JSON.stringify(r));
+    return post(env, 'a', { action: 'chat', code, text });
+  };
+
+  check('an empty message is refused', (await say('   ')).status, 400);
+  check('and so is one over the cap', (await say('x'.repeat(201))).status, 400);
+
+  /* Newlines are how one message takes over the whole panel. */
+  const flat = await say('one\ntwo\t\tthree');
+  check('newlines and tabs are flattened', flat.data.room.chat[0].text, 'one two three');
+
+  /* Zero-width and bidi characters are invisible in the box and scramble
+     every line drawn after them. */
+  const sneaky = await say('a\u202eb\u200bc');
+  check('bidi and zero-width characters are dropped',
+        sneaky.data.room.chat[1].text, 'abc');
+
+  /* Markup is stored as typed and escaped at render; the point here is
+     that nothing strips it into something that looks safe but is not. */
+  const tag = await say('<img src=x onerror=alert(1)>');
+  check('markup is kept verbatim for the page to escape',
+        tag.data.room.chat[2].text, '<img src=x onerror=alert(1)>');
+}
+
+/* ── Pace ─────────────────────────────────────────────────────────────── */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+
+  await post(env, 'a', { action: 'chat', code, text: 'one' });
+  const fast = await post(env, 'a', { action: 'chat', code, text: 'two' });
+  /* 429 rather than 400: the page tells "too fast" from "not allowed" by
+     the status, and puts the text back in the box either way. */
+  check('a second message immediately after is refused for pace', fast.status, 429);
+
+  /* The refusal must not cost them the message OR count against them. */
+  const state = await get(env, 'a', `action=get-state&code=${code}`);
+  check('and is not stored', state.data.chat.length, 1);
+}
+
+/* ── The history is bounded ───────────────────────────────────────────── */
+{
+  /* The room document is rewritten on every turn, so an hour-long game
+     must not be carrying an hour of chat through each one. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  room.chat = Array.from({ length: 80 }, (_, i) => ({ id: 'm' + i, at: i, by: '101', name: 'Ash', text: 'line ' + i }));
+  env._store.set('mc_room_' + code, JSON.stringify(room));
+
+  const said = await post(env, 'a', { action: 'chat', code, text: 'newest' });
+
+  /* THE STORE, NOT THE VIEW. viewFor slices on read, so reading the view
+     back reports sixty whether or not the document was trimmed -- an
+     earlier version of this assertion did exactly that and passed with the
+     trim deleted. What matters is the size of the thing being rewritten on
+     every turn. */
+  const stored = JSON.parse(env._store.get('mc_room_' + code)).chat;
+  check('the stored history is trimmed', stored.length, 60);
+  check('keeping the newest', stored[59].text, 'newest');
+  check('and dropping the oldest', stored[0].text, 'line 21');
+  check('and the view agrees with it', said.data.room.chat.length, 60);
+}
+
+/* ── IT NEVER LEAVES THE ROOM ─────────────────────────────────────────
+   The overlay calls viewFor with a null viewer. Chat is attached inside
+   the same `if (me)` that guards `you`, so a spectator view cannot carry
+   it -- but that is exactly the kind of thing a later refactor moves one
+   line up without noticing, and unmoderated text reaching a live stream
+   is the one failure here that cannot be undone. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'a', { action: 'chat', code, text: 'not for the stream' });
+
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  const spectator = viewFor(room, null, Date.now(), { dice: true });
+  check('a spectator view has no chat', spectator.chat, undefined);
+  check('and no you block either', spectator.you, undefined);
+
+  const player = viewFor(room, '101', Date.now());
+  check('a player in the room does get it', player.chat.length, 1);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

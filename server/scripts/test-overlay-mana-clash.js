@@ -148,6 +148,11 @@ const post = (env, body, userId) => route.onRequestPost({
      room. It is one argument away from being included, and a leak here is
      invisible to everyone watching. */
   check('the spectator view carries no you block', d.room.you, undefined);
+  /* ROOM CHAT IS THE OTHER ONE, and the one that cannot be taken back: it
+     is player-typed text and this view goes on a live stream. It rides the
+     same `if (me)` gate as `you`, which is exactly the kind of thing a
+     refactor lifts one line without noticing. */
+  check('and no room chat', d.room.chat, undefined);
   /* The password is a boolean in this view and must stay one. */
   ok('and no password', !('password' in d.room));
   check('only whether there is one', d.room.hasPassword, false);
