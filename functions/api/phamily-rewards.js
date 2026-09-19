@@ -207,7 +207,7 @@ function defineMilestones() {
     ]],
     ['Guardian','Badge + Title + Uncommon Egg + Dice Pack', [
       { type:'egg', rarity:'uncommon', name:'Uncommon Egg' },
-      { type:'dice', rarity:'rare', name:'Ember Dice', cosmeticId:'ember' },
+      { type:'dice', rarity:'rare', name:'Crimson Dice', cosmeticId:'crimson' },
     ]],
     ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Entries + a second Room', [
       { type:'nameeffect', rarity:'rare', name:'Name Effect' },
@@ -229,7 +229,7 @@ function defineMilestones() {
     ]],
     ['Specter','Badge + Title + Mythic Giveaway Entries + Dice Pack', [
       { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
-      { type:'dice', rarity:'mythic', name:'Eclipse Dice', cosmeticId:'eclipse' },
+      { type:'dice', rarity:'mythic', name:'Obsidian Dice', cosmeticId:'obsidian' },
     ]],
     ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Entries + a third Room', [
       { type:'banner', rarity:'mythic', name:'Exclusive Banner' },

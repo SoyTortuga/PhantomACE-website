@@ -245,11 +245,11 @@
     .die.set-phantom { border-color: #4a5a66; opacity: 0.88; }
     .die.set-phantom img { filter: grayscale(0.7) brightness(1.25) contrast(0.85); }
 
-    .die.set-ember { border-color: #7a3c1e; }
-    .die.set-ember img { filter: sepia(0.8) saturate(2.6) hue-rotate(-18deg) brightness(0.7); }
+    .die.set-crimson { border-color: #7a1e26; }
+    .die.set-crimson img { filter: sepia(0.7) saturate(3.2) hue-rotate(-30deg) brightness(0.65); }
 
-    .die.set-eclipse { border-color: #2e2e38; }
-    .die.set-eclipse img { filter: grayscale(0.85) brightness(1.5); }
+    .die.set-obsidian { border-color: #26262c; }
+    .die.set-obsidian img { filter: grayscale(0.9) brightness(1.6); }
 
     /* The one the pass calls animated. A slow drift rather than anything
        that twitches: these sit on screen for whole rounds, and the tumble
@@ -647,16 +647,16 @@ const DICE_SETS = {
     cls: 'set-phantom',
     colours: { C:'#8fa3ad', W:'#a8bcc4', U:'#7f9fb8', B:'#8b8fa8', R:'#a89099', G:'#8fa89a' },
   },
-  ember: {
-    name: 'Ember',
+  crimson: {
+    name: 'Crimson',
     faces: FACE_IMG,
-    cls: 'set-ember',
+    cls: 'set-crimson',
     colours: { C:'#d8a88a', W:'#f0c898', U:'#c89a86', B:'#b08878', R:'#f0a070', G:'#c9a882' },
   },
-  eclipse: {
-    name: 'Eclipse',
+  obsidian: {
+    name: 'Obsidian',
     faces: FACE_IMG,
-    cls: 'set-eclipse',
+    cls: 'set-obsidian',
     colours: { C:'#6a6a72', W:'#84848e', U:'#5e6b80', B:'#5a5468', R:'#7a5a60', G:'#5e6e62' },
   },
   fracture: {
