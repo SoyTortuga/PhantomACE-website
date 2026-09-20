@@ -51,7 +51,10 @@
        the walls at a whisper so the tester knows both truths at once. */
     .cell.dark { background: #060606; }
     .cell.dark.n, .cell.dark.e, .cell.dark.s, .cell.dark.w { border-color: transparent; }
-    .cell.xray { opacity: 0.28; }
+    /* X-ray is OPT-IN and whisper-faint: 0.28 read as "the fog is too
+       light" in live testing, because the default view was showing staff
+       the answers. The default is now exactly what a viewer sees. */
+    .cell.xray { opacity: 0.12; }
     .cell .bone {
       position: absolute; inset: 0; display: flex;
       align-items: center; justify-content: center; font-size: 13px;
@@ -112,6 +115,9 @@
     <div class="bar">
       <button class="btn" id="startBtn">Start (4×4)</button>
       <button class="btn" id="stopBtn">Stop</button>
+      <label class="bgs-toggle" style="font-size:11px;display:flex;gap:5px;align-items:center;cursor:pointer">
+        <input type="checkbox" id="xrayToggle"> X-ray (staff)
+      </label>
       <span class="status" id="status">loading…</span>
     </div>
     <div class="said" id="said"></div>

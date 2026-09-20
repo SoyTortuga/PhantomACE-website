@@ -292,8 +292,8 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   ok('the page loads its script', /js\/pages\/maze-test\.js/.test(page));
   const js = fs.readFileSync(path.join(REPO, 'js/pages/maze-test.js'), 'utf8');
   ok('the board fades on a transition it watched', /classList\.add\('fading'\)/.test(js));
-  ok('walls render as borders, masked digits as none',
-     /digit === '\.' \? 0 : parseInt\(digit, 16\)/.test(js));
+  ok('walls render as borders, and nothing renders unless shown',
+     /\(!show \|\| digit === '\.'\) \? 0 : parseInt\(digit, 16\)/.test(js));
   ok('cells are dressed every poll, because fog lifts between polls',
      /function updateCells/.test(js));
   ok('staff x-ray dims what chat cannot see', /' xray' : ' dark'/.test(js));
@@ -417,6 +417,36 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   const staffView = await (await GET(e, as('222'))).json();
   ok('staff see every wall', !staffView.walls.some(row => row.includes('.')));
   ok('and the goal', staffView.goal !== null);
+}
+
+/* ══ The overlay panel and the honest test page ════════════════════ */
+{
+  const ov = fs.readFileSync(path.join(REPO, 'overlay.html'), 'utf8');
+  ok('the overlay hosts a maze panel', /id="ovMaze" hidden/.test(ov));
+  ok('and loads its own script, apart from the alert feed', /overlay-maze\.js/.test(ov));
+
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/overlay-maze.js'), 'utf8');
+  ok('the panel hides when no maze runs', /panel\.hidden = true/.test(js));
+  ok('polls back off while idle', /IDLE_POLL_MS/.test(js));
+  ok('failures stay silent on stream', /Silent, like every panel here/.test(js));
+  ok('the wire IS the fog: a masked digit draws nothing', /digit === '\.'/.test(js));
+  ok('the rover glides on the overlay too', /class="rover" id="ovMazeRover"/.test(js));
+  ok('the clear choreography made it across', /MAZE ' \+ t\.clearedLevel \+ ' COMPLETE!/.test(js));
+  ok('the word-pad lights per incoming command', /lit-bonk/.test(js) && /data-dir="/.test(js));
+  ok('senders scroll beneath', /renderRecent/.test(js));
+
+  const css = fs.readFileSync(path.join(REPO, 'css/pages/overlay.css'), 'utf8');
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('the panel is styled', /\.ov-maze \{/.test(css));
+  ok('no box-shadow, still', !/box-shadow/.test(code));
+
+  /* The test page defaults to the viewer's truth: x-ray is opt-in. */
+  const tp = fs.readFileSync(path.join(REPO, 'js/pages/maze-test.js'), 'utf8');
+  ok('x-ray is behind a toggle, not the default',
+     /staff && \$\('xrayToggle'\) && \$\('xrayToggle'\)\.checked/.test(tp));
+  const tph = fs.readFileSync(path.join(REPO, 'maze-test.html'), 'utf8');
+  ok('and the toggle exists', /id="xrayToggle"/.test(tph));
+  ok('x-ray is a whisper now', /\.cell\.xray \{ opacity: 0\.12; \}/.test(tph));
 }
 
 /** BFS the walls; returns the direction list from (0,0) to the far corner. */

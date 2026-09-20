@@ -685,3 +685,69 @@ body.ov-alerting .ov-mc {
   color: #777;
   padding: 6px 10px;
 }
+
+
+/* ── Chat Maze ─────────────────────────────────────────────────────────
+   The featured panel while a maze runs: board dead-centre right, the pad
+   underneath doubling as the live command indicator, the last few inputs
+   scrolling beneath. Fog arrives pre-masked from the wire — the overlay
+   is an anonymous reader, so it cannot leak what chat has not earned.
+   Board reserves 300px square and cells divide it, which keeps a 15×15
+   legible on a 1080p canvas. Walls are borders, per the house rule. */
+.ov-maze {
+  position: fixed;
+  right: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  width: 332px;
+  padding: 14px 16px 12px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid #2a2a2a;
+  border-left: 3px solid #ff0000;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+}
+.ov-maze-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ov-maze-title { font-weight: 800; letter-spacing: 0.06em; color: #ff4444; font-size: 14px; }
+.ov-maze-stats { font-size: 10px; color: #ffffffbb; }
+.ov-maze-stage { position: relative; }
+.ov-maze-board {
+  display: grid; background: #0a0a0a; border-radius: 4px; padding: 6px;
+  transition: opacity 1s ease; position: relative;
+}
+.ov-maze-board.fading { opacity: 0; }
+.ov-maze-board .cell { position: relative; box-sizing: border-box; border: 1px solid transparent; }
+.ov-maze-board .cell.n { border-top-color: #ff0000; }
+.ov-maze-board .cell.e { border-right-color: #ff0000; }
+.ov-maze-board .cell.s { border-bottom-color: #ff0000; }
+.ov-maze-board .cell.w { border-left-color: #ff0000; }
+.ov-maze-board .cell.dark { background: #050505; }
+.ov-maze-board .cell .mark {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; font-size: 12px;
+}
+.ov-maze-board .rover {
+  position: absolute; top: 0; left: 0; border-radius: 50%;
+  background: #ff0000; border: 2px solid #ffffffcc;
+  transition: transform 0.22s ease; pointer-events: none;
+}
+.ov-maze-board .rover.no-anim { transition: none; }
+.ov-maze-done {
+  position: absolute; inset: 0; display: none;
+  align-items: center; justify-content: center; text-align: center;
+  background: rgba(0, 0, 0, 0.65); border-radius: 4px;
+  font-weight: 800; color: #ff4444; font-size: 15px; letter-spacing: 0.06em;
+}
+.ov-maze-done.show { display: flex; }
+.ov-maze-done small { display: block; font-size: 10px; color: #fff; font-weight: 400; margin-top: 4px; }
+.ov-maze-pad { display: flex; gap: 6px; justify-content: center; margin: 8px 0 6px; }
+.ov-maze-pad span {
+  padding: 4px 10px; border: 1px solid #ffffff2e; border-radius: 4px;
+  font-size: 11px; font-weight: 700; color: #ffffffcc;
+}
+.ov-maze-pad span.lit { border-color: #ff0000; color: #ff6666; }
+.ov-maze-pad span.lit-bonk { border-color: #ffaa00; color: #ffcc66; }
+.ov-maze-recent {
+  margin: 0; padding: 0 0 0 16px; font-size: 10px; color: #ffffffaa;
+  max-height: 64px; overflow: hidden;
+}

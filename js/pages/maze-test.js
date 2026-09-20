@@ -146,22 +146,30 @@
     var bones = {};
     (data.bones || []).forEach(function (b) { bones[b.x + '_' + b.y] = true; });
 
+    /* DEFAULT IS THE VIEWER'S TRUTH. Staff receive the full board on the
+       wire, but the page masks it back down unless X-ray is ticked — live
+       testing read the always-on x-ray as "the fog is too light", which
+       it was: it was not the fog at all, it was the answers. */
+    var xray = staff && $('xrayToggle') && $('xrayToggle').checked;
+
     for (var y = 0; y < size; y++) {
       for (var x = 0; x < size; x++) {
         var cell = $('mz_' + x + '_' + y);
         if (!cell) continue;
-        var digit = data.walls[y][x];
         var isRev = !!(revealed[y] && revealed[y][x] === '1');
-        var bits = digit === '.' ? 0 : parseInt(digit, 16);
+        var digit = data.walls[y][x];
+        var show = isRev || xray;
+        var bits = (!show || digit === '.') ? 0 : parseInt(digit, 16);
 
         cell.className = 'cell' +
           ((bits & 1) ? ' n' : '') + ((bits & 2) ? ' e' : '') +
           ((bits & 4) ? ' s' : '') + ((bits & 8) ? ' w' : '') +
-          (isRev ? '' : (staff ? ' xray' : ' dark'));
+          (isRev ? '' : (xray ? ' xray' : ' dark'));
 
         var marks = '';
-        if (bones[x + '_' + y]) marks += '<span class="bone">🦴</span>';
-        if (data.goal && x === data.goal.x && y === data.goal.y) {
+        if (bones[x + '_' + y] && show) marks += '<span class="bone">🦴</span>';
+        if (data.goal && x === data.goal.x && y === data.goal.y &&
+            (isRev || xray)) {
           marks += '<span class="ladder" title="down to the next maze">🪜</span>';
         }
         if (cell.innerHTML !== marks) cell.innerHTML = marks;
