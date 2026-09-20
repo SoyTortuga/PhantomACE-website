@@ -1,23 +1,25 @@
 #!/usr/bin/env node
 /* ══════════════════════════════════════════════
-   Apply a .sql file to the database.
+   Apply a .sql migration to the site's database.
 
-   Exists because psql is not on PATH on the rig — Postgres ships it under
-   "C:\Program Files\PostgreSQL\<v>\bin", which turns every schema change
-   into a hunt for the right path, with the connection string typed onto a
-   command line to get there. The server already has `pg` and already knows
-   how to find the production URL; this uses both.
+     node server/scripts/apply-sql.js --service phantomace-web server/sql/008_skull_saves.sql
 
-   Wrapped in a TRANSACTION. Postgres does DDL transactionally, so a file
-   that fails halfway leaves nothing behind rather than half a schema that
-   the next run then trips over.
+   Why this exists rather than psql: psql is not on the rig's PATH, and the
+   connection string lives in the Windows service's own environment, not the
+   interactive shell — so `psql $env:DATABASE_URL` fails twice over. This
+   reads the URL the same way every other maintenance script here does
+   (resolveDatabaseUrl --service), so the password never touches the shell,
+   and runs the file through the pool the app already uses.
 
-   Usage:
-     node server/scripts/apply-sql.js server/sql/002_checkins.sql --service phantomace-web
-     node server/scripts/apply-sql.js server/sql/002_checkins.sql --service phantomace-web --confirm
+     --service phantomace-web   read DATABASE_URL from that service's env
+     --database-url <url>       or pass one explicitly (dev)
+     --dry-run                  print the file and the target, run nothing
 
-   Dry run unless --confirm: it connects, reports the database, and prints
-   what it would run.
+   The whole file is sent as one script, so its own BEGIN/COMMIT frames the
+   transaction. Every migration here is written CREATE TABLE IF NOT EXISTS,
+   so re-running one is safe.
+
+   NEVER logs the connection string — only the database name.
    ══════════════════════════════════════════════ */
 
 import fs from 'node:fs';
@@ -30,80 +32,55 @@ import { createPool, waitForDatabase } from '../lib/db.js';
 import { resolveDatabaseUrl } from '../lib/service-env.js';
 
 function arg(name, fallback = null) {
-  const hit = process.argv.find(a => a.startsWith(`--${name}=`));
-  if (hit) return hit.slice(name.length + 3);
-  const i = process.argv.indexOf(`--${name}`);
-  if (i !== -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--')) return process.argv[i + 1];
-  return process.argv.includes(`--${name}`) ? true : fallback;
+  const i = process.argv.indexOf('--' + name);
+  if (i === -1) return fallback;
+  const next = process.argv[i + 1];
+  return (next && !next.startsWith('--')) ? next : true;
 }
+const has = (name) => process.argv.includes('--' + name);
 
 async function main() {
-  /* First non-flag argument is the file. */
+  /* The file is the first non-flag argument. */
   const file = process.argv.slice(2).find(a => !a.startsWith('--') &&
-    !process.argv.some((p, i) => p.startsWith('--') && process.argv[i + 1] === a));
-
+    a !== arg('service') && a !== arg('database-url'));
   if (!file) {
-    console.error('[sql] Usage: node server/scripts/apply-sql.js <file.sql> --service phantomace-web [--confirm]');
-    process.exit(2);
+    console.error('Which file? e.g. node server/scripts/apply-sql.js --service phantomace-web server/sql/008_skull_saves.sql');
+    process.exit(1);
   }
-  if (!fs.existsSync(file)) {
-    console.error(`[sql] No such file: ${file}`);
-    process.exit(2);
-  }
+  const full = path.resolve(file);
+  if (!fs.existsSync(full)) { console.error(`No such file: ${full}`); process.exit(1); }
+  const sql = fs.readFileSync(full, 'utf8');
 
-  const sql = fs.readFileSync(file, 'utf8');
-  const service = arg('service');
-  const confirm = arg('confirm') === true;
-  const databaseUrl = resolveDatabaseUrl({ service, fallback: arg('database-url') });
-
+  const databaseUrl = resolveDatabaseUrl({ service: arg('service'), fallback: arg('database-url') });
   if (!databaseUrl) {
-    console.error('[sql] No DATABASE_URL. Use --service phantomace-web.');
-    process.exit(2);
+    console.error('No DATABASE_URL. Pass --service phantomace-web, or set it in server/.env.');
+    process.exit(1);
   }
+  const dbName = (databaseUrl.split('/').pop() || '').split('?')[0];
 
-  const pool = createPool(databaseUrl);
-  const info = await waitForDatabase();
-  console.log(`Database: ${info.db}`);
-  console.log(`File:     ${file}  (${sql.split('\n').length} lines)`);
-
-  /* Statement count is a sanity signal, not a parser — a file that reads as
-     one statement when you expected six is worth noticing before it runs.
-     Comments are stripped FIRST: splitting on ';' and then discarding chunks
-     that start with '--' throws away every statement preceded by a comment
-     block, which in this codebase is all of them. It under-reported 3 as 2
-     on its first real use. */
-  const stripped = sql
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
-  const statements = stripped.split(';').map(s => s.trim()).filter(Boolean).length;
-  console.log(`Statements: ~${statements}`);
+  console.log('');
+  console.log(`  file      ${file}`);
+  console.log(`  database  ${dbName}`);
+  console.log(`  bytes     ${sql.length}`);
   console.log('');
 
-  if (!confirm) {
-    console.log(sql.split('\n').filter(l => l.trim() && !l.trim().startsWith('--')).join('\n'));
+  if (has('dry-run')) {
+    console.log('  Dry run — nothing sent. Re-run without --dry-run to apply.');
     console.log('');
-    console.log('DRY RUN — nothing applied. Re-run with --confirm.');
-    await pool.end().catch(() => {});
+    console.log(sql);
     return;
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query(sql);
-    await client.query('COMMIT');
-    console.log('Applied successfully.');
-  } catch (err) {
-    try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
-    console.error(`[sql] FAILED, rolled back: ${err.message}`);
-    process.exitCode = 1;
-  } finally {
-    client.release();
-    await pool.end().catch(() => {});
-  }
+  const pool = createPool(databaseUrl);
+  await waitForDatabase();
+  await pool.query(sql);            // whole file as one script; its own BEGIN/COMMIT
+  await pool.end();
+
+  console.log('  Applied.');
+  console.log('');
 }
 
-main().catch(err => {
-  console.error('[sql] FAILED:', err.message);
+main().catch((err) => {
+  console.error('[apply-sql] FAILED:', err.message);
   process.exit(1);
 });
