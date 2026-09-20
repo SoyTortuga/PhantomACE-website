@@ -103,7 +103,17 @@ const { ITEMS, BANDS, MAX_ITEMS } = new Function('IC', 'AB', `
         BANDS.filter(b => !ITEMS.some(t => t.band === b.id)).map(b => b.id), []);
   ok('the tray renders by band', /YARD_BANDS\.map\(b => \{/.test(src));
   ok('and the layout wraps rather than scrolling sideways forever',
-     /\.yard-tray-items \{ max-height: [\d.]+vh; overflow-y: auto;/.test(src));
+     /\.yard-tray-items \{ max-height: [^;]+; overflow-y: auto;/.test(src));
+
+  /* The tray must never sit ON the park. It shipped as an overlay pinned
+     to the viewport's bottom edge, which made the lowest rows of the
+     world impossible to decorate — the menu covered exactly the ground it
+     was for. It lives beside the park now, as a sibling in the stage
+     flex, and this pins both halves of that: no absolute positioning on
+     the tray, and the tray element outside the viewport element. */
+  ok('the tray is not an overlay', !/\.yard-tray \{[^}]*position: absolute/.test(src));
+  const viewport = /<div class="park-viewport"[\s\S]*?<div class="park-panel" id="parkPanel"><\/div>\s*<\/div>/.exec(src);
+  ok('and lives outside the viewport', !!viewport && !viewport[0].includes('id="yardTray"'));
 }
 
 /* ── Water decorations actually go in water ──────────────────────────── */
