@@ -195,9 +195,19 @@ export function viewOf(state, now = Date.now(), { full = false } = {}) {
 }
 
 /**
- * The question the drop guard asks. Reads stored state only — no Twitch
- * call — because a drop must not wait on a network round trip, and the
- * begin event has already been pushed by the time a break is running.
+ * Whether a break is running, for any caller that wants to behave
+ * differently during one.
+ *
+ * DELIBERATELY UNUSED. A drop guard — suppressing item drops and giveaway
+ * calls while ads play — was scoped and then declined: drops carry on
+ * unchanged through a break, by decision, not by oversight. So if you have
+ * arrived here planning to wire this into the drop path, that is the thing
+ * that was already considered and rejected. Ask before changing it.
+ *
+ * Kept because it is the correct way to ask the question and it is tested:
+ * stored state only, no Twitch call, because a drop must not wait on a
+ * network round trip and the begin event has already been pushed by the
+ * time a break is running.
  */
 export async function adsRunning(env, now = Date.now()) {
   return breakRunningAt(await read(env), now);
