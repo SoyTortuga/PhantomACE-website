@@ -86,6 +86,9 @@ const TOOLS = [
   { href: '/games/commander-bingo/host.html', name: 'Commander Bingo Host',
     desc: 'Host controls for stream bingo: create the room, call squares, end the game.',
     tags: ['Moderators'] },
+  { href: '/games/mtgbbb/host.html', name: 'MTGBBB Host',
+    desc: 'Booster Box Bingo host panel: open a room for a set, mark pulls as you crack packs, call shots, end the game and award prizes.',
+    tags: ['Moderators'] },
 ];
 
 export async function onRequestGet(context) {
