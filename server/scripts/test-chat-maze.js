@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import {
   generateMaze, wallsAt, offerMove, buildClearMessage, buildStartMessage,
   onRequestGet, onRequestPost, _resetHint, WALL, DIRS,
+  tierForLevel, clearTier, startMaze, stopMaze,
 } from '../../functions/api/bot/maze.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -447,6 +448,78 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   const tph = fs.readFileSync(path.join(REPO, 'maze-test.html'), 'utf8');
   ok('and the toggle exists', /id="xrayToggle"/.test(tph));
   ok('x-ray is a whisper now', /\.cell\.xray \{ opacity: 0\.12; \}/.test(tph));
+}
+
+/* ══ The reward ladder, verbatim from the broadcaster ═══════════════ */
+{
+  const expect = { 1:'common', 2:'common', 3:'common', 4:'common', 5:'uncommon',
+                   6:'common', 9:'common', 10:'uncommon', 15:'uncommon', 20:'uncommon',
+                   24:'common', 25:'rare', 26:'common', 50:'rare', 75:'rare',
+                   99:'common', 100:'mythic' };
+  for (const [lv, tier] of Object.entries(expect)) {
+    check('level ' + lv + ' pays ' + tier, tierForLevel(Number(lv)), tier);
+  }
+  /* "This continues": the cycle holds past 100. */
+  check('level 101 is common again', tierForLevel(101), 'common');
+  check('level 105 is uncommon', tierForLevel(105), 'uncommon');
+  check('level 125 is rare', tierForLevel(125), 'rare');
+  check('level 200 is mythic', tierForLevel(200), 'mythic');
+
+  /* Bones step the SCHEDULED tier, and mythic has no upstairs. */
+  check('bones upgrade a common level', clearTier(1, true), 'uncommon');
+  check('bones upgrade an uncommon level to rare', clearTier(5, true), 'rare');
+  check('bones on level 25 pay mythic', clearTier(25, true), 'mythic');
+  check('level 100 with bones stays mythic', clearTier(100, true), 'mythic');
+  check('no bones, no upgrade', clearTier(5, false), 'uncommon');
+
+  /* Announced from the plan the drop executes — never promised one thing
+     and paid another. */
+  ok('the clear message names the tier',
+     /RARE code incoming/.test(buildClearMessage({ level: 25, size: 28, moves: 1, bonks: 0 }, 'W',
+        { tier: 'rare', bonesTotal: 0, bonesFound: 0, allBones: false })));
+
+  /* End to end at level 5: a staged one-move clear announces UNCOMMON. */
+  const e = env();
+  const size = 8, seed = 'staged:5';
+  const walls = generateMaze(size, seed);
+  const goal = { x: size - 1, y: size - 1 };
+  let from = null, dir = null;
+  for (const [name, dd] of Object.entries(DIRS)) {
+    const fx = goal.x - dd.dx, fy = goal.y - dd.dy;
+    if (fx < 0 || fy < 0 || fx >= size || fy >= size) continue;
+    if (!(wallsAt(walls, fx, fy) & dd.bit)) { from = { x: fx, y: fy }; dir = name; break; }
+  }
+  ok('a doorway into the goal exists', !!from);
+  e.MARKETPLACE.store.set('maze_current', JSON.stringify({
+    status: 'active', startedAt: 1, totalMoves: 0, recent: [], contributors: {},
+    history: [], lastMove: null, transition: null, updatedAt: 1,
+    level: 5, size, seed, walls, pos: from, goal,
+    moves: 40, bonks: 2, bones: [], bonesTotal: 0, bonesFound: 0,
+    revealed: Array.from({ length: size }, () => '1'.repeat(size)),
+  }));
+  const winning = await (await POST(e, { action: 'move', dir }, as('222'))).json();
+  ok('the level-5 clear announces the scheduled UNCOMMON',
+     (winning.said || []).some(m => /UNCOMMON code incoming/.test(m)));
+}
+
+/* ══ Start and stop from chat as well as the page ═════════════════ */
+{
+  /* startMaze/stopMaze are the shared implementations; the !maze command
+     and the route both call them, so this behavioural check covers both
+     doors, and the source check pins the chat door's gate placement. */
+  const e = env();
+  await startMaze(e);
+  check('startMaze opens a 4×4', e.MARKETPLACE.read('maze_current').size, 4);
+  const summary = await stopMaze(e);
+  check('stopMaze reports the run', summary.level, 1);
+  check('and turns the game off', e.MARKETPLACE.read('maze_current').status, 'off');
+  check('stopping twice is a no-op', await stopMaze(e), null);
+
+  const cmds = fs.readFileSync(path.join(REPO, 'functions/api/bot/commands.js'), 'utf8').replace(/\r?\n/g, '\n');
+  ok('!maze exists as a chat command', /parsed\.command === '!maze'/.test(cmds));
+  ok('behind the moderator gate, not in front of it',
+     cmds.indexOf('isAuthorizedSender(env, event)') < cmds.indexOf("parsed.command === '!maze'"));
+  ok('and calls the shared implementations', /await startMaze\(env\)/.test(cmds) && /await stopMaze\(env\)/.test(cmds));
 }
 
 /** BFS the walls; returns the direction list from (0,0) to the far corner. */

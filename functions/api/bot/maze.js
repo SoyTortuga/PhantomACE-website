@@ -180,6 +180,28 @@ function freshLevel(level, startedAt) {
   return lv;
 }
 
+/* ── The reward ladder ─────────────────────────────────────────────────
+   The broadcaster's schedule, verbatim: every clear drops a code; every
+   fifth level the code is uncommon, every twenty-fifth rare, and level
+   100 pays mythic. The cycle repeats past 100 (150 is rare, 200 is
+   mythic again). A full bone set steps the SCHEDULED tier up one — so
+   bones on level 25 turn a rare into a mythic, and on a mythic level
+   there is nothing above to climb to. */
+const TIER_LADDER = ['common', 'uncommon', 'rare', 'mythic'];
+
+export function tierForLevel(level) {
+  if (level % 100 === 0) return 'mythic';
+  if (level % 25 === 0) return 'rare';
+  if (level % 5 === 0) return 'uncommon';
+  return 'common';
+}
+
+export function clearTier(level, allBones) {
+  const base = tierForLevel(level);
+  if (!allBones) return base;
+  return TIER_LADDER[Math.min(TIER_LADDER.length - 1, TIER_LADDER.indexOf(base) + 1)];
+}
+
 /* ── Chat entry point ──────────────────────────────────────────────────
    commands.js offers every non-command message here, exactly as it offers
    them to the scramble. The regex turns almost all of chat away without
@@ -274,7 +296,7 @@ async function performMove(env, dir, name, { hint = false, userId = null } = {})
       const allBones = state.bonesTotal > 0 && state.bonesFound === state.bonesTotal;
       cleared = {
         level: state.level, size: state.size,
-        tier: allBones ? 'uncommon' : 'common',
+        tier: clearTier(state.level, allBones),
         allBones, bonesFound: state.bonesFound, bonesTotal: state.bonesTotal,
         userId, name: who,
       };
@@ -332,12 +354,72 @@ export function buildClearMessage(state, who, plan) {
       ? ` All ${plan.bonesTotal} 🦴 collected — the drop is UPGRADED!`
       : ` 🦴 ${plan.bonesFound}/${plan.bonesTotal} collected.`;
   }
+  /* The tier is announced from the same plan the drop executes, so chat
+     is never promised one thing and paid another. */
+  if (plan && plan.tier) msg += ` 🎁 ${plan.tier.toUpperCase()} code incoming!`;
   return msg + ` Next up: ${next}×${next}`;
 }
 
 export function buildStartMessage() {
   return '🧭 MAZE TIME! Chat steers the dot: type up / down / left / right ' +
     '(or WASD) in chat. Every message moves it, in order. First maze is 4×4 — reach the flag!';
+}
+
+/* ── Start / stop ── shared by the route (the test page's buttons) and the
+   !maze chat command, so a maze started from a phone in chat is exactly a
+   maze started from the toolbox. Both are gated by their callers:
+   isModerator on the route, isAuthorizedSender in commands.js — the same
+   people through either door. Announcements ride inside, best-effort. */
+
+export async function startMaze(env) {
+  const now = Date.now();
+  const state = {
+    status: 'active',
+    startedAt: now,
+    totalMoves: 0,
+    recent: [],
+    contributors: {},
+    history: [],
+    lastMove: null,
+    transition: null,
+    updatedAt: now,
+    ...freshLevel(1, now),
+  };
+  await env.MARKETPLACE.put(KEY, JSON.stringify(state));
+  _resetHint();
+
+  try {
+    const { sendChatMessage } = await import('./send-chat.js');
+    await sendChatMessage(env, buildStartMessage());
+  } catch (err) {
+    /* The game runs whether or not the announcement lands. */
+    console.error('[maze] start announcement failed:', err.message);
+  }
+  return { started: true };
+}
+
+export async function stopMaze(env) {
+  let summary = null;
+  await env.MARKETPLACE.mutate(KEY, (state) => {
+    if (!state || state.status !== 'active') return undefined;
+    state.status = 'off';
+    state.updatedAt = Date.now();
+    summary = { level: state.level, size: state.size, totalMoves: state.totalMoves };
+    return state;
+  });
+  _resetHint();
+
+  if (summary) {
+    try {
+      const { sendChatMessage } = await import('./send-chat.js');
+      await sendChatMessage(env,
+        `🧭 Maze over! Chat reached maze ${summary.level} (${summary.size}×${summary.size}) ` +
+        `in ${summary.totalMoves} total moves. GG!`);
+    } catch (err) {
+      console.error('[maze] stop announcement failed:', err.message);
+    }
+  }
+  return summary;
 }
 
 /* ── Routes ──────────────────────────────────────────────────────────── */
@@ -411,46 +493,20 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
   if (body.action === 'start') {
-    const now = Date.now();
-    const state = {
-      status: 'active',
-      startedAt: now,
-      totalMoves: 0,
-      recent: [],
-      contributors: {},
-      history: [],
-      lastMove: null,
-      transition: null,
-      updatedAt: now,
-      ...freshLevel(1, now),
-    };
-    await env.MARKETPLACE.put(KEY, JSON.stringify(state));
-    _resetHint();
-
-    try {
-      const { sendChatMessage } = await import('./send-chat.js');
-      await sendChatMessage(env, buildStartMessage());
-    } catch (err) {
-      /* The game runs whether or not the announcement lands. */
-      console.error('[maze] start announcement failed:', err.message);
-    }
+    await startMaze(env);
     return json({ success: true, state: { level: 1, size: FIRST_SIZE } });
   }
 
   /* The test page's steering. Same rules as chat — performMove is the
-     only mover — but the clear announcement comes back in the RESPONSE
-     instead of going to the channel: a test drive must not narrate itself
-     into a live chat. */
+     only mover. Clears announce to the channel whoever made the winning
+     move (the broadcaster's call), and the message also comes back in
+     the response so the page can show it. */
   if (body.action === 'move') {
     const dir = String(body.dir || '').toLowerCase();
     if (!DIRS[dir]) return json({ error: 'Unknown direction' }, 400);
     const res = await performMove(env, dir, (session.display_name || 'tester') + ' (test)',
                                   { userId: session.user_id });
     if (!res) return json({ error: 'No maze is running.' }, 400);
-    /* Clears announce to chat WHOEVER made the winning move -- the
-       broadcaster wants the cleared list narrated in channel, and a level
-       falling during a staff assist is still a level the stream watched
-       fall. Individual moves stay silent either way. */
     if (res.say.length) {
       try {
         const { sendChatMessage } = await import('./send-chat.js');
@@ -461,26 +517,7 @@ export async function onRequestPost(context) {
   }
 
   if (body.action === 'stop') {
-    let summary = null;
-    await env.MARKETPLACE.mutate(KEY, (state) => {
-      if (!state || state.status !== 'active') return undefined;
-      state.status = 'off';
-      state.updatedAt = Date.now();
-      summary = { level: state.level, size: state.size, totalMoves: state.totalMoves };
-      return state;
-    });
-    _resetHint();
-
-    if (summary) {
-      try {
-        const { sendChatMessage } = await import('./send-chat.js');
-        await sendChatMessage(env,
-          `🧭 Maze over! Chat reached maze ${summary.level} (${summary.size}×${summary.size}) ` +
-          `in ${summary.totalMoves} total moves. GG!`);
-      } catch (err) {
-        console.error('[maze] stop announcement failed:', err.message);
-      }
-    }
+    const summary = await stopMaze(env);
     return json({ success: true, stopped: !!summary });
   }
 

@@ -287,6 +287,18 @@ async function handleChatMessage(env, event) {
     return;
   }
 
+  /* !maze on | !maze off — the maze from a phone, mid-stream, without
+     opening the toolbox. Same people as the page: this sits behind the
+     moderator gate above, and startMaze/stopMaze are the same functions
+     the route calls, announcements included. */
+  if (parsed.command === '!maze') {
+    const { startMaze, stopMaze } = await import('./maze.js');
+    const want = parsed.rest.toLowerCase();
+    if (want === 'on' || want === 'start') await startMaze(env);
+    else if (want === 'off' || want === 'stop' || want === 'end') await stopMaze(env);
+    return;
+  }
+
   /* !scramble | !scramble skip | !scramble stop
      Runnable from chat so the game can be started from a phone while the
      BRB screen is already up, without opening the control panel. */
