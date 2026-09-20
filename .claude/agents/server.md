@@ -32,6 +32,7 @@ non-goals list. Do not improvise around it.
 | Ports | 8789 = dev server, 8790 = production server (post-cutover). Bind to `127.0.0.1` |
 | Process supervision | **None yet.** No pm2 service, no phantomace service. `pm2 startup` does not support Windows — use NSSM |
 | Dino Park assets | `games/dino-park/assets/dino-assets/` — 72 MB, 829 files, **gitignored but required** |
+| Skull Clicker sprites | `games/skull-clicker/assets/buildings/` — 15 PNGs, **gitignored but required** (same licensed packs; copy alongside dino-assets) |
 
 ## Your Scope
 
@@ -70,11 +71,12 @@ connected to. There is no undo.
 **3. Production data is small but real** — 14 marketplace listings and 9 users' watch-time
 history. "Only 35 keys" is not permission to be casual with them.
 
-**4. Never re-clone the repo to fix a problem.** `games/dino-park/assets/dino-assets/` is
-gitignored (licensed asset pack) and a fresh clone silently loses all 829 sprite files. Copy
-the directory, never re-clone. Verify with:
+**4. Never re-clone the repo to fix a problem.** `games/dino-park/assets/dino-assets/` and
+`games/skull-clicker/assets/buildings/` are gitignored (licensed asset packs) and a fresh
+clone silently loses their sprite files. Copy the directories, never re-clone. Verify with:
 ```powershell
 (Get-ChildItem "...\games\dino-park\assets\dino-assets" -Recurse -File | Measure-Object).Count   # expect 829
+(Get-ChildItem "...\games\skull-clicker\assets\buildings" -File).Count                            # expect 15
 ```
 
 **5. During cutover, obey the 30-minute rule.** If smoke tests aren't green within 30 minutes,

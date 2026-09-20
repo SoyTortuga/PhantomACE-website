@@ -21,6 +21,8 @@ _private/
 # directory to Cloudflare Pages directly rather than building from git.
 # Regenerate derived sprites with games/dino-park/_build-*.js.
 games/dino-park/assets/dino-assets/
+# Skull Clicker building sprites, spliced from the same purchased packs.
+games/skull-clicker/assets/buildings/
 
 # Scratch output from asset extraction runs
 _tile_*.png

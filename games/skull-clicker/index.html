@@ -123,17 +123,35 @@
     .building-row.locked { opacity: 0.25; cursor: not-allowed; }
     .building-row.affordable { border-color: #331111; }
     .building-icon {
-      width: 36px; height: 36px;
+      position: relative;
+      width: 40px; height: 40px;
       border-radius: 4px;
       background: #151515;
       border: 1px solid #222;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .building-icon img {
+      width: 36px; height: 36px;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .building-count {
+      position: absolute;
+      right: -1px; bottom: -1px;
+      min-width: 14px;
+      padding: 0 3px;
+      background: #000;
+      border: 1px solid #ff0000;
+      border-radius: 3px;
+      font-size: 10px;
+      line-height: 14px;
+      text-align: center;
       color: #ff0000;
       font-weight: 800;
-      flex-shrink: 0;
     }
     .building-info { flex: 1; min-width: 0; }
     .building-name { font-size: 13px; font-weight: 600; color: #fff; }
@@ -550,7 +568,7 @@
         if (!revealed) continue;
         const cps = (b.baseCps * cnt * globalCpsMult);
         html += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}', event)">
-          <div class="building-icon">${cnt}</div>
+          <div class="building-icon"><img src="assets/buildings/${b.id}.png" alt="" onerror="this.remove()">${cnt > 0 ? `<span class="building-count">${cnt}</span>` : ''}</div>
           <div class="building-info">
             <div class="building-name">${b.name}</div>
             <div class="building-desc">${b.desc}</div>
