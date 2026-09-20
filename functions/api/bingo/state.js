@@ -25,6 +25,10 @@ function overlaySummary(game) {
     total: TOTAL_EVENTS,
     playerCount: Array.isArray(game.players) ? game.players.length : 0,
     winners,
+    /* Whether the host has this game on the stream overlay. Absent on games
+       from before the toggle existed, which showed by default — so undefined
+       reads as shown, and only an explicit false hides. */
+    showOnOverlay: game.showOnOverlay !== false,
   };
 }
 
@@ -67,6 +71,11 @@ export async function onRequestGet(context) {
 
   const session = getSession(request);
   if (session && session.user_id) {
+    /* The host can lose their connection and come back — the host page reads
+       this to know it may restore the control panel for this room rather than
+       force a brand-new game. Only the true host is ever told so. */
+    if (String(session.user_id) === String(game.host)) out.isHost = true;
+
     const me = game.players.find(p => p.id === 'u_' + session.user_id);
     if (me) {
       const cards = (Array.isArray(me.cards) && me.cards.length) ? me.cards : [me.cardIds];

@@ -27,6 +27,7 @@ import { onRequestPost as create } from '../../functions/api/bingo/create.js';
 import { onRequestPost as call } from '../../functions/api/bingo/call.js';
 import { onRequestPost as award } from '../../functions/api/bingo/award.js';
 import { onRequestPost as end } from '../../functions/api/bingo/end.js';
+import { onRequestPost as overlay } from '../../functions/api/bingo/overlay.js';
 import { onRequestGet as state } from '../../functions/api/bingo/state.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -94,6 +95,72 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   check('with nothing called yet', g.calledCount, 0);
   check('no players yet', g.playerCount, 0);
   check('and no winners yet', g.winners, []);
+  check('a fresh game shows on the overlay by default', g.showOnOverlay, true);
+}
+
+/* ══ isHost: the host is told, so a dropped connection can resume ══════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  const asHost = await (await GET(e, 'code=AAA', cookie(HOST))).json();
+  check('state tells the host they are the host', asHost.isHost, true);
+  const asOther = await (await GET(e, 'code=AAA', cookie('999'))).json();
+  ok('and never tells anyone else', !asOther.isHost);
+  const anon = await (await GET(e, 'code=AAA')).json();
+  ok('nor an anonymous poll', !anon.isHost);
+}
+
+/* ══ Show-on-overlay toggle — host only, gates panel and alerts ════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+
+  /* A stranger cannot flip it. */
+  const denied = await POST(overlay, e, { code: 'aaa', show: false }, cookie('999'));
+  check('a non-host cannot change the overlay', denied.status, 403);
+
+  /* The host switches it off. */
+  const off = await (await POST(overlay, e, { code: 'aaa', show: false }, cookie(HOST))).json();
+  check('the host can switch it off', off.showOnOverlay, false);
+  check('and the panel state reflects it', (await (await GET(e, 'current=1')).json()).showOnOverlay, false);
+
+  /* With it off, a call pushes NO alert. */
+  await POST(call, e, { code: 'aaa', eventId: 3, action: 'call', text: 'Someone tutors' }, cookie(HOST));
+  check('a call with the overlay off pushes no alert', ofType(e, 'bingo-call').length, 0);
+
+  /* Back on, and calls alert again. */
+  await POST(overlay, e, { code: 'aaa', show: true }, cookie(HOST));
+  await POST(call, e, { code: 'aaa', eventId: 7, action: 'call', text: 'Land destruction' }, cookie(HOST));
+  check('a call with the overlay on pushes the alert', ofType(e, 'bingo-call').length, 1);
+}
+
+/* ══ The broadcaster/moderator can toggle from Bot Control ═════════════ */
+{
+  /* A game hosted by someone else entirely. */
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie('111'));
+
+  /* The broadcaster (HOST is the broadcaster id here) is not this game's
+     host, but produces the stream — so they may flip the switch. */
+  const byBroadcaster = await POST(overlay, e, { code: 'aaa', show: false }, cookie(HOST));
+  check('the broadcaster can toggle a game they did not host', byBroadcaster.status, 200);
+
+  /* A random logged-in stranger still cannot. */
+  const byStranger = await POST(overlay, e, { code: 'aaa', show: true }, cookie('999'));
+  check('a stranger still cannot', byStranger.status, 403);
+}
+
+/* ══ A win alert is suppressed while the overlay is off ════════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await POST(overlay, e, { code: 'aaa', show: false }, cookie(HOST));
+  const game = e.MARKETPLACE.read('bingo_AAA');
+  game.players = [{ id: 'u_777', name: 'Winner777' }];
+  await e.MARKETPLACE.put('bingo_AAA', JSON.stringify(game));
+
+  await POST(award, e, { code: 'aaa', playerId: 'u_777', rarity: 'rare' }, cookie(HOST));
+  check('a win with the overlay off pushes no alert', ofType(e, 'bingo-win').length, 0);
 }
 
 /* ══ a new call pushes exactly one alert; uncall/re-call push none ═════ */
@@ -177,6 +244,14 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   ok('the panel poller finds its own room', /function[\s\S]*bingo\/state\?current=1/.test(poller));
   ok('the poller names called squares from the shared list', /BINGO_EVENTS/.test(poller) && /function nameFor/.test(poller));
   ok('the poller renders the called board newest-first', /calledEvents[\s\S]*reverse\(\)/.test(poller));
+  ok('the poller hides the panel when the host switched it off', /showOnOverlay === false/.test(poller));
+
+  const host = fs.readFileSync(path.join(REPO, 'games/commander-bingo/host.html'), 'utf8');
+  ok('the host page has the overlay toggle', /function toggleOverlay/.test(host) && /id="overlayToggleBtn"/.test(host));
+  ok('the toggle posts to the host-only route', /\/api\/bingo\/overlay/.test(host));
+  ok('the host can resume a dropped connection', /function resumeGame/.test(host) && /resumeGame\(\)/.test(host));
+  ok('resume only restores for the real host of an active game', /g\.isHost/.test(host) && /g\.status === 'active'/.test(host));
+  ok('the hosted room is remembered and cleared', /HOST_CODE_KEY/.test(host) && /function clearHostCode/.test(host));
 
   const samples = fs.readFileSync(path.join(REPO, 'js/pages/overlay-samples.js'), 'utf8');
   ok('layout mode knows the panel', /id: 'ovBingo'/.test(samples) && /function bingo\(\)/.test(samples));
@@ -189,8 +264,14 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   const css = fs.readFileSync(path.join(REPO, 'css/pages/overlay.css'), 'utf8');
   ok('the panel has styles', /\.ov-bingo\s*\{/.test(css));
 
-  const host = fs.readFileSync(path.join(REPO, 'games/commander-bingo/host.html'), 'utf8');
   ok('the host sends the square text with a call', /text:\s*\(BINGO_EVENTS\.find/.test(host));
+
+  const bcHtml = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
+  ok('bot control has the bingo overlay section', /id="ovBingoSection"/.test(bcHtml) && /id="ovBingoShowBtn"/.test(bcHtml));
+
+  const bcJs = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  ok('bot control wires the bingo overlay switch', /function initOvBingo/.test(bcJs) && /initOvBingo\(\)/.test(bcJs));
+  ok('and it reads the live room then posts the switch', /bingo\/state\?current=1/.test(bcJs) && /\/api\/bingo\/overlay/.test(bcJs));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

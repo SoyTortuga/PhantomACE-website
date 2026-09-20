@@ -59,11 +59,13 @@ export async function onRequestPost(context) {
 
   /* Overlay alert on a GENUINELY new call only — never on an uncall, and
      never on re-calling a square already up, or the stream would flash the
-     same alert twice. The label is the host's own event text (the host page
-     already has it); it is cosmetic and host-only, so it is trusted here and
-     escaped where the overlay renders it. Best-effort: an overlay hiccup
-     must not fail the call itself. */
-  if (newlyCalled) {
+     same alert twice. Suppressed entirely when the host has the game off the
+     overlay: the switch means "no bingo on stream", alerts included. The
+     label is the host's own event text (the host page already has it); it is
+     cosmetic and host-only, so it is trusted here and escaped where the
+     overlay renders it. Best-effort: an overlay hiccup must not fail the
+     call itself. */
+  if (newlyCalled && game.showOnOverlay !== false) {
     const label = String(body.text || '').slice(0, 120).trim();
     try {
       const { pushOverlayEvent } = await import('../overlay/events.js');

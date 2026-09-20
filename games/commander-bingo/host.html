@@ -137,6 +137,34 @@
     .code-copy-btn:hover { border-color: #ff0000; color: #fff; }
     .code-copy-btn.copied { border-color: #00cc66; color: #00cc66; }
 
+    /* Show-on-overlay toggle. Reads as a switch: a red dot and ON when the
+       game is live on the stream, a grey dot and OFF when it is not. */
+    .overlay-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 12px;
+      background: transparent;
+      border: 1px solid #222;
+      border-radius: 3px;
+      color: #666;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+    .overlay-toggle:hover { border-color: #444; color: #999; }
+    .overlay-toggle .ov-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #333; border: 1px solid #444;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .overlay-toggle.on { border-color: rgba(255, 0, 0, 0.4); color: #ff5555; }
+    .overlay-toggle.on .ov-dot { background: #ff0000; border-color: #ff0000; }
+    .overlay-toggle:disabled { opacity: 0.5; cursor: default; }
+
     .host-stats {
       display: flex;
       flex-direction: column;
@@ -518,6 +546,9 @@
         <div class="code-actions">
           <button class="code-copy-btn" id="copyCodeBtn" onclick="copyCode()">Copy Code</button>
           <button class="code-copy-btn" id="copyLinkBtn" onclick="copyLink()">Copy Join Link</button>
+          <button class="overlay-toggle" id="overlayToggleBtn" onclick="toggleOverlay()">
+            <span class="ov-dot"></span><span id="overlayToggleText">Overlay: On</span>
+          </button>
         </div>
       </div>
       <div class="host-stats">
@@ -593,9 +624,56 @@
     let calledEvents = new Set();
     let currentCat = 'all';
     let useApi = false;
+    let showOnOverlay = true;
+
+    /* The room this browser is hosting, remembered so a refresh or a dropped
+       connection can walk straight back into the live game instead of the
+       create screen. Cleared only when the host ends the game or leaves. */
+    const HOST_CODE_KEY = 'bingo_host_code';
 
     const TOTAL = BINGO_EVENTS.length;
     document.getElementById('totalCount').textContent = TOTAL;
+
+    /* ── Show on overlay ─────────────────── */
+    function renderOverlayToggle() {
+      const btn = document.getElementById('overlayToggleBtn');
+      const txt = document.getElementById('overlayToggleText');
+      btn.classList.toggle('on', showOnOverlay);
+      txt.textContent = 'Overlay: ' + (showOnOverlay ? 'On' : 'Off');
+    }
+
+    async function toggleOverlay() {
+      const next = !showOnOverlay;
+      const btn = document.getElementById('overlayToggleBtn');
+
+      if (useApi) {
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/bingo/overlay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ code: gameCode, show: next })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'Could not change the overlay.');
+          showOnOverlay = !!data.showOnOverlay;
+        } catch (err) {
+          window.alert(err.message);
+        } finally {
+          btn.disabled = false;
+        }
+      } else {
+        showOnOverlay = next;
+        const raw = localStorage.getItem('bingo_game_' + gameCode);
+        if (raw) {
+          const game = JSON.parse(raw);
+          game.showOnOverlay = showOnOverlay;
+          localStorage.setItem('bingo_game_' + gameCode, JSON.stringify(game));
+        }
+      }
+      renderOverlayToggle();
+    }
 
     function generateCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -608,6 +686,7 @@
     async function createGame() {
       calledEvents = new Set();
       gameCode = generateCode();
+      showOnOverlay = true;
 
       try {
         const res = await fetch('/api/bingo/create', {
@@ -627,16 +706,65 @@
           status: 'active',
           calledEvents: [],
           players: [],
+          showOnOverlay: true,
           createdAt: Date.now()
         }));
       }
 
+      /* Remember the room so a reload comes straight back to it. */
+      try { localStorage.setItem(HOST_CODE_KEY, gameCode); } catch {}
+
       document.getElementById('codeDisplay').textContent = gameCode;
       updateCalledCount();
+      renderOverlayToggle();
       renderEvents();
       showScreen('hostScreen');
 
       if (!useApi) startPlayerPoll();
+    }
+
+    /* ── Reconnect ───────────────────────────
+       On load, if this browser was hosting a game, walk back into it rather
+       than the create screen — the game lived on the server the whole time,
+       the host just lost the page. Verified by isHost so only the real host
+       resumes, and only while the game is still active. */
+    async function resumeGame() {
+      let code;
+      try { code = localStorage.getItem(HOST_CODE_KEY); } catch {}
+      if (!code) return;
+
+      try {
+        const res = await fetch('/api/bingo/state?code=' + encodeURIComponent(code), {
+          cache: 'no-store', credentials: 'same-origin'
+        });
+        if (res.ok) {
+          const g = await res.json();
+          if (g && g.status === 'active' && g.isHost) {
+            gameCode = code;
+            useApi = true;
+            calledEvents = new Set(Array.isArray(g.calledEvents) ? g.calledEvents : []);
+            showOnOverlay = g.showOnOverlay !== false;
+            document.getElementById('codeDisplay').textContent = gameCode;
+            document.getElementById('playerCount').textContent = g.playerCount || 0;
+            updateCalledCount();
+            renderOverlayToggle();
+            renderEvents();
+            showScreen('hostScreen');
+            return;
+          }
+          /* Game ended or this account is not its host — the pointer is stale. */
+          if (!g || g.status !== 'active' || !g.isHost) { clearHostCode(); return; }
+        }
+        /* A 404 means the room is gone; anything else (offline) we leave the
+           pointer in place so a later reload can still try. */
+        if (res.status === 404) clearHostCode();
+      } catch {
+        /* Offline: keep the pointer, stay on the create screen for now. */
+      }
+    }
+
+    function clearHostCode() {
+      try { localStorage.removeItem(HOST_CODE_KEY); } catch {}
     }
 
     let playerPollTimer = null;
@@ -780,6 +908,7 @@
       }
 
       if (playerPollTimer) clearInterval(playerPollTimer);
+      clearHostCode();
 
       let players = [];
 
@@ -950,6 +1079,7 @@
     /* ── Navigation ──────────────────────── */
     function backToCreate() {
       if (playerPollTimer) clearInterval(playerPollTimer);
+      clearHostCode();
       showScreen('createScreen');
     }
 
@@ -963,6 +1093,9 @@
         window.parent.postMessage('close-game', '*');
       }
     });
+
+    /* Walk back into a game this browser was hosting, if there is one. */
+    resumeGame();
   </script>
 </body>
 </html>

@@ -610,6 +610,7 @@ function initGiveawayPanel() {
 
   loadGiveawayState();
   initOvMc();
+  initOvBingo();
 }
 
 /* ── Mana Clash on the overlay ──────────────────────────────────── */
@@ -756,6 +757,105 @@ function initOvMc() {
   if (reload) reload.addEventListener('click', function () { reloadOverlay(reload); });
 
   loadOvMc();
+}
+
+/* ── Commander Bingo on the overlay ─────────────────────────────────
+   Unlike Mana Clash, there is no room to pick: the overlay finds the live
+   Commander Bingo game itself via bingo_current. So this card reports that
+   one game and offers the same show/hide switch the host has, for whoever
+   is producing the stream. The current room code is read from the state,
+   never typed. */
+
+let ovBingoCode = null;
+
+function ovBingoSay(text, showing) {
+  const state = document.getElementById('ovBingoState');
+  if (!state) return;
+  state.textContent = text;
+  state.className = 'giveaway-status' + (showing ? ' open' : '');
+}
+
+function ovBingoButtons(enabled) {
+  ['ovBingoShowBtn', 'ovBingoOffBtn'].forEach(function (id) {
+    const b = document.getElementById(id);
+    if (b) b.disabled = !enabled;
+  });
+}
+
+async function loadOvBingo() {
+  let res;
+  try {
+    res = await fetch('/api/bingo/state?current=1', { credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    ovBingoSay('Could not reach the server', false);
+    return;
+  }
+
+  if (res.status === 404) {
+    /* The ordinary "nobody is hosting one right now" case. */
+    ovBingoCode = null;
+    ovBingoSay('No game running', false);
+    ovBingoButtons(false);
+    return;
+  }
+  if (!res.ok) {
+    ovBingoSay('Could not load the game (HTTP ' + res.status + ')', false);
+    return;
+  }
+
+  let g;
+  try { g = await res.json(); } catch { ovBingoSay('Could not read the game', false); return; }
+
+  if (!g || !g.code || g.status !== 'active') {
+    ovBingoCode = null;
+    ovBingoSay('No game running', false);
+    ovBingoButtons(false);
+    return;
+  }
+
+  ovBingoCode = g.code;
+  ovBingoButtons(true);
+  const where = g.code + ' · ' + (g.calledCount || 0) + '/' + (g.total || 68) +
+                ' · ' + (g.playerCount || 0) + (g.playerCount === 1 ? ' player' : ' players');
+  if (g.showOnOverlay === false) ovBingoSay('Hidden — ' + where, false);
+  else ovBingoSay('Showing ' + where, true);
+}
+
+async function setOvBingo(show, btn) {
+  if (!ovBingoCode) { showBotStatus('There is no game to show.', true); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/bingo/overlay', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: ovBingoCode, show: show }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus(d.showOnOverlay ? 'Commander Bingo is on the overlay.' : 'Commander Bingo hidden from the overlay.', false);
+    } else if (res.status === 404) {
+      showBotStatus('The bingo overlay route returned 404. The server needs restarting after the last pull.', true);
+    } else {
+      showBotStatus(d.error || 'Could not change the overlay.', true);
+    }
+  } catch {
+    showBotStatus('Network error changing the overlay.', true);
+  }
+  await loadOvBingo();
+}
+
+function initOvBingo() {
+  const show = document.getElementById('ovBingoShowBtn');
+  const off = document.getElementById('ovBingoOffBtn');
+  const refresh = document.getElementById('ovBingoRefreshBtn');
+  if (!show) return;
+
+  show.addEventListener('click', function () { setOvBingo(true, show); });
+  off.addEventListener('click', function () { setOvBingo(false, off); });
+  refresh.addEventListener('click', function () { loadOvBingo(); });
+
+  loadOvBingo();
 }
 
 function initBotControlPanel() {

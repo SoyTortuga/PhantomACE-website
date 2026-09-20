@@ -66,9 +66,11 @@ export async function onRequestPost(context) {
 
   let failure = null;
   let awarded = null;
+  let showOnOverlay = true;
 
   await env.MARKETPLACE.mutate(`bingo_${code}`, (game) => {
     if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
+    showOnOverlay = game.showOnOverlay !== false;
 
     if (String(session.user_id) !== String(game.host)) {
       /* A moderator, but not the host of THIS game. */
@@ -123,9 +125,10 @@ export async function onRequestPost(context) {
   }
 
   /* Put the win on the overlay — the Commander Bingo equivalent of MTGBBB's
-     bingo alert. Best-effort, after the prize is safely recorded, so a
-     failed alert never affects whether the entries were credited. */
-  try {
+     bingo alert. Suppressed when the host has this game off the overlay, the
+     same as the call alert. Best-effort, after the prize is safely recorded,
+     so a failed alert never affects whether the entries were credited. */
+  if (showOnOverlay) try {
     const { pushOverlayEvent } = await import('../overlay/events.js');
     await pushOverlayEvent(env, {
       type: 'bingo-win',

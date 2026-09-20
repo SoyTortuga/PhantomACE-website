@@ -127,7 +127,9 @@
         return r.json();
       })
       .then(function (g) {
-        if (!g || !g.code || g.status !== 'active') {
+        /* Hidden unless a game is running AND the host has switched it on for
+           the stream. showOnOverlay === false is the host's explicit off. */
+        if (!g || !g.code || g.status !== 'active' || g.showOnOverlay === false) {
           hide();
           schedule(IDLE_POLL_MS);
           return;
