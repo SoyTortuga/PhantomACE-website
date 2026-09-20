@@ -105,9 +105,11 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   const asHost = await (await GET(e, 'code=AAA', cookie(HOST))).json();
   check('state tells the host they are the host', asHost.isHost, true);
   const asOther = await (await GET(e, 'code=AAA', cookie('999'))).json();
-  ok('and never tells anyone else', !asOther.isHost);
+  /* Explicit false, not merely absent — the host page needs to tell a real
+     "not the host" apart from an older server that never sent the field. */
+  check('and tells a logged-in non-host they are not', asOther.isHost, false);
   const anon = await (await GET(e, 'code=AAA')).json();
-  ok('nor an anonymous poll', !anon.isHost);
+  ok('an anonymous poll is told nothing either way', anon.isHost === undefined);
 }
 
 /* ══ Show-on-overlay toggle — host only, gates panel and alerts ════════ */
@@ -250,7 +252,10 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   ok('the host page has the overlay toggle', /function toggleOverlay/.test(host) && /id="overlayToggleBtn"/.test(host));
   ok('the toggle posts to the host-only route', /\/api\/bingo\/overlay/.test(host));
   ok('the host can resume a dropped connection', /function resumeGame/.test(host) && /resumeGame\(\)/.test(host));
-  ok('resume only restores for the real host of an active game', /g\.isHost/.test(host) && /g\.status === 'active'/.test(host));
+  ok('resume refuses only on an explicit non-host, else restores an active game',
+     /g\.isHost === false/.test(host) && /g\.status === 'active'/.test(host));
+  ok('resume falls back to a localStorage game when the API has none',
+     /function resumeFromLocal/.test(host) && /bingo_game_'\s*\+\s*code/.test(host));
   ok('the hosted room is remembered and cleared', /HOST_CODE_KEY/.test(host) && /function clearHostCode/.test(host));
 
   const samples = fs.readFileSync(path.join(REPO, 'js/pages/overlay-samples.js'), 'utf8');

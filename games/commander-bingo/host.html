@@ -725,9 +725,18 @@
 
     /* ── Reconnect ───────────────────────────
        On load, if this browser was hosting a game, walk back into it rather
-       than the create screen — the game lived on the server the whole time,
-       the host just lost the page. Verified by isHost so only the real host
-       resumes, and only while the game is still active. */
+       than the create screen — the game outlived the page, the host just lost
+       it. The stored code is only ever set by THIS browser creating that
+       game, so it is a trustworthy "I host this"; every actual call/award is
+       still checked against the session on the server, so restoring the panel
+       optimistically is safe.
+
+       The server is asked first. It refuses the restore only when it can
+       positively say this account is NOT the host (isHost === false). A game
+       it reports active is restored; a game it has ended, or one it does not
+       have at all, sends us to the localStorage copy (the offline/no-API
+       fallback the host page has always had), and only if that is gone too
+       is the pointer dropped. */
     async function resumeGame() {
       let code;
       try { code = localStorage.getItem(HOST_CODE_KEY); } catch {}
@@ -738,29 +747,60 @@
           cache: 'no-store', credentials: 'same-origin'
         });
         if (res.ok) {
-          const g = await res.json();
-          if (g && g.status === 'active' && g.isHost) {
-            gameCode = code;
-            useApi = true;
-            calledEvents = new Set(Array.isArray(g.calledEvents) ? g.calledEvents : []);
-            showOnOverlay = g.showOnOverlay !== false;
-            document.getElementById('codeDisplay').textContent = gameCode;
-            document.getElementById('playerCount').textContent = g.playerCount || 0;
-            updateCalledCount();
-            renderOverlayToggle();
-            renderEvents();
-            showScreen('hostScreen');
+          const g = await res.json().catch(function () { return null; });
+          /* The server positively says this account is not the host. */
+          if (g && g.isHost === false) { clearHostCode(); return; }
+          if (g && g.status === 'active') {
+            restoreHost(code, true, {
+              called: Array.isArray(g.calledEvents) ? g.calledEvents : [],
+              players: g.playerCount || 0,
+              showOnOverlay: g.showOnOverlay !== false
+            });
             return;
           }
-          /* Game ended or this account is not its host — the pointer is stale. */
-          if (!g || g.status !== 'active' || !g.isHost) { clearHostCode(); return; }
+          /* The server has it, but it has ended. */
+          if (g && g.status && g.status !== 'active') { clearHostCode(); return; }
         }
-        /* A 404 means the room is gone; anything else (offline) we leave the
-           pointer in place so a later reload can still try. */
-        if (res.status === 404) clearHostCode();
+        /* 404, or any non-OK: the server does not have this game (or is an
+           API-less deploy). Fall back to a localStorage game if there is one. */
+        if (!resumeFromLocal(code)) { if (res.status === 404) clearHostCode(); }
       } catch {
-        /* Offline: keep the pointer, stay on the create screen for now. */
+        /* Offline: try the local copy; otherwise keep the pointer and stay put
+           so a later reload can retry. */
+        resumeFromLocal(code);
       }
+    }
+
+    /* The localStorage-mode game this browser saved, if the API path was not
+       available when it was created. */
+    function resumeFromLocal(code) {
+      let raw;
+      try { raw = localStorage.getItem('bingo_game_' + code); } catch {}
+      if (!raw) return false;
+      let game;
+      try { game = JSON.parse(raw); } catch { return false; }
+      if (!game || game.status !== 'active') return false;
+      restoreHost(code, false, {
+        called: Array.isArray(game.calledEvents) ? game.calledEvents : [],
+        players: Array.isArray(game.players) ? game.players.length : 0,
+        showOnOverlay: game.showOnOverlay !== false
+      });
+      if (!useApi) startPlayerPoll();
+      return true;
+    }
+
+    /* Put the host panel back on screen for `code`, in API or local mode. */
+    function restoreHost(code, api, s) {
+      gameCode = code;
+      useApi = api;
+      calledEvents = new Set(s.called);
+      showOnOverlay = s.showOnOverlay;
+      document.getElementById('codeDisplay').textContent = gameCode;
+      document.getElementById('playerCount').textContent = s.players;
+      updateCalledCount();
+      renderOverlayToggle();
+      renderEvents();
+      showScreen('hostScreen');
     }
 
     function clearHostCode() {

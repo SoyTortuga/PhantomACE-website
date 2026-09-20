@@ -73,8 +73,10 @@ export async function onRequestGet(context) {
   if (session && session.user_id) {
     /* The host can lose their connection and come back — the host page reads
        this to know it may restore the control panel for this room rather than
-       force a brand-new game. Only the true host is ever told so. */
-    if (String(session.user_id) === String(game.host)) out.isHost = true;
+       force a brand-new game. Sent as an explicit true/false (not just when
+       true) so the host page can tell "not the host" apart from "an older
+       server that never sent this at all", and treat them differently. */
+    out.isHost = String(session.user_id) === String(game.host);
 
     const me = game.players.find(p => p.id === 'u_' + session.user_id);
     if (me) {
