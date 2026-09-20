@@ -170,6 +170,112 @@
     .prestige-btn:not(:disabled):hover { background: #cc0000; }
     .prestige-note { font-size: 10px; color: #ffffff77; margin-top: 12px; }
     .tab-btn:hover { color: #ff4444; }
+    .tab-btn { font-size: 10px; letter-spacing: 0.04em; padding: 10px 2px; }
+
+    /* Sound toggle */
+    .header { position: relative; }
+    .sound-btn {
+      position: absolute; top: 12px; right: 12px;
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; line-height: 1; opacity: 0.7;
+    }
+    .sound-btn:hover { opacity: 1; }
+
+    /* Buff bar + chips */
+    .buff-bar {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+      min-height: 22px; padding: 0 12px 4px;
+    }
+    .buff-chip {
+      font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 3px;
+      border: 1px solid; letter-spacing: 0.02em;
+    }
+    .buff-chip.frenzy { color: #ff3b3b; border-color: #ff3b3b; }
+    .buff-chip.rush   { color: #ff9500; border-color: #ff9500; }
+    .buff-chip.combo  { color: #ffd23b; border-color: #7a6a12; }
+
+    /* Buff toast (transient, centre-top) */
+    .buff-toast {
+      position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+      z-index: 1200; padding: 12px 22px; border-radius: 6px;
+      font-size: 18px; font-weight: 800; letter-spacing: 0.03em; text-align: center;
+      background: #000; border: 2px solid #ff0000; color: #fff;
+      animation: toast-in 0.3s ease-out, toast-out 0.4s ease-in 2.2s forwards;
+    }
+    .buff-toast.frenzy { border-color: #ff3b3b; }
+    .buff-toast.rush   { border-color: #ff9500; }
+    .buff-toast.reap   { border-color: #7a1fff; }
+    @keyframes toast-in { 0% { opacity: 0; transform: translate(-50%, -12px) scale(0.9); } 100% { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+    @keyframes toast-out { 100% { opacity: 0; } }
+
+    /* Cursed skull — drifts across, click for a buff */
+    .cursed-skull {
+      position: fixed; top: 30vh; left: -90px; width: 72px; height: 72px;
+      z-index: 1100; cursor: pointer;
+      transition: left 13s linear;
+      filter: drop-shadow(0 0 10px #ff0000);
+      animation: cursed-bob 1.4s ease-in-out infinite;
+    }
+    .cursed-skull img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+    .cursed-skull.fade { opacity: 0; transition: left 13s linear, opacity 0.4s; }
+    .cursed-skull.popped { animation: cursed-pop 0.3s ease-out forwards; }
+    @keyframes cursed-bob { 0%,100% { margin-top: 0; } 50% { margin-top: -12px; } }
+    @keyframes cursed-pop { 100% { transform: scale(2); opacity: 0; } }
+
+    /* Particles on a cursed pop */
+    .particle {
+      position: fixed; width: 6px; height: 6px; border-radius: 50%;
+      background: #ff0000; z-index: 1150; pointer-events: none;
+      animation: particle-fly 0.65s ease-out forwards;
+    }
+    @keyframes particle-fly {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+    }
+
+    /* Crit click pop */
+    .click-pop.crit { font-size: 22px; color: #ffd23b; }
+
+    /* Feat toast */
+    .ach-toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      z-index: 1200; background: #0a0a0a; border: 1px solid #ff0000; border-radius: 6px;
+      padding: 10px 18px; text-align: center; min-width: 200px;
+      animation: toast-in 0.3s ease-out, toast-out 0.5s ease-in 2.6s forwards;
+    }
+    .ach-toast-kind { font-size: 9px; text-transform: uppercase; letter-spacing: 0.14em; color: #ff0000; }
+    .ach-toast-name { font-size: 15px; font-weight: 800; margin: 2px 0; }
+    .ach-toast-desc { font-size: 11px; color: #ffffff99; }
+
+    /* Buy-amount toggle */
+    .buy-toggle { display: flex; gap: 4px; margin-bottom: 8px; }
+    .buy-amt {
+      flex: 1; padding: 6px 0; background: #0a0a0a; border: 1px solid #1a1a1a;
+      border-radius: 4px; color: #888; font-size: 12px; font-weight: 800;
+      cursor: pointer; font-family: inherit;
+    }
+    .buy-amt.active { border-color: #ff0000; color: #ff0000; background: rgba(255,0,0,0.06); }
+    .buy-qty { font-size: 10px; color: #ff5555; font-weight: 800; }
+
+    /* Synergy tag + locked upgrade */
+    .upgrade-tag.tag-syn { background: #2a0d2a; color: #d98fff; }
+    .upgrade-row.locked { opacity: 0.4; cursor: default; }
+
+    /* Feats grid */
+    .feats-head { font-size: 12px; color: #ffffffcc; text-align: center; padding: 6px 0 12px; }
+    .feats-head b { color: #ff3b3b; }
+    .feats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .feat { border: 1px solid #1a1a1a; border-radius: 4px; padding: 10px; background: #0a0a0a; }
+    .feat.got { border-color: #7a1212; background: rgba(152,9,10,0.10); }
+    .feat.locked { opacity: 0.5; }
+    .feat-name { font-size: 12px; font-weight: 800; color: #fff; }
+    .feat.got .feat-name { color: #ff5555; }
+    .feat-desc { font-size: 10px; color: #ffffff88; margin-top: 3px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cursed-skull { animation: none; }
+      .particle { display: none; }
+    }
 
     /* Content panels */
     .tab-content { display: none; flex: 1; overflow-y: auto; padding: 8px 12px 80px; }
@@ -392,6 +498,7 @@
 <body>
   <div class="game-wrap">
     <div class="header">
+      <button class="sound-btn" id="soundBtn" onclick="toggleSound()" title="Toggle sound">🔇</button>
       <h1>Skull Clicker</h1>
       <div class="score-display" id="score">0</div>
       <div class="per-sec" id="perSec">0 per second</div>
@@ -402,6 +509,8 @@
         <img src="/assets/images/skull.png" alt="Click">
       </div>
     </div>
+
+    <div class="buff-bar" id="buffBar"></div>
 
     <!-- The living world: every building you own appears here and stacks up,
          Cookie-Clicker style, so the screen fills as you go deeper. -->
@@ -416,6 +525,7 @@
       <button class="tab-btn active" onclick="switchTab('buildings')">Buildings</button>
       <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
       <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
+      <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
       <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
     </div>
@@ -423,6 +533,7 @@
     <div class="tab-content active" id="tab-buildings"></div>
     <div class="tab-content" id="tab-upgrades"></div>
     <div class="tab-content" id="tab-prestige"></div>
+    <div class="tab-content" id="tab-feats"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
     <div class="tab-content" id="tab-stats"></div>
   </div>
@@ -469,8 +580,59 @@
       { id:'c9', name:'Oblivion Grip',       cost:5e9,        desc:'+10% of CPS per click',tag:'click', apply:() => { cpsClickPct += 10; } },
     ];
 
+    /* Synergy upgrades — unlock at owning N of a building and multiply it, some
+       also cross-boosting another building by how many you own. Effects are
+       computed live in getBuildingMult (no apply()), so they survive a load
+       without being baked into a saved stat. */
+    const SYNERGY = [
+      { id:'s_shard1', building:'shard', req:10,  mult:2,   cost:1000,   name:'Sharpened Bone', desc:'Bone Shards are twice as productive' },
+      { id:'s_shard2', building:'shard', req:50,  mult:2,   cost:2e6,    name:'Marrow Extraction', desc:'Bone Shards ×2 again' },
+      { id:'s_ghost1', building:'ghost', req:10,  mult:2,   cost:8000,   name:'Ectoplasm', desc:'Ghost Hands are twice as productive' },
+      { id:'s_ghost2', building:'ghost', req:25,  mult:1,   cost:120000, name:'Poltergeist Pact', desc:'Each Necropolis boosts Ghost Hands +2%', cross:{ target:'ghost', per:0.02 } },
+      { id:'s_crypt1', building:'crypt', req:10,  mult:2,   cost:90000,  name:'Reinforced Crypts', desc:'Crypt Keepers ×2' },
+      { id:'s_altar1', building:'altar', req:10,  mult:2,   cost:1.2e6,  name:'Blood Rites', desc:'Dark Altars ×2' },
+      { id:'s_army1',  building:'army',  req:10,  mult:2,   cost:1.3e7,  name:'Endless Ranks', desc:'Phantom Armies ×2' },
+      { id:'s_necro1', building:'necro', req:10,  mult:2,   cost:1.4e8,  name:'Mass Graves', desc:'Necropoli ×2' },
+      { id:'s_necro2', building:'necro', req:25,  mult:1,   cost:5e9,    name:'Ossuary Network', desc:'Each Shadow Realm boosts Necropoli +3%', cross:{ target:'necro', per:0.03 } },
+      { id:'s_shadow1',building:'shadow',req:10,  mult:2,   cost:2e9,    name:'Deeper Dark', desc:'Shadow Realms ×2' },
+      { id:'s_engine1',building:'engine',req:10,  mult:2,   cost:3.3e10, name:'Overclocked Chaos', desc:'Chaos Engines ×2' },
+      { id:'s_portal1',building:'portal',req:10,  mult:2,   cost:5.1e11, name:'Stable Rifts', desc:'Void Portals ×2' },
+      { id:'s_horror1',building:'horror',req:10,  mult:2,   cost:7.5e12, name:'Maddening Whispers', desc:'Eldritch Horrors ×2' },
+    ];
+
     const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12, 100e12, 10e15];
     const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One','Skull God','Bone Absolute'];
+
+    /* Feats — each earned one is a permanent +1% to all production (achMult).
+       check() reads live state; it runs only for feats not yet earned. */
+    function totalBuildings() { let n = 0; for (const b of BUILDINGS) n += owned[b.id]; return n; }
+    function maxOwned() { let n = 0; for (const b of BUILDINGS) n = Math.max(n, owned[b.id]); return n; }
+    const ACHIEVEMENTS = [
+      { id:'clk1', name:'Knuckle Deep',    desc:'Click 100 times',           check:() => totalClicks >= 100 },
+      { id:'clk2', name:'Relentless',      desc:'Click 1,000 times',         check:() => totalClicks >= 1000 },
+      { id:'clk3', name:'Bonebreaker',     desc:'Click 10,000 times',        check:() => totalClicks >= 10000 },
+      { id:'clk4', name:'Carpal Tunnel',   desc:'Click 100,000 times',       check:() => totalClicks >= 100000 },
+      { id:'sk1',  name:'First Blood',     desc:'Gather 1M skulls',          check:() => lifetimeSkulls >= 1e6 },
+      { id:'sk2',  name:'Charnel Lord',    desc:'Gather 1B skulls',          check:() => lifetimeSkulls >= 1e9 },
+      { id:'sk3',  name:'Bone Tycoon',     desc:'Gather 1T skulls',          check:() => lifetimeSkulls >= 1e12 },
+      { id:'sk4',  name:'Ossuary Emperor', desc:'Gather 1Qa skulls',         check:() => lifetimeSkulls >= 1e15 },
+      { id:'bld1', name:'Groundskeeper',   desc:'Own 10 buildings',          check:() => totalBuildings() >= 10 },
+      { id:'bld2', name:'Warden',          desc:'Own 50 buildings',          check:() => totalBuildings() >= 50 },
+      { id:'bld3', name:'Overseer',        desc:'Own 100 buildings',         check:() => totalBuildings() >= 100 },
+      { id:'bld4', name:'Dominion',        desc:'Own 250 buildings',         check:() => totalBuildings() >= 250 },
+      { id:'one1', name:'Collector',       desc:'Own 25 of one building',    check:() => maxOwned() >= 25 },
+      { id:'one2', name:'Hoarder',         desc:'Own 50 of one building',    check:() => maxOwned() >= 50 },
+      { id:'one3', name:'Obsessed',        desc:'Own 100 of one building',   check:() => maxOwned() >= 100 },
+      { id:'var1', name:'Diversified',     desc:'Own one of every building', check:() => BUILDINGS.every(b => owned[b.id] > 0) },
+      { id:'up1',  name:'Shopper',         desc:'Buy 10 upgrades',           check:() => boughtUpgrades.size >= 10 },
+      { id:'up2',  name:'Completionist',   desc:'Buy every base upgrade',    check:() => UPGRADES.every(u => boughtUpgrades.has(u.id)) },
+      { id:'pr1',  name:'Reborn',          desc:'Prestige once',             check:() => prestige >= 1 },
+      { id:'pr2',  name:'Cycle of Bone',   desc:'Reach prestige 5',          check:() => prestige >= 5 },
+      { id:'pr3',  name:'Eternal Return',  desc:'Reach prestige 10',         check:() => prestige >= 10 },
+      { id:'cur1', name:'Cursed',          desc:'Pop a cursed skull',        check:() => cursedPopped >= 1 },
+      { id:'cur2', name:'Skull Hunter',    desc:'Pop 10 cursed skulls',      check:() => cursedPopped >= 10 },
+      { id:'cur3', name:'Doom Magnet',     desc:'Pop 50 cursed skulls',      check:() => cursedPopped >= 50 },
+    ];
 
     /* ═══════ STATE ═══════ */
 
@@ -494,6 +656,51 @@
     let activeTab = 'buildings';
     let playerName = null;
 
+    /* ── New systems ── */
+    let boneShards = 0;             /* prestige currency, spent in the shop */
+    let perks = new Set();          /* purchased prestige perks */
+    let achievements = new Set();   /* earned feats — each is a permanent boost */
+    let cursedPopped = 0;           /* lifetime cursed skulls clicked */
+    let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
+
+    /* Transient buffs from cursed skulls — never saved; they expire. */
+    let frenzyMult = 1, frenzyEnd = 0;      /* multiplies all production */
+    let clickBuffMult = 1, clickBuffEnd = 0; /* multiplies click power */
+
+    /* Active-click combo — builds while you keep clicking, decays when you stop. */
+    let combo = 0, lastClickAt = 0;
+
+    /* Sound — synthesized with WebAudio so there are no audio files to ship.
+       Off by default; the AudioContext is created lazily inside a user gesture
+       so browsers do not block it. */
+    let soundOn = false;
+    let audioCtx = null;
+    function playSound(kind) {
+      if (!soundOn) return;
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.connect(g); g.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+        let f = 180, dur = 0.05, type = 'square', vol = 0.05;
+        if (kind === 'click')  { f = 140 + Math.random() * 40; dur = 0.04; vol = 0.04; }
+        if (kind === 'buy')    { f = 320; dur = 0.08; type = 'triangle'; vol = 0.06; }
+        if (kind === 'cursed') { f = 90;  dur = 0.30; type = 'sawtooth'; vol = 0.09; }
+        if (kind === 'feat')   { f = 520; dur = 0.18; type = 'triangle'; vol = 0.07; }
+        o.type = type; o.frequency.setValueAtTime(f, t);
+        if (kind === 'cursed' || kind === 'feat') o.frequency.exponentialRampToValueAtTime(f * 2, t + dur);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.start(t); o.stop(t + dur);
+      } catch (e) { /* audio is a nicety; never let it break the game */ }
+    }
+    function toggleSound() {
+      soundOn = !soundOn;
+      try { localStorage.setItem('sc_sound', soundOn ? '1' : '0'); } catch(e) {}
+      if (soundOn) playSound('feat');
+      renderSettings();
+    }
+
     BUILDINGS.forEach(b => owned[b.id] = 0);
 
     /* ═══════ COMPUTED ═══════ */
@@ -508,16 +715,36 @@
        produces skulls. */
     function getPrestigeMult() { return 1 + 0.1 * prestige; }
 
+    /* Every earned feat is a small permanent multiplier on everything — the
+       "milk" of this game, so the achievements screen is a real power source,
+       not a trophy shelf. */
+    function achMult() { return 1 + 0.01 * achievements.size; }
+
+    /* Per-building multiplier from synergy upgrades: a building's own tiered
+       upgrades multiply it, and a cross-boost scales it by how many of ANOTHER
+       building you own. Computed live so nothing has to be baked into a saved
+       stat. (SYNERGY is filled in Phase B; empty here means ×1.) */
+    function getBuildingMult(b) {
+      let m = 1;
+      for (const u of SYNERGY) {
+        if (!boughtUpgrades.has(u.id)) continue;
+        if (u.building === b.id) m *= u.mult || 1;
+        if (u.cross && u.cross.target === b.id) m *= 1 + (u.cross.per || 0) * (owned[u.building] || 0);
+      }
+      return m;
+    }
+
     function getCPS() {
       let cps = 0;
       for (const b of BUILDINGS) {
-        cps += b.baseCps * owned[b.id];
+        cps += b.baseCps * owned[b.id] * getBuildingMult(b);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult();
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * frenzyMult;
     }
 
     function getClickPower() {
-      return ((1 + clickBonus) * clickMulti) * getPrestigeMult() + (getCPS() * cpsClickPct / 100);
+      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * clickBuffMult;
+      return base + (getCPS() * cpsClickPct / 100);
     }
 
     /* Every skull earned flows through here so the run total and the
@@ -531,12 +758,30 @@
 
     /* ═══════ ACTIONS ═══════ */
 
+    /* Crit chance comes from prestige perks (Phase B); zero until one is
+       bought. A crit is a big, satisfying spike on an otherwise steady click. */
+    function critChance() {
+      return (perks.has('crit') ? 0.05 : 0) + (perks.has('crit2') ? 0.10 : 0);
+    }
+    /* Combo rewards SUSTAINED clicking: each click within the window bumps it,
+       a pause resets it. Caps at +50% so it never dwarfs idle income. */
+    function comboMult() { return 1 + Math.min(combo, 100) * 0.005; }
+
     function handleClick(e) {
-      const power = getClickPower();
+      const now = Date.now();
+      combo = (now - lastClickAt < 1200) ? Math.min(combo + 1, 100) : 1;
+      lastClickAt = now;
+
+      let power = getClickPower() * comboMult();
+      const crit = Math.random() < critChance();
+      if (crit) power *= 7;
+
       earn(power);
       totalClicks++;
-      spawnPop(e, power);
+      spawnPop(e, power, crit);
+      playSound('click');
       checkMilestones();
+      checkAchievements();
       render();
     }
 
@@ -549,16 +794,50 @@
       setTimeout(() => row.classList.remove('reject-shake'), 350);
     }
 
+    const COST_RATE = 1.15;
+
+    /* Sum of the next `amount` prices for a building — a geometric series, so
+       ×10 and ×100 are one formula rather than a loop. */
+    function getBulkCost(b, amount) {
+      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]);
+      return Math.ceil(base * (Math.pow(r, amount) - 1) / (r - 1));
+    }
+
+    /* How many of a building the current bank can buy — the inverse of the
+       series above, so "Max" is exact rather than a loop that could stall. */
+    function maxAffordable(b) {
+      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]);
+      const n = Math.floor(Math.log((skulls * (r - 1)) / base + 1) / Math.log(r));
+      return Math.max(0, n);
+    }
+
+    /* The quantity a click will buy right now, honouring the ×1/×10/×100/Max
+       toggle. Fixed amounts are all-or-nothing; Max buys everything affordable. */
+    function buyQuantity(b) {
+      if (buyAmount === 'max') return maxAffordable(b);
+      return buyAmount;
+    }
+
     function buyBuilding(id, e) {
       const b = BUILDINGS.find(x => x.id === id);
       if (!b) return;
-      const cost = getBuildingCost(b);
+      const qty = buyQuantity(b);
+      if (qty < 1) { shakeReject(e); return; }
+      const cost = getBulkCost(b, qty);
       if (skulls < cost) { shakeReject(e); return; }
       skulls -= cost;
-      owned[b.id]++;
+      owned[b.id] += qty;
       lastBought = b.id;
+      playSound('buy');
+      checkAchievements();
       render();
       renderWorld();
+    }
+
+    function setBuyAmount(a) {
+      buyAmount = a;
+      try { localStorage.setItem('sc_buyAmount', String(a)); } catch(e) {}
+      if (activeTab === 'buildings') renderBuildings();
     }
 
     function buyUpgrade(id, e) {
@@ -567,22 +846,36 @@
       if (skulls < u.cost) { shakeReject(e); return; }
       skulls -= u.cost;
       boughtUpgrades.add(id);
-      u.apply();
+      if (u.apply) u.apply();   /* synergy upgrades have no apply — computed live */
+      checkAchievements();
       render();
+    }
+
+    /* Buy a synergy upgrade (separate list from UPGRADES). */
+    function buySynergy(id, e) {
+      const u = SYNERGY.find(x => x.id === id);
+      if (!u || boughtUpgrades.has(id)) return;
+      if ((owned[u.building] || 0) < u.req) { shakeReject(e); return; }
+      if (skulls < u.cost) { shakeReject(e); return; }
+      skulls -= u.cost;
+      boughtUpgrades.add(id);
+      checkAchievements();
+      render();
+      renderWorld();
     }
 
     /* ═══════ POPUPS ═══════ */
 
-    function spawnPop(e, val) {
+    function spawnPop(e, val, crit) {
       const btn = document.getElementById('skullBtn');
       const rect = btn.getBoundingClientRect();
       const pop = document.createElement('div');
-      pop.className = 'click-pop';
-      pop.textContent = `+${formatNum(Math.floor(val))}`;
+      pop.className = 'click-pop' + (crit ? ' crit' : '');
+      pop.textContent = (crit ? 'CRIT +' : '+') + formatNum(Math.floor(val));
       pop.style.left = (e.clientX - rect.left) + 'px';
       pop.style.top = (e.clientY - rect.top - 10) + 'px';
       btn.appendChild(pop);
-      setTimeout(() => pop.remove(), 500);
+      setTimeout(() => pop.remove(), crit ? 700 : 500);
     }
 
     function checkMilestones() {
@@ -601,6 +894,150 @@
       el.innerHTML = `<h3>${title}</h3><p>${formatNum(n)} skulls earned</p>`;
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 2200);
+    }
+
+    /* ═══════ FEATS (achievements) ═══════ */
+
+    function checkAchievements() {
+      let gained = false;
+      for (const a of ACHIEVEMENTS) {
+        if (!achievements.has(a.id) && a.check()) {
+          achievements.add(a.id);
+          gained = true;
+          showAchievement(a);
+        }
+      }
+      if (gained && activeTab === 'feats') renderAchievements();
+    }
+
+    function showAchievement(a) {
+      const el = document.createElement('div');
+      el.className = 'ach-toast';
+      el.innerHTML = '<div class="ach-toast-kind">Feat Unlocked</div>' +
+        '<div class="ach-toast-name">' + a.name + '</div>' +
+        '<div class="ach-toast-desc">' + a.desc + ' &mdash; +1% forever</div>';
+      document.body.appendChild(el);
+      playSound('feat');
+      setTimeout(() => el.remove(), 3200);
+    }
+
+    /* ═══════ CURSED SKULLS ═══════
+       The golden-cookie of this game: one drifts across the screen now and
+       then; catch it for a big timed buff or an instant windfall. This is the
+       reason to keep the tab open. */
+    let cursedTimer = null;
+
+    function cursedFreqMult() {
+      /* Prestige perk shortens the wait; a stream event can too (Phase D). */
+      return (perks.has('omen') ? 1.5 : 1) * (window.__streamFrenzy ? 3 : 1);
+    }
+
+    function scheduleCursed() {
+      clearTimeout(cursedTimer);
+      const wait = (60 + Math.random() * 120) / cursedFreqMult();  // 60–180s, sped up by perks/events
+      cursedTimer = setTimeout(spawnCursed, wait * 1000);
+    }
+
+    function spawnCursed() {
+      const el = document.createElement('div');
+      el.className = 'cursed-skull';
+      el.innerHTML = '<img src="/assets/images/skull.png" alt="Cursed skull">';
+      el.style.top = (10 + Math.random() * 60) + 'vh';
+      el.style.left = '-90px';
+      document.body.appendChild(el);
+      /* Kick off the drift on the next frame so the transition runs. */
+      requestAnimationFrame(() => { el.style.left = 'calc(100vw + 90px)'; });
+
+      let done = false;
+      const life = setTimeout(() => {
+        if (done) return;
+        done = true;
+        el.classList.add('fade');
+        setTimeout(() => el.remove(), 400);
+        scheduleCursed();
+      }, 13000);
+
+      el.addEventListener('click', () => {
+        if (done) return;
+        done = true;
+        clearTimeout(life);
+        popCursed(el);
+        scheduleCursed();
+      });
+    }
+
+    function popCursed(el) {
+      cursedPopped++;
+      const roll = Math.random();
+      let msg, kind;
+      if (roll < 0.55) {
+        frenzyMult = 7; frenzyEnd = Date.now() + 20000;
+        msg = 'FRENZY — ×7 production for 20s'; kind = 'frenzy';
+      } else if (roll < 0.80) {
+        clickBuffMult = 100; clickBuffEnd = Date.now() + 13000;
+        msg = 'BLOOD RUSH — ×100 clicks for 13s'; kind = 'rush';
+      } else {
+        const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100);
+        earn(reap);
+        msg = 'REAP — +' + formatNum(reap) + ' skulls'; kind = 'reap';
+      }
+      burstParticles(el);
+      showBuffToast(msg, kind);
+      playSound('cursed');
+      el.classList.add('popped');
+      setTimeout(() => el.remove(), 300);
+      checkAchievements();
+      render();
+      renderBuffs();
+    }
+
+    function showBuffToast(msg, kind) {
+      const el = document.createElement('div');
+      el.className = 'buff-toast ' + kind;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2600);
+    }
+
+    /* Standing indicator of any active buff, with a live countdown. */
+    function renderBuffs() {
+      const bar = document.getElementById('buffBar');
+      if (!bar) return;
+      const now = Date.now();
+      let html = '';
+      if (frenzyMult > 1 && frenzyEnd > now) {
+        html += '<span class="buff-chip frenzy">Frenzy ×7 · ' + Math.ceil((frenzyEnd - now) / 1000) + 's</span>';
+      }
+      if (clickBuffMult > 1 && clickBuffEnd > now) {
+        html += '<span class="buff-chip rush">Blood Rush ×100 · ' + Math.ceil((clickBuffEnd - now) / 1000) + 's</span>';
+      }
+      if (combo > 4 && now - lastClickAt < 1200) {
+        html += '<span class="buff-chip combo">Combo ×' + combo + ' · +' + Math.round((comboMult() - 1) * 100) + '%</span>';
+      }
+      bar.innerHTML = html;
+    }
+
+    function expireBuffs() {
+      const now = Date.now();
+      if (frenzyMult > 1 && now >= frenzyEnd) frenzyMult = 1;
+      if (clickBuffMult > 1 && now >= clickBuffEnd) clickBuffMult = 1;
+      if (combo > 0 && now - lastClickAt >= 1200) combo = 0;
+    }
+
+    /* A quick particle burst where a cursed skull was popped (juice). */
+    function burstParticles(el) {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      for (let i = 0; i < 10; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const ang = Math.random() * Math.PI * 2, dist = 30 + Math.random() * 50;
+        p.style.left = cx + 'px'; p.style.top = cy + 'px';
+        p.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
+        p.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 650);
+      }
     }
 
     /* ═══════ FORMATTING ═══════ */
@@ -631,8 +1068,28 @@
       if (activeTab === 'prestige') renderPrestige();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
+      else if (activeTab === 'feats') renderAchievements();
       else if (activeTab === 'cosmetics') renderCosmetics();
       else if (activeTab === 'stats') renderStats();
+    }
+
+    function renderAchievements() {
+      const el = document.getElementById('tab-feats');
+      const earned = achievements.size, total = ACHIEVEMENTS.length;
+      let html = '<div class="feats-head">' + earned + ' / ' + total +
+        ' feats · <b>+' + earned + '%</b> to all production</div><div class="feats-grid">';
+      for (const a of ACHIEVEMENTS) {
+        const got = achievements.has(a.id);
+        html += '<div class="feat ' + (got ? 'got' : 'locked') + '">' +
+          '<div class="feat-name">' + a.name + '</div>' +
+          '<div class="feat-desc">' + (got ? a.desc : '???') + '</div></div>';
+      }
+      el.innerHTML = html + '</div>';
+    }
+
+    function renderSettings() {
+      const b = document.getElementById('soundBtn');
+      if (b) b.textContent = soundOn ? '🔊' : '🔇';
     }
 
     /* ═══════ THE WORLD ═══════
@@ -683,15 +1140,21 @@
 
     function renderBuildings() {
       const el = document.getElementById('tab-buildings');
-      let html = '';
+      const amounts = [1, 10, 100, 'max'];
+      let html = '<div class="buy-toggle">' + amounts.map(a =>
+        `<button class="buy-amt ${buyAmount === a ? 'active' : ''}" onclick="setBuyAmount(${a === 'max' ? "'max'" : a})">${a === 'max' ? 'Max' : '×' + a}</button>`
+      ).join('') + '</div>';
+      let rows = '';
       for (const b of BUILDINGS) {
-        const cost = getBuildingCost(b);
-        const can = skulls >= cost;
         const cnt = owned[b.id];
         const revealed = totalSkulls >= b.baseCost * 0.5 || cnt > 0;
         if (!revealed) continue;
-        const cps = (b.baseCps * cnt * globalCpsMult);
-        html += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}', event)">
+        const qty = buyAmount === 'max' ? Math.max(1, maxAffordable(b)) : buyAmount;
+        const cost = getBulkCost(b, qty);
+        const can = buyAmount === 'max' ? maxAffordable(b) >= 1 : skulls >= cost;
+        const cps = (b.baseCps * cnt * getBuildingMult(b) * globalCpsMult);
+        const qtyBadge = buyAmount === 1 ? '' : ` <span class="buy-qty">×${qty}</span>`;
+        rows += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}', event)">
           <div class="building-icon"><img src="assets/buildings/${b.id}.png" alt="" onerror="this.remove()">${cnt > 0 ? `<span class="building-count">${cnt}</span>` : ''}</div>
           <div class="building-info">
             <div class="building-name">${b.name}</div>
@@ -699,25 +1162,46 @@
             ${cnt > 0 ? `<div class="building-cps">${formatNum(cps)}/s total</div>` : ''}
           </div>
           <div class="building-right">
-            <div class="building-cost">${formatNum(cost)}</div>
+            <div class="building-cost">${formatNum(cost)}${qtyBadge}</div>
           </div>
         </div>`;
       }
-      if (!html) html = '<div style="text-align:center;color:#333;padding:20px;font-size:12px">Keep clicking to unlock buildings!</div>';
-      el.innerHTML = html;
+      el.innerHTML = html + (rows || '<div style="text-align:center;color:#333;padding:20px;font-size:12px">Keep clicking to unlock buildings!</div>');
     }
 
     function renderUpgrades() {
       const el = document.getElementById('tab-upgrades');
-      let html = '<div class="section-label">Click Power</div>';
-      for (const u of UPGRADES.filter(u => u.tag === 'click')) {
-        html += upgradeRow(u);
+      let html = '';
+
+      /* Synergy first when any are in reach — they are the interesting, deep
+         buys, so surface them rather than burying them under the flat list. */
+      const synViz = SYNERGY.filter(u => boughtUpgrades.has(u.id) || (owned[u.building] || 0) >= Math.ceil(u.req / 2));
+      if (synViz.length) {
+        html += '<div class="section-label">Synergy</div>';
+        for (const u of synViz) html += synergyRow(u);
       }
+
+      html += '<div class="section-label">Click Power</div>';
+      for (const u of UPGRADES.filter(u => u.tag === 'click')) html += upgradeRow(u);
       html += '<div class="section-label">CPS Multipliers</div>';
-      for (const u of UPGRADES.filter(u => u.tag === 'mult')) {
-        html += upgradeRow(u);
-      }
+      for (const u of UPGRADES.filter(u => u.tag === 'mult')) html += upgradeRow(u);
       el.innerHTML = html;
+    }
+
+    function synergyRow(u) {
+      const bought = boughtUpgrades.has(u.id);
+      const have = owned[u.building] || 0;
+      const unlocked = have >= u.req;
+      const can = unlocked && skulls >= u.cost;
+      const state = bought ? 'bought' : can ? 'affordable' : unlocked ? '' : 'locked';
+      const right = bought ? 'Owned' : unlocked ? formatNum(u.cost) : ('Needs ' + u.req);
+      return `<div class="upgrade-row ${state}" onclick="${bought || !unlocked ? '' : `buySynergy('${u.id}', event)`}">
+        <div class="building-info">
+          <div class="building-name">${u.name} <span class="upgrade-tag tag-syn">synergy</span></div>
+          <div class="building-desc">${u.desc}</div>
+        </div>
+        <div class="building-right"><div class="building-cost">${right}</div></div>
+      </div>`;
     }
 
     function upgradeRow(u) {
@@ -769,7 +1253,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','feats','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         btn.classList.toggle('active', tabs[i] === tab);
       });
@@ -781,10 +1265,12 @@
 
     /* ═══════ GAME LOOP ═══════ */
 
+    let tickCount = 0;
     function tick() {
       const now = Date.now();
       const dt = (now - lastTick) / 1000;
       lastTick = now;
+      expireBuffs();
       const earned = getCPS() * dt;
       if (earned > 0) {
         earn(earned);
@@ -792,6 +1278,11 @@
       }
       document.getElementById('score').textContent = formatNum(Math.floor(skulls));
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
+      renderBuffs();
+
+      /* Passive feats (skulls/buildings) caught about once a second — cheap,
+         and no need to check 10×/s. */
+      if (++tickCount % 10 === 0) checkAchievements();
 
       if (now - lastSave > 30000) {
         save();
@@ -910,6 +1401,10 @@
       BUILDINGS.forEach(b => { if (!(b.id in d.owned)) d.owned[b.id] = 0; });
       if (!d.boughtUpgrades) d.boughtUpgrades = [];
       if (!d.hitMilestones) d.hitMilestones = [];
+      if (!d.perks) d.perks = [];
+      if (!d.achievements) d.achievements = [];
+      if (d.boneShards === undefined) d.boneShards = 0;
+      if (d.cursedPopped === undefined) d.cursedPopped = 0;
       if (d.startTime === undefined) d.startTime = Date.now();
       if (d.prestige === undefined) d.prestige = 0;
       /* Pre-prestige saves had no lifetime field; their run total IS their
@@ -926,8 +1421,11 @@
         skulls, totalSkulls, lifetimeSkulls, prestige,
         totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
+        boneShards, cursedPopped,
         boughtUpgrades: [...boughtUpgrades],
         hitMilestones: [...hitMilestones],
+        perks: [...perks],
+        achievements: [...achievements],
         savedAt: Date.now(),
         version: SAVE_VERSION
       };
@@ -979,8 +1477,12 @@
       startTime = d.startTime;
       prestige = d.prestige || 0;
       lifetimeSkulls = d.lifetimeSkulls || 0;
+      boneShards = d.boneShards || 0;
+      cursedPopped = d.cursedPopped || 0;
       boughtUpgrades = new Set(d.boughtUpgrades);
       hitMilestones = new Set(d.hitMilestones);
+      perks = new Set(d.perks || []);
+      achievements = new Set(d.achievements || []);
 
       if (d.savedAt) {
         const away = (Date.now() - d.savedAt) / 1000;
@@ -1305,12 +1807,19 @@
 
     window.addEventListener('beforeunload', save);
 
+    try { const ba = localStorage.getItem('sc_buyAmount'); if (ba) buyAmount = ba === 'max' ? 'max' : (parseInt(ba, 10) || 1); } catch(e) {}
+    try { soundOn = localStorage.getItem('sc_sound') === '1'; } catch(e) {}
+
     load();
     syncFromServer();
     loadCosmetics();
     lastTick = Date.now();
+    checkAchievements();
+    renderSettings();
     render();
     renderWorld();
+    renderBuffs();
+    scheduleCursed();
   </script>
 </body>
 </html>
