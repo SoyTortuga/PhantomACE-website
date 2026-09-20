@@ -262,11 +262,18 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
   check('a URL in the background field is refused', body2.park.background, '');
   ok('and never reaches the visitor', !JSON.stringify(body2).includes('evil.example'));
 
-  /* The viewer resolves art from its own table and falls back. */
-  ok('the visit view draws the owner\'s background by id',
-     /backgroundImage = `url\("\$\{getParkBackground\(p\.background\)\.src\}"\)`/.test(PAGE));
+  /* The viewer resolves art from its own catalogue and falls back. A
+     built-in background is one image; a studio one is COMPOSED from the
+     viewer's palette tiles — either way the response contributed an id
+     and nothing else. */
+  ok('the visit view resolves the owner\'s background by id',
+     /const entry = getParkBackground\(p\.background\);/.test(PAGE));
+  ok('and composes a studio background rather than fetching anything',
+     /entry\.tilemap[\s\S]{0,300}composeTilemap\(entry, 24, repaint\)/.test(PAGE));
   ok('unknown ids fall back rather than failing',
-     /return PARK_BACKGROUNDS\[id\] \|\| PARK_BACKGROUNDS\[DEFAULT_BACKGROUND\];/.test(PAGE));
+     /\|\| PARK_BACKGROUNDS\[DEFAULT_BACKGROUND\];/.test(PAGE));
+  ok('and studio entries join the same resolver',
+     /\|\| \(studioBackgrounds && studioBackgrounds\[id\]\)/.test(PAGE));
 
   /* Every background carries its own mask, or an aquatic dino ends up on
      the new art's grass. */

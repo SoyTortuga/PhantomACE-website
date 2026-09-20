@@ -141,3 +141,32 @@ if (failures.length) {
 }
 console.log(`[background-studio] ${passed} assertions passed.`);
 console.log('');
+
+/* NOTE: appended by phase 4. Kept in this file because the wiring under
+   test is the studio's output being CONSUMED — the game and visit view
+   composing what the painter produced. */
+{
+  const GAME = fs.readFileSync(path.join(REPO, 'games/dino-park/index.html'), 'utf8').replace(/\r\n/g, '\n');
+
+  ok('the game fetches the catalogue', /fetch\('\/api\/park-backgrounds', \{ cache: 'no-store' \}\)/.test(GAME));
+  ok('at park boot', /function initParkView\(\) \{\n  loadBackgroundCatalog\(\);/.test(GAME));
+  ok('the ground cache composes studio tilemaps',
+     /if \(entry\.tilemap\) \{[\s\S]{0,400}composeTilemap\(entry, TSIZE/.test(GAME));
+  ok('late tiles invalidate the cache, not the world',
+     /composeTilemap\(entry, TSIZE, \(\) => \{ groundCache = null; renderTileCanvas\(\); \}\)/.test(GAME));
+  ok('the scenery picker lists both kinds',
+     /Object\.entries\(PARK_BACKGROUNDS\)\n?\s*\.concat\(Object\.entries\(studioBackgrounds \|\| \{\}\)\)/.test(GAME));
+  ok('picker names are escaped', /scenery-btn[\s\S]{0,200}\$\{escapeHtml\(e\.name\)\}/.test(GAME));
+  ok('the selection gate admits studio ids',
+     /const known = PARK_BACKGROUNDS\[id\] \|\| \(studioBackgrounds && studioBackgrounds\[id\]\);/.test(GAME));
+  ok('tile refs resolve inside the palette tree only',
+     /img\.src = AB \+ 'park-tiles\/' \+ parts\[0\] \+ '\/' \+ parts\[1\] \+ '\.png';/.test(GAME));
+
+  console.log('');
+  if (failures.length) {
+    console.log(`[background-studio] ${passed} passed, ${failures.length} FAILED (phase 4 block)`);
+    for (const f of failures) console.log(`  FAIL: ${f}`);
+    process.exit(1);
+  }
+  console.log(`[background-studio] phase-4 wiring: all ${passed} assertions passed.`);
+}

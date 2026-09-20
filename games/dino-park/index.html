@@ -251,6 +251,8 @@
       color: #ffffff77; margin: 2px 0 4px; border-bottom: 1px solid #ffffff14;
       padding-bottom: 2px;
     }
+    .yard-item-btn.scenery-btn { width: auto; min-width: 62px; padding: 6px 10px; }
+    .yard-item-btn.scenery-btn .yard-item-name { font-size: 9px; }
     .yard-item-btn {
       flex: 0 0 auto; width: 62px; padding: 6px 3px 5px;
       background: #0a0a0a; border: 1px solid #ffffff12; border-radius: 3px;
@@ -4035,9 +4037,82 @@ const PARK_BACKGROUNDS = {
 };
 const DEFAULT_BACKGROUND = 'classic';
 
+/* ── STUDIO BACKGROUNDS ────────────────────────────────────────────────
+   Published maps from /api/park-backgrounds: a 32×32 tilemap plus the
+   mask the studio derived from it. They join PARK_BACKGROUNDS at lookup
+   time rather than being copied in, so a background published mid-session
+   exists here after one catalogue fetch — data, not a deploy.
+
+   Until the catalogue answers, an unknown id resolves to classic. That is
+   the same fallback an unknown id gets forever, so a slow network shows
+   the default scenery briefly instead of nothing — and the catalogue's
+   arrival just invalidates the ground cache and repaints. */
+let studioBackgrounds = null;          /* null = not fetched yet */
+
+async function loadBackgroundCatalog() {
+  if (studioBackgrounds) return;
+  studioBackgrounds = {};
+  try {
+    const res = await fetch('/api/park-backgrounds', { cache: 'no-store' });
+    const data = await res.json();
+    (data.backgrounds || []).forEach(bg => {
+      /* Adapted to the same shape as a built-in entry, so everything
+         downstream — zoneAt, the picker, the visit view — asks one
+         question and never cares where a background came from. */
+      studioBackgrounds[bg.id] = {
+        name: bg.name, src: null, mask: bg.mask, tilemap: bg.tilemap,
+      };
+    });
+    groundCache = null;
+    if (parkReady) { renderTileCanvas(); renderYardTray(); }
+  } catch (e) { /* the classic fallback covers a failed fetch */ }
+}
+
 /** The background entry for an id, falling back rather than failing. */
 function getParkBackground(id) {
-  return PARK_BACKGROUNDS[id] || PARK_BACKGROUNDS[DEFAULT_BACKGROUND];
+  return PARK_BACKGROUNDS[id]
+    || (studioBackgrounds && studioBackgrounds[id])
+    || PARK_BACKGROUNDS[DEFAULT_BACKGROUND];
+}
+
+/* Tile images for composed backgrounds, loaded on demand — a map uses a
+   few dozen distinct tiles out of an 845-tile palette, so preloading the
+   palette to show one background is the wrong trade. Each arrival
+   invalidates the cache once; images fire onload once. */
+const bgTileImgs = {};
+function bgTileImg(ref, onload) {
+  if (bgTileImgs[ref]) return bgTileImgs[ref];
+  const img = new Image();
+  img.onload = onload;
+  const parts = ref.split('/');
+  img.src = AB + 'park-tiles/' + parts[0] + '/' + parts[1] + '.png';
+  bgTileImgs[ref] = img;
+  return img;
+}
+
+/**
+ * Draw a studio tilemap onto a fresh square canvas, cellPx per cell.
+ * Tiles still in flight are skipped this pass; `onTileLoad` re-runs the
+ * caller when they land.
+ */
+function composeTilemap(entry, cellPx, onTileLoad) {
+  const n = PARK_GRID.COLS;
+  const c = document.createElement('canvas');
+  c.width = c.height = n * cellPx;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  for (let y = 0; y < n; y++) {
+    const row = (entry.tilemap && entry.tilemap[y]) || [];
+    for (let x = 0; x < n; x++) {
+      const ref = row[x];
+      if (!ref) continue;
+      const img = bgTileImg(ref, onTileLoad);
+      if (img.complete && img.naturalWidth) {
+        ctx.drawImage(img, x * cellPx, y * cellPx, cellPx, cellPx);
+      }
+    }
+  }
+  return c;
 }
 
 /** The background this save is using. */
@@ -4130,7 +4205,8 @@ function replaceStrandedForBackground() {
  * to apply.
  */
 function setParkBackground(id) {
-  if (!PARK_BACKGROUNDS[id]) { showToast('That background is not available'); return false; }
+  const known = PARK_BACKGROUNDS[id] || (studioBackgrounds && studioBackgrounds[id]);
+  if (!known) { showToast('That background is not available'); return false; }
   state.background = id;
   const moved = replaceStrandedForBackground();
   groundCache = null;                  /* the cached terrain is the old art */
@@ -4159,6 +4235,13 @@ function buildGroundCache() {
      stop being the preload list for every background at once — loading all
      of them to show one is the wrong trade. The MASK is already per
      background; only the owner-side image is not. */
+  const entry = activeBackground();
+  if (entry.tilemap) {
+    /* A studio background: composed from its own tiles, at the same cache
+       size the image path uses. Late-arriving tiles invalidate the cache
+       once each and the next blit picks them up. */
+    return composeTilemap(entry, TSIZE, () => { groundCache = null; renderTileCanvas(); });
+  }
   const img = parkImgs.background;
   if (img) ctx.drawImage(img, 0, 0, w, h);
   return offscreen;
@@ -4242,6 +4325,7 @@ function pickNewTarget(dino) {
 }
 
 function initParkView() {
+  loadBackgroundCatalog();   /* idempotent; first call fetches, rest return */
   state.park.forEach(d => { if (d.px === undefined) initDinoPosition(d); });
   if (state.debris && state.debris.length > 0) wasStreamLive = true;
   renderStreamClock();
@@ -4917,7 +5001,20 @@ function renderYardTray() {
     </button>`;
   };
 
-  wrap.innerHTML = YARD_BANDS.map(b => {
+  /* Scenery first: the built-ins plus every published studio background.
+     One list, because a player should not care which kind is which. */
+  const activeId = PARK_BACKGROUNDS[state.background] || (studioBackgrounds && studioBackgrounds[state.background])
+    ? state.background : DEFAULT_BACKGROUND;
+  const scenery = Object.entries(PARK_BACKGROUNDS)
+    .concat(Object.entries(studioBackgrounds || {}))
+    .map(([id, e]) => `<button class="yard-item-btn scenery-btn${id === activeId ? ' selected' : ''}"
+        onclick="setParkBackground('${id}');renderYardTray();">
+      <span class="yard-item-name">${escapeHtml(e.name)}</span>
+    </button>`).join('');
+
+  wrap.innerHTML = '<div class="yard-band-label">Scenery</div>'
+    + `<div class="yard-band">${scenery}</div>`
+    + YARD_BANDS.map(b => {
     const items = YARD_ITEM_TYPES.filter(t => t.band === b.id);
     if (!items.length) return '';
     return `<div class="yard-band-label">${b.label}</div>
@@ -5771,10 +5868,23 @@ function showVisitedPark(data) {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeVisit(); });
   document.body.appendChild(overlay);
 
-  /* Set as a style rather than in the template so the URL is this build's
-     constant and never anything interpolated from the response. */
+  /* THEIR scenery, resolved from OUR catalogue by id — never a URL from
+     the response. A built-in background is one image; a studio one is
+     composed from the same palette tiles the owner painted with, redrawn
+     as stragglers load. Unknown ids fall back to classic. */
   const world = overlay.querySelector('#visitWorld');
-  if (world) world.style.backgroundImage = `url("${getParkBackground(p.background).src}")`;
+  if (world) {
+    const entry = getParkBackground(p.background);
+    if (entry.tilemap) {
+      const repaint = () => {
+        const c = composeTilemap(entry, 24, repaint);
+        world.style.backgroundImage = `url("${c.toDataURL()}")`;
+      };
+      repaint();
+    } else {
+      world.style.backgroundImage = `url("${entry.src}")`;
+    }
+  }
 }
 
 function closeVisit() {
