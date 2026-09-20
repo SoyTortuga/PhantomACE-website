@@ -13,11 +13,39 @@
   /* Every movable panel, with the label the editor shows on its handle and
      the id the saved layout keys on. Order is z-order in the editor. */
   var PANELS = [
-    { id: 'ovStage', label: 'Alerts' },
-    { id: 'ovScramble', label: 'Scramble' },
-    { id: 'ovMaze', label: 'Chat Maze' },
-    { id: 'ovMtg', label: 'MTGBBB' },
-    { id: 'ovMc', label: 'Mana Clash' },
+    { id: 'ovStage', label: 'Alerts', holds: [
+      'One alert at a time, queued — never stacked',
+      'New subscriber · gift subs · raid',
+      'Hype train level-up',
+      'Code, item & egg drops (incl. maze rewards)',
+      'MTGBBB rare & mythic PULLS show here, not in the MTGBBB panel',
+      'MTGBBB bingo & blackout',
+    ] },
+    { id: 'ovScramble', label: 'Scramble', holds: [
+      'Round number & countdown clock',
+      'The scrambled word as tiles',
+      'Category · how many have solved it',
+      'Top 3 scores',
+    ] },
+    { id: 'ovMaze', label: 'Chat Maze', holds: [
+      'Level & maze size',
+      'The board — fogged to what chat has revealed',
+      'Move count & 🦴 bones collected',
+      'Direction pad — lights up on each chat command',
+      'Last few inputs with who sent them',
+    ] },
+    { id: 'ovMtg', label: 'MTGBBB', holds: [
+      'Set name & pack progress bar',
+      'Player count',
+      'Top 3 players by lines',
+      '(individual pulls appear in the Alerts window)',
+    ] },
+    { id: 'ovMc', label: 'Mana Clash', holds: [
+      'Round & FINAL ROUND flag',
+      'Target score (goal)',
+      'Leader progress bar',
+      'Standings',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }

@@ -23,6 +23,31 @@
   var scale = 1;
   var saved = {};           /* {id:{x,y}} last known-good, for Revert */
 
+  /* The legend is drawn from OverlaySamples.PANELS — the same source that
+     lists the movable panels — so it can never claim a panel shows
+     something the panel does not, and a new panel documents itself by
+     appearing in that one list. */
+  function renderLegend() {
+    /* From the PARENT's copy of the shared samples, loaded on this page, so
+       the legend renders immediately without waiting on the iframe. */
+    var panels = (window.OverlaySamples && window.OverlaySamples.PANELS) || [];
+    var body = document.getElementById('legendBody');
+    if (!body) return;
+    body.innerHTML = panels.map(function (p) {
+      var items = (p.holds || []).map(function (h) {
+        return '<li>' + escapeHtml(h) + '</li>';
+      }).join('');
+      return '<div class="lg-panel"><div class="lg-name">' + escapeHtml(p.label) +
+        '</div><ul>' + items + '</ul></div>';
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   function fitScale() {
     scale = stageFrame.clientWidth / CANVAS_W;
     frame.style.transform = 'scale(' + scale + ')';
@@ -48,6 +73,7 @@
     /* The iframe must not run its own live fetch under us. */
     try { frame.contentWindow.__ovLayoutManaged = true; } catch (e) {}
 
+    renderLegend();
     fitScale();
     window.addEventListener('resize', function () { fitScale(); });
 
@@ -81,13 +107,15 @@
            1920×1080 — the CSS scale lives in the PARENT and is invisible
            here — so this rect is already in canvas pixels. No /scale. */
         var r = el.getBoundingClientRect();
-        pos = { x: r.left / CANVAS_W * 100, y: r.top / CANVAS_H * 100 };
+        pos = { x: r.left / CANVAS_W * 100, y: r.top / CANVAS_H * 100, s: 1 };
       }
-      if (apply) apply(el, pos.x, pos.y);
+      if (apply) apply(el, pos.x, pos.y, pos.s);
       el.dataset.px = pos.x;
       el.dataset.py = pos.y;
+      el.dataset.ps = (pos.s === undefined || pos.s === null) ? 1 : pos.s;
 
       makeDraggable(el, apply);
+      addResizeHandle(el, apply);
       tagPanel(el, spec.label);
     });
   }
@@ -126,7 +154,7 @@
       var dyPct = (e.clientY - startY) / CANVAS_H * 100;
       var x = clamp(startPx + dxPct), y = clamp(startPy + dyPct);
       el.dataset.px = x; el.dataset.py = y;
-      if (apply) apply(el, x, y);
+      if (apply) apply(el, x, y, Number(el.dataset.ps) || 1);
     });
 
     function end(e) {
@@ -140,6 +168,48 @@
   }
 
   function clamp(v) { return Math.max(0, Math.min(96, Math.round(v * 100) / 100)); }
+  function clampScale(v) { return Math.max(0.3, Math.min(3, Math.round(v * 1000) / 1000)); }
+
+  /* A grab handle at the panel's bottom-right. offsetWidth is the panel's
+     UNSCALED layout width (transforms don't change it), so dragging the
+     corner right by dx canvas px grows the rendered width by dx —
+     WYSIWYG — via scale = startScale + dx/baseWidth. Counter-scaled so the
+     handle stays the same grab size whatever the panel's scale. */
+  function addResizeHandle(el, apply) {
+    var doc = frame.contentDocument;
+    var h = doc.createElement('div');
+    h.className = 'ov-resize-handle';
+    h.style.cssText =
+      'position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;' +
+      'background:#ff0000;border:2px solid #fff;border-radius:3px;' +
+      'cursor:nwse-resize;z-index:1000;transform-origin:bottom right;';
+    el.appendChild(h);
+
+    var startX, startScale, baseW;
+    h.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      startX = e.clientX;
+      startScale = Number(el.dataset.ps) || 1;
+      baseW = el.offsetWidth || 300;
+      h.setPointerCapture(e.pointerId);
+    });
+    h.addEventListener('pointermove', function (e) {
+      if (startX === undefined) return;
+      var sc = clampScale(startScale + (e.clientX - startX) / baseW);
+      el.dataset.ps = sc;
+      if (apply) apply(el, Number(el.dataset.px), Number(el.dataset.py), sc);
+      h.style.transform = 'scale(' + (1 / sc) + ')';   /* stay grabbable */
+      var st = document.getElementById('status');
+      if (st) st.textContent = 'scale ' + Math.round(sc * 100) + '%';
+    });
+    function end(e) {
+      if (startX === undefined) return;
+      startX = undefined;
+      try { h.releasePointerCapture(e.pointerId); } catch (ex) {}
+    }
+    h.addEventListener('pointerup', end);
+    h.addEventListener('pointercancel', end);
+  }
 
   function collect() {
     var doc = frame.contentDocument;
@@ -147,7 +217,8 @@
     ((frame.contentWindow.OverlaySamples || {}).PANELS || []).forEach(function (spec) {
       var el = doc.getElementById(spec.id);
       if (el && el.dataset.px !== undefined) {
-        out[spec.id] = { x: Number(el.dataset.px), y: Number(el.dataset.py) };
+        out[spec.id] = { x: Number(el.dataset.px), y: Number(el.dataset.py),
+                         s: Number(el.dataset.ps) || 1 };
       }
     });
     return out;

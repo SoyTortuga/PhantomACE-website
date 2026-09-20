@@ -78,7 +78,7 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   /* Unknown panel ids are dropped, not stored — a save cannot invent a
      panel the overlay has no element for. */
   const mixed = validatePanels({ ovMaze: { x: 10, y: 20 }, ovGhost: { x: 5, y: 5 } });
-  check('a known panel survives', mixed.panels.ovMaze, { x: 10, y: 20 });
+  check('a known panel survives, with a default scale', mixed.panels.ovMaze, { x: 10, y: 20, s: 1 });
   ok('an unknown panel is dropped', !('ovGhost' in mixed.panels));
 
   /* Off-canvas coordinates are clamped to the 0–96 band, not rejected —
@@ -90,9 +90,25 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   /* Non-numbers are skipped rather than stored as NaN. */
   const junk = validatePanels({ ovMaze: { x: 'left', y: 10 }, ovMtg: { x: 3, y: 4 } });
   ok('a non-numeric coord drops that panel', !('ovMaze' in junk.panels));
-  check('while a valid sibling stays', junk.panels.ovMtg, { x: 3, y: 4 });
+  check('while a valid sibling stays', junk.panels.ovMtg, { x: 3, y: 4, s: 1 });
 
   check('an empty map is refused', 'error' in validatePanels({}), true);
+}
+
+/* ══ Scale: stored, defaulted, clamped ═════════════════════════════════ */
+{
+  /* Absent scale means 1 — the layout is scale-optional per panel. */
+  const plain = validatePanels({ ovMaze: { x: 10, y: 20 } });
+  check('a panel with no scale defaults to 1', plain.panels.ovMaze.s, 1);
+
+  const scaled = validatePanels({ ovMaze: { x: 10, y: 20, s: 1.5 } });
+  check('a given scale is kept', scaled.panels.ovMaze.s, 1.5);
+
+  /* Bounded 0.3–3 so a fat-fingered corner drag cannot make a panel
+     unrecoverably tiny or swallow the screen. */
+  check('a huge scale clamps to 3', validatePanels({ ovMaze: { x: 1, y: 1, s: 99 } }).panels.ovMaze.s, 3);
+  check('a tiny scale clamps to 0.3', validatePanels({ ovMaze: { x: 1, y: 1, s: 0.01 } }).panels.ovMaze.s, 0.3);
+  check('a non-numeric scale falls back to 1', validatePanels({ ovMaze: { x: 1, y: 1, s: 'big' } }).panels.ovMaze.s, 1);
 }
 
 /* ══ Save round-trips; reset clears ════════════════════════════════════ */
@@ -100,7 +116,8 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   const e = env();
   await POST(e, { action: 'save', panels: good }, as('222'));
   const stored = e.MARKETPLACE.read('overlay_layout');
-  check('the save persisted the panels', stored.panels, good);
+  check('the save persisted the panels with default scale', stored.panels,
+        { ovScramble: { x: 5, y: 70, s: 1 }, ovMaze: { x: 60, y: 12, s: 1 } });
   check('and recorded the author', stored.updatedBy, 'U222');
 
   await POST(e, { action: 'reset' }, as('222'));
@@ -115,7 +132,7 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
 
   const apply = fs.readFileSync(path.join(REPO, 'js/pages/overlay-apply-layout.js'), 'utf8');
   ok('apply normalises to top-left', /el\.style\.left = x \+ '%'/.test(apply) && /el\.style\.right = 'auto'/.test(apply));
-  ok('and clears centring transforms', /el\.style\.transform = 'none'/.test(apply));
+  ok('and clears centring transforms when unscaled', /scale === 1 \? 'none'/.test(apply));
   ok('the live overlay reads the layout on boot', /fetch\('\/api\/overlay\/layout'/.test(apply));
   ok('and stands down when the editor manages it', /__ovLayoutManaged/.test(apply));
 
@@ -124,11 +141,32 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
      /win\.OverlayLayout && win\.OverlayLayout\.applyOne/.test(editor));
   ok('and tells the iframe not to double-fetch', /__ovLayoutManaged = true/.test(editor));
   ok('coordinates are stored as canvas percentages', /CANVAS_W = 1920, CANVAS_H = 1080/.test(editor));
+  ok('the editor resizes via a corner handle', /addResizeHandle/.test(editor));
+  ok('and collects each panel scale', /s: Number\(el\.dataset\.ps\) \|\| 1/.test(editor));
+
+  ok('apply scales from the top-left so the pin holds',
+     /transformOrigin = 'top left'/.test(apply) && /scale\(' \+ scale \+ '\)/.test(apply));
 
   const ov = fs.readFileSync(path.join(REPO, 'overlay.html'), 'utf8');
   ok('the overlay loads the samples and applier', /overlay-samples\.js/.test(ov) && /overlay-apply-layout\.js/.test(ov));
 
+  /* The legend is drawn from the same PANELS list the editor drags and the
+     route stores, so it cannot document a panel that does not exist or miss
+     one that does. And it must name the thing the broadcaster caught: an
+     MTGBBB pull surfaces in the ALERTS window, not the MTGBBB panel. */
   const samples = fs.readFileSync(path.join(REPO, 'js/pages/overlay-samples.js'), 'utf8');
+  ok('every panel declares what it holds',
+     (samples.match(/holds: \[/g) || []).length === 5);
+  ok('the alerts entry documents MTGBBB pulls landing there',
+     /PULLS show here/.test(samples));
+  ok('and drops, subs, raids, hype and bingo', /gift subs/.test(samples) && /Hype train/.test(samples) && /bingo & blackout/i.test(samples));
+
+  const eEd = fs.readFileSync(path.join(REPO, 'js/pages/overlay-editor.js'), 'utf8');
+  ok('the editor renders the legend from PANELS', /function renderLegend/.test(eEd) && /window\.OverlaySamples && window\.OverlaySamples\.PANELS/.test(eEd));
+  const eHtml = fs.readFileSync(path.join(REPO, 'overlay-editor.html'), 'utf8');
+  ok('the editor page has a legend column', /id="legendBody"/.test(eHtml));
+  ok('and loads the shared samples for it', /overlay-samples\.js/.test(eHtml));
+
   const ids = [...samples.matchAll(/id: '(ov\w+)'/g)].map(m => m[1]).sort();
   /* The panel list the editor drags must match the ids the route stores,
      or a panel can be arranged and then silently not saved. */

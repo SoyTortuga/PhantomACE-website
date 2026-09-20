@@ -19,13 +19,18 @@
 (function () {
   'use strict';
 
-  function applyOne(el, x, y) {
+  function applyOne(el, x, y, s) {
     if (!el) return;
+    var scale = (s === undefined || s === null) ? 1 : Number(s) || 1;
     el.style.left = x + '%';
     el.style.top = y + '%';
     el.style.right = 'auto';
     el.style.bottom = 'auto';
-    el.style.transform = 'none';    /* ovMc/ovStage centre themselves by default */
+    /* Scale from the TOP-LEFT, so the pinned corner is the anchor and the
+       panel grows down-and-right rather than drifting off its saved spot.
+       This also overrides the centring transforms ovMc/ovStage default to. */
+    el.style.transformOrigin = 'top left';
+    el.style.transform = scale === 1 ? 'none' : 'scale(' + scale + ')';
   }
 
   function applyAll(panels) {
@@ -33,7 +38,7 @@
     Object.keys(panels).forEach(function (id) {
       var el = document.getElementById(id);
       var p = panels[id];
-      if (el && p) applyOne(el, p.x, p.y);
+      if (el && p) applyOne(el, p.x, p.y, p.s);
     });
   }
 

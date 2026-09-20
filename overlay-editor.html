@@ -40,6 +40,21 @@
       transform-origin: top left; border: 0; background: transparent;
     }
     .drag-hint { font-size: 11px; color: #ffffff88; margin-top: 8px; }
+    .edit-row { display: flex; gap: 16px; align-items: flex-start; }
+    .edit-main { flex: 1 1 auto; min-width: 0; }
+    .legend {
+      flex: 0 0 300px; background: #111; border: 1px solid #ffffff1f;
+      border-radius: 8px; padding: 14px; max-height: 80vh; overflow-y: auto;
+    }
+    .legend h2 { font-size: 13px; color: #ff4444; letter-spacing: 0.05em; margin: 0 0 12px; }
+    .legend .lg-panel { margin-bottom: 14px; }
+    .legend .lg-name {
+      font-size: 12px; font-weight: 800; color: #fff; margin-bottom: 4px;
+      border-left: 3px solid #ff0000; padding-left: 7px;
+    }
+    .legend ul { margin: 0; padding-left: 20px; }
+    .legend li { font-size: 11px; color: #ffffffcc; line-height: 1.5; }
+    @media (max-width: 900px) { .edit-row { flex-direction: column; } .legend { flex: 1 1 auto; width: 100%; } }
   </style>
 </head>
 <body>
@@ -59,13 +74,22 @@
         <button class="btn btn-danger" id="resetBtn">Reset to defaults</button>
         <span class="status" id="status"></span>
       </div>
-      <div class="stage-frame" id="stageFrame">
-        <iframe id="ovFrame" src="/overlay?layout=1" title="overlay preview"></iframe>
+      <div class="edit-row">
+        <div class="edit-main">
+          <div class="stage-frame" id="stageFrame">
+            <iframe id="ovFrame" src="/overlay?layout=1" title="overlay preview"></iframe>
+          </div>
+          <p class="drag-hint">Drag a panel to move it; drag its bottom-right corner to resize. The dashed area is the 16:9 stream canvas.</p>
+        </div>
+        <aside class="legend" id="legend">
+          <h2>What each panel shows</h2>
+          <div id="legendBody"></div>
+        </aside>
       </div>
-      <p class="drag-hint">Drag a panel to move it. The dashed area is the 16:9 stream canvas.</p>
     </div>
   </div>
 
+  <script src="/js/pages/overlay-samples.js"></script>
   <script src="/js/pages/overlay-editor.js"></script>
 </body>
 </html>

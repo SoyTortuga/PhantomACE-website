@@ -48,6 +48,17 @@ function clampPct(v) {
   return Math.max(0, Math.min(96, Math.round(n * 100) / 100));
 }
 
+/* Scale is a multiplier on the panel's natural size. Bounded 0.3–3: small
+   enough to tuck a panel into a corner, large enough to feature one, never
+   so extreme a fat-fingered drag makes it unrecoverable or off-screen.
+   Absent means 1 — the layout is scale-optional per panel. */
+function clampScale(v) {
+  if (v === undefined || v === null) return 1;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(0.3, Math.min(3, Math.round(n * 1000) / 1000));
+}
+
 /** Validate a submitted panel map down to what may be stored, or explain. */
 export function validatePanels(raw) {
   if (!raw || typeof raw !== 'object') return { error: 'No panels given.' };
@@ -57,7 +68,7 @@ export function validatePanels(raw) {
     if (!pos || typeof pos !== 'object') continue;
     const x = clampPct(pos.x), y = clampPct(pos.y);
     if (x === null || y === null) continue;            // unpositioned: skip
-    panels[id] = { x, y };
+    panels[id] = { x, y, s: clampScale(pos.s) };
   }
   if (!Object.keys(panels).length) return { error: 'No valid panel positions.' };
   return { panels };
