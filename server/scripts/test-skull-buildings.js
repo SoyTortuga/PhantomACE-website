@@ -59,6 +59,21 @@ ok('the owned count renders as a badge, not the icon',
    /class="building-count">\$\{cnt\}<\/span>/.test(html));
 ok('a missing sprite degrades gracefully', /onerror="this\.remove\(\)"/.test(html));
 
+/* The living world: a Cookie-Clicker-style panel that draws owned buildings
+   and fills up as you buy, capped so a band never overflows. */
+ok('the page has the world panel', /id="worldGround"/.test(html) && /id="worldPanel"/.test(html));
+ok('renderWorld draws the owned buildings from their sprites',
+   /function renderWorld/.test(html) && /assets\/buildings\/'\s*\+\s*b\.id/.test(html));
+ok('the world caps how many sprites a band draws', /WORLD_CAP/.test(html) && /Math\.min\(cnt, WORLD_CAP\)/.test(html));
+ok('a buy grows the world and pops the new one',
+   /lastBought = b\.id;[\s\S]*renderWorld\(\)/.test(html) && /world-sprite\.fresh/.test(html));
+ok('the world is rebuilt on buy, load, prestige and boot',
+   (html.match(/renderWorld\(\);/g) || []).length >= 4);
+/* Never in the 10/s tick loop — that would rebuild hundreds of sprites ten
+   times a second. Scoped to the tick body so the check cannot leak past it. */
+const tickBody = html.slice(html.indexOf('function tick'), html.indexOf('setInterval(tick'));
+ok('the world is not rebuilt in the tick loop', tickBody.length > 0 && !/renderWorld/.test(tickBody));
+
 console.log('');
 if (failures.length) {
   console.log(`[skull-buildings] ${passed} passed, ${failures.length} FAILED`);

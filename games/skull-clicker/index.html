@@ -68,6 +68,75 @@
       100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
     }
 
+    /* The world — accumulating building sprites */
+    .world-panel {
+      position: relative;
+      margin: 0 12px 8px;
+      height: 172px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      background: linear-gradient(#0c0c0c, #050505);
+      flex-shrink: 0;
+    }
+    .world-ground { display: flex; flex-direction: column; min-height: 100%; }
+    /* Each building gets a tier the crowd stands on. The gradient reads as
+       ground the sprites sit atop rather than a flat list. */
+    .world-band {
+      position: relative;
+      height: 46px;
+      border-bottom: 1px solid #121212;
+      background: linear-gradient(180deg, transparent 60%, #0e0606 100%);
+    }
+    .world-band:last-child { border-bottom: none; }
+    .world-band-label {
+      position: absolute;
+      right: 6px; top: 5px;
+      z-index: 400;
+      font-size: 10px;
+      font-weight: 800;
+      color: #ff5555;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid #2a0d0d;
+      border-radius: 3px;
+      padding: 0 5px;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+    .world-sprite {
+      position: absolute;
+      bottom: 4px;
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+      image-rendering: pixelated;
+      transform-origin: bottom center;
+      filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.8));
+    }
+    /* The one just bought pops in; a rebuild does not replay it because only
+       the freshest sprite carries the class. */
+    .world-sprite.fresh { animation: sprite-in 0.35s ease-out; }
+    @keyframes sprite-in {
+      0% { opacity: 0; transform: translateY(-8px) scale(0.5); }
+      100% { opacity: 1; }
+    }
+    .world-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0 24px;
+      color: #333;
+      font-size: 12px;
+      pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .world-sprite.fresh { animation: none; }
+    }
+
     /* Tabs */
     .tab-bar {
       display: flex;
@@ -334,6 +403,13 @@
       </div>
     </div>
 
+    <!-- The living world: every building you own appears here and stacks up,
+         Cookie-Clicker style, so the screen fills as you go deeper. -->
+    <div class="world-panel" id="worldPanel">
+      <div class="world-ground" id="worldGround"></div>
+      <div class="world-empty" id="worldEmpty">Your dominion is empty. Buy a building to raise it.</div>
+    </div>
+
     <div id="offlineBanner"></div>
 
     <div class="tab-bar">
@@ -480,7 +556,9 @@
       if (skulls < cost) { shakeReject(e); return; }
       skulls -= cost;
       owned[b.id]++;
+      lastBought = b.id;
       render();
+      renderWorld();
     }
 
     function buyUpgrade(id, e) {
@@ -555,6 +633,52 @@
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'cosmetics') renderCosmetics();
       else if (activeTab === 'stats') renderStats();
+    }
+
+    /* ═══════ THE WORLD ═══════
+       Cookie-Clicker-style: every building you own is drawn here and the
+       crowd fills up as you buy more, capped so a band never overflows —
+       past the cap the count keeps climbing on the label. Rebuilt only on
+       buy, load and prestige (never in the tick loop), so it stays cheap.
+       Positions are seeded off (band, index) so a rebuild lands every sprite
+       exactly where it was — no flicker — and only the just-bought one pops. */
+    const WORLD_CAP = 18;
+    let lastBought = null;
+
+    function wRand(s) { const x = Math.sin(s) * 43758.5453; return x - Math.floor(x); }
+
+    function renderWorld() {
+      const ground = document.getElementById('worldGround');
+      const empty = document.getElementById('worldEmpty');
+      if (!ground) return;
+      let html = '';
+      let any = false;
+      for (let bi = 0; bi < BUILDINGS.length; bi++) {
+        const b = BUILDINGS[bi];
+        const cnt = owned[b.id] || 0;
+        if (cnt <= 0) continue;
+        any = true;
+        const n = Math.min(cnt, WORLD_CAP);
+        const step = WORLD_CAP > 1 ? 86 / (WORLD_CAP - 1) : 0;
+        let sprites = '';
+        for (let i = 0; i < n; i++) {
+          const left = 3 + i * step;
+          const jx = (wRand(bi * 31.7 + i * 2.3) - 0.5) * 3;
+          const jy = wRand(bi * 17.1 + i * 5.9) * 9;
+          const sc = 0.82 + wRand(bi * 11.3 + i * 3.1) * 0.34;
+          const fresh = (lastBought === b.id && i === n - 1) ? ' fresh' : '';
+          sprites += '<img class="world-sprite' + fresh + '" src="assets/buildings/' + b.id +
+            '.png" alt="" onerror="this.remove()" style="left:calc(' + left.toFixed(2) + '% + ' +
+            jx.toFixed(1) + 'px);bottom:' + (4 + jy).toFixed(1) + 'px;transform:scale(' +
+            sc.toFixed(2) + ');z-index:' + i + '">';
+        }
+        const label = b.name + ' ×' + (cnt >= 1000 ? formatNum(cnt) : cnt);
+        html += '<div class="world-band">' + sprites +
+          '<span class="world-band-label">' + label + '</span></div>';
+      }
+      ground.innerHTML = html;
+      empty.style.display = any ? 'none' : 'flex';
+      lastBought = null;
     }
 
     function renderBuildings() {
@@ -747,6 +871,7 @@
 
       save();
       render();
+      renderWorld();
     }
 
     function renderPrestige() {
@@ -869,6 +994,8 @@
           }
         }
       }
+
+      renderWorld();
     }
 
     function load() {
@@ -1183,6 +1310,7 @@
     loadCosmetics();
     lastTick = Date.now();
     render();
+    renderWorld();
   </script>
 </body>
 </html>
