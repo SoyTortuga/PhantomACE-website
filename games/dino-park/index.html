@@ -3722,11 +3722,29 @@ function updateTopBar() { state.level = getLevel(); document.getElementById('coi
 
 let marketPollInterval = null;
 
+const TAB_ORDER = ['park', 'eggs', 'collection', 'market', 'dinodex'];
+
 function switchTab(tab) {
+  /* RESOLVE BEFORE TEARING DOWN — the order here is the whole fix.
+     This used to strip `active` from every tab first and only then look up
+     the target, so an unknown tab name threw AFTER the page had been left
+     with no active tab at all. Nothing put it back. From that moment every
+     `document.querySelector('.tab-content.active')` returned null, and the
+     one inside the minute tick threw again on every tick: a console filling
+     with the same error over a blank page, all from one bad call. Resolving
+     first means a bad name changes nothing. */
+  const idx = TAB_ORDER.indexOf(tab);
+  const panel = document.getElementById('tab-' + tab);
+  const btn = document.querySelectorAll('.tab-btn')[idx];
+  if (idx === -1 || !panel || !btn) {
+    console.warn('[dino-park] unknown tab, ignoring:', tab);
+    return;
+  }
+
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.querySelectorAll('.tab-btn')[['park','eggs','collection','market','dinodex'].indexOf(tab)].classList.add('active');
+  panel.classList.add('active');
+  btn.classList.add('active');
   if (tab === 'park') initParkView();
   if (tab === 'eggs') renderEggsTab();
   if (tab === 'collection') renderCollection();
@@ -5213,7 +5231,8 @@ function speedUpEgg(idx) {
 
 function closeHatch() {
   document.getElementById('hatchOverlay').classList.remove('show');
-  if (document.querySelector('.tab-content.active').id === 'tab-park') renderParkWorld();
+  const active = document.querySelector('.tab-content.active');
+  if (active && active.id === 'tab-park') renderParkWorld();
 }
 
 /* ======================== COLLECTION ======================== */
@@ -5794,7 +5813,9 @@ function gameTick() {
   if (happy > 0 && Math.random() < 0.1) state.coins += happy;
   updateTopBar();
   const active = document.querySelector('.tab-content.active');
-  if (active.id === 'tab-park') {
+  /* Guarded because this runs on the tick. An unguarded read here is what
+     turned one bad switchTab call into an error every tick thereafter. */
+  if (active && active.id === 'tab-park') {
     // Update alert indicators
     state.park.forEach((dino, i) => {
       const el = document.getElementById('parkDino_' + i);
