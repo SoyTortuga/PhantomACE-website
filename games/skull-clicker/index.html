@@ -199,8 +199,36 @@
     .prestige-note { font-size: 10px; color: #ffffff77; margin-top: 12px; }
     .shard-balance { text-align: center; font-size: 14px; color: #fff; margin: 4px 0 10px; }
     .shard-balance b { color: #ff5555; }
+
+    /* Ranks / leaderboard */
+    .ranks-toggle { display: flex; gap: 4px; margin-bottom: 10px; }
+    .ranks-tab {
+      flex: 1; padding: 8px 0; background: #0a0a0a; border: 1px solid #1a1a1a;
+      border-radius: 4px; color: #888; font-size: 12px; font-weight: 800;
+      cursor: pointer; font-family: inherit;
+    }
+    .ranks-tab.active { border-color: #ff0000; color: #ff0000; background: rgba(255,0,0,0.06); }
+    .ranks-note { font-size: 11px; color: #ffffff88; text-align: center; margin-bottom: 6px; line-height: 1.5; }
+    .ranks-note b { color: #ff5555; }
+    .ranks-you { font-size: 12px; color: #fff; text-align: center; margin-bottom: 12px; }
+    .ranks-you b { color: #ff5555; }
+    .ranks-list { display: flex; flex-direction: column; gap: 4px; }
+    .rank-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 4px;
+    }
+    .rank-row.mine { border-color: #ff0000; background: rgba(255,0,0,0.08); }
+    .rank-pos { width: 26px; flex: none; text-align: center; font-weight: 800; color: #6f6f6f; font-variant-numeric: tabular-nums; }
+    .rank-pos.medal { font-size: 16px; }
+    .rank-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #eee; }
+    .rank-prestige { font-size: 10px; font-weight: 800; color: #d98fff; }
+    .rank-score { flex: none; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+    .ranks-empty { text-align: center; color: #333; font-size: 12px; padding: 24px; }
     .tab-btn:hover { color: #ff4444; }
-    .tab-btn { font-size: 10px; letter-spacing: 0.04em; padding: 10px 2px; }
+    /* Seven tabs: let them shrink to fit and scroll if the phone is very
+       narrow, rather than wrapping to a second row. */
+    .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tab-btn { font-size: 10px; letter-spacing: 0.02em; padding: 10px 4px; white-space: nowrap; min-width: 0; }
 
     /* Sound toggle */
     .header { position: relative; }
@@ -558,6 +586,7 @@
       <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
       <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
       <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
+      <button class="tab-btn" onclick="switchTab('ranks')">Ranks</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
       <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
     </div>
@@ -566,6 +595,7 @@
     <div class="tab-content" id="tab-upgrades"></div>
     <div class="tab-content" id="tab-prestige"></div>
     <div class="tab-content" id="tab-feats"></div>
+    <div class="tab-content" id="tab-ranks"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
     <div class="tab-content" id="tab-stats"></div>
   </div>
@@ -712,6 +742,10 @@
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
+    /* Season race: skulls gathered since this month's baseline. The baseline
+       is lifetime at the season's start; when the month turns it moves up to
+       the current lifetime, so the new month counts from zero. */
+    let seasonBaseline = 0, seasonMonth = '';
 
     /* Transient buffs from cursed skulls — never saved; they expire. */
     let frenzyMult = 1, frenzyEnd = 0;      /* multiplies all production */
@@ -1196,9 +1230,71 @@
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'feats') renderAchievements();
+      else if (activeTab === 'ranks') renderRanks();
       else if (activeTab === 'cosmetics') renderCosmetics();
       else if (activeTab === 'stats') renderStats();
     }
+
+    /* ═══════ RANKS (leaderboards) ═══════ */
+    let ranksBoard = 'season';   /* 'season' | 'alltime' */
+    let ranksData = { season: null, alltime: null };
+
+    function setRanksBoard(which) { ranksBoard = which; renderRanks(); loadRanks(); }
+
+    function daysLeftInSeason() {
+      const now = new Date();
+      const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+      return Math.max(0, Math.ceil((end - now.getTime()) / 86400000));
+    }
+
+    async function loadRanks() {
+      try {
+        const url = ranksBoard === 'season' ? '/api/skull-clicker?board=season' : '/api/skull-clicker?board=alltime';
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return;
+        const d = await res.json();
+        ranksData[ranksBoard] = ranksBoard === 'season' ? (Array.isArray(d.entries) ? d.entries : []) : (Array.isArray(d) ? d : []);
+        if (activeTab === 'ranks') renderRanks();
+      } catch (e) { /* leave whatever we last had */ }
+    }
+
+    function renderRanks() {
+      const el = document.getElementById('tab-ranks');
+      const entries = ranksData[ranksBoard];
+      const me = (playerName || '').toLowerCase();
+
+      let head = '<div class="ranks-toggle">' +
+        '<button class="ranks-tab ' + (ranksBoard === 'season' ? 'active' : '') + '" onclick="setRanksBoard(\'season\')">This Season</button>' +
+        '<button class="ranks-tab ' + (ranksBoard === 'alltime' ? 'active' : '') + '" onclick="setRanksBoard(\'alltime\')">All-Time</button></div>';
+
+      if (ranksBoard === 'season') {
+        head += '<div class="ranks-note">Skulls gathered this month · <b>' + daysLeftInSeason() + ' days</b> left · ' +
+          '🥇 mythic 🥈 rare 🥉 uncommon codes at season\'s end</div>' +
+          '<div class="ranks-you">Your season: <b>' + formatNum(seasonScore()) + '</b></div>';
+      } else {
+        head += '<div class="ranks-note">Lifetime skulls gathered — never resets.</div>' +
+          '<div class="ranks-you">Your lifetime: <b>' + formatNum(Math.floor(lifetimeSkulls)) + '</b></div>';
+      }
+
+      let rows;
+      if (entries === null) {
+        rows = '<div class="ranks-empty">Loading…</div>';
+      } else if (!entries.length) {
+        rows = '<div class="ranks-empty">No one has ranked yet. Be the first.</div>';
+      } else {
+        rows = entries.map((e, i) => {
+          const mine = (e.name || '').toLowerCase() === me && me;
+          const pb = e.prestige > 0 ? ' <span class="rank-prestige">P' + e.prestige + '</span>' : '';
+          return '<div class="rank-row ' + (mine ? 'mine' : '') + '">' +
+            '<span class="rank-pos ' + (i < 3 ? 'medal' : '') + '">' + (i < 3 ? ['🥇','🥈','🥉'][i] : (i + 1)) + '</span>' +
+            '<span class="rank-name">' + escSkull(e.name) + pb + '</span>' +
+            '<span class="rank-score">' + formatNum(e.score) + '</span></div>';
+        }).join('');
+      }
+      el.innerHTML = head + '<div class="ranks-list">' + rows + '</div>';
+    }
+
+    function escSkull(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
     function renderAchievements() {
       const el = document.getElementById('tab-feats');
@@ -1380,7 +1476,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','feats','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         btn.classList.toggle('active', tabs[i] === tab);
       });
@@ -1388,6 +1484,7 @@
         el.classList.toggle('active', tabs[i] === tab);
       });
       render();
+      if (tab === 'ranks') loadRanks();
     }
 
     /* ═══════ GAME LOOP ═══════ */
@@ -1578,6 +1675,8 @@
       if (!d.achievements) d.achievements = [];
       if (d.boneShards === undefined) d.boneShards = 0;
       if (d.cursedPopped === undefined) d.cursedPopped = 0;
+      if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
+      if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
       if (d.prestige === undefined) d.prestige = 0;
       /* Pre-prestige saves had no lifetime field; their run total IS their
@@ -1594,7 +1693,7 @@
         skulls, totalSkulls, lifetimeSkulls, prestige,
         totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
-        boneShards, cursedPopped,
+        boneShards, cursedPopped, seasonBaseline, seasonMonth,
         boughtUpgrades: [...boughtUpgrades],
         hitMilestones: [...hitMilestones],
         perks: [...perks],
@@ -1652,6 +1751,8 @@
       lifetimeSkulls = d.lifetimeSkulls || 0;
       boneShards = d.boneShards || 0;
       cursedPopped = d.cursedPopped || 0;
+      seasonBaseline = d.seasonBaseline || 0;
+      seasonMonth = d.seasonMonth || '';
       boughtUpgrades = new Set(d.boughtUpgrades);
       hitMilestones = new Set(d.hitMilestones);
       perks = new Set(d.perks || []);
@@ -1751,6 +1852,19 @@
       return { guestId: gid, guestName: gname };
     }
 
+    /* Current UTC month, matching the server's monthKeyUTC. */
+    function currentMonthKey() {
+      const d = new Date();
+      return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    }
+    /* Roll the client baseline when the month turns, then report skulls
+       gathered this season. */
+    function seasonScore() {
+      const cur = currentMonthKey();
+      if (seasonMonth !== cur) { seasonMonth = cur; seasonBaseline = lifetimeSkulls; }
+      return Math.max(0, Math.floor(lifetimeSkulls - seasonBaseline));
+    }
+
     async function submitScore() {
       if (totalSkulls < 100) return;
       const player = getPlayerId();
@@ -1758,7 +1872,7 @@
         await fetch('/api/skull-clicker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'submit-score', score: Math.floor(lifetimeSkulls), prestige, ...player })
+          body: JSON.stringify({ action: 'submit-score', score: Math.floor(lifetimeSkulls), seasonScore: seasonScore(), prestige, ...player })
         });
         fetch('/api/leaderboards', {
           method: 'POST',

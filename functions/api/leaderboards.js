@@ -38,7 +38,9 @@ const BOARDS = {
    window, then that game's board resets to empty. ── */
 
 const MONTHLY_GAME_LABELS = {
-  'skull-clicker':   'Skull Clicker',
+  /* Skull Clicker is intentionally absent: its board here (sc_leaderboard) is
+     the ALL-TIME board and must never be wiped. Its monthly race and prize
+     live on the season board (sc_season), handled in skull-clicker.js. */
   'memory-match':    'Memory Match',
   'commander-bingo': 'Commander Bingo',
   'mana-clash':      'Mana Clash High Score',

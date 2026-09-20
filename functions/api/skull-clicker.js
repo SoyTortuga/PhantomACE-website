@@ -41,6 +41,83 @@ async function currentEvent(env) {
   return ev;
 }
 
+/* ── Seasonal leaderboard ──────────────────────────────────────────────
+   sc_leaderboard is the ALL-TIME board (lifetime skulls, never reset). The
+   SEASON board ranks skulls gathered THIS month, so it is a real monthly
+   race rather than lifetime with a wipe that instantly refills. It is
+   season-aware server-side: the stored month is the authority, so when the
+   month turns the previous winners are prized (once) and the board clears —
+   the client never has to get the reset moment right. */
+const SEASON_KEY = 'sc_season';                 // { month:'YYYY-MM', entries:[] }
+const SEASON_CODE_SECONDS = 604800;             // 7-day redemption, like the other monthly prizes
+const SEASON_PLACEMENTS = [
+  { rarity: 'mythic',   suffix: 'Champion',    medal: '🥇' },
+  { rarity: 'rare',     suffix: 'Runner-Up',   medal: '🥈' },
+  { rarity: 'uncommon', suffix: 'Third Place', medal: '🥉' },
+];
+
+function monthKeyUTC(d) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; }
+function monthLabelFromKey(key) {
+  const [y, m] = String(key).split('-').map(Number);
+  if (!y || !m) return key;
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function readSeason(raw) {
+  if (raw && Array.isArray(raw.entries) && raw.month) return raw;
+  return { month: monthKeyUTC(new Date()), entries: [] };
+}
+
+/* Whisper the ended season's top-3 a redeemable badge code, once. Best-effort
+   per placement so one failure never aborts the rollover. */
+async function awardSeasonWinners(env, winners, endedMonth) {
+  const label = monthLabelFromKey(endedMonth);
+  const names = [];
+  const { createItemCode, activateItemCode } = await import('./item-codes.js');
+  const { sendWhisper } = await import('./bot/send-chat.js');
+  for (let i = 0; i < winners.length; i++) {
+    const w = winners[i], p = SEASON_PLACEMENTS[i];
+    try {
+      const record = await createItemCode(env, {
+        id: `season_skull-clicker_${endedMonth}_${i + 1}`,
+        game: 'skull-clicker', type: 'badge',
+        name: `Skull Clicker ${p.suffix} — ${label}`, rarity: p.rarity,
+      });
+      await activateItemCode(env, record.code, SEASON_CODE_SECONDS);
+      await sendWhisper(env, w.id,
+        `${p.medal} You placed #${i + 1} in the Skull Clicker season for ${label}! ` +
+        `Your ${p.rarity} code: ${record.code} — redeem at phantomace.tv/redeem.html within 7 days.`);
+    } catch { /* skip this placement */ }
+    names.push(`${p.medal} ${w.name}`);
+  }
+  try {
+    const { announceAction } = await import('./bot/send-chat.js');
+    if (names.length) await announceAction(env,
+      `💀 Skull Clicker ${label} champions: ${names.join(' ')} — codes whispered. Congrats!`, 'sc-season');
+  } catch { /* announcement is a nicety */ }
+}
+
+/* Ensure the season board is for the current month, rolling it over (and
+   prizing the previous winners exactly once) when the month has turned. */
+async function rolloverSeason(env) {
+  const cur = monthKeyUTC(new Date());
+  let s = readSeason(await env.MARKETPLACE.get(SEASON_KEY, 'json'));
+  if (s.month === cur) return s;
+
+  const winners = (s.entries || []).filter(e => !String(e.id).startsWith('guest_')).slice(0, 3);
+  let claimed = true;
+  try {
+    if (typeof env.MARKETPLACE.claimMonthlyAward === 'function') {
+      claimed = await env.MARKETPLACE.claimMonthlyAward('sc_season_' + s.month);
+    }
+  } catch { claimed = true; }
+  if (claimed && winners.length) await awardSeasonWinners(env, winners, s.month);
+
+  s = { month: cur, entries: [] };
+  await env.MARKETPLACE.put(SEASON_KEY, JSON.stringify(s));
+  return s;
+}
+
 /* The save-merge rank, matched exactly by the client. Prestige first, then
    lifetime skulls — never the run total, which prestige resets to zero. If
    the merge ranked on run total, a prestige (total 0) would lose to the old
@@ -59,13 +136,21 @@ function outranks(a, b) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
+  const url = new URL(request.url);
   /* `?event=1` — the live site-wide event the game polls for; kept separate
      from the leaderboard so the leaderboard's array shape never changes. */
-  if (new URL(request.url).searchParams.get('event')) {
+  if (url.searchParams.get('event')) {
     return json({ event: await currentEvent(env) });
   }
+  /* `?board=season` — this month's race (rolled over on read so the display
+     is always current); `?board=alltime` (or no param) — the persistent
+     lifetime board, unchanged in shape for any existing caller. */
+  if (url.searchParams.get('board') === 'season') {
+    const s = await rolloverSeason(env);
+    return json({ month: s.month, entries: s.entries.slice(0, 15) });
+  }
   const lb = await env.MARKETPLACE.get(LB_KEY, 'json') || [];
-  return json(lb.slice(0, 10));
+  return json(lb.slice(0, 15));
 }
 
 /**
@@ -140,6 +225,24 @@ export async function onRequestPost(context) {
   /* Carried for display — a prestige tier beside the name is the visible
      reward for resetting. Bounded so a bad client cannot store nonsense. */
   const prestige = Math.max(0, Math.min(9999, Math.floor(Number(body.prestige) || 0)));
+
+  /* SEASON board — skulls gathered this month, sent alongside the lifetime
+     score. Handled first and independently so it still records even when the
+     lifetime board's early-return fires below. */
+  const seasonScore = Math.max(0, Math.floor(Number(body.seasonScore) || 0));
+  if (seasonScore > 0) {
+    const s = await rolloverSeason(env);
+    const ex = s.entries.find(e => e.id === player.id);
+    if (ex) {
+      if (seasonScore > ex.score) { ex.score = seasonScore; ex.name = player.name; ex.prestige = prestige; ex.updatedAt = Date.now(); }
+      else if (prestige > (ex.prestige || 0)) { ex.prestige = prestige; }
+    } else {
+      s.entries.push({ id: player.id, name: player.name, score: seasonScore, prestige, updatedAt: Date.now() });
+    }
+    s.entries.sort((a, b) => b.score - a.score);
+    s.entries = s.entries.slice(0, 50);
+    await env.MARKETPLACE.put(SEASON_KEY, JSON.stringify(s));
+  }
 
   const lb = await env.MARKETPLACE.get(LB_KEY, 'json') || [];
 

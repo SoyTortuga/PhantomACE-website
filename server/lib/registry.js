@@ -26,6 +26,9 @@ export const SINGLETONS = {
      train or by a moderator. 'none' — the in-value `until` is the real
      expiry, read-filtered by the handler. */
   sc_event:              { table: 'singletons', expiry: 'none' },
+  /* Skull Clicker's monthly race — { month, entries }. Rolled over and
+     prized by skull-clicker.js; sc_leaderboard beside it stays all-time. */
+  sc_season:             { table: 'singletons', expiry: 'none' },
   lb_memory_match:       { table: 'singletons', expiry: 'none' },
   lb_bingo:              { table: 'singletons', expiry: 'none' },
   lb_mana_clash:         { table: 'singletons', expiry: 'none' },
