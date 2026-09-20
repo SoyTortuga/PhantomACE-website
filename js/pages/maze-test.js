@@ -102,8 +102,8 @@
     placeRover(data, false);
 
     $('levelLine').textContent = 'Maze ' + data.level + ' · ' + data.size + '×' + data.size;
-    $('statLine').textContent = data.moves + ' moves this maze · ' + data.bonks + ' bonks · '
-      + data.totalMoves + ' total'
+    $('statLine').textContent = data.moves + ' moves this maze · ' + data.bonks + ' bonks · 🦴 '
+      + data.bonesFound + '/' + data.bonesTotal + ' · ' + data.totalMoves + ' total'
       + (data.topMover ? ' · top: ' + data.topMover.name + ' (' + data.topMover.moves + ')' : '');
     $('lastLine').textContent = data.lastMove
       ? 'last: ' + data.lastMove.dir + ' by ' + data.lastMove.by + (data.lastMove.blocked ? ' — BONK' : '')
@@ -114,30 +114,59 @@
 
   function buildBoard(data) {
     if (!data || data.status !== 'active') return;
-    if (lastRenderedLevel === data.level) return;
+    if (lastRenderedLevel !== data.level) {
+      var board = $('board');
+      var size = data.size;
+      cellPx = Math.min(CELL_MAX, Math.floor(BOARD_MAX / size));
+      board.style.gridTemplateColumns = 'repeat(' + size + ', ' + cellPx + 'px)';
+      board.style.gridAutoRows = cellPx + 'px';
+      var html = '';
+      for (var y = 0; y < size; y++) {
+        for (var x = 0; x < size; x++) {
+          html += '<div class="cell" id="mz_' + x + '_' + y + '"></div>';
+        }
+      }
+      /* One rover, absolutely positioned, glides over everything. */
+      html += '<div class="rover" id="rover"></div>';
+      board.innerHTML = html;
+      lastRenderedLevel = data.level;
+    }
+    updateCells(data);
+  }
 
-    var board = $('board');
+  /* FOG LIFTS BETWEEN POLLS, so cells are dressed every poll rather than
+     once per level: walls appear as their cells are revealed (the wire
+     masks hidden ones to '.'), bones appear in revealed cells and vanish
+     when collected, and the ladder exists only once somebody has seen it.
+     Staff x-ray: hidden cells render dimmed instead of blank, so the
+     tester sees the whole truth AND what chat sees, at once. */
+  function updateCells(data) {
     var size = data.size;
-    cellPx = Math.min(CELL_MAX, Math.floor(BOARD_MAX / size));
+    var revealed = data.revealed || [];
+    var bones = {};
+    (data.bones || []).forEach(function (b) { bones[b.x + '_' + b.y] = true; });
 
-    board.style.gridTemplateColumns = 'repeat(' + size + ', ' + cellPx + 'px)';
-    board.style.gridAutoRows = cellPx + 'px';
-    var html = '';
     for (var y = 0; y < size; y++) {
       for (var x = 0; x < size; x++) {
-        var bits = parseInt(data.walls[y][x], 16);
-        var goal = (x === data.goal.x && y === data.goal.y);
-        html += '<div class="cell' +
+        var cell = $('mz_' + x + '_' + y);
+        if (!cell) continue;
+        var digit = data.walls[y][x];
+        var isRev = !!(revealed[y] && revealed[y][x] === '1');
+        var bits = digit === '.' ? 0 : parseInt(digit, 16);
+
+        cell.className = 'cell' +
           ((bits & 1) ? ' n' : '') + ((bits & 2) ? ' e' : '') +
-          ((bits & 4) ? ' s' : '') + ((bits & 8) ? ' w' : '') + '">' +
-          (goal ? '<span class="ladder" title="down to the next maze">🪜</span>' : '') +
-          '</div>';
+          ((bits & 4) ? ' s' : '') + ((bits & 8) ? ' w' : '') +
+          (isRev ? '' : (staff ? ' xray' : ' dark'));
+
+        var marks = '';
+        if (bones[x + '_' + y]) marks += '<span class="bone">🦴</span>';
+        if (data.goal && x === data.goal.x && y === data.goal.y) {
+          marks += '<span class="ladder" title="down to the next maze">🪜</span>';
+        }
+        if (cell.innerHTML !== marks) cell.innerHTML = marks;
       }
     }
-    /* One rover, absolutely positioned, glides over everything. */
-    html += '<div class="rover" id="rover"></div>';
-    board.innerHTML = html;
-    lastRenderedLevel = data.level;
   }
 
   function roverXY(pos) {

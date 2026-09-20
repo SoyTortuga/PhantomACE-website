@@ -292,7 +292,11 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   ok('the page loads its script', /js\/pages\/maze-test\.js/.test(page));
   const js = fs.readFileSync(path.join(REPO, 'js/pages/maze-test.js'), 'utf8');
   ok('the board fades on a transition it watched', /classList\.add\('fading'\)/.test(js));
-  ok('walls render as borders from the hex digits', /parseInt\(data\.walls\[y\]\[x\], 16\)/.test(js));
+  ok('walls render as borders, masked digits as none',
+     /digit === '\.' \? 0 : parseInt\(digit, 16\)/.test(js));
+  ok('cells are dressed every poll, because fog lifts between polls',
+     /function updateCells/.test(js));
+  ok('staff x-ray dims what chat cannot see', /' xray' : ' dark'/.test(js));
 }
 
 /* ══ The live-testing notes, pinned ════════════════════════════════════ */
@@ -342,6 +346,77 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   ok('the ledger reads Maze 1 downward and follows the bottom',
      /history\.map\(/.test(js) && /scrollTop = ul\.scrollHeight/.test(js));
   ok('the ledger scrolls rather than truncates', /#historyList \{ max-height/.test(page));
+}
+
+/* ══ Fog, bones, and the stakes ═════════════════════════════════════════ */
+{
+  const { seedBones } = await import('../../functions/api/bot/maze.js');
+
+  /* Bones: deterministic, in dead ends only, never on start or goal. */
+  for (const size of [4, 8, 12]) {
+    const walls = generateMaze(size, 'bones:' + size);
+    const bones = seedBones(walls, size, 'MAZE:x:' + size);
+    check(size + '-board bones are deterministic', bones, seedBones(walls, size, 'MAZE:x:' + size));
+    for (const b of bones) {
+      const bits = wallsAt(walls, b.x, b.y);
+      let up = 0; for (const w of [1,2,4,8]) if (bits & w) up++;
+      check('a bone sits in a dead end (' + b.x + ',' + b.y + ')', up, 3);
+      ok('never on start or goal', !(b.x === 0 && b.y === 0) && !(b.x === size-1 && b.y === size-1));
+    }
+  }
+
+  /* A fresh level starts fogged: the start area lit, the rest dark. */
+  const e = env();
+  await POST(e, { action: 'start' }, as('222'));
+  _resetHint();
+  let st = e.MARKETPLACE.read('maze_current');
+  ok('the start cell is revealed', st.revealed[0][0] === '1');
+  ok('and its neighbours', st.revealed[0][1] === '1' && st.revealed[1][0] === '1');
+  ok('but not the far corner', st.revealed[3][3] === '0');
+
+  /* Walking reveals; landing on a bone collects it. */
+  const path = solve(st.walls, st.size);
+  let sawBonePickup = false;
+  for (const dir of path) {
+    const before = e.MARKETPLACE.read('maze_current').bonesFound;
+    await offerMove(e, { userId: '77', name: 'Walker', text: dir });
+    const cur = e.MARKETPLACE.read('maze_current');
+    if (cur.level === 1 && cur.bonesFound > before) sawBonePickup = true;
+  }
+  st = e.MARKETPLACE.read('maze_current');
+  check('the walk cleared level 1', st.level, 2);
+  ok('level 2 starts re-fogged', st.revealed[st.size - 1][st.size - 1] === '0');
+  ok('with its own bones', st.bonesTotal >= 1 && st.bonesFound === 0);
+
+  /* THE STAKES LANDED: the winning mover's giveaway ledger exists in the
+     store, written by the real addEntries through the real mutate. */
+  const ledger = [...e.MARKETPLACE.store.keys()].find(k => k.includes('77') && k !== 'maze_current');
+  ok('the winning mover was credited an entry', !!ledger);
+  if (ledger) {
+    const led = e.MARKETPLACE.read(ledger);
+    ok('with the maze named as the source', JSON.stringify(led).includes('maze:level1'));
+  }
+
+  /* The clear message carries the stakes. */
+  ok('the clear message credits the entry',
+     /\+1 giveaway entry/.test(buildClearMessage({ level: 1, size: 4, moves: 9, bonks: 0 }, 'W')));
+  const plan = { bonesTotal: 2, bonesFound: 2, allBones: true };
+  ok('a full bone set announces the upgrade',
+     /UPGRADED/.test(buildClearMessage({ level: 1, size: 4, moves: 9, bonks: 0 }, 'W', plan)));
+  ok('a partial set just reports it',
+     /1\/2 collected/.test(buildClearMessage({ level: 1, size: 4, moves: 9, bonks: 0 }, 'W',
+        { bonesTotal: 2, bonesFound: 1, allBones: false })));
+
+  /* FOG IS ON THE WIRE. A viewer's GET must not leak the board. */
+  const pub = await (await GET(e)).json();
+  ok('unrevealed walls go out masked', pub.walls.some(row => row.includes('.')));
+  check('the ladder is withheld until seen', pub.goal, null);
+  ok('hidden bones are never named', (pub.bones || []).every(b => pub.revealed[b.y][b.x] === '1'));
+  ok('but the counts are public', typeof pub.bonesTotal === 'number' && typeof pub.bonesFound === 'number');
+
+  const staffView = await (await GET(e, as('222'))).json();
+  ok('staff see every wall', !staffView.walls.some(row => row.includes('.')));
+  ok('and the goal', staffView.goal !== null);
 }
 
 /** BFS the walls; returns the direction list from (0,0) to the far corner. */

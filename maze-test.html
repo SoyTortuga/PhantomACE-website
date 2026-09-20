@@ -47,6 +47,15 @@
     .cell.e { border-right-color: #ff0000; }
     .cell.s { border-bottom-color: #ff0000; }
     .cell.w { border-left-color: #ff0000; }
+    /* Fog: what chat has not seen simply is not there. Staff x-ray keeps
+       the walls at a whisper so the tester knows both truths at once. */
+    .cell.dark { background: #060606; }
+    .cell.dark.n, .cell.dark.e, .cell.dark.s, .cell.dark.w { border-color: transparent; }
+    .cell.xray { opacity: 0.28; }
+    .cell .bone {
+      position: absolute; inset: 0; display: flex;
+      align-items: center; justify-content: center; font-size: 13px;
+    }
     .cell .ladder {
       position: absolute; inset: 0; display: flex;
       align-items: center; justify-content: center; font-size: 15px;

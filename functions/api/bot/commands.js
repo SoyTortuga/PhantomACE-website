@@ -224,6 +224,7 @@ async function handleChatMessage(env, event) {
   try {
     const { offerMove } = await import('./maze.js');
     const mazeSaid = await offerMove(env, {
+      userId: event.chatter_user_id,
       name: event.chatter_user_name || event.chatter_user_login,
       text: event.message && event.message.text,
     });

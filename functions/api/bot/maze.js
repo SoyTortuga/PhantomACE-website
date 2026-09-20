@@ -111,17 +111,73 @@ export function wallsAt(walls, x, y) {
   return parseInt(walls[y][x], 16);
 }
 
+/**
+ * Bones live in DEAD ENDS — cells with three walls, minus start and goal —
+ * so optimal play stops being "ignore 80% of the board": the detour IS the
+ * collectible. Seeded like everything else; a maze whose spanning tree
+ * happens to have no spare dead ends simply carries no bones.
+ */
+export function seedBones(walls, size, seed) {
+  const rnd = mulberry32(hashSeed(String(seed) + ':bones'));
+  const dead = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if ((x === 0 && y === 0) || (x === size - 1 && y === size - 1)) continue;
+      const bits = wallsAt(walls, x, y);
+      let wallsUp = 0;
+      for (const b of [1, 2, 4, 8]) if (bits & b) wallsUp++;
+      if (wallsUp === 3) dead.push({ x, y });
+    }
+  }
+  const want = Math.min(dead.length, Math.min(5, Math.max(1, Math.round(size / 4))));
+  const picked = [];
+  while (picked.length < want && dead.length) {
+    picked.push(dead.splice(Math.floor(rnd() * dead.length), 1)[0]);
+  }
+  return picked;
+}
+
+function blankRevealed(size) {
+  return Array.from({ length: size }, () => '0'.repeat(size));
+}
+
+function markRevealed(state, x, y) {
+  if (x < 0 || y < 0 || x >= state.size || y >= state.size) return;
+  const row = state.revealed[y];
+  if (row[x] === '1') return;
+  state.revealed[y] = row.slice(0, x) + '1' + row.slice(x + 1);
+}
+
+/* The dot lights its own cell and the four orthogonal neighbours — you
+   can see over a wall into the next cell, but no further. Exploration is
+   the difficulty now: growth alone only ever made the walk longer. */
+function revealAround(state, x, y) {
+  markRevealed(state, x, y);
+  for (const d of Object.values(DIRS)) markRevealed(state, x + d.dx, y + d.dy);
+}
+
+export function isRevealed(state, x, y) {
+  return !!(state.revealed && state.revealed[y] && state.revealed[y][x] === '1');
+}
+
 function freshLevel(level, startedAt) {
   const size = FIRST_SIZE + (level - 1);
   const seed = `MAZE:${startedAt}:${level}`;
-  return {
-    level, size, seed,
-    walls: generateMaze(size, seed),
+  const walls = generateMaze(size, seed);
+  const bones = seedBones(walls, size, seed);
+  const lv = {
+    level, size, seed, walls,
     pos: { x: 0, y: 0 },
     goal: { x: size - 1, y: size - 1 },
     moves: 0,
     bonks: 0,
+    bones,
+    bonesTotal: bones.length,
+    bonesFound: 0,
+    revealed: blankRevealed(size),
   };
+  revealAround(lv, 0, 0);
+  return lv;
 }
 
 /* ── Chat entry point ──────────────────────────────────────────────────
@@ -149,7 +205,7 @@ export function _resetHint() { activeHint = { value: null, at: 0 }; }
  * (wrong shape, or no maze running) and an array of chat lines to say —
  * usually empty — when the move was consumed.
  */
-export async function offerMove(env, { name, text }) {
+export async function offerMove(env, { userId, name, text }) {
   const m = MOVE_RE.exec(String(text || '').trim());
   if (!m) return null;
   const dir = LETTER[m[1].toLowerCase()] || m[1].toLowerCase();
@@ -157,7 +213,7 @@ export async function offerMove(env, { name, text }) {
   const now = Date.now();
   if (activeHint.value === false && now - activeHint.at < HINT_TTL) return null;
 
-  const res = await performMove(env, dir, name, { hint: true });
+  const res = await performMove(env, dir, name, { hint: true, userId });
   return res ? res.say : null;
 }
 
@@ -170,10 +226,11 @@ export async function offerMove(env, { name, text }) {
  * CALLER decides what to do with: the chat path says them in channel,
  * the test page shows them on screen and keeps the channel quiet.
  */
-async function performMove(env, dir, name, { hint = false } = {}) {
+async function performMove(env, dir, name, { hint = false, userId = null } = {}) {
   const now = Date.now();
   const say = [];
   let consumed = false;
+  let cleared = null;
 
   await env.MARKETPLACE.mutate(KEY, (state) => {
     if (!state || state.status !== 'active') {
@@ -187,6 +244,12 @@ async function performMove(env, dir, name, { hint = false } = {}) {
     const blocked = !!(wallsAt(state.walls, state.pos.x, state.pos.y) & d.bit);
     if (!blocked) {
       state.pos = { x: state.pos.x + d.dx, y: state.pos.y + d.dy };
+      revealAround(state, state.pos.x, state.pos.y);
+      const bi = (state.bones || []).findIndex(b => b.x === state.pos.x && b.y === state.pos.y);
+      if (bi !== -1) {
+        state.bones.splice(bi, 1);
+        state.bonesFound += 1;
+      }
     } else {
       state.bonks += 1;
     }
@@ -205,11 +268,22 @@ async function performMove(env, dir, name, { hint = false } = {}) {
     }
 
     if (state.pos.x === state.goal.x && state.pos.y === state.goal.y) {
+      /* The stakes, decided inside the lock while the numbers are still
+         this level's: a full bone set upgrades the drop a tier. A maze
+         that never had bones stays common — nothing was collected. */
+      const allBones = state.bonesTotal > 0 && state.bonesFound === state.bonesTotal;
+      cleared = {
+        level: state.level, size: state.size,
+        tier: allBones ? 'uncommon' : 'common',
+        allBones, bonesFound: state.bonesFound, bonesTotal: state.bonesTotal,
+        userId, name: who,
+      };
       state.history.push({
         level: state.level, size: state.size,
         moves: state.moves, bonks: state.bonks, clearedBy: who,
+        bones: state.bonesFound + '/' + state.bonesTotal,
       });
-      say.push(buildClearMessage(state, who));
+      say.push(buildClearMessage(state, who, cleared));
       /* The fade is the overlay's job; the server just stamps when. The
          next board exists immediately, so a move typed during the fade
          lands on the new maze rather than into the void. */
@@ -224,16 +298,41 @@ async function performMove(env, dir, name, { hint = false } = {}) {
     return state;
   });
 
-  return consumed ? { say } : null;
+  /* THE PAYOUT, outside the lock — different keys, and real I/O has no
+     business inside a mutate. Both best-effort: the level is already
+     advanced and announced, so a failed credit or an empty code pool is a
+     log line, never an unwind. The winning mover gets one giveaway entry;
+     the drop posts its own chat lines through the same machinery as every
+     other drop, cooldown included. */
+  if (cleared) {
+    if (cleared.userId) {
+      try {
+        const { addEntries } = await import('../giveaway-entries.js');
+        await addEntries(env, String(cleared.userId), cleared.name, 1, `maze:level${cleared.level}`);
+      } catch (err) { console.error('[maze] entry credit failed:', err.message); }
+    }
+    try {
+      const { dropCodeAction } = await import('./send-chat.js');
+      await dropCodeAction(env, cleared.tier, 'chat-maze');
+    } catch (err) { console.error('[maze] clear drop failed:', err.message); }
+  }
+
+  return consumed ? { say, cleared } : null;
 }
 
 /* Pure and exported so the suite can pin the wording without a Twitch
    connection on the line. */
-export function buildClearMessage(state, who) {
+export function buildClearMessage(state, who, plan) {
   const next = state.size + 1;
-  return `🧭 Maze ${state.level} (${state.size}×${state.size}) cleared in ` +
+  let msg = `🧭 Maze ${state.level} (${state.size}×${state.size}) cleared in ` +
     `${state.moves} moves${state.bonks ? ` (${state.bonks} bonks)` : ''} — ` +
-    `${who} made the winning move! Next up: ${next}×${next}`;
+    `${who} made the winning move (+1 giveaway entry)!`;
+  if (plan && plan.bonesTotal > 0) {
+    msg += plan.allBones
+      ? ` All ${plan.bonesTotal} 🦴 collected — the drop is UPGRADED!`
+      : ` 🦴 ${plan.bonesFound}/${plan.bonesTotal} collected.`;
+  }
+  return msg + ` Next up: ${next}×${next}`;
 }
 
 export function buildStartMessage() {
@@ -265,11 +364,26 @@ export async function onRequestGet(context) {
   const top = Object.entries(state.contributors || {})
     .sort((a, b) => b[1] - a[1])[0] || null;
 
+  /* FOG IS ENFORCED ON THE WIRE. A curious chatter can curl this route,
+     so hiding cells only in CSS would make the fog a suggestion: walls of
+     unrevealed cells go out as '.', the ladder's location is withheld
+     until its cell has been seen, and only bones standing in revealed
+     cells are ever named. Staff get the whole board — the test page
+     renders their x-ray dimmed so they still see what chat sees. */
+  const revealed = state.revealed || [];
+  const rev = (x, y) => !!(revealed[y] && revealed[y][x] === '1');
+  const maskedWalls = staff ? state.walls : (state.walls || []).map((row, y) =>
+    row.split('').map((c, x) => (rev(x, y) ? c : '.')).join(''));
+  const goalOut = (staff || rev(state.goal.x, state.goal.y)) ? state.goal : null;
+  const bonesOut = (state.bones || []).filter(b => staff || rev(b.x, b.y));
+
   return json({
     staff,
     status: state.status,
     level: state.level, size: state.size,
-    walls: state.walls, pos: state.pos, goal: state.goal,
+    walls: maskedWalls, pos: state.pos, goal: goalOut,
+    revealed,
+    bones: bonesOut, bonesFound: state.bonesFound || 0, bonesTotal: state.bonesTotal || 0,
     moves: state.moves, bonks: state.bonks, totalMoves: state.totalMoves,
     lastMove: state.lastMove || null,
     recent: state.recent || [],
@@ -330,7 +444,8 @@ export async function onRequestPost(context) {
   if (body.action === 'move') {
     const dir = String(body.dir || '').toLowerCase();
     if (!DIRS[dir]) return json({ error: 'Unknown direction' }, 400);
-    const res = await performMove(env, dir, (session.display_name || 'tester') + ' (test)');
+    const res = await performMove(env, dir, (session.display_name || 'tester') + ' (test)',
+                                  { userId: session.user_id });
     if (!res) return json({ error: 'No maze is running.' }, 400);
     /* Clears announce to chat WHOEVER made the winning move -- the
        broadcaster wants the cleared list narrated in channel, and a level
