@@ -51,7 +51,8 @@ const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https
   method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify(body) }) });
 
 const state = (total, over = {}) => ({
-  skulls: total, totalSkulls: total, totalClicks: 10, owned: { a: 1 },
+  skulls: total, totalSkulls: total, lifetimeSkulls: total, prestige: 0,
+  totalClicks: 10, owned: { a: 1 },
   boughtUpgrades: ['u1'], hitMilestones: ['m1'], savedAt: 1, version: 2, ...over,
 });
 
@@ -103,6 +104,34 @@ const state = (total, over = {}) => ({
   check('and gets the real save back to adopt', wiped.state.totalSkulls, 2500);
 }
 
+/* ══ Prestige survives the merge — the collision this feature created ══ */
+{
+  const e = { MARKETPLACE: fakeKV() };
+  /* A long pre-prestige run: high lifetime, prestige 0. */
+  await POST(e, { action: 'save-state', state: state(5000, { lifetimeSkulls: 5000, prestige: 0 }) }, as('7'));
+
+  /* The player prestiges: run resets to 0, lifetime UNCHANGED at 5000,
+     prestige now 1. The save it pushes has total 0 — under the old
+     run-total merge this would LOSE and the sync would undo the prestige.
+     It must win on prestige. */
+  const afterPrestige = await (await POST(e, { action: 'save-state',
+    state: state(0, { lifetimeSkulls: 5000, prestige: 1 }) }, as('7'))).json();
+  check('a fresh prestige is stored despite total 0', e.MARKETPLACE.read('sc_save_7').prestige, 1);
+  check('and is not told to adopt the old save', afterPrestige.adopted, false);
+
+  /* The old device now syncs (still prestige 0, lifetime 5000). It must be
+     told to adopt the prestiged save, not overwrite it. */
+  const oldDevice = await (await POST(e, { action: 'save-state',
+    state: state(5000, { lifetimeSkulls: 5000, prestige: 0 }) }, as('7'))).json();
+  check('the old device does not clobber the prestige', e.MARKETPLACE.read('sc_save_7').prestige, 1);
+  check('and is handed the prestiged save to adopt', oldDevice.adopted, true);
+  check('which is prestige 1', oldDevice.state.prestige, 1);
+
+  /* Within the same prestige tier, more lifetime still wins normally. */
+  await POST(e, { action: 'save-state', state: state(0, { lifetimeSkulls: 9000, prestige: 1 }) }, as('7'));
+  check('more lifetime at equal prestige advances', e.MARKETPLACE.read('sc_save_7').lifetimeSkulls, 9000);
+}
+
 /* ══ Bad input ═════════════════════════════════════════════════════════ */
 {
   const e = { MARKETPLACE: fakeKV() };
@@ -129,8 +158,14 @@ const state = (total, over = {}) => ({
 
   const client = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
   ok('the client syncs from the server on boot', /function syncFromServer/.test(client) && /load\(\);\s*\n\s*syncFromServer\(\)/.test(client));
-  ok('adopts the server save only when it is ahead',
-     /Number\(server\.totalSkulls \|\| 0\) > totalSkulls/.test(client));
+  ok('adopts the server save only when it outranks by prestige then lifetime',
+     /function serverOutranks/.test(client) && /sp > lp/.test(client));
+  ok('prestige multiplies all gathering', /function getPrestigeMult/.test(client) && /1 \+ 0\.1 \* prestige/.test(client));
+  ok('a prestige resets the run but not lifetime or tier',
+     /function doPrestige/.test(client) && /prestige \+= 1/.test(client));
+  ok('lifetime is the leaderboard score, not the run total',
+     /score: Math\.floor\(lifetimeSkulls\)/.test(client));
+  ok('every earn path feeds lifetime', /function earn\(amount\)/.test(client) && /lifetimeSkulls \+= amount/.test(client));
   ok('and mirrors each save to the server', /function pushSaveToServer/.test(client) && /submitScore\(\);\s*\n\s*pushSaveToServer/.test(client));
   ok('local load and server adopt share one apply path', /function applyState/.test(client));
 }

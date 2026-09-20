@@ -89,6 +89,17 @@
       font-family: inherit;
     }
     .tab-btn.active { color: #ff0000; border-bottom-color: #ff0000; }
+    .prestige-panel { text-align: center; padding: 20px 16px; }
+    .prestige-tier { font-size: 26px; font-weight: 800; color: #ff0000; }
+    .prestige-mult { font-size: 15px; color: #fff; margin-top: 4px; }
+    .prestige-next { font-size: 12px; color: #ffffff99; margin: 10px 0 8px; }
+    .prestige-bar { height: 10px; background: #1a1a1a; border: 1px solid #ffffff28; border-radius: 5px; overflow: hidden; margin: 0 auto; max-width: 320px; }
+    .prestige-fill { height: 100%; background: #ff0000; transition: width 0.3s; }
+    .prestige-have { font-size: 11px; color: #ffffffaa; margin-top: 6px; }
+    .prestige-btn { margin-top: 16px; padding: 10px 22px; background: #ff0000; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 800; cursor: pointer; }
+    .prestige-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .prestige-btn:not(:disabled):hover { background: #cc0000; }
+    .prestige-note { font-size: 10px; color: #ffffff77; margin-top: 12px; }
     .tab-btn:hover { color: #ff4444; }
 
     /* Content panels */
@@ -310,12 +321,14 @@
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('buildings')">Buildings</button>
       <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
+      <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
       <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
     </div>
 
     <div class="tab-content active" id="tab-buildings"></div>
     <div class="tab-content" id="tab-upgrades"></div>
+    <div class="tab-content" id="tab-prestige"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
     <div class="tab-content" id="tab-stats"></div>
   </div>
@@ -339,6 +352,9 @@
       { id:'horror',    name:'Eldritch Horror',    baseCost:75e9,         baseCps:1600000,  desc:'Cosmic entity that devours reality' },
       { id:'fracture',  name:'Reality Fracture',   baseCost:1e12,         baseCps:10000000, desc:'The fabric of existence, torn asunder' },
       { id:'darkness',  name:'Eternal Darkness',   baseCost:14e12,        baseCps:65000000, desc:'The end of all light, the birth of skulls' },
+      { id:'singularity', name:'Skull Singularity', baseCost:2e14,         baseCps:430000000,  desc:'Collapses matter itself into bone' },
+      { id:'oblivion',    name:'Oblivion Maw',      baseCost:3e15,         baseCps:2.9e9,      desc:'Devours whole timelines for their skulls' },
+      { id:'apex',        name:'Apex Revenant',     baseCost:5e16,         baseCps:2e10,       desc:'The last thing the universe ever fears' },
     ];
 
     const UPGRADES = [
@@ -354,15 +370,20 @@
       { id:'m2', name:'Unholy Pact',         cost:100000,     desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
       { id:'m3', name:'Eternal Curse',       cost:10e6,       desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
       { id:'m4', name:'Cosmic Horror',       cost:1e9,        desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
+      { id:'m5', name:'Entropy Engine',      cost:100e9,      desc:'x2 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 2; } },
+      { id:'m6', name:'Final Darkness',      cost:10e12,      desc:'x3 all CPS',          tag:'mult',   apply:() => { globalCpsMult *= 3; } },
+      { id:'c9', name:'Oblivion Grip',       cost:5e9,        desc:'+10% of CPS per click',tag:'click', apply:() => { cpsClickPct += 10; } },
     ];
 
-    const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12];
-    const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One'];
+    const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12, 100e12, 10e15];
+    const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One','Skull God','Bone Absolute'];
 
     /* ═══════ STATE ═══════ */
 
     let skulls = 0;
-    let totalSkulls = 0;
+    let totalSkulls = 0;         /* this run — resets on prestige */
+    let lifetimeSkulls = 0;      /* every skull ever gathered — never resets */
+    let prestige = 0;            /* permanent multiplier tier */
     let totalClicks = 0;
     let clickBonus = 0;
     let clickMulti = 1;
@@ -387,24 +408,38 @@
       return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]));
     }
 
+    /* Prestige is the whole point of a resource-gathering game with no win:
+       reset the run for a permanent speed-up, so you gather MORE over time.
+       +0.1x per tier — P1 is 1.1x, P2 1.2x — applied to everything that
+       produces skulls. */
+    function getPrestigeMult() { return 1 + 0.1 * prestige; }
+
     function getCPS() {
       let cps = 0;
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id];
       }
-      return cps * globalCpsMult * cpBoostMult;
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult();
     }
 
     function getClickPower() {
-      return (1 + clickBonus) * clickMulti + (getCPS() * cpsClickPct / 100);
+      return ((1 + clickBonus) * clickMulti) * getPrestigeMult() + (getCPS() * cpsClickPct / 100);
+    }
+
+    /* Every skull earned flows through here so the run total and the
+       lifetime total can never drift apart — lifetime is the leaderboard
+       score and the save-merge key, so it must count every path. */
+    function earn(amount) {
+      skulls += amount;
+      totalSkulls += amount;
+      lifetimeSkulls += amount;
     }
 
     /* ═══════ ACTIONS ═══════ */
 
     function handleClick(e) {
       const power = getClickPower();
-      skulls += power;
-      totalSkulls += power;
+      earn(power);
       totalClicks++;
       spawnPop(e, power);
       checkMilestones();
@@ -497,6 +532,7 @@
     function render() {
       document.getElementById('score').textContent = formatNum(Math.floor(skulls));
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
+      if (activeTab === 'prestige') renderPrestige();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'cosmetics') renderCosmetics();
@@ -591,7 +627,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         btn.classList.toggle('active', tabs[i] === tab);
       });
@@ -609,8 +645,7 @@
       lastTick = now;
       const earned = getCPS() * dt;
       if (earned > 0) {
-        skulls += earned;
-        totalSkulls += earned;
+        earn(earned);
         checkMilestones();
       }
       document.getElementById('score').textContent = formatNum(Math.floor(skulls));
@@ -655,6 +690,66 @@
     }
     setInterval(checkSkullBoost, 15000);
 
+    /* ═══════ PRESTIGE ═══════ */
+
+    /* The bar to reset rises each tier: 1,000,000 this run for the first
+       prestige, ten times as much for each after. Steep on purpose — a
+       prestige should be earned, and the multiplier it grants is forever. */
+    function prestigeRequirement() { return 1e6 * Math.pow(10, prestige); }
+    function canPrestige() { return totalSkulls >= prestigeRequirement(); }
+
+    function doPrestige() {
+      if (!canPrestige()) return;
+      const nextMult = 1 + 0.1 * (prestige + 1);
+      if (!confirm('Prestige to tier ' + (prestige + 1) + '? This resets this run — skulls, ' +
+                   'buildings and upgrades — but grants a permanent ' + nextMult.toFixed(1) +
+                   'x to everything, forever. Your lifetime total and rank are kept.')) return;
+
+      prestige += 1;
+      /* Reset the RUN. Lifetime, prestige and cosmetics are untouched — the
+         first two are what the leaderboard and the save-merge rank on, so a
+         reset can never cost standing or be undone by a sync. */
+      skulls = 0;
+      totalSkulls = 0;
+      clickBonus = 0;
+      clickMulti = 1;
+      cpsClickPct = 0;
+      globalCpsMult = 1;
+      owned = {};
+      BUILDINGS.forEach(b => owned[b.id] = 0);
+      boughtUpgrades = new Set();
+      hitMilestones = new Set();
+      startTime = Date.now();
+
+      const el = document.createElement('div');
+      el.className = 'milestone';
+      el.innerHTML = '<h3>PRESTIGE ' + prestige + '</h3><p>' + getPrestigeMult().toFixed(1) + 'x forever</p>';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2600);
+
+      save();
+      render();
+    }
+
+    function renderPrestige() {
+      const mult = getPrestigeMult();
+      const req = prestigeRequirement();
+      const ready = canPrestige();
+      const pct = Math.min(100, (totalSkulls / req) * 100);
+      document.getElementById('tab-prestige').innerHTML =
+        '<div class="prestige-panel">' +
+          '<div class="prestige-tier">Prestige ' + prestige + '</div>' +
+          '<div class="prestige-mult">' + mult.toFixed(1) + 'x to all skull gathering</div>' +
+          '<div class="prestige-next">Next tier: ' + (mult + 0.1).toFixed(1) + 'x at ' +
+            formatNum(req) + ' skulls this run</div>' +
+          '<div class="prestige-bar"><div class="prestige-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="prestige-have">' + formatNum(Math.floor(totalSkulls)) + ' / ' + formatNum(req) + '</div>' +
+          '<button class="prestige-btn" ' + (ready ? '' : 'disabled') +
+            ' onclick="doPrestige()">' + (ready ? 'Prestige now' : 'Not yet') + '</button>' +
+          '<div class="prestige-note">Resets this run. Keeps your lifetime total, rank, and the multiplier — forever.</div>' +
+        '</div>';
+    }
+
     /* ═══════ SAVE / LOAD ═══════ */
 
     const SAVE_VERSION = 2;
@@ -673,13 +768,20 @@
       if (!d.boughtUpgrades) d.boughtUpgrades = [];
       if (!d.hitMilestones) d.hitMilestones = [];
       if (d.startTime === undefined) d.startTime = Date.now();
+      if (d.prestige === undefined) d.prestige = 0;
+      /* Pre-prestige saves had no lifetime field; their run total IS their
+         lifetime so far, so seed it there. Never let it drop below the run
+         total on any load. */
+      if (d.lifetimeSkulls === undefined) d.lifetimeSkulls = d.totalSkulls || 0;
+      if (d.lifetimeSkulls < d.totalSkulls) d.lifetimeSkulls = d.totalSkulls;
       d.version = SAVE_VERSION;
       return d;
     }
 
     function save() {
       const data = {
-        skulls, totalSkulls, totalClicks, clickBonus, clickMulti,
+        skulls, totalSkulls, lifetimeSkulls, prestige,
+        totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
         boughtUpgrades: [...boughtUpgrades],
         hitMilestones: [...hitMilestones],
@@ -711,8 +813,7 @@
         });
         if (!res.ok) return;
         const out = await res.json();
-        if (out && out.adopted && out.state &&
-            Number(out.state.totalSkulls || 0) > totalSkulls) {
+        if (out && out.adopted && out.state && serverOutranks(out.state)) {
           applyState(out.state);
           render();
         }
@@ -733,6 +834,8 @@
       globalCpsMult = d.globalCpsMult;
       owned = d.owned;
       startTime = d.startTime;
+      prestige = d.prestige || 0;
+      lifetimeSkulls = d.lifetimeSkulls || 0;
       boughtUpgrades = new Set(d.boughtUpgrades);
       hitMilestones = new Set(d.hitMilestones);
 
@@ -742,8 +845,7 @@
           const cps = getCPS();
           if (cps > 0) {
             const earned = cps * away * 0.5;
-            skulls += earned;
-            totalSkulls += earned;
+            earn(earned);
             const banner = document.getElementById('offlineBanner');
             banner.innerHTML = `<div class="offline-banner" onclick="this.remove()">Welcome back! You earned <b>${formatNum(earned)}</b> skulls while away (${formatTime(away * 1000)}). Click to dismiss.</div>`;
           }
@@ -757,6 +859,16 @@
         if (!raw) return;
         applyState(JSON.parse(raw));
       } catch(e) {}
+    }
+
+    /* Higher prestige wins; at equal prestige, more lifetime skulls wins.
+       IDENTICAL to the server's merge rank — a prestige reset (same
+       lifetime, higher tier) must beat the old save so the sync never
+       undoes it, and normal progress (more lifetime) still adopts forward. */
+    function serverOutranks(server) {
+      const sp = Number(server.prestige || 0), lp = prestige || 0;
+      if (sp !== lp) return sp > lp;
+      return Number(server.lifetimeSkulls || server.totalSkulls || 0) > lifetimeSkulls;
     }
 
     /* THE RECOVERY. A logged-in player's save also lives on the server;
@@ -778,10 +890,9 @@
         if (!res.ok) return;
         const data = await res.json();
         const server = data && data.state;
-        if (server && Number(server.totalSkulls || 0) > totalSkulls) {
+        if (server && serverOutranks(server)) {
           applyState(server);
           render();
-          if (typeof updateUpgradeList === 'function') updateUpgradeList();
         }
       } catch(e) {}
     }
@@ -827,13 +938,13 @@
         await fetch('/api/skull-clicker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'submit-score', score: Math.floor(totalSkulls), ...player })
+          body: JSON.stringify({ action: 'submit-score', score: Math.floor(lifetimeSkulls), prestige, ...player })
         });
         fetch('/api/leaderboards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ game: 'skull-clicker', score: Math.floor(totalSkulls) }),
+          body: JSON.stringify({ game: 'skull-clicker', score: Math.floor(lifetimeSkulls) }),
         }).catch(function () {});
       } catch(e) {}
     }

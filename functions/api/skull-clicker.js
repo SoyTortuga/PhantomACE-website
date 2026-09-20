@@ -21,9 +21,20 @@ const SAVE_MAX_BYTES = 20000;   /* a real save is a few hundred bytes */
 
 const saveKey = (userId) => `sc_save_${userId}`;
 
-function totalOf(state) {
-  const n = state && Number(state.totalSkulls);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+/* The save-merge rank, matched exactly by the client. Prestige first, then
+   lifetime skulls — never the run total, which prestige resets to zero. If
+   the merge ranked on run total, a prestige (total 0) would lose to the old
+   save and the sync would silently undo it. lifetime is monotonic and
+   prestige only climbs, so this is safe from both directions. */
+function num(v) { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; }
+function lifetimeOf(state) { return Math.max(num(state && state.lifetimeSkulls), num(state && state.totalSkulls)); }
+function prestigeOf(state) { return Math.floor(num(state && state.prestige)); }
+
+/** True when `a` should win the merge over `b`. */
+function outranks(a, b) {
+  const pa = prestigeOf(a), pb = prestigeOf(b);
+  if (pa !== pb) return pa > pb;
+  return lifetimeOf(a) > lifetimeOf(b);
 }
 
 export async function onRequestGet(context) {
@@ -48,11 +59,10 @@ async function saveState(env, session, body) {
   if (!state || typeof state !== 'object') return json({ error: 'No state' }, 400);
   if (JSON.stringify(state).length > SAVE_MAX_BYTES) return json({ error: 'Save too large' }, 400);
 
-  const incoming = totalOf(state);
   let winner = state;
 
   await env.MARKETPLACE.mutate(saveKey(session.user_id), (current) => {
-    if (current && totalOf(current) > incoming) {
+    if (current && outranks(current, state)) {
       winner = current;                 /* server is ahead — keep it, tell the client */
       return undefined;                 /* no write */
     }
@@ -89,6 +99,9 @@ export async function onRequestPost(context) {
 
   const score = typeof body.score === 'number' ? Math.floor(body.score) : 0;
   if (score <= 0) return json({ error: 'Invalid score' }, 400);
+  /* Carried for display — a prestige tier beside the name is the visible
+     reward for resetting. Bounded so a bad client cannot store nonsense. */
+  const prestige = Math.max(0, Math.min(9999, Math.floor(Number(body.prestige) || 0)));
 
   const lb = await env.MARKETPLACE.get(LB_KEY, 'json') || [];
 
@@ -97,12 +110,19 @@ export async function onRequestPost(context) {
     if (score > existing.score) {
       existing.score = score;
       existing.name = player.name;
+      existing.prestige = prestige;
       existing.updatedAt = Date.now();
     } else {
+      /* Score only ever rises, but prestige can climb while the leaderboard
+         number is still catching up to a past run — keep the badge current. */
+      if (prestige > (existing.prestige || 0)) {
+        existing.prestige = prestige;
+        await env.MARKETPLACE.put(LB_KEY, JSON.stringify(lb));
+      }
       return json({ success: true, updated: false });
     }
   } else {
-    lb.push({ id: player.id, name: player.name, score, updatedAt: Date.now() });
+    lb.push({ id: player.id, name: player.name, score, prestige, updatedAt: Date.now() });
   }
 
   lb.sort((a, b) => b.score - a.score);
