@@ -64,13 +64,38 @@ SETS = [
     ('stone',       'Mountain Stone',     'L', ('batch', 'Mountain Stone Floor Tiles')),
     ('cobble',      'Cobblestone',        'L', ('batch', 'Cobblestone Street Tiles')),
     ('marble',      'Atlantis Marble',    'L', ('batch', 'Atlantis Marble Floor Tiles')),
+    # Unlocked by the 2026-09 re-splice -- these packs had empty _tiles
+    # folders from an interrupted batch run.
+    ('asphalt',     'Asphalt Road',       'L', ('batch', 'Asphalt Road Tiles')),
+    ('neon',        'Neon Asphalt',       'L', ('batch', 'Neon asphalt road tiles')),
+    ('crosswalk',   'Crosswalk',          'L', ('batch', '3. Crosswalk Tiles')),
+    ('dragonscale', 'Dragon Scale',       'L', ('batch', 'Dragon scale floor tiles')),
+    ('cloud',       'Cloud Floor',        'L', ('batch', 'Cloud Floor Tiles')),
+    ('plainfloor',  'Stone Floor',        'L', ('batch', 'Floor tiles')),
 ]
+
+# Ground tiles are big squares; anything smaller slipped in through the
+# wide re-splice bounds (min-size 24 exists for props). A palette fragment
+# would paint as a mostly-empty cell.
+MIN_TILE = 60
 
 
 def batch_dir(stem):
-    """The already-spliced folder for a pack, found by its name stem."""
-    hits = [d for d in os.listdir(BATCH)
-            if d.endswith('_tiles') and stem.lower() in d.lower()]
+    """The already-spliced folder for a pack, by name stem.
+
+    Exact match first (after stripping the "N. " prefix), because stems
+    like "Floor tiles" are substrings of half the floor packs and only the
+    plain one is meant.
+    """
+    def core(d):
+        return re.sub(r'^\d+\.\s*', '', d[:-len('_tiles')]).lower()
+    dirs = [d for d in os.listdir(BATCH) if d.endswith('_tiles')]
+    # A stem may carry its "N. " prefix to split same-named packs apart.
+    exact = [d for d in dirs
+             if core(d) == stem.lower() or d[:-len('_tiles')].lower() == stem.lower()]
+    if len(exact) == 1:
+        return os.path.join(BATCH, exact[0])
+    hits = [d for d in dirs if stem.lower() in d.lower()]
     if len(hits) != 1:
         raise SystemExit('batch pack "%s": %d matches %s' % (stem, len(hits), hits))
     return os.path.join(BATCH, hits[0])
@@ -96,7 +121,9 @@ def main():
             src = batch_dir(ref)
             man = json.load(io.open(os.path.join(src, 'manifest.json'),
                                     encoding='utf-8'))
-            for i, t in enumerate(man['tiles']):
+            kept = [t for t in man['tiles']
+                    if t['size'][0] >= MIN_TILE and t['size'][1] >= MIN_TILE]
+            for i, t in enumerate(kept):
                 fn = '%02d.png' % i
                 shutil.copyfile(os.path.join(src, t['filename']),
                                 os.path.join(outdir, fn))

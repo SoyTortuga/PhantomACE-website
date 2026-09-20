@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Dino Park background studio - PhantomACE community.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Background Studio | PhantomACE</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/background-studio.css">
+</head>
+<body data-page="games">
+
+  <div id="site-header"></div>
+
+  <!-- A frame, like the room editor: everything below is drawn by
+       background-studio.js once it knows who you are. The page itself is
+       public — the API refuses non-staff, so an anonymous visitor sees
+       the sign-in notice and nothing else. -->
+  <section class="page-container bgs-wrap">
+    <h1 class="bgs-title">Park Background Studio</h1>
+    <p class="bgs-sub">Paint a 32×32 park from the tile palette. Where you put water is where
+      aquatic dinosaurs will swim — the walkability mask is derived from the tiles, not drawn.</p>
+
+    <div id="bgsNotice" class="bgs-notice">Checking who you are…</div>
+
+    <div id="bgsStudio" class="bgs-studio" style="display:none">
+      <div class="bgs-toolbar">
+        <input id="bgsName" class="bgs-name" maxlength="40" placeholder="Background name">
+        <select id="bgsLoad" class="bgs-load"><option value="">— new background —</option></select>
+        <button id="bgsSaveDraft" class="bgs-btn">Save Draft</button>
+        <button id="bgsPublish" class="bgs-btn bgs-btn-primary">Publish</button>
+        <button id="bgsDelete" class="bgs-btn bgs-btn-danger" style="display:none">Delete</button>
+        <span id="bgsStatus" class="bgs-status"></span>
+      </div>
+
+      <div class="bgs-main">
+        <div class="bgs-canvas-col">
+          <div class="bgs-canvas-tools">
+            <label class="bgs-toggle"><input type="checkbox" id="bgsZones"> Show zones</label>
+            <label class="bgs-toggle"><input type="checkbox" id="bgsVary" checked> Vary tiles while painting</label>
+            <button id="bgsFill" class="bgs-btn">Fill empty with selection</button>
+            <span class="bgs-hint">Left drag paints · right drag erases</span>
+          </div>
+          <canvas id="bgsGrid" width="1024" height="1024"></canvas>
+          <div id="bgsCoverage" class="bgs-coverage"></div>
+        </div>
+
+        <div class="bgs-palette-col">
+          <div id="bgsSets" class="bgs-sets"></div>
+          <div id="bgsTiles" class="bgs-tiles"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/session-read.js"></script>
+  <script src="/js/components.js"></script>
+  <script src="/js/nav.js"></script>
+  <script src="/js/pages/background-studio.js"></script>
+</body>
+</html>
