@@ -1123,6 +1123,34 @@
       if (combo > 0 && now - lastClickAt >= 1200) combo = 0;
     }
 
+    /* ═══════ STREAM EVENTS ═══════
+       A hype train (or a moderator) can fire a site-wide frenzy: cursed skulls
+       come thick and fast for everyone playing. Polled so an OBS-less viewer
+       still gets it; cursedFreqMult already reads window.__streamFrenzy. */
+    let streamEventUntil = 0;
+    async function pollSkullEvent() {
+      try {
+        const res = await fetch('/api/skull-clicker?event=1', { cache: 'no-store' });
+        if (!res.ok) return;
+        const d = await res.json();
+        const ev = d && d.event;
+        const now = Date.now();
+        if (ev && ev.until > now) {
+          window.__streamFrenzy = true;
+          if (ev.until > streamEventUntil + 1000) {   /* a newly-started frenzy */
+            streamEventUntil = ev.until;
+            showBuffToast('🚂 STREAM FRENZY — cursed skulls incoming!', 'frenzy');
+            playSound('cursed');
+            spawnCursed();
+          } else {
+            streamEventUntil = ev.until;
+          }
+        } else {
+          window.__streamFrenzy = false;
+        }
+      } catch (e) { /* silent — an event is a bonus, never load-bearing */ }
+    }
+
     /* A quick particle burst where a cursed skull was popped (juice). */
     function burstParticles(el) {
       const r = el.getBoundingClientRect();
@@ -1967,6 +1995,8 @@
     scheduleCursed();
     { const nt = document.getElementById('newsTicker'); if (nt) nt.textContent = pickNews(); }
     setInterval(cycleNews, 11000);
+    pollSkullEvent();
+    setInterval(pollSkullEvent, 30000);
   </script>
 </body>
 </html>

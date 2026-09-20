@@ -154,6 +154,16 @@ async function handleHypeTrainBegin(env, event) {
   await env.MARKETPLACE.put('hype_train_active', JSON.stringify(state), { expirationTtl: 3600 });
   await env.MARKETPLACE.put('hype_train_site', JSON.stringify(state), { expirationTtl: 3600 });
 
+  /* Light up Skull Clicker too: a train fires a site-wide cursed-skull
+     frenzy for everyone playing. Best-effort — an event must never break the
+     webhook that pays out the codes. */
+  try {
+    const { setSkullEvent } = await import('./skull-clicker.js');
+    await setSkullEvent(env, 'frenzy', 10 * 60 * 1000);
+  } catch (err) {
+    console.error('[hype-train] could not start skull frenzy:', err.message);
+  }
+
   await sendChatMessage(env,
     '🚂 HYPE TRAIN STARTED! Reach higher levels for bonus giveaway codes dropped right here in chat! 🎟️'
   );

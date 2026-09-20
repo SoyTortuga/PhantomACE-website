@@ -18,8 +18,28 @@ function getPlayer(request, body) {
 
 const LB_KEY = 'sc_leaderboard';
 const SAVE_MAX_BYTES = 20000;   /* a real save is a few hundred bytes */
+const EVENT_KEY = 'sc_event';
+const EVENT_MAX_MS = 30 * 60 * 1000;   /* cap a frenzy at 30 min, whoever sets it */
 
 const saveKey = (userId) => `sc_save_${userId}`;
+
+/**
+ * Start a site-wide Skull Clicker event (a cursed-skull frenzy). Shared so
+ * the hype-train webhook can call it too. Best-effort by contract: callers
+ * wrap it so an event never breaks the thing that triggered it.
+ */
+export async function setSkullEvent(env, type, durationMs) {
+  const until = Date.now() + Math.min(Math.max(0, durationMs || 0), EVENT_MAX_MS);
+  await env.MARKETPLACE.put(EVENT_KEY, JSON.stringify({ type: type || 'frenzy', until }));
+  return { type: type || 'frenzy', until };
+}
+
+/** The current event, or null when none is set or it has already elapsed. */
+async function currentEvent(env) {
+  const ev = await env.MARKETPLACE.get(EVENT_KEY, 'json');
+  if (!ev || !ev.until || ev.until <= Date.now()) return null;
+  return ev;
+}
 
 /* The save-merge rank, matched exactly by the client. Prestige first, then
    lifetime skulls — never the run total, which prestige resets to zero. If
@@ -38,7 +58,12 @@ function outranks(a, b) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
+  /* `?event=1` — the live site-wide event the game polls for; kept separate
+     from the leaderboard so the leaderboard's array shape never changes. */
+  if (new URL(request.url).searchParams.get('event')) {
+    return json({ event: await currentEvent(env) });
+  }
   const lb = await env.MARKETPLACE.get(LB_KEY, 'json') || [];
   return json(lb.slice(0, 10));
 }
@@ -90,6 +115,19 @@ export async function onRequestPost(context) {
     return body.action === 'save-state'
       ? saveState(env, session, body)
       : loadState(env, session);
+  }
+
+  /* Start a frenzy by hand — the broadcaster/moderators from Bot Control, or
+     a curl. Bounded server-side so a bad client cannot set a forever-event. */
+  if (body.action === 'trigger-event') {
+    const session = getSession(request);
+    const { isModerator } = await import('./admin/moderators.js');
+    if (!(await isModerator(env, session))) {
+      return json({ error: 'Only the broadcaster and moderators can start an event.' }, 403);
+    }
+    const mins = Math.min(30, Math.max(1, Math.floor(Number(body.minutes) || 5)));
+    const ev = await setSkullEvent(env, 'frenzy', mins * 60 * 1000);
+    return json({ success: true, event: ev });
   }
 
   if (body.action !== 'submit-score') return json({ error: 'Invalid action' }, 400);

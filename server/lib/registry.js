@@ -22,6 +22,10 @@
 export const SINGLETONS = {
   // leaderboards (seven arrays, max 50 entries each)
   sc_leaderboard:        { table: 'singletons', expiry: 'none' },
+  /* Skull Clicker site-wide event (a cursed-skull frenzy), set on a hype
+     train or by a moderator. 'none' — the in-value `until` is the real
+     expiry, read-filtered by the handler. */
+  sc_event:              { table: 'singletons', expiry: 'none' },
   lb_memory_match:       { table: 'singletons', expiry: 'none' },
   lb_bingo:              { table: 'singletons', expiry: 'none' },
   lb_mana_clash:         { table: 'singletons', expiry: 'none' },
