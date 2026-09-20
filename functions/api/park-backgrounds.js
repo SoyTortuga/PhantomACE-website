@@ -179,7 +179,14 @@ export async function onRequestPost(context) {
     name: checked.name,
     tilemap: checked.tilemap,
     mask: checked.mask,
-    published: !!body.publish,
+    /* ABSENT means UNCHANGED. Save-with-edits used to send publish:false,
+       which silently pulled a live background out of every player's
+       picker -- the author thought they were saving progress and was
+       actually unpublishing. Only an explicit true or false moves the
+       flag now; a new background starts as a draft. */
+    published: body.publish === undefined
+      ? (existing ? !!existing.published : false)
+      : !!body.publish,
     paletteVersion: 1,
     createdAt: existing ? existing.createdAt : Date.now(),
     /* The author comes from the session, never the request — same rule as

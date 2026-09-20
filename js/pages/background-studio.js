@@ -261,7 +261,10 @@
   /* ── save / load ── */
 
   function bindToolbar() {
-    $('bgsSaveDraft').onclick = function () { save(false); };
+    /* Save = keep my edits, change nothing about visibility. Publishing
+       is its own deliberate click. save(undefined) omits the flag and the
+       server keeps whatever state the background is in. */
+    $('bgsSaveDraft').onclick = function () { save(undefined); };
     $('bgsPublish').onclick = function () { save(true); };
     $('bgsDelete').onclick = del;
     $('bgsLoad').onchange = loadSelected;
@@ -292,7 +295,7 @@
       if (!res.ok) { status.textContent = data.error || 'Save failed'; return; }
       currentId = data.background.id;
       $('bgsDelete').style.display = '';
-      status.textContent = (publish ? 'Published' : 'Draft saved') + ' as "' + data.background.id + '"';
+      status.textContent = (data.background.published ? 'Saved & live' : 'Draft saved') + ' as "' + data.background.id + '"';
       refreshLoadList();
     } catch (e) {
       status.textContent = 'Save failed: ' + e.message;

@@ -149,6 +149,24 @@ const good = (over = {}) => ({
   check('asking for drafts anonymously changes nothing', anonDrafts.backgrounds.map(b => b.id), ['volcano-rim']);
 }
 
+/* ══ Saving edits must not unpublish ═══════════════════════════════════ */
+{
+  /* The trap that ate the first background anyone made: Save-with-edits
+     sent publish:false and silently pulled a live background out of every
+     player's picker. Absent now means unchanged. */
+  const e = env();
+  await POST(e, good({ publish: true }), as('222'));
+  await POST(e, good({ id: 'moonlit-lagoon', name: 'Moonlit Lagoon' }), as('222'));   /* no publish field */
+  const still = await (await GET(e)).json();
+  check('a plain save leaves it published', still.backgrounds.map(b => b.id), ['moonlit-lagoon']);
+
+  await POST(e, good({ id: 'moonlit-lagoon', publish: false }), as('222'));
+  check('an explicit false does unpublish', (await (await GET(e)).json()).backgrounds, []);
+
+  const fresh = await POST(e, good({ name: 'New One' }), as('222'));
+  check('a new background with no flag starts as a draft', (await fresh.json()).background.published, false);
+}
+
 /* ══ Delete, and the record it leaves ══════════════════════════════════ */
 {
   const e = env();
