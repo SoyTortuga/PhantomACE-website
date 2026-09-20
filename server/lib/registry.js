@@ -226,6 +226,12 @@ export const FAMILIES = [
   { prefix: 'mtgbbb_',         table: 'mtgbbb_rooms',     expiry: 'real' },
 
   { prefix: 'cp_skull_boost_', table: 'cp_skull_boosts',  expiry: 'none' },
+
+  /* Skull Clicker's cross-device save, one row per logged-in player. Its
+     own table (008_skull_saves.sql) rather than co-located, and read by
+     exact key only. 'none': a save must not expire out from under someone
+     who took a season off. */
+  { prefix: 'sc_save_',        table: 'skull_saves',      expiry: 'none' },
   { prefix: 'pt_alltime_',     table: 'phamily_alltime',  expiry: 'none' },
   { prefix: 'dino_park_',      table: 'dino_parks',       expiry: 'none' },
   /* Who has opted into letting other players visit their park. Its own

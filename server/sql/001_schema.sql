@@ -260,6 +260,16 @@ CREATE TABLE IF NOT EXISTS giveaway_drop_codes (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- sc_save_{userId} — Skull Clicker cross-device save. See 008_skull_saves.sql
+-- for why this exists (the game was localStorage-only; the leaderboard held
+-- one number, not a rebuildable save). Login-only.
+CREATE TABLE IF NOT EXISTS skull_saves (
+  key        text PRIMARY KEY,
+  value      jsonb NOT NULL,
+  expires_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ── Migration safety net ──────────────────────────────────────────────────
 
 -- The loader routes each dumped KV key to a table by longest-matching

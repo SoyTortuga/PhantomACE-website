@@ -693,37 +693,95 @@
         setTimeout(() => msg.classList.remove('show'), 1500);
       } catch(e) {}
       submitScore();
+      pushSaveToServer(data);
+    }
+
+    /* Mirror the save server-side for logged-in players. Best-effort and
+       fire-and-forget: local save already succeeded, and the server keeps
+       whichever total is higher, so a lost request costs nothing. If the
+       server turns out to be ahead (a wipe, or another device), adopt what
+       it returns rather than letting this device overwrite it. */
+    async function pushSaveToServer(data) {
+      const session = typeof readPhamSession === 'function' ? readPhamSession() : null;
+      if (!session || !session.user_id) return;
+      try {
+        const res = await fetch('/api/skull-clicker', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin', body: JSON.stringify({ action: 'save-state', state: data }),
+        });
+        if (!res.ok) return;
+        const out = await res.json();
+        if (out && out.adopted && out.state &&
+            Number(out.state.totalSkulls || 0) > totalSkulls) {
+          applyState(out.state);
+          render();
+        }
+      } catch(e) {}
+    }
+
+    /* Apply a save blob (from localStorage OR the server) into the live
+       game, then credit offline earnings from its savedAt. One path, so a
+       server-restored save behaves exactly like a local one. */
+    function applyState(d) {
+      d = migrateSave(d);
+      skulls = d.skulls;
+      totalSkulls = d.totalSkulls;
+      totalClicks = d.totalClicks;
+      clickBonus = d.clickBonus;
+      clickMulti = d.clickMulti;
+      cpsClickPct = d.cpsClickPct;
+      globalCpsMult = d.globalCpsMult;
+      owned = d.owned;
+      startTime = d.startTime;
+      boughtUpgrades = new Set(d.boughtUpgrades);
+      hitMilestones = new Set(d.hitMilestones);
+
+      if (d.savedAt) {
+        const away = (Date.now() - d.savedAt) / 1000;
+        if (away > 10) {
+          const cps = getCPS();
+          if (cps > 0) {
+            const earned = cps * away * 0.5;
+            skulls += earned;
+            totalSkulls += earned;
+            const banner = document.getElementById('offlineBanner');
+            banner.innerHTML = `<div class="offline-banner" onclick="this.remove()">Welcome back! You earned <b>${formatNum(earned)}</b> skulls while away (${formatTime(away * 1000)}). Click to dismiss.</div>`;
+          }
+        }
+      }
     }
 
     function load() {
       try {
         const raw = localStorage.getItem('sc_save');
         if (!raw) return;
-        const d = migrateSave(JSON.parse(raw));
-        skulls = d.skulls;
-        totalSkulls = d.totalSkulls;
-        totalClicks = d.totalClicks;
-        clickBonus = d.clickBonus;
-        clickMulti = d.clickMulti;
-        cpsClickPct = d.cpsClickPct;
-        globalCpsMult = d.globalCpsMult;
-        owned = d.owned;
-        startTime = d.startTime;
-        boughtUpgrades = new Set(d.boughtUpgrades);
-        hitMilestones = new Set(d.hitMilestones);
+        applyState(JSON.parse(raw));
+      } catch(e) {}
+    }
 
-        if (d.savedAt) {
-          const away = (Date.now() - d.savedAt) / 1000;
-          if (away > 10) {
-            const cps = getCPS();
-            if (cps > 0) {
-              const earned = cps * away * 0.5;
-              skulls += earned;
-              totalSkulls += earned;
-              const banner = document.getElementById('offlineBanner');
-              banner.innerHTML = `<div class="offline-banner" onclick="this.remove()">Welcome back! You earned <b>${formatNum(earned)}</b> skulls while away (${formatTime(away * 1000)}). Click to dismiss.</div>`;
-            }
-          }
+    /* THE RECOVERY. A logged-in player's save also lives on the server;
+       whichever has the higher lifetime total wins. A cleared browser
+       (local total 0, or no local save at all) adopts the server's — the
+       whole point of this — and a device that played further pushes its
+       save up on the next save(). Guests have no server save by design.
+
+       Runs after the local load so the comparison is against real local
+       progress, and re-renders once whatever won is in place. */
+    async function syncFromServer() {
+      const session = typeof readPhamSession === 'function' ? readPhamSession() : null;
+      if (!session || !session.user_id) return;
+      try {
+        const res = await fetch('/api/skull-clicker', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin', body: JSON.stringify({ action: 'load-state' }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const server = data && data.state;
+        if (server && Number(server.totalSkulls || 0) > totalSkulls) {
+          applyState(server);
+          render();
+          if (typeof updateUpgradeList === 'function') updateUpgradeList();
         }
       } catch(e) {}
     }
@@ -992,6 +1050,7 @@
     window.addEventListener('beforeunload', save);
 
     load();
+    syncFromServer();
     loadCosmetics();
     lastTick = Date.now();
     render();
