@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Users | PhantomACE</title>
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <style>
+    /* Self-contained like the toolbox and studio; border-based, no box-shadow. */
+    body { background: #0a0a0a; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 20px; }
+    .wrap { max-width: 820px; margin: 0 auto; }
+    h1 { color: #ff0000; font-size: 20px; letter-spacing: 0.06em; margin: 0 0 4px; }
+    .sub { color: #ffffffaa; font-size: 12px; margin-bottom: 14px; max-width: 720px; }
+    .notice { background: #111; border: 1px solid #ff000040; border-radius: 8px; padding: 16px; font-size: 14px; }
+    .bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: #111; border: 1px solid #ffffff1f; border-radius: 8px;
+      padding: 10px; margin-bottom: 12px;
+    }
+    .bar input {
+      flex: 1 1 220px; padding: 8px 10px; background: #1a1a1a; color: #fff;
+      border: 1px solid #ffffff28; border-radius: 4px; font-size: 13px;
+    }
+    .bar input:focus { border-color: #ff0000; outline: none; }
+    .count { font-size: 12px; color: #ffffffaa; margin-left: auto; }
+    .status { font-size: 12px; color: #ffcc44; min-height: 16px; margin-bottom: 10px; }
+
+    .row {
+      display: flex; align-items: center; gap: 10px;
+      background: #111; border: 1px solid #ffffff14; border-radius: 6px;
+      padding: 8px 10px; margin-bottom: 6px;
+    }
+    .row.is-mod { border-color: #ff000055; }
+    .row img { width: 32px; height: 32px; border-radius: 50%; background: #222; flex: 0 0 auto; }
+    .row .who { flex: 1 1 auto; min-width: 0; }
+    .row .name { font-size: 13px; font-weight: 700; }
+    .row .login { font-size: 11px; color: #ffffff88; }
+    .tag {
+      font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 3px;
+      border: 1px solid #ffffff33; color: #ffffffcc; text-transform: uppercase;
+    }
+    .tag.mod { border-color: #ff0000; color: #ff9999; }
+    .tag.bc { border-color: #ffaa00; color: #ffcc66; }
+    .row button {
+      padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer;
+      background: #1a1a1a; color: #fff; border: 1px solid #ffffff28;
+    }
+    .row button.elevate:hover { border-color: #ff0000; }
+    .row button.demote { color: #ff9999; border-color: #772222; }
+    .row .locked { font-size: 11px; color: #ffffff66; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>👥 Users</h1>
+    <p class="sub">Everyone who has logged in with Twitch. The broadcaster can elevate a user to
+      moderator or remove that role here — moderators can view the list. You can also add someone who
+      has never logged in by typing their Twitch name below.</p>
+
+    <div id="notice" class="notice">Checking access…</div>
+
+    <div id="panel" style="display:none">
+      <div class="bar">
+        <input id="search" placeholder="Filter by name or login…" autocomplete="off">
+        <input id="addName" placeholder="Add by Twitch username…" autocomplete="off" style="flex:0 1 200px">
+        <button class="row-add" id="addBtn" style="padding:8px 14px;background:#1a1a1a;color:#fff;border:1px solid #ff0000;border-radius:4px;font-weight:700;cursor:pointer">Make Mod</button>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="status" id="status"></div>
+      <div id="list"></div>
+    </div>
+  </div>
+
+  <script src="/js/pages/users.js"></script>
+</body>
+</html>
