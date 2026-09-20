@@ -534,6 +534,16 @@
   border-radius: 4px;
 }
 
+.account-menu-item-staff {
+  color: var(--red);
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.account-menu-item-staff:hover {
+  background: rgba(152, 9, 10, 0.1);
+  color: var(--white);
+}
+
 .account-menu-item-danger {
   color: var(--red);
 }

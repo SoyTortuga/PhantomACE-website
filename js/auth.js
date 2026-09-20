@@ -73,6 +73,13 @@ function applyRole() {
        works and redirects itself, but only after the page has loaded. */
     const menuProfile = document.getElementById('accountMenuProfile');
     if (menuProfile && session.login) menuProfile.href = '/user/' + session.login;
+
+    /* The Mod Toolbox link, for staff only. Cosmetic gate on the signed
+       role — the toolbox page and every tool behind it re-check on the
+       server, so a forged link reveals nothing it can act on. */
+    const toolbox = document.getElementById('accountMenuToolbox');
+    if (toolbox) toolbox.hidden = !(role === 'moderator' || role === 'broadcaster');
+
     renderRoleBadge(session.role);
     if (userAvatar && session.profile_image) {
       userAvatar.src = session.profile_image;
