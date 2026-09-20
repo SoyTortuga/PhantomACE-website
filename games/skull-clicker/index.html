@@ -33,6 +33,34 @@
     .score-display { font-size: 32px; font-weight: 800; color: #fff; line-height: 1.2; }
     .per-sec { font-size: 11px; color: #fff; margin-top: 2px; }
 
+    /* News ticker */
+    .news-ticker {
+      text-align: center;
+      font-size: 11px;
+      font-style: italic;
+      color: #8a6a6a;
+      padding: 6px 16px 0;
+      min-height: 20px;
+      transition: opacity 0.4s;
+      border-bottom: 1px solid #1a1a1a;
+      padding-bottom: 8px;
+    }
+    .news-ticker.fade { opacity: 0; }
+
+    /* Screen shake on milestones */
+    .shake { animation: shake 0.5s; }
+    @keyframes shake {
+      0%,100% { transform: translate(0,0); }
+      20% { transform: translate(-5px, 2px); }
+      40% { transform: translate(5px, -2px); }
+      60% { transform: translate(-4px, -1px); }
+      80% { transform: translate(4px, 1px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .shake { animation: none; }
+      .news-ticker { transition: none; }
+    }
+
     /* Skull Button */
     .skull-area {
       display: flex;
@@ -506,6 +534,8 @@
       <div class="per-sec" id="perSec">0 per second</div>
     </div>
 
+    <div class="news-ticker" id="newsTicker"></div>
+
     <div class="skull-area">
       <div class="skull-btn" id="skullBtn">
         <img src="/assets/images/skull.png" alt="Click">
@@ -914,6 +944,55 @@
       el.innerHTML = `<h3>${title}</h3><p>${formatNum(n)} skulls earned</p>`;
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 2200);
+      screenShake();
+      playSound('feat');
+    }
+
+    /* A brief shake on the big moments — the cheapest juice there is. */
+    function screenShake() {
+      const w = document.querySelector('.game-wrap');
+      if (!w) return;
+      w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake');
+      setTimeout(() => w.classList.remove('shake'), 500);
+    }
+
+    /* ═══════ NEWS TICKER ═══════
+       A gothic crawl that reacts to how far along you are — atmosphere for
+       almost nothing. Static generic lines, plus lines conjured from the
+       current state so it feels aware of your dominion. */
+    const NEWS_GENERIC = [
+      'The bones whisper of a coming harvest.',
+      'Local villagers report a chill on the wind.',
+      'A raven watches from the ossuary gate.',
+      'The candles gutter, though there is no draft.',
+      'Something in the crypt is counting.',
+      'The dead do not rest; they produce.',
+      'Rumors of a skull that moves on its own.',
+      'The altar is warm to the touch again.',
+      'Night lasts a little longer here each day.',
+      'They say the reaper keeps a leaderboard.',
+    ];
+    function pickNews() {
+      const dyn = [];
+      if (prestige > 0) dyn.push('The cycle turns for the ' + ordinal(prestige) + ' time. The dark remembers.');
+      if (cursedPopped >= 10) dyn.push('The cursed skulls fear you now — ' + cursedPopped + ' claimed.');
+      const tb = totalBuildings();
+      if (tb >= 100) dyn.push('Your dominion numbers ' + tb + ' and grows restless.');
+      else if (tb >= 20) dyn.push('Word spreads of a growing necropolis.');
+      if (achievements.size >= 10) dyn.push('Scholars catalogue your ' + achievements.size + ' dread feats.');
+      if (getCPS() > 1e9) dyn.push('The skull-tide rises by ' + formatNum(getCPS()) + ' every second.');
+      const pool = dyn.length && Math.random() < 0.6 ? dyn : NEWS_GENERIC;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    function ordinal(n) {
+      const s = ['th','st','nd','rd'], v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+    function cycleNews() {
+      const el = document.getElementById('newsTicker');
+      if (!el) return;
+      el.classList.add('fade');
+      setTimeout(() => { el.textContent = pickNews(); el.classList.remove('fade'); }, 400);
     }
 
     /* ═══════ FEATS (achievements) ═══════ */
@@ -1886,6 +1965,8 @@
     renderWorld();
     renderBuffs();
     scheduleCursed();
+    { const nt = document.getElementById('newsTicker'); if (nt) nt.textContent = pickNews(); }
+    setInterval(cycleNews, 11000);
   </script>
 </body>
 </html>
