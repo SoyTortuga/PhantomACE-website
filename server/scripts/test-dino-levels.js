@@ -72,13 +72,55 @@ const dino = (over = {}) => ({ speciesId: 'rex', careCount: 0, xp: 0, ...over })
 
 /* ── The card shows THIS dino, not the park ──────────────────────────── */
 {
-  /* The regression in one assertion: the template must pass the dino. */
-  ok('the collection card asks for a per-dino level',
-     /coll-card-level">Lv \$\{getDinoLevel\(d\)\}/.test(src));
-  ok('and getLevel is no longer used for a card',
+  /* THIS BLOCK USED TO BE A REGEX, AND IT SHIPPED A BROKEN COLLECTION TAB.
+     It asserted the source contained `getDinoLevel(d)` — which it did,
+     exactly as written — while the enclosing map binds `dino`, not `d`. A
+     text match cannot see scope, so the assertion passed on the identifier
+     being undefined at runtime: every card threw a ReferenceError inside
+     .map() and the whole list rendered empty.
+
+     So the template is EXECUTED now. Stubs stand in for the helpers it
+     calls; the point is not their return values but that every identifier
+     the template reaches actually resolves. */
+  const m = /list\.innerHTML = toggle \+ arr\.map\(\(dino, i\) => \{([\s\S]*?)\n  \}\)\.join\(''\);/.exec(src);
+  ok('the collection card template can be lifted', !!m);
+
+  if (m) {
+    const stubs = `
+      const XP_PER_LEVEL = ${XP_PER_LEVEL};
+      const getDinoXp = d => Math.max(0, Math.floor(d.xp || 0));
+      const getDinoLevel = d => Math.floor(Math.sqrt(getDinoXp(d) / XP_PER_LEVEL)) + 1;
+      const getStage = d => d.careCount >= ${GROWTH_THRESHOLDS.adult} ? 'adult'
+                          : d.careCount >= ${GROWTH_THRESHOLDS.juvenile} ? 'juvenile' : 'hatchling';
+      const getRosterById = () => ({ id: 'rex', name: 'Rex', rarity: 'common' });
+      const spriteImg = () => '<img>';
+      const escapeHtml = s => String(s == null ? '' : s);
+      const dinoName = (d, s) => String(d.nickname || (s && s.name) || '');
+      const collSelectedIdx = -1;
+    `;
+    let render = null;
+    try { render = new Function('dino', 'i', stubs + m[1]); }
+    catch (err) { failures.push(`the card template does not compile\n      ${err.message}`); }
+
+    if (render) {
+      const out = [];
+      for (const d of [dino({ xp: 0 }), dino({ xp: 5000, careCount: 90 })]) {
+        try { out.push(render(d, 0)); }
+        catch (err) {
+          failures.push(`rendering a collection card threw\n      ${err.constructor.name}: ${err.message}`);
+          out.push('');
+        }
+      }
+      const levels = out.map(h => (/Lv (\d+)/.exec(h) || [])[1]);
+      ok('every card renders a level', levels.every(Boolean));
+      /* The original bug in its observable form: one number for everyone. */
+      ok('and two differently-raised dinos do not share it', levels[0] !== levels[1]);
+    }
+  }
+
+  ok('getLevel is no longer used for a card',
      !/coll-card-level">Lv \$\{getLevel\(\)\}/.test(src));
 
-  /* And two differently-raised dinos must actually differ. */
   const a = dino({ xp: 0 }), b = dino({ xp: 5000 });
   ok('two dinos can hold different levels', getDinoLevel(a) !== getDinoLevel(b));
 }

@@ -5528,7 +5528,7 @@ function renderCollList() {
     return `<div class="coll-card rarity-${spec.rarity} ${i===collSelectedIdx?'selected':''}" onclick="collSelectedIdx=${i};renderCollection();">
       <div class="coll-card-sprite">${spriteImg(spec.id, 48, 'sprite-img')}</div>
       <div class="coll-card-name">${dino.nickname || spec.name}</div>
-      <div class="coll-card-level">Lv ${getDinoLevel(d)} · ${stage}</div>
+      <div class="coll-card-level">Lv ${getDinoLevel(dino)} · ${stage}</div>
       <div class="coll-card-bars">
         <div style="background:${hCol};opacity:${hPct}"></div>
         <div style="background:${tCol};opacity:${tPct}"></div>
