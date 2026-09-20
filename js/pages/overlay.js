@@ -38,6 +38,10 @@
   var stage = document.getElementById('ovStage');
   var faultEl = document.getElementById('ovFault');
   if (!stage) return;
+  /* Layout mode owns the screen: overlay-layout.js fills every panel with
+     sample content so OBS can be arranged offline. The live pollers stand
+     down so nothing fetches and nothing hides what layout placed. */
+  if (new URLSearchParams(location.search).get('layout')) return;
 
   var key = new URLSearchParams(location.search).get('key') || '';
   /* How far back a reload will replay. OBS shuts a browser source down when
