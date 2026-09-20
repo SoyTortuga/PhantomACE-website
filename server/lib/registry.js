@@ -67,6 +67,11 @@ export const SINGLETONS = {
      which is the exact failure the design avoids. */
   ad_state:              { table: 'singletons', expiry: 'none' },
 
+  /* The chat maze: one document holding the live board, the dot, and the
+     running tallies. 'none' -- a maze that expired mid-stream would strand
+     the overlay on a board the server no longer knows. */
+  maze_current:          { table: 'singletons', expiry: 'none' },
+
   /* Milestone drop config: on/off, the rarity per event, the raid floor. */
   milestone_drops:       { table: 'singletons', expiry: 'none' },
 

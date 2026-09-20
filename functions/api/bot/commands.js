@@ -217,6 +217,28 @@ async function handleChatMessage(env, event) {
      offerGuess returns null for the overwhelming majority of messages — no
      game running, or simply not the answer — and writes nothing for a
      chatter it has already counted. */
+  /* THE MAZE HEARS EVERYTHING FIRST, "!" or not. Its regex is one exact
+     token, so it turns almost every message away before either game does
+     any work -- and "!up" must work as well as "up", which the parsed
+     branch below would otherwise swallow into the command table. */
+  try {
+    const { offerMove } = await import('./maze.js');
+    const mazeSaid = await offerMove(env, {
+      name: event.chatter_user_name || event.chatter_user_login,
+      text: event.message && event.message.text,
+    });
+    if (mazeSaid) {
+      if (mazeSaid.length) {
+        const { sendChatMessage } = await import('./send-chat.js');
+        for (const m of mazeSaid) await sendChatMessage(env, m);
+      }
+      return;
+    }
+  } catch (err) {
+    /* A broken maze must not break chat commands, same as the scramble. */
+    console.error('[maze]', err.message);
+  }
+
   if (!parsed) {
     try {
       const { offerGuess, announceGame } = await import('../chat-game.js');

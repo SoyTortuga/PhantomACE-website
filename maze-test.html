@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Maze — Test | PhantomACE</title>
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <style>
+    /* Self-contained like the toolbox: this page exists to watch one game
+       state, and the overlay will lift this exact board rendering later.
+       Border-based everything — walls ARE borders here, which is the whole
+       trick, and box-shadow stays banned as always. */
+    body { background: #0a0a0a; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 24px; }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 { color: #ff0000; font-size: 20px; letter-spacing: 0.06em; margin: 0 0 4px; }
+    .sub { color: #ffffffaa; font-size: 12px; margin-bottom: 16px; }
+    .bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: #111; border: 1px solid #ffffff1f; border-radius: 8px;
+      padding: 10px; margin-bottom: 14px;
+    }
+    .btn {
+      padding: 8px 14px; background: #1a1a1a; color: #fff; cursor: pointer;
+      border: 1px solid #ffffff28; border-radius: 4px; font-size: 13px; font-weight: 700;
+    }
+    .btn:hover { border-color: #ff0000; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .status { font-size: 12px; color: #fff; margin-left: auto; }
+    .said {
+      font-size: 12px; color: #ffcc44; min-height: 16px; margin: 6px 0 10px;
+    }
+
+    .stage { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .board-wrap { flex: 0 0 auto; }
+    .board {
+      display: grid; background: #111; border-radius: 6px; padding: 10px;
+      border: 1px solid #ffffff1f;
+      transition: opacity 1s ease;
+    }
+    .board.fading { opacity: 0; }
+    .cell {
+      position: relative; box-sizing: border-box;
+      border: 1px solid transparent;
+    }
+    /* The maze IS its borders. Solid red walls on black, per the house. */
+    .cell.n { border-top-color: #ff0000; }
+    .cell.e { border-right-color: #ff0000; }
+    .cell.s { border-bottom-color: #ff0000; }
+    .cell.w { border-left-color: #ff0000; }
+    .cell .dot, .cell .flag {
+      position: absolute; inset: 0; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .cell .dot::after {
+      content: ''; width: 55%; height: 55%; border-radius: 50%;
+      background: #ff0000; border: 2px solid #ffffffcc;
+    }
+    .cell.bonked .dot::after { background: #ffaa00; }
+    .cell .flag { font-size: 14px; }
+
+    .side { flex: 1 1 240px; }
+    .panel {
+      background: #111; border: 1px solid #ffffff1f; border-radius: 8px;
+      padding: 12px; margin-bottom: 12px; font-size: 12px;
+    }
+    .panel h2 { font-size: 12px; margin: 0 0 8px; color: #ffffffaa; letter-spacing: 0.08em; text-transform: uppercase; }
+    .panel .big { font-size: 20px; color: #fff; font-weight: 700; }
+    .panel ul { margin: 0; padding-left: 16px; color: #ffffffcc; }
+    .pad { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; justify-content: center; }
+    .pad .btn { padding: 10px 0; text-align: center; }
+    .pad .blank { visibility: hidden; }
+    .hint { font-size: 10px; color: #ffffff77; text-align: center; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🧭 Chat Maze — Test</h1>
+    <p class="sub">The live board, exactly as the game sees it. Real play is chat typing
+      up / down / left / right (or WASD, "!" optional) — every message moves the dot, in order.
+      Moves made here are marked "(test)" and never post to the channel.</p>
+
+    <div class="bar">
+      <button class="btn" id="startBtn">Start (4×4)</button>
+      <button class="btn" id="stopBtn">Stop</button>
+      <span class="status" id="status">loading…</span>
+    </div>
+    <div class="said" id="said"></div>
+
+    <div class="stage">
+      <div class="board-wrap"><div class="board" id="board"></div></div>
+      <div class="side">
+        <div class="panel">
+          <h2>Level</h2>
+          <div class="big" id="levelLine">—</div>
+          <div id="statLine"></div>
+          <div id="lastLine"></div>
+        </div>
+        <div class="panel" id="padPanel">
+          <h2>Test drive</h2>
+          <div class="pad">
+            <span class="blank"></span><button class="btn" data-dir="up">▲</button><span class="blank"></span>
+            <button class="btn" data-dir="left">◀</button><button class="btn" data-dir="down">▼</button><button class="btn" data-dir="right">▶</button>
+          </div>
+          <div class="hint">Arrow keys and WASD work too, while this page is focused.</div>
+        </div>
+        <div class="panel">
+          <h2>Cleared</h2>
+          <ul id="historyList"><li>none yet</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/pages/maze-test.js"></script>
+</body>
+</html>
