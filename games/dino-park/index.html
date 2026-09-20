@@ -242,7 +242,15 @@
       text-transform: uppercase; color: #fff;
     }
     .yard-tray-hint { color: #fff; text-transform: none; letter-spacing: 0; font-size: 9px; }
-    .yard-tray-items { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+    /* Vertical scroll over a wrapping grid. The old single flex row was
+       fine for eight items and unusable for thirty-three. */
+    .yard-tray-items { max-height: 38vh; overflow-y: auto; padding-bottom: 2px; }
+    .yard-band { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .yard-band-label {
+      font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #ffffff77; margin: 2px 0 4px; border-bottom: 1px solid #ffffff14;
+      padding-bottom: 2px;
+    }
     .yard-item-btn {
       flex: 0 0 auto; width: 62px; padding: 6px 3px 5px;
       background: #0a0a0a; border: 1px solid #ffffff12; border-radius: 3px;
@@ -4058,6 +4066,19 @@ function isWaterWalkable(x, y) { const z = zoneAt(x, y); return z === 'R' || z =
 function isSolidGround(x, y) { return zoneAt(x, y) === 'L'; }
 
 /**
+ * Where a given decoration is allowed to sit.
+ *
+ * Land is the default and stays the old rule. A 'water' item goes in the
+ * river or the ocean instead — the same zones a water-habitat dino may
+ * swim in — which is the only way a lily pad or a reed bed makes sense.
+ * Derived from the item rather than hardcoded at the call sites, so adding
+ * a water decoration is a table entry and nothing else.
+ */
+function yardZoneTest(t) {
+  return (t && t.zone === 'water') ? isWaterWalkable : isSolidGround;
+}
+
+/**
  * Move anything standing somewhere its zone no longer allows.
  *
  * MUST RUN WHENEVER THE BACKGROUND CHANGES. Positions are stored as
@@ -4090,8 +4111,11 @@ function replaceStrandedForBackground() {
   });
 
   (state.yardItems || []).forEach(it => {
-    if (isSolidGround(it.x, it.y)) return;
-    const p = randomZonePoint(isSolidGround);
+    /* By ITS zone, not by land for everything -- otherwise the first
+       background change drags every lily pad onto the grass. */
+    const ok = yardZoneTest(getYardType(it.type));
+    if (ok(it.x, it.y)) return;
+    const p = randomZonePoint(ok);
     it.x = p.x; it.y = p.y;
     moved++;
   });
@@ -4736,17 +4760,72 @@ async function confirmListDino(idx, source) {
 }
 
 /* ======================== YARD ITEMS ======================== */
+/* ── DECORATIONS ────────────────────────────────────────────
+   Four bands, and the band is the design rather than the flavour:
+
+     ground cover  cheap, non-blocking, meant to be scattered
+     water         only placeable in the river or ocean -- see `zone`
+     large         blocks pathing, so WHERE it goes starts to matter
+     showpieces    expensive, and the thing worth visiting a park to see
+
+   `mood` feeds getYardMoodBonus, which is sqrt-damped and capped at 0.5,
+   so a wider catalogue cannot trivialise care however it is stacked --
+   the ceiling already binds at a full yard of the old items.
+
+   `zone` is new. Everything defaults to solid land; 'water' items place
+   in the river or ocean instead, which is the only way a lily pad was
+   ever going to work. Every src below was checked against the asset tree
+   on disk, because a missing one renders as a broken image in the tray
+   and nobody notices until a player tries to buy it. */
 const YARD_ITEM_TYPES = [
-  { id: 'sprig',   name: 'Sprig',   src: IC+'prehistoric_plants/curled_fern_frond.png',        cost: 15,  mood: 1, size: 20, blocks: false, radius: 0 },
-  { id: 'bloom',   name: 'Bloom',   src: IC+'prehistoric_plants/prehistoric_bloom.png',        cost: 25,  mood: 2, size: 22, blocks: false, radius: 0 },
-  { id: 'pebble',  name: 'Pebble',  src: IC+'environment_terrain/rock_formation.png',          cost: 20,  mood: 1, size: 24, blocks: false, radius: 0 },
-  { id: 'shroom',  name: 'Shroom',  src: IC+'prehistoric_plants/giant_prehistoric_mushroom.png', cost: 40, mood: 3, size: 28, blocks: false, radius: 0 },
-  { id: 'cycad',   name: 'Cycad',   src: IC+'prehistoric_plants/cycad.png',                    cost: 60,  mood: 4, size: 32, blocks: true,  radius: 4 },
-  { id: 'thicket', name: 'Thicket', src: IC+'prehistoric_plants/prehistoric_bush.png',         cost: 75,  mood: 5, size: 34, blocks: true,  radius: 4.5 },
-  { id: 'log',     name: 'Log',     src: IC+'prehistoric_plants/mossy_log.png',                cost: 90,  mood: 6, size: 36, blocks: true,  radius: 5 },
-  { id: 'stone',   name: 'Stone',   src: IC+'environment_terrain/rocky_cliff.png',             cost: 120, mood: 8, size: 40, blocks: true,  radius: 5.5 },
+  { id: 'sprig', name: 'Sprig', src: IC+'prehistoric_plants/curled_fern_frond.png', cost: 15, mood: 1, size: 20, blocks: false, radius: 0, band: 'ground' },
+  { id: 'tuft', name: 'Grass Tuft', src: IC+'prehistoric_plants/giant_grass_tuft.png', cost: 18, mood: 1, size: 22, blocks: false, radius: 0, band: 'ground' },
+  { id: 'pebble', name: 'Pebble', src: IC+'environment_terrain/rock_formation.png', cost: 20, mood: 1, size: 24, blocks: false, radius: 0, band: 'ground' },
+  { id: 'tracks', name: 'Old Tracks', src: IC+'fossils_bones/footprint_fossil.png', cost: 20, mood: 1, size: 22, blocks: false, radius: 0, band: 'ground' },
+  { id: 'moss', name: 'Moss Mound', src: IC+'prehistoric_plants/moss_mound.png', cost: 22, mood: 2, size: 24, blocks: false, radius: 0, band: 'ground' },
+  { id: 'flower', name: 'Primitive Flower', src: IC+'prehistoric_plants/primitive_flower.png', cost: 24, mood: 2, size: 20, blocks: false, radius: 0, band: 'ground' },
+  { id: 'bloom', name: 'Bloom', src: IC+'prehistoric_plants/prehistoric_bloom.png', cost: 25, mood: 2, size: 22, blocks: false, radius: 0, band: 'ground' },
+  { id: 'clubmoss', name: 'Club Moss', src: IC+'prehistoric_plants/club_moss.png', cost: 26, mood: 2, size: 22, blocks: false, radius: 0, band: 'ground' },
+  { id: 'lily', name: 'Lily Pad', src: IC+'prehistoric_plants/giant_lily_pad.png', cost: 35, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'reed', name: 'Reed Bed', src: IC+'prehistoric_plants/giant_reed.png', cost: 40, mood: 3, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'swamp', name: 'Swamp Plant', src: IC+'prehistoric_plants/swamp_plant.png', cost: 45, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'shroom', name: 'Shroom', src: IC+'prehistoric_plants/giant_prehistoric_mushroom.png', cost: 40, mood: 3, size: 28, blocks: false, radius: 0, band: 'mid' },
+  { id: 'horsetail', name: 'Horsetail', src: IC+'prehistoric_plants/horsetail_plant.png', cost: 42, mood: 3, size: 26, blocks: false, radius: 0, band: 'mid' },
+  { id: 'treefern', name: 'Tree Fern', src: IC+'prehistoric_plants/tree_fern.png', cost: 45, mood: 3, size: 28, blocks: false, radius: 0, band: 'mid' },
+  { id: 'nest', name: 'Empty Nest', src: IC+'environment_terrain/dino_nest_ground.png', cost: 50, mood: 3, size: 28, blocks: false, radius: 0, band: 'mid' },
+  { id: 'bones', name: 'Bone Pile', src: IC+'fossils_bones/bone_pile.png', cost: 55, mood: 3, size: 26, blocks: false, radius: 0, band: 'mid' },
+  { id: 'amber', name: 'Amber Stone', src: IC+'misc_jurassic/amber_stone.png', cost: 65, mood: 4, size: 22, blocks: false, radius: 0, band: 'mid' },
+  { id: 'sign', name: 'Warning Sign', src: IC+'misc_jurassic/dino_warning_sign.png', cost: 80, mood: 5, size: 30, blocks: false, radius: 0, band: 'mid' },
+  { id: 'cycad', name: 'Cycad', src: IC+'prehistoric_plants/cycad.png', cost: 60, mood: 4, size: 32, blocks: true, radius: 4, band: 'large' },
+  { id: 'bamboo', name: 'Bamboo', src: IC+'prehistoric_plants/prehistoric_bamboo.png', cost: 70, mood: 4, size: 32, blocks: true, radius: 4, band: 'large' },
+  { id: 'thicket', name: 'Thicket', src: IC+'prehistoric_plants/prehistoric_bush.png', cost: 75, mood: 5, size: 34, blocks: true, radius: 4.5, band: 'large' },
+  { id: 'stump', name: 'Old Stump', src: IC+'prehistoric_plants/ancient_tree_stump.png', cost: 85, mood: 5, size: 34, blocks: true, radius: 4.5, band: 'large' },
+  { id: 'log', name: 'Log', src: IC+'prehistoric_plants/mossy_log.png', cost: 90, mood: 6, size: 36, blocks: true, radius: 5, band: 'large' },
+  { id: 'palm', name: 'Prehistoric Palm', src: IC+'prehistoric_plants/prehistoric_palm.png', cost: 100, mood: 6, size: 38, blocks: true, radius: 5, band: 'large' },
+  { id: 'stone', name: 'Stone', src: IC+'environment_terrain/rocky_cliff.png', cost: 120, mood: 8, size: 40, blocks: true, radius: 5.5, band: 'large' },
+  { id: 'ginkgo', name: 'Ginkgo Tree', src: IC+'prehistoric_plants/ginkgo_tree.png', cost: 130, mood: 8, size: 42, blocks: true, radius: 5.5, band: 'large' },
+  { id: 'firepit', name: 'Fire Pit', src: IC+'misc_jurassic/tribal_fire_pit.png', cost: 140, mood: 8, size: 34, blocks: true, radius: 4.5, band: 'large' },
+  { id: 'conifer', name: 'Ancient Conifer', src: IC+'prehistoric_plants/ancient_conifer.png', cost: 150, mood: 9, size: 44, blocks: true, radius: 6, band: 'large' },
+  { id: 'skull', name: 'T-Rex Skull', src: IC+'fossils_bones/t_rex_skull.png', cost: 180, mood: 9, size: 40, blocks: true, radius: 5, band: 'show' },
+  { id: 'redwood', name: 'Ancient Redwood', src: IC+'prehistoric_plants/ancient_redwood.png', cost: 200, mood: 10, size: 48, blocks: true, radius: 6.5, band: 'show' },
+  { id: 'statue', name: 'Dino Statue', src: IC+'misc_jurassic/dino_statue.png', cost: 240, mood: 11, size: 44, blocks: true, radius: 5.5, band: 'show' },
+  { id: 'skeleton', name: 'Mounted Skeleton', src: IC+'fossils_bones/mounted_skeleton.png', cost: 260, mood: 12, size: 46, blocks: true, radius: 6, band: 'show' },
+  { id: 'gate', name: 'Park Gate', src: IC+'misc_jurassic/park_gate.png', cost: 300, mood: 12, size: 48, blocks: true, radius: 6.5, band: 'show' },
 ];
-const MAX_YARD_ITEMS = 14;
+/* Display order and labels for the tray. Separate from the item table so
+   the catalogue can grow without touching the grouping, and so a band
+   with no items simply does not render. */
+const YARD_BANDS = [
+  { id: 'ground', label: 'Ground Cover' },
+  { id: 'mid',    label: 'Features' },
+  { id: 'water',  label: 'Water' },
+  { id: 'large',  label: 'Large · blocks pathing' },
+  { id: 'show',   label: 'Showpieces' },
+];
+/* Raised with the catalogue: 33 types and 14 slots meant most of them
+   could never be seen together. Still a real constraint -- a park is a
+   choice, not an inventory. */
+const MAX_YARD_ITEMS = 20;
 const YARD_REFUND_PCT = 0.6;
 
 let decorateMode = false;
@@ -4787,15 +4866,27 @@ function renderYardTray() {
   const wrap = document.getElementById('yardTrayItems');
   const count = (state.yardItems || []).length;
   const full = count >= MAX_YARD_ITEMS;
-  wrap.innerHTML = YARD_ITEM_TYPES.map(t => {
-    const afford = state.coins >= t.cost;
-    const dis = !afford || full;
+  /* GROUPED, because 33 items in one horizontal strip is a scroll nobody
+     finishes — the catalogue may as well not have been expanded if half of
+     it is never seen. Bands are an explicit field rather than inferred
+     from cost, so re-pricing an item cannot silently move it. */
+  const button = (t) => {
+    const dis = state.coins < t.cost || full;
+    const where = t.zone === 'water' ? 'Goes in the water'
+                : t.blocks ? 'Dinos walk around this' : 'Dinos can walk over this';
     return `<button class="yard-item-btn${selectedYardType === t.id ? ' selected' : ''}" ${dis ? 'disabled' : ''}
-        onclick="selectYardType('${t.id}')" title="${t.blocks ? 'Dinos walk around this' : 'Dinos can walk over this'} · +${t.mood} mood">
+        onclick="selectYardType('${t.id}')" title="${where} · +${t.mood} mood">
       <img src="${t.src}" width="26" height="26" alt="">
       <span class="yard-item-name">${t.name}</span>
       <span class="yard-item-cost">🪙 ${t.cost}</span>
     </button>`;
+  };
+
+  wrap.innerHTML = YARD_BANDS.map(b => {
+    const items = YARD_ITEM_TYPES.filter(t => t.band === b.id);
+    if (!items.length) return '';
+    return `<div class="yard-band-label">${b.label}</div>
+      <div class="yard-band">${items.map(button).join('')}</div>`;
   }).join('');
   const hint = document.getElementById('yardTrayHint');
   hint.textContent = full
@@ -4817,7 +4908,10 @@ function placeYardItem(x, y) {
   if (!state.yardItems) state.yardItems = [];
   if (state.yardItems.length >= MAX_YARD_ITEMS) { showToast(`Yard is full (${MAX_YARD_ITEMS} items).`); return; }
   if (state.coins < t.cost) { showToast(`Not enough coins (need ${t.cost}).`); return; }
-  if (!isSolidGround(x, y)) { showToast('Place items on dry land.'); return; }
+  if (!yardZoneTest(t)(x, y)) {
+    showToast(t.zone === 'water' ? 'Place that in the water.' : 'Place items on dry land.');
+    return;
+  }
   if (state.yardItems.some(it => Math.hypot(x - it.x, y - it.y) < 5)) { showToast('Too close to another item.'); return; }
 
   state.coins -= t.cost;
