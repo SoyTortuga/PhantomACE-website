@@ -817,6 +817,9 @@
     .coll-growth-label { font-size: 9px; color: #fff; margin-bottom: 4px; display: flex; justify-content: space-between; }
     .coll-growth-bar { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
     .coll-growth-fill { height: 100%; background: linear-gradient(90deg, #ff0000, #ff4444); border-radius: 3px; transition: width 0.5s; }
+    /* Bone against the red growth bar, so two stacked bars read as two
+       different things at a glance rather than one that moved. */
+    .coll-growth-fill.lvl-fill { background: linear-gradient(90deg, #8a8272, #e8e2d0); }
 
     .coll-desc { font-size: 10px; color: #fff; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
 
@@ -1085,6 +1088,36 @@ const SERVER_SAVE_INTERVAL_MS = 20000;
 const RARITY_ORDER = ['common','uncommon','rare','epic','legendary'];
 const RARITY_COLORS = { common:'#7a7a7a', uncommon:'#2ecc71', rare:'#3498db', epic:'#9b59b6', legendary:'#f39c12' };
 const GROWTH_THRESHOLDS = { juvenile: 20, adult: 60 };
+
+/* ── PER-DINO LEVELLING ───────────────────────────────────────────────
+   Deliberately its OWN pool rather than a second reading of careCount,
+   which already drives the growth stage and the PWR/GRD/SPD figures. A
+   level derived from care would just be a fourth face on one number.
+
+   THE FAILURE TO DESIGN AROUND: any XP awarded for a park-wide event
+   lands on every dino at once, and a roster that levels in lockstep is
+   indistinguishable from the bug this replaced, where every card printed
+   the park level. So the two large sources are per-dino — care is earned
+   one animal at a time, and the daily dig credits a single random
+   resident. Park presence pays the same to everyone, which is why it is
+   the smallest of the three.
+
+   Vaulted dinos earn nothing. That is consistent with storage already
+   stopping growth and decay, and it keeps "leave it in the park" the
+   choice with a cost. */
+const DINO_XP = {
+  care: 10,            /* per care action; 5 types × 1 live-hour cooldown ⇒ ≤50/live hr */
+  stageJuvenile: 100,  /* one-off, on growing */
+  stageAdult: 250,
+  parkHour: 10,        /* passive, per live hour, park only */
+  dig: 40,             /* one randomly chosen park dino per daily dig */
+};
+
+/* level = floor(sqrt(xp / XP_PER_LEVEL)) + 1, so each level costs more
+   than the last and nothing ever caps. A perfectly tended dino earns
+   ~60 XP/live hour, which puts adulthood (12 live hours) near level 5 and
+   a month of streaming near level 9. */
+const XP_PER_LEVEL = 50;
 const STAT_DECAY_RATE = 1;
 // Decay and care cooldowns are measured in accumulated LIVE stream seconds
 // (state.liveSecAccum), not wall-clock time — both are frozen while
@@ -3646,6 +3679,22 @@ async function syncCloudSave() {
 function ensureDinoStats(d) {
   if (d.hygiene === undefined) d.hygiene = 80;
   if (d.stamina === undefined) d.stamina = 80;
+
+  /* BACKFILL, NOT A RESET. Every dino that existed before levelling has a
+     careCount and no xp. Starting them at zero would take a roster someone
+     spent live hours raising and show it as a wall of level 1s — the same
+     insult as the bug this feature fixes, in the other direction. So the
+     care they already did is converted at the rate it would have earned,
+     including the stage bonuses they would have been paid on the way.
+
+     `=== undefined` rather than `!d.xp`, because a dino legitimately
+     sitting at 0 XP must not be re-backfilled on every load. */
+  if (d.xp === undefined) {
+    const care = d.careCount || 0;
+    d.xp = care * DINO_XP.care
+      + (care >= GROWTH_THRESHOLDS.juvenile ? DINO_XP.stageJuvenile : 0)
+      + (care >= GROWTH_THRESHOLDS.adult ? DINO_XP.stageAdult : 0);
+  }
 }
 
 function applyOfflineDecay() {
@@ -3658,7 +3707,11 @@ function applyOfflineDecay() {
   if (restTicks > 0) {
     state.park.forEach(d => { ensureDinoStats(d); d.stamina = Math.min(100, d.stamina + restTicks * NIGHT_STAMINA_REGEN); });
   }
+  /* Vault dinos too. They earn nothing while stored, but they still need
+     the XP backfill — otherwise a roster put away before levelling comes
+     back out at level 1, and the sell price and card would both lie. */
   state.park.forEach(ensureDinoStats);
+  (state.vault || []).forEach(ensureDinoStats);
   if (!state.yardItems) state.yardItems = [];
   if (!state.debris) state.debris = [];
   if (!state.lastOvergrowth) state.lastOvergrowth = Date.now();
@@ -3701,6 +3754,35 @@ function getLevel() {
   const xp = [...state.park, ...state.vault].reduce((s,d) => s + d.careCount, 0) + state.discovered.length * 10;
   return Math.max(1, Math.floor(Math.sqrt(xp / 5)) + 1);
 }
+/* XP needed to REACH level n. Inverse of getDinoLevel, and the only place
+   the curve is written twice — asserted against each other in
+   server/scripts/test-dino-levels.js so they cannot drift. */
+function xpForLevel(n) { return Math.pow(Math.max(1, n) - 1, 2) * XP_PER_LEVEL; }
+
+function getDinoXp(d) { return Math.max(0, Math.floor(d.xp || 0)); }
+function getDinoLevel(d) { return Math.floor(Math.sqrt(getDinoXp(d) / XP_PER_LEVEL)) + 1; }
+
+/** How far through the current level, 0..1, for the bar. */
+function getDinoLevelProgress(d) {
+  const lv = getDinoLevel(d);
+  const base = xpForLevel(lv), next = xpForLevel(lv + 1);
+  return next === base ? 1 : Math.min(1, Math.max(0, (getDinoXp(d) - base) / (next - base)));
+}
+
+/**
+ * Award XP and report whether it crossed a level.
+ *
+ * Returns the new level only on a change, so callers can announce it
+ * without re-deriving and without announcing every single award.
+ */
+function awardDinoXp(d, amount) {
+  if (!d || !(amount > 0)) return null;
+  const before = getDinoLevel(d);
+  d.xp = getDinoXp(d) + Math.floor(amount);
+  const after = getDinoLevel(d);
+  return after > before ? after : null;
+}
+
 function getStage(d) { return d.careCount >= GROWTH_THRESHOLDS.adult ? 'adult' : d.careCount >= GROWTH_THRESHOLDS.juvenile ? 'juvenile' : 'hatchling'; }
 function getGrowthProgress(d) {
   const s = getStage(d);
@@ -4345,7 +4427,13 @@ function careAction(idx, type) {
   const newStage = getStage(dino);
   state.coins += 2;
 
+  const name = () => dino.nickname || getRosterById(dino.speciesId).name;
+  let leveled = awardDinoXp(dino, DINO_XP.care);
+
   if (newStage !== prevStage) {
+    /* The stage bonus is awarded before the announcement so a care action
+       that both grows and levels reports the level it ended on. */
+    leveled = awardDinoXp(dino, newStage === 'juvenile' ? DINO_XP.stageJuvenile : DINO_XP.stageAdult) || leveled;
     showToast(`${getRosterById(dino.speciesId).name} grew to ${newStage}! 🎉`);
     state.coins += newStage === 'juvenile' ? 20 : 50;
     // Update emoji size
@@ -4355,6 +4443,10 @@ function careAction(idx, type) {
       if (emojiEl) { emojiEl.className = `park-dino-emoji stage-${newStage} habitat-${getRosterById(dino.speciesId).habitat.toLowerCase()}`; }
     }
   }
+
+  /* Announced after the stage toast, never instead of it — growing up and
+     levelling can land on the same action and both are worth seeing. */
+  if (leveled) showToast(`${name()} reached level ${leveled}! ⭐`);
 
   save();
   renderBottomPanel();
@@ -4430,7 +4522,7 @@ async function confirmListDino(idx, source) {
     const res = await fetch('/api/marketplace', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'list', dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation, careCount: dino.careCount }, price }),
+      body: JSON.stringify({ action: 'list', dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation, careCount: dino.careCount, xp: getDinoXp(dino) }, price }),
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.error || 'Failed to list.'); return; }
@@ -4438,7 +4530,7 @@ async function confirmListDino(idx, source) {
     marketPendingAdds.set(data.id, {
       id: data.id,
       seller: { userId: session.user_id, displayName: session.display_name, profileImage: session.profile_image },
-      dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation || null, careCount: dino.careCount || 0 },
+      dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation || null, careCount: dino.careCount || 0, xp: getDinoXp(dino) },
       price, listedAt: Date.now(),
     });
     removeDinos([{ source, idx }]);
@@ -4863,6 +4955,7 @@ async function buyDino(listingId) {
       nickname: data.dino.nickname || '',
       mutation: data.dino.mutation || null,
       careCount: data.dino.careCount || 0,
+      xp: data.dino.xp || 0,
       hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
     };
     const dest = addNewDino(newDino);
@@ -4897,6 +4990,7 @@ async function cancelListing(listingId) {
       nickname: data.dino.nickname || '',
       mutation: data.dino.mutation || null,
       careCount: data.dino.careCount || 0,
+      xp: data.dino.xp || 0,
       hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
     };
     const dest = addNewDino(newDino);
@@ -5034,6 +5128,22 @@ function dailyDig() {
   const rarity = rollRarity(weights);
   const species = rollSpecies(rarity);
   const where = acquireEgg(species.id, rarity);
+
+  /* ONE random resident, not the whole park. A dig that paid everyone
+     would move every dino by the same amount every day, which is how a
+     roster ends up levelling in lockstep — the thing this system exists to
+     avoid. Crediting one animal is also the more characterful reading:
+     something came digging with you. */
+  const helpers = state.park;
+  if (helpers.length) {
+    const helper = helpers[Math.floor(Math.random() * helpers.length)];
+    ensureDinoStats(helper);
+    const lv = awardDinoXp(helper, DINO_XP.dig);
+    const hname = helper.nickname || getRosterById(helper.speciesId).name;
+    if (lv) setTimeout(() => showToast(`${hname} helped dig and reached level ${lv}! ⭐`), 2600);
+    else setTimeout(() => showToast(`${hname} helped with the dig — +${DINO_XP.dig} XP`), 2600);
+  }
+
   save(); updateTopBar(); renderEggsTab();
   showToast(where === 'storage'
     ? `Daily dig found a ${rarity} egg — incubator full, sent to Egg Storage! 🥚`
@@ -5199,7 +5309,7 @@ function hatchEgg(idx) {
   if (state.park.length >= MAX_ACTIVE_PARK && state.vault.length >= MAX_VAULT_SIZE) { showToast('Park and vault are both full!'); return; }
   const spec = getRosterById(egg.speciesId);
   const mut = egg.guaranteedMutation ? rollMutationGuaranteed(spec.id) : rollMutation(spec.id);
-  const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, hygiene:80, stamina:80, careCount:0, mutation: mut };
+  const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, hygiene:80, stamina:80, careCount:0, mutation: mut, xp: 0 };
   const dest = addNewDino(newDino);
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
   if (mut) { const mk=spec.id+'_'+mut; if(!state.discoveredMutations)state.discoveredMutations=[]; if(!state.discoveredMutations.includes(mk))state.discoveredMutations.push(mk); }
@@ -5372,7 +5482,7 @@ function performTradeUp() {
   tradeUpPicks = [];
 
   const newDino = { speciesId: spec.id, nickname: '', hunger: 80, thirst: 80, happiness: 80,
-                    hygiene: 80, stamina: 80, careCount: 0, mutation };
+                    hygiene: 80, stamina: 80, careCount: 0, mutation, xp: 0 };
   const dest = addNewDino(newDino);
 
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
@@ -5418,7 +5528,7 @@ function renderCollList() {
     return `<div class="coll-card rarity-${spec.rarity} ${i===collSelectedIdx?'selected':''}" onclick="collSelectedIdx=${i};renderCollection();">
       <div class="coll-card-sprite">${spriteImg(spec.id, 48, 'sprite-img')}</div>
       <div class="coll-card-name">${dino.nickname || spec.name}</div>
-      <div class="coll-card-level">Lv ${getLevel()} · ${stage}</div>
+      <div class="coll-card-level">Lv ${getDinoLevel(d)} · ${stage}</div>
       <div class="coll-card-bars">
         <div style="background:${hCol};opacity:${hPct}"></div>
         <div style="background:${tCol};opacity:${tPct}"></div>
@@ -5545,6 +5655,10 @@ function renderCollDetail() {
     <div class="coll-growth-section">
       <div class="coll-growth-label"><span>↑ ${stage}</span><span>${getNextStageLabel(dino)}</span></div>
       <div class="coll-growth-bar"><div class="coll-growth-fill" style="width:${getGrowthProgress(dino)*100}%"></div></div>
+    </div>
+    <div class="coll-growth-section">
+      <div class="coll-growth-label"><span>⭐ Level ${getDinoLevel(dino)}</span><span>${getDinoXp(dino) - xpForLevel(getDinoLevel(dino))} / ${xpForLevel(getDinoLevel(dino)+1) - xpForLevel(getDinoLevel(dino))} XP</span></div>
+      <div class="coll-growth-bar"><div class="coll-growth-fill lvl-fill" style="width:${getDinoLevelProgress(dino)*100}%"></div></div>
     </div>
     <div class="coll-attrs">
       <div class="coll-attr"><div class="coll-attr-label">PWR</div><div class="coll-attr-val">${power}</div></div>
@@ -5806,6 +5920,19 @@ function gameTick() {
     });
     state.lastDecayLiveSec = (state.lastDecayLiveSec || 0) + liveTicks * DECAY_INTERVAL_LIVE_SEC;
   }
+
+  /* Passive park XP, paid by the completed live hour.
+     Its own accumulator rather than a share of liveTicks, because the two
+     intervals are unrelated and tying them together would silently
+     re-scale XP the next time decay is tuned. Whole hours only, and the
+     remainder stays banked — closing the game mid-hour loses nothing, and
+     an hour cannot be paid twice. */
+  const xpHours = Math.floor(((state.liveSecAccum || 0) - (state.lastXpLiveSec || 0)) / 3600);
+  if (xpHours > 0) {
+    state.park.forEach(d => { ensureDinoStats(d); awardDinoXp(d, DINO_XP.parkHour * xpHours); });
+    state.lastXpLiveSec = (state.lastXpLiveSec || 0) + xpHours * 3600;
+  }
+
   if (isStreamLive) {
     state.eggs.forEach(e => { e.elapsed = Math.min(e.hatchTime, e.elapsed + deltaSec); });
   }

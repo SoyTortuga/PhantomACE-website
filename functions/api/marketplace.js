@@ -88,7 +88,11 @@ export async function onRequestPost(context) {
     const listing = {
       id,
       seller: { userId: session.user_id, displayName: session.display_name, profileImage: session.profile_image },
-      dino: { speciesId: body.dino.speciesId, nickname: body.dino.nickname, mutation: body.dino.mutation || null, careCount: body.dino.careCount || 0 },
+      /* xp is whitelisted alongside careCount because this object IS the
+         listing — anything absent here is gone when the dino is bought.
+         Without it a levelled dino would arrive at the buyer as level 1,
+         which reads as data loss rather than as a missing field. */
+      dino: { speciesId: body.dino.speciesId, nickname: body.dino.nickname, mutation: body.dino.mutation || null, careCount: body.dino.careCount || 0, xp: Math.max(0, Math.floor(Number(body.dino.xp) || 0)) },
       price: Math.floor(body.price),
       listedAt: Date.now(),
     };
