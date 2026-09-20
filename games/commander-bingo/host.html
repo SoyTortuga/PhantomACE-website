@@ -689,7 +689,10 @@
             body: JSON.stringify({
               code: gameCode,
               eventId: id,
-              action: wasCalled ? 'uncall' : 'call'
+              action: wasCalled ? 'uncall' : 'call',
+              /* The square's text, so the overlay can name the call. Cosmetic
+                 and host-only; ignored on an uncall. */
+              text: (BINGO_EVENTS.find(e => e.id === id) || {}).text || ''
             })
           });
         } catch { /* silent */ }

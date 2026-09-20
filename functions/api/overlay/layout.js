@@ -24,7 +24,7 @@ const KEY = 'overlay_layout';
 
 /* Must match overlay-samples.js PANELS — the ids the editor drags and the
    live overlay pins. A save naming anything else is dropped, not stored. */
-const PANEL_IDS = ['ovStage', 'ovScramble', 'ovMaze', 'ovMtg', 'ovMc'];
+const PANEL_IDS = ['ovStage', 'ovScramble', 'ovMaze', 'ovMtg', 'ovBingo', 'ovMc'];
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {

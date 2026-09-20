@@ -71,6 +71,25 @@
     <ol class="ov-mtg-top" id="ovMtgTop"></ol>
   </div>
 
+  <!-- Commander Bingo: the same standing furniture as MTGBBB — call
+       progress and player count up top, and a WINNERS board below (this
+       game has no per-player score, so "who's winning" is who the host has
+       awarded a prize). Individual calls and wins pop in the Alerts window. -->
+  <div class="ov-bingo" id="ovBingo" hidden>
+    <div class="ov-bingo-head">
+      <span class="ov-bingo-label">Commander Bingo</span>
+      <span class="ov-bingo-players" id="ovBingoPlayers"></span>
+    </div>
+    <div class="ov-bingo-pack">
+      <span id="ovBingoProgress"></span>
+    </div>
+    <div class="ov-bingo-track"><i id="ovBingoBar"></i></div>
+    <div class="ov-bingo-calllabel" id="ovBingoCallLabel" hidden>Called <span class="ov-bingo-more" id="ovBingoMore"></span></div>
+    <ol class="ov-bingo-called" id="ovBingoCalled"></ol>
+    <div class="ov-bingo-winlabel" id="ovBingoWinLabel" hidden>Winners</div>
+    <ol class="ov-bingo-top" id="ovBingoTop"></ol>
+  </div>
+
   <!-- Mana Clash: centred, and yields to an alert rather than sitting
        under one. Rounds are simultaneous, so every row carries its own
        dice. -->
@@ -90,6 +109,10 @@
   <script src="/js/pages/overlay.js" defer></script>
   <script src="/js/pages/overlay-scramble.js" defer></script>
   <script src="/js/pages/overlay-mtgbbb.js" defer></script>
+  <!-- The Commander Bingo square texts, so the panel can name called squares.
+       One source of truth, shared with the game and its host page. -->
+  <script src="/games/commander-bingo/events.js" defer></script>
+  <script src="/js/pages/overlay-commander-bingo.js" defer></script>
   <script src="/js/pages/overlay-mana-clash.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>
   <script src="/js/pages/overlay-layout.js" defer></script>

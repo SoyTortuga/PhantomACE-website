@@ -156,7 +156,7 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
      MTGBBB pull surfaces in the ALERTS window, not the MTGBBB panel. */
   const samples = fs.readFileSync(path.join(REPO, 'js/pages/overlay-samples.js'), 'utf8');
   ok('every panel declares what it holds',
-     (samples.match(/holds: \[/g) || []).length === 5);
+     (samples.match(/holds: \[/g) || []).length === (samples.match(/id: '(ov\w+)'/g) || []).length);
   ok('the alerts entry documents MTGBBB pulls landing there',
      /PULLS show here/.test(samples));
   ok('and drops, subs, raids, hype and bingo', /gift subs/.test(samples) && /Hype train/.test(samples) && /bingo & blackout/i.test(samples));
@@ -171,7 +171,7 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   /* The panel list the editor drags must match the ids the route stores,
      or a panel can be arranged and then silently not saved. */
   ok('the sample panel ids are exactly the stored ones',
-     JSON.stringify(ids) === JSON.stringify(['ovMaze', 'ovMc', 'ovMtg', 'ovScramble', 'ovStage']));
+     JSON.stringify(ids) === JSON.stringify(['ovBingo', 'ovMaze', 'ovMc', 'ovMtg', 'ovScramble', 'ovStage']));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

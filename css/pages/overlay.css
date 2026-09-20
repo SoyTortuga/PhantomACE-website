@@ -476,6 +476,166 @@ html, body {
   font-style: italic;
 }
 
+/* ══════════════════════════════════════════════
+   COMMANDER BINGO — the standing panel.
+
+   The same furniture as MTGBBB (progress bar, roster count, a board) so the
+   two games read alike on stream, but defaulted TOP-LEFT: the bottom-left
+   corner already holds MTGBBB and the scramble panel, and a broadcaster can
+   drag it anywhere from the layout editor regardless. The board here is
+   WINNERS, not a score ranking — this game has no points.
+   ══════════════════════════════════════════════ */
+.ov-bingo {
+  position: fixed;
+  left: 32px;
+  top: calc(32px + env(safe-area-inset-top, 0px));
+  width: 268px;
+  padding: 14px 16px 12px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid #2a2a2a;
+  border-left: 3px solid #ff0000;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+}
+
+.ov-bingo-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ov-bingo-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff0000;
+}
+
+.ov-bingo-players { font-size: 11px; color: #6f6f6f; }
+
+.ov-bingo-pack {
+  font-size: 12px;
+  color: #ddd;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-bingo-track {
+  height: 3px;
+  background: #1c1c1c;
+  border-radius: 2px;
+  margin: 7px 0 10px;
+  overflow: hidden;
+}
+
+.ov-bingo-track i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ff0000;
+  transition: width 0.4s ease;
+}
+
+.ov-bingo-calllabel,
+.ov-bingo-winlabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6f6f6f;
+  margin-bottom: 6px;
+}
+
+.ov-bingo-winlabel { margin-top: 12px; }
+
+/* The "+N" that says the list is capped: dimmer than the label, never the
+   loudest thing in the panel. */
+.ov-bingo-more {
+  margin-left: 6px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #8a8a8a;
+}
+
+.ov-bingo-called {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ov-bingo-called li {
+  font-size: 12px;
+  color: #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 10px;
+  position: relative;
+}
+
+/* A small red tick before each called square — the border-based accent the
+   rest of the overlay uses, no box-shadow. */
+.ov-bingo-called li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  background: #ff0000;
+  border-radius: 1px;
+}
+
+.ov-bingo-called li:first-child { color: #fff; font-weight: 600; }
+
+.ov-bingo-top {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ov-bingo-top li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: #eee;
+}
+
+.ov-bingo-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-bingo-rarity {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ov-bingo-rarity[data-rarity="common"]   { color: #9a9a9a; }
+.ov-bingo-rarity[data-rarity="uncommon"] { color: #7fd0e6; }
+.ov-bingo-rarity[data-rarity="rare"]     { color: #ffb300; }
+.ov-bingo-rarity[data-rarity="mythic"]   { color: #ff5a1f; }
+
+.ov-bingo-empty {
+  font-size: 12px;
+  color: #6f6f6f;
+  font-style: italic;
+}
+
 /* A pulled card is portrait and is the alert, so it gets more room than an
    emote mark and keeps its aspect ratio rather than being squared off. */
 .ov-mark.is-card {
@@ -511,6 +671,7 @@ html, body {
    slides is exactly the kind of motion it is asked to stop. */
 @media (prefers-reduced-motion: reduce) {
   .ov-mtg-track i { transition: none; }
+  .ov-bingo-track i { transition: none; }
 }
 
 /* ══════════════════════════════════════════════

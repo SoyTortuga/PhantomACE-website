@@ -122,5 +122,20 @@ export async function onRequestPost(context) {
     console.error('[bingo/award] entry credit failed:', err.message);
   }
 
+  /* Put the win on the overlay — the Commander Bingo equivalent of MTGBBB's
+     bingo alert. Best-effort, after the prize is safely recorded, so a
+     failed alert never affects whether the entries were credited. */
+  try {
+    const { pushOverlayEvent } = await import('../overlay/events.js');
+    await pushOverlayEvent(env, {
+      type: 'bingo-win',
+      who: awarded.name,
+      rarity: awarded.rarity,
+      entries: awarded.entries,
+    });
+  } catch (err) {
+    console.error('[bingo/award] could not push overlay event:', err.message);
+  }
+
   return json({ success: true, ...awarded, total });
 }

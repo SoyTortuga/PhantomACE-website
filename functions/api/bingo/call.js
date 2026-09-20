@@ -45,14 +45,39 @@ export async function onRequestPost(context) {
 
   if (game.status === 'ended') return json({ error: 'Game has ended' }, 400);
 
+  let newlyCalled = false;
   if (action === 'uncall') {
     game.calledEvents = game.calledEvents.filter(id => id !== eventId);
   } else {
     if (!game.calledEvents.includes(eventId)) {
       game.calledEvents.push(eventId);
+      newlyCalled = true;
     }
   }
 
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+
+  /* Overlay alert on a GENUINELY new call only — never on an uncall, and
+     never on re-calling a square already up, or the stream would flash the
+     same alert twice. The label is the host's own event text (the host page
+     already has it); it is cosmetic and host-only, so it is trusted here and
+     escaped where the overlay renders it. Best-effort: an overlay hiccup
+     must not fail the call itself. */
+  if (newlyCalled) {
+    const label = String(body.text || '').slice(0, 120).trim();
+    try {
+      const { pushOverlayEvent } = await import('../overlay/events.js');
+      await pushOverlayEvent(env, {
+        type: 'bingo-call',
+        eventId,
+        label,
+        called: game.calledEvents.length,
+        total: TOTAL_EVENTS,
+      });
+    } catch (err) {
+      console.error('[bingo/call] could not push overlay event:', err.message);
+    }
+  }
+
   return json({ success: true, calledEvents: game.calledEvents });
 }

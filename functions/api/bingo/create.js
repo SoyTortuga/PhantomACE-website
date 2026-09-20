@@ -44,5 +44,16 @@ export async function onRequestPost(context) {
   };
 
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+
+  /* Point the overlay at this room so OBS never needs a code in its URL.
+     Best-effort: a game is perfectly playable without the overlay, so a
+     failure here must not fail the create. Cleared in end.js, and only if
+     it still points at this room. */
+  try {
+    await env.MARKETPLACE.put('bingo_current', JSON.stringify({ code, at: Date.now() }));
+  } catch (err) {
+    console.error('[bingo/create] could not set bingo_current:', err.message);
+  }
+
   return json({ success: true, code });
 }

@@ -230,6 +230,40 @@
         rarity: blackout ? 'mythic' : 'rare',
       };
     }
+
+    /* ── Commander Bingo ─────────────────────────────────────────────────
+       The host calling a square — the moment a chat player marks their card.
+       Given a slightly shorter life than a normal alert because a host who
+       spots two things at once should not back the stage up for fourteen
+       seconds. The label is the square's own text, escaped in call.js's
+       source but re-escaped here since it is event-derived. */
+    if (ev.type === 'bingo-call') {
+      var called = Number(ev.called);
+      var totalSq = Number(ev.total);
+      var progress = (Number.isFinite(called) && Number.isFinite(totalSq) && totalSq > 0)
+        ? called + ' of ' + totalSq + ' called'
+        : 'Mark your card';
+      return {
+        art: ART.lit, ms: 5000,
+        kind: 'Bingo Call',
+        title: esc(ev.label || 'A square was called'),
+        sub: progress,
+        rarity: 'common',
+      };
+    }
+
+    if (ev.type === 'bingo-win') {
+      var r = String(ev.rarity || 'rare').toLowerCase();
+      var big = r === 'mythic';
+      return {
+        art: big ? ART.love3 : ART.hype,
+        kind: big ? 'BINGO!' : 'Bingo',
+        title: esc(ev.who) + ' got a bingo!',
+        sub: (big ? 'Mythic prize' : (r.charAt(0).toUpperCase() + r.slice(1)) + ' prize') +
+             (Number.isFinite(Number(ev.entries)) ? ' — +' + ev.entries + ' entries' : ''),
+        rarity: big ? 'mythic' : 'rare',
+      };
+    }
     return null;
   }
 

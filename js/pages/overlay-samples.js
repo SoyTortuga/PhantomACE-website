@@ -20,6 +20,7 @@
       'Code, item & egg drops (incl. maze rewards)',
       'MTGBBB rare & mythic PULLS show here, not in the MTGBBB panel',
       'MTGBBB bingo & blackout',
+      'Commander Bingo calls & wins',
     ] },
     { id: 'ovScramble', label: 'Scramble', holds: [
       'Round number & countdown clock',
@@ -39,6 +40,12 @@
       'Player count',
       'Top 3 players by lines',
       '(individual pulls appear in the Alerts window)',
+    ] },
+    { id: 'ovBingo', label: 'Commander Bingo', holds: [
+      'Call progress bar (squares of 68)',
+      'Player count',
+      'Winners board (name & prize rarity)',
+      '(calls & wins appear in the Alerts window)',
     ] },
     { id: 'ovMc', label: 'Mana Clash', holds: [
       'Round & FINAL ROUND flag',
@@ -147,6 +154,30 @@
       '<li><span>thirdPlace</span><span>2 lines</span></li>';
   }
 
+  function bingo() {
+    show('ovBingo');
+    set('ovBingoProgress', '19 / 68 called');
+    set('ovBingoPlayers', '12 players');
+    var bar = $('ovBingoBar'); if (bar) bar.style.width = '28%';
+    var cl = $('ovBingoCallLabel'); if (cl) cl.hidden = false;
+    set('ovBingoMore', '+3');
+    var called = $('ovBingoCalled');
+    if (called) called.innerHTML =
+      '<li>Board wipe played</li>' +
+      '<li>Sol Ring on turn 1</li>' +
+      '<li>Someone scoops early</li>' +
+      '<li>Counterspell cast</li>';
+    var wl = $('ovBingoWinLabel'); if (wl) wl.hidden = false;
+    var top = $('ovBingoTop');
+    if (top) top.innerHTML =
+      '<li><span class="ov-bingo-name">firstBingo</span>' +
+        '<span class="ov-bingo-rarity" data-rarity="mythic">mythic</span></li>' +
+      '<li><span class="ov-bingo-name">secondWinner</span>' +
+        '<span class="ov-bingo-rarity" data-rarity="rare">rare</span></li>' +
+      '<li><span class="ov-bingo-name">thirdWinner</span>' +
+        '<span class="ov-bingo-rarity" data-rarity="uncommon">uncommon</span></li>';
+  }
+
   function manaClash() {
     show('ovMc');
     set('ovMcRound', 'Round 4'); set('ovMcNote', 'FINAL ROUND'); set('ovMcGoal', '5,000');
@@ -158,7 +189,7 @@
       '<li><span>duelistThree</span><span>2,900</span></li>';
   }
 
-  function fillAll() { alertCard(); scramble(); maze(); mtg(); manaClash(); }
+  function fillAll() { alertCard(); scramble(); maze(); mtg(); bingo(); manaClash(); }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
 })();

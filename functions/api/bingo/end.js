@@ -38,5 +38,16 @@ export async function onRequestPost(context) {
   game.endedAt = Date.now();
 
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+
+  /* Take the overlay pointer down with the game, but ONLY if it still names
+     this room — a newer game may have opened and claimed it, and clearing it
+     blind would blank that live game's overlay. */
+  try {
+    const current = await env.MARKETPLACE.get('bingo_current', 'json');
+    if (current && current.code === code) await env.MARKETPLACE.delete('bingo_current');
+  } catch (err) {
+    console.error('[bingo/end] could not clear bingo_current:', err.message);
+  }
+
   return json({ success: true, players: game.players });
 }

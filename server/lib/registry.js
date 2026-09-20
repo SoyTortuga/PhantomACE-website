@@ -78,6 +78,13 @@ export const SINGLETONS = {
      the overlay on a board the server no longer knows. */
   maze_current:          { table: 'singletons', expiry: 'none' },
 
+  /* Commander Bingo's live-room pointer, exactly like mtgbbb_current: the
+     overlay resolves "the game running now" from here so OBS never needs a
+     room code in its URL. A SINGLETON, so it is matched before the `bingo_`
+     room family below. 'none' -- a pointer that expired mid-stream would
+     blank the overlay while a game was still going. */
+  bingo_current:         { table: 'singletons', expiry: 'none' },
+
   /* Milestone drop config: on/off, the rarity per event, the raid floor. */
   milestone_drops:       { table: 'singletons', expiry: 'none' },
 
