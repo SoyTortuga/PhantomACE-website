@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overlay Layout | PhantomACE</title>
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <style>
+    /* Self-contained, like the toolbox and the background studio. Border-based
+       hierarchy; no box-shadow, per the house rule. */
+    body { background: #0a0a0a; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 20px; }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #ff0000; font-size: 20px; letter-spacing: 0.06em; margin: 0 0 4px; }
+    .sub { color: #ffffffaa; font-size: 12px; margin-bottom: 14px; max-width: 780px; }
+    .bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: #111; border: 1px solid #ffffff1f; border-radius: 8px;
+      padding: 10px; margin-bottom: 14px;
+    }
+    .btn {
+      padding: 8px 14px; background: #1a1a1a; color: #fff; cursor: pointer;
+      border: 1px solid #ffffff28; border-radius: 4px; font-size: 13px; font-weight: 700;
+    }
+    .btn:hover { border-color: #ff0000; }
+    .btn-primary { border-color: #ff0000; }
+    .btn-danger { border-color: #772222; color: #ff9999; }
+    .status { font-size: 12px; color: #fff; margin-left: auto; }
+    .notice { background: #111; border: 1px solid #ff000040; border-radius: 8px; padding: 16px; font-size: 14px; }
+
+    /* The stage is the 16:9 canvas, scaled to fit. The iframe inside it is
+       the REAL overlay at 1920×1080 in layout mode — dragging moves its
+       actual panels, so there is no second copy to drift. */
+    .stage-frame {
+      position: relative; width: 100%; aspect-ratio: 16 / 9;
+      background: #000 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%230d0d0d"/><rect width="20" height="20" fill="%23111"/><rect x="20" y="20" width="20" height="20" fill="%23111"/></svg>');
+      border: 1px solid #ffffff28; border-radius: 6px; overflow: hidden;
+    }
+    #ovFrame {
+      position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+      transform-origin: top left; border: 0; background: transparent;
+    }
+    .drag-hint { font-size: 11px; color: #ffffff88; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🖥 Overlay Layout</h1>
+    <p class="sub">Drag each panel where you want it on stream, then Save. The live overlay picks it up
+      on its next load — no OBS edits needed. Panels are shown with sample content and only appear on
+      air while their game is actually running. Positions are stored as percentages, so they hold at any
+      OBS source size.</p>
+
+    <div id="notice" class="notice">Checking access…</div>
+
+    <div id="editor" style="display:none">
+      <div class="bar">
+        <button class="btn btn-primary" id="saveBtn">Save Layout</button>
+        <button class="btn" id="reloadBtn">Revert</button>
+        <button class="btn btn-danger" id="resetBtn">Reset to defaults</button>
+        <span class="status" id="status"></span>
+      </div>
+      <div class="stage-frame" id="stageFrame">
+        <iframe id="ovFrame" src="/overlay?layout=1" title="overlay preview"></iframe>
+      </div>
+      <p class="drag-hint">Drag a panel to move it. The dashed area is the 16:9 stream canvas.</p>
+    </div>
+  </div>
+
+  <script src="/js/pages/overlay-editor.js"></script>
+</body>
+</html>

@@ -58,6 +58,12 @@ export const SINGLETONS = {
      as a stream and correctly breaks a streak. */
   stream_log:            { table: 'singletons', expiry: 'none' },
 
+  /* Where each overlay panel sits, as percentages of the canvas — set in
+     the overlay editor, read by every OBS source on boot. 'none': a layout
+     that expired would snap every panel back to its default corner
+     mid-stream with nothing to explain it. */
+  overlay_layout:        { table: 'singletons', expiry: 'none' },
+
   /* Ad breaks: the running break and the cached schedule, one row.
 
      'none', and the reason is the point of the whole feature. The break is
