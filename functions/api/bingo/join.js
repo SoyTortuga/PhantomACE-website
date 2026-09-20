@@ -12,7 +12,9 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
-function generateCard() {
+/* Exported for powers.js — an extra card must be dealt by the same hand
+   as the first one. */
+export function generateCard() {
   const all = [];
   for (let i = 1; i <= TOTAL_EVENTS; i++) all.push(i);
   for (let i = all.length - 1; i > 0; i--) {
@@ -59,14 +61,24 @@ export async function onRequestPost(context) {
   const existing = game.players.find(p => p.id === playerId);
   if (existing) {
     if (existing.name !== name) existing.name = name;
+    /* Pre-powers players hold only cardIds; hand back everything they own
+       so a refresh restores extra cards and wildcard stamps, not just the
+       original card — losing those on reload was half of the extra-card
+       bug as shipped. */
+    if (!Array.isArray(existing.cards) || !existing.cards.length) existing.cards = [existing.cardIds];
+    if (!Array.isArray(existing.wildcards)) existing.wildcards = [];
+    existing.cardIds = existing.cards[0];
     await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
-    return json({ cardIds: existing.cardIds, calledEvents: game.calledEvents });
+    return json({ cardIds: existing.cardIds, cards: existing.cards, wildcards: existing.wildcards, calledEvents: game.calledEvents });
   }
 
   const cardIds = generateCard();
 
-  game.players.push({ id: playerId, name, cardIds });
+  /* cards[0] === cardIds, mirrored: the host page and older rooms read
+     cardIds, powers.js reads cards. One truth, two spellings, kept equal
+     by everything that writes a player. */
+  game.players.push({ id: playerId, name, cardIds, cards: [cardIds], wildcards: [] });
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
 
-  return json({ cardIds, calledEvents: game.calledEvents });
+  return json({ cardIds, cards: [cardIds], wildcards: [], calledEvents: game.calledEvents });
 }

@@ -27,6 +27,55 @@ async function saveInventory(env, userId, inv) {
   await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
 }
 
+/**
+ * Spend one consumable of a given game+type, under the inventory's lock.
+ *
+ * FOR GAME SERVERS, NOT FOR CLIENTS. The generic `use` action below trusts
+ * the caller about which item was spent and leaves the effect entirely
+ * client-side — which is how the bingo wildcard shipped consuming the item
+ * while the stamp itself evaporated on the next poll. A game endpoint that
+ * grants an effect must take the item itself, in the same breath as
+ * recording the effect, so "spent but nothing happened" stops being a
+ * reachable state.
+ *
+ * mutate(), not get/save: two tabs spending the last wildcard must not
+ * both succeed off the same read.
+ *
+ * Returns { ok: true, remaining } or { ok: false }.
+ */
+export async function consumeConsumable(env, userId, { game, type }) {
+  let outcome = { ok: false };
+  await env.MARKETPLACE.mutate(inventoryKey(userId), (inv) => {
+    const cur = inv || { userId, items: [], equips: {} };
+    const idx = (cur.items || []).findIndex(i =>
+      i.game === game && i.type === type && i.consumable && (i.quantity || 1) > 0);
+    if (idx === -1) { outcome = { ok: false }; return undefined; }   /* no write */
+
+    const item = cur.items[idx];
+    if ((item.quantity || 1) <= 1) cur.items.splice(idx, 1);
+    else item.quantity--;
+
+    outcome = { ok: true, remaining: item.quantity || 0 };
+    return cur;
+  });
+  return outcome;
+}
+
+/**
+ * Best-effort refund when the effect's own write failed after the item was
+ * already taken. Losing the item AND the effect is the one outcome worse
+ * than either failure alone.
+ */
+export async function refundConsumable(env, userId, { game, type, name }) {
+  await env.MARKETPLACE.mutate(inventoryKey(userId), (inv) => {
+    const cur = inv || { userId, items: [], equips: {} };
+    const existing = (cur.items || []).find(i => i.game === game && i.type === type && i.consumable);
+    if (existing) existing.quantity = (existing.quantity || 1) + 1;
+    else cur.items.push({ id: `${type}_refund_${Date.now()}`, game, type, name: name || type, consumable: true, quantity: 1 });
+    return cur;
+  });
+}
+
 /* ── GET — fetch user inventory ───────────────── */
 
 export async function onRequestGet(context) {

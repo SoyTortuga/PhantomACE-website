@@ -108,7 +108,15 @@ export function countTreatments(pull) {
  *   breakdown: { marks: number, treatments: number, bingo: number, blackout: number }
  * }}
  */
-export function scoreCard(card, pulls) {
+/**
+ * `wilds` is the wildcard stamps for THIS card: square indices (0-24)
+ * marked by a spent item rather than a pull. They participate in lines
+ * and blackout exactly like pulled marks -- a stamp that did not count
+ * toward a bingo would be the old client-side bug wearing a new coat --
+ * but they mint no treatment points, because treatments describe the
+ * cardboard the broadcaster actually opened.
+ */
+export function scoreCard(card, pulls, wilds) {
   const marked = new Array(SQUARES).fill(false);
 
   /* Where each id sits on this card. A card holds distinct ids by
@@ -118,6 +126,10 @@ export function scoreCard(card, pulls) {
   for (let i = 0; i < SQUARES; i++) {
     const id = card && card[i];
     if (id !== undefined && id !== null && !at.has(id)) at.set(id, i);
+  }
+
+  for (const i of wilds || []) {
+    if (Number.isInteger(i) && i >= 0 && i < SQUARES) marked[i] = true;
   }
 
   let treatments = 0;
@@ -271,9 +283,49 @@ export function hottest(cards, n = 3) {
  * they want to decide themselves. Equal scores come back adjacent and
  * equal, and the panel shows them as tied.
  */
+/**
+ * A player's cards and stamps, whatever era wrote the record. Rooms from
+ * before powers hold a single `card` and nothing else.
+ */
+export function playerCards(p) {
+  const cards = (Array.isArray(p.cards) && p.cards.length) ? p.cards : [p.card];
+  const wildcards = Array.isArray(p.wildcards) ? p.wildcards : [];
+  return { cards, wildcards };
+}
+
+/** The stamp indices belonging to one of a player's cards. */
+export function wildsFor(wildcards, cardIndex) {
+  return (wildcards || [])
+    .filter(w => w.cardIndex === cardIndex)
+    .map(w => w.squareIndex);
+}
+
+/**
+ * Score every card a player holds and return the best, which is what the
+ * player IS worth: standings, the winner, and the leaderboard all take one
+ * number per player, and summing cards would make a second card worth more
+ * than a better card -- pay-to-win by arithmetic. An extra card is another
+ * CHANCE, not another score.
+ */
+export function bestOf(p, pulls) {
+  const { cards, wildcards } = playerCards(p);
+  let best = null, bestIndex = 0;
+  cards.forEach((card, i) => {
+    const scored = scoreCard(card, pulls, wildsFor(wildcards, i));
+    if (!best || scored.points > best.points) { best = scored; bestIndex = i; }
+  });
+  return { scored: best, cardIndex: bestIndex, cardCount: cards.length, wildcardsUsed: (wildcards || []).length };
+}
+
 export function standings(players, pulls) {
   return (players || [])
-    .map(p => ({ ...p, ...scoreCard(p.card, pulls) }))
+    .map(p => {
+      const b = bestOf(p, pulls);
+      /* cardCount and wildcardsUsed ride along so the host panel can say
+         "2 cards, 1 stamp" next to a claim -- a bingo the host cannot
+         verify honestly is a prize dispute on stream. */
+      return { ...p, ...b.scored, bestCard: b.cardIndex, cardCount: b.cardCount, wildcardsUsed: b.wildcardsUsed };
+    })
     .sort((a, b) => (b.points - a.points) ||
       (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }

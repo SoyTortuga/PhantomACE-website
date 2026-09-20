@@ -477,6 +477,12 @@
       text-align: center;
     }
 
+    .card-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+    .card-tab {
+      padding: 5px 14px; background: #1a1a1a; color: #fff; cursor: pointer;
+      border: 1px solid #ffffff28; border-radius: 4px; font-size: 11px; font-weight: 700;
+    }
+    .card-tab.active { border-color: #ff0000; color: #ffaaaa; }
     .inv-btn.wildcard-active {
       border-color: #ffaa00;
       color: #ffaa00;
@@ -552,6 +558,7 @@
 
     <div class="bingo-alert" id="bingoAlert">B I N G O !</div>
 
+    <div class="card-tabs" id="cardTabs" hidden></div>
     <div class="score-bar">
       <div class="score-item">Marked: <span id="markedCount">1</span>/25</div>
       <div class="score-item bingo-count">Bingos: <span id="bingoCount">0</span></div>
@@ -617,6 +624,60 @@
     let markedSet = new Set();
     let previousBingos = 0;
     let pollTimer = null;
+
+    /* ── Live multi-card state ─────────────────────────────────────────
+       `card`/`markedSet` above stay THE ACTIVE CARD's view, so every
+       renderer and pattern check keeps working untouched. What changed is
+       where marks come from: they are DERIVED — called events plus this
+       card's wildcard stamps — never mutated in place. The old sweep in
+       applyCalledEvents deleted any mark it could not find in
+       calledEvents, which is precisely how a paid wildcard stamp vanished
+       within one poll. A derived set has nothing to sweep. */
+    let liveCards = null;        /* [{ ids:[...], wildcardIds:Set }] in live mode */
+    let activeCardIdx = 0;
+    let calledSet = new Set();
+
+    function deriveMarks(entry) {
+      const m = new Set(['free']);
+      for (const id of entry.ids) if (calledSet.has(id)) m.add(id);
+      for (const id of entry.wildcardIds) m.add(id);
+      return m;
+    }
+
+    function setActiveCard(i) {
+      activeCardIdx = i;
+      const entry = liveCards[i];
+      card = idsToCard(entry.ids);
+      markedSet = deriveMarks(entry);
+      previousBingos = 0;
+      exitWildcardMode();
+      renderCard();
+      renderCardTabs();
+      updateScore();
+    }
+
+    function renderCardTabs() {
+      const el = document.getElementById('cardTabs');
+      if (!liveCards || liveCards.length < 2) { el.hidden = true; return; }
+      el.hidden = false;
+      el.innerHTML = liveCards.map((c, i) =>
+        '<button class="card-tab' + (i === activeCardIdx ? ' active' : '') + '"' +
+        ' onclick="setActiveCard(' + i + ')">Card ' + (i + 1) +
+        (c.wildcardIds.size ? ' ★' : '') + '</button>').join('');
+    }
+
+    /* The server's record of us, on join and on every poll — a second tab
+       or a refresh sees the same cards and stamps as the first. */
+    function syncFromServer(cards, wildcards) {
+      const list = (cards && cards.length) ? cards : null;
+      if (!list) return;
+      liveCards = list.map((ids, i) => ({
+        ids,
+        wildcardIds: new Set((wildcards || [])
+          .filter(w => w.cardIndex === i).map(w => w.eventId)),
+      }));
+      if (activeCardIdx >= liveCards.length) activeCardIdx = liveCards.length - 1;
+    }
 
     let guestId = localStorage.getItem('bingo_guestId');
     if (!guestId) {
@@ -725,13 +786,14 @@
         }
         if (!res.ok) throw new Error('not found');
         const data = await res.json();
-        card = idsToCard(data.cardIds);
-        markedSet = new Set(['free']);
-        if (data.calledEvents) {
-          data.calledEvents.forEach(id => markedSet.add(id));
-        }
-        previousBingos = 0;
+        calledSet = new Set(data.calledEvents || []);
+        syncFromServer(data.cards || [data.cardIds], data.wildcards || []);
         setupLiveUI('live');
+        setActiveCard(0);
+        /* Deliberately NOT loaded at page open any more: the bar appears on
+       joining a live game. In practice mode the buttons would spend real
+       items on a card that exists only locally — an item sink with no
+       game attached. */
         pollTimer = setInterval(pollState, 3000);
 
       } catch {
@@ -797,6 +859,7 @@
         const res = await fetch('/api/bingo/state?code=' + gameCode);
         if (!res.ok) return;
         const data = await res.json();
+        if (data.you) syncFromServer(data.you.cards, data.you.wildcards);
         applyCalledEvents(data.calledEvents || []);
         if (data.status === 'ended') {
           clearInterval(pollTimer);
@@ -817,27 +880,33 @@
     }
 
     function applyCalledEvents(calledIds) {
-      const calledSet = new Set(calledIds);
+      calledSet = new Set(calledIds);
 
-      calledIds.forEach(id => {
-        if (!markedSet.has(id)) {
-          markedSet.add(id);
-          const cell = document.querySelector('.bingo-cell[data-id="' + id + '"]');
-          if (cell) {
-            cell.classList.add('marked', 'just-marked');
-            setTimeout(() => cell.classList.remove('just-marked'), 500);
-          }
-        }
-      });
+      /* DERIVED WHOLESALE, never swept. The old version deleted any mark
+         missing from calledEvents — which is also every wildcard stamp,
+         so a stamp survived at most one poll after being paid for. Marks
+         are now recomputed from called + this card's own stamps: a host
+         retraction still unmarks, and a stamp cannot be eaten, because
+         both are inputs rather than residue. */
+      const entry = liveCards ? liveCards[activeCardIdx] : null;
+      const next = entry ? deriveMarks(entry) : new Set(['free']);
+      if (!entry) calledIds.forEach(id => next.add(id));
 
-      for (const id of [...markedSet]) {
-        if (id !== 'free' && !calledSet.has(id)) {
-          markedSet.delete(id);
-          const cell = document.querySelector('.bingo-cell[data-id="' + id + '"]');
-          if (cell) cell.classList.remove('marked', 'in-pattern');
+      for (const id of next) {
+        if (markedSet.has(id)) continue;
+        const cell = document.querySelector('.bingo-cell[data-id="' + id + '"]');
+        if (cell) {
+          cell.classList.add('marked', 'just-marked');
+          setTimeout(() => cell.classList.remove('just-marked'), 500);
         }
       }
-
+      for (const id of markedSet) {
+        if (next.has(id)) continue;
+        const cell = document.querySelector('.bingo-cell[data-id="' + id + '"]');
+        if (cell) cell.classList.remove('marked', 'in-pattern');
+      }
+      markedSet = next;
+      renderCardTabs();
       updateScore();
     }
 
@@ -937,6 +1006,22 @@
 
     /* ── Results ─────────────────────────── */
     function showGameResults() {
+      /* Results and the leaderboard read the player's BEST card. Playing
+         two cards is two chances at one score, not two scores — summing
+         would make a spare card outrank a better one. */
+      if (liveCards && liveCards.length > 1) {
+        let bestIdx = 0, bestCount = -1;
+        liveCards.forEach((e, i) => {
+          card = idsToCard(e.ids);
+          markedSet = deriveMarks(e);
+          const c = getPatterns().length;
+          if (c > bestCount) { bestCount = c; bestIdx = i; }
+        });
+        activeCardIdx = bestIdx;
+        card = idsToCard(liveCards[bestIdx].ids);
+        markedSet = deriveMarks(liveCards[bestIdx]);
+      }
+
       const patterns = getPatterns();
       document.getElementById('resultsBingos').textContent = patterns.length;
 
@@ -967,7 +1052,8 @@
       }).join('');
 
       document.getElementById('resultsSubtitle').textContent =
-        markedSet.size + ' squares marked';
+        markedSet.size + ' squares marked' +
+        (liveCards && liveCards.length > 1 ? ' · best of ' + liveCards.length + ' cards' : '');
 
       showScreen('resultsScreen');
 
@@ -993,6 +1079,11 @@
     function leaveGame() {
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = null;
+      liveCards = null;
+      activeCardIdx = 0;
+      calledSet = new Set();
+      document.getElementById('bingoInvBar').hidden = true;
+      document.getElementById('cardTabs').hidden = true;
       backToJoin();
     }
 
@@ -1034,7 +1125,8 @@
     function renderBingoInventory() {
       const wcTotal = wildcardItems.reduce((s, i) => s + (i.quantity || 1), 0);
       const bcTotal = bonusCardItems.reduce((s, i) => s + (i.quantity || 1), 0);
-      if (wcTotal === 0 && bcTotal === 0) return;
+      if (gameMode !== 'live') { document.getElementById('bingoInvBar').hidden = true; return; }
+      if (wcTotal === 0 && bcTotal === 0 && (!liveCards || liveCards.length < 2)) return;
 
       document.getElementById('bingoInvBar').hidden = false;
 
@@ -1078,55 +1170,70 @@
       const evt = card[index];
       if (evt.id === 'free' || markedSet.has(evt.id)) return;
 
-      const item = wildcardItems.find(i => (i.quantity || 1) > 0);
-      if (!item) return;
-
-      markedSet.add(evt.id);
-      const cell = document.querySelector('.bingo-cell[data-index="' + index + '"]');
-      if (cell) {
-        cell.classList.add('marked', 'just-marked');
-        setTimeout(() => cell.classList.remove('just-marked'), 500);
-      }
-
-      if (item.quantity > 1) item.quantity--;
-      else wildcardItems = wildcardItems.filter(i => i !== item);
-
+      /* THE SERVER SPENDS THE ITEM AND RECORDS THE STAMP IN ONE MOVE. The
+         old order — mark locally, then tell the generic inventory route an
+         item was used — paid for a mark the next poll deleted. Now the
+         stamp exists in the room before this function draws anything, so
+         no poll can disagree with it. */
       exitWildcardMode();
-      renderBingoInventory();
-      updateScore();
-
       try {
-        await fetch('/api/inventory', {
+        const res = await fetch('/api/bingo/powers', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'use', itemId: item.id }),
+          body: JSON.stringify({ action: 'wildcard', code: gameCode,
+                                 cardIndex: activeCardIdx, eventId: evt.id }),
         });
-      } catch {}
+        const data = await res.json();
+        if (!res.ok) { showInvError(data.error || 'Could not stamp that square.'); return; }
+
+        liveCards[activeCardIdx].wildcardIds.add(evt.id);
+        markedSet.add(evt.id);
+        const cell = document.querySelector('.bingo-cell[data-index="' + index + '"]');
+        if (cell) {
+          cell.classList.add('marked', 'just-marked');
+          setTimeout(() => cell.classList.remove('just-marked'), 500);
+        }
+        renderCardTabs();
+        updateScore();
+        loadBingoInventory();
+      } catch {
+        showInvError('Could not reach the game.');
+      }
+    }
+
+    function showInvError(msg) {
+      const bar = document.getElementById('bingoInvBar');
+      let el = document.getElementById('invError');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'invError';
+        el.style.cssText = 'font-size:10px;color:#ff9999;width:100%;text-align:center;margin-top:4px;';
+        bar.appendChild(el);
+      }
+      el.textContent = msg;
+      setTimeout(() => { el.textContent = ''; }, 4000);
     }
 
     async function useBonusCard() {
-      const bcTotal = bonusCardItems.reduce((s, i) => s + (i.quantity || 1), 0);
-      if (bcTotal === 0) return;
-
-      const item = bonusCardItems.find(i => (i.quantity || 1) > 0);
-      if (!item) return;
-
-      card = generateCard();
-      markedSet = new Set(['free']);
-      previousBingos = 0;
-      exitWildcardMode();
-      renderCard();
-      updateScore();
-
-      if (item.quantity > 1) item.quantity--;
-      else bonusCardItems = bonusCardItems.filter(i => i !== item);
-      renderBingoInventory();
-
+      /* AN EXTRA CARD, NOT A REPLACEMENT. The old version overwrote `card`
+         with a local reroll: the first card, its marks and its bingos were
+         destroyed on the spot, and since the server still held the
+         original, a refresh brought the old card back and the new one had
+         never existed anywhere but the page that paid for it. The card is
+         dealt by the server into the room now, and arrives as a tab. */
       try {
-        await fetch('/api/inventory', {
+        const res = await fetch('/api/bingo/powers', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'use', itemId: item.id }),
+          body: JSON.stringify({ action: 'extra-card', code: gameCode }),
         });
-      } catch {}
+        const data = await res.json();
+        if (!res.ok) { showInvError(data.error || 'Could not add a card.'); return; }
+
+        liveCards.push({ ids: data.cardIds, wildcardIds: new Set() });
+        setActiveCard(liveCards.length - 1);
+        loadBingoInventory();
+      } catch {
+        showInvError('Could not reach the game.');
+      }
     }
 
     document.addEventListener('keydown', (e) => {

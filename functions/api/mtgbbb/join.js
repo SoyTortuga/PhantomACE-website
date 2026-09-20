@@ -60,13 +60,15 @@ export async function onRequestPost(context) {
     const existing = room.players.find(p => p.id === playerId);
     if (existing) {
       if (existing.name !== name) existing.name = name;
+      if (!Array.isArray(existing.cards) || !existing.cards.length) existing.cards = [existing.card];
+      if (!Array.isArray(existing.wildcards)) existing.wildcards = [];
       result = { card: existing.card };
       return room;
     }
 
     const pool = room.pool.map(c => c.name);
     const card = buildCard(pool, `${code}:${session.user_id}`);
-    room.players.push({ id: playerId, name, card });
+    room.players.push({ id: playerId, name, card, cards: [card], wildcards: [] });
     result = { card };
     return room;
   }, { expirationTtl: GAME_TTL });

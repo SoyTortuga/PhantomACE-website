@@ -25,7 +25,7 @@
    plain 404, same as an unknown code.
    ══════════════════════════════════════════════ */
 
-import { scoreCard, oneAway, standings, hottest } from '../mtgbbb-scoring.js';
+import { scoreCard, oneAway, standings, hottest, playerCards, wildsFor } from '../mtgbbb-scoring.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -101,7 +101,30 @@ export async function onRequestGet(context) {
     const myId = 'u_' + session.user_id;
     const me = room.players.find(p => p.id === myId);
     if (me) {
-      const scored = scoreCard(me.card, room.pulls);
+      /* Every card the player holds, each scored with ITS OWN wildcard
+         stamps, plus which one is currently best. The legacy `you.card`
+         stays and mirrors the best card, so anything still reading the
+         single-card shape sees the number the standings see. */
+      const { cards, wildcards } = playerCards(me);
+      const views = cards.map((card, ci) => {
+        const wilds = wildsFor(wildcards, ci);
+        const wildSet = new Set(wilds);
+        const scored = scoreCard(card, room.pulls, wilds);
+        return {
+          scored,
+          view: card.map((name, i) => ({
+            name,
+            marked: scored.marked[i],
+            wild: wildSet.has(i),
+            rarity: byName.get(name) ? byName.get(name).rarity : '',
+            image: byName.get(name) ? byName.get(name).image : '',
+          })),
+        };
+      });
+      let best = 0;
+      views.forEach((v, i) => { if (v.scored.points > views[best].scored.points) best = i; });
+      const scored = views[best].scored;
+
       /* shot.js requires a player to have joined before calling a shot, so
          a shot can only exist here alongside a card — no separate branch
          for "has a shot but never joined" to keep in sync with the UI. */
@@ -109,12 +132,16 @@ export async function onRequestGet(context) {
       out.you = {
         id: me.id,
         name: me.name,
-        card: me.card.map((name, i) => ({
-          name,
-          marked: scored.marked[i],
-          rarity: byName.get(name) ? byName.get(name).rarity : '',
-          image: byName.get(name) ? byName.get(name).image : '',
+        card: views[best].view,
+        cards: views.map((v, i) => ({
+          card: v.view,
+          marks: v.scored.marks,
+          points: v.scored.points,
+          lines: v.scored.lines.map(l => l.id),
+          oneAway: [...oneAway(v.scored.marked)],
+          best: i === best,
         })),
+        wildcardsUsed: wildcards.length,
         marks: scored.marks,
         treatments: scored.treatments,
         lines: scored.lines.map(l => l.id),

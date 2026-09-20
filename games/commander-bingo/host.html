@@ -805,20 +805,36 @@
       }
 
       const results = players.map(p => {
-        const cardEvents = p.cardIds.map(id => id === 0 ? 'free' : id);
-        const marked = cardEvents.filter(id => id === 'free' || calledEvents.has(id));
-        const bingos = countBingos(cardEvents);
+        /* A player may hold several cards now, and wildcard stamps count
+           as marks — the host's verification must see exactly what the
+           player's page scores, or every close call becomes a dispute.
+           The player is worth their BEST card; the badge column says how
+           they got there so "3 bingos (2 cards, 1 stamp)" reads honestly. */
+        const cards = (Array.isArray(p.cards) && p.cards.length) ? p.cards : [p.cardIds];
+        const wilds = Array.isArray(p.wildcards) ? p.wildcards : [];
+        let best = { bingos: -1, marked: 0 };
+        cards.forEach((ids, ci) => {
+          const wildIds = new Set(wilds.filter(w => w.cardIndex === ci).map(w => w.eventId));
+          const cardEvents = ids.map(id => id === 0 ? 'free' : id);
+          const m = cardEvents.filter(id => id === 'free' || calledEvents.has(id) || wildIds.has(id));
+          const bingos = countBingos(cardEvents, wildIds);
+          if (bingos > best.bingos || (bingos === best.bingos && m.length > best.marked)) {
+            best = { bingos, marked: m.length };
+          }
+        });
         /* The id comes through so a prize can be awarded to a player rather
            than to a display name, which two people can share. */
-        return { id: p.id, name: p.name, bingos, marked: marked.length };
+        return { id: p.id, name: p.name, bingos: best.bingos, marked: best.marked,
+                 cardCount: cards.length, wildcardsUsed: wilds.length };
       });
 
       results.sort((a, b) => b.bingos - a.bingos || b.marked - a.marked);
       showResults(results);
     }
 
-    function countBingos(cardEvents) {
-      const m = cardEvents.map(id => id === 'free' || calledEvents.has(id));
+    function countBingos(cardEvents, wildIds) {
+      const w = wildIds || new Set();
+      const m = cardEvents.map(id => id === 'free' || calledEvents.has(id) || w.has(id));
       let count = 0;
 
       for (let r = 0; r < 5; r++) {
@@ -847,7 +863,14 @@
         body.innerHTML = results.map((r, i) =>
           '<div class="lb-row">' +
           '<div class="lb-rank">' + (i + 1) + '</div>' +
-          '<div class="lb-name">' + escHtml(r.name) + '</div>' +
+          '<div class="lb-name">' + escHtml(r.name) +
+            ((r.cardCount > 1 || r.wildcardsUsed > 0)
+              ? ' <span style="font-size:9px;color:#ffffff88">(' +
+                (r.cardCount > 1 ? r.cardCount + ' cards' : '') +
+                (r.cardCount > 1 && r.wildcardsUsed > 0 ? ' · ' : '') +
+                (r.wildcardsUsed > 0 ? r.wildcardsUsed + ' stamp' + (r.wildcardsUsed > 1 ? 's' : '') : '') +
+                ')</span>'
+              : '') + '</div>' +
           '<div class="lb-bingos">' + r.bingos + '</div>' +
           '<div class="lb-marked">' + r.marked + '/25</div>' +
           awardControl(r) +

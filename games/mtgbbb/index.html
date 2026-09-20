@@ -112,6 +112,26 @@
     }
 
     .mtg-cell.just-marked { animation: cell-flash 0.6s ease-out; }
+    .mtg-cell.wild::after {
+      content: '°5'; position: absolute; top: 2px; right: 4px;
+      font-size: 11px; color: #ffcc44;
+    }
+    .mtg-cell.wildcard-target { cursor: pointer; border-color: #ffcc4477; }
+    .mtg-cell.wildcard-target:hover { border-color: #ffcc44; }
+    .card-tabs { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
+    .card-tab {
+      padding: 5px 14px; background: #1a1a1a; color: #fff; cursor: pointer;
+      border: 1px solid #ffffff28; border-radius: 4px; font-size: 11px; font-weight: 700;
+    }
+    .card-tab.active { border-color: #ff0000; color: #ffaaaa; }
+    .inv-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
+    .inv-btn {
+      padding: 6px 12px; background: #1a1a1a; color: #fff; cursor: pointer;
+      border: 1px solid #ffffff28; border-radius: 4px; font-size: 11px; font-weight: 700;
+    }
+    .inv-btn:disabled { opacity: 0.4; cursor: default; }
+    .inv-btn.wildcard-active { border-color: #ffcc44; color: #ffcc44; }
+    .inv-count { color: #ffaa00; margin-left: 4px; }
     @keyframes cell-flash {
       0% { background: rgba(255, 0, 0, 0.55); }
       100% { background: rgba(152, 9, 10, 0.15); }
@@ -227,6 +247,7 @@
       <div class="pack-bar"><div class="pack-bar-fill" id="packBarFill" style="width:0%"></div></div>
     </div>
 
+    <div class="card-tabs" id="cardTabs" hidden></div>
     <div class="mtg-grid" id="mtgGrid"></div>
 
     <div class="bingo-alert" id="bingoAlert">Bingo!</div>
@@ -239,6 +260,16 @@
       <div class="score-item">Treatments: <span id="treatCount">0</span></div>
       <div class="score-item">Lines: <span id="linesCount">0</span></div>
       <div class="score-item total">Points: <span id="pointsCount">0</span></div>
+    </div>
+
+    <div class="inv-bar" id="mtgInvBar" hidden>
+      <button class="inv-btn" id="mtgWildcardBtn" onclick="toggleWildcard()" disabled>
+        Wildcard Stamp <span class="inv-count" id="mtgWildcardCount">0</span>
+      </button>
+      <button class="inv-btn" id="mtgBonusBtn" onclick="useExtraCard()" disabled>
+        Extra Card <span class="inv-count" id="mtgBonusCount">0</span>
+      </button>
+      <div id="mtgInvError" style="font-size:10px;color:#ff9999;width:100%;text-align:center;"></div>
     </div>
 
     <div class="card-actions">
@@ -269,6 +300,117 @@
     let pollTimer = null;
     let previousLines = 0;
     let previousPulls = 0;
+
+    /* ── Cards & powers ────────────────────────────────────────────────
+       The server scores every card the player holds and says which is
+       best; this page shows one at a time behind tabs. Wildcard stamps
+       and extra cards go through /api/mtgbbb/powers, which takes the item
+       and records the effect in the same breath — the pattern Commander
+       Bingo had to learn after stamps that evaporated on the next poll. */
+    let activeCardIdx = 0;
+    let wildcardMode = false;
+    let invWild = 0, invBonus = 0, invLoaded = false;
+
+    async function loadItemCounts() {
+      try {
+        /* The commander-bingo pool on purpose: it is the namespace every
+           already-granted pass reward carries, shared by both bingos. */
+        const res = await fetch('/api/inventory?game=commander-bingo');
+        if (!res.ok) return;
+        const items = (await res.json()).items || [];
+        invWild = items.filter(i => i.type === 'wildcard').reduce((s, i) => s + (i.quantity || 1), 0);
+        invBonus = items.filter(i => i.type === 'bonus-card').reduce((s, i) => s + (i.quantity || 1), 0);
+        invLoaded = true;
+        renderInvBar();
+      } catch {}
+    }
+
+    function renderInvBar() {
+      const bar = document.getElementById('mtgInvBar');
+      if (!invLoaded || (invWild === 0 && invBonus === 0)) { bar.hidden = true; return; }
+      bar.hidden = false;
+      document.getElementById('mtgWildcardCount').textContent = invWild;
+      document.getElementById('mtgBonusCount').textContent = invBonus;
+      document.getElementById('mtgWildcardBtn').disabled = invWild === 0;
+      document.getElementById('mtgBonusBtn').disabled = invBonus === 0;
+    }
+
+    function invError(msg) {
+      const el = document.getElementById('mtgInvError');
+      el.textContent = msg;
+      setTimeout(() => { el.textContent = ''; }, 4000);
+    }
+
+    function toggleWildcard() {
+      if (invWild === 0 && !wildcardMode) return;
+      wildcardMode = !wildcardMode;
+      document.getElementById('mtgWildcardBtn').classList.toggle('wildcard-active', wildcardMode);
+      document.querySelectorAll('.mtg-cell').forEach(c => {
+        c.classList.toggle('wildcard-target', wildcardMode && !c.classList.contains('marked'));
+      });
+    }
+
+    async function useWildcardOnSquare(i) {
+      wildcardMode = false;
+      document.getElementById('mtgWildcardBtn').classList.remove('wildcard-active');
+      document.querySelectorAll('.mtg-cell.wildcard-target').forEach(c => c.classList.remove('wildcard-target'));
+      try {
+        const res = await fetch('/api/mtgbbb/powers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'wildcard', code: gameCode,
+                                 cardIndex: activeCardIdx, squareIndex: i }),
+        });
+        const data = await res.json();
+        if (!res.ok) { invError(data.error || 'Could not stamp that square.'); return; }
+        invWild = Math.max(0, invWild - 1);
+        renderInvBar();
+        pollState();      /* the server re-scores; the stamp comes back marked */
+      } catch { invError('Could not reach the game.'); }
+    }
+
+    async function useExtraCard() {
+      try {
+        const res = await fetch('/api/mtgbbb/powers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'extra-card', code: gameCode }),
+        });
+        const data = await res.json();
+        if (!res.ok) { invError(data.error || 'Could not add a card.'); return; }
+        invBonus = Math.max(0, invBonus - 1);
+        renderInvBar();
+        await pollState();
+        const you = lastYou;
+        if (you && you.cards) setActiveCard(you.cards.length - 1);
+      } catch { invError('Could not reach the game.'); }
+    }
+
+    let lastYou = null;
+    function setActiveCard(i) {
+      activeCardIdx = i;
+      gridBuilt = false;      /* force a rebuild for the new card's art */
+      if (lastYou) { renderCardTabs(lastYou); renderGrid(lastYou); renderCardStats(lastYou); }
+    }
+
+    function renderCardTabs(you) {
+      const el = document.getElementById('cardTabs');
+      const many = you.cards && you.cards.length > 1;
+      el.hidden = !many;
+      if (!many) return;
+      el.innerHTML = you.cards.map((c, i) =>
+        '<button class="card-tab' + (i === activeCardIdx ? ' active' : '') + '"' +
+        ' onclick="setActiveCard(' + i + ')">Card ' + (i + 1) +
+        (c.best ? ' ⭐' : '') + '</button>').join('');
+    }
+
+    /* The visible numbers describe the visible card; the rank is always
+       the player's best, because that is what the standings pay. */
+    function renderCardStats(you) {
+      const v = (you.cards && you.cards[activeCardIdx]) || you;
+      document.getElementById('marksCount').textContent = v.marks;
+      document.getElementById('linesCount').textContent = (v.lines || []).length;
+      document.getElementById('pointsCount').textContent = v.points;
+      document.getElementById('treatCount').textContent = you.treatments;
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
       const gate = document.getElementById('loginGate');
@@ -325,6 +467,7 @@
         showScreen('cardScreen');
         await pollState();
         pollTimer = setInterval(pollState, 2000);
+        loadItemCounts();
       } catch {
         errorEl.textContent = 'Network error — try again.';
       } finally {
@@ -360,12 +503,11 @@
       document.getElementById('rankNum').textContent = rank || '—';
       document.getElementById('rankTotal').textContent = data.standings.length;
 
+      lastYou = you;
+      if (you.cards && activeCardIdx >= you.cards.length) activeCardIdx = 0;
+      renderCardTabs(you);
       renderGrid(you);
-
-      document.getElementById('marksCount').textContent = you.marks;
-      document.getElementById('treatCount').textContent = you.treatments;
-      document.getElementById('linesCount').textContent = you.lines.length;
-      document.getElementById('pointsCount').textContent = you.points;
+      renderCardStats(you);
 
       if (you.lines.length > previousLines && you.lines.length > 0) {
         const alert = document.getElementById('bingoAlert');
@@ -469,11 +611,16 @@
     let gridBuilt = false;
     function renderGrid(you) {
       const grid = document.getElementById('mtgGrid');
-      const oneAway = new Set(you.oneAway || []);
+      /* The ACTIVE card's view. you.card mirrors the best card for older
+         readers; the tabs read you.cards, where each entry carries its own
+         oneAway and its own wildcard flags. */
+      const view = (you.cards && you.cards[activeCardIdx]) ? you.cards[activeCardIdx].card : you.card;
+      const oneAway = new Set((you.cards && you.cards[activeCardIdx])
+        ? you.cards[activeCardIdx].oneAway : (you.oneAway || []));
 
-      if (!gridBuilt || grid.children.length !== you.card.length) {
-        grid.innerHTML = you.card.map((c, i) => `
-          <div class="mtg-cell" data-index="${i}">
+      if (!gridBuilt || grid.children.length !== view.length) {
+        grid.innerHTML = view.map((c, i) => `
+          <div class="mtg-cell" data-index="${i}" onclick="if (wildcardMode) useWildcardOnSquare(${i})">
             ${c.image ? `<img src="${escAttr(c.image)}" alt="" loading="lazy">` : ''}
             <span class="mtg-rarity"></span>
             <span class="mtg-name">${escHtml(c.name)}</span>
@@ -481,7 +628,7 @@
         gridBuilt = true;
       }
 
-      you.card.forEach((c, i) => {
+      view.forEach((c, i) => {
         const cell = grid.children[i];
         if (!cell) return;
         const wasMarked = cell.classList.contains('marked');
@@ -489,6 +636,7 @@
         const rarityEl = cell.querySelector('.mtg-rarity');
         if (rarityEl) rarityEl.textContent = c.rarity === 'mythic' ? 'M' : c.rarity === 'rare' ? 'R' : '';
         cell.classList.toggle('one-away', oneAway.has(i) && !c.marked);
+        cell.classList.toggle('wild', !!c.wild);
         if (c.marked && !wasMarked) {
           cell.classList.add('marked', 'just-marked');
           setTimeout(() => cell.classList.remove('just-marked'), 600);
