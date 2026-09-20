@@ -710,6 +710,42 @@
       text-transform: uppercase; letter-spacing: 0.08em;
     }
     .trade-open:hover { color: #fff; border-color: #ff000055; }
+    /* Visiting reuses the trade-open shape so the collection controls read
+       as one set rather than as a feature bolted on. Border-based, per the
+       house rule — no box-shadow anywhere in this project. */
+    .visit-open { border-color: #ffffff1a; }
+    .visit-open:hover { color: #fff; border-color: #6688cc77; }
+    .visit-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; width: 100%; margin-bottom: 6px; padding: 6px 8px;
+      background: #1a1a1a; border: 1px solid #ffffff1a; border-radius: 4px;
+      font-size: 9px; color: #fff;
+    }
+    .visit-toggle button {
+      padding: 3px 8px; border-radius: 3px; font-size: 9px; font-weight: 700;
+      cursor: pointer; background: #222; color: #fff; border: 1px solid #ffffff28;
+    }
+    .visit-toggle button.on { border-color: #6688cc; color: #cfe0ff; }
+    .visit-dialog {
+      background: #111; border: 2px solid #6688cc; border-radius: 10px;
+      padding: 18px; width: min(560px, 92vw); max-height: 82vh; overflow-y: auto;
+    }
+    .visit-head { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .visit-sub { font-size: 9px; color: #9aa7bd; margin-bottom: 12px; }
+    .visit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+    .visit-card {
+      background: #161616; border: 1px solid #ffffff14; border-radius: 6px;
+      padding: 8px 6px; text-align: center;
+    }
+    .visit-card-name { font-size: 9px; color: #fff; margin-top: 4px; word-break: break-word; }
+    .visit-card-lv { font-size: 8px; color: #9aa7bd; margin-top: 2px; }
+    .visit-empty { font-size: 10px; color: #9aa7bd; text-align: center; padding: 18px; }
+    .visit-btns { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+    .visit-btns button {
+      padding: 7px 14px; border-radius: 4px; font-size: 10px; font-weight: 700;
+      cursor: pointer; background: #222; color: #fff; border: 1px solid #ffffff28;
+    }
+    .visit-btns button:hover { border-color: #6688cc; }
     .trade-bar {
       background: #0f0f0f; border: 1px solid #ffffff14; border-radius: 4px;
       padding: 8px; margin-bottom: 8px;
@@ -2535,6 +2571,32 @@ function toggleFavorite(idx) {
   save();
 }
 
+/**
+ * Escape a player-authored string for interpolation into innerHTML.
+ *
+ * NICKNAMES ARE THE ONLY PLAYER-AUTHORED TEXT THIS PAGE RENDERS, AND THEY
+ * TRAVEL. A dino carries its nickname onto a marketplace listing — and now
+ * into someone else's park view — and both grids are built as strings and
+ * assigned to innerHTML. Unescaped, a nickname of `<img src=x onerror=...>`
+ * becomes live markup on every other player's screen. Verified against the
+ * real card template rather than assumed.
+ *
+ * Applied to every nickname regardless of whose it is. A rule that only
+ * covers other people's strings is one refactor away from being wrong
+ * about which is which.
+ */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+/** A dino's display name, always escaped. Never interpolate a raw one. */
+function dinoName(dino, spec) {
+  const s = spec || getRosterById(dino.speciesId) || {};
+  return escapeHtml(dino.nickname || s.name || 'Dinosaur');
+}
+
 function spriteImg(specId, size, cls, mutation) {
   const asset = ASSET_MAP[specId];
   if (asset) {
@@ -3636,6 +3698,11 @@ async function syncCloudSave() {
     if (!res.ok) return;
     const data = await res.json();
 
+    /* Read from the server's consent row, never inferred from the save.
+       The toggle has to show what the listing will actually do, and the
+       two live in different places on purpose. */
+    parkVisitable = !!(data && data.visitable);
+
     if (data && data.hasSave && data.state && isStaleSave(data.state)) {
       /* A pre-epoch cloud save. Overwrite it now with the fresh state
          rather than merely ignoring it: otherwise it sits there being
@@ -4258,7 +4325,7 @@ function renderParkWorld() {
     const sprSize = stage === 'hatchling' ? 20 : stage === 'juvenile' ? 26 : 32;
     el.innerHTML = `
       ${needsAttention ? '<div class="park-dino-alert"></div>' : ''}
-      <div class="park-dino-label">${dino.nickname || spec.name}</div>
+      <div class="park-dino-label">${dinoName(dino, spec)}</div>
       <div class="park-dino-sprite habitat-${spec.habitat.toLowerCase()}"
            style="transform: scaleX(${dino.facing || 1})">
         ${spriteImg(spec.id, sprSize, 'sprite-img', dino.mutation)}
@@ -4334,7 +4401,7 @@ function renderBottomPanel() {
     <div class="panel-header">
       <div class="panel-emoji">${spriteImg(spec.id, 40, 'sprite-img')}</div>
       <div class="panel-info">
-        <div class="panel-name">${dino.nickname || spec.name}</div>
+        <div class="panel-name">${dinoName(dino, spec)}</div>
         <div class="panel-meta">
           <span class="panel-badge pbadge-${spec.rarity}">${spec.rarity}</span>
           <span class="panel-badge pbadge-diet">${spec.diet}</span>
@@ -4488,7 +4555,7 @@ function sellDino(idx, source) {
       <div class="sell-dialog-title">List on Marketplace</div>
       <div class="sell-dialog-sprite">${spriteImg(spec.id, 64, 'sprite-img', dino.mutation)}</div>
       <div class="sell-dialog-info">
-        ${dino.nickname || spec.name} · ${spec.rarity}${mutInfo ? ' · ' + mutInfo.label : ''} · ${getStage(dino)}
+        ${dinoName(dino, spec)} · ${spec.rarity}${mutInfo ? ' · ' + mutInfo.label : ''} · ${getStage(dino)}
       </div>
       <div class="sell-dialog-price-row">
         <label>Price:</label>
@@ -4886,7 +4953,7 @@ async function renderMarketplace() {
       html += `
         <div class="market-card">
           <div class="market-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', l.dino.mutation)}</div>
-          <div class="market-card-name">${l.dino.nickname || spec.name}</div>
+          <div class="market-card-name">${dinoName(l.dino, spec)}</div>
           <div class="market-card-meta">
             <span class="rarity-chip rarity-${spec.rarity}">${spec.rarity}</span>
             ${mutInfo ? `<div class="market-mut-badge">✨ ${mutInfo.label}</div>` : ''}
@@ -4912,7 +4979,7 @@ async function renderMarketplace() {
       html += `
         <div class="market-card">
           <div class="market-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', l.dino.mutation)}</div>
-          <div class="market-card-name">${l.dino.nickname || spec.name}</div>
+          <div class="market-card-name">${dinoName(l.dino, spec)}</div>
           <div class="market-card-meta">
             <span class="rarity-chip rarity-${spec.rarity}">${spec.rarity}</span>
             ${mutInfo ? `<div class="market-mut-badge">✨ ${mutInfo.label}</div>` : ''}
@@ -5345,6 +5412,90 @@ function closeHatch() {
   if (active && active.id === 'tab-park') renderParkWorld();
 }
 
+/* ======================== VISITING ==========================
+   Read-only by construction, and not merely by omission of buttons: the
+   visited park never enters `state`, so nothing that acts on a dino has
+   anything to act on. Care, sell, move and trade-up all index into
+   state.park / state.vault, so there is no path from this view into them
+   even if a control were added by mistake.
+
+   Every string here goes through escapeHtml. The park is projected and
+   capped on the server, but a nickname is still player-authored text on
+   another player's screen, and defending it in one place only is how it
+   goes wrong the next time somebody adds a field. */
+let parkVisitable = false;
+
+async function setParkVisitable(on) {
+  parkVisitable = !!on;
+  renderCollection();                       /* optimistic; corrected below */
+  try {
+    const res = await fetch('/api/dino-park', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set-visitable', visitable: !!on }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed');
+    parkVisitable = !!data.visitable;
+    showToast(parkVisitable ? 'Your park is open to visitors 👀' : 'Your park is private again');
+  } catch (e) {
+    /* Put the switch back rather than leave it showing a state the server
+       never accepted — consent is the one thing that must not be reported
+       optimistically. */
+    parkVisitable = !on;
+    showToast('Could not change that right now');
+  }
+  renderCollection();
+}
+
+async function visitRandomPark() {
+  try {
+    const res = await fetch('/api/dino-park?visit=random', { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'No parks available'); return; }
+    showVisitedPark(data);
+  } catch (e) {
+    showToast('Could not reach the parks right now');
+  }
+}
+
+function showVisitedPark(data) {
+  const p = data.park || {};
+  const dinos = Array.isArray(p.park) ? p.park : [];
+
+  const cards = dinos.length ? dinos.map(d => {
+    const spec = getRosterById(d.speciesId);
+    if (!spec) return '';
+    const mutInfo = d.mutation ? resolveSpeciesMut(d.speciesId, d.mutation) : null;
+    return `<div class="visit-card">
+      ${spriteImg(spec.id, 40, 'sprite-img', d.mutation)}
+      <div class="visit-card-name">${dinoName(d, spec)}</div>
+      <div class="visit-card-lv">Lv ${getDinoLevel(d)} · ${getStage(d)}</div>
+      ${mutInfo ? `<div class="visit-card-lv" style="color:#ff0000">✨ ${escapeHtml(mutInfo.label)}</div>` : ''}
+    </div>`;
+  }).join('') : '<div class="visit-empty">This keeper has no dinosaurs in their park right now.</div>';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sell-overlay';
+  overlay.id = 'visitOverlay';
+  overlay.innerHTML = `
+    <div class="visit-dialog">
+      <div class="visit-head">👀 ${escapeHtml(data.ownerName || 'A keeper')}'s Park</div>
+      <div class="visit-sub">Day ${p.parkDay || 1} · ${dinos.length} in the park · ${p.speciesDiscovered || 0} species discovered · looking only</div>
+      <div class="visit-grid">${cards}</div>
+      <div class="visit-btns">
+        <button onclick="closeVisit();visitRandomPark();">Visit another</button>
+        <button onclick="closeVisit()">Close</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeVisit(); });
+  document.body.appendChild(overlay);
+}
+
+function closeVisit() {
+  const o = document.getElementById('visitOverlay');
+  if (o) o.remove();
+}
+
 /* ======================== COLLECTION ======================== */
 let collSelectedIdx = -1;
 let collViewMode = 'park'; // 'park' (active, growing/decaying) | 'vault' (stored, frozen)
@@ -5421,7 +5572,7 @@ function confirmTradeUpDialog() {
   const names = tradeUpPicks.map(p => {
     const e = entries.find(x => x.source === p.source && x.idx === p.idx);
     const spec = getRosterById(e.dino.speciesId);
-    return (e.dino.nickname || spec.name);
+    return dinoName(e.dino, spec);
   });
   const overlay = document.createElement('div');
   overlay.className = 'sell-overlay';
@@ -5511,7 +5662,12 @@ function renderCollList() {
     <button class="${collViewMode==='park'?'active':''}" onclick="setCollViewMode('park')">Park (${state.park.length}/${MAX_ACTIVE_PARK})</button>
     <button class="${collViewMode==='vault'?'active':''}" onclick="setCollViewMode('vault')">Vault (${state.vault.length}/${MAX_VAULT_SIZE})</button>
   </div>
-  <button class="trade-open" onclick="setTradeUpTrack('plain')">&#9650; Trade Up</button>`;
+  <button class="trade-open" onclick="setTradeUpTrack('plain')">&#9650; Trade Up</button>
+  <button class="trade-open visit-open" onclick="visitRandomPark()">&#128064; Visit a Park</button>
+  <div class="visit-toggle">
+    <span>Let others visit my park</span>
+    <button class="${parkVisitable ? 'on' : ''}" onclick="setParkVisitable(${parkVisitable ? 'false' : 'true'})">${parkVisitable ? 'ON' : 'OFF'}</button>
+  </div>`;
   if (arr.length === 0) {
     list.innerHTML = toggle + `<div style="color:#333;font-size:10px;text-align:center;padding:20px;">${collViewMode==='vault' ? 'Vault is empty' : 'No dinosaurs yet'}</div>`;
     return;
@@ -5527,7 +5683,7 @@ function renderCollList() {
     const hpCol = hpPct > 0.3 ? '#2ecc71' : '#ff0000';
     return `<div class="coll-card rarity-${spec.rarity} ${i===collSelectedIdx?'selected':''}" onclick="collSelectedIdx=${i};renderCollection();">
       <div class="coll-card-sprite">${spriteImg(spec.id, 48, 'sprite-img')}</div>
-      <div class="coll-card-name">${dino.nickname || spec.name}</div>
+      <div class="coll-card-name">${dinoName(dino, spec)}</div>
       <div class="coll-card-level">Lv ${getDinoLevel(dino)} · ${stage}</div>
       <div class="coll-card-bars">
         <div style="background:${hCol};opacity:${hPct}"></div>
@@ -5590,7 +5746,7 @@ function renderTradeUpList(list) {
     return `<div class="coll-card rarity-${spec.rarity} ${isPicked?'tu-picked':''} ${usable?'':'tu-dim'}"
       onclick="${usable?`toggleTradeUpPick('${e.source}',${e.idx})`:''}">
       <div class="coll-card-sprite">${spriteImg(spec.id, 48, 'sprite-img', e.dino.mutation)}</div>
-      <div class="coll-card-name">${e.dino.nickname || spec.name}</div>
+      <div class="coll-card-name">${dinoName(e.dino, spec)}</div>
       <div class="coll-card-level">${e.source === 'vault' ? 'Vault' : 'Park'}${mutInfo ? ' · ' + mutInfo.label : ''}</div>
     </div>`;
   }).join('');
@@ -5636,7 +5792,7 @@ function renderCollDetail() {
       ${inVault ? '🏞️ Move to Park' : '📦 Move to Vault'}
     </button>
     <div class="coll-sprite-large">${portraitImg(spec.id, PORTRAIT_SLOT, 'sprite-img', dino.mutation)}</div>
-    <div class="coll-name">${dino.nickname || spec.name}</div>
+    <div class="coll-name">${dinoName(dino, spec)}</div>
     <div class="coll-species">${spec.name} · ${spec.era}${inVault ? ' · <span style="color:#fff">Vaulted</span>' : ''}</div>
     ${dino.mutation ? `<div style="font-size:11px;color:#ff0000;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em">✨ ${(resolveSpeciesMut(spec.id,dino.mutation)||{}).label||dino.mutation} Mutation</div>` : ''}
     <div class="coll-badges">
@@ -5817,7 +5973,7 @@ function renderDexDetail(specId) {
       <div class="dex-detail-section-title">In Your Park (${owned.length})</div>
       <div class="dex-owned-row">${owned.map(d => {
         const ml = d.mutation ? resolveSpeciesMut(specId, d.mutation) : null;
-        return `<div class="dex-owned-chip">${spriteImg(specId, 20, '', d.mutation)} ${d.nickname || spec.name}${ml ? ' · <span style="color:#ff0000">' + ml.label + '</span>' : ''}</div>`;
+        return `<div class="dex-owned-chip">${spriteImg(specId, 20, '', d.mutation)} ${dinoName(d, spec)}${ml ? ' · <span style="color:#ff0000">' + ml.label + '</span>' : ''}</div>`;
       }).join('')}</div>
     </div>` : ''}
     <div class="dex-detail-section">

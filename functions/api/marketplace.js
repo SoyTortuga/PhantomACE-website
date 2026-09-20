@@ -92,7 +92,22 @@ export async function onRequestPost(context) {
          listing — anything absent here is gone when the dino is bought.
          Without it a levelled dino would arrive at the buyer as level 1,
          which reads as data loss rather than as a missing field. */
-      dino: { speciesId: body.dino.speciesId, nickname: body.dino.nickname, mutation: body.dino.mutation || null, careCount: body.dino.careCount || 0, xp: Math.max(0, Math.floor(Number(body.dino.xp) || 0)) },
+      /* nickname is player-authored free text that every OTHER player then
+         renders. Capped here and escaped at render — both, because this
+         listing is stored and re-served for as long as it is up, and the
+         client is not the only thing that will ever read it.
+
+         xp is whitelisted alongside careCount because this object IS the
+         listing: anything absent here is gone when the dino is bought, and
+         a levelled dino arriving as level 1 reads as data loss rather than
+         a missing field. */
+      dino: {
+        speciesId: body.dino.speciesId,
+        nickname: String(body.dino.nickname == null ? '' : body.dino.nickname).trim().slice(0, 24),
+        mutation: body.dino.mutation || null,
+        careCount: body.dino.careCount || 0,
+        xp: Math.max(0, Math.floor(Number(body.dino.xp) || 0)),
+      },
       price: Math.floor(body.price),
       listedAt: Date.now(),
     };

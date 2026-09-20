@@ -177,10 +177,62 @@ export async function onRequestGet(context) {
   const session = getSession(request);
   if (!session || !session.user_id) return json({ error: 'Not logged in' }, 401);
 
+  const url = new URL(request.url);
+  const visit = url.searchParams.get('visit');
+  if (visit) return await visitPark(env, session, visit);
+
   const record = await env.MARKETPLACE.get(saveKey(session.user_id), 'json');
   if (!record) return json({ hasSave: false, state: null });
 
-  return json({ hasSave: true, state: record.state, savedAt: record.savedAt || 0 });
+  return json({
+    hasSave: true,
+    state: record.state,
+    savedAt: record.savedAt || 0,
+    /* Read from the consent row, never from the save, so the toggle always
+       reflects what the listing will actually do. */
+    visitable: !!(await env.MARKETPLACE.get(visitKey(session.user_id), 'json')),
+  });
+}
+
+/**
+ * Serve somebody else's park, or pick one at random.
+ *
+ * Requires a session of its own. Not because the projection is unsafe
+ * without one — it is the same data either way — but because an endpoint
+ * that hands out a random player on every anonymous request is an
+ * enumeration tool, and the people listed here opted into being visited by
+ * other players rather than by anyone with curl.
+ */
+async function visitPark(env, session, target) {
+  let userId = target;
+
+  if (target === 'random') {
+    const listed = await env.MARKETPLACE.list({ prefix: VISIT_KEY_PREFIX });
+    /* Own park excluded: "visit a random park" landing on your own reads
+       as the button being broken. */
+    const others = (listed.keys || [])
+      .map(k => k.name.slice(VISIT_KEY_PREFIX.length))
+      .filter(id => String(id) !== String(session.user_id));
+    if (!others.length) return json({ error: 'No parks are open to visitors yet.' }, 404);
+    userId = others[Math.floor(Math.random() * others.length)];
+  }
+
+  if (!/^[0-9]{1,20}$/.test(String(userId))) return json({ error: 'Unknown park' }, 404);
+
+  /* THE CONSENT CHECK, and it is deliberately before the read. Opting out
+     has to take effect immediately; checking afterwards would mean a park
+     stayed visitable for as long as anyone held its id. */
+  const pass = await env.MARKETPLACE.get(visitKey(userId), 'json');
+  if (!pass) return json({ error: 'That park is not open to visitors.' }, 403);
+
+  const record = await env.MARKETPLACE.get(saveKey(userId), 'json');
+  if (!record) return json({ error: 'That park is empty.' }, 404);
+
+  return json({
+    visiting: true,
+    ownerName: String(pass.name || 'A keeper').slice(0, VISIT_NAME_MAX),
+    park: projectPark(record.state),
+  });
 }
 
 /* ── POST — persist the player's current state ── */
@@ -266,6 +318,86 @@ export function sanitizeFavorite(fav) {
   };
 }
 
+/* ══ VISITING ═══════════════════════════════════════════════════════════
+   Letting other people look at a park inverts the assumption this file is
+   built on, stated above sanitizeFavorite: the save is stored wholesale
+   and never read by the server, which is only harmless while exactly one
+   person can see it. The client writes that document, so every field in it
+   is attacker-controlled — nicknames included, and nicknames are rendered.
+
+   So a visitor is never served the record. They are served a PROJECTION:
+   a fixed list of fields, each one validated, everything else dropped by
+   omission rather than by a denylist. A field added to the save later is
+   private by default and stays that way until somebody adds it here on
+   purpose.
+
+   OPT-IN. A park is invisible until its owner turns visiting on, and the
+   flag is stored as its own row rather than read out of the save — the
+   listing has to be enumerable without loading and parsing every player's
+   park document, and a row nobody else can write is a consent record.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const VISIT_KEY_PREFIX = 'parkpub_';
+const visitKey = (userId) => `${VISIT_KEY_PREFIX}${userId}`;
+
+/* One row per consenting player. Kept deliberately tiny: enough to draw a
+   list entry without opening anybody's save. */
+const VISIT_NAME_MAX = 40;
+/* A park holds at most MAX_ACTIVE_PARK dinos, but the save is client-
+   written, so the cap is enforced here rather than assumed. */
+const VISIT_PARK_MAX = 40;
+
+/**
+ * The public view of one dino. Whitelist, not cleanup.
+ *
+ * `nickname` is the field that matters. It is player-authored free text
+ * that ends up inside innerHTML on someone else's screen, so it is capped
+ * here and escaped at render — both, because either alone has been enough
+ * to be wrong before.
+ */
+function projectDino(d) {
+  if (!d || typeof d !== 'object') return null;
+  const speciesId = String(d.speciesId || '');
+  if (!FAV_ID.test(speciesId)) return null;
+
+  const mutation = String(d.mutation || '');
+  const num = (v, max) => {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0;
+  };
+
+  return {
+    speciesId,
+    mutation: FAV_ID.test(mutation) ? mutation : '',
+    /* Stored as written, capped, never reassembled into markup. */
+    nickname: String(d.nickname || '').trim().slice(0, 24),
+    careCount: num(d.careCount, 1_000_000),
+    xp: num(d.xp, 1_000_000_000),
+  };
+}
+
+/**
+ * The public view of a park.
+ *
+ * Roster only. Coins, eggs, the vault, cooldowns, energy, yard layout and
+ * dig timers are all absent — not stripped, simply never named. Visiting
+ * is for looking at someone's dinosaurs, and every extra field would be
+ * another thing to get right for no added reason to visit.
+ */
+function projectPark(state) {
+  const s = (state && typeof state === 'object') ? state : {};
+  const park = Array.isArray(s.park) ? s.park : [];
+  return {
+    park: park.slice(0, VISIT_PARK_MAX).map(projectDino).filter(Boolean),
+    parkDay: Math.max(1, Math.min(100000, Math.floor(Number(s.parkDay) || 1))),
+    speciesDiscovered: Array.isArray(s.discovered) ? s.discovered.length : 0,
+    /* Already sanitised on write by sanitizeFavorite, and re-run here
+       because this is a different reader and the stored value predates
+       that function for some saves. */
+    favorite: sanitizeFavorite(s.favorite),
+  };
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = getSession(request);
@@ -273,6 +405,24 @@ export async function onRequestPost(context) {
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+
+  /* ── Opt in or out of being visited ──
+     Its own action rather than a field on the save, because consent must
+     not ride along inside a document the client rewrites wholesale every
+     few seconds — a stale save would silently re-open a park somebody had
+     just closed. The name is taken from the SESSION, never from the
+     request, so nobody can list themselves under another person's name. */
+  if (body.action === 'set-visitable') {
+    if (body.visitable) {
+      await env.MARKETPLACE.put(visitKey(session.user_id), JSON.stringify({
+        name: String(session.display_name || 'A keeper').slice(0, VISIT_NAME_MAX),
+        since: Date.now(),
+      }));
+    } else {
+      await env.MARKETPLACE.delete(visitKey(session.user_id));
+    }
+    return json({ success: true, visitable: !!body.visitable });
+  }
 
   if (!body || typeof body.state !== 'object' || body.state === null) {
     return json({ error: 'Missing state' }, 400);

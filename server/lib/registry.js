@@ -217,6 +217,14 @@ export const FAMILIES = [
   { prefix: 'cp_skull_boost_', table: 'cp_skull_boosts',  expiry: 'none' },
   { prefix: 'pt_alltime_',     table: 'phamily_alltime',  expiry: 'none' },
   { prefix: 'dino_park_',      table: 'dino_parks',       expiry: 'none' },
+  /* Who has opted into letting other players visit their park. Its own
+     row per player, in the same table as the saves, so the listing is a
+     cheap prefix scan and nobody's consent lives inside a document the
+     client rewrites wholesale. Only the owner can write their own row.
+     'none': a consent record that quietly expired would re-hide a park
+     with nothing to explain it. */
+  { prefix: 'parkpub_',        table: 'dino_parks',       expiry: 'none' },
+
   { prefix: 'item_code_',      table: 'item_codes',       expiry: 'none' },
   { prefix: 'cp_queue_',       table: 'cp_queues',        expiry: 'real' },
   { prefix: 'earnings_',       table: 'earnings',         expiry: 'none' },
