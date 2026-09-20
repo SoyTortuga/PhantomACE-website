@@ -169,6 +169,8 @@
     .prestige-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .prestige-btn:not(:disabled):hover { background: #cc0000; }
     .prestige-note { font-size: 10px; color: #ffffff77; margin-top: 12px; }
+    .shard-balance { text-align: center; font-size: 14px; color: #fff; margin: 4px 0 10px; }
+    .shard-balance b { color: #ff5555; }
     .tab-btn:hover { color: #ff4444; }
     .tab-btn { font-size: 10px; letter-spacing: 0.04em; padding: 10px 2px; }
 
@@ -599,6 +601,24 @@
       { id:'s_portal1',building:'portal',req:10,  mult:2,   cost:5.1e11, name:'Stable Rifts', desc:'Void Portals ×2' },
       { id:'s_horror1',building:'horror',req:10,  mult:2,   cost:7.5e12, name:'Maddening Whispers', desc:'Eldritch Horrors ×2' },
     ];
+
+    /* Prestige perks — bought with Bone Shards (earned on prestige) and kept
+       forever across every future run. `req` gates a perk on owning another;
+       their effects are read live by critChance/cursedFreqMult/offlineRate and
+       applied in doPrestige. */
+    const PERKS = [
+      { id:'omen',      name:'Ill Omen',        cost:1,  desc:'Cursed skulls appear 50% more often' },
+      { id:'crit',      name:'Killing Blow',    cost:2,  desc:'5% chance a click deals ×7' },
+      { id:'greed',     name:'Grave Robber',    cost:2,  desc:'Full offline earnings (100%, up from 50%)' },
+      { id:'headstart', name:'Ancestral Cache', cost:3,  desc:'Start each run with 10 Bone Shards and 5 Ghost Hands' },
+      { id:'crit2',     name:'Executioner',     cost:5,  req:'crit', desc:'+10% more crit chance (15% total)' },
+      { id:'legacy',    name:'Undying Knowledge',cost:8, desc:'Keep your Click & CPS upgrades through prestige' },
+    ];
+
+    /* Shards a prestige right now would grant — a cube-root of the run total,
+       so a fresh reset (run total ~0) yields none and cannot be farmed. */
+    function pendingShards() { return Math.floor(Math.cbrt(Math.max(0, totalSkulls) / 1e6)); }
+    function offlineRate() { return perks.has('greed') ? 1 : 0.5; }
 
     const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12, 100e12, 10e15];
     const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One','Skull God','Bone Absolute'];
@@ -1334,14 +1354,22 @@
     function doPrestige() {
       if (!canPrestige()) return;
       const nextMult = 1 + 0.1 * (prestige + 1);
+      const gained = pendingShards();
       if (!confirm('Prestige to tier ' + (prestige + 1) + '? This resets this run — skulls, ' +
                    'buildings and upgrades — but grants a permanent ' + nextMult.toFixed(1) +
-                   'x to everything, forever. Your lifetime total and rank are kept.')) return;
+                   'x to everything, forever' + (gained > 0 ? ', and ' + gained + ' Bone Shard' + (gained === 1 ? '' : 's') + ' to spend in the shop' : '') +
+                   '. Your lifetime total and rank are kept.')) return;
+
+      /* Legacy perk keeps the base upgrades; capture them before the wipe. */
+      const keptUpgrades = perks.has('legacy')
+        ? [...boughtUpgrades].filter(id => UPGRADES.some(u => u.id === id)) : [];
 
       prestige += 1;
-      /* Reset the RUN. Lifetime, prestige and cosmetics are untouched — the
-         first two are what the leaderboard and the save-merge rank on, so a
-         reset can never cost standing or be undone by a sync. */
+      boneShards += gained;
+
+      /* Reset the RUN. Lifetime, prestige, shards and cosmetics are untouched
+         — the first two are what the leaderboard and the save-merge rank on,
+         so a reset can never cost standing or be undone by a sync. */
       skulls = 0;
       totalSkulls = 0;
       clickBonus = 0;
@@ -1354,6 +1382,15 @@
       hitMilestones = new Set();
       startTime = Date.now();
 
+      /* Legacy: restore the kept upgrades and re-apply their baked effects
+         (clickMulti/globalCpsMult were just reset). */
+      for (const id of keptUpgrades) {
+        const u = UPGRADES.find(x => x.id === id);
+        if (u) { boughtUpgrades.add(id); if (u.apply) u.apply(); }
+      }
+      /* Headstart: a few free buildings so the early grind is shorter. */
+      if (perks.has('headstart')) { owned.shard += 10; owned.ghost += 5; }
+
       const el = document.createElement('div');
       el.className = 'milestone';
       el.innerHTML = '<h3>PRESTIGE ' + prestige + '</h3><p>' + getPrestigeMult().toFixed(1) + 'x forever</p>';
@@ -1365,11 +1402,39 @@
       renderWorld();
     }
 
+    function buyPerk(id) {
+      const p = PERKS.find(x => x.id === id);
+      if (!p || perks.has(id)) return;
+      if (p.req && !perks.has(p.req)) return;
+      if (boneShards < p.cost) return;
+      boneShards -= p.cost;
+      perks.add(id);
+      playSound('feat');
+      save();
+      render();
+    }
+
     function renderPrestige() {
       const mult = getPrestigeMult();
       const req = prestigeRequirement();
       const ready = canPrestige();
       const pct = Math.min(100, (totalSkulls / req) * 100);
+      const gained = pendingShards();
+
+      let shop = '<div class="section-label">Bone Shard Shop</div>' +
+        '<div class="shard-balance">🦴 <b>' + boneShards + '</b> Bone Shard' + (boneShards === 1 ? '' : 's') + '</div>';
+      for (const p of PERKS) {
+        const owned = perks.has(p.id);
+        const locked = p.req && !perks.has(p.req);
+        const can = !owned && !locked && boneShards >= p.cost;
+        const state = owned ? 'bought' : can ? 'affordable' : locked ? 'locked' : '';
+        const right = owned ? 'Owned' : locked ? 'Locked' : '🦴 ' + p.cost;
+        shop += '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyPerk('" + p.id + "')" : '') + '">' +
+          '<div class="building-info"><div class="building-name">' + p.name + '</div>' +
+          '<div class="building-desc">' + p.desc + '</div></div>' +
+          '<div class="building-right"><div class="building-cost">' + right + '</div></div></div>';
+      }
+
       document.getElementById('tab-prestige').innerHTML =
         '<div class="prestige-panel">' +
           '<div class="prestige-tier">Prestige ' + prestige + '</div>' +
@@ -1380,8 +1445,9 @@
           '<div class="prestige-have">' + formatNum(Math.floor(totalSkulls)) + ' / ' + formatNum(req) + '</div>' +
           '<button class="prestige-btn" ' + (ready ? '' : 'disabled') +
             ' onclick="doPrestige()">' + (ready ? 'Prestige now' : 'Not yet') + '</button>' +
-          '<div class="prestige-note">Resets this run. Keeps your lifetime total, rank, and the multiplier — forever.</div>' +
-        '</div>';
+          '<div class="prestige-note">Resets this run. Keeps your lifetime total, rank, the multiplier, and your Bone Shards' +
+            (gained > 0 ? '. Prestiging now earns <b style="color:#ff5555">' + gained + '</b> shard' + (gained === 1 ? '' : 's') : '') + '.</div>' +
+        '</div>' + shop;
     }
 
     /* ═══════ SAVE / LOAD ═══════ */
@@ -1489,7 +1555,7 @@
         if (away > 10) {
           const cps = getCPS();
           if (cps > 0) {
-            const earned = cps * away * 0.5;
+            const earned = cps * away * offlineRate();
             earn(earned);
             const banner = document.getElementById('offlineBanner');
             banner.innerHTML = `<div class="offline-banner" onclick="this.remove()">Welcome back! You earned <b>${formatNum(earned)}</b> skulls while away (${formatTime(away * 1000)}). Click to dismiss.</div>`;
