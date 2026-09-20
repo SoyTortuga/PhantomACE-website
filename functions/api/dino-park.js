@@ -346,6 +346,10 @@ const VISIT_NAME_MAX = 40;
 /* A park holds at most MAX_ACTIVE_PARK dinos, but the save is client-
    written, so the cap is enforced here rather than assumed. */
 const VISIT_PARK_MAX = 40;
+/* MAX_YARD_ITEMS is 14 in the game; the cap here is deliberately looser so
+   a legitimate park is never truncated, and exists only to bound what a
+   doctored save can ask a visitor's browser to draw. */
+const VISIT_YARD_MAX = 40;
 
 /**
  * The public view of one dino. Whitelist, not cleanup.
@@ -355,6 +359,21 @@ const VISIT_PARK_MAX = 40;
  * here and escaped at render — both, because either alone has been enough
  * to be wrong before.
  */
+/**
+ * A position percentage, clamped into the world.
+ *
+ * NOT COSMETIC. The park renderer derives stacking from the y coordinate —
+ * `z-index: 3 + Math.round(it.y / 10)` — so an unclamped y out of a
+ * client-written save is an arbitrary z-index, and an arbitrary z-index is
+ * one decoration painted over the entire interface. Clamping here is what
+ * stops a hostile park from covering its visitor's screen.
+ */
+function pct(v, fallback = 50) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(n * 100) / 100));
+}
+
 function projectDino(d) {
   if (!d || typeof d !== 'object') return null;
   const speciesId = String(d.speciesId || '');
@@ -373,7 +392,27 @@ function projectDino(d) {
     nickname: String(d.nickname || '').trim().slice(0, 24),
     careCount: num(d.careCount, 1_000_000),
     xp: num(d.xp, 1_000_000_000),
+    /* Where it is standing, so the park can be drawn rather than listed. */
+    px: pct(d.px), py: pct(d.py),
+    facing: Number(d.facing) === -1 ? -1 : 1,
   };
+}
+
+/**
+ * A placed decoration.
+ *
+ * ONLY THE TYPE CROSSES THE WIRE, never a src. The visitor's own copy of
+ * YARD_ITEM_TYPES resolves the image, so the set of things that can be
+ * drawn is fixed by the game rather than chosen by whoever wrote the save.
+ * A type the visitor does not recognise draws nothing. This is the same
+ * reason debris is not projected at all: its records carry a client-authored
+ * `src`, which is a URL somebody else's browser would fetch.
+ */
+function projectYardItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const type = String(it.type || '');
+  if (!FAV_ID.test(type)) return null;
+  return { type, x: pct(it.x), y: pct(it.y) };
 }
 
 /**
@@ -387,8 +426,22 @@ function projectDino(d) {
 function projectPark(state) {
   const s = (state && typeof state === 'object') ? state : {};
   const park = Array.isArray(s.park) ? s.park : [];
+  const yard = Array.isArray(s.yardItems) ? s.yardItems : [];
   return {
     park: park.slice(0, VISIT_PARK_MAX).map(projectDino).filter(Boolean),
+    /* The decorations ARE the point of visiting — a park you can look at
+       rather than a list you can read. Capped well above the in-game limit
+       so a legitimate park always arrives whole while a doctored save still
+       cannot ask the visitor to draw ten thousand sprites. */
+    yardItems: yard.slice(0, VISIT_YARD_MAX).map(projectYardItem).filter(Boolean),
+    /* The BACKGROUND ID, never a URL. Backgrounds are unlockable
+       cosmetics and each one carries its own walkability mask, so a
+       visitor must draw the owner's scenery or the dinos appear on the
+       wrong terrain — an aquatic one standing on grass. The viewer
+       resolves the art from its own table and falls back when it does not
+       recognise the id, which is also what keeps a save file from naming
+       an image somebody else's browser will fetch. */
+    background: FAV_ID.test(String(s.background || '')) ? String(s.background) : '',
     parkDay: Math.max(1, Math.min(100000, Math.floor(Number(s.parkDay) || 1))),
     speciesDiscovered: Array.isArray(s.discovered) ? s.discovered.length : 0,
     /* Already sanitised on write by sanitizeFavorite, and re-run here

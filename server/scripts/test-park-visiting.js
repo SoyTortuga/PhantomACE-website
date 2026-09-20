@@ -68,6 +68,9 @@ const POST = (env, body, headers) => onRequestPost({ env, request: new Request('
   method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }) });
 
 /* A save carrying everything a visitor must never receive. */
+/* Everything a visitor must NEVER receive. yardItems are deliberately
+   absent from this list: decorations are the point of visiting, so they
+   are public by design and asserted separately. */
 const SECRETS = {
   coins: 999999,
   vault: [{ speciesId: 'rex', nickname: 'vaulted' }],
@@ -79,7 +82,6 @@ const SECRETS = {
   usedCodes: ['SECRET-CODE-1'],
   lastDailyDig: 123456789,
   grantSeq: 42,
-  yardItems: [{ id: 'fern', x: 1, y: 2 }],
 };
 const OWNER_SAVE = JSON.stringify({
   userId: '200', savedAt: 1,
@@ -136,7 +138,14 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
   /* And nothing private hides inside a dino either. */
   const dinoKeys = [...new Set(body.park.park.flatMap(d => Object.keys(d)))].sort();
   check('a visited dino carries only these fields', dinoKeys,
-        ['careCount', 'mutation', 'nickname', 'speciesId', 'xp']);
+        ['careCount', 'facing', 'mutation', 'nickname', 'px', 'py', 'speciesId', 'xp']);
+
+  /* THE NEEDS STAY PRIVATE. hunger/thirst/happiness describe how well
+     somebody is looking after their animals, and a visitor does not get to
+     audit that — the park is there to be admired, not inspected. */
+  const needKeys = ['hunger', 'thirst', 'happiness', 'hygiene', 'stamina']
+    .filter(k => body.park.park.some(d => k in d));
+  check('a visitor cannot see how well the dinos are cared for', needKeys, []);
 
   /* Serialise the whole response and look for the actual secret values —
      catches a leak through a field name nobody thought to list. */
@@ -173,6 +182,110 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
   check('a negative careCount floors at zero', park[0].careCount, 0);
   ok('an absurd xp is capped to something finite', Number.isFinite(park[0].xp) && park[0].xp <= 1e9);
   ok('an absurd parkDay is capped', body.park.parkDay <= 100000);
+}
+
+/* ══ The park is drawn, and a hostile layout cannot cover the screen ═══ */
+{
+  const laid = JSON.stringify({
+    userId: '500', savedAt: 1,
+    state: {
+      parkDay: 4, discovered: ['rex'],
+      park: [{ speciesId: 'rex', nickname: 'Roam', careCount: 30, xp: 900, px: 61.5, py: 22.25, facing: -1 }],
+      yardItems: [
+        { id: 'a', type: 'cycad', x: 10, y: 20 },
+        { id: 'b', type: 'bloom', x: 90.4, y: 77.7 },
+        /* THE Z-INDEX ATTACK. The renderer derives stacking from y —
+           `z-index: 3 + Math.round(y / 10)` — so an unclamped y is an
+           arbitrary z-index, and an arbitrary z-index is one decoration
+           painted over the visitor's entire interface. */
+        { id: 'c', type: 'sprig', x: -500, y: 99999999 },
+        { id: 'd', type: '<script>', x: 5, y: 5 },
+        /* A client-authored image URL, which is exactly why only the type
+           is projected and the visitor resolves the src themselves. */
+        { id: 'e', type: 'sprig', x: 5, y: 5, src: 'https://evil.example/pixel.png' },
+      ],
+      /* Debris records carry a client-written src, so they are not
+         projected at all rather than being filtered. */
+      debris: [{ id: 'x', x: 3, y: 3, src: 'https://evil.example/debris.png' }],
+    },
+  });
+  const env = envWith({ 'dino_park_500': laid, 'parkpub_500': JSON.stringify({ name: 'Decorator' }) });
+  const body = await (await GET(env, '?visit=500', as('100'))).json();
+  const p = body.park;
+
+  check('the dino keeps its position', [p.park[0].px, p.park[0].py], [61.5, 22.25]);
+  check('and which way it is facing', p.park[0].facing, -1);
+
+  check('decorations come through', p.yardItems.length, 4);
+  const yardKeys = [...new Set(p.yardItems.flatMap(i => Object.keys(i)))].sort();
+  check('a decoration is only a type and a place', yardKeys, ['type', 'x', 'y']);
+
+  const wild = p.yardItems.find(i => i.type === 'sprig' && i.y > 100);
+  ok('no decoration escapes the world vertically', !wild);
+  ok('nor horizontally', p.yardItems.every(i => i.x >= 0 && i.x <= 100));
+  ok('every position is inside 0..100', p.yardItems.every(i => i.y >= 0 && i.y <= 100));
+
+  ok('an out-of-charset type is dropped', !p.yardItems.some(i => i.type.includes('<')));
+  ok('debris is not projected at all', !('debris' in p));
+
+  const wire = JSON.stringify(body);
+  ok('no client-authored image URL crosses the wire', !wire.includes('evil.example'));
+  ok('and no src field is projected', !/"src"/.test(wire));
+
+  /* The client must resolve decoration images from its own table. */
+  ok('the visit view looks the src up locally', /const t = getYardType\(it\.type\);/.test(PAGE));
+  ok('and skips anything it does not recognise', /if \(!t\) return '';/.test(PAGE));
+}
+
+/* ══ Backgrounds are an identity, because they carry the boundaries ════ */
+{
+  /* Backgrounds are becoming unlockable cosmetics and each one is sampled
+     into its own walkability mask. A visited park must therefore be drawn
+     on ITS OWN scenery: on the wrong art a mosasaur that is correctly in
+     the ocean appears to be standing on grass. So the id travels — and
+     only the id, so a save cannot name an image another player's browser
+     would fetch. */
+  const themed = JSON.stringify({
+    userId: '600', savedAt: 1,
+    state: { parkDay: 2, discovered: [], park: [], yardItems: [], background: 'lagoon' },
+  });
+  const env = envWith({ 'dino_park_600': themed, 'parkpub_600': JSON.stringify({ name: 'Themed' }) });
+  const body = await (await GET(env, '?visit=600', as('100'))).json();
+  check('the background id travels', body.park.background, 'lagoon');
+
+  const hostile = JSON.stringify({
+    userId: '700', savedAt: 1,
+    state: { park: [], yardItems: [], background: 'https://evil.example/bg.png' },
+  });
+  const env2 = envWith({ 'dino_park_700': hostile, 'parkpub_700': JSON.stringify({ name: 'Bad' }) });
+  const body2 = await (await GET(env2, '?visit=700', as('100'))).json();
+  check('a URL in the background field is refused', body2.park.background, '');
+  ok('and never reaches the visitor', !JSON.stringify(body2).includes('evil.example'));
+
+  /* The viewer resolves art from its own table and falls back. */
+  ok('the visit view draws the owner\'s background by id',
+     /backgroundImage = `url\("\$\{getParkBackground\(p\.background\)\.src\}"\)`/.test(PAGE));
+  ok('unknown ids fall back rather than failing',
+     /return PARK_BACKGROUNDS\[id\] \|\| PARK_BACKGROUNDS\[DEFAULT_BACKGROUND\];/.test(PAGE));
+
+  /* Every background carries its own mask, or an aquatic dino ends up on
+     the new art's grass. */
+  ok('backgrounds are a table, not a constant', /const PARK_BACKGROUNDS = \{/.test(PAGE));
+  const entries = [...PAGE.matchAll(/^  ([a-z0-9_-]+): \{\n\s*name:/gm)].map(m => m[1]);
+  ok('at least one background is defined', entries.length >= 1);
+  ok('every background declares a mask',
+     (PAGE.match(/mask: /g) || []).length >= entries.length);
+  ok('and nothing reads a single global mask any more',
+     !/zoneAt\([^)]*\)\s*\{[\s\S]{0,200}return WALK_MASK\[row\]/.test(PAGE));
+
+  /* Switching scenery moves whatever the new zones strand. */
+  ok('there is a re-placement pass', /function replaceStrandedForBackground\(\)/.test(PAGE));
+  ok('it is run when the background changes',
+     /state\.background = id;\n\s*const moved = replaceStrandedForBackground\(\);/.test(PAGE));
+  ok('and it judges water dinos by the water zones',
+     /spec\.habitat === 'Water' \? isWaterWalkable : isLandWalkable/.test(PAGE));
+  ok('it clears the stale wander target too', /dino\.tx = p\.x; dino\.ty = p\.y;/.test(PAGE));
+  ok('and drops the cached terrain', /groundCache = null;/.test(PAGE));
 }
 
 /* ══ Consent rows carry the session's name, never the caller's claim ═══ */
@@ -243,7 +356,7 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
   check('no HTML template interpolates a raw nickname', htmlSinkLeaks, []);
 
   ok('the visit view escapes the owner name', /escapeHtml\(data\.ownerName/.test(PAGE));
-  ok('and its cards use dinoName', /visit-card-name">\$\{dinoName\(/.test(PAGE));
+  ok('and its dinos are named through dinoName', /visit-name">\$\{dinoName\(/.test(PAGE));
 
   /* Capped on the server too: escaping is the render-side half, and the
      listing is stored and re-served for as long as it is up. */

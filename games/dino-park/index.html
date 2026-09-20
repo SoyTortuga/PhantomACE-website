@@ -732,13 +732,26 @@
     }
     .visit-head { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px; }
     .visit-sub { font-size: 9px; color: #9aa7bd; margin-bottom: 12px; }
-    .visit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-    .visit-card {
-      background: #161616; border: 1px solid #ffffff14; border-radius: 6px;
-      padding: 8px 6px; text-align: center;
+    /* A real park, not a list of cards. Same square world and percentage
+       positioning the owner sees, at whatever size the dialog allows, so a
+       decorated park reads as the place its keeper arranged. */
+    .visit-world {
+      position: relative; width: 100%; aspect-ratio: 1 / 1;
+      overflow: hidden; border-radius: 6px; border: 1px solid #ffffff14;
+      background: #2d5a1e center/cover no-repeat;
     }
-    .visit-card-name { font-size: 9px; color: #fff; margin-top: 4px; word-break: break-word; }
-    .visit-card-lv { font-size: 8px; color: #9aa7bd; margin-top: 2px; }
+    .visit-dino, .visit-yard { position: absolute; transform: translate(-50%, -50%); }
+    .visit-dino { text-align: center; }
+    .visit-dino .visit-name {
+      font-size: 7px; color: #fff; white-space: nowrap;
+      text-shadow: 0 1px 2px #000; margin-bottom: 1px;
+    }
+    .visit-dino img, .visit-yard img { image-rendering: pixelated; display: block; margin: 0 auto; }
+    .visit-empty { font-size: 10px; color: #9aa7bd; text-align: center; padding: 18px; }
+    .visit-legend {
+      display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 10px;
+      font-size: 8px; color: #9aa7bd;
+    }
     .visit-empty { font-size: 10px; color: #9aa7bd; text-align: center; padding: 18px; }
     .visit-btns { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
     .visit-btns button {
@@ -3989,10 +4002,52 @@ const WALK_MASK = [
   'XXXXXXXXXXXXOOOOOOOOOOOOOOOOOOOO',
 ];
 
-function zoneAt(xPct, yPct) {
+/* ── BACKGROUNDS ARE AN IDENTITY, NOT A CONSTANT ──────────────────────
+   Backgrounds are becoming unlockable cosmetics, and a mask belongs to
+   the art it was sampled from: swap the scenery and the ocean moves, so
+   every water dino's valid area moves with it. Keeping one global
+   WALK_MASK would mean an aquatic dino standing on the new art's grass.
+
+   So each background carries its own mask, sampled from ITS asset —
+   practice #1, the walkable region is data taken from the picture, never
+   re-derived by eye. Adding a background means adding its mask here, and
+   a background without one cannot be selected because it is not in this
+   table at all.
+
+   ONLY THE ID TRAVELS. A visited park sends its background id and the
+   viewer resolves the art from this table, exactly as decorations resolve
+   through getYardType — so the set of images a park can ask another
+   player's browser to load is fixed by this build, not by a save file. */
+const PARK_BACKGROUNDS = {
+  classic: {
+    name: 'Classic Valley',
+    src: PARK_ASSET_URLS.background,
+    mask: WALK_MASK,
+  },
+};
+const DEFAULT_BACKGROUND = 'classic';
+
+/** The background entry for an id, falling back rather than failing. */
+function getParkBackground(id) {
+  return PARK_BACKGROUNDS[id] || PARK_BACKGROUNDS[DEFAULT_BACKGROUND];
+}
+
+/** The background this save is using. */
+function activeBackground() { return getParkBackground(state.background); }
+
+/**
+ * Which zone a point sits in, on a given background.
+ *
+ * `mask` is a parameter rather than a lookup of the active one so a
+ * VISITED park is read against its own scenery. Judging someone else's
+ * dinos by our mask would report a mosasaur as standing on land purely
+ * because we happen to own different art.
+ */
+function zoneAt(xPct, yPct, mask) {
+  const m = mask || activeBackground().mask;
   const col = Math.max(0, Math.min(PARK_GRID.COLS - 1, Math.floor(xPct / 100 * PARK_GRID.COLS)));
   const row = Math.max(0, Math.min(PARK_GRID.ROWS - 1, Math.floor(yPct / 100 * PARK_GRID.ROWS)));
-  return WALK_MASK[row][col];
+  return m[row][col];
 }
 // Land & sky dinos: grass, sand, or the crossable river/oasis — never the
 // fence border strip or the ocean.
@@ -4001,6 +4056,67 @@ function isLandWalkable(x, y) { const z = zoneAt(x, y); return z === 'L' || z ==
 function isWaterWalkable(x, y) { const z = zoneAt(x, y); return z === 'R' || z === 'O'; }
 // Decor placement: solid ground only — not the river/oasis a dino can wade through.
 function isSolidGround(x, y) { return zoneAt(x, y) === 'L'; }
+
+/**
+ * Move anything standing somewhere its zone no longer allows.
+ *
+ * MUST RUN WHENEVER THE BACKGROUND CHANGES. Positions are stored as
+ * percentages and validated against the mask of the art that was showing
+ * when they were chosen. Swap the scenery and the zones move underneath
+ * them: a mosasaur that was in the ocean is suddenly on grass, and every
+ * wander target it picks is rejected, so it stops dead in a place it
+ * cannot legally be. It looks like the dino is broken rather than like
+ * the background changed.
+ *
+ * Decorations get the same treatment for the same reason — a cycad
+ * planted on solid ground should not end up floating in a new lagoon.
+ *
+ * Returns how many things had to be moved, so a caller can tell the
+ * player their park was rearranged rather than silently shuffling it.
+ */
+function replaceStrandedForBackground() {
+  let moved = 0;
+
+  state.park.forEach(dino => {
+    const spec = getRosterById(dino.speciesId);
+    if (!spec) return;
+    const ok = spec.habitat === 'Water' ? isWaterWalkable : isLandWalkable;
+    if (ok(dino.px, dino.py)) return;
+    const p = randomZonePoint(ok);
+    dino.px = p.x; dino.py = p.y;
+    dino.tx = p.x; dino.ty = p.y;      /* drop the old target too, or it
+                                          immediately walks back out */
+    moved++;
+  });
+
+  (state.yardItems || []).forEach(it => {
+    if (isSolidGround(it.x, it.y)) return;
+    const p = randomZonePoint(isSolidGround);
+    it.x = p.x; it.y = p.y;
+    moved++;
+  });
+
+  return moved;
+}
+
+/**
+ * Switch the park's background, rearranging anything the new zones
+ * strand. Refuses an id this build does not know rather than falling back
+ * silently, because a silent fallback would look like the cosmetic failing
+ * to apply.
+ */
+function setParkBackground(id) {
+  if (!PARK_BACKGROUNDS[id]) { showToast('That background is not available'); return false; }
+  state.background = id;
+  const moved = replaceStrandedForBackground();
+  groundCache = null;                  /* the cached terrain is the old art */
+  save();
+  initParkView();
+  showToast(moved
+    ? `Background changed — ${moved} moved to suit the new terrain`
+    : 'Background changed');
+  return true;
+}
 
 let groundCache = null;
 
@@ -4013,6 +4129,12 @@ function buildGroundCache() {
   offscreen.height = h;
   const ctx = offscreen.getContext('2d');
   ctx.imageSmoothingEnabled = true;
+  /* STILL THE ONE PRELOADED IMAGE. Correct while `classic` is the only
+     entry in PARK_BACKGROUNDS, and the thing to change when a second one
+     ships: this must draw activeBackground().src, and PARK_ASSET_URLS must
+     stop being the preload list for every background at once — loading all
+     of them to show one is the wrong trade. The MASK is already per
+     background; only the owner-side image is not. */
   const img = parkImgs.background;
   if (img) ctx.drawImage(img, 0, 0, w, h);
   return offscreen;
@@ -5461,18 +5583,46 @@ async function visitRandomPark() {
 function showVisitedPark(data) {
   const p = data.park || {};
   const dinos = Array.isArray(p.park) ? p.park : [];
+  const yard = Array.isArray(p.yardItems) ? p.yardItems : [];
 
-  const cards = dinos.length ? dinos.map(d => {
+  /* Decorations first, sorted by depth, exactly as the owner's park draws
+     them — lower items overlapping higher ones is what makes it read as a
+     scene rather than a scatter.
+
+     The SRC COMES FROM OUR OWN TABLE, never from the response. getYardType
+     returns undefined for anything unrecognised and that item is skipped,
+     so the set of images a visited park can ask us to load is fixed by this
+     build rather than by whoever wrote that save. */
+  const yardHtml = yard.map(it => {
+    const t = getYardType(it.type);
+    if (!t) return '';
+    const px = Math.round(t.size * 0.62);
+    return `<div class="visit-yard" style="left:${it.x}%;top:${it.y}%;z-index:${3 + Math.round(it.y / 10)}">
+      <img src="${t.src}" width="${px}" height="${px}" alt="">
+    </div>`;
+  }).join('');
+
+  const dinoHtml = dinos.map(d => {
     const spec = getRosterById(d.speciesId);
     if (!spec) return '';
-    const mutInfo = d.mutation ? resolveSpeciesMut(d.speciesId, d.mutation) : null;
-    return `<div class="visit-card">
-      ${spriteImg(spec.id, 40, 'sprite-img', d.mutation)}
-      <div class="visit-card-name">${dinoName(d, spec)}</div>
-      <div class="visit-card-lv">Lv ${getDinoLevel(d)} · ${getStage(d)}</div>
-      ${mutInfo ? `<div class="visit-card-lv" style="color:#ff0000">✨ ${escapeHtml(mutInfo.label)}</div>` : ''}
+    const stage = getStage(d);
+    const size = stage === 'hatchling' ? 20 : stage === 'juvenile' ? 26 : 32;
+    return `<div class="visit-dino" style="left:${d.px}%;top:${d.py}%;z-index:${20 + Math.round(d.py / 10)}"
+                 title="Lv ${getDinoLevel(d)} · ${stage}">
+      <div class="visit-name">${dinoName(d, spec)}</div>
+      <div style="transform:scaleX(${d.facing === -1 ? -1 : 1})">
+        ${spriteImg(spec.id, size, 'sprite-img', d.mutation)}
+      </div>
     </div>`;
-  }).join('') : '<div class="visit-empty">This keeper has no dinosaurs in their park right now.</div>';
+  }).join('');
+
+  /* Named separately from the sprites, because a mutation is the thing
+     worth spotting in someone else's park and it is easy to miss at 32px. */
+  const muts = dinos.map(d => {
+    const info = d.mutation ? resolveSpeciesMut(d.speciesId, d.mutation) : null;
+    const spec = getRosterById(d.speciesId);
+    return info && spec ? `<span>✨ ${dinoName(d, spec)} · ${escapeHtml(info.label)}</span>` : '';
+  }).filter(Boolean).join('');
 
   const overlay = document.createElement('div');
   overlay.className = 'sell-overlay';
@@ -5480,8 +5630,10 @@ function showVisitedPark(data) {
   overlay.innerHTML = `
     <div class="visit-dialog">
       <div class="visit-head">👀 ${escapeHtml(data.ownerName || 'A keeper')}'s Park</div>
-      <div class="visit-sub">Day ${p.parkDay || 1} · ${dinos.length} in the park · ${p.speciesDiscovered || 0} species discovered · looking only</div>
-      <div class="visit-grid">${cards}</div>
+      <div class="visit-sub">Day ${p.parkDay || 1} · ${dinos.length} in the park · ${yard.length} decorations · ${p.speciesDiscovered || 0} species discovered · looking only</div>
+      <div class="visit-world" id="visitWorld">${yardHtml}${dinoHtml}</div>
+      ${dinos.length ? '' : '<div class="visit-empty">This keeper has no dinosaurs in their park right now.</div>'}
+      ${muts ? `<div class="visit-legend">${muts}</div>` : ''}
       <div class="visit-btns">
         <button onclick="closeVisit();visitRandomPark();">Visit another</button>
         <button onclick="closeVisit()">Close</button>
@@ -5489,6 +5641,11 @@ function showVisitedPark(data) {
     </div>`;
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeVisit(); });
   document.body.appendChild(overlay);
+
+  /* Set as a style rather than in the template so the URL is this build's
+     constant and never anything interpolated from the response. */
+  const world = overlay.querySelector('#visitWorld');
+  if (world) world.style.backgroundImage = `url("${getParkBackground(p.background).src}")`;
 }
 
 function closeVisit() {
