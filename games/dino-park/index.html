@@ -4427,7 +4427,11 @@ function renderParkWorld() {
       el.dataset.yard = it.id;
       el.style.cssText = `left:${it.x}%;top:${it.y}%;z-index:${3 + Math.round(it.y / 10)};`;
       const px = Math.round(t.size * parkScale * 0.62);
-      el.innerHTML = `<img src="${t.src}" width="${px}" height="${px}" alt="">`;
+      /* WIDTH ONLY. The icons happened to be square; the megapack
+         sprites are not -- a fossil wall is twice as wide as it is tall
+         -- and forcing both attributes squashes every non-square asset
+         into a box. The height follows the art. */
+      el.innerHTML = `<img src="${t.src}" width="${px}" alt="">`;
       if (decorateMode) {
         el.title = `${t.name} — tap to sell for ${Math.floor(t.cost * YARD_REFUND_PCT)} coins`;
         el.onclick = (e) => { e.stopPropagation(); sellYardItem(it.id); };
@@ -4811,6 +4815,35 @@ const YARD_ITEM_TYPES = [
   { id: 'statue', name: 'Dino Statue', src: IC+'misc_jurassic/dino_statue.png', cost: 240, mood: 11, size: 44, blocks: true, radius: 5.5, band: 'show' },
   { id: 'skeleton', name: 'Mounted Skeleton', src: IC+'fossils_bones/mounted_skeleton.png', cost: 260, mood: 12, size: 46, blocks: true, radius: 6, band: 'show' },
   { id: 'gate', name: 'Park Gate', src: IC+'misc_jurassic/park_gate.png', cost: 300, mood: 12, size: 48, blocks: true, radius: 6.5, band: 'show' },
+  /* -- Megapack items: spliced from the Jurassic World Pixel Art Megapack
+     by tools/splice-megapack.py, each crop the sprite's own NON-SQUARE
+     alpha bounds. The renderer sets width only, so a wide wall stays
+     wide. The sprites live under megapack-sprites/, gitignored with the
+     rest of dino-assets: they reach the rig by COPY, not by pull. */
+  { id: 'barrel2', name: 'Old Barrel', src: AB+'megapack-sprites/camp-props/16.png', cost: 45, mood: 3, size: 28, blocks: false, radius: 0, band: 'camp' },
+  { id: 'spears', name: 'Spear Rack', src: AB+'megapack-sprites/camp-props/33.png', cost: 55, mood: 3, size: 32, blocks: false, radius: 0, band: 'camp' },
+  { id: 'tiki', name: 'Tiki Torch', src: AB+'megapack-sprites/torches-and-fire-pits/04.png', cost: 60, mood: 4, size: 30, blocks: false, radius: 0, band: 'camp' },
+  { id: 'camptorch', name: 'Camp Torch', src: AB+'megapack-sprites/camp-props/18.png', cost: 70, mood: 4, size: 30, blocks: false, radius: 0, band: 'camp' },
+  { id: 'palisade', name: 'Palisade', src: AB+'megapack-sprites/wooden-tribal-fences/00.png', cost: 85, mood: 5, size: 42, blocks: true, radius: 4.5, band: 'camp' },
+  { id: 'campfire', name: 'Campfire', src: AB+'megapack-sprites/camp-props/09.png', cost: 95, mood: 6, size: 34, blocks: true, radius: 4, band: 'camp' },
+  { id: 'tribalfence', name: 'Tribal Fence', src: AB+'megapack-sprites/wooden-tribal-fences/17.png', cost: 100, mood: 6, size: 42, blocks: true, radius: 4.5, band: 'camp' },
+  { id: 'firering', name: 'Stone Fire Ring', src: AB+'megapack-sprites/torches-and-fire-pits/17.png', cost: 110, mood: 7, size: 40, blocks: true, radius: 4.5, band: 'camp' },
+  { id: 'tribalgate', name: 'Tribal Gate', src: AB+'megapack-sprites/wooden-tribal-fences/30.png', cost: 130, mood: 8, size: 46, blocks: true, radius: 5, band: 'camp' },
+  { id: 'tent', name: 'Hide Tent', src: AB+'megapack-sprites/camp-props/00.png', cost: 170, mood: 9, size: 44, blocks: true, radius: 5, band: 'camp' },
+  { id: 'skullpile', name: 'Skull Pile', src: AB+'megapack-sprites/bones-and-skeleton-decorations/24.png', cost: 190, mood: 9, size: 36, blocks: false, radius: 0, band: 'monument' },
+  { id: 'bonepit', name: 'Bone Pit', src: AB+'megapack-sprites/bones-and-skeleton-decorations/16.png', cost: 210, mood: 10, size: 44, blocks: false, radius: 0, band: 'monument' },
+  { id: 'carvedhead', name: 'Carved Head', src: AB+'megapack-sprites/stone-ruins/46.png', cost: 220, mood: 10, size: 48, blocks: true, radius: 5, band: 'monument' },
+  { id: 'bonearch', name: 'Bone Arch', src: AB+'megapack-sprites/bones-and-skeleton-decorations/18.png', cost: 280, mood: 12, size: 52, blocks: true, radius: 5.5, band: 'monument' },
+  { id: 'monolith', name: 'Carved Monolith', src: AB+'megapack-sprites/dinosaur-statues-and-monuments/07.png', cost: 320, mood: 13, size: 50, blocks: true, radius: 5, band: 'monument' },
+  { id: 'trikestatue', name: 'Triceratops Statue', src: AB+'megapack-sprites/dinosaur-statues-and-monuments/01.png', cost: 360, mood: 13, size: 56, blocks: true, radius: 5.5, band: 'monument' },
+  { id: 'trexstatue', name: 'T-Rex Statue', src: AB+'megapack-sprites/dinosaur-statues-and-monuments/00.png', cost: 400, mood: 14, size: 56, blocks: true, radius: 5.5, band: 'monument' },
+  { id: 'fossilwall', name: 'Fossil Wall', src: AB+'megapack-sprites/dinosaur-statues-and-monuments/10.png', cost: 450, mood: 14, size: 72, blocks: true, radius: 7, band: 'monument' },
+  { id: 'skullarch', name: 'Skull Arch', src: AB+'megapack-sprites/dinosaur-statues-and-monuments/06.png', cost: 500, mood: 15, size: 64, blocks: true, radius: 6.5, band: 'monument' },
+  { id: 'skullpyramid', name: 'Skull Pyramid', src: AB+'megapack-sprites/dinosaur-statues-and-monuments/16.png', cost: 600, mood: 16, size: 72, blocks: true, radius: 8, band: 'monument' },
+  { id: 'eggnest', name: 'Egg Nest', src: AB+'megapack-sprites/dinosaur-nests-and-eggs/00.png', cost: 60, mood: 3, size: 30, blocks: false, radius: 0, band: 'mid' },
+  { id: 'hatchnest', name: 'Hatchling Nest', src: AB+'megapack-sprites/dinosaur-nests-and-eggs/17.png', cost: 145, mood: 8, size: 32, blocks: false, radius: 0, band: 'mid' },
+  { id: 'giantfern', name: 'Giant Fern', src: AB+'megapack-sprites/tropical-trees-and-ferns/21.png', cost: 65, mood: 4, size: 34, blocks: false, radius: 0, band: 'large' },
+  { id: 'royalpalm', name: 'Royal Palm', src: AB+'megapack-sprites/tropical-trees-and-ferns/00.png', cost: 115, mood: 7, size: 48, blocks: true, radius: 5, band: 'large' },
 ];
 /* Display order and labels for the tray. Separate from the item table so
    the catalogue can grow without touching the grouping, and so a band
@@ -4819,7 +4852,9 @@ const YARD_BANDS = [
   { id: 'ground', label: 'Ground Cover' },
   { id: 'mid',    label: 'Features' },
   { id: 'water',  label: 'Water' },
-  { id: 'large',  label: 'Large · blocks pathing' },
+  { id: 'large',  label: 'Large - blocks pathing' },
+  { id: 'camp',   label: 'Camp & Tribal' },
+  { id: 'monument', label: 'Ancient Monuments' },
   { id: 'show',   label: 'Showpieces' },
 ];
 /* Raised with the catalogue: 33 types and 14 slots meant most of them
@@ -4876,7 +4911,7 @@ function renderYardTray() {
                 : t.blocks ? 'Dinos walk around this' : 'Dinos can walk over this';
     return `<button class="yard-item-btn${selectedYardType === t.id ? ' selected' : ''}" ${dis ? 'disabled' : ''}
         onclick="selectYardType('${t.id}')" title="${where} · +${t.mood} mood">
-      <img src="${t.src}" width="26" height="26" alt="">
+      <img src="${t.src}" style="max-width:26px;max-height:26px;width:auto;height:auto" alt="">
       <span class="yard-item-name">${t.name}</span>
       <span class="yard-item-cost">🪙 ${t.cost}</span>
     </button>`;
@@ -5692,7 +5727,7 @@ function showVisitedPark(data) {
     if (!t) return '';
     const px = Math.round(t.size * 0.62);
     return `<div class="visit-yard" style="left:${it.x}%;top:${it.y}%;z-index:${3 + Math.round(it.y / 10)}">
-      <img src="${t.src}" width="${px}" height="${px}" alt="">
+      <img src="${t.src}" width="${px}" alt="">
     </div>`;
   }).join('');
 
