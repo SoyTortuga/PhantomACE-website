@@ -193,6 +193,10 @@ async function performMove(env, dir, name, { hint = false } = {}) {
     state.moves += 1;
     state.totalMoves += 1;
     state.lastMove = { dir, by: String(name || 'chat').slice(0, 40), blocked, at: now };
+    /* The on-screen input history: last ten moves, newest last, whoever
+       sent them -- chat and test drives alike. Capped by slicing on write
+       so the document cannot grow with the stream. */
+    state.recent = [...(state.recent || []), state.lastMove].slice(-10);
 
     const who = state.lastMove.by;
     if (state.contributors[who] !== undefined ||
@@ -268,8 +272,12 @@ export async function onRequestGet(context) {
     walls: state.walls, pos: state.pos, goal: state.goal,
     moves: state.moves, bonks: state.bonks, totalMoves: state.totalMoves,
     lastMove: state.lastMove || null,
+    recent: state.recent || [],
     transition: state.transition || null,
-    history: (state.history || []).slice(-8),
+    /* The WHOLE session, Maze 1 onward -- the cleared panel is a ledger
+       that scrolls, not a ticker that forgets. One entry per clear cannot
+       outgrow a stream. */
+    history: state.history || [],
     topMover: top ? { name: top[0], moves: top[1] } : null,
     startedAt: state.startedAt,
   });
@@ -294,6 +302,7 @@ export async function onRequestPost(context) {
       status: 'active',
       startedAt: now,
       totalMoves: 0,
+      recent: [],
       contributors: {},
       history: [],
       lastMove: null,
@@ -323,6 +332,16 @@ export async function onRequestPost(context) {
     if (!DIRS[dir]) return json({ error: 'Unknown direction' }, 400);
     const res = await performMove(env, dir, (session.display_name || 'tester') + ' (test)');
     if (!res) return json({ error: 'No maze is running.' }, 400);
+    /* Clears announce to chat WHOEVER made the winning move -- the
+       broadcaster wants the cleared list narrated in channel, and a level
+       falling during a staff assist is still a level the stream watched
+       fall. Individual moves stay silent either way. */
+    if (res.say.length) {
+      try {
+        const { sendChatMessage } = await import('./send-chat.js');
+        for (const m of res.say) await sendChatMessage(env, m);
+      } catch (err) { console.error('[maze] clear announcement failed:', err.message); }
+    }
     return json({ success: true, said: res.say });
   }
 

@@ -295,6 +295,55 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   ok('walls render as borders from the hex digits', /parseInt\(data\.walls\[y\]\[x\], 16\)/.test(js));
 }
 
+/* ══ The live-testing notes, pinned ════════════════════════════════════ */
+{
+  /* Input history: last ten, in order, named. Drive 12 distinct moves and
+     the first two must have fallen off the front. */
+  const e = env();
+  await POST(e, { action: 'start' }, as('222'));
+  _resetHint();
+  const seq = ['up','down','left','right','up','down','left','right','up','down','left','right'];
+  for (let i = 0; i < seq.length; i++) {
+    await offerMove(e, { name: 'Mover' + i, text: seq[i] });
+  }
+  const st = e.MARKETPLACE.read('maze_current');
+  check('the recent ring holds exactly ten', st.recent.length, 10);
+  check('oldest surviving move is the third sent', st.recent[0].by, 'Mover2');
+  check('newest is last', st.recent[9].by, 'Mover11');
+  ok('each entry names its direction and sender',
+     st.recent.every(m => m.dir && m.by && typeof m.blocked === 'boolean'));
+
+  const pub = await (await GET(e)).json();
+  check('the wire carries the ring', pub.recent.length, 10);
+
+  /* The cleared ledger is the whole session, not a tail. */
+  ok('GET returns full history, unsliced',
+     /history: state\.history \|\| \[\]/.test(fs.readFileSync(path.join(REPO, 'functions/api/bot/maze.js'), 'utf8')));
+
+  /* Test-driven clears now announce to chat too -- the broadcaster's call,
+     overriding the earlier keep-quiet default. */
+  const mz = fs.readFileSync(path.join(REPO, 'functions/api/bot/maze.js'), 'utf8').replace(/\r?\n/g, '\n');
+  ok('a clear from the test page reaches the channel',
+     /action === 'move'[\s\S]{0,900}sendChatMessage\(env, m\)/.test(mz));
+
+  /* The page's promises from the notes. */
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/maze-test.js'), 'utf8').replace(/\r?\n/g, '\n');
+  const page = fs.readFileSync(path.join(REPO, 'maze-test.html'), 'utf8').replace(/\r?\n/g, '\n');
+
+  ok('one rover glides; the dot is never re-parented', /class="rover"/.test(js) && !/class="dot"/.test(js));
+  ok('with a transform transition to glide on', /\.rover \{[\s\S]{0,200}transition: transform/.test(page));
+  ok('a bonk lunges toward the wall it hit', /cellPx \* 0\.28/.test(js));
+  ok('the goal is a downward ladder, not a flag', /🪜/.test(js) && !/🏁/.test(js));
+  ok('the old board is never unhidden after its fade begins',
+     /buildBoard\(latest\);[\s\S]{0,200}classList\.remove\('fading'\)/.test(js));
+  ok('a MAZE COMPLETE card shows during the fade', /MAZE ' \+ t\.clearedLevel \+ ' COMPLETE!/.test(js));
+  ok('the pad speaks words, not glyphs', /data-dir="up">Up</.test(page) && /data-dir="right">Right</.test(page));
+  ok('and lights the direction chat sent', /function flashPad/.test(js) && /lit-bonk/.test(js));
+  ok('the ledger reads Maze 1 downward and follows the bottom',
+     /history\.map\(/.test(js) && /scrollTop = ul\.scrollHeight/.test(js));
+  ok('the ledger scrolls rather than truncates', /#historyList \{ max-height/.test(page));
+}
+
 /** BFS the walls; returns the direction list from (0,0) to the far corner. */
 function solve(walls, size) {
   const prev = new Map([['0,0', null]]);

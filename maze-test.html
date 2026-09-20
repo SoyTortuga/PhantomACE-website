@@ -47,16 +47,34 @@
     .cell.e { border-right-color: #ff0000; }
     .cell.s { border-bottom-color: #ff0000; }
     .cell.w { border-left-color: #ff0000; }
-    .cell .dot, .cell .flag {
+    .cell .ladder {
       position: absolute; inset: 0; display: flex;
-      align-items: center; justify-content: center;
+      align-items: center; justify-content: center; font-size: 15px;
     }
-    .cell .dot::after {
-      content: ''; width: 55%; height: 55%; border-radius: 50%;
+    /* ONE dot for the whole board, gliding on a transform transition —
+       re-parenting it cell to cell was why movement felt rigid. */
+    .rover {
+      position: absolute; top: 0; left: 0; border-radius: 50%;
       background: #ff0000; border: 2px solid #ffffffcc;
+      transition: transform 0.22s ease;
+      pointer-events: none;
     }
-    .cell.bonked .dot::after { background: #ffaa00; }
-    .cell .flag { font-size: 14px; }
+    .rover.no-anim { transition: none; }
+
+    .board-wrap { position: relative; }
+    .level-done {
+      position: absolute; inset: 0; display: none;
+      align-items: center; justify-content: center; text-align: center;
+      background: rgba(10,10,10,0.6); border-radius: 6px;
+    }
+    .level-done.show { display: flex; }
+    .level-done .inner { font-size: 18px; font-weight: 800; color: #ff0000; letter-spacing: 0.08em; }
+    .level-done .inner small { display: block; font-size: 11px; color: #fff; font-weight: 400; margin-top: 6px; }
+
+    /* The pad doubles as a live indicator: whichever direction chat (or a
+       test drive) sent lights up for a beat, amber when it bonked. */
+    .pad .btn.lit { border-color: #ff0000; color: #ff6666; }
+    .pad .btn.lit-bonk { border-color: #ffaa00; color: #ffcc66; }
 
     .side { flex: 1 1 240px; }
     .panel {
@@ -66,6 +84,8 @@
     .panel h2 { font-size: 12px; margin: 0 0 8px; color: #ffffffaa; letter-spacing: 0.08em; text-transform: uppercase; }
     .panel .big { font-size: 20px; color: #fff; font-weight: 700; }
     .panel ul { margin: 0; padding-left: 16px; color: #ffffffcc; }
+    #historyList { max-height: 150px; overflow-y: auto; }
+    #recentList { max-height: 170px; overflow-y: auto; }
     .pad { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; justify-content: center; }
     .pad .btn { padding: 10px 0; text-align: center; }
     .pad .blank { visibility: hidden; }
@@ -77,7 +97,8 @@
     <h1>🧭 Chat Maze — Test</h1>
     <p class="sub">The live board, exactly as the game sees it. Real play is chat typing
       up / down / left / right (or WASD, "!" optional) — every message moves the dot, in order.
-      Moves made here are marked "(test)" and never post to the channel.</p>
+      Moves made here are marked "(test)"; single moves stay out of chat, but a cleared
+      maze is announced in channel whoever made the winning move.</p>
 
     <div class="bar">
       <button class="btn" id="startBtn">Start (4×4)</button>
@@ -87,7 +108,10 @@
     <div class="said" id="said"></div>
 
     <div class="stage">
-      <div class="board-wrap"><div class="board" id="board"></div></div>
+      <div class="board-wrap">
+        <div class="board" id="board"></div>
+        <div class="level-done" id="levelDone"><div class="inner" id="levelDoneText"></div></div>
+      </div>
       <div class="side">
         <div class="panel">
           <h2>Level</h2>
@@ -97,11 +121,15 @@
         </div>
         <div class="panel" id="padPanel">
           <h2>Test drive</h2>
-          <div class="pad">
-            <span class="blank"></span><button class="btn" data-dir="up">▲</button><span class="blank"></span>
-            <button class="btn" data-dir="left">◀</button><button class="btn" data-dir="down">▼</button><button class="btn" data-dir="right">▶</button>
+          <div class="pad" style="grid-template-columns: repeat(3, 72px);">
+            <span class="blank"></span><button class="btn" data-dir="up">Up</button><span class="blank"></span>
+            <button class="btn" data-dir="left">Left</button><button class="btn" data-dir="down">Down</button><button class="btn" data-dir="right">Right</button>
           </div>
           <div class="hint">Arrow keys and WASD work too, while this page is focused.</div>
+        </div>
+        <div class="panel">
+          <h2>Input history</h2>
+          <ul id="recentList"><li>none yet</li></ul>
         </div>
         <div class="panel">
           <h2>Cleared</h2>

@@ -1,30 +1,51 @@
 /* ══════════════════════════════════════════════
-   CHAT MAZE — the staff test page.
+   CHAT MAZE — the staff test page, and the reference for the overlay.
 
-   Watches /api/bot/maze at chat speed and renders the board the way the
-   overlay eventually will: a CSS grid whose borders ARE the walls, one
-   hex digit per cell straight off the wire. The transition is the spec's
-   sentence made literal — on a clear, the old board fades out, then the
-   next one renders a cell larger in each direction.
+   Everything visual here came from live-testing notes and is meant to be
+   lifted onto the stream overlay as-is:
 
-   Controls are cosmetic-gated on the GET's `staff` flag; the server
-   re-checks every POST for real. Test moves are named "(test)" and their
-   clear announcements come back in the response instead of going to the
-   channel, so testing before stream never narrates into a live chat.
+     · the dot is ONE element gliding on a transform transition — moving
+       it between cells by re-parenting was why movement felt rigid, and
+       a bonk now bounces it toward the wall it hit
+     · a clear runs a choreographed sequence: fade the old board out,
+       hold a "MAZE N COMPLETE" card, build the next board while still
+       invisible, fade that in — the old board can never flash back,
+       because it is never made visible again after the fade begins
+     · the goal is a ladder going down to the next maze
+     · the pad shows Up/Down/Left/Right as words and doubles as a live
+       indicator: whichever direction arrives (from chat or here) lights
+       its button, amber on a bonk
+     · input history lists the last ten moves with their senders; the
+       cleared panel is the session's ledger, Maze 1 downward, scrolling
    ══════════════════════════════════════════════ */
 
 (function () {
   'use strict';
 
   var POLL_MS = 1000;
-  var CELL_MAX = 52, BOARD_MAX = 440;
+  var CELL_MAX = 52, BOARD_MAX = 480, PAD = 10;
 
-  var lastTransitionAt = null;   /* fade only on a transition we WATCHED */
-  var lastRenderedLevel = null;
-  var fading = false;
   var staff = false;
+  var latest = null;              /* freshest state, for the end of staging */
+  var lastRenderedLevel = null;
+  var lastTransitionAt = null;
+  var lastMoveAt = null;
+  var staging = false;            /* the clear choreography owns the board */
+  var cellPx = 0;
 
   var $ = function (id) { return document.getElementById(id); };
+
+  /* ── polling ── */
+
+  async function poll() {
+    try {
+      var res = await fetch('/api/bot/maze', { cache: 'no-store' });
+      var data = await res.json();
+      staff = !!data.staff;
+      latest = data;
+      render(data);
+    } catch (e) { $('status').textContent = 'unreachable'; }
+  }
 
   function render(data) {
     $('status').textContent = data.status === 'active'
@@ -32,87 +53,164 @@
       : 'no maze running';
     $('startBtn').disabled = !staff || data.status === 'active';
     $('stopBtn').disabled = !staff || data.status !== 'active';
-    $('padPanel').style.display = (staff && data.status === 'active') ? '' : 'none';
+    $('padPanel').style.display = data.status === 'active' ? '' : 'none';
+
+    renderRecent(data.recent || []);
+    renderHistory(data.history || []);
+    flashPad(data.lastMove);
 
     if (data.status !== 'active') {
       $('board').innerHTML = '';
       $('levelLine').textContent = '—';
       $('statLine').textContent = '';
       $('lastLine').textContent = '';
-      renderHistory(data.history || []);
       lastRenderedLevel = null;
       return;
     }
 
-    /* THE FADE. A transition stamped since our last look means the board
-       we are showing was just cleared: fade it, and only rebuild once the
-       fade has been seen. First sight of the page skips the theatre. */
+    /* THE CLEAR, CHOREOGRAPHED. Once the fade starts, the old board is
+       never shown again: card over the dark, then the NEW board is built
+       while still transparent and fades in. The flash the first version
+       had came from un-hiding before rebuilding. */
     var t = data.transition;
-    if (t && lastTransitionAt !== null && t.at !== lastTransitionAt && !fading) {
+    if (t && lastTransitionAt !== null && t.at !== lastTransitionAt && !staging) {
       lastTransitionAt = t.at;
-      fading = true;
+      staging = true;
       $('board').classList.add('fading');
       setTimeout(function () {
-        fading = false;
-        $('board').classList.remove('fading');
-        lastRenderedLevel = null;      /* force the bigger board to build */
-      }, 1000);
-      return;                          /* keep the old board while it fades */
+        $('levelDoneText').innerHTML =
+          'MAZE ' + t.clearedLevel + ' COMPLETE!' +
+          '<small>' + t.moves + ' moves' + (t.bonks ? ' · ' + t.bonks + ' bonks' : '') +
+          ' · winning move by ' + escapeHtml(t.by) +
+          ' · next: ' + (t.clearedSize + 1) + '×' + (t.clearedSize + 1) + '</small>';
+        $('levelDone').classList.add('show');
+      }, 900);
+      setTimeout(function () {
+        $('levelDone').classList.remove('show');
+        lastRenderedLevel = null;
+        buildBoard(latest);
+        placeRover(latest, true);
+        $('board').classList.remove('fading');   /* the new board fades IN */
+        staging = false;
+      }, 2400);
+      return;
     }
     if (t && lastTransitionAt === null) lastTransitionAt = t.at;
-    if (fading) return;
+    if (staging) return;
 
     buildBoard(data);
+    placeRover(data, false);
+
     $('levelLine').textContent = 'Maze ' + data.level + ' · ' + data.size + '×' + data.size;
     $('statLine').textContent = data.moves + ' moves this maze · ' + data.bonks + ' bonks · '
-      + data.totalMoves + ' total' + (data.topMover ? ' · top: ' + data.topMover.name + ' (' + data.topMover.moves + ')' : '');
+      + data.totalMoves + ' total'
+      + (data.topMover ? ' · top: ' + data.topMover.name + ' (' + data.topMover.moves + ')' : '');
     $('lastLine').textContent = data.lastMove
       ? 'last: ' + data.lastMove.dir + ' by ' + data.lastMove.by + (data.lastMove.blocked ? ' — BONK' : '')
       : '';
-    renderHistory(data.history || []);
   }
 
+  /* ── the board ── */
+
   function buildBoard(data) {
+    if (!data || data.status !== 'active') return;
+    if (lastRenderedLevel === data.level) return;
+
     var board = $('board');
     var size = data.size;
-    var cell = Math.min(CELL_MAX, Math.floor(BOARD_MAX / size));
+    cellPx = Math.min(CELL_MAX, Math.floor(BOARD_MAX / size));
 
-    if (lastRenderedLevel !== data.level) {
-      board.style.gridTemplateColumns = 'repeat(' + size + ', ' + cell + 'px)';
-      board.style.gridAutoRows = cell + 'px';
-      var html = '';
-      for (var y = 0; y < size; y++) {
-        for (var x = 0; x < size; x++) {
-          var bits = parseInt(data.walls[y][x], 16);
-          html += '<div class="cell' +
-            ((bits & 1) ? ' n' : '') + ((bits & 2) ? ' e' : '') +
-            ((bits & 4) ? ' s' : '') + ((bits & 8) ? ' w' : '') +
-            '" id="mz_' + x + '_' + y + '"></div>';
-        }
+    board.style.gridTemplateColumns = 'repeat(' + size + ', ' + cellPx + 'px)';
+    board.style.gridAutoRows = cellPx + 'px';
+    var html = '';
+    for (var y = 0; y < size; y++) {
+      for (var x = 0; x < size; x++) {
+        var bits = parseInt(data.walls[y][x], 16);
+        var goal = (x === data.goal.x && y === data.goal.y);
+        html += '<div class="cell' +
+          ((bits & 1) ? ' n' : '') + ((bits & 2) ? ' e' : '') +
+          ((bits & 4) ? ' s' : '') + ((bits & 8) ? ' w' : '') + '">' +
+          (goal ? '<span class="ladder" title="down to the next maze">🪜</span>' : '') +
+          '</div>';
       }
-      board.innerHTML = html;
-      lastRenderedLevel = data.level;
     }
+    /* One rover, absolutely positioned, glides over everything. */
+    html += '<div class="rover" id="rover"></div>';
+    board.innerHTML = html;
+    lastRenderedLevel = data.level;
+  }
 
-    /* The dot and the flag move; the walls never do within a level. */
-    var old = board.querySelectorAll('.dot, .flag');
-    for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
-    var goalCell = $('mz_' + data.goal.x + '_' + data.goal.y);
-    if (goalCell) goalCell.insertAdjacentHTML('beforeend', '<span class="flag">🏁</span>');
-    var posCell = $('mz_' + data.pos.x + '_' + data.pos.y);
-    if (posCell) {
-      posCell.insertAdjacentHTML('beforeend', '<span class="dot"></span>');
-      posCell.classList.toggle('bonked', !!(data.lastMove && data.lastMove.blocked));
+  function roverXY(pos) {
+    return {
+      x: PAD + pos.x * cellPx + cellPx / 2,
+      y: PAD + pos.y * cellPx + cellPx / 2,
+    };
+  }
+
+  function placeRover(data, instant) {
+    var rover = $('rover');
+    if (!rover || !data || data.status !== 'active') return;
+
+    var d = Math.max(10, Math.round(cellPx * 0.55));
+    rover.style.width = d + 'px';
+    rover.style.height = d + 'px';
+
+    if (instant) rover.classList.add('no-anim');
+    var at = roverXY(data.pos);
+    var moved = data.lastMove && data.lastMove.at !== lastMoveAt;
+
+    if (moved && data.lastMove.blocked && !instant) {
+      /* The bonk: lunge a quarter-cell into the wall, then settle back.
+         Both legs ride the same transition, so it reads as a bounce. */
+      var D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[data.lastMove.dir] || [0, 0];
+      setXY(rover, at.x + D[0] * cellPx * 0.28, at.y + D[1] * cellPx * 0.28, d);
+      setTimeout(function () { setXY(rover, at.x, at.y, d); }, 140);
+    } else {
+      setXY(rover, at.x, at.y, d);
     }
+    if (instant) {
+      void rover.offsetWidth;              /* commit before re-enabling */
+      rover.classList.remove('no-anim');
+    }
+    if (moved) lastMoveAt = data.lastMove.at;
+  }
+
+  function setXY(rover, x, y, d) {
+    rover.style.transform = 'translate(' + (x - d / 2) + 'px,' + (y - d / 2) + 'px)';
+  }
+
+  /* ── the pad as a live indicator ── */
+
+  function flashPad(lastMove) {
+    if (!lastMove || lastMove.at === lastMoveAt) return;
+    var btn = document.querySelector('.pad .btn[data-dir="' + lastMove.dir + '"]');
+    if (!btn) return;
+    var cls = lastMove.blocked ? 'lit-bonk' : 'lit';
+    btn.classList.add(cls);
+    setTimeout(function () { btn.classList.remove(cls); }, 500);
+  }
+
+  /* ── side panels ── */
+
+  function renderRecent(recent) {
+    var ul = $('recentList');
+    if (!recent.length) { ul.innerHTML = '<li>none yet</li>'; return; }
+    ul.innerHTML = recent.slice().reverse().map(function (m) {
+      return '<li><b>' + m.dir + '</b>' + (m.blocked ? ' (bonk)' : '') +
+        ' — ' + escapeHtml(m.by) + '</li>';
+    }).join('');
   }
 
   function renderHistory(history) {
     var ul = $('historyList');
     if (!history.length) { ul.innerHTML = '<li>none yet</li>'; return; }
-    ul.innerHTML = history.slice().reverse().map(function (h) {
+    /* Maze 1 first, latest at the bottom, and the scroll follows the
+       bottom — the ledger reads downward like the session happened. */
+    ul.innerHTML = history.map(function (h) {
       return '<li>Maze ' + h.level + ' (' + h.size + '×' + h.size + ') — ' +
         h.moves + ' moves, cleared by ' + escapeHtml(h.clearedBy) + '</li>';
     }).join('');
+    ul.scrollTop = ul.scrollHeight;
   }
 
   function escapeHtml(s) {
@@ -121,14 +219,7 @@
     });
   }
 
-  async function poll() {
-    try {
-      var res = await fetch('/api/bot/maze', { cache: 'no-store' });
-      var data = await res.json();
-      staff = !!data.staff;
-      render(data);
-    } catch (e) { $('status').textContent = 'unreachable'; }
-  }
+  /* ── controls ── */
 
   async function post(body) {
     var res = await fetch('/api/bot/maze', {
@@ -142,11 +233,12 @@
 
   $('startBtn').onclick = async function () {
     $('said').textContent = '';
-    if (await post({ action: 'start' })) { lastTransitionAt = null; lastRenderedLevel = null; poll(); }
+    if (await post({ action: 'start' })) {
+      lastTransitionAt = null; lastRenderedLevel = null; lastMoveAt = null;
+      poll();
+    }
   };
-  $('stopBtn').onclick = async function () {
-    if (await post({ action: 'stop' })) poll();
-  };
+  $('stopBtn').onclick = async function () { if (await post({ action: 'stop' })) poll(); };
 
   async function move(dir) {
     var data = await post({ action: 'move', dir: dir });
@@ -154,7 +246,7 @@
     poll();
   }
   document.querySelectorAll('.pad .btn').forEach(function (b) {
-    b.onclick = function () { move(b.getAttribute('data-dir')); };
+    b.onclick = function () { if (staff) move(b.getAttribute('data-dir')); };
   });
 
   var KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
