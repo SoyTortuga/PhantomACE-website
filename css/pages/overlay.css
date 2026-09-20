@@ -477,6 +477,84 @@ html, body {
 }
 
 /* ══════════════════════════════════════════════
+   SKULL CLICKER RAID BOSS — a thin, tall column for the left edge.
+   Boss art up top, a vertical health bar that drains downward as the site
+   clicks it apart, then minions and the top strikers.
+   ══════════════════════════════════════════════ */
+.ov-raid {
+  position: fixed;
+  left: 14px;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  width: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 12px;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid #2a2a2a;
+  border-left: 3px solid #ff0000;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+}
+.ov-raid-art {
+  width: 92px; height: 92px;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.7));
+}
+.ov-raid-art.shielded { filter: drop-shadow(0 0 8px rgba(90, 160, 255, 0.9)); }
+.ov-raid-name {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  color: #ff5555; text-align: center; line-height: 1.2;
+}
+.ov-raid-timer { font-size: 10px; color: #9a9a9a; font-variant-numeric: tabular-nums; }
+/* The tall vertical health bar — this is most of the "tall" in thin-and-tall. */
+.ov-raid-track {
+  position: relative;
+  width: 26px;
+  height: 42vh;
+  min-height: 200px;
+  background: #160000;
+  border: 1px solid #3a0000;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.ov-raid-track i {
+  position: absolute;
+  left: 0; bottom: 0; width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #ff5a1f, #ff0000);
+  transition: height 0.4s ease;
+}
+.ov-raid-track.shielded i { background: linear-gradient(180deg, #7fb2ff, #2a6adf); }
+.ov-raid-hp { font-size: 10px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+.ov-raid-pct { font-size: 13px; font-weight: 800; color: #ff5555; }
+/* Minions — the summoned adds */
+.ov-raid-minions { display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 0; }
+.ov-raid-minions.empty { display: none; }
+.ov-raid-mini-row { display: flex; gap: 2px; }
+.ov-raid-mini {
+  width: 26px; height: 26px;
+  background-repeat: no-repeat; background-position: 0 0;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 3px rgba(120, 0, 200, 0.8));
+}
+.ov-raid-mini-bar { width: 60px; height: 4px; background: #1a0022; border: 1px solid #3a1a4a; border-radius: 2px; overflow: hidden; }
+.ov-raid-mini-bar i { display: block; height: 100%; background: #b060ff; transition: width 0.3s; }
+.ov-raid-toplabel {
+  font-size: 8px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #6f6f6f; margin-top: 2px;
+}
+.ov-raid-top { list-style: none; margin: 0; padding: 0; width: 100%; }
+.ov-raid-top li {
+  font-size: 10px; color: #ddd; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) { .ov-raid-track i { transition: none; } }
+
+/* ══════════════════════════════════════════════
    COMMANDER BINGO — the standing panel.
 
    The same furniture as MTGBBB (progress bar, roster count, a board) so the

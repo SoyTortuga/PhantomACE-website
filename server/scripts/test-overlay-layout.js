@@ -171,7 +171,7 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   /* The panel list the editor drags must match the ids the route stores,
      or a panel can be arranged and then silently not saved. */
   ok('the sample panel ids are exactly the stored ones',
-     JSON.stringify(ids) === JSON.stringify(['ovBingo', 'ovMaze', 'ovMc', 'ovMtg', 'ovScramble', 'ovStage']));
+     JSON.stringify(ids) === JSON.stringify(['ovBingo', 'ovMaze', 'ovMc', 'ovMtg', 'ovRaid', 'ovScramble', 'ovStage']));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

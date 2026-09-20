@@ -611,6 +611,7 @@ function initGiveawayPanel() {
   loadGiveawayState();
   initOvMc();
   initOvBingo();
+  initOvRaid();
 }
 
 /* ── Mana Clash on the overlay ──────────────────────────────────── */
@@ -856,6 +857,57 @@ function initOvBingo() {
   refresh.addEventListener('click', function () { loadOvBingo(); });
 
   loadOvBingo();
+}
+
+/* ── Skull Clicker raid boss ─────────────────────────────────────────── */
+function ovRaidSay(text, live) {
+  const el = document.getElementById('ovRaidState');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'giveaway-status' + (live ? ' open' : '');
+}
+
+async function loadOvRaid() {
+  let res;
+  try { res = await fetch('/api/skull-raid', { credentials: 'same-origin', cache: 'no-store' }); }
+  catch { ovRaidSay('Could not reach the server', false); return; }
+  if (res.status === 404) { ovRaidSay('Raid route missing — restart the server', false); return; }
+  if (!res.ok) { ovRaidSay('Could not load (HTTP ' + res.status + ')', false); return; }
+  let s; try { s = await res.json(); } catch { return; }
+  if (s.status === 'active') {
+    const pct = s.maxHp ? Math.ceil((s.hp / s.maxHp) * 100) : 0;
+    ovRaidSay(s.name + ' — ' + pct + '% HP', true);
+  } else if (s.status === 'defeated') { ovRaidSay('Defeated by ' + (s.defeatedBy || '—'), false); }
+  else { ovRaidSay('No boss', false); }
+}
+
+async function ovRaidPost(body, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/skull-raid', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) { showBotStatus(body.action === 'start' ? 'Boss summoned.' : 'Boss ended.', false); }
+    else if (res.status === 404) { showBotStatus('The raid route returned 404. The server needs restarting after the last pull.', true); }
+    else { showBotStatus(d.error || 'Could not change the boss.', true); }
+  } catch { showBotStatus('Network error.', true); }
+  if (btn) btn.disabled = false;
+  loadOvRaid();
+}
+
+function initOvRaid() {
+  const start = document.getElementById('ovRaidStartBtn');
+  if (!start) return;
+  start.addEventListener('click', function () {
+    const hp = parseInt(document.getElementById('ovRaidHp').value, 10) || 5000;
+    const minutes = parseInt(document.getElementById('ovRaidMin').value, 10) || 15;
+    ovRaidPost({ action: 'start', hp: hp, minutes: minutes }, start);
+  });
+  document.getElementById('ovRaidEndBtn').addEventListener('click', function (e) { ovRaidPost({ action: 'end' }, e.target); });
+  document.getElementById('ovRaidRefreshBtn').addEventListener('click', function () { loadOvRaid(); });
+  loadOvRaid();
 }
 
 function initBotControlPanel() {

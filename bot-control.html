@@ -175,6 +175,19 @@
         </div>
       </div>
 
+      <div class="card bot-section" id="ovRaidSection">
+        <h2>Skull Clicker Raid Boss</h2>
+        <p class="bot-section-desc">Summons the Undead Executioner across every open Skull Clicker. The whole site clicks it down together; it heals, guards and summons minions, and when it falls everyone gets a cursed-skull frenzy. The thin overlay panel shows its health &mdash; place it on the left.</p>
+        <div class="ovmc-row">
+          <span class="giveaway-status" id="ovRaidState">No boss</span>
+          <input type="number" id="ovRaidHp" class="lb-award-tier" style="max-width:90px" value="5000" min="100" step="500" title="Boss HP (total clicks)">
+          <input type="number" id="ovRaidMin" class="lb-award-tier" style="max-width:70px" value="15" min="1" max="120" title="Minutes">
+          <button class="btn-primary" id="ovRaidStartBtn">Summon</button>
+          <button class="btn-secondary" id="ovRaidEndBtn">End</button>
+          <button class="btn-secondary" id="ovRaidRefreshBtn">Refresh</button>
+        </div>
+      </div>
+
       <div class="card bot-section">
         <h2>Send Announcement</h2>
         <p class="bot-section-desc">Posts a custom message to chat verbatim, exactly as typed.</p>

@@ -23,6 +23,9 @@ _private/
 games/dino-park/assets/dino-assets/
 # Skull Clicker building sprites, spliced from the same purchased packs.
 games/skull-clicker/assets/buildings/
+# Raid-boss source art (aseprite + raw sheets). The flattened strips the game
+# actually loads live in games/skull-clicker/assets/raid/ and ARE tracked.
+games/skull-clicker/assets/Undead executioner/
 
 # Scratch output from asset extraction runs
 _tile_*.png

@@ -71,6 +71,24 @@
     <ol class="ov-mtg-top" id="ovMtgTop"></ol>
   </div>
 
+  <!-- Skull Clicker co-op raid boss: a thin, tall column for the left edge —
+       boss art, a vertical health bar that drains as the site clicks it down,
+       and the top strikers. Hidden unless a boss is live. -->
+  <div class="ov-raid" id="ovRaid" hidden>
+    <div class="ov-raid-art" id="ovRaidArt"></div>
+    <div class="ov-raid-name" id="ovRaidName">Undead Executioner</div>
+    <div class="ov-raid-timer" id="ovRaidTimer"></div>
+    <div class="ov-raid-pct" id="ovRaidPct"></div>
+    <div class="ov-raid-track"><i id="ovRaidBar"></i></div>
+    <div class="ov-raid-hp" id="ovRaidHp"></div>
+    <div class="ov-raid-minions empty" id="ovRaidMinions">
+      <div class="ov-raid-mini-row"><div class="ov-raid-mini" id="ovRaidMini"></div></div>
+      <div class="ov-raid-mini-bar"><i id="ovRaidMiniBar"></i></div>
+    </div>
+    <div class="ov-raid-toplabel">Top Strikers</div>
+    <ol class="ov-raid-top" id="ovRaidTop"></ol>
+  </div>
+
   <!-- Commander Bingo: the same standing furniture as MTGBBB — call
        progress and player count up top, and a WINNERS board below (this
        game has no per-player score, so "who's winning" is who the host has
@@ -113,6 +131,7 @@
        One source of truth, shared with the game and its host page. -->
   <script src="/games/commander-bingo/events.js" defer></script>
   <script src="/js/pages/overlay-commander-bingo.js" defer></script>
+  <script src="/js/pages/overlay-skull-raid.js" defer></script>
   <script src="/js/pages/overlay-mana-clash.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>
   <script src="/js/pages/overlay-layout.js" defer></script>

@@ -41,6 +41,12 @@
       'Top 3 players by lines',
       '(individual pulls appear in the Alerts window)',
     ] },
+    { id: 'ovRaid', label: 'Raid Boss', holds: [
+      'The boss (animated) & its name',
+      'A tall vertical health bar',
+      'Minions when summoned',
+      'Top strikers',
+    ] },
     { id: 'ovBingo', label: 'Commander Bingo', holds: [
       'Call progress bar (squares of 68)',
       'Player count',
@@ -154,6 +160,24 @@
       '<li><span>thirdPlace</span><span>2 lines</span></li>';
   }
 
+  function raidBoss() {
+    show('ovRaid');
+    set('ovRaidName', 'Undead Executioner');
+    set('ovRaidTimer', '11:20');
+    set('ovRaidPct', '64%');
+    set('ovRaidHp', '3.2K / 5.0K');
+    var art = $('ovRaidArt');
+    if (art) {
+      art.style.backgroundImage = 'url(/games/skull-clicker/assets/raid/idle.png)';
+      art.style.backgroundSize = '500px 100px';
+      art.style.backgroundPositionX = '0';
+    }
+    var bar = $('ovRaidBar'); if (bar) bar.style.height = '64%';
+    var mins = $('ovRaidMinions'); if (mins) mins.classList.add('empty');
+    var top = $('ovRaidTop');
+    if (top) top.innerHTML = '<li>chatKnight · 1.2K</li><li>boneMob · 800</li><li>freezy · 540</li>';
+  }
+
   function bingo() {
     show('ovBingo');
     set('ovBingoProgress', '19 / 68 called');
@@ -189,7 +213,7 @@
       '<li><span>duelistThree</span><span>2,900</span></li>';
   }
 
-  function fillAll() { alertCard(); scramble(); maze(); mtg(); bingo(); manaClash(); }
+  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
 })();

@@ -252,6 +252,37 @@
     .buff-chip.rush   { color: #ff9500; border-color: #ff9500; }
     .buff-chip.combo  { color: #ffd23b; border-color: #7a6a12; }
 
+    /* Co-op raid banner (in-game) */
+    .raid-banner {
+      margin: 0 12px 8px; padding: 8px 12px;
+      background: rgba(40,0,0,0.55); border: 1px solid #ff0000; border-radius: 6px;
+    }
+    .raid-head { display: flex; align-items: center; gap: 8px; }
+    .raid-boss-mini {
+      width: 34px; height: 34px; flex: none;
+      background: url('assets/raid/idle.png') 0 0 no-repeat;
+      background-size: 170px 34px;  /* 5 frames × 34px */
+      image-rendering: pixelated;
+      filter: drop-shadow(0 0 4px rgba(255,0,0,0.7));
+      animation: raid-mini-idle 0.6s steps(5) infinite;
+    }
+    .raid-boss-mini.shielded { filter: drop-shadow(0 0 5px rgba(90,160,255,0.9)); }
+    @keyframes raid-mini-idle { from { background-position-x: 0; } to { background-position-x: -170px; } }
+    .raid-name { font-size: 13px; font-weight: 800; color: #ff5555; flex: 1; }
+    .raid-mini-tag { font-size: 10px; color: #b060ff; font-weight: 800; }
+    .raid-timer { font-size: 11px; color: #ffffffaa; font-variant-numeric: tabular-nums; }
+    .raid-track {
+      position: relative; height: 16px; margin: 6px 0 4px; background: #1a0000;
+      border: 1px solid #3a0000; border-radius: 4px; overflow: hidden;
+    }
+    .raid-track i { display: block; height: 100%; background: linear-gradient(90deg,#ff0000,#ff5a1f); transition: width 0.4s; }
+    .raid-hp {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000;
+    }
+    .raid-top { font-size: 10px; color: #ffffff99; text-align: center; }
+    @media (prefers-reduced-motion: reduce) { .raid-track i { transition: none; } }
+
     /* Buff toast (transient, centre-top) */
     .buff-toast {
       position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
@@ -571,6 +602,7 @@
     </div>
 
     <div class="buff-bar" id="buffBar"></div>
+    <div class="raid-banner" id="raidBanner" hidden></div>
 
     <!-- The living world: every building you own appears here and stacks up,
          Cookie-Clicker style, so the screen fills as you go deeper. -->
@@ -862,6 +894,7 @@
 
       earn(power);
       totalClicks++;
+      if (raidActive()) raidQueue++;   /* each strike also hits the shared boss */
       spawnPop(e, power, crit);
       playSound('click');
       checkMilestones();
@@ -1183,6 +1216,79 @@
           window.__streamFrenzy = false;
         }
       } catch (e) { /* silent — an event is a bonus, never load-bearing */ }
+    }
+
+    /* ═══════ CO-OP RAID BOSS ═══════
+       One boss shared by everyone. While it lives, each skull click also
+       strikes it (queued and flushed to the server in small batches). Beat
+       it and the whole site gets a frenzy (delivered via the event poller). */
+    let raidState = null;
+    let raidQueue = 0;          /* clicks dealt since the last flush */
+    let raidSeenStatus = null;  /* to announce transitions once */
+
+    function raidActive() { return raidState && raidState.status === 'active'; }
+
+    async function pollRaid() {
+      try {
+        const res = await fetch('/api/skull-raid', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        applyRaid(await res.json());
+      } catch (e) { /* a boss is a bonus, never load-bearing */ }
+    }
+
+    function applyRaid(s) {
+      const prev = raidSeenStatus;
+      raidState = s;
+      renderRaidBanner();
+      if (s && s.status !== prev) {
+        raidSeenStatus = s.status;
+        if (s.status === 'defeated' && prev === 'active') {
+          showBuffToast('☠️ ' + (s.defeatedBy || 'The chat') + ' felled ' + s.name + '! Frenzy!', 'reap');
+          screenShake();
+        } else if (s.status === 'expired' && prev === 'active') {
+          showBuffToast(s.name + ' escaped into the dark…', 'frenzy');
+        } else if (s.status === 'active' && prev !== 'active') {
+          showBuffToast('⚔️ ' + s.name + ' rises — click to strike!', 'rush');
+          screenShake();
+        }
+      }
+    }
+
+    async function flushRaidDamage() {
+      if (!raidActive() || raidQueue <= 0) return;
+      const dmg = Math.min(100, raidQueue);
+      raidQueue -= dmg;
+      const p = getPlayerId();
+      const body = { action: 'hit', damage: dmg };
+      if (p.guestId) { body.guestId = p.guestId; body.guestName = p.guestName; }
+      try {
+        const res = await fetch('/api/skull-raid', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        if (res.ok) applyRaid(await res.json());
+      } catch (e) { raidQueue += dmg; /* put it back to retry next flush */ }
+    }
+
+    function renderRaidBanner() {
+      const el = document.getElementById('raidBanner');
+      if (!el) return;
+      if (!raidState || raidState.status !== 'active') { el.hidden = true; return; }
+      const pct = Math.max(0, Math.min(100, (raidState.hp / raidState.maxHp) * 100));
+      const secs = Math.max(0, Math.floor((raidState.endsAt - Date.now()) / 1000));
+      const top = (raidState.top || []).slice(0, 3).map(t => escSkull(t.name) + ' (' + formatNum(t.dmg) + ')').join(' · ');
+      const shielded = raidState.shielded ? ' shielded' : '';
+      const mins = (raidState.minions && raidState.minions.hp > 0)
+        ? ' <span class="raid-mini-tag">minions!</span>' : '';
+      el.hidden = false;
+      el.innerHTML =
+        '<div class="raid-head">' +
+          '<span class="raid-boss-mini' + shielded + '"></span>' +
+          '<span class="raid-name">⚔️ ' + escSkull(raidState.name) + mins + '</span>' +
+          '<span class="raid-timer">' + formatTime(secs * 1000) + '</span></div>' +
+        '<div class="raid-track"><i style="width:' + pct + '%"></i>' +
+          '<span class="raid-hp">' + formatNum(raidState.hp) + ' / ' + formatNum(raidState.maxHp) + '</span></div>' +
+        (top ? '<div class="raid-top">Top: ' + top + '</div>' : '<div class="raid-top">Click the skull to strike!</div>');
     }
 
     /* A quick particle burst where a cursed skull was popped (juice). */
@@ -2111,6 +2217,9 @@
     setInterval(cycleNews, 11000);
     pollSkullEvent();
     setInterval(pollSkullEvent, 30000);
+    pollRaid();
+    setInterval(pollRaid, 4000);
+    setInterval(flushRaidDamage, 3000);
   </script>
 </body>
 </html>
