@@ -142,14 +142,35 @@ function coopRoom(over = {}, turnOver = {}) {
   check('a White trio heals the team (attack 0 here)', room.coop.teamHp, 52); // +12
 }
 
-/* Blue (3): adds rounds to the budget (net of the round just spent). */
+/* Blue (3): a banked trio is a net gain — the round isn't spent, and each trio
+   adds one, so the counter climbs (not cancelled by the round spend). */
 {
   const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
     { coop: { enemyHp: 10000, enemyMaxHp: 10000, roundsLeft: 3 } },
-    { pending: 100, kept: [3, 3, 3, 3, 3, 3], done: null }) }) }; // two Blue trios → +2
+    { pending: 100, kept: [3, 3, 3, 3, 3, 3], done: null }) }) }; // two Blue trios → +2, no spend
   await POST(e, { action: 'bank', code: 'AAAA' });
   const room = e.MARKETPLACE.read('mc_room_AAAA');
-  check('two Blue trios add two rounds, one is spent', room.coop.roundsLeft, 4);
+  check('two Blue trios raise the counter by two (round not spent)', room.coop.roundsLeft, 5);
+}
+
+/* A single Blue trio nets +1 to the visible counter (was previously cancelled). */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, roundsLeft: 4 } },
+    { pending: 100, kept: [3, 3, 3], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('one Blue trio nets +1 round', room.coop.roundsLeft, 5);
+}
+
+/* Blue on a Blue-weak enemy is doubled — +2 from a single trio. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, roundsLeft: 4, weakColor: 3 } },
+    { pending: 100, kept: [3, 3, 3], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a Blue trio on a Blue-weak enemy nets +2', room.coop.roundsLeft, 6);
 }
 
 /* Black (4): stacks Poison on the enemy. */
@@ -203,6 +224,32 @@ function coopRoom(over = {}, turnOver = {}) {
   await POST(e, { action: 'bank', code: 'AAAA' });
   const room = e.MARKETPLACE.read('mc_room_AAAA');
   check('a trio of the weak colour is doubled', room.coop.poison, 2);
+}
+
+/* Weakness also tears off bonus damage AND doubles the effect, together —
+   White-weak enemy, banked White trio, attack 0 to read team HP cleanly. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, weakColor: 2, teamHp: 40, teamMaxHp: 100, enemyAttack: 0 } },
+    { pending: 100, kept: [2, 2, 2], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  // 100 banked + weakness bonus (6% of 10000 = 600) = 700 damage.
+  check('weakness deals bonus damage', room.coop.enemyHp, 9300);
+  // White heal doubled by the weakness: 2 trios-worth × 12 = 24.
+  check('and the White effect is doubled', room.coop.teamHp, 64);
+}
+
+/* Two different colour trios in one bank both fire (kept = a Black + a Red
+   triple). Minions present so Red Burn has something to land on. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, minions: { hp: 2000, maxHp: 2000, count: 2 } } },
+    { pending: 100, kept: [4, 4, 4, 5, 5, 5], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a Black trio in a multi-colour bank poisons', room.coop.poison, 1);
+  check('and the Red trio in the same bank burns', room.coop.burn, 1);
 }
 
 /* ══ Overkill carries a share into the next enemy ══════════════════════ */

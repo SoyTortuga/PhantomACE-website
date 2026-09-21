@@ -215,6 +215,7 @@ const COOP_MINION_ATK = 3;           // added enemy attack per living minion
 const COOP_POISON_PCT = 0.02;        // enemy maxHp lost per Poison stack per round
 const COOP_BURN_PCT = 0.04;          // minion maxHp lost per Burn stack per round
 const COOP_COLORLESS_PCT = 0.05;     // piercing damage per Colourless trio (of enemy maxHp)
+const COOP_WEAK_BONUS_PCT = 0.06;    // bonus damage per trio of the enemy's weak colour
 const COOP_HEAL_PCT = 0.03;          // enemy self-heal when under-pressured
 const COOP_MINION_SOAK = 0.4;        // share of team damage minions absorb
 const COOP_SUMMON_THRESHOLDS = [0.66, 0.33];
@@ -516,18 +517,23 @@ function endRoundCoop(room, now) {
   }
 
   /* 6. The enemy takes what's left, plus piercing, plus the Poison DoT
-     (harder with Venomcraft). */
+     (harder with Venomcraft), plus a weakness strike — banking a trio of the
+     enemy's weak colour always tears off bonus HP, on top of doubling that
+     colour's effect. So weakness is felt every time, whatever colour it is. */
   const poisonDmg = c.poison * Math.ceil(c.enemyMaxHp * COOP_POISON_PCT * (1 + b.poisonMult));
-  const dealt = Math.max(0, dmg) + pierce + poisonDmg;
+  const weakTrios = c.weakColor ? (trios[c.weakColor] || 0) : 0;
+  const weakBonus = weakTrios * Math.ceil(c.enemyMaxHp * COOP_WEAK_BONUS_PCT);
+  const dealt = Math.max(0, dmg) + pierce + poisonDmg + weakBonus;
   const before = c.enemyHp;
   c.enemyHp = Math.max(0, before - dealt);
   c.lastDamage = raw;
   c.lastDealt = dealt;
-  if (c.weakColor && trios[c.weakColor]) log.push('weak:' + c.weakColor);
+  if (weakTrios) log.push('weak:' + c.weakColor);
 
   /* 7. Apply the colour effects that heal now or seed later rounds. */
   if (eff(2)) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(eff(2) * COOP_WHITE_HEAL * (1 + b.healMult))); log.push('heal:' + eff(2)); }
-  if (eff(3)) { c.roundsLeft += eff(3); log.push('rounds:' + eff(3)); }
+  /* Blue (eff(3)) is applied at the round-spend step so it produces a visible
+     net gain instead of being cancelled by the spend. */
   if (eff(4)) { c.poison += eff(4); log.push('poison:' + eff(4)); }
   if (eff(5)) { c.burn += eff(5); log.push('burn:' + eff(5)); }
   if (eff(6)) { c.dmgBuffRounds += eff(6) * COOP_GREEN_ROUNDS; log.push('buff:' + eff(6)); }
@@ -573,10 +579,15 @@ function endRoundCoop(room, now) {
   /* 12. Bosses raise a shield for the coming round on their cadence. */
   if (c.shieldEvery && c.roundsThisEnemy % c.shieldEvery === 0) { c.shieldRounds = 2; log.push('shield-up'); }
 
-  /* 13. Tick the timed effects down and spend the round. */
+  /* 13. Tick the timed effects down and settle the round budget. Blue trios
+     extend the fight: the round you bank them in isn't spent, and each trio
+     banks an extra round on top — so the counter visibly climbs (doubled on a
+     Blue-weak enemy). Any other round simply spends one. */
   if (c.dmgBuffRounds > 0) c.dmgBuffRounds -= 1;
   if (c.shieldRounds > 0) c.shieldRounds -= 1;
-  c.roundsLeft -= 1;
+  const blueRounds = eff(3);
+  if (blueRounds > 0) { c.roundsLeft += blueRounds; log.push('rounds:' + blueRounds); }
+  else c.roundsLeft -= 1;
   c.log = log;
 
   /* 14. Loss checks — wiped, or out of time with the enemy still standing.
