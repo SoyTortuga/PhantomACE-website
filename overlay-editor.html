@@ -60,14 +60,24 @@
 <body>
   <div class="wrap">
     <h1>🖥 Overlay Layout</h1>
-    <p class="sub">Drag each panel where you want it on stream, then Save. The live overlay picks it up
-      on its next load — no OBS edits needed. Panels are shown with sample content and only appear on
-      air while their game is actually running. Positions are stored as percentages, so they hold at any
-      OBS source size.</p>
+    <p class="sub">Keep several layouts as <b>presets</b> — "Just Chatting", "Gaming", "Bingo night" —
+      and switch which one is <b>live</b> as the stream changes. Drag each panel where you want it, Save,
+      then Make Live; the overlay uses the live preset on its next load (hit "Reload OBS Overlay" in Bot
+      Control to swap it instantly). Panels show sample content and only air while their game is running.
+      Positions are percentages, so they hold at any OBS source size.</p>
 
     <div id="notice" class="notice">Checking access…</div>
 
     <div id="editor" style="display:none">
+      <div class="bar">
+        <label style="font-size:13px;color:#ffffffcc">Preset:
+          <select id="presetSelect" class="btn" style="font-weight:700"></select>
+        </label>
+        <button class="btn" id="newBtn">+ New</button>
+        <button class="btn btn-primary" id="activateBtn">Make Live</button>
+        <button class="btn btn-danger" id="deleteBtn">Delete Preset</button>
+        <span id="liveTag" style="font-size:12px;color:#6ac46a;font-weight:700"></span>
+      </div>
       <div class="bar">
         <button class="btn btn-primary" id="saveBtn">Save Layout</button>
         <button class="btn" id="reloadBtn">Revert</button>

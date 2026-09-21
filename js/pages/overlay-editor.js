@@ -21,7 +21,14 @@
   var stageFrame = document.getElementById('stageFrame');
   var notice = document.getElementById('notice');
   var scale = 1;
-  var saved = {};           /* {id:{x,y}} last known-good, for Revert */
+
+  /* Multi-preset state. `presets` mirrors the server: name -> { panels }.
+     `activeName` is the live one; `currentName` is the one being edited. */
+  var presets = {};
+  var activeName = '';
+  var currentName = '';
+
+  function currentPanels() { return (presets[currentName] && presets[currentName].panels) || {}; }
 
   /* The legend is drawn from OverlaySamples.PANELS — the same source that
      lists the movable panels — so it can never claim a panel shows
@@ -57,7 +64,7 @@
   async function boot() {
     var data;
     try {
-      var res = await fetch(API, { cache: 'no-store' });
+      var res = await fetch(API + '?full=1', { cache: 'no-store' });
       data = await res.json();
     } catch (e) { notice.textContent = 'Could not reach the server.'; return; }
 
@@ -66,7 +73,12 @@
         + 'Sign in on the main site as staff.';
       return;
     }
-    saved = data.panels || {};
+    presets = data.presets || {};
+    activeName = data.active || '';
+    /* Always have something to edit: fall back to a fresh, unsaved Default. */
+    currentName = activeName || Object.keys(presets)[0] || 'Default';
+    if (!presets[currentName]) presets[currentName] = { panels: {} };
+
     notice.style.display = 'none';
     document.getElementById('editor').style.display = '';
 
@@ -74,6 +86,7 @@
     try { frame.contentWindow.__ovLayoutManaged = true; } catch (e) {}
 
     renderLegend();
+    renderPresetBar();
     fitScale();
     window.addEventListener('resize', function () { fitScale(); });
 
@@ -81,6 +94,33 @@
     else frame.addEventListener('load', wireFrame);
 
     bindButtons();
+  }
+
+  function renderPresetBar() {
+    var sel = document.getElementById('presetSelect');
+    var names = Object.keys(presets);
+    sel.innerHTML = names.map(function (n) {
+      return '<option value="' + escapeHtml(n) + '"' + (n === currentName ? ' selected' : '') + '>' +
+        escapeHtml(n) + (n === activeName ? ' (live)' : '') + '</option>';
+    }).join('') || '<option>Default</option>';
+    var tag = document.getElementById('liveTag');
+    tag.textContent = activeName ? ('Live: ' + activeName) : 'No preset is live yet';
+  }
+
+  /* Switch which preset is being edited: reload the iframe to a clean slate,
+     then pin from that preset's saved panels. */
+  function selectPreset(name) {
+    currentName = name;
+    if (!presets[currentName]) presets[currentName] = { panels: {} };
+    renderPresetBar();
+    reloadFrame('Editing "' + currentName + '".');
+  }
+
+  function reloadFrame(msg) {
+    wired = false;
+    frame.contentWindow.location.reload();
+    frame.addEventListener('load', wireFrame, { once: true });
+    if (msg) document.getElementById('status').textContent = msg;
   }
 
   var wired = false;
@@ -101,7 +141,7 @@
       /* Pin every panel to top-left in canvas %, from the saved layout if
          it has one, else from where its default CSS currently places it —
          so dragging starts from the real position either way. */
-      var pos = saved[spec.id];
+      var pos = currentPanels()[spec.id];
       if (!pos) {
         /* Inside the same-origin iframe the document lays out at native
            1920×1080 — the CSS scale lives in the PARENT and is invisible
@@ -224,45 +264,85 @@
     return out;
   }
 
+  function setStatus(t) { document.getElementById('status').textContent = t; }
+
+  async function post(bodyObj) {
+    var res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify(bodyObj),
+    });
+    var data = await res.json().catch(function () { return {}; });
+    return { ok: res.ok, data: data };
+  }
+
   function bindButtons() {
+    document.getElementById('presetSelect').onchange = function (e) { selectPreset(e.target.value); };
+
+    document.getElementById('newBtn').onclick = function () {
+      var name = (prompt('Name the new preset (e.g. "Gaming", "Bingo night"):') || '').trim().slice(0, 40);
+      if (!name) return;
+      if (presets[name]) { selectPreset(name); setStatus('That preset already exists — editing it.'); return; }
+      presets[name] = { panels: {} };            /* unsaved until Save */
+      selectPreset(name);
+      setStatus('New preset "' + name + '" — arrange it, then Save.');
+    };
+
     document.getElementById('saveBtn').onclick = async function () {
-      var status = document.getElementById('status');
-      status.textContent = 'Saving…';
+      setStatus('Saving…');
       try {
-        var res = await fetch(API, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ action: 'save', panels: collect() }),
-        });
-        var data = await res.json();
-        if (!res.ok) { status.textContent = data.error || 'Save failed'; return; }
-        saved = data.panels || {};
-        status.textContent = 'Saved — the overlay will use this on its next load.';
-      } catch (e) { status.textContent = 'Save failed: ' + e.message; }
+        var r = await post({ action: 'save', name: currentName, panels: collect() });
+        if (!r.ok) { setStatus(r.data.error || 'Save failed'); return; }
+        presets[currentName] = { panels: r.data.panels || {} };
+        activeName = r.data.active || activeName;
+        renderPresetBar();
+        setStatus('Saved "' + currentName + '".' + (currentName === activeName ? ' It is live.' : ' Make it live to air it.'));
+      } catch (e) { setStatus('Save failed: ' + e.message); }
+    };
+
+    document.getElementById('activateBtn').onclick = async function () {
+      setStatus('Making live…');
+      try {
+        /* Save the current arrangement first, so "Make Live" always airs what
+           is on screen and a brand-new preset exists before it is activated. */
+        var s = await post({ action: 'save', name: currentName, panels: collect() });
+        if (!s.ok) { setStatus(s.data.error || 'Save failed'); return; }
+        presets[currentName] = { panels: s.data.panels || {} };
+        var r = await post({ action: 'activate', name: currentName });
+        if (!r.ok) { setStatus(r.data.error || 'Could not make it live'); return; }
+        activeName = r.data.active || currentName;
+        renderPresetBar();
+        setStatus('"' + currentName + '" is live. Hit "Reload OBS Overlay" in Bot Control to swap it now.');
+      } catch (e) { setStatus('Failed: ' + e.message); }
+    };
+
+    document.getElementById('deleteBtn').onclick = async function () {
+      var names = Object.keys(presets);
+      if (names.length <= 1) { setStatus('Keep at least one preset.'); return; }
+      if (!confirm('Delete the preset "' + currentName + '"?')) return;
+      try {
+        var r = await post({ action: 'delete', name: currentName });
+        if (!r.ok) { setStatus(r.data.error || 'Delete failed'); return; }
+        delete presets[currentName];
+        activeName = r.data.active || '';
+        currentName = activeName || Object.keys(presets)[0] || 'Default';
+        if (!presets[currentName]) presets[currentName] = { panels: {} };
+        renderPresetBar();
+        reloadFrame('Deleted. Now editing "' + currentName + '".');
+      } catch (e) { setStatus('Delete failed: ' + e.message); }
     };
 
     document.getElementById('reloadBtn').onclick = function () {
-      wired = false;
-      frame.contentWindow.location.reload();
-      frame.addEventListener('load', wireFrame, { once: true });
-      document.getElementById('status').textContent = 'Reverted to the last saved layout.';
+      reloadFrame('Reverted "' + currentName + '" to its last saved state.');
     };
 
     document.getElementById('resetBtn').onclick = async function () {
-      if (!confirm('Reset every panel to its default position? The saved layout is deleted.')) return;
-      var status = document.getElementById('status');
+      if (!confirm('Reset "' + currentName + '" — every panel back to its default position?')) return;
       try {
-        var res = await fetch(API, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin', body: JSON.stringify({ action: 'reset' }),
-        });
-        if (!res.ok) { status.textContent = 'Reset failed'; return; }
-        saved = {};
-        wired = false;
-        frame.contentWindow.location.reload();
-        frame.addEventListener('load', wireFrame, { once: true });
-        status.textContent = 'Reset to defaults.';
-      } catch (e) { status.textContent = 'Reset failed: ' + e.message; }
+        var r = await post({ action: 'reset', name: currentName });
+        if (!r.ok) { setStatus('Reset failed'); return; }
+        presets[currentName] = { panels: {} };
+        reloadFrame('"' + currentName + '" reset to defaults.');
+      } catch (e) { setStatus('Reset failed: ' + e.message); }
     };
   }
 

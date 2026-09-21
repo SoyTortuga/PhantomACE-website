@@ -1,26 +1,30 @@
 /* ══════════════════════════════════════════════
-   OVERLAY LAYOUT — where each panel sits, saved once, read by every source.
+   OVERLAY LAYOUT — named presets, one live at a time.
 
-     GET  /api/overlay/layout        the saved positions (public)
-     POST /api/overlay/layout        { action: 'save', panels } | { action: 'reset' }, staff
+     GET  /api/overlay/layout          the ACTIVE preset's positions (public)
+     GET  /api/overlay/layout?full=1   every preset (staff only, for the editor)
+     POST /api/overlay/layout          save | activate | delete | reset (staff)
 
-   The overlay editor drags the real panels around a scaled 16:9 stage and
-   saves their top-left corners here as PERCENTAGES of the 1920×1080 canvas.
-   The live overlay reads this on boot and pins each panel to its saved
-   spot. Percentages, not pixels, so a 1280×720 OBS source lands the panels
-   in the same relative places as a 1080p one.
+   The broadcaster keeps several layouts — "Just Chatting", "Gaming",
+   "Bingo night" — and swaps which is live as the stream's needs change. The
+   live overlay always reads the ACTIVE preset, so a swap plus a reload puts
+   the new arrangement on air with no OBS edits.
 
-   GET IS PUBLIC on purpose: the overlay URL already carries the OBS key,
-   positions are not a secret, and the overlay must read this without a
-   session. Saving is staff, gated like every other editor here. Only known
-   panel ids are stored and every coordinate is clamped to the canvas, so a
-   malformed save can never push a panel off-screen or name a panel that
-   does not exist.
+   Stored as { active, presets: { name: { panels } } }. A pre-preset save
+   (a bare { panels }) is migrated on read into a single "Default" preset, so
+   nothing that was already arranged is lost.
+
+   Positions are top-left corners as PERCENTAGES of the 1920×1080 canvas, so
+   a layout holds whether the OBS source is 1080p or 720p. GET is public (the
+   overlay has no session); saving is staff, and only known panel ids and
+   clamped coordinates are ever stored.
    ══════════════════════════════════════════════ */
 
 import { isModerator, isBroadcaster } from '../admin/moderators.js';
 
 const KEY = 'overlay_layout';
+const MAX_PRESETS = 12;
+const NAME_MAX = 40;
 
 /* Must match overlay-samples.js PANELS — the ids the editor drags and the
    live overlay pins. A save naming anything else is dropped, not stored. */
@@ -74,18 +78,54 @@ export function validatePanels(raw) {
   return { panels };
 }
 
+function cleanName(n) {
+  const s = String(n == null ? '' : n).trim().slice(0, NAME_MAX);
+  return s;
+}
+
+/* Normalise storage to { active, presets } — migrating a pre-preset
+   { panels } record into a single "Default" preset so nothing is lost. */
+function normalizeDoc(rec) {
+  if (rec && rec.presets && typeof rec.presets === 'object') {
+    const active = rec.active && rec.presets[rec.active] ? rec.active : (Object.keys(rec.presets)[0] || '');
+    return { active, presets: rec.presets };
+  }
+  if (rec && rec.panels && typeof rec.panels === 'object' && Object.keys(rec.panels).length) {
+    return { active: 'Default', presets: { Default: { panels: rec.panels, updatedAt: rec.updatedAt, updatedBy: rec.updatedBy } } };
+  }
+  return { active: '', presets: {} };
+}
+
+function activePanels(doc) {
+  const p = doc.presets[doc.active];
+  return (p && p.panels) || {};
+}
+
+async function saveDoc(env, doc) {
+  await env.MARKETPLACE.put(KEY, JSON.stringify({ active: doc.active, presets: doc.presets, updatedAt: Date.now() }));
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
-  const rec = await env.MARKETPLACE.get(KEY, 'json');
+  const doc = normalizeDoc(await env.MARKETPLACE.get(KEY, 'json'));
 
   /* A staff flag for the editor's cosmetic gate — the POST is the real
      guard. Costs one lookup and only when a session is present. */
   let staff = false;
   const session = getSession(request);
-  if (session && session.user_id) {
-    staff = isBroadcaster(env, session) || await isModerator(env, session);
+  if (session && session.user_id) staff = isBroadcaster(env, session) || await isModerator(env, session);
+
+  /* The editor asks for every preset; everyone else (the live overlay) gets
+     only the active one's panels, in the shape apply-layout already reads. */
+  if (staff && new URL(request.url).searchParams.get('full')) {
+    return json({ full: true, active: doc.active, presets: doc.presets, staff: true });
   }
-  return json({ panels: (rec && rec.panels) || {}, staff });
+  return json({
+    panels: activePanels(doc),
+    active: doc.active,
+    presets: Object.keys(doc.presets),
+    staff,
+  });
 }
 
 export async function onRequestPost(context) {
@@ -100,20 +140,52 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
-  if (body.action === 'reset') {
-    await env.MARKETPLACE.delete(KEY);
-    return json({ success: true, panels: {} });
+  const doc = normalizeDoc(await env.MARKETPLACE.get(KEY, 'json'));
+  const by = String(session.display_name || session.user_id).slice(0, 40);
+  const ok = (extra) => json(Object.assign({ success: true, active: doc.active, presets: Object.keys(doc.presets) }, extra || {}));
+
+  /* ── Make a named preset live ── */
+  if (body.action === 'activate') {
+    const name = cleanName(body.name);
+    if (!doc.presets[name]) return json({ error: 'No such preset.' }, 404);
+    doc.active = name;
+    await saveDoc(env, doc);
+    return ok();
   }
 
-  if (body.action !== 'save') return json({ error: 'Unknown action' }, 400);
+  /* ── Delete a preset (active falls back to another) ── */
+  if (body.action === 'delete') {
+    const name = cleanName(body.name);
+    if (!doc.presets[name]) return json({ error: 'No such preset.' }, 404);
+    delete doc.presets[name];
+    if (doc.active === name) doc.active = Object.keys(doc.presets)[0] || '';
+    await saveDoc(env, doc);
+    return ok();
+  }
 
-  const checked = validatePanels(body.panels);
-  if (checked.error) return json({ error: checked.error }, 400);
+  /* ── Reset one preset's panels to the defaults (kept, just cleared) ── */
+  if (body.action === 'reset') {
+    const name = cleanName(body.name) || doc.active;
+    if (name && doc.presets[name]) { doc.presets[name] = { panels: {}, updatedAt: Date.now(), updatedBy: by }; }
+    await saveDoc(env, doc);
+    return ok({ panels: {} });
+  }
 
-  await env.MARKETPLACE.put(KEY, JSON.stringify({
-    panels: checked.panels,
-    updatedAt: Date.now(),
-    updatedBy: String(session.display_name || session.user_id).slice(0, 40),
-  }));
-  return json({ success: true, panels: checked.panels });
+  /* ── Save (create or overwrite) a preset ── */
+  if (body.action === 'save') {
+    const name = cleanName(body.name) || doc.active || 'Default';
+    if (!name) return json({ error: 'Name the preset.' }, 400);
+    const isNew = !doc.presets[name];
+    if (isNew && Object.keys(doc.presets).length >= MAX_PRESETS) {
+      return json({ error: `That is the most presets allowed (${MAX_PRESETS}). Delete one first.` }, 400);
+    }
+    const checked = validatePanels(body.panels);
+    if (checked.error) return json({ error: checked.error }, 400);
+    doc.presets[name] = { panels: checked.panels, updatedAt: Date.now(), updatedBy: by };
+    if (!doc.active) doc.active = name;   /* first preset becomes live */
+    await saveDoc(env, doc);
+    return ok({ panels: checked.panels, saved: name });
+  }
+
+  return json({ error: 'Unknown action' }, 400);
 }

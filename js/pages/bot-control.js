@@ -612,6 +612,7 @@ function initGiveawayPanel() {
   initOvMc();
   initOvBingo();
   initOvRaid();
+  initOvPreset();
 }
 
 /* ── Mana Clash on the overlay ──────────────────────────────────── */
@@ -908,6 +909,54 @@ function initOvRaid() {
   document.getElementById('ovRaidEndBtn').addEventListener('click', function (e) { ovRaidPost({ action: 'end' }, e.target); });
   document.getElementById('ovRaidRefreshBtn').addEventListener('click', function () { loadOvRaid(); });
   loadOvRaid();
+}
+
+/* ── Overlay preset switch ───────────────────────────────────────────── */
+async function loadOvPreset() {
+  const state = document.getElementById('ovPresetState');
+  const pick = document.getElementById('ovPresetPick');
+  if (!state || !pick) return;
+  let res;
+  try { res = await fetch('/api/overlay/layout', { credentials: 'same-origin', cache: 'no-store' }); }
+  catch { pick.innerHTML = '<option value="">Could not reach the server</option>'; return; }
+  if (!res.ok) { pick.innerHTML = '<option value="">Could not load (HTTP ' + res.status + ')</option>'; return; }
+  let d; try { d = await res.json(); } catch { return; }
+  const names = Array.isArray(d.presets) ? d.presets : [];
+  const active = d.active || '';
+  state.textContent = active ? 'Live: ' + active : 'No preset live';
+  state.className = 'giveaway-status' + (active ? ' open' : '');
+  const keep = pick.value;
+  pick.innerHTML = names.length
+    ? names.map(function (n) { return '<option value="' + escapeBotHtml(n) + '">' + escapeBotHtml(n) + (n === active ? ' (live)' : '') + '</option>'; }).join('')
+    : '<option value="">No presets yet — make some in the Overlay Layout editor</option>';
+  if (keep && names.indexOf(keep) !== -1) pick.value = keep;
+  else if (active) pick.value = active;
+}
+
+function initOvPreset() {
+  const live = document.getElementById('ovPresetLiveBtn');
+  const refresh = document.getElementById('ovPresetRefreshBtn');
+  if (!live) return;
+  live.addEventListener('click', async function () {
+    const name = document.getElementById('ovPresetPick').value;
+    if (!name) { showBotStatus('No preset selected.', true); return; }
+    live.disabled = true;
+    try {
+      const res = await fetch('/api/overlay/layout', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'activate', name: name }),
+      });
+      const d = await res.json().catch(function () { return {}; });
+      if (res.ok && d.success) {
+        showBotStatus('"' + name + '" is live. Reloading the overlay…', false);
+        await reloadOverlay(null);           /* push it to air immediately */
+        await loadOvPreset();
+      } else { showBotStatus(d.error || 'Could not switch preset.', true); }
+    } catch { showBotStatus('Network error switching preset.', true); }
+    live.disabled = false;
+  });
+  refresh.addEventListener('click', function () { loadOvPreset(); });
+  loadOvPreset();
 }
 
 function initBotControlPanel() {

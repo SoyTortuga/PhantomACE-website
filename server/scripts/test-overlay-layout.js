@@ -49,7 +49,7 @@ const env = (seed = {}) => ({
   TWITCH_BROADCASTER_ID: '111',
 });
 const as = (id) => ({ Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: id, display_name: 'U' + id })) });
-const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api/overlay/layout', { headers: h }) });
+const GET = (e, h, qs) => onRequestGet({ env: e, request: new Request('https://x/api/overlay/layout' + (qs || ''), { headers: h }) });
 const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https://x/api/overlay/layout', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify(body) }) });
 
@@ -111,18 +111,62 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   check('a non-numeric scale falls back to 1', validatePanels({ ovMaze: { x: 1, y: 1, s: 'big' } }).panels.ovMaze.s, 1);
 }
 
-/* ══ Save round-trips; reset clears ════════════════════════════════════ */
+/* ══ Save creates a preset, which becomes live and round-trips ═════════ */
+{
+  const e = env();
+  const r = await (await POST(e, { action: 'save', panels: good }, as('222'))).json();
+  check('the first save becomes the live preset', r.active, 'Default');
+  const stored = e.MARKETPLACE.read('overlay_layout');
+  check('the preset persisted the panels with default scale', stored.presets.Default.panels,
+        { ovScramble: { x: 5, y: 70, s: 1 }, ovMaze: { x: 60, y: 12, s: 1 } });
+  check('and recorded the author', stored.presets.Default.updatedBy, 'U222');
+  check('GET serves the active preset panels', (await (await GET(e)).json()).panels, stored.presets.Default.panels);
+}
+
+/* ══ Reset clears the live preset but keeps it selectable ══════════════ */
 {
   const e = env();
   await POST(e, { action: 'save', panels: good }, as('222'));
-  const stored = e.MARKETPLACE.read('overlay_layout');
-  check('the save persisted the panels with default scale', stored.panels,
-        { ovScramble: { x: 5, y: 70, s: 1 }, ovMaze: { x: 60, y: 12, s: 1 } });
-  check('and recorded the author', stored.updatedBy, 'U222');
-
   await POST(e, { action: 'reset' }, as('222'));
-  check('reset clears the layout', e.MARKETPLACE.read('overlay_layout'), null);
-  check('and GET then returns empty', (await (await GET(e)).json()).panels, {});
+  check('reset empties the active preset', (await (await GET(e)).json()).panels, {});
+  check('but the preset still exists', (await (await GET(e)).json()).presets, ['Default']);
+}
+
+/* ══ Multiple presets: save, list, activate to swap, delete ════════════ */
+{
+  const e = env();
+  await POST(e, { action: 'save', name: 'Chatting', panels: { ovScramble: { x: 1, y: 1 } } }, as('222'));
+  await POST(e, { action: 'save', name: 'Gaming',   panels: { ovMaze: { x: 2, y: 2 } } }, as('111'));
+
+  let g = await (await GET(e)).json();
+  check('the first-saved preset is live', g.active, 'Chatting');
+  check('both presets are listed', g.presets.slice().sort(), ['Chatting', 'Gaming']);
+
+  const act = await (await POST(e, { action: 'activate', name: 'Gaming' }, as('222'))).json();
+  check('activate reports the new live preset', act.active, 'Gaming');
+  g = await (await GET(e)).json();
+  check('GET now serves the newly-live preset', g.panels, { ovMaze: { x: 2, y: 2, s: 1 } });
+  check('activating a preset that does not exist 404s', (await POST(e, { action: 'activate', name: 'Nope' }, as('222'))).status, 404);
+
+  const full = await (await GET(e, as('222'), '?full=1')).json();
+  ok('the editor full view carries every preset', full.presets.Chatting && full.presets.Gaming);
+  check('and names the active one', full.active, 'Gaming');
+  ok('a non-staff full request gets only the active panels', !(await (await GET(e, as('999'), '?full=1')).json()).full);
+
+  await POST(e, { action: 'delete', name: 'Gaming' }, as('222'));
+  g = await (await GET(e)).json();
+  check('delete removes the preset', g.presets, ['Chatting']);
+  check('and the live one falls back', g.active, 'Chatting');
+}
+
+/* ══ A pre-preset layout migrates to a Default preset ══════════════════ */
+{
+  const e = env({ overlay_layout: { panels: good, updatedBy: 'old' } });
+  const g = await (await GET(e)).json();
+  check('an old single layout is served as the active Default', g.active, 'Default');
+  check('and its panels still read', g.panels, good);
+  const full = await (await GET(e, as('222'), '?full=1')).json();
+  ok('the migrated layout appears as a Default preset', !!full.presets.Default);
 }
 
 /* ══ Wiring: one applyOne, shared samples, live read on boot ═══════════ */
@@ -166,6 +210,17 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   const eHtml = fs.readFileSync(path.join(REPO, 'overlay-editor.html'), 'utf8');
   ok('the editor page has a legend column', /id="legendBody"/.test(eHtml));
   ok('and loads the shared samples for it', /overlay-samples\.js/.test(eHtml));
+
+  /* Multi-preset editing: the editor reads every preset and can switch,
+     create, make-live and delete. */
+  ok('the editor page has the preset controls',
+     /id="presetSelect"/.test(eHtml) && /id="newBtn"/.test(eHtml) && /id="activateBtn"/.test(eHtml) && /id="deleteBtn"/.test(eHtml));
+  ok('the editor loads every preset (full)', /API \+ '\?full=1'/.test(eEd));
+  ok('and switches, activates and pins from the chosen preset',
+     /function selectPreset/.test(eEd) && /action: 'activate'/.test(eEd) && /function currentPanels/.test(eEd));
+
+  const bc = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  ok('bot control can swap the live preset', /function initOvPreset/.test(bc) && /action: 'activate'/.test(bc));
 
   const ids = [...samples.matchAll(/id: '(ov\w+)'/g)].map(m => m[1]).sort();
   /* The panel list the editor drags must match the ids the route stores,
