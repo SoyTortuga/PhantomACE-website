@@ -93,6 +93,14 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   check('while a valid sibling stays', junk.panels.ovMtg, { x: 3, y: 4, s: 1 });
 
   check('an empty map is refused', 'error' in validatePanels({}), true);
+
+  /* Hidden panels — removed from a preset — are kept with the flag, position
+     optional (a hidden panel needs none). */
+  const hid = validatePanels({ ovMaze: { x: 10, y: 20 }, ovMtg: { hidden: true } });
+  check('a hidden panel is stored flag-only', hid.panels.ovMtg, { hidden: true });
+  check('while its sibling positions normally', hid.panels.ovMaze, { x: 10, y: 20, s: 1 });
+  check('a positioned+hidden panel keeps both', validatePanels({ ovMaze: { x: 5, y: 5, s: 2, hidden: true } }).panels.ovMaze,
+        { x: 5, y: 5, s: 2, hidden: true });
 }
 
 /* ══ Scale: stored, defaulted, clamped ═════════════════════════════════ */
@@ -130,6 +138,15 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   await POST(e, { action: 'reset' }, as('222'));
   check('reset empties the active preset', (await (await GET(e)).json()).panels, {});
   check('but the preset still exists', (await (await GET(e)).json()).presets, ['Default']);
+}
+
+/* ══ A removed (hidden) panel round-trips and is served to the overlay ══ */
+{
+  const e = env();
+  await POST(e, { action: 'save', panels: { ovMaze: { x: 1, y: 1 }, ovMtg: { hidden: true } } }, as('222'));
+  const g = await (await GET(e)).json();
+  check('the hidden panel is served with its flag', g.panels.ovMtg, { hidden: true });
+  check('and the shown one with its position', g.panels.ovMaze, { x: 1, y: 1, s: 1 });
 }
 
 /* ══ Multiple presets: save, list, activate to swap, delete ════════════ */
@@ -218,6 +235,10 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   ok('the editor loads every preset (full)', /API \+ '\?full=1'/.test(eEd));
   ok('and switches, activates and pins from the chosen preset',
      /function selectPreset/.test(eEd) && /action: 'activate'/.test(eEd) && /function currentPanels/.test(eEd));
+  ok('the editor can hide (remove) a panel from a preset',
+     /function togglePanel/.test(eEd) && /dataset\.hidden/.test(eEd) && /out\[spec\.id\]\.hidden = true/.test(eEd));
+  ok('the live overlay removes a hidden panel', /p\.hidden/.test(apply) && /display = 'none'/.test(apply));
+  ok('the legend cards carry a show/hide toggle', /class="lg-toggle"/.test(eEd) && /function updateLegendToggle/.test(eEd));
 
   const bc = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
   ok('bot control can swap the live preset', /function initOvPreset/.test(bc) && /action: 'activate'/.test(bc));

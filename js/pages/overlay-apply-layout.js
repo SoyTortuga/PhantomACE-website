@@ -38,7 +38,13 @@
     Object.keys(panels).forEach(function (id) {
       var el = document.getElementById(id);
       var p = panels[id];
-      if (el && p) applyOne(el, p.x, p.y, p.s);
+      if (!el || !p) return;
+      /* Removed from this preset: force it off, over-riding whatever its game
+         poller does with the `hidden` attribute. A panel NOT in the map, or
+         one without `hidden`, keeps its game-driven visibility untouched. */
+      if (p.hidden) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      applyOne(el, p.x, p.y, p.s);
     });
   }
 

@@ -71,7 +71,14 @@ export function validatePanels(raw) {
     if (!PANEL_IDS.includes(id)) continue;             // unknown id: dropped
     if (!pos || typeof pos !== 'object') continue;
     const x = clampPct(pos.x), y = clampPct(pos.y);
-    if (x === null || y === null) continue;            // unpositioned: skip
+    /* A hidden panel is removed from this preset — the live overlay forces it
+       off regardless of whether its game is running. It keeps its position so
+       un-hiding restores where it sat. A hidden panel needs no position. */
+    if (pos.hidden) {
+      panels[id] = (x !== null && y !== null) ? { x, y, s: clampScale(pos.s), hidden: true } : { hidden: true };
+      continue;
+    }
+    if (x === null || y === null) continue;            // unpositioned, not hidden: skip
     panels[id] = { x, y, s: clampScale(pos.s) };
   }
   if (!Object.keys(panels).length) return { error: 'No valid panel positions.' };

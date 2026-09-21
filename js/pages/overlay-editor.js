@@ -36,7 +36,8 @@
      appearing in that one list. */
   function renderLegend() {
     /* From the PARENT's copy of the shared samples, loaded on this page, so
-       the legend renders immediately without waiting on the iframe. */
+       the legend renders immediately without waiting on the iframe. Each card
+       carries a Show/Hide toggle that removes the panel from this preset. */
     var panels = (window.OverlaySamples && window.OverlaySamples.PANELS) || [];
     var body = document.getElementById('legendBody');
     if (!body) return;
@@ -44,9 +45,49 @@
       var items = (p.holds || []).map(function (h) {
         return '<li>' + escapeHtml(h) + '</li>';
       }).join('');
-      return '<div class="lg-panel"><div class="lg-name">' + escapeHtml(p.label) +
-        '</div><ul>' + items + '</ul></div>';
+      return '<div class="lg-panel" data-id="' + escapeHtml(p.id) + '">' +
+        '<div class="lg-head"><span class="lg-name">' + escapeHtml(p.label) + '</span>' +
+        '<button class="lg-toggle" data-id="' + escapeHtml(p.id) + '">Shown</button></div>' +
+        '<ul>' + items + '</ul></div>';
     }).join('');
+    body.querySelectorAll('.lg-toggle').forEach(function (b) {
+      b.onclick = function () { togglePanel(b.dataset.id); };
+    });
+  }
+
+  /* Reflect a panel's hidden state on its legend card + toggle button. */
+  function updateLegendToggle(id, hidden) {
+    var body = document.getElementById('legendBody');
+    if (!body) return;
+    var card = body.querySelector('.lg-panel[data-id="' + id + '"]');
+    var btn = body.querySelector('.lg-toggle[data-id="' + id + '"]');
+    if (card) card.classList.toggle('is-hidden', hidden);
+    if (btn) { btn.textContent = hidden ? 'Hidden' : 'Shown'; btn.classList.toggle('hidden-state', hidden); }
+  }
+
+  /* Sync every toggle to the panels currently in the iframe. */
+  function updateLegendToggles() {
+    var doc = frame.contentDocument; if (!doc) return;
+    ((window.OverlaySamples && window.OverlaySamples.PANELS) || []).forEach(function (spec) {
+      var el = doc.getElementById(spec.id);
+      updateLegendToggle(spec.id, !!(el && el.dataset.hidden === '1'));
+    });
+  }
+
+  /* Hide/show a panel in the current preset. Hidden panels stay visible in
+     the editor (dimmed) so they can be brought back; on the live overlay they
+     are removed. */
+  function applyHiddenVisual(el, hidden) {
+    el.style.opacity = hidden ? '0.28' : '';
+  }
+  function togglePanel(id) {
+    var doc = frame.contentDocument; if (!doc) return;
+    var el = doc.getElementById(id); if (!el) return;
+    var nowHidden = el.dataset.hidden !== '1';
+    el.dataset.hidden = nowHidden ? '1' : '';
+    applyHiddenVisual(el, nowHidden);
+    updateLegendToggle(id, nowHidden);
+    setStatus((nowHidden ? 'Hid ' : 'Restored ') + id + ' in "' + currentName + '" — Save to keep it.');
   }
 
   function escapeHtml(s) {
@@ -138,26 +179,36 @@
       var el = doc.getElementById(spec.id);
       if (!el) return;
 
-      /* Pin every panel to top-left in canvas %, from the saved layout if
-         it has one, else from where its default CSS currently places it —
-         so dragging starts from the real position either way. */
-      var pos = currentPanels()[spec.id];
-      if (!pos) {
+      /* Pin every panel to top-left in canvas %, from the saved layout if it
+         has a position, else from where its default CSS places it — so
+         dragging starts from the real position either way. A hidden panel may
+         carry no position; it still gets one so un-hiding lands it sensibly. */
+      var saved = currentPanels()[spec.id] || {};
+      var pos;
+      if (saved.x === undefined || saved.x === null) {
         /* Inside the same-origin iframe the document lays out at native
            1920×1080 — the CSS scale lives in the PARENT and is invisible
            here — so this rect is already in canvas pixels. No /scale. */
         var r = el.getBoundingClientRect();
-        pos = { x: r.left / CANVAS_W * 100, y: r.top / CANVAS_H * 100, s: 1 };
+        pos = { x: r.left / CANVAS_W * 100, y: r.top / CANVAS_H * 100, s: saved.s || 1 };
+      } else {
+        pos = { x: saved.x, y: saved.y, s: (saved.s === undefined || saved.s === null) ? 1 : saved.s };
       }
       if (apply) apply(el, pos.x, pos.y, pos.s);
       el.dataset.px = pos.x;
       el.dataset.py = pos.y;
-      el.dataset.ps = (pos.s === undefined || pos.s === null) ? 1 : pos.s;
+      el.dataset.ps = pos.s;
+
+      var hid = !!saved.hidden;
+      el.dataset.hidden = hid ? '1' : '';
+      applyHiddenVisual(el, hid);
 
       makeDraggable(el, apply);
       addResizeHandle(el, apply);
       tagPanel(el, spec.label);
     });
+
+    updateLegendToggles();
   }
 
   function tagPanel(el, label) {
@@ -259,6 +310,7 @@
       if (el && el.dataset.px !== undefined) {
         out[spec.id] = { x: Number(el.dataset.px), y: Number(el.dataset.py),
                          s: Number(el.dataset.ps) || 1 };
+        if (el.dataset.hidden === '1') out[spec.id].hidden = true;
       }
     });
     return out;
