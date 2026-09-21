@@ -29,6 +29,9 @@ const MAX_HP = 5_000_000;
 const DEFAULT_MINUTES = 15;
 const FRENZY_MS = 10 * 60 * 1000;    /* the reward on a kill */
 
+const RAID_CODE_SECONDS = 604800;    /* 7-day redemption on defeat codes */
+const RAID_REWARD_CAP = 100;         /* most participants paid per kill */
+
 const MECH_INTERVAL_MS = 15000;      /* boss acts this often */
 const HEAL_PCT = 0.03;               /* attack heals this much of max HP */
 const SHIELD_MS = 6000;              /* skill guard duration */
@@ -85,6 +88,51 @@ function maybeSummon(raid) {
       raid.summonCount = (raid.summonCount || 0) + 1;
     }
   }
+}
+
+/* On a kill, code everyone who struck: an uncommon for every account that
+   landed a hit, upgraded to a rare for the single top damager. Each code is
+   RESTRICTED to its recipient, so a whispered code cannot be redeemed by
+   whoever else sees it. Guests are skipped — a guest id has no account to
+   redeem into. Best-effort per person so one failure never denies the rest. */
+async function awardRaidRewards(env, raid) {
+  const entries = Object.keys(raid.contributors || {})
+    .map(id => ({ id, name: raid.contributors[id].name, dmg: raid.contributors[id].dmg }))
+    .filter(e => e.id.startsWith('u_') && e.dmg > 0)
+    .sort((a, b) => b.dmg - a.dmg)
+    .slice(0, RAID_REWARD_CAP);
+  if (!entries.length) return;
+
+  const { createItemCode, activateItemCode } = await import('./item-codes.js');
+  const { sendWhisper } = await import('./bot/send-chat.js');
+  const bossName = raid.name || 'the boss';
+
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const top = i === 0;
+    const rarity = top ? 'rare' : 'uncommon';
+    const userId = e.id.slice(2);          // strip the 'u_' prefix
+    try {
+      const rec = await createItemCode(env, {
+        id: `raid_${raid.id}_${e.id}`,
+        game: 'skull-clicker', type: 'badge',
+        name: `${bossName} ${top ? 'Slayer' : 'Raider'}`,
+        rarity,
+      }, { restrictedTo: [userId] });
+      await activateItemCode(env, rec.code, RAID_CODE_SECONDS);
+      await sendWhisper(env, userId,
+        `☠️ You helped fell ${bossName}! Your ${rarity} code: ${rec.code} — ` +
+        `redeem at phantomace.tv/redeem.html within 7 days.` +
+        (top ? ' 🥇 Top damage — a RARE reward!' : ''));
+    } catch { /* skip this raider, keep paying the others */ }
+  }
+
+  try {
+    const { announceAction } = await import('./bot/send-chat.js');
+    await announceAction(env,
+      `☠️ ${bossName} has fallen! ${entries.length} raider${entries.length === 1 ? '' : 's'} were whispered codes ` +
+      `— top damage to ${entries[0].name} (rare). Log in next time to earn yours!`, 'raid-defeat');
+  } catch { /* announcement is a nicety */ }
 }
 
 /* Fold the live boss into the small public shape the game and overlay read —
@@ -237,6 +285,11 @@ export async function onRequestPost(context) {
         await setSkullEvent(env, 'frenzy', FRENZY_MS);
       } catch (err) {
         console.error('[skull-raid] could not start victory frenzy:', err.message);
+      }
+      try {
+        await awardRaidRewards(env, after);
+      } catch (err) {
+        console.error('[skull-raid] could not award raid codes:', err.message);
       }
     }
 

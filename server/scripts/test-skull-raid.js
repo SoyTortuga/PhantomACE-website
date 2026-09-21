@@ -111,14 +111,30 @@ function boss(over = {}) {
   ok('and the boss is shielded', s.shielded === true);
 }
 
-/* ══ The kill: top contributor credited, frenzy fired ══════════════════ */
+/* ══ The kill: credit, frenzy, and defeat codes ════════════════════════ */
 {
-  const e = envWith({ sc_raid: boss({ hp: 40, contributors: { u_7: { name: 'U7', dmg: 500 }, u_9: { name: 'U9', dmg: 10 } } }) });
+  const e = envWith({ sc_raid: boss({ hp: 40, contributors: {
+    u_7: { name: 'U7', dmg: 500 }, u_9: { name: 'U9', dmg: 10 }, guest_z: { name: 'Gz', dmg: 300 },
+  } }) });
   const s = await (await POST(e, { action: 'hit', damage: 100 }, cookie('9'))).json();
   check('the boss falls', s.status, 'defeated');
   check('credit goes to the top striker, not the last hit', s.defeatedBy, 'U7');
+
   const ev = e.MARKETPLACE.read('sc_event');
   ok('a victory frenzy is fired', ev && ev.type === 'frenzy' && ev.until > Date.now());
+
+  /* Every account that struck is coded; guests are skipped. */
+  const codes = [...e.MARKETPLACE.store.keys()].filter(k => k.startsWith('item_code_')).map(k => e.MARKETPLACE.read(k));
+  check('one code per account striker (guests excluded)', codes.length, 2);
+
+  const rare = codes.find(c => c.item.rarity === 'rare');
+  const uncommon = codes.find(c => c.item.rarity === 'uncommon');
+  ok('the top damager gets a rare code', !!rare);
+  check('restricted to the top damager', rare.restrictedTo, ['7']);
+  ok('everyone else gets an uncommon code', !!uncommon);
+  check('restricted to that raider', uncommon.restrictedTo, ['9']);
+  ok('the codes are activated with an expiry', rare.active === true && rare.expiresAt > Date.now());
+  ok('no code was minted for the guest striker', !codes.some(c => (c.restrictedTo || []).includes('z')));
 }
 
 /* ══ Expiry and manual end ═════════════════════════════════════════════ */
