@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { onRequestPost, viewFor } from '../../functions/api/mana-clash.js';
+import { onRequestPost, viewFor, coopPick, pickRandom } from '../../functions/api/mana-clash.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -502,6 +502,65 @@ function coopVoteRoom(ids) {
   const v = await (await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'slayer' }, cookie('p2'))).json();
   const room = e.MARKETPLACE.read('mc_room_AAAA');
   ok('the changed vote is the one counted', room.coop.boons.taken.includes('slayer'));
+}
+
+/* ══ Enemies are randomized, not a fixed cycle ══════════════════════════ */
+
+/* Wave 20 is always the fixed final boss, regardless of randomness. */
+{
+  for (let i = 0; i < 20; i++) {
+    check('wave 20 is always the final boss', coopPick(20).tier, 'final');
+  }
+}
+
+/* Boss/normal waves always draw from the right pool. */
+{
+  const bossSlugs = new Set(['boss-badger','boss-cat','boss-dino-rex','boss-dino-tri','boss-frogger','boss-gollux','boss-pengu','demon-slime','necromancer']);
+  for (let wave = 1; wave <= 30; wave++) {
+    if (wave === 20) continue;
+    const pick = coopPick(wave);
+    if (wave % 5 === 0) {
+      check('wave ' + wave + ' is a boss', pick.tier, 'boss');
+      ok('drawn from the boss roster', bossSlugs.has(pick.slug));
+    } else {
+      check('wave ' + wave + ' is a normal enemy', pick.tier, 'normal');
+      ok('not a boss slug', !bossSlugs.has(pick.slug));
+    }
+  }
+}
+
+/* pickRandom never returns the excluded slug when the pool has other
+   options — this is what stops back-to-back waves repeating an enemy. */
+{
+  const pool = [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }];
+  for (let i = 0; i < 50; i++) {
+    ok('never repeats the avoided slug', pickRandom(pool, 'a').slug !== 'a');
+  }
+  ok('a single-entry pool still returns something (no infinite loop)', pickRandom([{ slug: 'only' }], 'only').slug === 'only');
+}
+
+/* Across many picks at a fixed wave, more than one enemy actually turns up
+   -- guards against a "randomized" implementation that silently always
+   rolls index 0 or otherwise never varies. */
+{
+  const seen = new Set();
+  for (let i = 0; i < 60; i++) seen.add(coopPick(3).slug);
+  ok('the same wave can produce different enemies across picks', seen.size > 1);
+}
+
+/* End to end: clearing an enemy never respawns the exact one just beaten.
+   Seeded with a real slug (the default fixture carries none) so the check
+   is a genuine guarantee, not an undefined-never-equals-anything freebie. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom({ coop: { enemyHp: 100, enemyMaxHp: 100, enemySlug: 'compy' } }, { pending: 100 }) }) };
+  const before = e.MARKETPLACE.read('mc_room_AAAA').coop.enemySlug;
+  ok('the fixture actually seeded a real slug', before === 'compy');
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  let room = e.MARKETPLACE.read('mc_room_AAAA');
+  const pick = room.coop.pendingBoons[0].id;
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: pick });
+  room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the next enemy is never the one that was just cleared', room.coop.enemySlug !== before);
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */

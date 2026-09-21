@@ -324,18 +324,29 @@ const COOP_ROSTER = {
 };
 const COOP_BACKGROUNDS = ['cave', 'dead-forest', 'dock', 'plains', 'snowy-mountains'];
 
-/* Which enemy stands at `wave` — deterministic so every client agrees. Final
-   boss at wave 20; a boss every fifth wave (cycling the boss roster); a
-   spread pick from the normal roster otherwise. Past the final boss it keeps
-   cycling into ever-tougher Nightmare waves. */
-function coopPick(wave) {
+/* Random, not a fixed cycle — a fixed `wave*7 % len` formula meant every run
+   fought the exact same enemy on the exact same wave, in the exact same
+   order, forever. Picked once here and stored on the room (enemySlug etc.),
+   so every polling client still agrees on the result without needing the
+   pick itself to be deterministic — they're just reading what the server
+   already decided.
+
+   `avoidSlug` (the outgoing enemy) is excluded so two same-tier waves in a
+   row can't hand back the exact same enemy that was just cleared. */
+export function pickRandom(pool, avoidSlug) {
+  if (pool.length <= 1) return pool[0];
+  let choice;
+  do { choice = pool[Math.floor(Math.random() * pool.length)]; } while (choice.slug === avoidSlug);
+  return choice;
+}
+
+/* Which enemy stands at `wave`. Final boss at wave 20; a random boss every
+   fifth wave; a random pick from the normal roster otherwise. Past the
+   final boss it keeps randomly cycling into ever-tougher Nightmare waves. */
+export function coopPick(wave, avoidSlug) {
   if (wave === COOP_FINAL_WAVE) return Object.assign({ tier: 'final' }, COOP_ROSTER.final);
-  if (wave % 5 === 0) {
-    const b = COOP_ROSTER.boss[(Math.floor(wave / 5) - 1) % COOP_ROSTER.boss.length];
-    return Object.assign({ tier: 'boss' }, b);
-  }
-  const n = COOP_ROSTER.normal[(wave * 7) % COOP_ROSTER.normal.length];
-  return Object.assign({ tier: 'normal' }, n);
+  if (wave % 5 === 0) return Object.assign({ tier: 'boss' }, pickRandom(COOP_ROSTER.boss, avoidSlug));
+  return Object.assign({ tier: 'normal' }, pickRandom(COOP_ROSTER.normal, avoidSlug));
 }
 
 /* Team HP is a shared pool sized to the CURRENT roster (plus any Vigor boons).
@@ -350,7 +361,7 @@ function coopTeamMax(players, bonus = 0) {
    curve that made big teams a pushover); attack scales too, since more players
    also means a deeper HP pool and more healing to out-pace. */
 function coopSpawn(room, wave) {
-  const pick = coopPick(wave);
+  const pick = coopPick(wave, room.coop.enemySlug);
   const isFinal = pick.tier === 'final';
   const isBoss = pick.tier === 'boss';
   const players = Math.max(1, Object.keys(room.players).length);
