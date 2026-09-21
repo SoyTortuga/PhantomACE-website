@@ -330,6 +330,48 @@ function coopRoom(over = {}, turnOver = {}) {
   check('one charge is spent, the other remains (stacks)', room.coop.boons.secondWind, 1);
 }
 
+/* ══ Second Wind also cheats a round-timeout, not just a wipe ══════════ */
+{
+  const seed = coopRoom(
+    // Team HP is comfortably safe; only the round budget is about to run out.
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, teamHp: 200, teamMaxHp: 200, enemyAttack: 1, roundsLeft: 1 } },
+    { pending: 100, kept: [], done: null });
+  seed.coop.boons = { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: 1, taken: ['wind'] };
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: seed }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('Second Wind keeps the run alive on a timeout', room.status !== 'finished');
+  check('and grants a fresh block of rounds', room.coop.roundsLeft, 3);
+  check('the charge is spent', room.coop.boons.secondWind, 0);
+}
+
+/* ══ Without a charge, a round-timeout still ends the run as before ═══ */
+{
+  const room0 = coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, teamHp: 200, teamMaxHp: 200, enemyAttack: 1, roundsLeft: 1 } },
+    { pending: 100, kept: [], done: null });
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room0 }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('no charge, no save — the run ends on timeout', room.status === 'finished' && room.runOver === true);
+}
+
+/* ══ A double failure in one round can cheat both, if charges allow ════ */
+{
+  const seed = coopRoom(
+    // Enough incoming damage to wipe the team AND already on the last round.
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, teamHp: 5, teamMaxHp: 100, enemyAttack: 50, roundsLeft: 1 } },
+    { pending: 100, kept: [], done: null });
+  seed.coop.boons = { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: 2, taken: ['wind', 'wind'] };
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: seed }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('both the wipe and the timeout are cheated', room.status !== 'finished');
+  check('team HP is revived', room.coop.teamHp, 40);
+  check('and a fresh round block is granted', room.coop.roundsLeft, 3);
+  check('both charges are spent', room.coop.boons.secondWind, 0);
+}
+
 /* ══ Enemies scale with the party ══════════════════════════════════════ */
 
 /* A co-op lobby of `n` ready players, host = p1, ready to start. */

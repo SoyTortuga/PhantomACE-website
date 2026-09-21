@@ -1431,6 +1431,7 @@ function coopLogText(log) {
     else if (t === 'shield-up') parts.push('it raised a shield');
     else if (t.startsWith('weak:')) { const col = COOP_COLORS[+val(t)]; parts.push('weakness struck (' + (col ? col.name : '?') + ' ×2)'); }
     else if (t === 'second-wind') parts.push('SECOND WIND — cheated death!');
+    else if (t === 'second-wind-rounds') parts.push('SECOND WIND — bought more time!');
     else if (t.startsWith('ally:')) parts.push('allies struck for ' + val(t));
     else if (t.startsWith('regen:')) parts.push('regen +' + val(t));
   }

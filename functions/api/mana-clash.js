@@ -220,6 +220,8 @@ const COOP_HEAL_PCT = 0.03;          // enemy self-heal when under-pressured
 const COOP_MINION_SOAK = 0.4;        // share of team damage minions absorb
 const COOP_SUMMON_THRESHOLDS = [0.66, 0.33];
 const COOP_OVERKILL_CARRY = 0.5;     // share of overkill that spills to the next enemy
+const COOP_SECOND_WIND_HP_PCT = 0.4; // team HP restored when a wipe is cheated
+const COOP_SECOND_WIND_ROUNDS = 3;   // rounds granted when a timeout is cheated
 
 /* Between-wave boons — the team picks one of three after every clear, building
    a run. Effects accumulate on room.coop.boons; some apply immediately. */
@@ -230,7 +232,7 @@ const COOP_BOONS = [
   { id: 'medic',   name: 'Field Medic',  desc: 'White healing +50%' },
   { id: 'slayer',  name: 'Giant Slayer', desc: '+1 round on every enemy' },
   { id: 'purify',  name: 'Purifier',     desc: 'Enemy minions soak 15% less' },
-  { id: 'wind',    name: 'Second Wind',  desc: 'Cheat death (stacks — one revive each)' },
+  { id: 'wind',    name: 'Second Wind',  desc: 'Cheat a wipe or a timeout (stacks — one save each)' },
   { id: 'bulwark', name: 'Bulwark',      desc: 'Team takes 15% less damage' },
   { id: 'army',    name: 'Conscripts',   desc: 'An ally strikes for 3% of enemy HP each round' },
   { id: 'regen',   name: 'Regeneration', desc: 'Heal 8 Team HP every round' },
@@ -618,18 +620,31 @@ function endRoundCoop(room, now) {
   c.log = log;
 
   /* 14. Loss checks — wiped, or out of time with the enemy still standing.
-     Second Wind cheats death once, restoring the team to 40% instead. */
+     Second Wind cheats death from EITHER cause, each spending its own
+     charge: a wipe revives the team to COOP_SECOND_WIND_HP_PCT of max HP, a
+     timeout grants COOP_SECOND_WIND_ROUNDS more rounds to keep fighting.
+     The two checks are independent (not else-if) — a room that manages to
+     hit zero HP and zero rounds in the same round can cheat both, if it
+     holds enough charges to cover them. */
   if (c.teamHp <= 0) {
     if (b.secondWind > 0) {
       b.secondWind -= 1;                // spend one revive charge
-      c.teamHp = Math.max(1, Math.round(c.teamMaxHp * 0.4));
+      c.teamHp = Math.max(1, Math.round(c.teamMaxHp * COOP_SECOND_WIND_HP_PCT));
       c.log = log.concat('second-wind');
     } else {
       c.teamHp = 0;
       return coopEnd(room, now);
     }
   }
-  if (c.roundsLeft <= 0) return coopEnd(room, now);
+  if (c.roundsLeft <= 0) {
+    if (b.secondWind > 0) {
+      b.secondWind -= 1;                // spend one revive charge
+      c.roundsLeft = COOP_SECOND_WIND_ROUNDS;
+      c.log = c.log.concat('second-wind-rounds');
+    } else {
+      return coopEnd(room, now);
+    }
+  }
 
   room.status = 'intermission';
   room.intermissionEndsAt = now + COOP_INTERMISSION_MS;
