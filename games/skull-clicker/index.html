@@ -791,15 +791,53 @@
        so browsers do not block it. */
     let soundOn = false;
     let audioCtx = null;
+    let noiseBuffer = null;
+
+    /* ~0.25s of white noise, made once and reused — the "wires" of the snare. */
+    function getNoise() {
+      if (noiseBuffer) return noiseBuffer;
+      const len = Math.floor(audioCtx.sampleRate * 0.25);
+      noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      return noiseBuffer;
+    }
+
+    /* A snare hit: a bright, fast noise burst (the wire rattle) over a short
+       tonal body (the drum head) that drops in pitch. On theme — this is a
+       drummer's stream — and short enough that rapid clicking stays tight. */
+    function playSnare(t) {
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = getNoise();
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 1400;
+      const ng = audioCtx.createGain();
+      ng.gain.setValueAtTime(0.45, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+      noise.connect(hp); hp.connect(ng); ng.connect(audioCtx.destination);
+      noise.start(t); noise.stop(t + 0.14);
+
+      const body = audioCtx.createOscillator();
+      body.type = 'triangle';
+      body.frequency.setValueAtTime(210, t);
+      body.frequency.exponentialRampToValueAtTime(120, t + 0.1);
+      const bg = audioCtx.createGain();
+      bg.gain.setValueAtTime(0.28, t);
+      bg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+      body.connect(bg); bg.connect(audioCtx.destination);
+      body.start(t); body.stop(t + 0.12);
+    }
+
     function playSound(kind) {
       if (!soundOn) return;
       try {
         audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const t = audioCtx.currentTime;
+        if (kind === 'click') { playSnare(t); return; }   /* the skull is a snare */
+
         const o = audioCtx.createOscillator(), g = audioCtx.createGain();
         o.connect(g); g.connect(audioCtx.destination);
-        const t = audioCtx.currentTime;
         let f = 180, dur = 0.05, type = 'square', vol = 0.05;
-        if (kind === 'click')  { f = 140 + Math.random() * 40; dur = 0.04; vol = 0.04; }
         if (kind === 'buy')    { f = 320; dur = 0.08; type = 'triangle'; vol = 0.06; }
         if (kind === 'cursed') { f = 90;  dur = 0.30; type = 'sawtooth'; vol = 0.09; }
         if (kind === 'feat')   { f = 520; dur = 0.18; type = 'triangle'; vol = 0.07; }
