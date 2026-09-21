@@ -181,6 +181,94 @@ function contenders(room) {
   return all;
 }
 
+/* ══ Co-op gauntlet ═══════════════════════════════════════════════════════
+   A cooperative mode: everyone is one team against a SERIES of enemies. Each
+   encounter, the team's banked points are damage; deplete the enemy's health
+   within its round budget to advance to a tougher one — a boss every fifth,
+   then a final boss, then endless Nightmare waves. A round the team can't
+   finish ends the run. "How far you got" (enemies cleared) is the score. No
+   winner, no leaderboard — you win or lose together. A bust deals no damage
+   that turn, so pushing your luck is a decision the whole team shares. */
+const COOP_BASE_HP = 1500;
+const COOP_GROWTH = 1.25;
+const COOP_FINAL_WAVE = 20;
+const COOP_NORMAL_NAMES = [
+  'Bone Rattler', 'Grave Wretch', 'Ashen Ghoul', 'Crypt Lurker', 'Pale Revenant',
+  'Rotting Thrall', 'Cinder Wraith', 'Hollow Knight', 'Marrow Hound', 'Dust Shade',
+  'Gravemoss Crawler', 'Tattered Phantom', 'Sallow Fiend', 'Withered Acolyte',
+];
+const COOP_BOSS_NAMES = ['The Gravekeeper', 'Marrow Tyrant', 'The Pale Warden', 'Ossuary Colossus'];
+const COOP_FINAL_NAME = 'The Bone Sovereign';
+
+function coopEnemyName(wave, isBoss, isFinal) {
+  if (isFinal) return COOP_FINAL_NAME;
+  if (wave > COOP_FINAL_WAVE) return 'Nightmare ' + (wave - COOP_FINAL_WAVE);
+  if (isBoss) return COOP_BOSS_NAMES[(Math.floor(wave / 5) - 1) % COOP_BOSS_NAMES.length];
+  return COOP_NORMAL_NAMES[(wave - 1) % COOP_NORMAL_NAMES.length];
+}
+
+/* Set the room's current enemy for `wave`. HP grows with the wave and scales
+   with the party size (each extra player is another turn of damage a round),
+   so a full team faces a real fight rather than a pushover. */
+function coopSpawn(room, wave) {
+  const isFinal = wave === COOP_FINAL_WAVE;
+  const isBoss = !isFinal && wave % 5 === 0;
+  const players = Math.max(1, Object.keys(room.players).length);
+  let hp = COOP_BASE_HP * Math.pow(COOP_GROWTH, wave - 1);
+  if (isBoss) hp *= 2.6;
+  if (isFinal) hp *= 5;
+  if (wave > COOP_FINAL_WAVE) hp *= 1.5;          // nightmare tier bites harder
+  hp *= (0.5 + 0.5 * players);                    // party scaling
+  hp = Math.ceil(hp / 100) * 100;
+  room.coop.wave = wave;
+  room.coop.enemyName = coopEnemyName(wave, isBoss, isFinal);
+  room.coop.enemyMaxHp = hp;
+  room.coop.enemyHp = hp;
+  room.coop.roundsLeft = isFinal ? 6 : isBoss ? 5 : 3;
+  room.coop.isBoss = isBoss;
+  room.coop.isFinal = isFinal;
+}
+
+function coopInit(room) {
+  room.coop = { cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false };
+  coopSpawn(room, 1);
+}
+
+/* Resolve a co-op round: the team's banked points this round are damage. */
+function endRoundCoop(room, now) {
+  const c = room.coop;
+  let dmg = 0;
+  for (const p of Object.values(room.players)) dmg += (p.turn && p.turn.gained) || 0;
+  c.lastDamage = dmg;
+  c.enemyHp = Math.max(0, c.enemyHp - dmg);
+
+  if (c.enemyHp <= 0) {
+    /* Enemy down — bank the clear and bring on the next, tougher one. */
+    c.cleared += 1;
+    if (c.isFinal) c.victory = true;
+    c.justCleared = true;
+    coopSpawn(room, c.wave + 1);
+    room.status = 'intermission';
+    room.intermissionEndsAt = now + INTERMISSION_MS;
+    return;
+  }
+
+  c.justCleared = false;
+  c.roundsLeft -= 1;
+  if (c.roundsLeft <= 0) {
+    /* Out of rounds with the enemy still standing — the run ends here. */
+    room.status = 'finished';
+    room.winner = null;
+    room.runOver = true;
+    c.runOver = true;
+    room.finishedAt = now;
+    room.intermissionEndsAt = null;
+    return;
+  }
+  room.status = 'intermission';
+  room.intermissionEndsAt = now + INTERMISSION_MS;
+}
+
 /* ══ Round lifecycle ══════════════════════════════════════════════════════ */
 
 function startRound(room, now) {
@@ -209,6 +297,9 @@ function startRound(room, now) {
  * which is the point of simultaneous rounds.
  */
 function endRound(room, now) {
+  /* Co-op has its own resolution — team damage vs one enemy, not a race. */
+  if (room.mode === 'coop') return endRoundCoop(room, now);
+
   /* Everyone eligible has left or been removed. Ending on whoever is still
      in the room beats looping the round forever with nobody in it. */
   const remaining = Object.keys(room.players);
@@ -423,6 +514,21 @@ export function viewFor(room, userId, now, opts = {}) {
     goal: room.goal,
     idleMs: room.idleMs,
     practice: !!room.practice,
+    mode: room.mode || 'versus',
+    coop: room.mode === 'coop' && room.coop ? {
+      wave: room.coop.wave,
+      cleared: room.coop.cleared,
+      enemyName: room.coop.enemyName,
+      enemyHp: Math.max(0, Math.round(room.coop.enemyHp)),
+      enemyMaxHp: Math.round(room.coop.enemyMaxHp),
+      roundsLeft: room.coop.roundsLeft,
+      isBoss: !!room.coop.isBoss,
+      isFinal: !!room.coop.isFinal,
+      lastDamage: room.coop.lastDamage || 0,
+      justCleared: !!room.coop.justCleared,
+      victory: !!room.coop.victory,
+      runOver: !!room.coop.runOver,
+    } : null,
     ranked: isRanked(room),
     round: room.round,
     isFinalRound: !!room.isFinalRound,
@@ -595,6 +701,8 @@ export async function onRequestGet(context) {
         maxPlayers: MAX_PLAYERS,
         hasPassword: !!room.password,
         goal: room.goal,
+        mode: room.mode || 'versus',
+        wave: room.mode === 'coop' && room.coop ? room.coop.wave : null,
         status: room.status,
         round: room.round || 0,
         /* The highest score on the table, so the list can say what someone
@@ -648,11 +756,14 @@ export async function onRequestPost(context) {
 
   /* ── create-room ──────────────────────────────────────────────────── */
   if (body.action === 'create-room') {
-    const goal = Number(body.goal);
-    if (!GOALS.includes(goal)) return json({ error: `Goal must be one of: ${GOALS.join(', ')}` }, 400);
+    const coop = body.mode === 'coop';
+    /* Co-op has no point goal — the enemies are the target — so goal is only
+       required and validated for a versus game. */
+    const goal = coop ? 0 : Number(body.goal);
+    if (!coop && !GOALS.includes(goal)) return json({ error: `Goal must be one of: ${GOALS.join(', ')}` }, 400);
     const idleMs = Number(body.idleMs);
     if (!IDLE_CHOICES.includes(idleMs)) return json({ error: 'Pick a 10, 30 or 60 second timer.' }, 400);
-    const practice = !!body.practice;
+    const practice = !coop && !!body.practice;   // co-op is its own multiplayer mode
 
     let made = null;
     for (let i = 0; i < 10; i++) {
@@ -662,6 +773,7 @@ export async function onRequestPost(context) {
         host: userId, hostName: displayName,
         password: practice ? null : (body.password || null),
         practice,
+        mode: coop ? 'coop' : 'versus',
         goal, idleMs,
         status: 'lobby',
         round: 0, roundStartedAt: null,
@@ -691,7 +803,7 @@ export async function onRequestPost(context) {
       if (claimed) { made = candidate; break; }
     }
     if (!made) return json({ error: 'Could not generate a room code' }, 500);
-    return json({ success: true, code: made, practice });
+    return json({ success: true, code: made, practice, mode: coop ? 'coop' : 'versus' });
   }
 
   if (!code) return json({ error: 'Missing room code' }, 400);
@@ -797,6 +909,8 @@ export async function onRequestPost(context) {
       r.tiedPlayers = null;
       r.restingIds = [];
       r.joinedLate = 0;
+      r.runOver = false;
+      if (r.mode === 'coop') r.coop = null;   // re-initialised fresh on start-game
 
       /* THE ONE THAT WOULD HAVE GONE UNNOTICED. settle() claims a finished
          room once by setting resultsRecorded, and refuses to record again
@@ -889,12 +1003,15 @@ export async function onRequestPost(context) {
       if (r.host !== userId) return json({ error: 'Only the host can start.' }, 403);
       if (r.status !== 'lobby') return json({ error: 'Already started' }, 400);
       const ids = Object.keys(r.players);
-      if (!r.practice && ids.length < 2) return json({ error: 'Wait for someone to join.' }, 400);
+      /* Co-op can be run solo (a one-person gauntlet); versus still needs an
+         opponent. */
+      if (!r.practice && r.mode !== 'coop' && ids.length < 2) return json({ error: 'Wait for someone to join.' }, 400);
       if (ids.some(id => !r.players[id].ready)) return json({ error: 'Not everyone is ready.' }, 400);
       r.round = 0;
       r.tiedPlayers = null;
       r.nextIsFinal = false;
       for (const p of Object.values(r.players)) p.total = 0;
+      if (r.mode === 'coop') coopInit(r);
       startRound(r, now);
       return null;
     });

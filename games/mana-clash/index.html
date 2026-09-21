@@ -34,6 +34,20 @@
     .btn-red:hover:not(:disabled) { background: #d40000; }
     .btn-dim { background: #1a1a1a; color: #fff; border-color: var(--line); }
     .btn-dim:hover:not(:disabled) { background: #242424; color: #fff; }
+    .btn-coop { background: #2a0d2a; color: #d98fff; border-color: #5a2a6a; }
+    .btn-coop:hover:not(:disabled) { background: #3a1247; color: #fff; }
+    .coop-note { font-size: 11px; color: var(--dim); opacity: 0.7; margin-top: 6px; line-height: 1.5; }
+
+    /* Co-op enemy banner */
+    .enemy-banner { margin: 8px 0; padding: 8px 12px; background: rgba(40,0,0,0.5); border: 1px solid var(--red); border-radius: 6px; }
+    .enemy-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .enemy-name { font-size: 15px; font-weight: 800; color: #ff5555; }
+    .enemy-name.boss { color: #ff9500; }
+    .enemy-name.final { color: #d98fff; }
+    .enemy-rounds { font-size: 11px; color: var(--dim); opacity: 0.85; }
+    .enemy-track { position: relative; height: 18px; margin-top: 6px; background: #1a0000; border: 1px solid #3a0000; border-radius: 4px; overflow: hidden; }
+    .enemy-track i { display: block; height: 100%; background: linear-gradient(90deg, #ff0000, #ff5a1f); transition: width 0.5s ease; }
+    .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
     .btn-lg { padding: 14px 38px; font-size: 15px; }
 
     .input, .select {
@@ -435,6 +449,8 @@
         <input class="input" id="createPassword" placeholder="Password (optional)">
         <button class="btn btn-red" id="createBtn">Create Room</button>
         <button class="btn btn-dim" id="practiceBtn">Solo Practice</button>
+        <button class="btn btn-coop" id="coopBtn">Co-op Gauntlet</button>
+        <div class="coop-note" id="coopNote">Team up (or go solo) against a series of enemies and bosses — bank points to damage them, and see how far you can get. The Target above is ignored in co-op.</div>
         <span class="muted">Only 10,000-point games reach the leaderboards. Practice never does.</span>
       </div>
 
@@ -503,6 +519,13 @@
   </div>
   <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
   <div class="final-banner" id="finalBanner" hidden>Final round — highest total wins</div>
+  <div class="enemy-banner" id="enemyBanner" hidden>
+    <div class="enemy-head">
+      <span class="enemy-name" id="enemyName">—</span>
+      <span class="enemy-rounds" id="enemyRounds"></span>
+    </div>
+    <div class="enemy-track"><i id="enemyHpFill"></i><span class="enemy-hp" id="enemyHpText"></span></div>
+  </div>
   <div class="standings-strip" id="standingsStrip"></div>
   <div class="round-progress" id="roundProgress"></div>
 
@@ -1167,7 +1190,7 @@ function standingsTable(el, players, meId, showDelta) {
 
 function renderLobby() {
   $('lobbyCode').textContent = state.code;
-  $('lobbyGoal').textContent = state.goal.toLocaleString();
+  $('lobbyGoal').textContent = state.mode === 'coop' ? 'Co-op Gauntlet' : state.goal.toLocaleString();
   $('lobbyIdle').textContent = (state.idleMs / 1000) + 's';
   $('lobbyCount').textContent = state.playerCount;
 
@@ -1202,18 +1225,53 @@ function renderLobby() {
   $('startBtn').disabled = !everyoneReady || (!state.practice && state.playerCount < 2);
 }
 
+function renderEnemy() {
+  const c = state.coop;
+  const banner = $('enemyBanner');
+  banner.hidden = false;
+  const nameEl = $('enemyName');
+  nameEl.textContent = (c.isFinal ? '☠ ' : c.isBoss ? '⚔ ' : '') + c.enemyName;
+  nameEl.className = 'enemy-name' + (c.isFinal ? ' final' : c.isBoss ? ' boss' : '');
+  const rounds = c.roundsLeft === 1 ? '1 round left' : c.roundsLeft + ' rounds left';
+  $('enemyRounds').textContent = (c.cleared ? c.cleared + ' cleared · ' : '') + rounds;
+  const pct = c.enemyMaxHp > 0 ? Math.max(0, Math.min(100, (c.enemyHp / c.enemyMaxHp) * 100)) : 0;
+  $('enemyHpFill').style.width = pct + '%';
+  $('enemyHpText').textContent = Math.round(c.enemyHp).toLocaleString() + ' / ' + Math.round(c.enemyMaxHp).toLocaleString() + ' HP';
+}
+
 function renderIntermission() {
   const inter = $('intermission');
   /* Held back while a flash is up, so a burn is never hidden by the
      standings screen that the burn itself triggered. */
   if (state.status !== 'intermission' || Date.now() < flashUntil) { inter.hidden = true; return; }
   inter.hidden = false;
-  $('intermissionTitle').textContent = state.tiedPlayers ? 'Tied — one more round' : 'Round ' + state.round + ' over';
+  if (state.mode === 'coop' && state.coop) {
+    const c = state.coop;
+    $('intermissionTitle').textContent = c.justCleared
+      ? (c.enemyName ? 'Defeated! Next: ' + c.enemyName : 'Enemy defeated!')
+      : c.enemyName + ' — ' + Math.round(c.enemyHp).toLocaleString() + ' HP left';
+  } else {
+    $('intermissionTitle').textContent = state.tiedPlayers ? 'Tied — one more round' : 'Round ' + state.round + ' over';
+  }
   standingsTable($('intermissionTable'), state.players, state.you ? state.you.id : null, true);
 }
 
 function renderResults() {
   const meId = state.you ? state.you.id : null;
+
+  if (state.mode === 'coop' && state.coop) {
+    const c = state.coop;
+    $('resultsTitle').textContent = c.victory ? 'THE SOVEREIGN FALLS' : 'RUN OVER';
+    const enemies = c.cleared === 1 ? '1 enemy' : c.cleared.toLocaleString() + ' enemies';
+    $('resultsSub').textContent = 'Your team cleared ' + enemies +
+      (c.enemyName ? ' — fell at Wave ' + c.wave + ' (' + c.enemyName + ')' : '') + '.';
+    standingsTable($('resultsTable'), state.players, meId);
+    const hostC = !!(state.you && state.host === state.you.id);
+    $('rematchBtn').hidden = !hostC;
+    $('againBtn').className = hostC ? 'btn btn-dim' : 'btn btn-red';
+    return;
+  }
+
   const winner = state.players.find(p => p.id === state.winner);
   $('resultsTitle').textContent = winner && winner.id === meId ? 'YOU WIN' : 'GAME OVER';
   $('resultsSub').textContent = winner
@@ -1337,8 +1395,16 @@ function render() {
 
   show('gameScreen');
   $('roundNum').textContent = state.round;
-  $('goalNum').textContent = state.goal.toLocaleString();
-  $('finalBanner').hidden = !state.isFinalRound;
+  const coop = state.mode === 'coop' && state.coop;
+  if (coop) {
+    $('goalNum').textContent = 'Wave ' + state.coop.wave;
+    $('finalBanner').hidden = true;
+    renderEnemy();
+  } else {
+    $('goalNum').textContent = state.goal.toLocaleString();
+    $('finalBanner').hidden = !state.isFinalRound;
+    $('enemyBanner').hidden = true;
+  }
   renderStandings();
   renderRoundProgress();
   renderDice();
@@ -1586,15 +1652,17 @@ async function loadRooms() {
   }
 }
 
-async function createRoom(practice) {
+async function createRoom(opts) {
+  opts = opts || {};
   say('splashFeedback', '');
   try {
     const data = await api({
       action: 'create-room',
       goal: Number($('createGoal').value),
       idleMs: Number($('createIdle').value),
-      password: practice ? '' : $('createPassword').value.trim(),
-      practice: !!practice,
+      password: opts.practice ? '' : $('createPassword').value.trim(),
+      practice: !!opts.practice,
+      mode: opts.coop ? 'coop' : 'versus',
     });
     roomCode = data.code;
     startPolling();
@@ -1618,8 +1686,9 @@ async function joinRoom() {
 
 /* ── Wiring ────────────────────────────────────────────────────────────── */
 
-$('createBtn').addEventListener('click', () => createRoom(false));
-$('practiceBtn').addEventListener('click', () => createRoom(true));
+$('createBtn').addEventListener('click', () => createRoom({}));
+$('practiceBtn').addEventListener('click', () => createRoom({ practice: true }));
+$('coopBtn').addEventListener('click', () => createRoom({ coop: true }));
 $('joinBtn').addEventListener('click', joinRoom);
 $('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
 
