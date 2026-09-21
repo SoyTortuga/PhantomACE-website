@@ -169,7 +169,7 @@
     var art = $('ovRaidArt');
     if (art) {
       art.style.backgroundImage = 'url(/games/skull-clicker/assets/raid/idle.png)';
-      art.style.backgroundSize = '500px 100px';
+      art.style.backgroundSize = '400px 100px';   // idle.png is 4 frames — see js/pages/overlay-skull-raid.js's BOSS.idle
       art.style.backgroundPositionX = '0';
     }
     var bar = $('ovRaidBar'); if (bar) bar.style.height = '64%';

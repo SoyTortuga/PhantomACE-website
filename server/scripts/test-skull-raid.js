@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 import { onRequestGet, onRequestPost } from '../../functions/api/skull-raid.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -212,8 +213,48 @@ function boss(over = {}) {
   ok('layout mode knows the raid panel', /id: 'ovRaid'/.test(samples) && /function raidBoss/.test(samples));
 
   ok('the flattened sprite strips exist',
-     ['idle', 'attack', 'skill', 'summon', 'death', 'minion-appear', 'minion-idle', 'minion-death']
+     ['idle', 'idle2', 'attack', 'skill', 'summon', 'death', 'minion-appear', 'minion-idle', 'minion-death']
        .every(n => fs.existsSync(path.join(REPO, 'games/skull-clicker/assets/raid/' + n + '.png'))));
+
+  /* THE BUG THIS GUARDS AGAINST: a strip's real frame count silently
+     drifting from the hand-typed constant that steps through it. That
+     happened for real -- five different raid strips shipped with trailing
+     fully-transparent frames the animator still stepped through, so the
+     boss blinked invisible for part of every idle/attack/death/
+     minion-death loop, because nothing checked the PNG against the number
+     next to it. Re-derive both sides here: BOSS/MINI from the source, the
+     real frame count from the file's own width, and require them to
+     agree exactly. */
+  const overlayJs = fs.readFileSync(path.join(REPO, 'js/pages/overlay-skull-raid.js'), 'utf8');
+  const bossMatch = overlayJs.match(/var BOSS = \{([\s\S]*?)\};/);
+  const miniMatch = overlayJs.match(/var MINI = \{([\s\S]*?)\};/);
+  ok('BOSS/MINI frame-count tables are present', !!bossMatch && !!miniMatch);
+  const parseCounts = (body) => Object.fromEntries(
+    [...body.matchAll(/['"]?([\w-]+)['"]?\s*:\s*(\d+)/g)].map(m => [m[1], Number(m[2])])
+  );
+  const BOSS = parseCounts(bossMatch[1]);
+  const MINI = parseCounts(miniMatch[1]);
+
+  for (const [name, expected] of Object.entries(BOSS)) {
+    const file = path.join(REPO, 'games/skull-clicker/assets/raid/' + name + '.png');
+    const { width } = await sharp(file).metadata();
+    check(`${name}.png is ${expected} frames at 100px (BOSS.${name})`, width / 100, expected);
+  }
+  for (const [name, expected] of Object.entries(MINI)) {
+    const file = path.join(REPO, 'games/skull-clicker/assets/raid/' + name + '.png');
+    const { width } = await sharp(file).metadata();
+    check(`${name}.png is ${expected} frames at 50px (MINI.${name})`, width / 50, expected);
+  }
+
+  /* The mini idle icon on the game's own page reads idle.png at a
+     different display size (34px) via its own hardcoded background-size
+     and steps() count -- both have to track idle.png's real frame count
+     too, independently of the overlay's BOSS table. */
+  const gamePage = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
+  const miniIconWidth = BOSS.idle * 34;
+  ok(`the mini idle icon's background-size matches idle.png's ${BOSS.idle} frames`,
+     gamePage.includes(`background-size: ${miniIconWidth}px 34px`));
+  ok('and its steps() count matches', gamePage.includes(`steps(${BOSS.idle})`));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

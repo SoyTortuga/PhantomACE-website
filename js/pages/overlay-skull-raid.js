@@ -21,10 +21,18 @@
   var FPS_MS = 110;                 // per sprite frame
   var ART = '/games/skull-clicker/assets/raid/';
 
-  var BOSS = {                      // strip -> frame count (single-row, 100px)
-    idle: 5, idle2: 8, attack: 18, skill: 12, summon: 8, death: 20,
+  /* strip -> frame count (single-row, 100px). Re-derived from the source
+     .aseprite's own tags via server/scripts/aseprite-export.js rather than
+     hand-counted — every strip but summon/minion-idle/minion-appear
+     dropped one or more frames from what originally shipped, because the
+     old strips carried fully-transparent frames past the real animation
+     (the boss blinked invisible for part of every idle/attack/death/
+     minion-death loop) plus one held duplicate frame apiece on
+     attack/skill. */
+  var BOSS = {
+    idle: 4, idle2: 7, attack: 12, skill: 11, summon: 8, death: 19,
   };
-  var MINI = { 'minion-appear': 6, 'minion-idle': 4, 'minion-death': 6 };
+  var MINI = { 'minion-appear': 6, 'minion-idle': 4, 'minion-death': 5 };
 
   var panel = document.getElementById('ovRaid');
   if (!panel) return;

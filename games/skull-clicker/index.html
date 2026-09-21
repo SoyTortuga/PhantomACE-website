@@ -266,13 +266,13 @@
     .raid-boss-mini {
       width: 34px; height: 34px; flex: none;
       background: url('assets/raid/idle.png') 0 0 no-repeat;
-      background-size: 170px 34px;  /* 5 frames × 34px */
+      background-size: 136px 34px;  /* idle.png is 4 frames (see js/pages/overlay-skull-raid.js's BOSS.idle) × 34px */
       image-rendering: pixelated;
       filter: drop-shadow(0 0 4px rgba(255,0,0,0.7));
-      animation: raid-mini-idle 0.6s steps(5) infinite;
+      animation: raid-mini-idle 0.6s steps(4) infinite;
     }
     .raid-boss-mini.shielded { filter: drop-shadow(0 0 5px rgba(90,160,255,0.9)); }
-    @keyframes raid-mini-idle { from { background-position-x: 0; } to { background-position-x: -170px; } }
+    @keyframes raid-mini-idle { from { background-position-x: 0; } to { background-position-x: -136px; } }
     .raid-name { font-size: 13px; font-weight: 800; color: #ff5555; flex: 1; }
     .raid-mini-tag { font-size: 10px; color: #b060ff; font-weight: 800; }
     .raid-timer { font-size: 11px; color: #ffffffaa; font-variant-numeric: tabular-nums; }
