@@ -78,6 +78,7 @@ function chatAllowed(player, now) {
 }
 const MAX_PLAYERS = 100;
 const INTERMISSION_MS = 10000;
+const COOP_INTERMISSION_MS = 5000;   // co-op has no standings race to read — keep the pace up
 const GOALS = [5000, 10000, 20000];
 const IDLE_CHOICES = [10000, 30000, 60000];
 
@@ -352,7 +353,7 @@ function coopSpawn(room, wave) {
   room.coop.enemyHp = carry > 0 ? Math.max(1, hp - carry) : hp;
   room.coop.carryover = 0;
   const roundsBonus = (room.coop.boons && room.coop.boons.roundsBonus) || 0;
-  room.coop.roundsLeft = (isFinal ? 6 : isBoss ? 5 : 3) + roundsBonus;
+  room.coop.roundsLeft = (isFinal ? 9 : isBoss ? 7 : 5) + roundsBonus;
   room.coop.isBoss = isBoss;
   room.coop.isFinal = isFinal;
   room.coop.bg = COOP_BACKGROUNDS[(wave - 1) % COOP_BACKGROUNDS.length];
@@ -593,7 +594,7 @@ function endRoundCoop(room, now) {
   if (c.roundsLeft <= 0) return coopEnd(room, now);
 
   room.status = 'intermission';
-  room.intermissionEndsAt = now + INTERMISSION_MS;
+  room.intermissionEndsAt = now + COOP_INTERMISSION_MS;
 }
 
 /* ══ Round lifecycle ══════════════════════════════════════════════════════ */
@@ -1395,7 +1396,7 @@ export async function onRequestPost(context) {
       r.coop.pendingBoons = null;
       coopSpawn(r, r.coop.wave + 1);
       r.status = 'intermission';
-      r.intermissionEndsAt = now + INTERMISSION_MS;
+      r.intermissionEndsAt = now + COOP_INTERMISSION_MS;
       return null;
     });
     if (failed) return failed;

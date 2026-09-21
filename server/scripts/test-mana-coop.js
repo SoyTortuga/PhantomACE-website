@@ -277,6 +277,8 @@ async function startedCoop(n) {
   // Shared team pool grows +25 per extra player.
   check('solo team pool', solo.teamMaxHp, 100);
   check('3-player team pool', trio.teamMaxHp, 150);
+  // A normal enemy gives a workable round budget (not the old cramped 3).
+  check('a normal enemy gives 5 rounds', solo.roundsLeft, 5);
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
