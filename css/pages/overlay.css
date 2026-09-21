@@ -220,6 +220,93 @@ html, body {
   border-radius: 4px;
 }
 
+/* ══ BIG PRIZE GIVEAWAY — the spin, replayed on stream ══════════════════
+   Same reel, same names, same landing row as the control panel — see
+   js/giveaway-reel.js. .ov-reel-row's height has to stay equal to
+   window.PhamReel.ROW_H for the same reason bot-control.css calls out: the
+   strip moves by whole rows, and a mismatch here puts a name half out of
+   frame. Laid out as a column rather than the standard icon+text row —
+   there is no mark, the reel window is the whole point. */
+
+.ov-reel-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 480px;
+  text-align: center;
+}
+
+.ov-reel-card .ov-kind { margin-bottom: 0; }
+
+.ov-reel-wrap {
+  position: relative;
+}
+
+.ov-reel-window {
+  height: 56px;
+  overflow: hidden;
+  border: 1px solid var(--border-mid);
+  border-left: 3px solid var(--red);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.ov-reel-strip {
+  will-change: transform;
+}
+
+.ov-reel-row {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-gothic);
+  font-size: 24px;
+  color: var(--text-pri);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 18px;
+}
+
+.ov-reel-row.winner { color: var(--red); }
+
+/* The rails — two hairlines at the window edges read as a mechanism the
+   names pass through. Same trick as bot-control.css, costs nothing. */
+.ov-reel-wrap::before,
+.ov-reel-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-mid);
+  pointer-events: none;
+}
+.ov-reel-wrap::before { top: 0; }
+.ov-reel-wrap::after { bottom: 0; }
+
+.ov-reel-caption {
+  margin: 0;
+  transition: color 200ms ease;
+}
+
+/* Once the reel lands, the caption swaps from "Spinning…" to the winner's
+   name — this is the moment the card exists for, so it takes the rarity
+   colour rather than staying the muted default. */
+.ov-reel-card.is-landed .ov-reel-caption { color: var(--text-pri); font-weight: 700; }
+
+.ov-reel-card[data-rarity="mythic"] .ov-reel-window { border-left-color: var(--amber); }
+.ov-reel-card[data-rarity="rare"]   .ov-reel-window { border-left-color: var(--purple); }
+.ov-reel-card[data-rarity="mythic"] .ov-reel-row.winner { color: var(--amber); }
+.ov-reel-card[data-rarity="rare"]   .ov-reel-row.winner { color: var(--purple); }
+.ov-reel-card.is-landed[data-rarity="mythic"] .ov-reel-caption { color: var(--amber); }
+.ov-reel-card.is-landed[data-rarity="rare"]   .ov-reel-caption { color: var(--purple); }
+
+@media (max-width: 560px) {
+  .ov-reel-card { min-width: 0; width: 92vw; }
+}
+
 /* ══ CHAT SCRAMBLE ═══════════════════════════════════════════════════════
    A standing panel, not an alert. It sits bottom-left so it never collides
    with the alert stage, and it is hidden entirely between games so this

@@ -147,6 +147,10 @@
      less. Pulls get four. */
   var PULL_MS = 4000;
 
+  /* How long the winner's name stays up, landed, after the reel itself
+     stops spinning — long enough to read on stream before the card leaves. */
+  var REEL_HOLD_MS = 2600;
+
   /* ── What each event looks like on screen ── */
   function describe(ev) {
     if (ev.type === 'drop') {
@@ -264,13 +268,29 @@
         rarity: big ? 'mythic' : 'rare',
       };
     }
+
+    /* ── Big Prize Giveaway ────────────────────────────────────────────
+       The same spin the control panel just showed the moderator, replayed
+       on stream so the draw is something viewers watch happen rather than
+       a name that just appears. Held up for the whole spin plus a pause on
+       the winner's name — everything else here is a fixed SHOW_MS/PULL_MS,
+       this is the one alert whose life is dictated by an animation. */
+    if (ev.type === 'giveaway-spin') {
+      var rarity = ev.rarity === 'mythic' ? 'mythic' : 'rare';
+      var spinMs = (window.PhamReel && window.PhamReel.SPIN_MS) || 6000;
+      return {
+        reel: true,
+        entrants: Array.isArray(ev.entrants) ? ev.entrants : [],
+        winnerIndex: ev.winnerIndex,
+        who: ev.who || '',
+        rarity: rarity,
+        ms: spinMs + REEL_HOLD_MS,
+      };
+    }
     return null;
   }
 
-  function render(ev) {
-    var d = describe(ev);
-    if (!d) return false;
-
+  function buildStandardCard(ev, d) {
     var card = document.createElement('div');
     card.className = 'ov-alert';
     card.dataset.type = ev.type;
@@ -313,6 +333,79 @@
 
     card.appendChild(img);
     card.appendChild(text);
+    return card;
+  }
+
+  /* ── Big Prize Giveaway spin ──────────────────────────────────────────
+     The same PhamReel arithmetic bot-control.js drives its panel with,
+     replayed here so the winner it lands on is never a second computation
+     that could disagree with the one the moderator watched — same names,
+     same offset, same landing row, only the row height is untouched (it is
+     shared with the CSS transform math) while the type size around it is
+     bumped up for a stream instead of a control panel. */
+  function buildReelCard(ev, d) {
+    var card = document.createElement('div');
+    card.className = 'ov-alert ov-reel-card';
+    card.dataset.type = ev.type;
+    card.dataset.rarity = d.rarity;
+
+    var kind = document.createElement('span');
+    kind.className = 'ov-kind';
+    kind.textContent = (d.rarity === 'mythic' ? 'Mythic' : 'Rare') + ' Giveaway';
+    card.appendChild(kind);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'ov-reel-wrap';
+    var win = document.createElement('div');
+    win.className = 'ov-reel-window';
+    var strip = document.createElement('div');
+    strip.className = 'ov-reel-strip';
+    win.appendChild(strip);
+    wrap.appendChild(win);
+    card.appendChild(wrap);
+
+    var caption = document.createElement('p');
+    caption.className = 'ov-sub ov-reel-caption';
+    caption.textContent = 'Spinning for the winner…';
+    card.appendChild(caption);
+
+    if (window.PhamReel && d.entrants.length) {
+      var plan = window.PhamReel.strip(d.entrants, d.winnerIndex);
+      plan.names.forEach(function (name, i) {
+        var row = document.createElement('div');
+        row.className = 'ov-reel-row' + (i === plan.landing ? ' winner' : '');
+        row.textContent = name;               // a Twitch username, not markup
+        strip.appendChild(row);
+      });
+
+      var spinMs = window.PhamReel.SPIN_MS;
+      /* Forced reflow, same trick the control panel uses: without it the
+         browser coalesces the reset transform and the travel into one
+         style change and the reel arrives with no animation at all. */
+      void strip.offsetHeight;
+      requestAnimationFrame(function () {
+        strip.style.transition = 'transform ' + (spinMs / 1000) + 's cubic-bezier(0.12, 0.8, 0.18, 1)';
+        strip.style.transform = 'translateY(' + plan.offset + 'px)';
+      });
+
+      setTimeout(function () {
+        /* textContent, not the innerHTML esc() elsewhere is for — a plain
+           string assignment here needs no escaping of its own. */
+        caption.textContent = d.who ? (d.who + ' wins!') : 'We have a winner!';
+        card.classList.add('is-landed');
+      }, spinMs + 100);
+    } else {
+      caption.textContent = 'No entrants to draw from.';
+    }
+
+    return card;
+  }
+
+  function render(ev) {
+    var d = describe(ev);
+    if (!d) return false;
+
+    var card = d.reel ? buildReelCard(ev, d) : buildStandardCard(ev, d);
     stage.appendChild(card);
 
     /* PUBLISHED, NOT ENFORCED. The standing panels — Mana Clash, the

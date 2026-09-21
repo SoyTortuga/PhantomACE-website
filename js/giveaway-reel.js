@@ -25,10 +25,14 @@
      disagreement here shows up as a name sitting half out of frame. */
   var ROW_H = 56;
 
-  /* How many names flick past before the winner. Four seconds of travel at
-     a believable slot-machine rate; fewer reads as a jump cut, many more
-     and the panel is holding the stream up. */
-  var SPIN_ROWS = 28;
+  /* How many names flick past before the winner, and how long the CSS
+     transition that drives them takes. Kept together and exposed as the one
+     source both callers (the control panel and the overlay alert) drive
+     their animation from, rather than each guessing a number that has to
+     agree with the other's. Six seconds of travel reads as a real spin
+     rather than a jump cut, and is long enough to hold on stream. */
+  var SPIN_ROWS = 40;
+  var SPIN_MS = 6000;
 
   /**
    * The strip of names the reel scrolls through, ending on the winner.
@@ -69,6 +73,7 @@
   root.PhamReel = {
     ROW_H: ROW_H,
     SPIN_ROWS: SPIN_ROWS,
+    SPIN_MS: SPIN_MS,
     strip: strip,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

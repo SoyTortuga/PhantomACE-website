@@ -296,6 +296,18 @@ export async function onRequestPost(context) {
       actor: session.display_name || 'broadcaster',
     });
 
+    /* Puts the same spin on stream that the moderator just watched in the
+       panel. Only usernames and the index the reel has to land on — nothing
+       here is more than what is already on screen at the control panel. */
+    const { pushOverlayEvent } = await import('../overlay/events.js');
+    await pushOverlayEvent(env, {
+      type: 'giveaway-spin',
+      entrants: entrants.map(e => ({ username: e.username })),
+      winnerIndex,
+      rarity: winner.rarity,
+      who: winner.username,
+    });
+
     return json({
       success: true,
       winner: publicEntrant(winner),

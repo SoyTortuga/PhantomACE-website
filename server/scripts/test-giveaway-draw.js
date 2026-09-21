@@ -338,6 +338,16 @@ const fresh = (pools) => { patches = []; whispers = []; settlements = []; return
   check('a winner is drawn', body.winner.username, 'alice');
   check('carrying the draw rarity', body.rarity, 'mythic');
   check('stored on the winner record', JSON.parse(env._store.get('giveaway_winner')).rarity, 'mythic');
+
+  /* The same spin the moderator just saw is put on the overlay, so the reel
+     is not something a viewer only hears about. */
+  const feed = JSON.parse(env._store.get('overlay_events'));
+  const spinEvent = feed.events.find(e => e.type === 'giveaway-spin');
+  ok('the spin reaches the overlay feed', !!spinEvent);
+  check('carrying the rarity', spinEvent.rarity, 'mythic');
+  check('the winner name', spinEvent.who, 'alice');
+  check('and the index the reel must land on', spinEvent.winnerIndex, body.winnerIndex);
+  check('with the entrant list to spin through', spinEvent.entrants, [{ username: 'alice' }]);
 }
 
 /* ── An empty wheel does not spin ────────────────────────────────────── */

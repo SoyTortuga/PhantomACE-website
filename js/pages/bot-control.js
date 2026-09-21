@@ -404,7 +404,8 @@ function spinGiveawayReelTo(entrants, winnerIndex) {
   void strip.offsetHeight;
 
   requestAnimationFrame(function () {
-    strip.style.transition = 'transform 4s cubic-bezier(0.12, 0.8, 0.18, 1)';
+    var spinMs = window.PhamReel.SPIN_MS;
+    strip.style.transition = 'transform ' + (spinMs / 1000) + 's cubic-bezier(0.12, 0.8, 0.18, 1)';
     strip.style.transform = 'translateY(' + plan.offset + 'px)';
   });
 }
@@ -515,7 +516,7 @@ async function spinGiveawayWheel() {
       spinGiveawayReelTo(data.entrants, data.winnerIndex);
       setTimeout(function () {
         showGiveawayWinner(Object.assign({ rarity: data.rarity }, data.winner));
-      }, 4100);
+      }, window.PhamReel.SPIN_MS + 100);
     } else {
       showBotStatus(data.error || 'Could not pick a winner.', true);
     }
