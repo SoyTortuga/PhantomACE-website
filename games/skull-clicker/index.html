@@ -804,9 +804,22 @@
     }
 
     /* A snare hit: a bright, fast noise burst (the wire rattle) over a short
-       tonal body (the drum head) that drops in pitch. On theme — this is a
-       drummer's stream — and short enough that rapid clicking stays tight. */
+       tonal body (the drum head) that drops in pitch, with a kick thump under
+       it for weight. On theme — this is a drummer's stream — and short enough
+       that rapid clicking stays tight. */
     function playSnare(t) {
+      /* Kick: a low sine that drops fast in pitch — the thump under the hit.
+         Louder than the rest because low frequencies read quieter. */
+      const kick = audioCtx.createOscillator();
+      kick.type = 'sine';
+      kick.frequency.setValueAtTime(150, t);
+      kick.frequency.exponentialRampToValueAtTime(48, t + 0.11);
+      const kg = audioCtx.createGain();
+      kg.gain.setValueAtTime(0.6, t);
+      kg.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+      kick.connect(kg); kg.connect(audioCtx.destination);
+      kick.start(t); kick.stop(t + 0.14);
+
       const noise = audioCtx.createBufferSource();
       noise.buffer = getNoise();
       const hp = audioCtx.createBiquadFilter();
