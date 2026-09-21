@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { onRequestPost } from '../../functions/api/mana-clash.js';
+import { onRequestPost, viewFor } from '../../functions/api/mana-clash.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -53,7 +53,9 @@ function coopRoom(over = {}, turnOver = {}) {
     teamHp: 100, teamMaxHp: 100, enemyAttack: 6, shieldEvery: 0,
     poison: 0, burn: 0, shieldRounds: 0, dmgBuffRounds: 0,
     minions: { hp: 0, maxHp: 0, count: 0 }, summonedThresholds: [], roundsThisEnemy: 0,
-    lastDealt: 0, lastAttack: 0, log: [],
+    lastDealt: 0, lastAttack: 0, log: [], weakColor: 6, carryover: 0,
+    boons: { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: false, secondWindUsed: false, taken: [] },
+    awaitingBoon: false, pendingBoons: null,
   }, over.coop || {});
   return Object.assign({
     code: 'AAAA', host: '7', hostName: 'U7',
@@ -78,16 +80,23 @@ function coopRoom(over = {}, turnOver = {}) {
   check('with no point goal', room.goal, 0);
 }
 
-/* ══ Banking damages the enemy; enough clears it and advances ══════════ */
+/* ══ Clearing an enemy offers a boon, which then advances the wave ══════ */
 {
-  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom({ coop: { enemyHp: 100, enemyMaxHp: 100 } }, { pending: 150 }) }) };
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom({ coop: { enemyHp: 100, enemyMaxHp: 100 } }, { pending: 100 }) }) };
   const view = await (await POST(e, { action: 'bank', code: 'AAAA' })).json();
-  const room = e.MARKETPLACE.read('mc_room_AAAA');
-  check('clearing an enemy advances the wave', room.coop.wave, 2);
-  check('and counts the clear', room.coop.cleared, 1);
+  let room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('clearing counts the clear', room.coop.cleared, 1);
+  check('the wave pauses for a boon (not yet advanced)', room.coop.wave, 1);
+  ok('a boon choice is offered', room.coop.awaitingBoon === true && room.coop.pendingBoons.length === 3);
+  ok('the view carries the boon choice', view.room.coop.awaitingBoon && view.room.coop.pendingBoons.length === 3);
+
+  const pick = room.coop.pendingBoons[0].id;
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: pick });
+  room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('choosing a boon advances the wave', room.coop.wave, 2);
+  ok('the boon is banked on the run', room.coop.boons.taken.includes(pick));
   check('the next enemy has fresh health', room.coop.enemyHp, room.coop.enemyMaxHp);
   check('the room is between waves', room.status, 'intermission');
-  ok('the view carries the co-op block', view.room && view.room.coop && view.room.coop.wave === 2);
 }
 
 /* ══ Not enough damage chips the enemy and spends a round ══════════════ */
@@ -183,6 +192,58 @@ function coopRoom(over = {}, turnOver = {}) {
   const room = e.MARKETPLACE.read('mc_room_AAAA');
   check('minions absorb 40% of the hit', room.coop.minions.hp, 600);
   check('the enemy takes only the remaining 60%', room.coop.enemyHp, 9400);
+}
+
+/* ══ Weakness — the weak colour's effect lands doubled ═════════════════ */
+{
+  // Black weakness (face 4) + one banked Black trio → 2 poison, not 1.
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, weakColor: 4 } },
+    { pending: 100, kept: [4, 4, 4], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a trio of the weak colour is doubled', room.coop.poison, 2);
+}
+
+/* ══ Overkill carries a share into the next enemy ══════════════════════ */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100, enemyMaxHp: 100 } },
+    { pending: 300, kept: [], done: null }) }) }; // 200 overkill → 100 carried (50%)
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  let room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('overkill is banked for the next enemy', room.coop.carryover, 100);
+  const pick = room.coop.pendingBoons[0].id;
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: pick });
+  room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('the next enemy spawns already wounded by the spill', room.coop.enemyHp, room.coop.enemyMaxHp - 100);
+  check('and the carry is spent', room.coop.carryover, 0);
+}
+
+/* ══ Telegraph — the view previews the next incoming hit ═══════════════ */
+{
+  const room = coopRoom({ coop: { enemyHp: 10000, enemyMaxHp: 10000, enemyAttack: 12, roundsLeft: 5 } });
+  const v = viewFor(room, '7', Date.now());
+  check('the view telegraphs the next attack', v.coop.nextAttack, 12);
+  ok('and flags no enrage yet', v.coop.willEnrage === false);
+  // Cornered on rounds → the telegraph shows the enraged figure.
+  const room2 = coopRoom({ coop: { enemyHp: 10000, enemyMaxHp: 10000, enemyAttack: 12, roundsLeft: 2 } });
+  const v2 = viewFor(room2, '7', Date.now());
+  check('a cornered enemy telegraphs an enraged hit', v2.coop.nextAttack, 21); // 12 * 1.75
+  ok('and flags the enrage', v2.coop.willEnrage === true);
+}
+
+/* ══ Second Wind cheats death once ═════════════════════════════════════ */
+{
+  const seed = coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, teamHp: 5, teamMaxHp: 100, enemyAttack: 50, roundsLeft: 5 } },
+    { pending: 100, kept: [], done: null });
+  seed.coop.boons = { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: true, secondWindUsed: false, taken: ['wind'] };
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: seed }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('Second Wind keeps the run alive', room.status !== 'finished' && room.coop.teamHp === 40);
+  ok('and is spent', room.coop.boons.secondWindUsed === true);
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */

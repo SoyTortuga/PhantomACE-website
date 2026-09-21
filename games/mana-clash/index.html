@@ -77,9 +77,27 @@
     .stat-chip.shield { color: #93c5fd; border-color: #1d4ed8; background: rgba(20,40,120,0.35); }
     .stat-chip.enrage { color: #fca5a5; border-color: #b91c1c; background: rgba(120,10,10,0.4); }
 
+    .stat-chip.weak { color: #fde047; border-color: #a16207; background: rgba(90,70,5,0.4); }
+
+    /* Telegraph: the incoming hit to brace for */
+    .enemy-telegraph { margin-top: 6px; font-size: 12px; font-weight: 700; color: #fca5a5; text-align: center; letter-spacing: 0.02em; }
+    .enemy-telegraph:empty { margin: 0; }
+
     /* One-line recap of what the last round did */
     .combat-log { margin-top: 6px; font-size: 11px; color: #cdb4db; text-align: center; min-height: 0; line-height: 1.5; }
     .combat-log:empty { margin-top: 0; }
+    .coop-boons { margin-top: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #86efac; text-align: center; }
+    .coop-boons:empty { margin: 0; }
+
+    /* Between-wave boon chooser */
+    .boon-picker { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 6px 0 14px; }
+    .boon-card { flex: 1 1 150px; max-width: 200px; background: #14071a; border: 1px solid #5a2a6a; border-radius: 8px;
+                 padding: 14px 12px; cursor: pointer; text-align: left; color: #eee; font-family: inherit; transition: border-color 0.15s, background 0.15s; }
+    .boon-card:hover:not(:disabled) { background: #23103a; border-color: #d98fff; }
+    .boon-card:disabled { opacity: 0.5; cursor: default; }
+    .boon-card b { display: block; font-size: 14px; color: #d98fff; margin-bottom: 5px; }
+    .boon-card span { font-size: 12px; color: var(--dim); line-height: 1.4; }
+    .boon-wait { font-size: 12px; color: var(--dim); text-align: center; margin: 6px 0 14px; }
     .btn-lg { padding: 14px 38px; font-size: 15px; }
 
     .input, .select {
@@ -562,9 +580,11 @@
     </div>
     <div class="enemy-track"><i id="enemyHpFill"></i><span class="enemy-hp" id="enemyHpText"></span></div>
     <div class="enemy-status" id="enemyStatus"></div>
+    <div class="enemy-telegraph" id="enemyTelegraph"></div>
     <div class="minion-track" id="minionTrack" hidden><i id="minionHpFill"></i><span class="minion-hp" id="minionHpText"></span></div>
     <div class="team-track"><i id="teamHpFill"></i><span class="team-hp" id="teamHpText"></span></div>
     <div class="combat-log" id="combatLog"></div>
+    <div class="coop-boons" id="coopBoons"></div>
   </div>
   <div class="standings-strip" id="standingsStrip"></div>
   <div class="round-progress" id="roundProgress"></div>
@@ -618,6 +638,7 @@
 <div class="intermission" id="intermission" hidden>
   <h2 id="intermissionTitle">Round Over</h2>
   <div class="count" id="intermissionCount"></div>
+  <div class="boon-picker" id="boonPicker" hidden></div>
   <div class="standings-table" id="intermissionTable"></div>
 </div>
 
@@ -1291,6 +1312,16 @@ function animateEnemy(slug, frames) {
   }
 }
 
+const COOP_COLORS = {
+  1: { icon: '◇', name: 'Colourless' }, 2: { icon: '✦', name: 'White' },
+  3: { icon: '💧', name: 'Blue' },      4: { icon: '☠', name: 'Black' },
+  5: { icon: '🔥', name: 'Red' },       6: { icon: '🌿', name: 'Green' },
+};
+const COOP_BOON_NAMES = {
+  vigor: 'Vigor', venom: 'Venomcraft', zeal: 'Zealotry', medic: 'Field Medic',
+  slayer: 'Giant Slayer', purify: 'Purifier', wind: 'Second Wind',
+};
+
 let lastEnemyHp = null;
 function renderEnemy() {
   const c = state.coop;
@@ -1345,12 +1376,24 @@ function renderEnemy() {
 
   /* Persistent status chips (what's currently on the board). */
   const chips = [];
+  const wk = COOP_COLORS[c.weakColor];
+  if (wk) chips.push('<span class="stat-chip weak">◎ Weak: ' + wk.icon + ' ' + wk.name + '</span>');
   if (c.poison > 0) chips.push('<span class="stat-chip poison">☠ Poison ×' + c.poison + '</span>');
   if (c.burn > 0 && hasMin) chips.push('<span class="stat-chip burn">🔥 Burn ×' + c.burn + '</span>');
   if (c.buff > 0) chips.push('<span class="stat-chip buff">⚔ Dmg buff ' + c.buff + 'r</span>');
   if (c.shield) chips.push('<span class="stat-chip shield">🛡 Shield</span>');
   if ((c.log || []).includes('enrage')) chips.push('<span class="stat-chip enrage">😡 Enraged</span>');
   $('enemyStatus').innerHTML = chips.join('');
+
+  /* Telegraph: the hit coming next round, so the team can plan a defensive bank. */
+  const na = c.nextAttack || 0;
+  $('enemyTelegraph').textContent = na > 0
+    ? '⚠ Next hit: ' + na + (c.willEnrage ? ' (enraged)' : '') + (c.shield ? ' · it will be shielded' : '')
+    : '';
+
+  /* Run-long boons the team has banked. */
+  const boons = c.boons || [];
+  $('coopBoons').textContent = boons.length ? 'Boons: ' + boons.map(id => COOP_BOON_NAMES[id] || id).join(' · ') : '';
 
   $('combatLog').textContent = coopLogText(c.log || []);
 }
@@ -1373,6 +1416,8 @@ function coopLogText(log) {
     else if (t.startsWith('hit:')) parts.push('hit team for ' + val(t));
     else if (t.startsWith('enemyheal:')) parts.push('it regenerated');
     else if (t === 'shield-up') parts.push('it raised a shield');
+    else if (t.startsWith('weak:')) { const col = COOP_COLORS[+val(t)]; parts.push('weakness struck (' + (col ? col.name : '?') + ' ×2)'); }
+    else if (t === 'second-wind') parts.push('SECOND WIND — cheated death!');
   }
   return parts.length ? parts.join(' · ') : '';
 }
@@ -1383,15 +1428,46 @@ function renderIntermission() {
      standings screen that the burn itself triggered. */
   if (state.status !== 'intermission' || Date.now() < flashUntil) { inter.hidden = true; return; }
   inter.hidden = false;
+  const picker = $('boonPicker');
   if (state.mode === 'coop' && state.coop) {
     const c = state.coop;
-    $('intermissionTitle').textContent = c.justCleared
-      ? (c.enemyName ? 'Defeated! Next: ' + c.enemyName : 'Enemy defeated!')
-      : c.enemyName + ' — ' + Math.round(c.enemyHp).toLocaleString() + ' HP left';
+    if (c.awaitingBoon && Array.isArray(c.pendingBoons)) {
+      $('intermissionTitle').textContent = 'Enemy down — choose a boon';
+      renderBoonPicker(c.pendingBoons);
+    } else {
+      picker.hidden = true;
+      $('intermissionTitle').textContent = c.justCleared
+        ? (c.enemyName ? 'Next up: ' + c.enemyName : 'Enemy defeated!')
+        : c.enemyName + ' — ' + Math.round(c.enemyHp).toLocaleString() + ' HP left';
+    }
   } else {
+    picker.hidden = true;
     $('intermissionTitle').textContent = state.tiedPlayers ? 'Tied — one more round' : 'Round ' + state.round + ' over';
   }
   standingsTable($('intermissionTable'), state.players, state.you ? state.you.id : null, true);
+}
+
+let boonBusy = false;
+function renderBoonPicker(boons) {
+  const picker = $('boonPicker');
+  picker.hidden = false;
+  picker.innerHTML = '';
+  for (const b of boons) {
+    const card = document.createElement('button');
+    card.className = 'boon-card';
+    card.disabled = boonBusy;
+    card.innerHTML = '<b>' + b.name + '</b><span>' + b.desc + '</span>';
+    card.addEventListener('click', () => chooseBoon(b.id));
+    picker.appendChild(card);
+  }
+}
+
+async function chooseBoon(id) {
+  if (boonBusy) return;
+  boonBusy = true;
+  [...$('boonPicker').querySelectorAll('.boon-card')].forEach(c => c.disabled = true);
+  await act({ action: 'choose-boon', code: roomCode, boon: id }, 'gameFeedback');
+  boonBusy = false;
 }
 
 function renderResults() {
@@ -1560,6 +1636,11 @@ function tick() {
   if (!state) return;
 
   if (state.status === 'intermission') {
+    /* A co-op boon choice has no clock — the next enemy waits on the pick. */
+    if (state.mode === 'coop' && state.coop && state.coop.awaitingBoon) {
+      $('intermissionCount').textContent = '';
+      return;
+    }
     const left = Math.max(0, state.intermissionEndsAt - (Date.now() + clockOffset));
     $('intermissionCount').textContent = 'Next round in ' + Math.ceil(left / 1000) + 's';
     return;

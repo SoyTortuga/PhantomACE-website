@@ -217,6 +217,46 @@ const COOP_COLORLESS_PCT = 0.05;     // piercing damage per Colourless trio (of 
 const COOP_HEAL_PCT = 0.03;          // enemy self-heal when under-pressured
 const COOP_MINION_SOAK = 0.4;        // share of team damage minions absorb
 const COOP_SUMMON_THRESHOLDS = [0.66, 0.33];
+const COOP_OVERKILL_CARRY = 0.5;     // share of overkill that spills to the next enemy
+
+/* Between-wave boons — the team picks one of three after every clear, building
+   a run. Effects accumulate on room.coop.boons; some apply immediately. */
+const COOP_BOONS = [
+  { id: 'vigor',  name: 'Vigor',        desc: '+30 max Team HP (and heal it)' },
+  { id: 'venom',  name: 'Venomcraft',   desc: 'Poison ticks 50% harder' },
+  { id: 'zeal',   name: 'Zealotry',     desc: '+12% team damage' },
+  { id: 'medic',  name: 'Field Medic',  desc: 'White healing +50%' },
+  { id: 'slayer', name: 'Giant Slayer', desc: '+1 round on every enemy' },
+  { id: 'purify', name: 'Purifier',     desc: 'Minions soak 15% less' },
+  { id: 'wind',   name: 'Second Wind',  desc: 'Once per run, cheat death' },
+];
+function coopBoonDefaults() {
+  return { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: false, secondWindUsed: false, taken: [] };
+}
+/* Three distinct boons on offer. Second Wind only appears once it isn't already
+   held (a second copy would do nothing). */
+function coopOfferBoons(c) {
+  const pool = COOP_BOONS.filter(b => !(b.id === 'wind' && c.boons && c.boons.secondWind));
+  const out = [];
+  const bag = pool.slice();
+  while (out.length < 3 && bag.length) out.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
+  return out.map(b => ({ id: b.id, name: b.name, desc: b.desc }));
+}
+function coopApplyBoon(c, id) {
+  const b = c.boons;
+  switch (id) {
+    case 'vigor':  c.teamMaxHp += 30; c.teamHp = Math.min(c.teamMaxHp, c.teamHp + 30); break;
+    case 'venom':  b.poisonMult += 0.5; break;
+    case 'zeal':   b.dmgMult += 0.12; break;
+    case 'medic':  b.healMult += 0.5; break;
+    case 'slayer': b.roundsBonus += 1; break;
+    case 'purify': b.soakReduce += 0.15; break;
+    case 'wind':   b.secondWind = true; break;
+    default: return false;
+  }
+  b.taken.push(id);
+  return true;
+}
 
 /* The enemy roster — real art from the itch.io packs, keyed by slug with its
    idle-strip frame count so the client can animate it. Generated from
@@ -298,11 +338,19 @@ function coopSpawn(room, wave) {
   room.coop.enemySlug = pick.slug;
   room.coop.enemyFrames = pick.frames;
   room.coop.enemyMaxHp = hp;
-  room.coop.enemyHp = hp;
-  room.coop.roundsLeft = isFinal ? 6 : isBoss ? 5 : 3;
+  /* Overkill from the previous clear spills in, but can't skip a whole enemy —
+     it leaves at least 1 HP so every wave is still fought. */
+  const carry = room.coop.carryover || 0;
+  room.coop.enemyHp = carry > 0 ? Math.max(1, hp - carry) : hp;
+  room.coop.carryover = 0;
+  const roundsBonus = (room.coop.boons && room.coop.boons.roundsBonus) || 0;
+  room.coop.roundsLeft = (isFinal ? 6 : isBoss ? 5 : 3) + roundsBonus;
   room.coop.isBoss = isBoss;
   room.coop.isFinal = isFinal;
   room.coop.bg = COOP_BACKGROUNDS[(wave - 1) % COOP_BACKGROUNDS.length];
+  /* This enemy is vulnerable to one mana colour — that colour's banked effect
+     lands doubled. Rotates so a run sees every colour matter. */
+  room.coop.weakColor = ((wave * 7) % 6) + 1;
 
   /* How hard the enemy hits the team's shared HP each round, in team-HP
      units (not the point/damage scale the enemy's own HP lives in). */
@@ -331,6 +379,7 @@ function coopInit(room) {
   room.coop = {
     cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false,
     teamMaxHp: teamMax, teamHp: teamMax, log: [],
+    boons: coopBoonDefaults(), carryover: 0, awaitingBoon: false, pendingBoons: null,
   };
   coopSpawn(room, 1);
 }
@@ -348,6 +397,15 @@ function coopTrios(room) {
     for (let f = 1; f <= 6; f++) t[f] += Math.floor((counts[f] || 0) / 3);
   }
   return t;
+}
+
+/* The hit the enemy (plus any minions) will land next round, enrage included —
+   for the telegraph the team plans around. */
+function coopNextAttack(c) {
+  if (!c || typeof c.enemyAttack !== 'number') return 0;
+  let atk = c.enemyAttack + ((c.minions && c.minions.count) || 0) * COOP_MINION_ATK;
+  if (c.roundsLeft <= 2 || (c.enemyMaxHp > 0 && c.enemyHp / c.enemyMaxHp < 0.25)) atk = Math.round(atk * COOP_ENRAGE_MULT);
+  return atk;
 }
 
 /* Bosses and the final boss call in minions at HP thresholds. Minions are a
@@ -396,27 +454,34 @@ function endRoundCoop(room, now) {
   c.dmgBuffRounds = c.dmgBuffRounds || 0; c.shieldRounds = c.shieldRounds || 0;
   c.summonedThresholds = c.summonedThresholds || [];
   c.shieldEvery = c.shieldEvery || 0;
+  if (!c.boons) c.boons = coopBoonDefaults();
+  if (!c.weakColor) c.weakColor = 1;
   c.roundsThisEnemy = (c.roundsThisEnemy || 0) + 1;
+  const b = c.boons;
   const log = [];
+  /* This enemy's weak colour lands its banked effect doubled. */
+  const eff = (face) => trios[face] * (face === c.weakColor ? 2 : 1);
 
   /* 1. Raw banked points across the team, and the colour trios that back them. */
   let raw = 0;
   for (const p of Object.values(room.players)) raw += (p.turn && p.turn.gained) || 0;
   const trios = coopTrios(room);
 
-  /* 2. Green: a standing team-damage buff amplifies this round's hit. */
-  let dmg = c.dmgBuffRounds > 0 ? Math.round(raw * COOP_DMG_BUFF_MULT) : raw;
+  /* 2. Zealotry boon then a standing Green buff amplify this round's hit. */
+  let dmg = Math.round(raw * (1 + b.dmgMult));
+  if (c.dmgBuffRounds > 0) dmg = Math.round(dmg * COOP_DMG_BUFF_MULT);
 
   /* 3. Colourless: piercing straight damage — ignores shield and minions. */
-  const pierce = trios[1] * Math.ceil(c.enemyMaxHp * COOP_COLORLESS_PCT);
+  const pierce = eff(1) * Math.ceil(c.enemyMaxHp * COOP_COLORLESS_PCT);
 
   /* 4. Shield halves the ordinary (non-piercing) hit. */
   let shielded = false;
   if (c.shieldRounds > 0) { dmg = Math.round(dmg * 0.5); shielded = true; }
 
-  /* 5. Minions soak a share of the ordinary hit, then Red Burn eats them. */
+  /* 5. Minions soak a share of the ordinary hit (less if Purifier is held),
+     then Red Burn eats them. */
   if (c.minions.hp > 0) {
-    const soak = Math.round(dmg * COOP_MINION_SOAK);
+    const soak = Math.round(dmg * Math.max(0, COOP_MINION_SOAK - b.soakReduce));
     c.minions.hp -= soak;
     dmg -= soak;
   }
@@ -429,32 +494,38 @@ function endRoundCoop(room, now) {
     log.push('minions-cleared');
   }
 
-  /* 6. The enemy takes what's left, plus piercing, plus the Poison DoT. */
-  const poisonDmg = c.poison * Math.ceil(c.enemyMaxHp * COOP_POISON_PCT);
+  /* 6. The enemy takes what's left, plus piercing, plus the Poison DoT
+     (harder with Venomcraft). */
+  const poisonDmg = c.poison * Math.ceil(c.enemyMaxHp * COOP_POISON_PCT * (1 + b.poisonMult));
   const dealt = Math.max(0, dmg) + pierce + poisonDmg;
-  c.enemyHp = Math.max(0, c.enemyHp - dealt);
+  const before = c.enemyHp;
+  c.enemyHp = Math.max(0, before - dealt);
   c.lastDamage = raw;
   c.lastDealt = dealt;
+  if (c.weakColor && trios[c.weakColor]) log.push('weak:' + c.weakColor);
 
   /* 7. Apply the colour effects that heal now or seed later rounds. */
-  if (trios[2]) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + trios[2] * COOP_WHITE_HEAL); log.push('heal:' + trios[2]); }
-  if (trios[3]) { c.roundsLeft += trios[3]; log.push('rounds:' + trios[3]); }
-  if (trios[4]) { c.poison += trios[4]; log.push('poison:' + trios[4]); }
-  if (trios[5]) { c.burn += trios[5]; log.push('burn:' + trios[5]); }
-  if (trios[6]) { c.dmgBuffRounds += trios[6] * COOP_GREEN_ROUNDS; log.push('buff:' + trios[6]); }
-  if (trios[1]) log.push('pierce:' + trios[1]);
+  if (eff(2)) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(eff(2) * COOP_WHITE_HEAL * (1 + b.healMult))); log.push('heal:' + eff(2)); }
+  if (eff(3)) { c.roundsLeft += eff(3); log.push('rounds:' + eff(3)); }
+  if (eff(4)) { c.poison += eff(4); log.push('poison:' + eff(4)); }
+  if (eff(5)) { c.burn += eff(5); log.push('burn:' + eff(5)); }
+  if (eff(6)) { c.dmgBuffRounds += eff(6) * COOP_GREEN_ROUNDS; log.push('buff:' + eff(6)); }
+  if (eff(1)) log.push('pierce:' + eff(1));
   if (shielded) log.push('shielded');
 
-  /* 8. Enemy down — clear it, heal the team a little, bring on the next. */
+  /* 8. Enemy down — bank the clear, capture overkill spill, heal the team, and
+     offer a boon before the next enemy (the run pauses until one is chosen). */
   if (c.enemyHp <= 0) {
     c.cleared += 1;
-    if (c.isFinal) c.victory = true;
+    if (c.isFinal) c.victory = true;   // milestone flag; the gauntlet plays on
     c.justCleared = true;
+    c.carryover = Math.max(0, Math.round((dealt - before) * COOP_OVERKILL_CARRY));
     c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(c.teamMaxHp * 0.15));
     c.log = log;
-    coopSpawn(room, c.wave + 1);
+    c.awaitingBoon = true;
+    c.pendingBoons = coopOfferBoons(c);
     room.status = 'intermission';
-    room.intermissionEndsAt = now + INTERMISSION_MS;
+    room.intermissionEndsAt = null;    // no auto-advance until a boon is picked
     return;
   }
   c.justCleared = false;
@@ -487,8 +558,18 @@ function endRoundCoop(room, now) {
   c.roundsLeft -= 1;
   c.log = log;
 
-  /* 14. Loss checks — wiped, or out of time with the enemy still standing. */
-  if (c.teamHp <= 0) { c.teamHp = 0; return coopEnd(room, now); }
+  /* 14. Loss checks — wiped, or out of time with the enemy still standing.
+     Second Wind cheats death once, restoring the team to 40% instead. */
+  if (c.teamHp <= 0) {
+    if (b.secondWind && !b.secondWindUsed) {
+      b.secondWindUsed = true;
+      c.teamHp = Math.max(1, Math.round(c.teamMaxHp * 0.4));
+      c.log = log.concat('second-wind');
+    } else {
+      c.teamHp = 0;
+      return coopEnd(room, now);
+    }
+  }
   if (c.roundsLeft <= 0) return coopEnd(room, now);
 
   room.status = 'intermission';
@@ -615,7 +696,11 @@ function advance(room, now) {
     }
 
     if (room.status === 'intermission') {
-      if (now < room.intermissionEndsAt) break;
+      /* A co-op clear pauses here until the team picks a boon; there is no
+         clock to run down (intermissionEndsAt is null), so the next enemy
+         waits for the choose-boon action rather than for time. */
+      if (room.mode === 'coop' && room.coop && room.coop.awaitingBoon) break;
+      if (room.intermissionEndsAt === null || now < room.intermissionEndsAt) break;
       startRound(room, now);
       changed = true;
       continue;
@@ -775,6 +860,16 @@ export function viewFor(room, userId, now, opts = {}) {
       },
       /* Terse event tags from the last resolution (heal:2, poison:1, hit:14…). */
       log: Array.isArray(room.coop.log) ? room.coop.log.slice() : [],
+      /* This enemy's weak colour (1-6); its banked effect lands doubled. */
+      weakColor: room.coop.weakColor || 0,
+      /* Telegraph: the hit the team should brace for next round. */
+      nextAttack: coopNextAttack(room.coop),
+      willEnrage: (room.coop.roundsLeft <= 2) || (room.coop.enemyMaxHp > 0 && room.coop.enemyHp / room.coop.enemyMaxHp < 0.25),
+      /* Between-wave boon choice, and the run's accumulated boons. */
+      awaitingBoon: !!room.coop.awaitingBoon,
+      pendingBoons: room.coop.awaitingBoon && Array.isArray(room.coop.pendingBoons) ? room.coop.pendingBoons.slice() : null,
+      boons: (room.coop.boons && room.coop.boons.taken ? room.coop.boons.taken : []).slice(),
+      secondWind: !!(room.coop.boons && room.coop.boons.secondWind && !room.coop.boons.secondWindUsed),
     } : null,
     ranked: isRanked(room),
     round: room.round,
@@ -1260,6 +1355,27 @@ export async function onRequestPost(context) {
       for (const p of Object.values(r.players)) p.total = 0;
       if (r.mode === 'coop') coopInit(r);
       startRound(r, now);
+      return null;
+    });
+    if (failed) return failed;
+    return json({ success: true, room: viewFor(room, userId, Date.now()) });
+  }
+
+  /* ── choose-boon (co-op, between waves) ───────────────────────────── */
+  if (body.action === 'choose-boon') {
+    const { failed, room } = await withRoom(env, code, (r, now) => {
+      if (r.mode !== 'coop' || !r.coop || !r.coop.awaitingBoon) return json({ error: 'No boon to choose.' }, 400);
+      if (!r.players[userId]) return json({ error: 'Join the room first.' }, 403);
+      const offered = (r.coop.pendingBoons || []).map(x => x.id);
+      if (!offered.includes(body.boon)) return json({ error: 'That boon is not on offer.' }, 400);
+      /* Any player in the room may pick — first choice wins, so a boon is never
+         blocked on one person. */
+      coopApplyBoon(r.coop, body.boon);
+      r.coop.awaitingBoon = false;
+      r.coop.pendingBoons = null;
+      coopSpawn(r, r.coop.wave + 1);
+      r.status = 'intermission';
+      r.intermissionEndsAt = now + INTERMISSION_MS;
       return null;
     });
     if (failed) return failed;
