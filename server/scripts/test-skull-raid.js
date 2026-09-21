@@ -35,6 +35,7 @@ function fakeKV(seed = {}) {
     read(k) { return store.has(k) ? JSON.parse(store.get(k)) : null; },
     async get(k, t) { const v = store.get(k); return v === undefined ? null : (t === 'json' ? JSON.parse(v) : v); },
     async put(k, v) { store.set(k, String(v)); },
+    async delete(k) { store.delete(k); },
     async mutate(k, fn) { const cur = store.has(k) ? JSON.parse(store.get(k)) : null; const out = await fn(cur); if (out === undefined) return; store.set(k, JSON.stringify(out)); },
   };
 }
@@ -42,7 +43,7 @@ const BC = '555';
 const cookie = (id) => id ? { Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: id, display_name: 'U' + id })) } : {};
 const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https://x/api/skull-raid', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify(body) }) });
-const GET = (e) => onRequestGet({ env: e });
+const GET = (e, qs, h) => onRequestGet({ env: e, request: new Request('https://x/api/skull-raid?' + (qs || ''), { headers: { ...h } }) });
 const envWith = (seed) => ({ MARKETPLACE: fakeKV(seed), TWITCH_BROADCASTER_ID: BC });
 
 /* A live boss with the fight fields, tickless (nextTickAt far ahead). */
@@ -135,6 +136,24 @@ function boss(over = {}) {
   check('restricted to that raider', uncommon.restrictedTo, ['9']);
   ok('the codes are activated with an expiry', rare.active === true && rare.expiresAt > Date.now());
   ok('no code was minted for the guest striker', !codes.some(c => (c.restrictedTo || []).includes('z')));
+
+  /* The in-game claim: each account has a pending reward pointer it can fetch. */
+  const topReward = e.MARKETPLACE.read('sc_raid_reward_7');
+  check('the top damager has a pending rare reward', topReward && topReward.rarity, 'rare');
+  ok('flagged as top', topReward.top === true);
+  check('the pointer carries the same code', topReward.code, rare.code);
+  check('a raider has a pending uncommon reward', (e.MARKETPLACE.read('sc_raid_reward_9') || {}).rarity, 'uncommon');
+  ok('the guest has no pending reward', !e.MARKETPLACE.read('sc_raid_reward_z'));
+
+  /* GET ?reward=1 returns it for that session; a stranger sees nothing. */
+  const mine = await (await GET(e, 'reward=1', cookie('7'))).json();
+  check('the player fetches their own reward in-game', mine.reward.code, rare.code);
+  check('a session with no reward gets null', (await (await GET(e, 'reward=1', cookie('nobody'))).json()).reward, null);
+  check('an anonymous reward fetch is null', (await (await GET(e, 'reward=1')).json()).reward, null);
+
+  /* Claim (dismiss) clears the pointer so it does not nag on reload. */
+  check('claiming succeeds', (await (await POST(e, { action: 'claim-reward' }, cookie('7'))).json()).success, true);
+  ok('and the pointer is gone', !e.MARKETPLACE.read('sc_raid_reward_7'));
 }
 
 /* ══ Expiry and manual end ═════════════════════════════════════════════ */
@@ -167,6 +186,10 @@ function boss(over = {}) {
   const game = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
   ok('a strike also hits the boss', /if \(raidActive\(\)\) raidQueue\+\+/.test(game));
   ok('the game polls and flushes damage', /function pollRaid/.test(game) && /function flushRaidDamage/.test(game));
+  ok('the game claims raid rewards in-game', /function fetchRaidReward/.test(game) && /skull-raid\?reward=1/.test(game) && /id="rewardBanner"/.test(game));
+
+  const reg2 = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
+  ok('the per-account reward key is registered', /prefix: 'sc_raid_reward_'/.test(reg2));
 
   const bc = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
   ok('bot control can summon the boss', /function initOvRaid/.test(bc) && /action: 'start'/.test(bc));

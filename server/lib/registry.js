@@ -265,6 +265,11 @@ export const FAMILIES = [
   { prefix: 'park_bg_',        table: 'dino_parks',       expiry: 'none' },
 
 
+  /* A raider's pending raid-boss reward code, per account, claimed in-game.
+     'real': it carries a TTL matching the code's redemption window, so an
+     unclaimed one clears itself. Matched after the sc_raid singleton. */
+  { prefix: 'sc_raid_reward_',  table: 'singletons',       expiry: 'real' },
+
   { prefix: 'item_code_',      table: 'item_codes',       expiry: 'none' },
   { prefix: 'cp_queue_',       table: 'cp_queues',        expiry: 'real' },
   { prefix: 'earnings_',       table: 'earnings',         expiry: 'none' },

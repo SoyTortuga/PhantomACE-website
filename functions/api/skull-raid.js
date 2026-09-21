@@ -23,6 +23,7 @@
    ══════════════════════════════════════════════ */
 
 const RAID_KEY = 'sc_raid';
+const rewardKey = (userId) => `sc_raid_reward_${userId}`;   /* a raider's pending code, per account */
 const HIT_CAP = 100;                 /* most damage one POST can carry */
 const DEFAULT_HP = 5000;
 const MAX_HP = 5_000_000;
@@ -113,13 +114,21 @@ async function awardRaidRewards(env, raid) {
     const rarity = top ? 'rare' : 'uncommon';
     const userId = e.id.slice(2);          // strip the 'u_' prefix
     try {
+      const itemName = `${bossName} ${top ? 'Slayer' : 'Raider'}`;
       const rec = await createItemCode(env, {
         id: `raid_${raid.id}_${e.id}`,
         game: 'skull-clicker', type: 'badge',
-        name: `${bossName} ${top ? 'Slayer' : 'Raider'}`,
+        name: itemName,
         rarity,
       }, { restrictedTo: [userId] });
       await activateItemCode(env, rec.code, RAID_CODE_SECONDS);
+      /* Stash it as an in-game reward the player can claim on their next poll,
+         so a code never depends on the whisper arriving. Expires with it. */
+      try {
+        await env.MARKETPLACE.put(rewardKey(userId), JSON.stringify({
+          code: rec.code, rarity, name: itemName, top, boss: bossName, at: Date.now(),
+        }), { expirationTtl: RAID_CODE_SECONDS });
+      } catch { /* the whisper is still the backup */ }
       await sendWhisper(env, userId,
         `☠️ You helped fell ${bossName}! Your ${rarity} code: ${rec.code} — ` +
         `redeem at phantomace.tv/redeem.html within 7 days.` +
@@ -167,7 +176,17 @@ function publicState(raid) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
+
+  /* `?reward=1` — a logged-in raider's pending defeat code, delivered
+     in-game rather than only by whisper. Session only; guests have none. */
+  if (new URL(request.url).searchParams.get('reward')) {
+    const session = getSession(request);
+    if (!session || !session.user_id) return json({ reward: null });
+    const reward = await env.MARKETPLACE.get(rewardKey(session.user_id), 'json');
+    return json({ reward: reward || null });
+  }
+
   /* Resolve mechanics on read too, so an idle overlay still sees the boss
      heal/guard/summon on schedule. Persist only if something changed. */
   let changed = false;
@@ -187,6 +206,14 @@ export async function onRequestPost(context) {
   const { env, request } = context;
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+
+  /* ── Dismiss the in-game reward banner (the player has noted their code) ── */
+  if (body.action === 'claim-reward') {
+    const session = getSession(request);
+    if (!session || !session.user_id) return json({ error: 'Not authenticated' }, 401);
+    await env.MARKETPLACE.delete(rewardKey(session.user_id));
+    return json({ success: true });
+  }
 
   /* ── Start a boss — broadcaster/moderators only ── */
   if (body.action === 'start') {

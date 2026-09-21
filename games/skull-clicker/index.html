@@ -283,6 +283,33 @@
     .raid-top { font-size: 10px; color: #ffffff99; text-align: center; }
     @media (prefers-reduced-motion: reduce) { .raid-track i { transition: none; } }
 
+    /* Raid reward banner (claim your code in-game) */
+    .reward-banner {
+      margin: 0 12px 8px; padding: 12px; text-align: center;
+      background: #0a0a0a; border: 1px solid #ffb300; border-radius: 6px;
+    }
+    .reward-banner.rar-rare { border-color: #ffb300; }
+    .reward-banner.rar-uncommon { border-color: #7fd0e6; }
+    .reward-banner.rar-mythic { border-color: #ff5a1f; }
+    .reward-title { font-size: 14px; font-weight: 800; color: #fff; }
+    .reward-banner.rar-rare .reward-title { color: #ffb300; }
+    .reward-banner.rar-uncommon .reward-title { color: #7fd0e6; }
+    .reward-sub { font-size: 11px; color: #ffffffaa; margin: 3px 0 8px; }
+    .reward-sub b { text-transform: uppercase; color: #fff; }
+    .reward-code {
+      font-size: 20px; font-weight: 800; letter-spacing: 0.15em; color: #fff;
+      background: #000; border: 1px dashed #444; border-radius: 4px; padding: 6px; margin-bottom: 10px;
+    }
+    .reward-actions { display: flex; gap: 8px; justify-content: center; }
+    .reward-btn {
+      padding: 7px 18px; border-radius: 4px; font-size: 12px; font-weight: 800;
+      cursor: pointer; font-family: inherit; text-decoration: none;
+      background: #ff0000; color: #fff; border: none;
+    }
+    .reward-btn:hover { background: #cc0000; }
+    .reward-btn.ghost { background: transparent; border: 1px solid #333; color: #888; }
+    .reward-btn.ghost:hover { border-color: #666; color: #fff; }
+
     /* Buff toast (transient, centre-top) */
     .buff-toast {
       position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
@@ -603,6 +630,7 @@
 
     <div class="buff-bar" id="buffBar"></div>
     <div class="raid-banner" id="raidBanner" hidden></div>
+    <div class="reward-banner" id="rewardBanner" hidden></div>
 
     <!-- The living world: every building you own appears here and stacks up,
          Cookie-Clicker style, so the screen fills as you go deeper. -->
@@ -1269,6 +1297,48 @@
       } catch (e) { /* silent — an event is a bonus, never load-bearing */ }
     }
 
+    /* ═══════ RAID REWARD (claim in-game) ═══════
+       A raid code is whispered, but the whisper can fail to arrive — so the
+       server also stashes it per account and the game surfaces it here, code
+       and all. Logged-in only; guests earn no code. */
+    async function fetchRaidReward() {
+      const session = typeof readPhamSession === 'function' ? readPhamSession() : null;
+      if (!session || !session.user_id) return;
+      try {
+        const res = await fetch('/api/skull-raid?reward=1', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (d && d.reward && d.reward.code) renderRewardBanner(d.reward);
+      } catch (e) { /* the whisper is still the backup */ }
+    }
+
+    function renderRewardBanner(r) {
+      const el = document.getElementById('rewardBanner');
+      if (!el) return;
+      const rar = String(r.rarity || 'uncommon');
+      el.className = 'reward-banner rar-' + rar;
+      el.hidden = false;
+      el.innerHTML =
+        '<div class="reward-title">🏆 Raid Reward — ' + (r.top ? 'Top Damage!' : 'Raider') + '</div>' +
+        '<div class="reward-sub">You earned a <b>' + rar + '</b> code for ' + escSkull(r.boss || 'the boss') + '</div>' +
+        '<div class="reward-code">' + escSkull(r.code) + '</div>' +
+        '<div class="reward-actions">' +
+          '<a class="reward-btn" href="/redeem.html" target="_blank" rel="noopener">Redeem</a>' +
+          '<button class="reward-btn ghost" onclick="dismissRaidReward()">Got it</button>' +
+        '</div>';
+    }
+
+    async function dismissRaidReward() {
+      const el = document.getElementById('rewardBanner');
+      if (el) el.hidden = true;
+      try {
+        await fetch('/api/skull-raid', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'claim-reward' }),
+        });
+      } catch (e) { /* it will TTL out regardless */ }
+    }
+
     /* ═══════ CO-OP RAID BOSS ═══════
        One boss shared by everyone. While it lives, each skull click also
        strikes it (queued and flushed to the server in small batches). Beat
@@ -1296,6 +1366,7 @@
         if (s.status === 'defeated' && prev === 'active') {
           showBuffToast('☠️ ' + (s.defeatedBy || 'The chat') + ' felled ' + s.name + '! Frenzy!', 'reap');
           screenShake();
+          setTimeout(fetchRaidReward, 1500);   /* your code is minted on the killing blow */
         } else if (s.status === 'expired' && prev === 'active') {
           showBuffToast(s.name + ' escaped into the dark…', 'frenzy');
         } else if (s.status === 'active' && prev !== 'active') {
@@ -2271,6 +2342,8 @@
     pollRaid();
     setInterval(pollRaid, 4000);
     setInterval(flushRaidDamage, 3000);
+    fetchRaidReward();
+    setInterval(fetchRaidReward, 30000);
   </script>
 </body>
 </html>
