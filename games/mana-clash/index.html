@@ -66,6 +66,32 @@
     .minion-track i { display: block; height: 100%; background: linear-gradient(90deg, #4d7c0f, #a3e635); transition: width 0.4s ease; }
     .team-hp, .minion-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
 
+    /* The ultimate: charged by Mana Clash, spent as a team-wide burst */
+    .ult-track { position: relative; height: 16px; margin-top: 5px; background: #1a0a00; border: 1px solid #4a2000; border-radius: 4px; overflow: hidden; }
+    .ult-track i { display: block; height: 100%; background: linear-gradient(90deg, #ff0000, #ffb020); transition: width 0.5s ease; }
+    .ult-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
+    .ult-btn {
+      display: block; width: 100%; margin-top: 8px; padding: 9px; background: linear-gradient(90deg, #ff0000, #ffb020);
+      border: none; border-radius: 5px; color: #000; font-family: inherit; font-size: 12px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; animation: ultPulse 1.1s infinite;
+    }
+    .ult-btn:disabled { opacity: 0.5; cursor: default; animation: none; }
+    @keyframes ultPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+    @media (prefers-reduced-motion: reduce) { .ult-btn { animation: none; } }
+
+    /* The beam itself — a single rising flash over the enemy sprite,
+       filter: drop-shadow() rather than a box-shadow glow. */
+    .ult-beam { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); pointer-events: none; opacity: 0; }
+    .ult-beam img { display: block; filter: drop-shadow(0 0 10px rgba(255,60,0,0.7)); }
+    .ult-beam.firing { animation: ultBeamFire 900ms ease-out both; }
+    @keyframes ultBeamFire {
+      0%   { opacity: 0; transform: translateX(-50%) scale(0.7); }
+      15%  { opacity: 1; transform: translateX(-50%) scale(1.05); }
+      70%  { opacity: 1; transform: translateX(-50%) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) scale(1.15); }
+    }
+    @media (prefers-reduced-motion: reduce) { .ult-beam.firing { animation: none; opacity: 0; } }
+
     /* Status-effect chips */
     .enemy-status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; min-height: 0; }
     .enemy-status:empty { margin-top: 0; }
@@ -583,6 +609,7 @@
     <div class="enemy-stage">
       <div class="enemy-sprite" id="enemySprite"></div>
       <div class="minion-swarm" id="minionSwarm" hidden></div>
+      <div class="ult-beam" id="ultBeam" hidden><img src="assets/fx/ultimate-beam.png" alt="" width="72" height="94"></div>
     </div>
     <div class="enemy-head">
       <span class="enemy-name" id="enemyName">—</span>
@@ -593,6 +620,8 @@
     <div class="enemy-telegraph" id="enemyTelegraph"></div>
     <div class="minion-track" id="minionTrack" hidden><i id="minionHpFill"></i><span class="minion-hp" id="minionHpText"></span></div>
     <div class="team-track"><i id="teamHpFill"></i><span class="team-hp" id="teamHpText"></span></div>
+    <div class="ult-track"><i id="ultFill"></i><span class="ult-text" id="ultText">⚡ Ultimate 0%</span></div>
+    <button class="ult-btn" id="ultBtn" hidden>⚡ UNLEASH ULTIMATE</button>
     <div class="combat-log" id="combatLog"></div>
     <div class="coop-boons" id="coopBoons"></div>
   </div>
@@ -1383,6 +1412,14 @@ function renderEnemy() {
   $('teamHpFill').style.width = tPct + '%';
   $('teamHpText').textContent = '🛡 Team ' + Math.round(tHp) + ' / ' + Math.round(tMax);
 
+  /* The ultimate — charged by Mana Clash, spent as a team-wide burst. */
+  const ultPct = Math.max(0, Math.min(100, c.ultCharge || 0));
+  $('ultFill').style.width = ultPct + '%';
+  $('ultText').textContent = c.ultReady ? '⚡ ULTIMATE READY' : '⚡ Ultimate ' + Math.round(ultPct) + '%';
+  const ultBtn = $('ultBtn');
+  ultBtn.hidden = !c.ultReady;
+  ultBtn.disabled = ultBusy;
+
   /* Minion soak pool — only shown while a boss has some in play. */
   const m = c.minions || { hp: 0, maxHp: 0, count: 0 };
   const hasMin = m.count > 0 && m.maxHp > 0;
@@ -1452,6 +1489,8 @@ function coopLogText(log) {
     else if (t === 'second-wind-rounds') parts.push('SECOND WIND — bought more time!');
     else if (t.startsWith('ally:')) parts.push('allies struck for ' + val(t));
     else if (t.startsWith('regen:')) parts.push('regen +' + val(t));
+    else if (t.startsWith('crit:')) parts.push('CRITICAL HIT! (' + val(t) + ' of a kind)');
+    else if (t.startsWith('ultimate:')) parts.push('ULTIMATE — ' + val(t) + ' damage!');
   }
   return parts.length ? parts.join(' · ') : '';
 }
@@ -1482,6 +1521,31 @@ function renderIntermission() {
 }
 
 let boonBusy = false;
+let ultBusy = false;
+
+/* Fires the ultimate. No vote, unlike a boon — there is no downside to
+   using it, so nothing needs coordinating. */
+async function useUltimate() {
+  if (ultBusy) return;
+  ultBusy = true;
+  $('ultBtn').disabled = true;
+  fireUltimateBeam();
+  await act({ action: 'use-ultimate', code: roomCode }, 'gameFeedback');
+  ultBusy = false;
+}
+
+/* One rising flash over the enemy, then gone. Fired the moment the player
+   presses the button rather than waiting on the next poll, so it reads as
+   an action they took, not something that happened to arrive. */
+function fireUltimateBeam() {
+  const beam = $('ultBeam');
+  beam.classList.remove('firing');
+  void beam.offsetWidth;   // forced reflow — restarts the animation on a rapid re-trigger
+  beam.hidden = false;
+  beam.classList.add('firing');
+  setTimeout(() => { beam.hidden = true; beam.classList.remove('firing'); }, 900);
+}
+
 function renderBoonPicker(boons) {
   const picker = $('boonPicker');
   const c = state.coop;
@@ -1979,6 +2043,7 @@ $('rollBtn').addEventListener('click', () => {
   act({ action: 'roll', code: roomCode }, 'gameFeedback');
 });
 $('bankBtn').addEventListener('click', () => act({ action: 'bank', code: roomCode }, 'gameFeedback'));
+$('ultBtn').addEventListener('click', useUltimate);
 $('keepBtn').addEventListener('click', () => {
   const indices = [...held];
   held.clear();

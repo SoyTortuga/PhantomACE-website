@@ -641,12 +641,188 @@ function coopVoteRoom(ids) {
   check('and it holds for a solo run too', soloView.players[0].kept, ['G', 'G', 'G']);
 }
 
+/* ══ Critical hits — 4/5/6 of a kind amplify the round's damage ═══════ */
+
+/* enemyMaxHp is kept small enough here that the round's damage always
+   clears the "barely scratched it" anti-stall threshold (4% of max HP) —
+   otherwise the enemy's own self-heal would mask the crit math entirely,
+   since 100-300 damage against a 10,000 HP enemy reads as a stall. */
+
+/* Three of a kind is not a crit — the baseline everything else compares to. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 2000, enemyMaxHp: 2000, enemyAttack: 0 } },
+    { pending: 100, kept: ['W', 'W', 'W'], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('three of a kind deals plain damage, no crit', room.coop.enemyHp, 1900);
+  ok('and logs no crit tag', !(room.coop.log || []).some(t => t.startsWith('crit:')));
+}
+
+/* Four of a kind: x1.5. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 2000, enemyMaxHp: 2000, enemyAttack: 0 } },
+    { pending: 100, kept: ['W', 'W', 'W', 'W'], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('four of a kind crits for 1.5x', room.coop.enemyHp, 2000 - 150);
+  ok('and logs the crit tier', (room.coop.log || []).includes('crit:4'));
+}
+
+/* Five of a kind: x2. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 2000, enemyMaxHp: 2000, enemyAttack: 0 } },
+    { pending: 100, kept: ['W', 'W', 'W', 'W', 'W'], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('five of a kind crits for 2x', room.coop.enemyHp, 2000 - 200);
+  ok('and logs the crit tier', (room.coop.log || []).includes('crit:5'));
+}
+
+/* Six of a kind: x3 — the ceiling. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 2000, enemyMaxHp: 2000, enemyAttack: 0 } },
+    { pending: 100, kept: ['W', 'W', 'W', 'W', 'W', 'W'], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('six of a kind crits for 3x', room.coop.enemyHp, 2000 - 300);
+  ok('and logs the crit tier', (room.coop.log || []).includes('crit:6'));
+}
+
+/* Crit is a personal feat, but the team shares the best one landed. */
+{
+  const room = coopRoom(
+    { coop: { enemyHp: 2000, enemyMaxHp: 2000, enemyAttack: 0 } },
+    { pending: 100, kept: ['W', 'W', 'W'], done: null });   // host: no crit alone
+  room.players.p2 = { displayName: 'P2', profileImage: null, ready: true, total: 0, turn: {
+    pending: 50, dice: [], kept: ['R', 'R', 'R', 'R', 'R', 'R'], remaining: 6,
+    awaitingSelection: false, done: 'banked', gained: 50, event: null, deadline: null,
+  } };
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });   // host banks last, resolving the round
+  const after = e.MARKETPLACE.read('mc_room_AAAA');
+  // raw = 100 + 50 = 150, amplified by p2's six-of-a-kind (x3) = 450.
+  check('the best crit across the team applies to the team’s total', after.coop.enemyHp, 2000 - 450);
+}
+
+/* ══ The ultimate — charged by Mana Clash, spent for a team-wide burst ═══ */
+
+/* Rolling into hot dice charges it, through the real roll handler. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopLobby(1) }) };
+  await POST(e, { action: 'start-game', code: 'AAAA' }, cookie('p1'));
+  const realRandom = Math.random;
+  const queue = [0.05, 0.20, 0.38, 0.55, 0.71, 0.90];   // one of each face -> a scoring straight
+  let qi = 0;
+  Math.random = () => (qi < queue.length ? queue[qi++] : realRandom());
+  await POST(e, { action: 'roll', code: 'AAAA' }, cookie('p1'));
+  Math.random = realRandom;
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the forced roll actually hot-diced', room.players.p1.turn.event === 'clash');
+  check('Mana Clash charges the ultimate', room.coop.ultCharge, 2.5);
+}
+
+/* Emptying the hand via keep (the OTHER hot-dice path) also charges it. */
+{
+  // The leftover dice must themselves score for the keep to be accepted —
+  // two 1s ('C') do, each as a single, unlike two 2s ('W') which score nothing.
+  const room = coopRoom({ coop: { ultCharge: 10 } },
+    { dice: ['C', 'C'], kept: ['W', 'W', 'W'], remaining: 2, awaitingSelection: true, pending: 100, done: null });
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room }) };
+  await POST(e, { action: 'keep', code: 'AAAA', indices: [0, 1] });   // keeps the last 2 dice, empties the hand
+  const after = e.MARKETPLACE.read('mc_room_AAAA');
+  check('emptying the hand also charges the ultimate', after.coop.ultCharge, 12.5);
+}
+
+/* The charge cannot exceed the cap. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopLobby(1) }) };
+  await POST(e, { action: 'start-game', code: 'AAAA' }, cookie('p1'));
+  const room0 = e.MARKETPLACE.read('mc_room_AAAA');
+  room0.coop.ultCharge = 99;
+  await e.MARKETPLACE.put('mc_room_AAAA', JSON.stringify(room0));
+  const realRandom = Math.random;
+  const queue = [0.05, 0.20, 0.38, 0.55, 0.71, 0.90];
+  let qi = 0;
+  Math.random = () => (qi < queue.length ? queue[qi++] : realRandom());
+  await POST(e, { action: 'roll', code: 'AAAA' }, cookie('p1'));
+  Math.random = realRandom;
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('the charge clamps at the cap, not past it', room.coop.ultCharge, 100);
+}
+
+/* Versus has no ultimate to charge -- a hot dice roll there is a no-op for it. */
+{
+  const env = { MARKETPLACE: fakeKV() };
+  const made = await (await POST(env, { action: 'create-room', goal: 10000, idleMs: 30000, practice: true })).json();
+  const code = made.code;
+  await POST(env, { action: 'ready', code, ready: true });
+  await POST(env, { action: 'start-game', code });
+  const realRandom = Math.random;
+  const queue = [0.05, 0.20, 0.38, 0.55, 0.71, 0.90];
+  let qi = 0;
+  Math.random = () => (qi < queue.length ? queue[qi++] : realRandom());
+  const res = await POST(env, { action: 'roll', code });
+  Math.random = realRandom;
+  ok('a versus hot-dice roll does not error', res.status === 200);
+  const room = env.MARKETPLACE.read('mc_room_' + code);
+  ok('and there is no coop block to have charged', !room.coop);
+}
+
+/* use-ultimate refuses below full charge. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom({ coop: { ultCharge: 99.9 } }) }) };
+  const res = await POST(e, { action: 'use-ultimate', code: 'AAAA' });
+  check('refused while not fully charged', res.status, 400);
+}
+
+/* use-ultimate refuses mid boon-vote. */
+{
+  const room = coopVoteRoom(['p1']);
+  room.coop.ultCharge = 100;
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room }) };
+  const res = await POST(e, { action: 'use-ultimate', code: 'AAAA' }, cookie('p1'));
+  check('refused while a boon vote is open', res.status, 400);
+}
+
+/* use-ultimate: the burst, the heal, and spending the charge. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, teamHp: 20, teamMaxHp: 100, ultCharge: 100 } }) }) };
+  const res = await (await POST(e, { action: 'use-ultimate', code: 'AAAA' })).json();
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('the burst deals 25% of current HP', room.coop.enemyHp, 10000 - 2500);
+  check('the team is fully healed', room.coop.teamHp, 100);
+  check('the charge is spent', room.coop.ultCharge, 0);
+  ok('the view carries the burst amount', res.success === true);
+  ok('and logs it', (room.coop.log || []).includes('ultimate:2500'));
+}
+
+/* A lethal ultimate clears the enemy exactly like a lethal bank does.
+   HP 1 is deliberate: ceil(1 * 0.25) = 1, so the burst is guaranteed to be
+   at least the enemy's whole remaining HP. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 1, enemyMaxHp: 1, ultCharge: 100, wave: 1 } }) }) };
+  await POST(e, { action: 'use-ultimate', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the enemy is cleared', room.coop.cleared === 1);
+  ok('a boon is offered, same as any other clear', room.coop.awaitingBoon === true);
+}
+
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
 {
   const api = fs.readFileSync(path.join(REPO, 'functions/api/mana-clash.js'), 'utf8');
   ok('endRound branches to co-op resolution', /room\.mode === 'coop'\) return endRoundCoop/.test(api));
   ok('enemies scale and escalate to a final boss', /COOP_FINAL_WAVE/.test(api) && /function coopSpawn/.test(api));
   ok('co-op is not ranked (no leaderboard)', /function isRanked[\s\S]*goal === RANKED_GOAL/.test(api));
+
+  ok('critical hits are wired into the round resolution', /coopCritInfo\(room\)/.test(api));
+  ok('the ultimate is charged from Mana Clash, not damage', /coopGainUltCharge\(r, COOP_ULT_CHARGE_PER_CLASH\)/.test(api));
+  ok('a lethal ultimate reuses the shared clear path', /coopClearEnemy\(r, now, burst, before/.test(api));
 
   const game = fs.readFileSync(path.join(REPO, 'games/mana-clash/index.html'), 'utf8');
   ok('the client offers co-op and shows the enemy', /coop/i.test(game));

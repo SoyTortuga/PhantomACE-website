@@ -224,6 +224,20 @@ const COOP_OVERKILL_CARRY = 0.5;     // share of overkill that spills to the nex
 const COOP_SECOND_WIND_HP_PCT = 0.4; // team HP restored when a wipe is cheated
 const COOP_SECOND_WIND_ROUNDS = 3;   // rounds granted when a timeout is cheated
 
+/* Critical hits: banking 4/5/6 of the same face this turn amplifies the
+   round's damage. Keyed by the run length so a look-up is a plain object
+   read, no branching on top of the branching endRoundCoop already does. */
+const COOP_CRIT_MULT = { 4: 1.5, 5: 2, 6: 3 };
+
+/* The ultimate: a shared, run-long charge (not per-enemy — it is worth
+   saving for a boss) fed by MANA CLASH itself, the moment every die on the
+   table scores and the team gets to reroll all six. It is a rarer, more
+   exciting trigger than "damage dealt" and ties the ultimate to a dice
+   event rather than a second damage-based economy layered on the first. */
+const COOP_ULT_MAX = 100;
+const COOP_ULT_CHARGE_PER_CLASH = 2.5;
+const COOP_ULT_BURST_PCT = 0.25;     // of the enemy's CURRENT hp, not max — always a real chunk of what's left
+
 /* Between-wave boons — the team picks one of three after every clear, building
    a run. Effects accumulate on room.coop.boons; some apply immediately. */
 const COOP_BOONS = [
@@ -276,6 +290,30 @@ function coopApplyBoon(c, id) {
   }
   b.taken.push(id);
   return true;
+}
+
+/* Bank a clear: counts it, captures overkill spill into the next enemy,
+   fully heals the team, and opens the boon vote. Shared by the ordinary
+   round-resolution path (endRoundCoop, below) and the ultimate's burst
+   (use-ultimate) — a lethal ultimate has to end an enemy exactly the same
+   way a lethal bank does, not a second, easily-drifting copy of this. */
+function coopClearEnemy(room, now, dealt, before, log) {
+  const c = room.coop;
+  c.cleared += 1;
+  if (c.isFinal) c.victory = true;   // milestone flag; the gauntlet plays on
+  c.justCleared = true;
+  c.carryover = Math.max(0, Math.round((dealt - before) * COOP_OVERKILL_CARRY));
+  c.teamHp = c.teamMaxHp;             // clearing an enemy fully restores the team
+  c.log = log;
+  c.awaitingBoon = true;
+  c.pendingBoons = coopOfferBoons(c);
+  c.boonVotes = {};                   // userId → boon id, tallied when everyone has voted
+  /* Resolved early once everyone votes; force-resolved with whatever exists
+     once this passes, so one AFK player can't hold the run open forever.
+     See coopResolveBoonVote and its call from advance(). */
+  c.boonVoteDeadline = now + COOP_BOON_VOTE_MS;
+  room.status = 'intermission';
+  room.intermissionEndsAt = null;    // no auto-advance until the vote resolves
 }
 
 /* Tally the current votes and apply the winner — shared by choose-boon
@@ -460,6 +498,7 @@ function coopInit(room) {
     cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false,
     teamMaxHp: teamMax, teamHp: teamMax, teamHpBonus: 0, log: [],
     boons: coopBoonDefaults(), carryover: 0, awaitingBoon: false, pendingBoons: null,
+    ultCharge: 0,   // run-long, not per-enemy — deliberately worth saving for a boss
   };
   coopSpawn(room, 1);
 }
@@ -482,6 +521,38 @@ function coopTrios(room) {
     for (let f = 1; f <= 6; f++) t[f] += Math.floor((counts[f] || 0) / 3);
   }
   return t;
+}
+
+/* The biggest same-face run any ONE player banked this turn — a personal
+   feat, unlike the colour trios above, which pool across the whole team.
+   Four, five or six of a kind is a CRITICAL HIT; anything smaller doesn't
+   qualify. Best across the team wins (the round either crit or it didn't),
+   counted the same way coopTrios does — across every keep this turn, not
+   just the most recent one, so two separate keeps of the same face still
+   add up to the run that matters. */
+function coopCritInfo(room) {
+  let best = 0;
+  for (const p of Object.values(room.players)) {
+    const turn = p.turn;
+    if (!turn || (turn.done !== 'banked' && turn.done !== 'timeout')) continue;
+    const counts = {};
+    for (const d of (turn.kept || [])) {
+      const f = typeof d === 'number' ? d : FACE_VALUE[d];
+      if (f) counts[f] = (counts[f] || 0) + 1;
+    }
+    for (const n of Object.values(counts)) if (n > best) best = n;
+  }
+  return { n: COOP_CRIT_MULT[best] ? best : 0, mult: COOP_CRIT_MULT[best] || 1 };
+}
+
+/* Ultimate charge is gained the moment Mana Clash itself fires — every die
+   on the table scoring, the rarest roll event in the game — not from
+   ordinary damage, so it stays a distinct, exciting trigger rather than a
+   second damage economy layered on the first. Guarded on co-op: versus has
+   no ultimate, and this is called from the shared roll/keep handlers. */
+function coopGainUltCharge(room, amount) {
+  if (room.mode !== 'coop' || !room.coop) return;
+  room.coop.ultCharge = Math.min(COOP_ULT_MAX, (room.coop.ultCharge || 0) + amount);
 }
 
 /* The hit the enemy (plus any minions) will land next round, enrage included —
@@ -552,9 +623,13 @@ function endRoundCoop(room, now) {
   for (const p of Object.values(room.players)) raw += (p.turn && p.turn.gained) || 0;
   const trios = coopTrios(room);
 
-  /* 2. Zealotry boon then a standing Green buff amplify this round's hit. */
+  /* 2. Zealotry boon, a standing Green buff, then a CRITICAL HIT amplify
+     this round's hit — banking 4/5/6 of the same face this turn (a
+     personal feat, best-of-the-team) hits for 1.5x/2x/3x. */
   let dmg = Math.round(raw * (1 + b.dmgMult));
   if (c.dmgBuffRounds > 0) dmg = Math.round(dmg * COOP_DMG_BUFF_MULT);
+  const crit = coopCritInfo(room);
+  if (crit.mult > 1) dmg = Math.round(dmg * crit.mult);
 
   /* 3. Colourless: piercing straight damage — ignores shield and minions. */
   const pierce = eff(1) * Math.ceil(c.enemyMaxHp * COOP_COLORLESS_PCT);
@@ -595,6 +670,7 @@ function endRoundCoop(room, now) {
   c.lastDamage = raw;
   c.lastDealt = dealt;
   if (weakTrios) log.push('weak:' + c.weakColor);
+  if (crit.n) log.push('crit:' + crit.n);
 
   /* 7. Apply the colour effects that heal now or seed later rounds. */
   if (eff(2)) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(eff(2) * COOP_WHITE_HEAL * (1 + b.healMult))); log.push('heal:' + eff(2)); }
@@ -609,21 +685,7 @@ function endRoundCoop(room, now) {
   /* 8. Enemy down — bank the clear, capture overkill spill, heal the team, and
      offer a boon before the next enemy (the run pauses until one is chosen). */
   if (c.enemyHp <= 0) {
-    c.cleared += 1;
-    if (c.isFinal) c.victory = true;   // milestone flag; the gauntlet plays on
-    c.justCleared = true;
-    c.carryover = Math.max(0, Math.round((dealt - before) * COOP_OVERKILL_CARRY));
-    c.teamHp = c.teamMaxHp;             // clearing an enemy fully restores the team
-    c.log = log;
-    c.awaitingBoon = true;
-    c.pendingBoons = coopOfferBoons(c);
-    c.boonVotes = {};                   // userId → boon id, tallied when everyone has voted
-    /* Resolved early once everyone votes; force-resolved with whatever
-       exists once this passes, so one AFK player can't hold the run open
-       forever. See coopResolveBoonVote and its call from advance(). */
-    c.boonVoteDeadline = now + COOP_BOON_VOTE_MS;
-    room.status = 'intermission';
-    room.intermissionEndsAt = null;    // no auto-advance until the vote resolves
+    coopClearEnemy(room, now, dealt, before, log);
     return;
   }
   c.justCleared = false;
@@ -1017,6 +1079,11 @@ export function viewFor(room, userId, now, opts = {}) {
         ? Math.max(0, room.coop.boonVoteDeadline - now) : 0,
       boons: (room.coop.boons && room.coop.boons.taken ? room.coop.boons.taken : []).slice(),
       secondWind: (room.coop.boons && room.coop.boons.secondWind) || 0,
+      /* The ultimate: a run-long meter fed by Mana Clash (hot dice), fired
+         with use-ultimate once full. */
+      ultCharge: Math.min(COOP_ULT_MAX, room.coop.ultCharge || 0),
+      ultMax: COOP_ULT_MAX,
+      ultReady: (room.coop.ultCharge || 0) >= COOP_ULT_MAX,
     } : null,
     ranked: isRanked(room),
     round: room.round,
@@ -1533,6 +1600,38 @@ export async function onRequestPost(context) {
     return json({ success: true, room: viewFor(room, userId, Date.now()) });
   }
 
+  /* ── use-ultimate (co-op) ─────────────────────────────────────────────
+     Any player may fire it once the shared meter is full — a team-wide
+     burst, not a vote: there is no downside to using it, so nothing needs
+     coordinating the way a boon pick does. A lethal burst clears the enemy
+     through the exact same path a lethal bank does (coopClearEnemy). */
+  if (body.action === 'use-ultimate') {
+    const { failed, room } = await withRoom(env, code, (r, now) => {
+      if (r.mode !== 'coop' || !r.coop) return json({ error: 'Not a co-op run.' }, 400);
+      if (!r.players[userId]) return json({ error: 'Join the room first.' }, 403);
+      if (r.coop.awaitingBoon) return json({ error: 'Choose a boon first.' }, 400);
+      if (r.status !== 'playing' && r.status !== 'intermission') return json({ error: 'Nothing to use it on right now.' }, 400);
+      if ((r.coop.ultCharge || 0) < COOP_ULT_MAX) return json({ error: 'The ultimate is not charged yet.' }, 400);
+
+      const c = r.coop;
+      const before = c.enemyHp;
+      const burst = Math.ceil(before * COOP_ULT_BURST_PCT);
+      c.enemyHp = Math.max(0, before - burst);
+      c.teamHp = c.teamMaxHp;            // the burst's other half: a full team heal
+      c.ultCharge = 0;
+      c.lastDealt = burst;
+
+      if (c.enemyHp <= 0) {
+        coopClearEnemy(r, now, burst, before, ['ultimate:' + burst]);
+      } else {
+        c.log = ['ultimate:' + burst];
+      }
+      return null;
+    });
+    if (failed) return failed;
+    return json({ success: true, room: viewFor(room, userId, Date.now()) });
+  }
+
   /* ── roll ─────────────────────────────────────────────────────────── */
   if (body.action === 'roll') {
     const { failed, room } = await withRoom(env, code, (r, now) => {
@@ -1560,13 +1659,15 @@ export async function onRequestPost(context) {
 
       if (isHotDice(t.dice)) {
         /* MANA CLASH. Every die scores, so there is nothing to choose and
-           nothing to be gained by making them click it. */
+           nothing to be gained by making them click it. Also the ultimate's
+           only fuel — see coopGainUltCharge. */
         t.pending += scoreSelection(t.dice).points;
         t.kept = t.kept.concat(t.dice);
         t.dice = [];
         t.remaining = DICE_COUNT;
         t.awaitingSelection = false;
         t.event = 'clash';
+        coopGainUltCharge(r, COOP_ULT_CHARGE_PER_CLASH);
         touch(r, t, now);
         return null;
       }
@@ -1614,6 +1715,7 @@ export async function onRequestPost(context) {
         t.dice = [];
         t.remaining = DICE_COUNT;
         t.event = 'clash';
+        coopGainUltCharge(r, COOP_ULT_CHARGE_PER_CLASH);
       }
 
       touch(r, t, now);
