@@ -821,6 +821,47 @@
     let audioCtx = null;
     let noiseBuffer = null;
 
+    /* The click sound is a real snare sample. It is decoded once, the actual
+       hit onset is found (the file has leading silence) and its level measured
+       so playback is normalised — then each click plays a short, tight slice
+       from the onset, cutting the long room tail so rapid clicking stays
+       crisp. Auto-adapts if the sample file is swapped. Falls back to the
+       synth snare until it has loaded (or if it fails to). */
+    const CLICK_SAMPLE = 'assets/audio/snare.mp3';
+    const CLICK_SLICE = 0.5;          // seconds of the hit to play
+    let clickBuffer = null, clickOnset = 0, clickGain = 1, clickLoading = false;
+
+    function loadClickSample() {
+      if (clickBuffer || clickLoading || !audioCtx) return;
+      clickLoading = true;
+      fetch(CLICK_SAMPLE)
+        .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+        .then(a => audioCtx.decodeAudioData(a))
+        .then(buf => {
+          const d = buf.getChannelData(0), sr = buf.sampleRate;
+          let onset = 0, peak = 0;
+          for (let i = 0; i < d.length; i++) { if (Math.abs(d[i]) > 0.03) { onset = i; break; } }
+          for (let i = onset; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; }
+          clickBuffer = buf;
+          clickOnset = onset / sr;
+          clickGain = peak > 0 ? Math.min(3.5, 0.6 / peak) : 1;
+        })
+        .catch(() => { /* keep the synth fallback */ })
+        .finally(() => { clickLoading = false; });
+    }
+
+    function playClickSample(t) {
+      const src = audioCtx.createBufferSource();
+      src.buffer = clickBuffer;
+      const g = audioCtx.createGain();
+      const fade = 0.05;
+      g.gain.setValueAtTime(clickGain, t);
+      g.gain.setValueAtTime(clickGain, t + CLICK_SLICE - fade);
+      g.gain.linearRampToValueAtTime(0.0001, t + CLICK_SLICE);
+      src.connect(g); g.connect(audioCtx.destination);
+      src.start(t, clickOnset, CLICK_SLICE);
+    }
+
     /* ~0.25s of white noise, made once and reused — the "wires" of the snare. */
     function getNoise() {
       if (noiseBuffer) return noiseBuffer;
@@ -873,8 +914,9 @@
       if (!soundOn) return;
       try {
         audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        loadClickSample();                                 /* decode the sample once, lazily */
         const t = audioCtx.currentTime;
-        if (kind === 'click') { playSnare(t); return; }   /* the skull is a snare */
+        if (kind === 'click') { clickBuffer ? playClickSample(t) : playSnare(t); return; }
 
         const o = audioCtx.createOscillator(), g = audioCtx.createGain();
         o.connect(g); g.connect(audioCtx.destination);
