@@ -48,6 +48,12 @@
     .enemy-track { position: relative; height: 18px; margin-top: 6px; background: #1a0000; border: 1px solid #3a0000; border-radius: 4px; overflow: hidden; }
     .enemy-track i { display: block; height: 100%; background: linear-gradient(90deg, #ff0000, #ff5a1f); transition: width 0.5s ease; }
     .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
+    .enemy-stage { display: flex; justify-content: center; align-items: flex-end; height: 104px; margin-bottom: 4px; }
+    .enemy-sprite { width: 96px; height: 96px; background-repeat: no-repeat; background-position: 0% 0%; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.7)); }
+    .enemy-sprite.hit { animation: enemy-hit 0.3s; }
+    @keyframes enemy-hit { 0%,100%{ transform: translateX(0);} 25%{ transform: translateX(-5px); filter: brightness(2);} 75%{ transform: translateX(5px);} }
+    #gameScreen { background-size: cover; background-position: center; }
+    @media (prefers-reduced-motion: reduce) { .enemy-sprite.hit { animation: none; } }
     .btn-lg { padding: 14px 38px; font-size: 15px; }
 
     .input, .select {
@@ -520,6 +526,7 @@
   <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
   <div class="final-banner" id="finalBanner" hidden>Final round — highest total wins</div>
   <div class="enemy-banner" id="enemyBanner" hidden>
+    <div class="enemy-stage"><div class="enemy-sprite" id="enemySprite"></div></div>
     <div class="enemy-head">
       <span class="enemy-name" id="enemyName">—</span>
       <span class="enemy-rounds" id="enemyRounds"></span>
@@ -1225,10 +1232,51 @@ function renderLobby() {
   $('startBtn').disabled = !everyoneReady || (!state.practice && state.playerCount < 2);
 }
 
+let enemyAnim = { slug: null, frames: 1, frame: 0, timer: null };
+function animateEnemy(slug, frames) {
+  const el = $('enemySprite');
+  if (!slug) {
+    el.style.display = 'none';
+    if (enemyAnim.timer) { clearInterval(enemyAnim.timer); enemyAnim.timer = null; }
+    enemyAnim.slug = null;
+    return;
+  }
+  el.style.display = 'block';
+  if (enemyAnim.slug === slug && enemyAnim.frames === frames) return;   // already running this one
+  enemyAnim.slug = slug;
+  enemyAnim.frames = Math.max(1, frames || 1);
+  enemyAnim.frame = 0;
+  el.style.backgroundImage = 'url(assets/enemies/' + slug + '.png)';
+  el.style.backgroundSize = (enemyAnim.frames * 100) + '% 100%';
+  el.style.backgroundPositionX = '0%';
+  if (enemyAnim.timer) { clearInterval(enemyAnim.timer); enemyAnim.timer = null; }
+  if (enemyAnim.frames > 1) {
+    enemyAnim.timer = setInterval(() => {
+      enemyAnim.frame = (enemyAnim.frame + 1) % enemyAnim.frames;
+      el.style.backgroundPositionX = (enemyAnim.frame * (100 / (enemyAnim.frames - 1))) + '%';
+    }, 150);
+  }
+}
+
+let lastEnemyHp = null;
 function renderEnemy() {
   const c = state.coop;
   const banner = $('enemyBanner');
   banner.hidden = false;
+
+  /* The sprite + background are optional: the server sends a slug/frames/bg
+     once the art is in place, and the banner works text-only until then. */
+  animateEnemy(c.enemySlug || null, c.enemyFrames || 1);
+  if (c.bg) $('gameScreen').style.backgroundImage =
+    'linear-gradient(rgba(0,0,0,0.62), rgba(0,0,0,0.62)), url(assets/backgrounds/' + c.bg + '.png)';
+
+  /* Flash the sprite when it just took damage. */
+  const spriteEl = $('enemySprite');
+  if (lastEnemyHp !== null && c.enemyHp < lastEnemyHp && spriteEl && c.enemySlug) {
+    spriteEl.classList.remove('hit'); void spriteEl.offsetWidth; spriteEl.classList.add('hit');
+  }
+  lastEnemyHp = c.enemyHp;
+
   const nameEl = $('enemyName');
   nameEl.textContent = (c.isFinal ? '☠ ' : c.isBoss ? '⚔ ' : '') + c.enemyName;
   nameEl.className = 'enemy-name' + (c.isFinal ? ' final' : c.isBoss ? ' boss' : '');
@@ -1404,6 +1452,8 @@ function render() {
     $('goalNum').textContent = state.goal.toLocaleString();
     $('finalBanner').hidden = !state.isFinalRound;
     $('enemyBanner').hidden = true;
+    $('gameScreen').style.backgroundImage = '';
+    animateEnemy(null);
   }
   renderStandings();
   renderRoundProgress();

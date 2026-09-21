@@ -192,27 +192,75 @@ function contenders(room) {
 const COOP_BASE_HP = 1500;
 const COOP_GROWTH = 1.25;
 const COOP_FINAL_WAVE = 20;
-const COOP_NORMAL_NAMES = [
-  'Bone Rattler', 'Grave Wretch', 'Ashen Ghoul', 'Crypt Lurker', 'Pale Revenant',
-  'Rotting Thrall', 'Cinder Wraith', 'Hollow Knight', 'Marrow Hound', 'Dust Shade',
-  'Gravemoss Crawler', 'Tattered Phantom', 'Sallow Fiend', 'Withered Acolyte',
-];
-const COOP_BOSS_NAMES = ['The Gravekeeper', 'Marrow Tyrant', 'The Pale Warden', 'Ossuary Colossus'];
-const COOP_FINAL_NAME = 'The Bone Sovereign';
 
-function coopEnemyName(wave, isBoss, isFinal) {
-  if (isFinal) return COOP_FINAL_NAME;
-  if (wave > COOP_FINAL_WAVE) return 'Nightmare ' + (wave - COOP_FINAL_WAVE);
-  if (isBoss) return COOP_BOSS_NAMES[(Math.floor(wave / 5) - 1) % COOP_BOSS_NAMES.length];
-  return COOP_NORMAL_NAMES[(wave - 1) % COOP_NORMAL_NAMES.length];
+/* The enemy roster — real art from the itch.io packs, keyed by slug with its
+   idle-strip frame count so the client can animate it. Generated from
+   games/mana-clash/assets/enemies/manifest.json. */
+const COOP_ROSTER = {
+  normal: [
+    { slug: 'bat', name: 'Bat', frames: 9 },
+    { slug: 'boar', name: 'Boar', frames: 4 },
+    { slug: 'character', name: 'Adventurer', frames: 4 },
+    { slug: 'devil', name: 'Devil', frames: 4 },
+    { slug: 'gingerbread', name: 'Gingerbread', frames: 4 },
+    { slug: 'golem-blue', name: 'Blue Golem', frames: 8 },
+    { slug: 'golem-orange', name: 'Orange Golem', frames: 8 },
+    { slug: 'kid-ghost', name: 'Kid Ghost', frames: 4 },
+    { slug: 'nasta', name: 'Nasta', frames: 4 },
+    { slug: 'pig', name: 'Pig', frames: 4 },
+    { slug: 'piggy', name: 'Piggy', frames: 4 },
+    { slug: 'reindeer', name: 'Reindeer', frames: 4 },
+    { slug: 'reindeer-phurold', name: 'Phurold Reindeer', frames: 4 },
+    { slug: 'reindeer-rudolph', name: 'Rudolph Reindeer', frames: 4 },
+    { slug: 'skeleton', name: 'Skeleton', frames: 4 },
+    { slug: 'skeleton-white', name: 'White Skeleton', frames: 12 },
+    { slug: 'skeleton-yellow', name: 'Yellow Skeleton', frames: 12 },
+    { slug: 'slime', name: 'Slime', frames: 4 },
+    { slug: 'snowman-a', name: 'Snowman', frames: 4 },
+    { slug: 'snowman-b', name: 'Frost Snowman', frames: 4 },
+    { slug: 'snowman-c', name: 'Grim Snowman', frames: 4 },
+    { slug: 'snowman-d', name: 'Coal Snowman', frames: 4 },
+    { slug: 'snowman-e', name: 'Icy Snowman', frames: 4 },
+    { slug: 'snowman-f', name: 'Cursed Snowman', frames: 4 },
+    { slug: 'snowman-g', name: 'Wicked Snowman', frames: 4 },
+    { slug: 'witch-doctor', name: 'Witch Doctor', frames: 4 },
+  ],
+  boss: [
+    { slug: 'boss-badger', name: 'Badger', frames: 5 },
+    { slug: 'boss-cat', name: 'Gunslinger Cat', frames: 5 },
+    { slug: 'boss-dino-rex', name: 'Dino Rex', frames: 5 },
+    { slug: 'boss-dino-tri', name: 'Dino Tri', frames: 6 },
+    { slug: 'boss-frogger', name: 'Frogger', frames: 5 },
+    { slug: 'boss-gollux', name: 'Gollux', frames: 5 },
+    { slug: 'boss-pengu', name: 'Pengu', frames: 5 },
+    { slug: 'demon-slime', name: 'Demon Slime', frames: 6 },
+    { slug: 'necromancer', name: 'Necromancer', frames: 8 },
+  ],
+  final: { slug: 'bringer-of-death', name: 'Bringer of Death', frames: 8 },
+};
+const COOP_BACKGROUNDS = ['cave', 'dead-forest', 'dock', 'plains', 'snowy-mountains'];
+
+/* Which enemy stands at `wave` — deterministic so every client agrees. Final
+   boss at wave 20; a boss every fifth wave (cycling the boss roster); a
+   spread pick from the normal roster otherwise. Past the final boss it keeps
+   cycling into ever-tougher Nightmare waves. */
+function coopPick(wave) {
+  if (wave === COOP_FINAL_WAVE) return Object.assign({ tier: 'final' }, COOP_ROSTER.final);
+  if (wave % 5 === 0) {
+    const b = COOP_ROSTER.boss[(Math.floor(wave / 5) - 1) % COOP_ROSTER.boss.length];
+    return Object.assign({ tier: 'boss' }, b);
+  }
+  const n = COOP_ROSTER.normal[(wave * 7) % COOP_ROSTER.normal.length];
+  return Object.assign({ tier: 'normal' }, n);
 }
 
 /* Set the room's current enemy for `wave`. HP grows with the wave and scales
    with the party size (each extra player is another turn of damage a round),
    so a full team faces a real fight rather than a pushover. */
 function coopSpawn(room, wave) {
-  const isFinal = wave === COOP_FINAL_WAVE;
-  const isBoss = !isFinal && wave % 5 === 0;
+  const pick = coopPick(wave);
+  const isFinal = pick.tier === 'final';
+  const isBoss = pick.tier === 'boss';
   const players = Math.max(1, Object.keys(room.players).length);
   let hp = COOP_BASE_HP * Math.pow(COOP_GROWTH, wave - 1);
   if (isBoss) hp *= 2.6;
@@ -221,12 +269,15 @@ function coopSpawn(room, wave) {
   hp *= (0.5 + 0.5 * players);                    // party scaling
   hp = Math.ceil(hp / 100) * 100;
   room.coop.wave = wave;
-  room.coop.enemyName = coopEnemyName(wave, isBoss, isFinal);
+  room.coop.enemyName = wave > COOP_FINAL_WAVE ? pick.name + ' (Nightmare ' + (wave - COOP_FINAL_WAVE) + ')' : pick.name;
+  room.coop.enemySlug = pick.slug;
+  room.coop.enemyFrames = pick.frames;
   room.coop.enemyMaxHp = hp;
   room.coop.enemyHp = hp;
   room.coop.roundsLeft = isFinal ? 6 : isBoss ? 5 : 3;
   room.coop.isBoss = isBoss;
   room.coop.isFinal = isFinal;
+  room.coop.bg = COOP_BACKGROUNDS[(wave - 1) % COOP_BACKGROUNDS.length];
 }
 
 function coopInit(room) {
@@ -519,6 +570,9 @@ export function viewFor(room, userId, now, opts = {}) {
       wave: room.coop.wave,
       cleared: room.coop.cleared,
       enemyName: room.coop.enemyName,
+      enemySlug: room.coop.enemySlug || null,
+      enemyFrames: room.coop.enemyFrames || 1,
+      bg: room.coop.bg || null,
       enemyHp: Math.max(0, Math.round(room.coop.enemyHp)),
       enemyMaxHp: Math.round(room.coop.enemyMaxHp),
       roundsLeft: room.coop.roundsLeft,

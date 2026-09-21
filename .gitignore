@@ -26,6 +26,10 @@ games/skull-clicker/assets/buildings/
 # Raid-boss source art (aseprite + raw sheets). The flattened strips the game
 # actually loads live in games/skull-clicker/assets/raid/ and ARE tracked.
 games/skull-clicker/assets/Undead executioner/
+# Mana Clash co-op enemy + background art (licensed itch.io packs). Normalized
+# strips the game loads; gitignored like dino-assets, copied to the rig.
+games/mana-clash/assets/enemies/
+games/mana-clash/assets/backgrounds/
 
 # Scratch output from asset extraction runs
 _tile_*.png

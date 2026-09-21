@@ -33,6 +33,7 @@ non-goals list. Do not improvise around it.
 | Process supervision | **None yet.** No pm2 service, no phantomace service. `pm2 startup` does not support Windows — use NSSM |
 | Dino Park assets | `games/dino-park/assets/dino-assets/` — 72 MB, 829 files, **gitignored but required** |
 | Skull Clicker sprites | `games/skull-clicker/assets/buildings/` — 15 PNGs, **gitignored but required** (same licensed packs; copy alongside dino-assets) |
+| Mana Clash co-op art | `games/mana-clash/assets/enemies/` + `.../backgrounds/` — licensed itch.io enemy/boss sprites + backgrounds, **gitignored but required** (copy alongside dino-assets) |
 
 ## Your Scope
 
