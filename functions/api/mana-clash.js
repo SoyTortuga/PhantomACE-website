@@ -79,6 +79,7 @@ function chatAllowed(player, now) {
 const MAX_PLAYERS = 100;
 const INTERMISSION_MS = 10000;
 const COOP_INTERMISSION_MS = 5000;   // co-op has no standings race to read — keep the pace up
+const COOP_BOON_VOTE_MS = 20000;     // an AFK vote resolves with whatever votes exist, not never
 const GOALS = [5000, 10000, 20000];
 const IDLE_CHOICES = [10000, 30000, 60000];
 
@@ -275,6 +276,35 @@ function coopApplyBoon(c, id) {
   }
   b.taken.push(id);
   return true;
+}
+
+/* Tally the current votes and apply the winner — shared by choose-boon
+   (once everyone has voted) and advance() (once the vote's deadline passes
+   regardless of who has). Ties, including "nobody voted at all" where
+   every tally sits at 0, break by offer order — there is always a winner
+   to fall back to, even out of zero votes. */
+function coopResolveBoonVote(r, now) {
+  const c = r.coop;
+  const offered = (c.pendingBoons || []).map(x => x.id);
+  const tally = {};
+  for (const id of Object.keys(r.players)) {
+    const vote = c.boonVotes && c.boonVotes[id];
+    if (vote) tally[vote] = (tally[vote] || 0) + 1;
+  }
+  let winner = offered[0], best = -1;
+  for (const opt of offered) {
+    const v = tally[opt] || 0;
+    if (v > best) { best = v; winner = opt; }
+  }
+  coopApplyBoon(c, winner);
+  c.lastBoon = winner;
+  c.awaitingBoon = false;
+  c.pendingBoons = null;
+  c.boonVotes = null;
+  c.boonVoteDeadline = null;
+  coopSpawn(r, c.wave + 1);
+  r.status = 'intermission';
+  r.intermissionEndsAt = now + COOP_INTERMISSION_MS;
 }
 
 /* The enemy roster — real art from the itch.io packs, keyed by slug with its
@@ -588,6 +618,10 @@ function endRoundCoop(room, now) {
     c.awaitingBoon = true;
     c.pendingBoons = coopOfferBoons(c);
     c.boonVotes = {};                   // userId → boon id, tallied when everyone has voted
+    /* Resolved early once everyone votes; force-resolved with whatever
+       exists once this passes, so one AFK player can't hold the run open
+       forever. See coopResolveBoonVote and its call from advance(). */
+    c.boonVoteDeadline = now + COOP_BOON_VOTE_MS;
     room.status = 'intermission';
     room.intermissionEndsAt = null;    // no auto-advance until the vote resolves
     return;
@@ -782,9 +816,18 @@ function advance(room, now) {
 
     if (room.status === 'intermission') {
       /* A co-op clear pauses here until the team picks a boon; there is no
-         clock to run down (intermissionEndsAt is null), so the next enemy
-         waits for the choose-boon action rather than for time. */
-      if (room.mode === 'coop' && room.coop && room.coop.awaitingBoon) break;
+         intermission clock to run down (intermissionEndsAt is null) while
+         this is open. It still has ITS OWN deadline though — force-resolve
+         with whatever votes exist once that passes, so one AFK player can't
+         hold the run open forever the way an unlimited wait would. */
+      if (room.mode === 'coop' && room.coop && room.coop.awaitingBoon) {
+        if (typeof room.coop.boonVoteDeadline === 'number' && now >= room.coop.boonVoteDeadline) {
+          coopResolveBoonVote(room, now);
+          changed = true;
+          continue;
+        }
+        break;
+      }
       if (room.intermissionEndsAt === null || now < room.intermissionEndsAt) break;
       startRound(room, now);
       changed = true;
@@ -866,16 +909,18 @@ function publicPlayer(id, p, { dice = false } = {}) {
     event: p.turn ? p.turn.event : null,
   };
 
-  /* OPT-IN, and only the overlay asks. Rounds are simultaneous, so at any
-     moment several players have dice on the table — the on-stream panel
-     shows them landing, which is the whole appeal of watching. The players'
-     own payload is left exactly as it was: the game page has never needed
-     anyone else's dice, and quietly widening what every client receives to
-     serve one spectator is how a contract drifts.
+  /* OPT-IN. The overlay always asks (viewFor's caller passes {dice:true});
+     viewFor also now forces it on for every player in CO-OP, because a team
+     deciding whether to chase a Blue trio or bank now needs to see what
+     colour everyone else is actually holding, not just their point total —
+     there's no opponent to hide a hand from. Versus keeps the old default
+     off: the game page has never needed an opponent's dice there, and
+     quietly widening what every client receives to serve one spectator (or
+     one mode) is how a contract drifts, so it stays a deliberate opt-in
+     rather than the default for everyone.
 
-     Nothing here is secret. Dice are rolled face up; every one of these
-     numbers is already on the screen of the player who rolled it, and the
-     overlay is pointed at a stream where they are visible anyway. */
+     Nothing here is secret regardless. Dice are rolled face up; every one
+     of these numbers is already on the screen of the player who rolled it. */
   if (dice && p.turn) {
     out.dice = Array.isArray(p.turn.dice) ? p.turn.dice.slice() : [];
     out.kept = Array.isArray(p.turn.kept) ? p.turn.kept.slice() : [];
@@ -900,8 +945,15 @@ function publicPlayer(id, p, { dice = false } = {}) {
  */
 export function viewFor(room, userId, now, opts = {}) {
   const me = room.players[userId];
+  /* Co-op always shows dice, to every player, not only the overlay. Versus
+     is a race between opponents, where a hidden hand is part of the tension
+     of "did they beat my total" — co-op has no opponent, only a team
+     deciding together whether to chase a Blue trio for another round or
+     bank now, and that decision needs to see what colour everyone else is
+     actually holding, not just their point total. */
+  const dice = !!opts.dice || room.mode === 'coop';
   const standings = Object.entries(room.players)
-    .map(([id, p]) => publicPlayer(id, p, opts))
+    .map(([id, p]) => publicPlayer(id, p, { ...opts, dice }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   const view = {
@@ -957,6 +1009,12 @@ export function viewFor(room, userId, now, opts = {}) {
       boonVotes: room.coop.awaitingBoon ? coopVoteTally(room.coop) : null,
       myVote: room.coop.awaitingBoon && room.coop.boonVotes ? (room.coop.boonVotes[userId] || null) : null,
       votesCast: room.coop.awaitingBoon && room.coop.boonVotes ? Object.keys(room.coop.boonVotes).filter(id => room.players[id]).length : 0,
+      /* Milliseconds left before an incomplete vote force-resolves — see
+         COOP_BOON_VOTE_MS / coopResolveBoonVote. Same "ms left" shape as
+         intermissionMsLeft, for the same reason: it survives a clock
+         disagreement between server and client. */
+      boonVoteMsLeft: room.coop.awaitingBoon && typeof room.coop.boonVoteDeadline === 'number'
+        ? Math.max(0, room.coop.boonVoteDeadline - now) : 0,
       boons: (room.coop.boons && room.coop.boons.taken ? room.coop.boons.taken : []).slice(),
       secondWind: (room.coop.boons && room.coop.boons.secondWind) || 0,
     } : null,
@@ -1464,25 +1522,11 @@ export async function onRequestPost(context) {
       r.coop.boonVotes = r.coop.boonVotes || {};
       r.coop.boonVotes[userId] = body.boon;
 
-      /* Resolve only when every current player has cast a vote. */
+      /* Resolve only when every current player has cast a vote; otherwise
+         the vote's own deadline (see advance()) is what moves this along. */
       const ids = Object.keys(r.players);
       if (!ids.every(id => r.coop.boonVotes[id])) return null;   // still waiting on votes
-
-      const tally = {};
-      for (const id of ids) tally[r.coop.boonVotes[id]] = (tally[r.coop.boonVotes[id]] || 0) + 1;
-      let winner = offered[0], best = -1;
-      for (const opt of offered) {                                // offer order breaks ties
-        const v = tally[opt] || 0;
-        if (v > best) { best = v; winner = opt; }
-      }
-      coopApplyBoon(r.coop, winner);
-      r.coop.lastBoon = winner;
-      r.coop.awaitingBoon = false;
-      r.coop.pendingBoons = null;
-      r.coop.boonVotes = null;
-      coopSpawn(r, r.coop.wave + 1);
-      r.status = 'intermission';
-      r.intermissionEndsAt = now + COOP_INTERMISSION_MS;
+      coopResolveBoonVote(r, now);
       return null;
     });
     if (failed) return failed;

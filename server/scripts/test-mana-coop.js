@@ -504,6 +504,65 @@ function coopVoteRoom(ids) {
   ok('the changed vote is the one counted', room.coop.boons.taken.includes('slayer'));
 }
 
+/* ── The vote has a deadline, so an AFK player can't hold it open forever ── */
+
+/* Not expired yet, and votes are incomplete: nothing forces a resolution. */
+{
+  const room = coopVoteRoom(['p1', 'p2']);
+  room.coop.boonVoteDeadline = Date.now() + 60000;   // well in the future
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room }) };
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'zeal' }, cookie('p1'));
+  const after = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('still waiting on p2 — the deadline has not passed', after.coop.awaitingBoon === true);
+}
+
+/* Expired, with only some players having voted: resolves on THEIR votes. */
+{
+  const room = coopVoteRoom(['p1', 'p2', 'p3']);
+  room.coop.boonVoteDeadline = Date.now() - 1000;    // already passed
+  room.coop.boonVotes = { p1: 'vigor' };             // p2, p3 never voted
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room }) };
+  // 'ready' is a neutral trigger here — it goes through withRoom (which
+  // runs advance() first) and is expected to refuse since the room isn't
+  // in the lobby; only the persisted STATE from advance() matters.
+  await POST(e, { action: 'ready', code: 'AAAA' }, cookie('p1'));
+  const after = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the vote resolved without waiting for p2/p3', after.coop.awaitingBoon === false);
+  ok('p1’s lone vote won it', after.coop.boons.taken.includes('vigor'));
+  check('and the run moved on to the next wave', after.coop.wave, 2);
+}
+
+/* Expired with NOBODY having voted: still resolves, to the first offer. */
+{
+  const room = coopVoteRoom(['p1', 'p2']);
+  room.coop.boonVoteDeadline = Date.now() - 1000;
+  room.coop.boonVotes = {};
+  const firstOffered = room.coop.pendingBoons[0].id;
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: room }) };
+  await POST(e, { action: 'ready', code: 'AAAA' }, cookie('p1'));
+  const after = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('an entirely unvoted deadline still resolves', after.coop.awaitingBoon === false);
+  ok('falling back to the first offered boon', after.coop.boons.taken.includes(firstOffered));
+}
+
+/* The deadline is actually set the moment a boon is first offered. */
+{
+  const before = Date.now();
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom({ coop: { enemyHp: 100, enemyMaxHp: 100 } }, { pending: 100 }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('a deadline is set on offer', typeof room.coop.boonVoteDeadline === 'number');
+  ok('roughly COOP_BOON_VOTE_MS out', room.coop.boonVoteDeadline >= before + 19000 && room.coop.boonVoteDeadline <= before + 21000);
+}
+
+/* The client-facing countdown, via viewFor. */
+{
+  const room = coopVoteRoom(['p1']);
+  room.coop.boonVoteDeadline = Date.now() + 12000;
+  const v = viewFor(room, 'p1', Date.now());
+  ok('the view reports roughly the time left', v.coop.boonVoteMsLeft > 11000 && v.coop.boonVoteMsLeft <= 12000);
+}
+
 /* ══ Enemies are randomized, not a fixed cycle ══════════════════════════ */
 
 /* Wave 20 is always the fixed final boss, regardless of randomness. */
@@ -561,6 +620,25 @@ function coopVoteRoom(ids) {
   await POST(e, { action: 'choose-boon', code: 'AAAA', boon: pick });
   room = e.MARKETPLACE.read('mc_room_AAAA');
   ok('the next enemy is never the one that was just cleared', room.coop.enemySlug !== before);
+}
+
+/* ══ Co-op shows every player's banked colours, not just your own ══════ */
+{
+  const room = coopVoteRoom(['p1', 'p2']);
+  room.players.p1.turn.kept = ['R', 'R', 'R'];
+  room.players.p2.turn.kept = ['W', 'W', 'W'];
+
+  const seenByP1 = viewFor(room, 'p1', Date.now());
+  const p2AsSeenByP1 = seenByP1.players.find(p => p.id === 'p2');
+  check('p1 can see what p2 banked', p2AsSeenByP1.kept, ['W', 'W', 'W']);
+  const p1AsSeenByP1 = seenByP1.players.find(p => p.id === 'p1');
+  check('and their own, same as always', p1AsSeenByP1.kept, ['R', 'R', 'R']);
+
+  // Solo co-op gets no special treatment here — there's simply nobody else
+  // to check, but the same opt-in applies to a lone player's own row too.
+  const solo = coopRoom({}, { kept: ['G', 'G', 'G'], done: null });
+  const soloView = viewFor(solo, '7', Date.now());
+  check('and it holds for a solo run too', soloView.players[0].kept, ['G', 'G', 'G']);
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */

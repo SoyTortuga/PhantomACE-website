@@ -881,6 +881,34 @@ async function playToFinish(env, code, hands) {
   check('a player in the room does get it', player.chat.length, 1);
 }
 
+/* ── VERSUS KEEPS DICE PRIVATE BETWEEN OPPONENTS ──────────────────────
+   Co-op turns this on for every player (there's no opponent to hide a hand
+   from); versus is a race between them, so the old default has to survive
+   that change untouched. Read through the real onRequestGet, not a direct
+   viewFor call, so this exercises exactly what a versus player's poll
+   actually receives. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: false });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+
+  // Give 'a' some kept dice directly, rather than threading a real roll.
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  room.players['101'].turn = room.players['101'].turn || {};
+  Object.assign(room.players['101'].turn, { kept: ['R', 'R', 'R'], dice: [], pending: 500, remaining: 3, awaitingSelection: false });
+  env._store.set('mc_room_' + code, JSON.stringify(room));
+
+  const seenByB = await get(env, 'b', `action=get-state&code=${code}`);
+  const ashAsSeenByB = seenByB.data.players.find(p => p.name === 'Ash');
+  check('an opponent’s kept dice are not sent', ashAsSeenByB.kept, undefined);
+  check('nor their live roll', ashAsSeenByB.dice, undefined);
+
+  // The overlay's explicit opt-in still works for versus, unchanged.
+  const overlayView = viewFor(JSON.parse(env._store.get('mc_room_' + code)), null, Date.now(), { dice: true });
+  check('the overlay can still ask for it explicitly', overlayView.players.find(p => p.name === 'Ash').kept, ['R', 'R', 'R']);
+}
+
 /* ── JOINING A GAME ALREADY RUNNING ──────────────────────────────────
    From zero, counting for the leaderboard like any other game. The round
    in progress is the hazard: roundIsOver waits for every player in the

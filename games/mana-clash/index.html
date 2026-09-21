@@ -223,6 +223,13 @@
     }
     .die.kept { width: 44px; height: 44px; border-color: #3a3a3a; }
     .die.kept img { width: 24px; height: 24px; }
+    /* Co-op only: a teammate's banked colours, shrunk to fit inside their
+       standings card. The pip number is unreadable at this size, so it's
+       hidden rather than squeezed. */
+    .die.mini { width: 16px; height: 16px; border-radius: 3px; border-width: 1px; }
+    .die.mini img { width: 9px; height: 9px; }
+    .die.mini .pip-num { display: none; }
+    .standing-kept { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 4px; }
 
     .tray-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--dim); text-align: center; }
     .kept-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 0; }
@@ -1053,7 +1060,7 @@ function initRules() {
 function dieEl(face, opts = {}) {
   const set = currentSet();
   const d = document.createElement('div');
-  d.className = 'die' + (opts.kept ? ' kept' : '') + (set.cls ? ' ' + set.cls : '');
+  d.className = 'die' + (opts.kept ? ' kept' : '') + (opts.mini ? ' mini' : '') + (set.cls ? ' ' + set.cls : '');
   /* The set may recolour the body; if it does not, the face keeps the
      colour it has always had. The number stays black and stays here. */
   d.style.background = (set.colours || DIE_COLOUR)[face] || '#141414';
@@ -1209,6 +1216,7 @@ function renderSpectate(spec) {
 function renderStandings() {
   const strip = $('standingsStrip');
   strip.innerHTML = '';
+  const coop = state.mode === 'coop';
   for (const p of state.players) {
     const el = document.createElement('div');
     el.className = 'standing' + (p.id === (state.you && state.you.id) ? ' me' : '') +
@@ -1217,6 +1225,16 @@ function renderStandings() {
     el.innerHTML = '<span class="nm">' + esc(p.name) + '</span>' +
                    '<span class="tot">' + p.total.toLocaleString() + '</span>' +
                    '<span class="st ' + out.cls + '">' + esc(out.text) + '</span>';
+    /* Co-op only: what colours this player has banked this round, so the
+       team can coordinate ("go Blue, we need the round" / "someone's
+       holding White for a heal") without asking. Server sends `kept` to
+       everyone in co-op; versus never gets it here at all. */
+    if (coop && Array.isArray(p.kept) && p.kept.length) {
+      const row = document.createElement('div');
+      row.className = 'standing-kept';
+      p.kept.forEach(f => row.appendChild(dieEl(f, { mini: true })));
+      el.appendChild(row);
+    }
     strip.appendChild(el);
   }
 }
@@ -1663,9 +1681,13 @@ function tick() {
   if (!state) return;
 
   if (state.status === 'intermission') {
-    /* A co-op boon choice has no clock — the next enemy waits on the pick. */
+    /* A co-op boon vote has its own clock, separate from the round
+       intermission one — it resolves on its own once everyone has voted OR
+       this runs out, whichever comes first, so an AFK teammate can't hold
+       the run open forever. */
     if (state.mode === 'coop' && state.coop && state.coop.awaitingBoon) {
-      $('intermissionCount').textContent = '';
+      const left = Math.max(0, state.coop.boonVoteEndsAt - (Date.now() + clockOffset));
+      $('intermissionCount').textContent = left > 0 ? 'Vote closes in ' + Math.ceil(left / 1000) + 's' : 'Resolving…';
       return;
     }
     const left = Math.max(0, state.intermissionEndsAt - (Date.now() + clockOffset));
@@ -1696,6 +1718,7 @@ function applyState(next) {
      runs smoothly between polls instead of jumping every poll. */
   if (next.you) next.you.deadlineAt = Date.now() + clockOffset + next.you.msLeft;
   next.intermissionEndsAt = Date.now() + clockOffset + next.intermissionMsLeft;
+  if (next.coop) next.coop.boonVoteEndsAt = Date.now() + clockOffset + (next.coop.boonVoteMsLeft || 0);
 
   /* A poll mid-selection must not wipe what the player has clicked, but a
      NEW roll seeds the selection from the server's suggestion — which is a
@@ -1982,6 +2005,33 @@ $('rematchBtn').addEventListener('click', async () => {
 $('againBtn').addEventListener('click', async () => {
   await api({ action: 'leave-room', code: roomCode }).catch(() => {});
   leaveToSplash('');
+});
+
+/* ── Leaving without clicking Leave ───────────────────────────────────────
+   Closing the tab, navigating away, or switching modes from the browser's
+   back button never ran leave-room at all — there was no listener for it.
+   In the lobby that leaves a stale player sitting in the roster forever:
+   nobody else's poll ever sees them go, "Not everyone is ready" never
+   clears, and the host has to notice and hit Remove by hand.
+
+   Scoped to the LOBBY only, on purpose. Mid-run a closed tab already has a
+   correct, gentler fallback — the turn/idle clock times it out — and
+   actually removing someone from an in-progress co-op run because they
+   reloaded the page would cost them their spot in the team for nothing.
+
+   pagehide over beforeunload/unload: it fires reliably on mobile Safari
+   and on a page entering the back/forward cache, where the older events
+   are inconsistent. sendBeacon is what makes this workable at all — a
+   normal fetch can be, and often is, cancelled by the browser the instant
+   the page starts navigating away. */
+window.addEventListener('pagehide', () => {
+  if (!roomCode || !state || state.status !== 'lobby') return;
+  try {
+    navigator.sendBeacon(API, new Blob(
+      [JSON.stringify({ action: 'leave-room', code: roomCode })],
+      { type: 'application/json' }
+    ));
+  } catch (e) { /* best effort — a missed beacon is what already happened before this existed */ }
 });
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
