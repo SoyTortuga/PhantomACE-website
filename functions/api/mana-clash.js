@@ -209,7 +209,7 @@ const COOP_TEAM_HP_BASE = 100;
 const COOP_TEAM_HP_PER_PLAYER = 50;
 const COOP_DMG_BUFF_MULT = 1.5;      // Green
 const COOP_GREEN_ROUNDS = 2;         // buff rounds per Green trio
-const COOP_WHITE_HEAL = 12;          // team HP per White trio
+const COOP_WHITE_HEAL = 25;          // team HP per White trio
 const COOP_ENRAGE_MULT = 1.75;       // attack up when cornered
 const COOP_MINION_ATK = 3;           // added enemy attack per living minion
 const COOP_POISON_PCT = 0.02;        // enemy maxHp lost per Poison stack per round
@@ -224,25 +224,37 @@ const COOP_OVERKILL_CARRY = 0.5;     // share of overkill that spills to the nex
 /* Between-wave boons — the team picks one of three after every clear, building
    a run. Effects accumulate on room.coop.boons; some apply immediately. */
 const COOP_BOONS = [
-  { id: 'vigor',  name: 'Vigor',        desc: '+30 max Team HP (and heal it)' },
-  { id: 'venom',  name: 'Venomcraft',   desc: 'Poison ticks 50% harder' },
-  { id: 'zeal',   name: 'Zealotry',     desc: '+12% team damage' },
-  { id: 'medic',  name: 'Field Medic',  desc: 'White healing +50%' },
-  { id: 'slayer', name: 'Giant Slayer', desc: '+1 round on every enemy' },
-  { id: 'purify', name: 'Purifier',     desc: 'Minions soak 15% less' },
-  { id: 'wind',   name: 'Second Wind',  desc: 'Once per run, cheat death' },
+  { id: 'vigor',   name: 'Vigor',        desc: '+30 max Team HP (and heal it)' },
+  { id: 'venom',   name: 'Venomcraft',   desc: 'Poison ticks 50% harder' },
+  { id: 'zeal',    name: 'Zealotry',     desc: '+12% team damage' },
+  { id: 'medic',   name: 'Field Medic',  desc: 'White healing +50%' },
+  { id: 'slayer',  name: 'Giant Slayer', desc: '+1 round on every enemy' },
+  { id: 'purify',  name: 'Purifier',     desc: 'Enemy minions soak 15% less' },
+  { id: 'wind',    name: 'Second Wind',  desc: 'Cheat death (stacks — one revive each)' },
+  { id: 'bulwark', name: 'Bulwark',      desc: 'Team takes 15% less damage' },
+  { id: 'army',    name: 'Conscripts',   desc: 'An ally strikes for 3% of enemy HP each round' },
+  { id: 'regen',   name: 'Regeneration', desc: 'Heal 8 Team HP every round' },
 ];
 function coopBoonDefaults() {
-  return { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: false, secondWindUsed: false, taken: [] };
+  return { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: 0,
+    dmgTakenMult: 1, allyPct: 0, regen: 0, taken: [] };
 }
-/* Three distinct boons on offer. Second Wind only appears once it isn't already
-   held (a second copy would do nothing). */
+/* Three distinct boons on offer. Every boon stacks without limit, so all seven
+   are always eligible — Second Wind included (each copy is another revive). */
 function coopOfferBoons(c) {
-  const pool = COOP_BOONS.filter(b => !(b.id === 'wind' && c.boons && c.boons.secondWind));
   const out = [];
-  const bag = pool.slice();
+  const bag = COOP_BOONS.slice();
   while (out.length < 3 && bag.length) out.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
   return out.map(b => ({ id: b.id, name: b.name, desc: b.desc }));
+}
+/* Vote counts per offered boon, for the client to show the live tally. */
+function coopVoteTally(c) {
+  const t = {};
+  for (const opt of (c.pendingBoons || [])) t[opt.id] = 0;
+  for (const id of Object.keys(c.boonVotes || {})) {
+    if (t[c.boonVotes[id]] !== undefined) t[c.boonVotes[id]] += 1;
+  }
+  return t;
 }
 function coopApplyBoon(c, id) {
   const b = c.boons;
@@ -253,7 +265,10 @@ function coopApplyBoon(c, id) {
     case 'medic':  b.healMult += 0.5; break;
     case 'slayer': b.roundsBonus += 1; break;
     case 'purify': b.soakReduce += 0.15; break;
-    case 'wind':   b.secondWind = true; break;
+    case 'wind':   b.secondWind = (b.secondWind || 0) + 1; break;      // stacks — one revive charge each
+    case 'bulwark': b.dmgTakenMult = (b.dmgTakenMult || 1) * 0.85; break;  // team shield, multiplicative
+    case 'army':    b.allyPct = (b.allyPct || 0) + 0.03; break;        // summoned ally damage per round
+    case 'regen':   b.regen = (b.regen || 0) + 8; break;              // heal each round
     default: return false;
   }
   b.taken.push(id);
@@ -528,7 +543,10 @@ function endRoundCoop(room, now) {
   const poisonDmg = c.poison * Math.ceil(c.enemyMaxHp * COOP_POISON_PCT * (1 + b.poisonMult));
   const weakTrios = c.weakColor ? (trios[c.weakColor] || 0) : 0;
   const weakBonus = weakTrios * Math.ceil(c.enemyMaxHp * COOP_WEAK_BONUS_PCT);
-  const dealt = Math.max(0, dmg) + pierce + poisonDmg + weakBonus;
+  /* Conscripts: summoned allies chip the enemy every round, regardless of dice. */
+  const allyDmg = (b.allyPct || 0) > 0 ? Math.ceil(c.enemyMaxHp * b.allyPct) : 0;
+  if (allyDmg) log.push('ally:' + allyDmg);
+  const dealt = Math.max(0, dmg) + pierce + poisonDmg + weakBonus + allyDmg;
   const before = c.enemyHp;
   c.enemyHp = Math.max(0, before - dealt);
   c.lastDamage = raw;
@@ -552,12 +570,13 @@ function endRoundCoop(room, now) {
     if (c.isFinal) c.victory = true;   // milestone flag; the gauntlet plays on
     c.justCleared = true;
     c.carryover = Math.max(0, Math.round((dealt - before) * COOP_OVERKILL_CARRY));
-    c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(c.teamMaxHp * 0.15));
+    c.teamHp = c.teamMaxHp;             // clearing an enemy fully restores the team
     c.log = log;
     c.awaitingBoon = true;
     c.pendingBoons = coopOfferBoons(c);
+    c.boonVotes = {};                   // userId → boon id, tallied when everyone has voted
     room.status = 'intermission';
-    room.intermissionEndsAt = null;    // no auto-advance until a boon is picked
+    room.intermissionEndsAt = null;    // no auto-advance until the vote resolves
     return;
   }
   c.justCleared = false;
@@ -570,9 +589,12 @@ function endRoundCoop(room, now) {
      when cornered on time or health. */
   let atk = c.enemyAttack + c.minions.count * COOP_MINION_ATK;
   if (c.roundsLeft <= 2 || c.enemyHp / c.enemyMaxHp < 0.25) { atk = Math.round(atk * COOP_ENRAGE_MULT); log.push('enrage'); }
+  atk = Math.round(atk * (b.dmgTakenMult || 1));   // Bulwark softens the blow
   c.teamHp -= atk;
   c.lastAttack = atk;
   log.push('hit:' + atk);
+  /* Regeneration heals a flat amount every round (after the hit lands). */
+  if (b.regen > 0) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + b.regen); log.push('regen:' + b.regen); }
 
   /* 11. If the team barely scratched it, the enemy regenerates (anti-stall). */
   if (dealt < c.enemyMaxHp * 0.04) {
@@ -598,8 +620,8 @@ function endRoundCoop(room, now) {
   /* 14. Loss checks — wiped, or out of time with the enemy still standing.
      Second Wind cheats death once, restoring the team to 40% instead. */
   if (c.teamHp <= 0) {
-    if (b.secondWind && !b.secondWindUsed) {
-      b.secondWindUsed = true;
+    if (b.secondWind > 0) {
+      b.secondWind -= 1;                // spend one revive charge
       c.teamHp = Math.max(1, Math.round(c.teamMaxHp * 0.4));
       c.log = log.concat('second-wind');
     } else {
@@ -902,11 +924,15 @@ export function viewFor(room, userId, now, opts = {}) {
       /* Telegraph: the hit the team should brace for next round. */
       nextAttack: coopNextAttack(room.coop),
       willEnrage: (room.coop.roundsLeft <= 2) || (room.coop.enemyMaxHp > 0 && room.coop.enemyHp / room.coop.enemyMaxHp < 0.25),
-      /* Between-wave boon choice, and the run's accumulated boons. */
+      /* Between-wave boon choice (a vote), and the run's accumulated boons. */
       awaitingBoon: !!room.coop.awaitingBoon,
       pendingBoons: room.coop.awaitingBoon && Array.isArray(room.coop.pendingBoons) ? room.coop.pendingBoons.slice() : null,
+      /* Live vote tallies per offered boon, this viewer's vote, and progress. */
+      boonVotes: room.coop.awaitingBoon ? coopVoteTally(room.coop) : null,
+      myVote: room.coop.awaitingBoon && room.coop.boonVotes ? (room.coop.boonVotes[userId] || null) : null,
+      votesCast: room.coop.awaitingBoon && room.coop.boonVotes ? Object.keys(room.coop.boonVotes).filter(id => room.players[id]).length : 0,
       boons: (room.coop.boons && room.coop.boons.taken ? room.coop.boons.taken : []).slice(),
-      secondWind: !!(room.coop.boons && room.coop.boons.secondWind && !room.coop.boons.secondWindUsed),
+      secondWind: (room.coop.boons && room.coop.boons.secondWind) || 0,
     } : null,
     ranked: isRanked(room),
     round: room.round,
@@ -1398,18 +1424,36 @@ export async function onRequestPost(context) {
     return json({ success: true, room: viewFor(room, userId, Date.now()) });
   }
 
-  /* ── choose-boon (co-op, between waves) ───────────────────────────── */
+  /* ── choose-boon (co-op, between waves) — a VOTE ──────────────────────
+     Each player votes for one of the three offered boons; the tally resolves
+     once everyone in the room has voted. Solo, that's a single vote. A player
+     may change their vote until it resolves. Ties break by offer order. */
   if (body.action === 'choose-boon') {
     const { failed, room } = await withRoom(env, code, (r, now) => {
       if (r.mode !== 'coop' || !r.coop || !r.coop.awaitingBoon) return json({ error: 'No boon to choose.' }, 400);
       if (!r.players[userId]) return json({ error: 'Join the room first.' }, 403);
       const offered = (r.coop.pendingBoons || []).map(x => x.id);
       if (!offered.includes(body.boon)) return json({ error: 'That boon is not on offer.' }, 400);
-      /* Any player in the room may pick — first choice wins, so a boon is never
-         blocked on one person. */
-      coopApplyBoon(r.coop, body.boon);
+
+      r.coop.boonVotes = r.coop.boonVotes || {};
+      r.coop.boonVotes[userId] = body.boon;
+
+      /* Resolve only when every current player has cast a vote. */
+      const ids = Object.keys(r.players);
+      if (!ids.every(id => r.coop.boonVotes[id])) return null;   // still waiting on votes
+
+      const tally = {};
+      for (const id of ids) tally[r.coop.boonVotes[id]] = (tally[r.coop.boonVotes[id]] || 0) + 1;
+      let winner = offered[0], best = -1;
+      for (const opt of offered) {                                // offer order breaks ties
+        const v = tally[opt] || 0;
+        if (v > best) { best = v; winner = opt; }
+      }
+      coopApplyBoon(r.coop, winner);
+      r.coop.lastBoon = winner;
       r.coop.awaitingBoon = false;
       r.coop.pendingBoons = null;
+      r.coop.boonVotes = null;
       coopSpawn(r, r.coop.wave + 1);
       r.status = 'intermission';
       r.intermissionEndsAt = now + COOP_INTERMISSION_MS;

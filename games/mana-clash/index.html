@@ -97,6 +97,9 @@
     .boon-card:disabled { opacity: 0.5; cursor: default; }
     .boon-card b { display: block; font-size: 14px; color: #d98fff; margin-bottom: 5px; }
     .boon-card span { font-size: 12px; color: var(--dim); line-height: 1.4; }
+    .boon-card.mine { border-color: #d98fff; background: #2a1440; }
+    .boon-vote-count { display: block; margin-top: 8px; font-size: 11px; font-weight: 800; color: #d98fff; }
+    .boon-progress { flex: 1 1 100%; text-align: center; font-size: 12px; color: var(--dim); margin-top: 2px; }
     .boon-wait { font-size: 12px; color: var(--dim); text-align: center; margin: 6px 0 14px; }
     .btn-lg { padding: 14px 38px; font-size: 15px; }
 
@@ -1323,6 +1326,7 @@ const COOP_COLORS = {
 const COOP_BOON_NAMES = {
   vigor: 'Vigor', venom: 'Venomcraft', zeal: 'Zealotry', medic: 'Field Medic',
   slayer: 'Giant Slayer', purify: 'Purifier', wind: 'Second Wind',
+  bulwark: 'Bulwark', army: 'Conscripts', regen: 'Regeneration',
 };
 
 let lastEnemyHp = null;
@@ -1386,6 +1390,7 @@ function renderEnemy() {
   if (c.buff > 0) chips.push('<span class="stat-chip buff">⚔ Dmg buff ' + c.buff + 'r</span>');
   if (c.shield) chips.push('<span class="stat-chip shield">🛡 Shield</span>');
   if ((c.log || []).includes('enrage')) chips.push('<span class="stat-chip enrage">😡 Enraged</span>');
+  if (c.secondWind > 0) chips.push('<span class="stat-chip buff">🕊 Second Wind ×' + c.secondWind + '</span>');
   $('enemyStatus').innerHTML = chips.join('');
 
   /* Telegraph: the hit coming next round, so the team can plan a defensive bank. */
@@ -1394,9 +1399,14 @@ function renderEnemy() {
     ? '⚠ Next hit: ' + na + (c.willEnrage ? ' (enraged)' : '') + (c.shield ? ' · it will be shielded' : '')
     : '';
 
-  /* Run-long boons the team has banked. */
+  /* Run-long boons the team has banked, collapsed to name ×count. */
   const boons = c.boons || [];
-  $('coopBoons').textContent = boons.length ? 'Boons: ' + boons.map(id => COOP_BOON_NAMES[id] || id).join(' · ') : '';
+  if (boons.length) {
+    const counts = {};
+    for (const id of boons) counts[id] = (counts[id] || 0) + 1;
+    const parts = Object.keys(counts).map(id => (COOP_BOON_NAMES[id] || id) + (counts[id] > 1 ? ' ×' + counts[id] : ''));
+    $('coopBoons').textContent = 'Boons: ' + parts.join(' · ');
+  } else $('coopBoons').textContent = '';
 
   $('combatLog').textContent = coopLogText(c.log || []);
 }
@@ -1421,6 +1431,8 @@ function coopLogText(log) {
     else if (t === 'shield-up') parts.push('it raised a shield');
     else if (t.startsWith('weak:')) { const col = COOP_COLORS[+val(t)]; parts.push('weakness struck (' + (col ? col.name : '?') + ' ×2)'); }
     else if (t === 'second-wind') parts.push('SECOND WIND — cheated death!');
+    else if (t.startsWith('ally:')) parts.push('allies struck for ' + val(t));
+    else if (t.startsWith('regen:')) parts.push('regen +' + val(t));
   }
   return parts.length ? parts.join(' · ') : '';
 }
@@ -1435,7 +1447,7 @@ function renderIntermission() {
   if (state.mode === 'coop' && state.coop) {
     const c = state.coop;
     if (c.awaitingBoon && Array.isArray(c.pendingBoons)) {
-      $('intermissionTitle').textContent = 'Enemy down — choose a boon';
+      $('intermissionTitle').textContent = state.playerCount > 1 ? 'Enemy down — vote for a boon' : 'Enemy down — choose a boon';
       renderBoonPicker(c.pendingBoons);
     } else {
       picker.hidden = true;
@@ -1453,22 +1465,33 @@ function renderIntermission() {
 let boonBusy = false;
 function renderBoonPicker(boons) {
   const picker = $('boonPicker');
+  const c = state.coop;
+  const votes = c.boonVotes || {};
+  const myVote = c.myVote || null;
+  const multi = state.playerCount > 1;
   picker.hidden = false;
   picker.innerHTML = '';
   for (const b of boons) {
     const card = document.createElement('button');
-    card.className = 'boon-card';
-    card.disabled = boonBusy;
-    card.innerHTML = '<b>' + b.name + '</b><span>' + b.desc + '</span>';
+    card.className = 'boon-card' + (myVote === b.id ? ' mine' : '');
+    const n = votes[b.id] || 0;
+    const badge = multi ? '<span class="boon-vote-count">' + (myVote === b.id ? '✓ ' : '') + n + (n === 1 ? ' vote' : ' votes') + '</span>' : '';
+    card.innerHTML = '<b>' + b.name + '</b><span>' + b.desc + '</span>' + badge;
     card.addEventListener('click', () => chooseBoon(b.id));
     picker.appendChild(card);
+  }
+  if (multi) {
+    const prog = document.createElement('div');
+    prog.className = 'boon-progress';
+    prog.textContent = (c.votesCast || 0) + ' / ' + state.playerCount + ' voted'
+      + (myVote ? ' · tap another to change your vote' : ' · tap a boon to vote');
+    picker.appendChild(prog);
   }
 }
 
 async function chooseBoon(id) {
-  if (boonBusy) return;
+  if (boonBusy || (state.coop && state.coop.myVote === id)) return;   // re-votable, but not the same choice
   boonBusy = true;
-  [...$('boonPicker').querySelectorAll('.boon-card')].forEach(c => c.disabled = true);
   await act({ action: 'choose-boon', code: roomCode, boon: id }, 'gameFeedback');
   boonBusy = false;
 }

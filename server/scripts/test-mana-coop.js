@@ -139,7 +139,7 @@ function coopRoom(over = {}, turnOver = {}) {
     { pending: 100, kept: [2, 2, 2], done: null }) }) };
   await POST(e, { action: 'bank', code: 'AAAA' });
   const room = e.MARKETPLACE.read('mc_room_AAAA');
-  check('a White trio heals the team (attack 0 here)', room.coop.teamHp, 52); // +12
+  check('a White trio heals the team (attack 0 here)', room.coop.teamHp, 65); // +25
 }
 
 /* Blue (3): a banked trio is a net gain — the round isn't spent, and each trio
@@ -273,8 +273,8 @@ function coopRoom(over = {}, turnOver = {}) {
   const room = e.MARKETPLACE.read('mc_room_AAAA');
   // 100 banked + weakness bonus (6% of 10000 = 600) = 700 damage.
   check('weakness deals bonus damage', room.coop.enemyHp, 9300);
-  // White heal doubled by the weakness: 2 trios-worth × 12 = 24.
-  check('and the White effect is doubled', room.coop.teamHp, 64);
+  // White heal doubled by the weakness: 2 trios-worth × 25 = 50.
+  check('and the White effect is doubled', room.coop.teamHp, 90);
 }
 
 /* Two different colour trios in one bank both fire (kept = a Black + a Red
@@ -322,12 +322,12 @@ function coopRoom(over = {}, turnOver = {}) {
   const seed = coopRoom(
     { coop: { enemyHp: 100000, enemyMaxHp: 100000, teamHp: 5, teamMaxHp: 100, enemyAttack: 50, roundsLeft: 5 } },
     { pending: 100, kept: [], done: null });
-  seed.coop.boons = { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: true, secondWindUsed: false, taken: ['wind'] };
+  seed.coop.boons = { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: 2, taken: ['wind', 'wind'] };
   const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: seed }) };
   await POST(e, { action: 'bank', code: 'AAAA' });
   const room = e.MARKETPLACE.read('mc_room_AAAA');
   ok('Second Wind keeps the run alive', room.status !== 'finished' && room.coop.teamHp === 40);
-  ok('and is spent', room.coop.boons.secondWindUsed === true);
+  check('one charge is spent, the other remains (stacks)', room.coop.boons.secondWind, 1);
 }
 
 /* ══ Enemies scale with the party ══════════════════════════════════════ */
@@ -363,6 +363,103 @@ async function startedCoop(n) {
   check('3-player team pool', trio.teamMaxHp, 200);
   // A normal enemy gives a workable round budget (not the old cramped 3).
   check('a normal enemy gives 5 rounds', solo.roundsLeft, 5);
+}
+
+/* ══ New boons: Bulwark, Conscripts, Regeneration ══════════════════════ */
+function boonsWith(over) {
+  return Object.assign({ dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0,
+    secondWind: 0, dmgTakenMult: 1, allyPct: 0, regen: 0, taken: [] }, over);
+}
+{
+  // Bulwark: incoming attack scaled by dmgTakenMult (0.5 here → 20 becomes 10).
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 20, teamHp: 100, teamMaxHp: 100, roundsLeft: 5, boons: boonsWith({ dmgTakenMult: 0.5, taken: ['bulwark'] }) } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('Bulwark softens the incoming hit', room.coop.lastAttack, 10);
+}
+{
+  // Conscripts: allies add 3% of enemy max HP each round (300 here), on top of banked damage.
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, boons: boonsWith({ allyPct: 0.03, taken: ['army'] }) } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('Conscripts add ally damage each round', room.coop.enemyHp, 9600); // 100 banked + 300 ally
+}
+{
+  // Regeneration: +8 team HP each round (attack 0 to read it cleanly).
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 50, teamMaxHp: 100, roundsLeft: 5, boons: boonsWith({ regen: 8, taken: ['regen'] }) } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('Regeneration heals each round', room.coop.teamHp, 58);
+}
+
+/* ══ Boon voting — resolves once everyone has voted, majority wins ══════ */
+
+/* A co-op room mid-boon-vote for the given players (all clear/banked). */
+function coopVoteRoom(ids) {
+  const now = Date.now();
+  const players = {};
+  for (const id of ids) players[id] = { displayName: 'U' + id, profileImage: null, ready: true, total: 0,
+    turn: { done: 'banked', gained: 0, kept: [], pending: 0, dice: [], remaining: 6, awaitingSelection: false, deadline: null, event: null } };
+  return {
+    code: 'AAAA', host: ids[0], hostName: 'U' + ids[0], mode: 'coop', practice: false, goal: 0, idleMs: 30000,
+    status: 'intermission', round: 1, roundStartedAt: now, isFinalRound: false, nextIsFinal: false,
+    tiedPlayers: null, restingIds: [], intermissionEndsAt: null, winner: null, players, createdAt: now,
+    coop: {
+      cleared: 1, wave: 1, enemyName: 'X', enemyMaxHp: 1000, enemyHp: 0, roundsLeft: 5,
+      isBoss: false, isFinal: false, teamHp: 100, teamMaxHp: 100, teamHpBonus: 0,
+      poison: 0, burn: 0, shieldRounds: 0, dmgBuffRounds: 0, minions: { hp: 0, maxHp: 0, count: 0 },
+      summonedThresholds: [], roundsThisEnemy: 0, weakColor: 6, carryover: 0, log: [],
+      boons: { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: 0, taken: [] },
+      awaitingBoon: true, boonVotes: {},
+      pendingBoons: [
+        { id: 'zeal', name: 'Zealotry', desc: '' },
+        { id: 'vigor', name: 'Vigor', desc: '' },
+        { id: 'slayer', name: 'Giant Slayer', desc: '' },
+      ],
+    },
+  };
+}
+
+/* One vote in a two-player room doesn't resolve; the second does. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopVoteRoom(['p1', 'p2']) }) };
+  const v1 = await (await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'zeal' }, cookie('p1'))).json();
+  let room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('one vote of two does not resolve', room.coop.awaitingBoon === true);
+  check('the tally shows the pending vote', v1.room.coop.boonVotes.zeal, 1);
+  check('and reports one vote cast', v1.room.coop.votesCast, 1);
+
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'zeal' }, cookie('p2'));
+  room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the final vote resolves the choice', room.coop.awaitingBoon === false);
+  ok('the winning boon is applied', room.coop.boons.taken.includes('zeal'));
+  check('and the wave advances', room.coop.wave, 2);
+}
+
+/* Majority wins: two for Vigor, one for Zealotry → Vigor. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopVoteRoom(['p1', 'p2', 'p3']) }) };
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'vigor' }, cookie('p1'));
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'zeal' }, cookie('p2'));
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'vigor' }, cookie('p3'));
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the majority boon wins', room.coop.boons.taken.includes('vigor') && !room.coop.boons.taken.includes('zeal'));
+}
+
+/* A player can change their vote before it resolves. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopVoteRoom(['p1', 'p2']) }) };
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'zeal' }, cookie('p1'));
+  await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'slayer' }, cookie('p1')); // p1 changes vote
+  const v = await (await POST(e, { action: 'choose-boon', code: 'AAAA', boon: 'slayer' }, cookie('p2'))).json();
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the changed vote is the one counted', room.coop.boons.taken.includes('slayer'));
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
