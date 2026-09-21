@@ -1283,7 +1283,10 @@ function renderLobby() {
   $('readyBtn').textContent = me && me.ready ? 'Not Ready' : "I'm Ready";
   $('startBtn').hidden = !isHost;
   const everyoneReady = state.players.every(p => p.ready);
-  $('startBtn').disabled = !everyoneReady || (!state.practice && state.playerCount < 2);
+  /* Co-op (like practice) can start solo — mirror the server, which exempts
+     both from the two-player minimum. */
+  const needsSecond = !state.practice && state.mode !== 'coop' && state.playerCount < 2;
+  $('startBtn').disabled = !everyoneReady || needsSecond;
 }
 
 let enemyAnim = { slug: null, frames: 1, frame: 0, timer: null };
