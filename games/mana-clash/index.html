@@ -48,12 +48,38 @@
     .enemy-track { position: relative; height: 18px; margin-top: 6px; background: #1a0000; border: 1px solid #3a0000; border-radius: 4px; overflow: hidden; }
     .enemy-track i { display: block; height: 100%; background: linear-gradient(90deg, #ff0000, #ff5a1f); transition: width 0.5s ease; }
     .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
-    .enemy-stage { display: flex; justify-content: center; align-items: flex-end; height: 104px; margin-bottom: 4px; }
+    .enemy-stage { position: relative; display: flex; justify-content: center; align-items: flex-end; height: 104px; margin-bottom: 4px; }
     .enemy-sprite { width: 96px; height: 96px; background-repeat: no-repeat; background-position: 0% 0%; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.7)); }
     .enemy-sprite.hit { animation: enemy-hit 0.3s; }
     @keyframes enemy-hit { 0%,100%{ transform: translateX(0);} 25%{ transform: translateX(-5px); filter: brightness(2);} 75%{ transform: translateX(5px);} }
     #gameScreen { background-size: cover; background-position: center; }
     @media (prefers-reduced-motion: reduce) { .enemy-sprite.hit { animation: none; } }
+
+    /* Minions clustered at the enemy's feet */
+    .minion-swarm { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; }
+    .minion-swarm i { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #b0ff6a, #2f5a12); border: 1px solid #0a1a00; }
+
+    /* Health bars: enemy (red, above) already styled; team (green) and minions (sickly green) */
+    .team-track, .minion-track { position: relative; height: 16px; margin-top: 5px; background: #001200; border: 1px solid #0a2a0a; border-radius: 4px; overflow: hidden; }
+    .team-track i { display: block; height: 100%; background: linear-gradient(90deg, #16a34a, #4ade80); transition: width 0.4s ease; }
+    .team-track.low i { background: linear-gradient(90deg, #b91c1c, #f59e0b); }
+    .minion-track i { display: block; height: 100%; background: linear-gradient(90deg, #4d7c0f, #a3e635); transition: width 0.4s ease; }
+    .team-hp, .minion-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
+
+    /* Status-effect chips */
+    .enemy-status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; min-height: 0; }
+    .enemy-status:empty { margin-top: 0; }
+    .stat-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700;
+                 padding: 2px 7px; border-radius: 10px; border: 1px solid; line-height: 1.4; }
+    .stat-chip.poison { color: #a3e635; border-color: #4d7c0f; background: rgba(60,90,10,0.35); }
+    .stat-chip.burn   { color: #fb923c; border-color: #9a3412; background: rgba(120,40,5,0.35); }
+    .stat-chip.buff   { color: #86efac; border-color: #15803d; background: rgba(10,80,30,0.35); }
+    .stat-chip.shield { color: #93c5fd; border-color: #1d4ed8; background: rgba(20,40,120,0.35); }
+    .stat-chip.enrage { color: #fca5a5; border-color: #b91c1c; background: rgba(120,10,10,0.4); }
+
+    /* One-line recap of what the last round did */
+    .combat-log { margin-top: 6px; font-size: 11px; color: #cdb4db; text-align: center; min-height: 0; line-height: 1.5; }
+    .combat-log:empty { margin-top: 0; }
     .btn-lg { padding: 14px 38px; font-size: 15px; }
 
     .input, .select {
@@ -456,7 +482,7 @@
         <button class="btn btn-red" id="createBtn">Create Room</button>
         <button class="btn btn-dim" id="practiceBtn">Solo Practice</button>
         <button class="btn btn-coop" id="coopBtn">Co-op Gauntlet</button>
-        <div class="coop-note" id="coopNote">Team up (or go solo) against a series of enemies and bosses — bank points to damage them, and see how far you can get. The Target above is ignored in co-op.</div>
+        <div class="coop-note" id="coopNote">Team up (or go solo) against a gauntlet of enemies, bosses, and a final boss — bank points to damage them and survive on shared Team HP. The <b>colour</b> of the dice you bank matters: a banked trio triggers an effect — ⚪ pierce · ⚪ White heal · 🔵 +round · ⚫ poison · 🔴 burn minions · 🟢 damage buff. The Target above is ignored in co-op.</div>
         <span class="muted">Only 10,000-point games reach the leaderboards. Practice never does.</span>
       </div>
 
@@ -526,12 +552,19 @@
   <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
   <div class="final-banner" id="finalBanner" hidden>Final round — highest total wins</div>
   <div class="enemy-banner" id="enemyBanner" hidden>
-    <div class="enemy-stage"><div class="enemy-sprite" id="enemySprite"></div></div>
+    <div class="enemy-stage">
+      <div class="enemy-sprite" id="enemySprite"></div>
+      <div class="minion-swarm" id="minionSwarm" hidden></div>
+    </div>
     <div class="enemy-head">
       <span class="enemy-name" id="enemyName">—</span>
       <span class="enemy-rounds" id="enemyRounds"></span>
     </div>
     <div class="enemy-track"><i id="enemyHpFill"></i><span class="enemy-hp" id="enemyHpText"></span></div>
+    <div class="enemy-status" id="enemyStatus"></div>
+    <div class="minion-track" id="minionTrack" hidden><i id="minionHpFill"></i><span class="minion-hp" id="minionHpText"></span></div>
+    <div class="team-track"><i id="teamHpFill"></i><span class="team-hp" id="teamHpText"></span></div>
+    <div class="combat-log" id="combatLog"></div>
   </div>
   <div class="standings-strip" id="standingsStrip"></div>
   <div class="round-progress" id="roundProgress"></div>
@@ -1285,6 +1318,63 @@ function renderEnemy() {
   const pct = c.enemyMaxHp > 0 ? Math.max(0, Math.min(100, (c.enemyHp / c.enemyMaxHp) * 100)) : 0;
   $('enemyHpFill').style.width = pct + '%';
   $('enemyHpText').textContent = Math.round(c.enemyHp).toLocaleString() + ' / ' + Math.round(c.enemyMaxHp).toLocaleString() + ' HP';
+
+  /* Shared team HP — the second life bar. Turns amber when it gets dangerous. */
+  const tMax = c.teamMaxHp || 0, tHp = c.teamHp || 0;
+  const tPct = tMax > 0 ? Math.max(0, Math.min(100, (tHp / tMax) * 100)) : 0;
+  const teamTrack = $('teamHpFill').parentElement;
+  teamTrack.classList.toggle('low', tPct <= 30);
+  $('teamHpFill').style.width = tPct + '%';
+  $('teamHpText').textContent = '🛡 Team ' + Math.round(tHp) + ' / ' + Math.round(tMax);
+
+  /* Minion soak pool — only shown while a boss has some in play. */
+  const m = c.minions || { hp: 0, maxHp: 0, count: 0 };
+  const hasMin = m.count > 0 && m.maxHp > 0;
+  $('minionTrack').hidden = !hasMin;
+  const swarm = $('minionSwarm');
+  swarm.hidden = !hasMin;
+  if (hasMin) {
+    const mPct = Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100));
+    $('minionHpFill').style.width = mPct + '%';
+    $('minionHpText').textContent = 'Minions ×' + m.count + ' — ' + Math.round(m.hp).toLocaleString() + ' HP';
+    if (swarm.childElementCount !== m.count) {
+      swarm.innerHTML = '';
+      for (let i = 0; i < m.count; i++) swarm.appendChild(document.createElement('i'));
+    }
+  } else if (swarm.childElementCount) { swarm.innerHTML = ''; }
+
+  /* Persistent status chips (what's currently on the board). */
+  const chips = [];
+  if (c.poison > 0) chips.push('<span class="stat-chip poison">☠ Poison ×' + c.poison + '</span>');
+  if (c.burn > 0 && hasMin) chips.push('<span class="stat-chip burn">🔥 Burn ×' + c.burn + '</span>');
+  if (c.buff > 0) chips.push('<span class="stat-chip buff">⚔ Dmg buff ' + c.buff + 'r</span>');
+  if (c.shield) chips.push('<span class="stat-chip shield">🛡 Shield</span>');
+  if ((c.log || []).includes('enrage')) chips.push('<span class="stat-chip enrage">😡 Enraged</span>');
+  $('enemyStatus').innerHTML = chips.join('');
+
+  $('combatLog').textContent = coopLogText(c.log || []);
+}
+
+/* Turn the terse resolution tags into a one-line recap for players. */
+function coopLogText(log) {
+  const val = (t) => t.split(':')[1];
+  const parts = [];
+  for (const t of log) {
+    if (t.startsWith('pierce:')) parts.push('Colourless pierced');
+    else if (t === 'shielded') parts.push('shield halved the hit');
+    else if (t.startsWith('heal:')) parts.push('team healed');
+    else if (t.startsWith('rounds:')) parts.push('+' + val(t) + ' round' + (val(t) === '1' ? '' : 's'));
+    else if (t.startsWith('poison:')) parts.push('+' + val(t) + ' poison');
+    else if (t.startsWith('burn:')) parts.push('+' + val(t) + ' burn');
+    else if (t.startsWith('buff:')) parts.push('damage buffed');
+    else if (t === 'minions-cleared') parts.push('minions wiped');
+    else if (t.startsWith('summon:')) parts.push('summoned ' + val(t) + ' minions!');
+    else if (t === 'enrage') parts.push('it enraged');
+    else if (t.startsWith('hit:')) parts.push('hit team for ' + val(t));
+    else if (t.startsWith('enemyheal:')) parts.push('it regenerated');
+    else if (t === 'shield-up') parts.push('it raised a shield');
+  }
+  return parts.length ? parts.join(' · ') : '';
 }
 
 function renderIntermission() {
@@ -1311,8 +1401,9 @@ function renderResults() {
     const c = state.coop;
     $('resultsTitle').textContent = c.victory ? 'THE SOVEREIGN FALLS' : 'RUN OVER';
     const enemies = c.cleared === 1 ? '1 enemy' : c.cleared.toLocaleString() + ' enemies';
-    $('resultsSub').textContent = 'Your team cleared ' + enemies +
-      (c.enemyName ? ' — fell at Wave ' + c.wave + ' (' + c.enemyName + ')' : '') + '.';
+    const how = c.victory ? '' : (c.teamHp <= 0 ? ' — the team was wiped out' : ' — out of time')
+      + (c.enemyName ? ' at Wave ' + c.wave + ' (' + c.enemyName + ')' : '');
+    $('resultsSub').textContent = 'Your team cleared ' + enemies + how + '.';
     standingsTable($('resultsTable'), state.players, meId);
     const hostC = !!(state.you && state.host === state.you.id);
     $('rematchBtn').hidden = !hostC;

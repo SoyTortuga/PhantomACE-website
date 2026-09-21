@@ -50,6 +50,10 @@ function coopRoom(over = {}, turnOver = {}) {
     cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false,
     wave: 1, enemyName: 'Bone Rattler', enemyMaxHp: 100, enemyHp: 100,
     roundsLeft: 3, isBoss: false, isFinal: false,
+    teamHp: 100, teamMaxHp: 100, enemyAttack: 6, shieldEvery: 0,
+    poison: 0, burn: 0, shieldRounds: 0, dmgBuffRounds: 0,
+    minions: { hp: 0, maxHp: 0, count: 0 }, summonedThresholds: [], roundsThisEnemy: 0,
+    lastDealt: 0, lastAttack: 0, log: [],
   }, over.coop || {});
   return Object.assign({
     code: 'AAAA', host: '7', hostName: 'U7',
@@ -104,6 +108,81 @@ function coopRoom(over = {}, turnOver = {}) {
   check('the run ends when rounds run out', room.status, 'finished');
   ok('flagged as a finished run, no winner', room.runOver === true && room.winner === null);
   ok('no versus leaderboard was written', !e.MARKETPLACE.read('lb_mana_clash') && !e.MARKETPLACE.read('lb_mana_clash_wins'));
+}
+
+/* ══ Colour mechanics — a banked trio drives an effect by die face ═════ */
+
+/* Colourless (1): piercing straight damage on top of the banked points. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000 } },
+    { pending: 1000, kept: [1, 1, 1], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  // 1000 banked + one Colourless trio (5% of 10000 = 500 piercing) = 1500 dealt
+  check('a Colourless trio pierces for bonus damage', room.coop.enemyHp, 8500);
+}
+
+/* White (2): heals the team. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, teamHp: 40, teamMaxHp: 100, enemyAttack: 0 } },
+    { pending: 100, kept: [2, 2, 2], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a White trio heals the team (attack 0 here)', room.coop.teamHp, 52); // +12
+}
+
+/* Blue (3): adds rounds to the budget (net of the round just spent). */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, roundsLeft: 3 } },
+    { pending: 100, kept: [3, 3, 3, 3, 3, 3], done: null }) }) }; // two Blue trios → +2
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('two Blue trios add two rounds, one is spent', room.coop.roundsLeft, 4);
+}
+
+/* Black (4): stacks Poison on the enemy. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000 } },
+    { pending: 100, kept: [4, 4, 4], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a Black trio poisons the enemy', room.coop.poison, 1);
+}
+
+/* Green (6): a standing buff amplifies the banked damage. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, dmgBuffRounds: 2 } },
+    { pending: 400, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a Green buff amplifies banked damage 1.5x', room.coop.enemyHp, 9400); // 400*1.5=600
+}
+
+/* ══ Team HP is a second loss condition ════════════════════════════════ */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, teamHp: 5, enemyAttack: 20, roundsLeft: 5 } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('the run ends when the team is wiped', room.status === 'finished' && room.runOver === true);
+  check('team HP floors at zero', room.coop.teamHp, 0);
+}
+
+/* ══ Minions soak a share of the team's damage ═════════════════════════ */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, minions: { hp: 1000, maxHp: 1000, count: 2 } } },
+    { pending: 1000, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('minions absorb 40% of the hit', room.coop.minions.hp, 600);
+  check('the enemy takes only the remaining 60%', room.coop.enemyHp, 9400);
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */

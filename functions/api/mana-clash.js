@@ -193,6 +193,31 @@ const COOP_BASE_HP = 1500;
 const COOP_GROWTH = 1.25;
 const COOP_FINAL_WAVE = 20;
 
+/* ── Combat tuning (first pass — all adjustable) ──
+   Team HP is a shared pool: the enemy attacks it each round, and running it
+   to zero ends the run just like running out of the round budget does. The
+   colour of the DICE the team banks drives the roll-reactive effects, each
+   triggered per three-of-a-kind ("trio") banked that round:
+     1 Colourless → piercing straight damage (ignores shield & minions)
+     2 White      → heal the team
+     3 Blue       → +1 round to the budget
+     4 Black      → +1 Poison stack on the enemy (damage each round)
+     5 Red        → +1 Burn stack on the minions (damage each round)
+     6 Green      → team damage buff for a few rounds */
+const COOP_TEAM_HP_BASE = 100;
+const COOP_TEAM_HP_PER_PLAYER = 25;
+const COOP_DMG_BUFF_MULT = 1.5;      // Green
+const COOP_GREEN_ROUNDS = 2;         // buff rounds per Green trio
+const COOP_WHITE_HEAL = 12;          // team HP per White trio
+const COOP_ENRAGE_MULT = 1.75;       // attack up when cornered
+const COOP_MINION_ATK = 3;           // added enemy attack per living minion
+const COOP_POISON_PCT = 0.02;        // enemy maxHp lost per Poison stack per round
+const COOP_BURN_PCT = 0.04;          // minion maxHp lost per Burn stack per round
+const COOP_COLORLESS_PCT = 0.05;     // piercing damage per Colourless trio (of enemy maxHp)
+const COOP_HEAL_PCT = 0.03;          // enemy self-heal when under-pressured
+const COOP_MINION_SOAK = 0.4;        // share of team damage minions absorb
+const COOP_SUMMON_THRESHOLDS = [0.66, 0.33];
+
 /* The enemy roster — real art from the itch.io packs, keyed by slug with its
    idle-strip frame count so the client can animate it. Generated from
    games/mana-clash/assets/enemies/manifest.json. */
@@ -278,44 +303,194 @@ function coopSpawn(room, wave) {
   room.coop.isBoss = isBoss;
   room.coop.isFinal = isFinal;
   room.coop.bg = COOP_BACKGROUNDS[(wave - 1) % COOP_BACKGROUNDS.length];
+
+  /* How hard the enemy hits the team's shared HP each round, in team-HP
+     units (not the point/damage scale the enemy's own HP lives in). */
+  let atk = 4 + wave;
+  if (isBoss) atk *= 1.7;
+  if (isFinal) atk *= 2.3;
+  if (wave > COOP_FINAL_WAVE) atk *= 1.4;
+  room.coop.enemyAttack = Math.round(atk);
+  /* Bosses raise a damage-halving shield on a cadence; normal enemies don't. */
+  room.coop.shieldEvery = isFinal ? 2 : isBoss ? 3 : 0;
+  /* Combat state is per-enemy — it resets with each new foe. Team HP does not
+     (it is the run-long resource, carried across enemies by coopInit). */
+  room.coop.poison = 0;
+  room.coop.burn = 0;
+  room.coop.shieldRounds = 0;
+  room.coop.dmgBuffRounds = 0;
+  room.coop.minions = { hp: 0, maxHp: 0, count: 0 };
+  room.coop.summonedThresholds = [];
+  room.coop.roundsThisEnemy = 0;
+  room.coop.log = [];
 }
 
 function coopInit(room) {
-  room.coop = { cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false };
+  const players = Math.max(1, Object.keys(room.players).length);
+  const teamMax = COOP_TEAM_HP_BASE + COOP_TEAM_HP_PER_PLAYER * (players - 1);
+  room.coop = {
+    cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false,
+    teamMaxHp: teamMax, teamHp: teamMax, log: [],
+  };
   coopSpawn(room, 1);
 }
 
-/* Resolve a co-op round: the team's banked points this round are damage. */
+/* Count three-of-a-kinds banked this round, by die face (1-6 = the mana
+   colours). Six-of-a-kind counts as two trios. Only dice that were kept and
+   banked count — a Mana Burn clears them, so busting earns no colour effect. */
+function coopTrios(room) {
+  const t = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  for (const p of Object.values(room.players)) {
+    const turn = p.turn;
+    if (!turn || (turn.done !== 'banked' && turn.done !== 'timeout')) continue;
+    const counts = {};
+    for (const d of (turn.kept || [])) counts[d] = (counts[d] || 0) + 1;
+    for (let f = 1; f <= 6; f++) t[f] += Math.floor((counts[f] || 0) / 3);
+  }
+  return t;
+}
+
+/* Bosses and the final boss call in minions at HP thresholds. Minions are a
+   single soak pool with a headcount: while alive they absorb a share of the
+   team's damage and add to the enemy's attack, and Red Burn eats away at them. */
+function coopSummon(c) {
+  if (!c.isBoss && !c.isFinal) return 0;
+  const frac = c.enemyHp / c.enemyMaxHp;
+  for (const th of COOP_SUMMON_THRESHOLDS) {
+    if (frac <= th && !c.summonedThresholds.includes(th)) {
+      c.summonedThresholds.push(th);
+      const count = c.isFinal ? 3 : 2;
+      const pool = Math.ceil(c.enemyMaxHp * 0.15);
+      const alive = c.minions.hp > 0;
+      c.minions.count = (alive ? c.minions.count : 0) + count;
+      c.minions.maxHp = (alive ? c.minions.maxHp : 0) + pool;
+      c.minions.hp = (alive ? c.minions.hp : 0) + pool;
+      return count;
+    }
+  }
+  return 0;
+}
+
+/* End the run, no winner — the team either wiped or ran out of time. */
+function coopEnd(room, now) {
+  room.status = 'finished';
+  room.winner = null;
+  room.runOver = true;
+  room.coop.runOver = true;
+  room.finishedAt = now;
+  room.intermissionEndsAt = null;
+}
+
+/* Resolve a co-op round. The team's banked points are damage; the COLOURS of
+   the dice they banked (per three-of-a-kind) trigger the roll-reactive effects;
+   the enemy hits back at the team's shared HP and works its own mechanics.
+   Order matters — see the numbered steps. */
 function endRoundCoop(room, now) {
   const c = room.coop;
-  let dmg = 0;
-  for (const p of Object.values(room.players)) dmg += (p.turn && p.turn.gained) || 0;
-  c.lastDamage = dmg;
-  c.enemyHp = Math.max(0, c.enemyHp - dmg);
+  /* Defensive defaults so a room that was mid-run when this deployed (and any
+     stripped-down test fixture) resolves instead of throwing on a missing field. */
+  if (!c.minions) c.minions = { hp: 0, maxHp: 0, count: 0 };
+  if (typeof c.teamHp !== 'number') { c.teamMaxHp = c.teamMaxHp || COOP_TEAM_HP_BASE; c.teamHp = c.teamMaxHp; }
+  if (typeof c.enemyAttack !== 'number') c.enemyAttack = 6;
+  c.poison = c.poison || 0; c.burn = c.burn || 0;
+  c.dmgBuffRounds = c.dmgBuffRounds || 0; c.shieldRounds = c.shieldRounds || 0;
+  c.summonedThresholds = c.summonedThresholds || [];
+  c.shieldEvery = c.shieldEvery || 0;
+  c.roundsThisEnemy = (c.roundsThisEnemy || 0) + 1;
+  const log = [];
 
+  /* 1. Raw banked points across the team, and the colour trios that back them. */
+  let raw = 0;
+  for (const p of Object.values(room.players)) raw += (p.turn && p.turn.gained) || 0;
+  const trios = coopTrios(room);
+
+  /* 2. Green: a standing team-damage buff amplifies this round's hit. */
+  let dmg = c.dmgBuffRounds > 0 ? Math.round(raw * COOP_DMG_BUFF_MULT) : raw;
+
+  /* 3. Colourless: piercing straight damage — ignores shield and minions. */
+  const pierce = trios[1] * Math.ceil(c.enemyMaxHp * COOP_COLORLESS_PCT);
+
+  /* 4. Shield halves the ordinary (non-piercing) hit. */
+  let shielded = false;
+  if (c.shieldRounds > 0) { dmg = Math.round(dmg * 0.5); shielded = true; }
+
+  /* 5. Minions soak a share of the ordinary hit, then Red Burn eats them. */
+  if (c.minions.hp > 0) {
+    const soak = Math.round(dmg * COOP_MINION_SOAK);
+    c.minions.hp -= soak;
+    dmg -= soak;
+  }
+  if (c.burn > 0 && c.minions.hp > 0) {
+    c.minions.hp -= c.burn * Math.ceil(c.enemyMaxHp * COOP_BURN_PCT);
+  }
+  if (c.minions.count > 0 && c.minions.hp <= 0) {
+    c.minions = { hp: 0, maxHp: 0, count: 0 };
+    c.burn = 0;                       // nothing left to burn
+    log.push('minions-cleared');
+  }
+
+  /* 6. The enemy takes what's left, plus piercing, plus the Poison DoT. */
+  const poisonDmg = c.poison * Math.ceil(c.enemyMaxHp * COOP_POISON_PCT);
+  const dealt = Math.max(0, dmg) + pierce + poisonDmg;
+  c.enemyHp = Math.max(0, c.enemyHp - dealt);
+  c.lastDamage = raw;
+  c.lastDealt = dealt;
+
+  /* 7. Apply the colour effects that heal now or seed later rounds. */
+  if (trios[2]) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + trios[2] * COOP_WHITE_HEAL); log.push('heal:' + trios[2]); }
+  if (trios[3]) { c.roundsLeft += trios[3]; log.push('rounds:' + trios[3]); }
+  if (trios[4]) { c.poison += trios[4]; log.push('poison:' + trios[4]); }
+  if (trios[5]) { c.burn += trios[5]; log.push('burn:' + trios[5]); }
+  if (trios[6]) { c.dmgBuffRounds += trios[6] * COOP_GREEN_ROUNDS; log.push('buff:' + trios[6]); }
+  if (trios[1]) log.push('pierce:' + trios[1]);
+  if (shielded) log.push('shielded');
+
+  /* 8. Enemy down — clear it, heal the team a little, bring on the next. */
   if (c.enemyHp <= 0) {
-    /* Enemy down — bank the clear and bring on the next, tougher one. */
     c.cleared += 1;
     if (c.isFinal) c.victory = true;
     c.justCleared = true;
+    c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(c.teamMaxHp * 0.15));
+    c.log = log;
     coopSpawn(room, c.wave + 1);
     room.status = 'intermission';
     room.intermissionEndsAt = now + INTERMISSION_MS;
     return;
   }
-
   c.justCleared = false;
-  c.roundsLeft -= 1;
-  if (c.roundsLeft <= 0) {
-    /* Out of rounds with the enemy still standing — the run ends here. */
-    room.status = 'finished';
-    room.winner = null;
-    room.runOver = true;
-    c.runOver = true;
-    room.finishedAt = now;
-    room.intermissionEndsAt = null;
-    return;
+
+  /* 9. Bosses summon reinforcements as their health falls. */
+  const summoned = coopSummon(c);
+  if (summoned) log.push('summon:' + summoned);
+
+  /* 10. The enemy (and any minions) strike the team's shared HP, enraging
+     when cornered on time or health. */
+  let atk = c.enemyAttack + c.minions.count * COOP_MINION_ATK;
+  if (c.roundsLeft <= 2 || c.enemyHp / c.enemyMaxHp < 0.25) { atk = Math.round(atk * COOP_ENRAGE_MULT); log.push('enrage'); }
+  c.teamHp -= atk;
+  c.lastAttack = atk;
+  log.push('hit:' + atk);
+
+  /* 11. If the team barely scratched it, the enemy regenerates (anti-stall). */
+  if (dealt < c.enemyMaxHp * 0.04) {
+    const heal = Math.ceil(c.enemyMaxHp * COOP_HEAL_PCT);
+    c.enemyHp = Math.min(c.enemyMaxHp, c.enemyHp + heal);
+    log.push('enemyheal:' + heal);
   }
+
+  /* 12. Bosses raise a shield for the coming round on their cadence. */
+  if (c.shieldEvery && c.roundsThisEnemy % c.shieldEvery === 0) { c.shieldRounds = 2; log.push('shield-up'); }
+
+  /* 13. Tick the timed effects down and spend the round. */
+  if (c.dmgBuffRounds > 0) c.dmgBuffRounds -= 1;
+  if (c.shieldRounds > 0) c.shieldRounds -= 1;
+  c.roundsLeft -= 1;
+  c.log = log;
+
+  /* 14. Loss checks — wiped, or out of time with the enemy still standing. */
+  if (c.teamHp <= 0) { c.teamHp = 0; return coopEnd(room, now); }
+  if (c.roundsLeft <= 0) return coopEnd(room, now);
+
   room.status = 'intermission';
   room.intermissionEndsAt = now + INTERMISSION_MS;
 }
@@ -579,9 +754,27 @@ export function viewFor(room, userId, now, opts = {}) {
       isBoss: !!room.coop.isBoss,
       isFinal: !!room.coop.isFinal,
       lastDamage: room.coop.lastDamage || 0,
+      lastDealt: room.coop.lastDealt || 0,
+      lastAttack: room.coop.lastAttack || 0,
       justCleared: !!room.coop.justCleared,
       victory: !!room.coop.victory,
       runOver: !!room.coop.runOver,
+      /* Shared team HP — the second way to lose, alongside the round budget. */
+      teamHp: Math.max(0, Math.round(room.coop.teamHp != null ? room.coop.teamHp : 0)),
+      teamMaxHp: Math.round(room.coop.teamMaxHp || 0),
+      /* Status effects, for the HUD. */
+      poison: room.coop.poison || 0,
+      burn: room.coop.burn || 0,
+      shield: (room.coop.shieldRounds || 0) > 0,
+      buff: room.coop.dmgBuffRounds || 0,
+      enemyAttack: room.coop.enemyAttack || 0,
+      minions: {
+        hp: Math.max(0, Math.round((room.coop.minions && room.coop.minions.hp) || 0)),
+        maxHp: Math.round((room.coop.minions && room.coop.minions.maxHp) || 0),
+        count: (room.coop.minions && room.coop.minions.count) || 0,
+      },
+      /* Terse event tags from the last resolution (heal:2, poison:1, hit:14…). */
+      log: Array.isArray(room.coop.log) ? room.coop.log.slice() : [],
     } : null,
     ranked: isRanked(room),
     round: room.round,
