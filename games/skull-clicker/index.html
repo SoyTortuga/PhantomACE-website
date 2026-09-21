@@ -812,13 +812,13 @@
          Louder than the rest because low frequencies read quieter. */
       const kick = audioCtx.createOscillator();
       kick.type = 'sine';
-      kick.frequency.setValueAtTime(150, t);
-      kick.frequency.exponentialRampToValueAtTime(48, t + 0.11);
+      kick.frequency.setValueAtTime(160, t);
+      kick.frequency.exponentialRampToValueAtTime(42, t + 0.14);
       const kg = audioCtx.createGain();
-      kg.gain.setValueAtTime(0.6, t);
-      kg.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+      kg.gain.setValueAtTime(0.95, t);
+      kg.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       kick.connect(kg); kg.connect(audioCtx.destination);
-      kick.start(t); kick.stop(t + 0.14);
+      kick.start(t); kick.stop(t + 0.21);
 
       const noise = audioCtx.createBufferSource();
       noise.buffer = getNoise();
