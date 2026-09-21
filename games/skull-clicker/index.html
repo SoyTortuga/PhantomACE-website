@@ -225,10 +225,13 @@
     .rank-score { flex: none; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
     .ranks-empty { text-align: center; color: #333; font-size: 12px; padding: 24px; }
     .tab-btn:hover { color: #ff4444; }
-    /* Seven tabs: let them shrink to fit and scroll if the phone is very
-       narrow, rather than wrapping to a second row. */
-    .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .tab-btn { font-size: 10px; letter-spacing: 0.02em; padding: 10px 4px; white-space: nowrap; min-width: 0; }
+    /* Seven tabs: on a narrow phone they must NOT squeeze below their text
+       (that ran the labels together). Keep each at its content width — grow
+       to fill on a wide screen, never shrink — and let the bar scroll
+       horizontally when they don't all fit. */
+    .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab-btn { flex: 1 0 auto; font-size: 11px; letter-spacing: 0.03em; padding: 10px 12px; white-space: nowrap; }
 
     /* Sound toggle */
     .header { position: relative; }
@@ -1748,7 +1751,9 @@
       activeTab = tab;
       const tabs = ['buildings','upgrades','prestige','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-        btn.classList.toggle('active', tabs[i] === tab);
+        const on = tabs[i] === tab;
+        btn.classList.toggle('active', on);
+        if (on && btn.scrollIntoView) btn.scrollIntoView({ inline: 'nearest', block: 'nearest' });
       });
       document.querySelectorAll('.tab-content').forEach((el, i) => {
         el.classList.toggle('active', tabs[i] === tab);
