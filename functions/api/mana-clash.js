@@ -206,7 +206,7 @@ const COOP_FINAL_WAVE = 20;
      5 Red        → +1 Burn stack on the minions (damage each round)
      6 Green      → team damage buff for a few rounds */
 const COOP_TEAM_HP_BASE = 100;
-const COOP_TEAM_HP_PER_PLAYER = 25;
+const COOP_TEAM_HP_PER_PLAYER = 50;
 const COOP_DMG_BUFF_MULT = 1.5;      // Green
 const COOP_GREEN_ROUNDS = 2;         // buff rounds per Green trio
 const COOP_WHITE_HEAL = 12;          // team HP per White trio

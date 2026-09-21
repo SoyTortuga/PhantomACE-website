@@ -358,9 +358,9 @@ async function startedCoop(n) {
   // Attack scales too (5 base × [0.7 + 0.3·players]).
   check('solo enemy attack', solo.enemyAttack, 5);
   check('3-player enemy attack is higher', trio.enemyAttack, 8);
-  // Shared team pool grows +25 per extra player.
+  // Shared team pool grows +50 per extra player.
   check('solo team pool', solo.teamMaxHp, 100);
-  check('3-player team pool', trio.teamMaxHp, 150);
+  check('3-player team pool', trio.teamMaxHp, 200);
   // A normal enemy gives a workable round budget (not the old cramped 3).
   check('a normal enemy gives 5 rounds', solo.roundsLeft, 5);
 }
