@@ -199,6 +199,8 @@
     .prestige-note { font-size: 10px; color: #ffffff77; margin-top: 12px; }
     .shard-balance { text-align: center; font-size: 14px; color: #fff; margin: 4px 0 10px; }
     .shard-balance b { color: #ff5555; }
+    .perk-lvl { font-size: 10px; font-weight: 800; color: #d98fff; margin-left: 4px; }
+    .perk-now { color: #6ac46a; font-size: 10px; }
 
     /* Ranks / leaderboard */
     .ranks-toggle { display: flex; gap: 4px; margin-bottom: 10px; }
@@ -725,23 +727,71 @@
       { id:'s_horror1',building:'horror',req:10,  mult:2,   cost:7.5e12, name:'Maddening Whispers', desc:'Eldritch Horrors ×2' },
     ];
 
-    /* Prestige perks — bought with Bone Shards (earned on prestige) and kept
-       forever across every future run. `req` gates a perk on owning another;
-       their effects are read live by critChance/cursedFreqMult/offlineRate and
-       applied in doPrestige. */
+    /* Prestige perks — bought with Bone Shards and kept forever across every
+       future run. Two kinds:
+
+         'once'   — a single unlock, stored in the `perks` Set.
+         'tiered' — bought many times; the level lives in `perkLevels`, each
+                    level costs base·growth^level and stacks its effect. These
+                    are the long grind — hundreds of levels across the shop, so
+                    the store is a month-long climb, not an afternoon's buy-out.
+
+       Effects are read live by the compute helpers below and applied in
+       doPrestige. `req` gates a perk on owning another. */
     const PERKS = [
-      { id:'omen',      name:'Ill Omen',        cost:1,  desc:'Cursed skulls appear 50% more often' },
-      { id:'crit',      name:'Killing Blow',    cost:2,  desc:'5% chance a click deals ×7' },
-      { id:'greed',     name:'Grave Robber',    cost:2,  desc:'Full offline earnings (100%, up from 50%)' },
-      { id:'headstart', name:'Ancestral Cache', cost:3,  desc:'Start each run with 10 Bone Shards and 5 Ghost Hands' },
-      { id:'crit2',     name:'Executioner',     cost:5,  req:'crit', desc:'+10% more crit chance (15% total)' },
-      { id:'legacy',    name:'Undying Knowledge',cost:8, desc:'Keep your Click & CPS upgrades through prestige' },
+      // ── One-time unlocks ──
+      { id:'omen',       type:'once', name:'Ill Omen',          cost:2,  desc:'Cursed skulls appear 50% more often' },
+      { id:'crit',       type:'once', name:'Killing Blow',      cost:3,  desc:'5% chance a click crits' },
+      { id:'crit2',      type:'once', name:'Executioner',       cost:6,  req:'crit', desc:'+10% crit chance (15% total)' },
+      { id:'greed',      type:'once', name:'Grave Robber',      cost:3,  desc:'Full offline earnings (100%, up from 50%)' },
+      { id:'offline2',   type:'once', name:'Nightshift',        cost:40, req:'greed', desc:'Offline earnings run at 150%' },
+      { id:'headstart',  type:'once', name:'Ancestral Cache',   cost:4,  desc:'Start each run with 10 Bone Shards and 5 Ghost Hands' },
+      { id:'legacy',     type:'once', name:'Undying Knowledge', cost:12, desc:'Keep your Click & CPS upgrades through prestige' },
+      { id:'everfrenzy', type:'once', name:'Perpetual Dread',   cost:18, desc:'Frenzy and Blood Rush last twice as long' },
+      { id:'comboking',  type:'once', name:'Relentless',        cost:22, desc:'Click combo bonus caps at +100% (was +50%)' },
+      { id:'luckyskull', type:'once', name:'Fated',             cost:30, desc:'Cursed skulls have a 12% chance to also drop a Bone Shard' },
+      // ── Tiered climbs (repeatable) ──
+      { id:'t_cps',     type:'tiered', name:'Endless Hunger',   base:2,  growth:1.32, max:100, per:0.03, unit:'production', desc:'+3% to all production' },
+      { id:'t_click',   type:'tiered', name:'Bonecrusher',      base:2,  growth:1.32, max:75,  per:0.04, unit:'click',      desc:'+4% click power' },
+      { id:'t_crit',    type:'tiered', name:'Deadeye',          base:5,  growth:1.45, max:20,  per:0.01, unit:'crit%',      desc:'+1% crit chance' },
+      { id:'t_critdmg', type:'tiered', name:'Butchery',         base:6,  growth:1.5,  max:20,  per:0.5,  unit:'crit×',      desc:'+0.5× crit damage' },
+      { id:'t_omen',    type:'tiered', name:'Beckoning',        base:4,  growth:1.6,  max:15,  per:0.08, unit:'freq',       desc:'Cursed skulls +8% more often' },
+      { id:'t_reap',    type:'tiered', name:'Plunder',          base:3,  growth:1.4,  max:20,  per:0.15, unit:'reap',       desc:'+15% Reap windfall' },
+      { id:'t_frenzy',  type:'tiered', name:'Bloodlust',        base:8,  growth:1.6,  max:10,  per:1,    unit:'frenzy×',    desc:'+1× Frenzy multiplier' },
+      { id:'t_cost',    type:'tiered', name:'Grave Economy',    base:6,  growth:1.5,  max:20,  per:0.01, unit:'cheaper',    desc:'Buildings 1% cheaper' },
+      { id:'t_start',   type:'tiered', name:'Standing Legion',  base:5,  growth:1.5,  max:20,  per:1,    unit:'buildings',  desc:'Start with +1 of the first five buildings' },
+      { id:'t_shard',   type:'tiered', name:'Bone Harvest',     base:12, growth:1.7,  max:25,  per:0.04, unit:'shards',     desc:'+4% Bone Shards earned on prestige' },
     ];
 
-    /* Shards a prestige right now would grant — a cube-root of the run total,
-       so a fresh reset (run total ~0) yields none and cannot be farmed. */
-    function pendingShards() { return Math.floor(Math.cbrt(Math.max(0, totalSkulls) / 1e6)); }
-    function offlineRate() { return perks.has('greed') ? 1 : 0.5; }
+    /* ── Perk readers ── */
+    function pHas(id) { return perks.has(id); }
+    function pLvl(id) { return perkLevels[id] || 0; }
+    function perkDef(id) { return PERKS.find(p => p.id === id); }
+    /* Cost of the NEXT level of a tiered perk (or the flat cost of a once perk). */
+    function perkCost(p) {
+      if (p.type !== 'tiered') return p.cost;
+      return Math.ceil(p.base * Math.pow(p.growth, pLvl(p.id)));
+    }
+    function perkMaxed(p) { return p.type === 'tiered' ? pLvl(p.id) >= p.max : pHas(p.id); }
+
+    /* ── Aggregated effects (read by the game each frame) ── */
+    function perkCpsMult()    { return 1 + p_per('t_cps'); }
+    function perkClickMult()  { return 1 + p_per('t_click'); }
+    function critMult()       { return 7 + 0.5 * pLvl('t_critdmg'); }
+    function reapMult()       { return 1 + 0.15 * pLvl('t_reap'); }
+    function frenzyMultValue(){ return 7 + pLvl('t_frenzy'); }
+    function buffScale()      { return pHas('everfrenzy') ? 2 : 1; }
+    function comboCapPer()    { return pHas('comboking') ? 0.01 : 0.005; }
+    function buildingCostMult() { return Math.max(0.5, 1 - 0.01 * pLvl('t_cost')); }
+    function p_per(id) { const p = perkDef(id); return (p ? p.per : 0) * pLvl(id); }
+
+    /* Shards a prestige would grant — cube-root of the run total (so a fresh
+       reset yields none and cannot be farmed), lifted by Bone Harvest. */
+    function pendingShards() {
+      const base = Math.floor(Math.cbrt(Math.max(0, totalSkulls) / 1e6));
+      return Math.floor(base * (1 + 0.04 * pLvl('t_shard')));
+    }
+    function offlineRate() { return pHas('offline2') ? 1.5 : (pHas('greed') ? 1 : 0.5); }
 
     const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12, 100e12, 10e15];
     const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One','Skull God','Bone Absolute'];
@@ -801,7 +851,8 @@
 
     /* ── New systems ── */
     let boneShards = 0;             /* prestige currency, spent in the shop */
-    let perks = new Set();          /* purchased prestige perks */
+    let perks = new Set();          /* one-time prestige perks owned */
+    let perkLevels = {};            /* tiered prestige perk -> level */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -946,7 +997,7 @@
     /* ═══════ COMPUTED ═══════ */
 
     function getBuildingCost(b) {
-      return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]));
+      return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]) * buildingCostMult());
     }
 
     /* Prestige is the whole point of a resource-gathering game with no win:
@@ -979,11 +1030,11 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * frenzyMult;
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * frenzyMult;
     }
 
     function getClickPower() {
-      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * clickBuffMult;
+      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * clickBuffMult;
       return base + (getCPS() * cpsClickPct / 100);
     }
 
@@ -1001,11 +1052,12 @@
     /* Crit chance comes from prestige perks (Phase B); zero until one is
        bought. A crit is a big, satisfying spike on an otherwise steady click. */
     function critChance() {
-      return (perks.has('crit') ? 0.05 : 0) + (perks.has('crit2') ? 0.10 : 0);
+      return Math.min(0.9, (pHas('crit') ? 0.05 : 0) + (pHas('crit2') ? 0.10 : 0) + 0.01 * pLvl('t_crit'));
     }
     /* Combo rewards SUSTAINED clicking: each click within the window bumps it,
-       a pause resets it. Caps at +50% so it never dwarfs idle income. */
-    function comboMult() { return 1 + Math.min(combo, 100) * 0.005; }
+       a pause resets it. Caps at +50% (or +100% with Relentless) so it never
+       dwarfs idle income. */
+    function comboMult() { return 1 + Math.min(combo, 100) * comboCapPer(); }
 
     function handleClick(e) {
       const now = Date.now();
@@ -1014,7 +1066,7 @@
 
       let power = getClickPower() * comboMult();
       const crit = Math.random() < critChance();
-      if (crit) power *= 7;
+      if (crit) power *= critMult();
 
       earn(power);
       totalClicks++;
@@ -1040,14 +1092,14 @@
     /* Sum of the next `amount` prices for a building — a geometric series, so
        ×10 and ×100 are one formula rather than a loop. */
     function getBulkCost(b, amount) {
-      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]);
+      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult();
       return Math.ceil(base * (Math.pow(r, amount) - 1) / (r - 1));
     }
 
     /* How many of a building the current bank can buy — the inverse of the
        series above, so "Max" is exact rather than a loop that could stall. */
     function maxAffordable(b) {
-      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]);
+      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult();
       const n = Math.floor(Math.log((skulls * (r - 1)) / base + 1) / Math.log(r));
       return Math.max(0, n);
     }
@@ -1218,8 +1270,8 @@
     let cursedTimer = null;
 
     function cursedFreqMult() {
-      /* Prestige perk shortens the wait; a stream event can too (Phase D). */
-      return (perks.has('omen') ? 1.5 : 1) * (window.__streamFrenzy ? 3 : 1);
+      /* Prestige perks shorten the wait; a stream event can too. */
+      return (pHas('omen') ? 1.5 : 1) * (1 + 0.08 * pLvl('t_omen')) * (window.__streamFrenzy ? 3 : 1);
     }
 
     function scheduleCursed() {
@@ -1260,16 +1312,22 @@
       cursedPopped++;
       const roll = Math.random();
       let msg, kind;
+      const fmult = frenzyMultValue(), fdur = 20000 * buffScale(), rdur = 13000 * buffScale();
       if (roll < 0.55) {
-        frenzyMult = 7; frenzyEnd = Date.now() + 20000;
-        msg = 'FRENZY — ×7 production for 20s'; kind = 'frenzy';
+        frenzyMult = fmult; frenzyEnd = Date.now() + fdur;
+        msg = 'FRENZY — ×' + fmult + ' production for ' + Math.round(fdur / 1000) + 's'; kind = 'frenzy';
       } else if (roll < 0.80) {
-        clickBuffMult = 100; clickBuffEnd = Date.now() + 13000;
-        msg = 'BLOOD RUSH — ×100 clicks for 13s'; kind = 'rush';
+        clickBuffMult = 100; clickBuffEnd = Date.now() + rdur;
+        msg = 'BLOOD RUSH — ×100 clicks for ' + Math.round(rdur / 1000) + 's'; kind = 'rush';
       } else {
-        const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100);
+        const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult();
         earn(reap);
         msg = 'REAP — +' + formatNum(reap) + ' skulls'; kind = 'reap';
+      }
+      /* Fated: a chance the skull also drops a Bone Shard. */
+      if (pHas('luckyskull') && Math.random() < 0.12) {
+        boneShards += 1;
+        msg += ' · +1 🦴';
       }
       burstParticles(el);
       showBuffToast(msg, kind);
@@ -1868,7 +1926,10 @@
         if (u) { boughtUpgrades.add(id); if (u.apply) u.apply(); }
       }
       /* Headstart: a few free buildings so the early grind is shorter. */
-      if (perks.has('headstart')) { owned.shard += 10; owned.ghost += 5; }
+      if (pHas('headstart')) { owned.shard += 10; owned.ghost += 5; }
+      /* Standing Legion: +1 of each of the first five buildings per level. */
+      const legion = pLvl('t_start');
+      if (legion > 0) { ['shard', 'ghost', 'crypt', 'altar', 'army'].forEach(id => { owned[id] += legion; }); }
 
       const el = document.createElement('div');
       el.className = 'milestone';
@@ -1882,15 +1943,30 @@
     }
 
     function buyPerk(id) {
-      const p = PERKS.find(x => x.id === id);
-      if (!p || perks.has(id)) return;
-      if (p.req && !perks.has(p.req)) return;
-      if (boneShards < p.cost) return;
-      boneShards -= p.cost;
-      perks.add(id);
+      const p = perkDef(id);
+      if (!p || perkMaxed(p)) return;
+      if (p.req && !pHas(p.req)) return;
+      const cost = perkCost(p);
+      if (boneShards < cost) return;
+      boneShards -= cost;
+      if (p.type === 'tiered') perkLevels[id] = pLvl(id) + 1;
+      else perks.add(id);
       playSound('feat');
       save();
       render();
+      renderWorld();
+    }
+
+    /* The running total a tiered perk is currently giving, for its row. */
+    function perkNowLabel(p) {
+      const lv = pLvl(p.id), pct = Math.round(p.per * lv * 100);
+      switch (p.id) {
+        case 't_critdmg': return '×' + critMult().toFixed(1) + ' crit dmg';
+        case 't_frenzy':  return '×' + frenzyMultValue() + ' frenzy';
+        case 't_cost':    return pct + '% cheaper';
+        case 't_start':   return '+' + lv + ' each';
+        default:          return '+' + pct + '%';
+      }
     }
 
     function renderPrestige() {
@@ -1900,19 +1976,26 @@
       const pct = Math.min(100, (totalSkulls / req) * 100);
       const gained = pendingShards();
 
-      let shop = '<div class="section-label">Bone Shard Shop</div>' +
-        '<div class="shard-balance">🦴 <b>' + boneShards + '</b> Bone Shard' + (boneShards === 1 ? '' : 's') + '</div>';
-      for (const p of PERKS) {
-        const owned = perks.has(p.id);
-        const locked = p.req && !perks.has(p.req);
-        const can = !owned && !locked && boneShards >= p.cost;
-        const state = owned ? 'bought' : can ? 'affordable' : locked ? 'locked' : '';
-        const right = owned ? 'Owned' : locked ? 'Locked' : '🦴 ' + p.cost;
-        shop += '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyPerk('" + p.id + "')" : '') + '">' +
-          '<div class="building-info"><div class="building-name">' + p.name + '</div>' +
-          '<div class="building-desc">' + p.desc + '</div></div>' +
+      function perkRow(p) {
+        const tiered = p.type === 'tiered';
+        const maxed = perkMaxed(p);
+        const locked = p.req && !pHas(p.req);
+        const cost = perkCost(p);
+        const can = !maxed && !locked && boneShards >= cost;
+        const state = maxed ? 'bought' : can ? 'affordable' : locked ? 'locked' : '';
+        const lvlTag = tiered ? ' <span class="perk-lvl">Lv ' + pLvl(p.id) + '/' + p.max + '</span>' : '';
+        const right = maxed ? (tiered ? 'Maxed' : 'Owned') : locked ? 'Locked' : '🦴 ' + formatNum(cost);
+        return '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyPerk('" + p.id + "')" : '') + '">' +
+          '<div class="building-info"><div class="building-name">' + p.name + lvlTag + '</div>' +
+          '<div class="building-desc">' + p.desc + (tiered && pLvl(p.id) > 0 ? ' <span class="perk-now">(now ' + perkNowLabel(p) + ')</span>' : '') + '</div></div>' +
           '<div class="building-right"><div class="building-cost">' + right + '</div></div></div>';
       }
+
+      let shop = '<div class="section-label">Bone Shard Shop — Unlocks</div>' +
+        '<div class="shard-balance">🦴 <b>' + formatNum(boneShards) + '</b> Bone Shard' + (boneShards === 1 ? '' : 's') + '</div>';
+      for (const p of PERKS) if (p.type !== 'tiered') shop += perkRow(p);
+      shop += '<div class="section-label">Bone Shard Shop — Endless Climbs</div>';
+      for (const p of PERKS) if (p.type === 'tiered') shop += perkRow(p);
 
       document.getElementById('tab-prestige').innerHTML =
         '<div class="prestige-panel">' +
@@ -1947,6 +2030,7 @@
       if (!d.boughtUpgrades) d.boughtUpgrades = [];
       if (!d.hitMilestones) d.hitMilestones = [];
       if (!d.perks) d.perks = [];
+      if (!d.perkLevels || typeof d.perkLevels !== 'object') d.perkLevels = {};
       if (!d.achievements) d.achievements = [];
       if (d.boneShards === undefined) d.boneShards = 0;
       if (d.cursedPopped === undefined) d.cursedPopped = 0;
@@ -1972,6 +2056,7 @@
         boughtUpgrades: [...boughtUpgrades],
         hitMilestones: [...hitMilestones],
         perks: [...perks],
+        perkLevels,
         achievements: [...achievements],
         savedAt: Date.now(),
         version: SAVE_VERSION
@@ -2031,6 +2116,7 @@
       boughtUpgrades = new Set(d.boughtUpgrades);
       hitMilestones = new Set(d.hitMilestones);
       perks = new Set(d.perks || []);
+      perkLevels = (d.perkLevels && typeof d.perkLevels === 'object') ? d.perkLevels : {};
       achievements = new Set(d.achievements || []);
 
       if (d.savedAt) {
