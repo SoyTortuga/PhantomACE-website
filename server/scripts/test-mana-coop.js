@@ -215,6 +215,43 @@ function coopRoom(over = {}, turnOver = {}) {
   check('the enemy takes only the remaining 60%', room.coop.enemyHp, 9400);
 }
 
+/* ══ REAL dice are LETTER faces — colour trios must register from them ══ */
+{
+  // Kept dice are stored as 'C','W','U','B','R','G' in the live game, not 1-6.
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, weakColor: 6 } },
+    { pending: 100, kept: ['B', 'B', 'B'], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('letter-face dice register as colour trios (Black → poison)', room.coop.poison, 1);
+}
+
+/* Full flow: create → start → roll (forced W,W,W,U,B,G) → keep the Whites →
+   bank, against the real wave-1 White-weak enemy. Proves the whole path. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopLobby(1) }) };
+  await POST(e, { action: 'start-game', code: 'AAAA' }, cookie('p1'));
+  let room = e.MARKETPLACE.read('mc_room_AAAA');
+  const weak = room.coop.weakColor, maxHp = room.coop.enemyMaxHp;
+  const realRandom = Math.random;
+  const queue = [0.17, 0.17, 0.17, 0.34, 0.51, 0.84];   // → indices 1,1,1,2,3,5 = W,W,W,U,B,G
+  let qi = 0;
+  Math.random = () => (qi < queue.length ? queue[qi++] : realRandom());
+  await POST(e, { action: 'roll', code: 'AAAA' }, cookie('p1'));
+  Math.random = realRandom;
+  room = e.MARKETPLACE.read('mc_room_AAAA');
+  const dice = room.players.p1.turn.dice;
+  const wIdx = dice.map((d, i) => (d === 'W' ? i : -1)).filter(i => i >= 0).slice(0, 3);
+  ok('the forced roll produced three Whites to keep', wIdx.length === 3);
+  await POST(e, { action: 'keep', code: 'AAAA', indices: wIdx }, cookie('p1'));
+  await POST(e, { action: 'bank', code: 'AAAA' }, cookie('p1'));
+  room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('wave 1 is White-weak', weak === 2);
+  // 200 (White triple) + weakness bonus (6% of maxHp) torn off the enemy.
+  check('the real keep→bank flow lands the weak-White bonus damage',
+    room.coop.enemyHp, maxHp - (200 + Math.ceil(maxHp * 0.06)));
+}
+
 /* ══ Weakness — the weak colour's effect lands doubled ═════════════════ */
 {
   // Black weakness (face 4) + one banked Black trio → 2 poison, not 1.

@@ -17,7 +17,7 @@
    ══════════════════════════════════════════════ */
 
 import {
-  rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection, DICE_COUNT,
+  rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection, DICE_COUNT, FACE_VALUE,
 } from './mana-clash-scoring.js';
 
 const ROOM_TTL = 7200;
@@ -415,7 +415,12 @@ function coopTrios(room) {
     const turn = p.turn;
     if (!turn || (turn.done !== 'banked' && turn.done !== 'timeout')) continue;
     const counts = {};
-    for (const d of (turn.kept || [])) counts[d] = (counts[d] || 0) + 1;
+    for (const d of (turn.kept || [])) {
+      /* Kept dice are stored as LETTER faces ('C','W','U','B','R','G'); map to
+         the 1-6 colour number. (Numbers are tolerated too, for seeded tests.) */
+      const f = typeof d === 'number' ? d : FACE_VALUE[d];
+      if (f) counts[f] = (counts[f] || 0) + 1;
+    }
     for (let f = 1; f <= 6; f++) t[f] += Math.floor((counts[f] || 0) / 3);
   }
   return t;
