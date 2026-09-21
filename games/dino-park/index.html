@@ -569,6 +569,14 @@
     .egg-timer { font-size: 18px; font-weight: 700; color: #ff0000; margin-bottom: 4px; }
     .egg-progress { width: 80%; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
     .egg-progress-fill { height: 100%; background: #ff0000; border-radius: 2px; transition: width 1s linear; }
+    /* Whether an egg is actually ticking. Was a plain 8px caption easy to miss;
+       now a real badge, same visual language as .esbadge-*. */
+    .egg-live-badge {
+      display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 3px;
+      font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .egg-live-badge.is-live { background: #27ae6022; color: #2ecc71; }
+    .egg-live-badge.is-paused { background: #ffb02018; color: #ffb020; border: 1px solid #ffb02044; }
     .egg-hatch-btn {
       margin-top: 8px; padding: 6px 16px; background: #ff0000; border: none;
       border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
@@ -631,6 +639,22 @@
     .event-banner-btn:hover { background: #cc0000; }
     .event-banner-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .event-banner.expired { opacity: 0.3; animation: none; }
+
+    /* Incubator live/paused status — a single banner at the top of the tab
+       so "eggs aren't moving" reads as "stream's offline" at a glance,
+       instead of hunting for a small badge on each egg. Shown only while
+       something is actually incubating; nothing to say otherwise. */
+    .incubator-status {
+      font-size: 11px; font-weight: 600; text-align: center;
+      padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
+    }
+    .incubator-status.is-live { background: #27ae6018; color: #2ecc71; border: 1px solid #2ecc7144; }
+    .incubator-status.is-paused {
+      background: #ffb02018; color: #ffb020; border: 1px solid #ffb02044;
+      animation: pausedPulse 2s ease-in-out infinite;
+    }
+    @keyframes pausedPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @media (prefers-reduced-motion: reduce) { .incubator-status.is-paused { animation: none; } }
 
     /* Code redeem */
     .redeem-row { display: flex; gap: 6px; margin-top: 8px; }
@@ -1089,6 +1113,7 @@
   <div id="eventBannerArea"></div>
   <div class="eggs-section">
     <div class="section-title">Incubator</div>
+    <div id="incubatorStatusBanner"></div>
     <div class="incubator-grid" id="incubatorGrid"></div>
   </div>
   <div class="eggs-section">
@@ -3810,12 +3835,67 @@ function ensureDinoStats(d) {
   }
 }
 
+/* Below this, a gap is too small to be worth a network round trip — an
+   ordinary reload or a brief tab switch, not a closed browser. */
+const EGG_CATCHUP_MIN_GAP_SEC = 60;
+/* applyOfflineDecay() can run twice for one load (load() on the local save,
+   then syncCloudSave() again on whatever it merges in) — this just skips
+   the second Twitch lookup rather than firing two for one page load. Not a
+   correctness guard: the credit below is additive, so even a genuine double
+   call could only ever move elapsed further forward, never wrongly back. */
+let lastEggCatchupAt = 0;
+
+/**
+ * Credits every incubating egg for live seconds Dino Park now knows it
+ * missed while the page was closed, via /api/dino-park-catchup (which
+ * answers from the channel's Twitch VOD history — no session needed, so
+ * this covers guests exactly like logged-in players).
+ *
+ * Fire-and-forget by design: called from inside applyOfflineDecay(), which
+ * runs synchronously during load()/syncCloudSave() and must not block on a
+ * network round trip. It patches state.eggs in place whenever the response
+ * arrives, additively on top of whatever gameTick() has ticked forward in
+ * the meantime, so a slow reply can never roll incubation backwards.
+ */
+async function applyEggCatchup(sinceMs) {
+  if (!state.eggs.length) return;
+  if ((Date.now() - sinceMs) / 1000 < EGG_CATCHUP_MIN_GAP_SEC) return;
+  if (Date.now() - lastEggCatchupAt < 5000) return;
+  lastEggCatchupAt = Date.now();
+
+  try {
+    const res = await fetch('/api/dino-park-catchup?since=' + Math.floor(sinceMs));
+    if (!res.ok) return;
+    const data = await res.json();
+    const liveSeconds = Number(data.liveSeconds) || 0;
+    if (liveSeconds <= 0) return;
+
+    let credited = false;
+    state.eggs.forEach(e => {
+      if (e.elapsed < e.hatchTime) {
+        e.elapsed = Math.min(e.hatchTime, e.elapsed + liveSeconds);
+        credited = true;
+      }
+    });
+    if (!credited) return;
+    save();
+    const active = document.querySelector('.tab-content.active');
+    if (active && active.id === 'tab-eggs') renderIncubator();
+  } catch (e) { /* no catch-up this time — nothing already earned is lost */ }
+}
+
 function applyOfflineDecay() {
   // Hunger/thirst/happiness/hygiene only decay while the stream is live
   // (see DECAY_INTERVAL_LIVE_SEC) — time the game was closed can't be
   // attributed to live minutes, so it isn't decayed retroactively here.
   // Stamina still gets a wall-clock "welcome back" rest bonus for time away.
   const elapsedSec = (Date.now() - state.lastTick) / 1000;
+  /* Eggs get the retroactive treatment the comment above says decay
+     doesn't: /api/dino-park-catchup can now answer "was the stream live
+     during this gap" from Twitch's own VOD history, so a closed browser no
+     longer means lost incubation. Fire-and-forget — it patches state.eggs
+     in place once it resolves and must never block the rest of load(). */
+  applyEggCatchup(state.lastTick);
   const restTicks = Math.floor(elapsedSec / 600);
   if (restTicks > 0) {
     state.park.forEach(d => { ensureDinoStats(d); d.stamina = Math.min(100, d.stamina + restTicks * NIGHT_STAMINA_REGEN); });
@@ -5714,7 +5794,20 @@ function fmtTime(sec) {
   return `${m}:${String(s).padStart(2,'0')}`;
 }
 
+function renderIncubatorStatus() {
+  const el = document.getElementById('incubatorStatusBanner');
+  if (!el) return;
+  /* Nothing to say when there is no egg actually waiting on it — a ready
+     egg needs a hatch, not a status line. */
+  const incubating = state.eggs.some(e => e.elapsed < e.hatchTime);
+  if (!incubating) { el.innerHTML = ''; return; }
+  el.innerHTML = isStreamLive
+    ? '<div class="incubator-status is-live">🟢 PhantomACE is live — eggs are incubating!</div>'
+    : '<div class="incubator-status is-paused">⏸ Stream is offline — incubation is paused until PhantomACE goes live.</div>';
+}
+
 function renderIncubator() {
+  renderIncubatorStatus();
   const slots = [];
   state.eggs.forEach((egg, i) => {
     const spec = getRosterById(egg.speciesId);
@@ -5722,8 +5815,8 @@ function renderIncubator() {
     const ready = progress >= 1;
     const rem = Math.max(0, egg.hatchTime - egg.elapsed);
     const liveTag = isStreamLive
-      ? '<div style="font-size:8px;color:#2ecc71;margin-top:3px;">● LIVE — Incubating</div>'
-      : '<div style="font-size:8px;color:#fff;margin-top:3px;">○ Stream offline — Paused</div>';
+      ? '<div class="egg-live-badge is-live">● Live — Incubating</div>'
+      : '<div class="egg-live-badge is-paused">⏸ Paused — Offline</div>';
     const eggSrc = ready ? EGG_ASSETS.hatching : (EGG_ASSETS[spec.rarity] || EGG_ASSETS.common);
     slots.push(`<div class="egg-slot"><div class="egg-emoji"><img src="${eggSrc}" width="40" height="40" style="image-rendering:pixelated;" alt=""></div>
       <div class="egg-name">${spec.rarity.charAt(0).toUpperCase()+spec.rarity.slice(1)} Egg</div>
@@ -6538,7 +6631,7 @@ function gameTick() {
   }
   growOvergrowth();
   checkForEvent();
-  if (active.id === 'tab-eggs') { renderIncubator(); renderEventBanner(); renderEggSources(); }
+  if (active && active.id === 'tab-eggs') { renderIncubator(); renderEventBanner(); renderEggSources(); }
 }
 
 /* ======================== STREAM TIME (a stream is a day) ======================== */
