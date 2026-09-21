@@ -246,6 +246,39 @@ function coopRoom(over = {}, turnOver = {}) {
   ok('and is spent', room.coop.boons.secondWindUsed === true);
 }
 
+/* ══ Enemies scale with the party ══════════════════════════════════════ */
+
+/* A co-op lobby of `n` ready players, host = p1, ready to start. */
+function coopLobby(n) {
+  const now = Date.now();
+  const players = {};
+  for (let i = 1; i <= n; i++) players['p' + i] = { displayName: 'P' + i, profileImage: null, ready: true, total: 0, turn: null };
+  return {
+    code: 'AAAA', host: 'p1', hostName: 'P1', mode: 'coop', practice: false, goal: 0, idleMs: 30000,
+    status: 'lobby', round: 0, roundStartedAt: now, isFinalRound: false, nextIsFinal: false,
+    tiedPlayers: null, restingIds: [], intermissionEndsAt: null, winner: null, players, createdAt: now,
+  };
+}
+async function startedCoop(n) {
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopLobby(n) }) };
+  await POST(e, { action: 'start-game', code: 'AAAA' }, cookie('p1'));
+  return e.MARKETPLACE.read('mc_room_AAAA').coop;
+}
+{
+  const solo = await startedCoop(1);
+  const trio = await startedCoop(3);
+  // Wave-1 enemy HP: solo ×1.0, +0.8 per extra player → 3p = ×2.6, near-linear.
+  check('solo wave-1 enemy HP', solo.enemyMaxHp, 1500);
+  check('3-player wave-1 enemy HP scales ~linearly', trio.enemyMaxHp, 3900);
+  ok('a bigger party faces far more enemy HP', trio.enemyMaxHp / solo.enemyMaxHp === 2.6);
+  // Attack scales too (5 base × [0.7 + 0.3·players]).
+  check('solo enemy attack', solo.enemyAttack, 5);
+  check('3-player enemy attack is higher', trio.enemyAttack, 8);
+  // Shared team pool grows +25 per extra player.
+  check('solo team pool', solo.teamMaxHp, 100);
+  check('3-player team pool', trio.teamMaxHp, 150);
+}
+
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
 {
   const api = fs.readFileSync(path.join(REPO, 'functions/api/mana-clash.js'), 'utf8');

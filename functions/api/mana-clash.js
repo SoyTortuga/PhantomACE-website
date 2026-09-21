@@ -245,7 +245,7 @@ function coopOfferBoons(c) {
 function coopApplyBoon(c, id) {
   const b = c.boons;
   switch (id) {
-    case 'vigor':  c.teamMaxHp += 30; c.teamHp = Math.min(c.teamMaxHp, c.teamHp + 30); break;
+    case 'vigor':  c.teamHpBonus = (c.teamHpBonus || 0) + 30; break;   // realized as +max & heal on the next spawn
     case 'venom':  b.poisonMult += 0.5; break;
     case 'zeal':   b.dmgMult += 0.12; break;
     case 'medic':  b.healMult += 0.5; break;
@@ -319,9 +319,17 @@ function coopPick(wave) {
   return Object.assign({ tier: 'normal' }, n);
 }
 
-/* Set the room's current enemy for `wave`. HP grows with the wave and scales
-   with the party size (each extra player is another turn of damage a round),
-   so a full team faces a real fight rather than a pushover. */
+/* Team HP is a shared pool sized to the CURRENT roster (plus any Vigor boons).
+   Kept in a helper so spawn can resize it when players join or leave mid-run. */
+function coopTeamMax(players, bonus = 0) {
+  return COOP_TEAM_HP_BASE + COOP_TEAM_HP_PER_PLAYER * (Math.max(1, players) - 1) + bonus;
+}
+
+/* Set the room's current enemy for `wave`. HP and attack grow with the wave and
+   with the party size. A bigger team banks proportionally more damage each
+   round, so enemy HP scales near-LINEARLY with players (not the old half-rate
+   curve that made big teams a pushover); attack scales too, since more players
+   also means a deeper HP pool and more healing to out-pace. */
 function coopSpawn(room, wave) {
   const pick = coopPick(wave);
   const isFinal = pick.tier === 'final';
@@ -331,8 +339,8 @@ function coopSpawn(room, wave) {
   if (isBoss) hp *= 2.6;
   if (isFinal) hp *= 5;
   if (wave > COOP_FINAL_WAVE) hp *= 1.5;          // nightmare tier bites harder
-  hp *= (0.5 + 0.5 * players);                    // party scaling
-  hp = Math.ceil(hp / 100) * 100;
+  hp *= (0.2 + 0.8 * players);                    // party scaling — solo ×1.0, +0.8 per extra player
+  hp = Math.ceil(Math.round(hp) / 100) * 100;     // round first so float dust (2.4000…) doesn't bump a clean value
   room.coop.wave = wave;
   room.coop.enemyName = wave > COOP_FINAL_WAVE ? pick.name + ' (Nightmare ' + (wave - COOP_FINAL_WAVE) + ')' : pick.name;
   room.coop.enemySlug = pick.slug;
@@ -358,7 +366,19 @@ function coopSpawn(room, wave) {
   if (isBoss) atk *= 1.7;
   if (isFinal) atk *= 2.3;
   if (wave > COOP_FINAL_WAVE) atk *= 1.4;
+  atk *= (0.7 + 0.3 * players);                   // bigger parties get hit harder too
   room.coop.enemyAttack = Math.round(atk);
+
+  /* Resize the shared team pool to the current roster (and Vigor bonuses),
+     preserving current HP: a player joining reinforces the team by their
+     share, one leaving trims the cap without draining what's left. Runs on
+     every spawn, so a mid-run join/leave is reflected on the next enemy. */
+  const newMax = coopTeamMax(players, room.coop.teamHpBonus || 0);
+  const oldMax = room.coop.teamMaxHp || newMax;
+  if (typeof room.coop.teamHp !== 'number') room.coop.teamHp = newMax;
+  else if (newMax > oldMax) room.coop.teamHp += (newMax - oldMax);   // reinforcement / Vigor heal
+  else room.coop.teamHp = Math.min(room.coop.teamHp, newMax);
+  room.coop.teamMaxHp = newMax;
   /* Bosses raise a damage-halving shield on a cadence; normal enemies don't. */
   room.coop.shieldEvery = isFinal ? 2 : isBoss ? 3 : 0;
   /* Combat state is per-enemy — it resets with each new foe. Team HP does not
@@ -375,10 +395,10 @@ function coopSpawn(room, wave) {
 
 function coopInit(room) {
   const players = Math.max(1, Object.keys(room.players).length);
-  const teamMax = COOP_TEAM_HP_BASE + COOP_TEAM_HP_PER_PLAYER * (players - 1);
+  const teamMax = coopTeamMax(players);
   room.coop = {
     cleared: 0, victory: false, runOver: false, lastDamage: 0, justCleared: false,
-    teamMaxHp: teamMax, teamHp: teamMax, log: [],
+    teamMaxHp: teamMax, teamHp: teamMax, teamHpBonus: 0, log: [],
     boons: coopBoonDefaults(), carryover: 0, awaitingBoon: false, pendingBoons: null,
   };
   coopSpawn(room, 1);
