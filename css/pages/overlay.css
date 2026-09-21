@@ -481,6 +481,10 @@ html, body {
    Boss art up top, a vertical health bar that drains downward as the site
    clicks it apart, then minions and the top strikers.
    ══════════════════════════════════════════════ */
+/* display:flex below would override the [hidden] attribute the poller sets
+   (an author rule beats the UA [hidden]{display:none}), so the panel would
+   sit on the overlay with no boss. This restores hiding when hidden. */
+.ov-raid[hidden] { display: none; }
 .ov-raid {
   position: fixed;
   left: 14px;
