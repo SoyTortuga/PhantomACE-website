@@ -29,6 +29,7 @@ const DEFAULT_HP = 5000;
 const MAX_HP = 5_000_000;
 const DEFAULT_MINUTES = 15;
 const FRENZY_MS = 10 * 60 * 1000;    /* the reward on a kill */
+const DEFEAT_LINGER_MS = 15000;      /* a defeated boss shows this long, then clears */
 
 const RAID_CODE_SECONDS = 604800;    /* 7-day redemption on defeat codes */
 const RAID_REWARD_CAP = 100;         /* most participants paid per kill */
@@ -151,6 +152,9 @@ function publicState(raid) {
   if (!raid || !raid.status) return { status: 'none' };
   let status = raid.status;
   if (status === 'active' && raid.endsAt && Date.now() > raid.endsAt) status = 'expired';
+  /* A defeated boss shows just long enough for the death + banner, then reads
+     as gone so the overlay panel clears itself rather than lingering. */
+  if (status === 'defeated' && raid.defeatedAt && Date.now() - raid.defeatedAt > DEFEAT_LINGER_MS) status = 'none';
   const contributors = raid.contributors || {};
   const top = Object.keys(contributors)
     .map(id => ({ name: contributors[id].name, dmg: contributors[id].dmg }))
@@ -242,16 +246,14 @@ export async function onRequestPost(context) {
     return json({ success: true, raid: publicState(raid) });
   }
 
-  /* ── End a boss early — broadcaster/moderators only ── */
+  /* ── Remove the boss — broadcaster/moderators only. Clears it outright
+     whatever its state (active, defeated-but-lingering, or a stuck record),
+     so there is always a reliable way to get it off the overlay now. ── */
   if (body.action === 'end') {
     const session = getSession(request);
     const { isModerator } = await import('./admin/moderators.js');
     if (!(await isModerator(env, session))) return json({ error: 'Moderators only.' }, 403);
-    const raid = await env.MARKETPLACE.get(RAID_KEY, 'json');
-    if (raid && raid.status === 'active') {
-      raid.status = 'expired';
-      await env.MARKETPLACE.put(RAID_KEY, JSON.stringify(raid));
-    }
+    await env.MARKETPLACE.delete(RAID_KEY);
     return json({ success: true });
   }
 

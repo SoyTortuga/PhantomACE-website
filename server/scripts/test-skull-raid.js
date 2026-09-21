@@ -165,7 +165,21 @@ function boss(over = {}) {
   const e = envWith({ sc_raid: boss() });
   check('a stranger cannot end it', (await POST(e, { action: 'end' }, cookie('9'))).status, 403);
   await POST(e, { action: 'end' }, cookie(BC));
-  check('the broadcaster ends it', e.MARKETPLACE.read('sc_raid').status, 'expired');
+  check('the broadcaster removes it outright', e.MARKETPLACE.read('sc_raid'), null);
+}
+{
+  /* End clears a stuck defeated boss too, not just an active one. */
+  const e = envWith({ sc_raid: boss({ status: 'defeated', hp: 0, defeatedAt: Date.now() }) });
+  await POST(e, { action: 'end' }, cookie(BC));
+  check('and clears a lingering defeated boss', e.MARKETPLACE.read('sc_raid'), null);
+}
+
+/* ══ A defeated boss shows briefly, then clears itself ═════════════════ */
+{
+  const fresh = envWith({ sc_raid: boss({ status: 'defeated', hp: 0, defeatedAt: Date.now() - 1000 }) });
+  check('a fresh kill still shows (death + banner)', (await (await GET(fresh)).json()).status, 'defeated');
+  const old = envWith({ sc_raid: boss({ status: 'defeated', hp: 0, defeatedAt: Date.now() - 20000 }) });
+  check('but a long-defeated boss reads as gone', (await (await GET(old)).json()).status, 'none');
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
