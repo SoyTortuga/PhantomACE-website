@@ -54,6 +54,7 @@ export const SINGLETONS = {
   giveaway_reward_rare_id:   { table: 'singletons', expiry: 'none' },
   giveaway_reward_mythic_id: { table: 'singletons', expiry: 'none' },
   checkin_reward_id:     { table: 'singletons', expiry: 'none' },
+  raid_boss_reward_id:   { table: 'singletons', expiry: 'none' },
 
   /* Rotating chat announcements: the list, the interval, and the rotation
      cursor. expiry 'none' — an expired row would silently stop the rotation

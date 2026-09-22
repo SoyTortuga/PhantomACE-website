@@ -103,6 +103,7 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   const broadcasterRefresh = await env.MARKETPLACE.get('twitch_broadcaster_refresh_token');
   const giveawayRewardId = await env.MARKETPLACE.get('giveaway_reward_id');
   const checkinRewardId = await env.MARKETPLACE.get('checkin_reward_id');
+  const raidRewardId = await env.MARKETPLACE.get('raid_boss_reward_id');
 
   const tokenStatus = botRefresh ? '✅ Bot token stored' : '❌ No bot token — authorize below';
   const subStatus = subs && subs.length > 0
@@ -176,6 +177,9 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
     : '❌ Not created yet';
   const checkinRewardStatus = checkinRewardId
     ? `✅ "Pham Check-In" reward created (ID: ${checkinRewardId})`
+    : '❌ Not created yet';
+  const raidRewardStatus = raidRewardId
+    ? `✅ "Summon Raid Boss" reward created (ID: ${raidRewardId})`
     : '❌ Not created yet';
 
   const callbackUrl = `${url.origin}/api/admin/bot-setup`;
@@ -303,6 +307,21 @@ PhantomACE's own channel and only they can approve those, so they are shown here
   </label>
   <button class="btn btn-red" onclick="createCheckinReward()" ${checkinRewardId ? 'disabled' : ''}>Create Reward</button>
   <div id="checkinResult"></div>`
+    : `<div class="locked">🔒 Broadcaster only — creates a reward in their channel.</div>`}
+</div>
+
+<div class="section${isBroadcasterUser ? '' : ' is-locked'}">
+  <h2><span class="step">Step 3c:</span> Create the "Summon Raid Boss" Reward</h2>
+  <div class="status">${raidRewardStatus}</div>
+  <p>Summons the Skull Clicker co-op raid boss, sized to a third of the current viewer count. Fixed at a
+  1-hour cooldown and 3 redemptions per stream — both enforced by Twitch on the reward itself, not by the
+  site. Like check-in, it needs no new EventSub subscription — Step 4's redemption subscription already
+  covers every reward on the channel, and this one is matched by title too.</p>
+  ${isBroadcasterUser ? `<label style="display:block;margin:10px 0">Cost (channel points):
+    <input id="raidCost" type="number" value="10000" min="1" style="width:100px;margin-left:8px;padding:6px;background:#222;color:#eee;border:1px solid #333;border-radius:4px">
+  </label>
+  <button class="btn btn-red" onclick="createRaidReward()" ${raidRewardId ? 'disabled' : ''}>Create Reward</button>
+  <div id="raidResult"></div>`
     : `<div class="locked">🔒 Broadcaster only — creates a reward in their channel.</div>`}
 </div>
 
@@ -497,6 +516,33 @@ async function createCheckinReward() {
   }
 }
 
+async function createRaidReward() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  const el = document.getElementById('raidResult');
+  const cost = parseInt(document.getElementById('raidCost').value, 10) || 10000;
+  try {
+    const res = await fetch('/api/admin/bot-setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create-raid-reward', cost })
+    });
+    const data = await res.json();
+    el.style.display = 'block';
+    el.innerHTML = data.success
+      ? '<b>✅ Reward created!</b> ID: ' + esc(data.rewardId) + '. It is live now — no Step 4 needed for this one.'
+      : '<b>❌ Error:</b> ' + esc(data.error || 'Unknown error');
+  } catch (e) {
+    el.style.display = 'block';
+    el.innerHTML = '<b>❌ Error:</b> ' + esc(e.message);
+  }
+  if (!document.getElementById('raidResult').innerHTML.includes('✅')) {
+    btn.disabled = false;
+    btn.textContent = 'Create Reward';
+  }
+}
+
 async function createGiveawayReward() {
   const btn = event.target;
   btn.disabled = true;
@@ -634,6 +680,10 @@ export async function onRequestPost(context) {
 
   if (body.action === 'create-checkin-reward') {
     return await createCheckinReward(env, body);
+  }
+
+  if (body.action === 'create-raid-reward') {
+    return await createRaidBossReward(env, body);
   }
 
   return json({ error: 'Invalid action' }, 400);
@@ -785,6 +835,65 @@ async function createCheckinReward(env, body) {
   const data = await res.json();
   const rewardId = data.data[0].id;
   await env.MARKETPLACE.put('checkin_reward_id', rewardId);
+
+  return json({ success: true, rewardId });
+}
+
+
+async function createRaidBossReward(env, body) {
+  const broadcasterId = env.TWITCH_BROADCASTER_ID;
+  if (!broadcasterId) return json({ error: 'TWITCH_BROADCASTER_ID env var not set.' }, 500);
+
+  const existing = await env.MARKETPLACE.get('raid_boss_reward_id');
+  if (existing) return json({ success: true, rewardId: existing, alreadyExisted: true });
+
+  const token = await getBroadcasterToken(env);
+  if (!token) return json({ error: 'Not authorized for channel points management — complete Step 2 first.' }, 400);
+
+  const cost = Math.max(1, parseInt(body.cost, 10) || 10000);
+
+  const res = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Client-Id': env.TWITCH_CLIENT_ID,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: 'Summon Raid Boss',
+      cost,
+      prompt: 'Summon the co-op raid boss for the whole channel to click down! Sized to how many people are watching.',
+      is_enabled: true,
+      /* NOT skipped, unlike check-in/giveaway. A redemption stays UNFULFILLED
+         until channel-points.js explicitly settles it -- which is what lets
+         a redemption while a fight is already active be CANCELED (refunded)
+         instead of silently spending 10,000 points for nothing. Twitch
+         refuses status changes once a redemption auto-fulfills, so skipping
+         the queue here would make that refund impossible. */
+      should_redemptions_skip_request_queue: false,
+      /* Fixed at creation, not exposed as an input -- these are the two
+         numbers Twitch enforces so the site never has to count redemptions
+         or track a cooldown clock itself. */
+      is_global_cooldown_enabled: true,
+      global_cooldown_seconds: 3600,
+      is_max_per_stream_enabled: true,
+      max_per_stream: 3,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const dup = /duplicate/i.test(err.message || '');
+    return json({
+      error: dup
+        ? 'A reward called "Summon Raid Boss" already exists on the channel. Delete it in the Twitch dashboard first, or leave it — redemptions are matched by title, so an existing one already works (just confirm it has a 1-hour cooldown and a 3-per-stream cap set).'
+        : (err.message || 'Twitch API error creating the reward.'),
+    }, 400);
+  }
+
+  const data = await res.json();
+  const rewardId = data.data[0].id;
+  await env.MARKETPLACE.put('raid_boss_reward_id', rewardId);
 
   return json({ success: true, rewardId });
 }

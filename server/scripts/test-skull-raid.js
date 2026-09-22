@@ -304,6 +304,16 @@ function boss(over = {}) {
   ok('channel points routes a boss/raid reward title', /if \(lower\.includes\('boss'\) \|\| lower\.includes\('raid'\)\)/.test(cp));
   ok('and spawns the boss on redemption', /spawnRaidFromRedemption/.test(cp));
   ok('refunding when it refuses', /settleRedemption/.test(cp) && /CANCELED/.test(cp));
+
+  const bs = fs.readFileSync(path.join(REPO, 'functions/api/admin/bot-setup.js'), 'utf8');
+  ok('the admin panel can create the raid boss reward', /function createRaidBossReward/.test(bs) && /'create-raid-reward'/.test(bs));
+  ok('sized so Twitch owns the cooldown/cap, not the site',
+     /global_cooldown_seconds:\s*3600/.test(bs) && /max_per_stream:\s*3/.test(bs));
+  ok('and leaves the redemption queued so a refusal can be refunded',
+     /should_redemptions_skip_request_queue:\s*false/.test(bs));
+
+  const reg = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
+  ok('the raid boss reward id is a registered singleton', /raid_boss_reward_id:\s*\{ table: 'singletons'/.test(reg));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
