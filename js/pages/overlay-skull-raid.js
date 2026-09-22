@@ -87,7 +87,17 @@
   var boss = makeAnimator(artEl, 100, BOSS);
   var minion = miniEl ? makeAnimator(miniEl, 50, MINI) : null;
   boss.play('idle', true);
-  setInterval(function () { boss.tick(); if (minion && minionsShown) minion.tick(); }, FPS_MS);
+  /* Only step the sprite while a boss is actually on screen. The panel is
+     hidden whenever no boss is live (see poll()), which is the overwhelming
+     majority of an OBS session — ticking then rewrote the boss's
+     background-image ~9x/second for nothing, steady GPU/CPU churn in a
+     browser source that stays open for days. Skipping while hidden costs a
+     cheap boolean per frame and cuts the panel's idle cost to zero. */
+  setInterval(function () {
+    if (panel.hidden) return;
+    boss.tick();
+    if (minion && minionsShown) minion.tick();
+  }, FPS_MS);
 
   /* ── State ── */
   var seen = { attackCount: 0, skillCount: 0, summonCount: 0, minionDeaths: 0, status: null };

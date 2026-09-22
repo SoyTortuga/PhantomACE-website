@@ -197,6 +197,10 @@ function boss(over = {}) {
   const ovjs = fs.readFileSync(path.join(REPO, 'js/pages/overlay-skull-raid.js'), 'utf8');
   ok('the overlay animates every reaper sprite',
      ['idle', 'attack', 'skill', 'summon', 'death', 'minion-appear', 'minion-idle', 'minion-death'].every(n => ovjs.includes(n)));
+  /* The sprite loop must idle when hidden: it runs for the life of an OBS
+     browser source (days), and re-writing the background-image ~9x/second
+     while no boss is up is pure churn on a fragile CEF. */
+  ok('the sprite animation is skipped while the panel is hidden', /if \(panel\.hidden\) return;/.test(ovjs));
 
   const game = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
   ok('a strike also hits the boss', /if \(raidActive\(\)\) raidQueue\+\+/.test(game));
