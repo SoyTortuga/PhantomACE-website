@@ -4,17 +4,17 @@
 
      node server/scripts/test-dino-park-catchup.js
 
-   Eggs only incubate while PhantomACE is live, and until now a closed
-   browser meant that gap was simply never credited — nobody could say
-   whether the stream WAS live while the page was shut. Twitch's VOD list
-   is that missing record: this endpoint sums how much of [since, now]
-   overlaps the channel's own archived broadcasts.
+   Eggs only incubate while PhantomACE is live, and a closed browser used to
+   mean that gap was never credited. The catch-up answers "how many seconds
+   of [since, now] was the stream live" — now from a live-interval log the
+   RIG stamps on its own minute tick (recordLiveTick), not from Twitch VODs,
+   which silently credited nothing whenever VOD archiving was off.
 
-   Everything here drives the real onRequestGet with a faked env and a
-   faked Twitch Videos response — no network, no KV.
+   Everything here drives the real recordLiveTick + onRequestGet against a
+   fake KV — no network, no Twitch, no real database.
    ══════════════════════════════════════════════ */
 
-import { onRequestGet, parseDuration, overlapSeconds } from '../../functions/api/dino-park-catchup.js';
+import { onRequestGet, recordLiveTick, overlapSeconds } from '../../functions/api/dino-park-catchup.js';
 
 let passed = 0;
 const failures = [];
@@ -25,17 +25,9 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
+const MIN = 60 * 1000;
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
-
-/* ── parseDuration ────────────────────────────────────────────────────── */
-check('hours, minutes and seconds', parseDuration('3h24m10s'), 3 * 3600 + 24 * 60 + 10);
-check('minutes and seconds', parseDuration('45m2s'), 45 * 60 + 2);
-check('seconds only', parseDuration('10s'), 10);
-check('hours only', parseDuration('2h'), 7200);
-check('empty string is zero', parseDuration(''), 0);
-check('undefined is zero', parseDuration(undefined), 0);
-check('garbage is zero, not a throw', parseDuration('not a duration'), 0);
 
 /* ── overlapSeconds ───────────────────────────────────────────────────── */
 {
@@ -48,20 +40,17 @@ check('garbage is zero, not a throw', parseDuration('not a duration'), 0);
   check('entirely after the window', overlapSeconds(6000, 7000, from, now), 0);
 }
 
-/* ── Fake env / fake Twitch ───────────────────────────────────────────── */
-function makeEnv() {
+/* An env with a KV stand-in, env-shaped so the real code's env.MARKETPLACE
+   works; `store`/`read` hang off it for the test to inspect. */
+function fakeKV(seed = {}) {
+  const store = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
   return {
-    TWITCH_BROADCASTER_ID: '900',
-    TWITCH_CLIENT_ID: 'cid',
+    store,
+    read(k) { return store.has(k) ? JSON.parse(store.get(k)) : null; },
     MARKETPLACE: {
-      async get(k, t) {
-        if (k === 'twitch_app_token') {
-          const v = { access_token: 'tok', token: 'tok', expiresAt: Date.now() + HOUR };
-          return t === 'json' ? v : JSON.stringify(v);
-        }
-        return null;
-      },
-      async put() {},
+      async get(k, t) { const v = store.get(k); return v === undefined ? null : (t === 'json' ? JSON.parse(v) : v); },
+      async put(k, v) { store.set(k, typeof v === 'string' ? v : JSON.stringify(v)); },
+      async mutate(k, fn) { const cur = store.has(k) ? JSON.parse(store.get(k)) : null; const out = await fn(cur); if (out === undefined) return; store.set(k, JSON.stringify(out)); },
     },
   };
 }
@@ -69,127 +58,123 @@ function makeEnv() {
 const GET = (env, since) => onRequestGet({
   env, request: new Request('https://x/api/dino-park-catchup' + (since === undefined ? '' : `?since=${since}`)),
 });
+const liveLog = (env) => env.read('dino_live_log');
 
-function vod(startMs, durationStr) {
-  return { created_at: new Date(startMs).toISOString(), duration: durationStr };
-}
-
-let calls;
-function mockVideos(pages) {
-  calls = [];
-  globalThis.fetch = async (url) => {
-    calls.push(String(url));
-    const u = new URL(String(url));
-    const cursor = u.searchParams.get('after');
-    const pageIdx = cursor ? parseInt(cursor, 10) : 0;
-    const page = pages[pageIdx];
-    if (!page) return new Response(JSON.stringify({ data: [] }), { status: 200 });
-    const nextCursor = pageIdx + 1 < pages.length ? String(pageIdx + 1) : null;
-    return new Response(JSON.stringify({
-      data: page,
-      pagination: nextCursor ? { cursor: nextCursor } : {},
-    }), { status: 200 });
-  };
-}
-
-/* ── No/invalid `since` credits nothing ──────────────────────────────── */
+/* ── recordLiveTick builds intervals ──────────────────────────────────── */
 {
-  mockVideos([[]]);
+  const env = fakeKV();
+  const t0 = Date.now() - HOUR;
+  /* Five consecutive minute ticks, all live → one interval spanning them. */
+  for (let i = 0; i <= 5; i++) await recordLiveTick(env, true, t0 + i * MIN);
+  const log = liveLog(env);
+  check('consecutive live ticks make one interval', log.intervals.length, 1);
+  check('the interval starts at the first tick', log.intervals[0].start, t0);
+  check('and ends at the last', log.intervals[0].end, t0 + 5 * MIN);
+}
+{
+  /* An offline tick records nothing and does not extend the interval. */
+  const env = fakeKV();
+  const t0 = Date.now() - HOUR;
+  await recordLiveTick(env, true, t0);
+  await recordLiveTick(env, true, t0 + MIN);
+  await recordLiveTick(env, false, t0 + 2 * MIN);   // stream went down
+  await recordLiveTick(env, false, t0 + 3 * MIN);
+  const log = liveLog(env);
+  check('offline ticks add no interval', log.intervals.length, 1);
+  check('and leave the interval ended at the last live tick', log.intervals[0].end, t0 + MIN);
+}
+{
+  /* A live tick after a long gap opens a NEW interval (a separate broadcast). */
+  const env = fakeKV();
+  const t0 = Date.now() - 6 * HOUR;
+  await recordLiveTick(env, true, t0);
+  await recordLiveTick(env, true, t0 + MIN);
+  await recordLiveTick(env, true, t0 + 3 * HOUR);   // hours later — a new stream
+  const log = liveLog(env);
+  check('a live tick after a long gap starts a new interval', log.intervals.length, 2);
+}
+{
+  /* A single missed tick (a gap under the merge tolerance) still counts as
+     the same interval rather than splitting it. */
+  const env = fakeKV();
+  const t0 = Date.now() - HOUR;
+  await recordLiveTick(env, true, t0);
+  await recordLiveTick(env, true, t0 + 2 * MIN);    // ~one missed tick (120s < 150s tolerance)
+  check('a single missed tick does not split the interval', liveLog(env).intervals.length, 1);
+}
+
+/* ── onRequestGet sums overlap ────────────────────────────────────────── */
+{
+  const env = fakeKV();
   const now = Date.now();
-  check('missing since', (await (await GET(makeEnv(), undefined)).json()).liveSeconds, 0);
-  check('since in the future', (await (await GET(makeEnv(), now + 60000)).json()).liveSeconds, 0);
-  ok('neither even asked Twitch', calls.length === 0);
+  /* A live interval from 2h ago to 1h ago (a 1-hour broadcast). */
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [{ start: now - 2 * HOUR, end: now - HOUR }] }));
+  const body = await (await GET(env, now - 3 * HOUR)).json();
+  check('a live interval fully inside the gap counts in full', body.liveSeconds, 3600);
 }
-
-/* ── Missing config credits nothing, does not throw ──────────────────── */
 {
-  mockVideos([[]]);
-  const env = makeEnv();
-  delete env.TWITCH_BROADCASTER_ID;
-  const body = await (await GET(env, Date.now() - HOUR)).json();
-  check('no broadcaster id configured', body.liveSeconds, 0);
-  ok('and Twitch was never called', calls.length === 0);
-}
-
-/* ── A VOD fully inside the gap is credited in full ──────────────────── */
-{
+  const env = fakeKV();
   const now = Date.now();
-  const since = now - 2 * HOUR;
-  mockVideos([[ vod(now - HOUR, '45m0s') ]]);
-  const body = await (await GET(makeEnv(), since)).json();
-  check('a VOD fully inside the gap counts in full', body.liveSeconds, 45 * 60);
-}
-
-/* ── A VOD that started before `since` only counts from `since` ─────── */
-{
-  const now = Date.now();
-  const since = now - HOUR;
-  // Started 90 minutes ago, ran 1 hour -> ended 30 minutes ago, so only the
-  // last 30 of those 60 minutes fall inside [since, now].
-  mockVideos([[ vod(now - 90 * 60 * 1000, '1h0m0s') ]]);
-  const body = await (await GET(makeEnv(), since)).json();
+  /* Live interval started before `since`: only the part inside [since, now]. */
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [{ start: now - 90 * MIN, end: now - 30 * MIN }] }));
+  const body = await (await GET(env, now - HOUR)).json();
   check('only the portion inside [since, now] counts', body.liveSeconds, 30 * 60);
 }
-
-/* ── A VOD entirely before `since` contributes nothing ───────────────── */
 {
+  const env = fakeKV();
   const now = Date.now();
-  const since = now - HOUR;
-  mockVideos([[ vod(now - 5 * HOUR, '1h0m0s') ]]);
-  const body = await (await GET(makeEnv(), since)).json();
-  check('an old VOD outside the gap is worth zero', body.liveSeconds, 0);
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [{ start: now - 5 * HOUR, end: now - 4 * HOUR }] }));
+  const body = await (await GET(env, now - HOUR)).json();
+  check('an interval entirely before the gap is worth zero', body.liveSeconds, 0);
+}
+{
+  const env = fakeKV();
+  const now = Date.now();
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [
+    { start: now - 5 * HOUR, end: now - 5 * HOUR + 30 * MIN },
+    { start: now - 2 * HOUR, end: now - HOUR },
+  ] }));
+  const body = await (await GET(env, now - 6 * HOUR)).json();
+  check('multiple intervals in the gap sum', body.liveSeconds, 30 * 60 + 60 * 60);
 }
 
-/* ── Multiple VODs on one page sum ───────────────────────────────────── */
+/* ── No/invalid since, and the window cap ─────────────────────────────── */
 {
+  const env = fakeKV({ dino_live_log: { intervals: [{ start: Date.now() - HOUR, end: Date.now() }] } });
+  check('missing since credits nothing', (await (await GET(env, undefined)).json()).liveSeconds, 0);
+  check('since in the future credits nothing', (await (await GET(env, Date.now() + MIN)).json()).liveSeconds, 0);
+}
+{
+  const env = fakeKV();
   const now = Date.now();
-  const since = now - 6 * HOUR;
-  mockVideos([[ vod(now - 5 * HOUR, '30m0s'), vod(now - 2 * HOUR, '1h0m0s') ]]);
-  const body = await (await GET(makeEnv(), since)).json();
-  check('two VODs in the gap sum', body.liveSeconds, 30 * 60 + 60 * 60);
+  /* Fully inside a 30-day gap but before the 7-day cap → not credited. */
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [{ start: now - 10 * DAY, end: now - 10 * DAY + HOUR }] }));
+  const body = await (await GET(env, now - 30 * DAY)).json();
+  check('live time older than the capped window is not credited', body.liveSeconds, 0);
+}
+{
+  const env = fakeKV();
+  check('no log yet credits nothing, cleanly', (await (await GET(env, Date.now() - HOUR)).json()).liveSeconds, 0);
+}
+{
+  /* Never credit more than the gap itself, whatever the log claims. */
+  const env = fakeKV();
+  const now = Date.now();
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [{ start: now - 10 * HOUR, end: now }] }));
+  const body = await (await GET(env, now - HOUR)).json();
+  check('credit is capped at the gap length', body.liveSeconds, 3600);
 }
 
-/* ── Pagination: keeps paging while the oldest VOD is still in the gap ── */
+/* ── Pruning keeps the record bounded ─────────────────────────────────── */
 {
+  const env = fakeKV();
   const now = Date.now();
-  const since = now - 10 * HOUR;
-  mockVideos([
-    [ vod(now - HOUR, '20m0s') ],          // page 0 — oldest here is still > since -> must page on
-    [ vod(now - 5 * HOUR, '10m0s') ],      // page 1 — oldest here is still > since -> must page on
-    [ vod(now - 20 * HOUR, '10m0s') ],     // page 2 — starts (and ends) before since -> zero credit, but its
-                                            //          age is what stops paging any further
-    [ vod(now - 40 * HOUR, '10m0s') ],     // page 3 — must never be reached
-  ]);
-  const body = await (await GET(makeEnv(), since)).json();
-  check('credit sums across pages, excluding the one outside the window', body.liveSeconds, 20 * 60 + 10 * 60);
-  check('paging stopped once a page\'s oldest VOD precedes the window', calls.length, 3);
-}
-
-/* ── The lookback window itself is capped ────────────────────────────── */
-{
-  const now = Date.now();
-  const since = now - 30 * DAY;              // far beyond MAX_WINDOW_MS (7 days)
-  // Entirely inside the 30-day gap, but before the 7-day cap -> must not count.
-  mockVideos([[ vod(now - 10 * DAY, '1h0m0s') ]]);
-  const body = await (await GET(makeEnv(), since)).json();
-  check('a VOD older than the capped window is not credited', body.liveSeconds, 0);
-}
-
-/* ── A dead Twitch call fails soft, not a throw ──────────────────────── */
-{
-  globalThis.fetch = async () => new Response('nope', { status: 500 });
-  const body = await (await GET(makeEnv(), Date.now() - HOUR)).json();
-  check('a Twitch failure still answers cleanly', body.liveSeconds, 0);
-}
-
-/* ── The request itself is well-formed ───────────────────────────────── */
-{
-  const now = Date.now();
-  mockVideos([[ vod(now - HOUR, '10m0s') ]]);
-  await GET(makeEnv(), now - 2 * HOUR);
-  const u = new URL(calls[0]);
-  check('queries the right broadcaster', u.searchParams.get('user_id'), '900');
-  check('archived broadcasts only', u.searchParams.get('type'), 'archive');
+  /* Seed an ancient interval, then a live tick now: the old one is pruned. */
+  env.store.set('dino_live_log', JSON.stringify({ intervals: [{ start: now - 10 * DAY, end: now - 10 * DAY + HOUR }] }));
+  await recordLiveTick(env, true, now);
+  const log = liveLog(env);
+  ok('an interval past the window is pruned on the next tick',
+     log.intervals.every(iv => iv.end >= now - 7 * DAY));
 }
 
 /* ── Wiring ───────────────────────────────────────────────────────────── */
@@ -203,7 +188,15 @@ function mockVideos(pages) {
   const game = fs.readFileSync(path.join(REPO, 'games/dino-park/index.html'), 'utf8');
   ok('applyOfflineDecay calls the catch-up', /applyEggCatchup\(state\.lastTick\)/.test(game));
   ok('the catch-up credit is additive, never a replace', /e\.elapsed = Math\.min\(e\.hatchTime, e\.elapsed \+ liveSeconds\)/.test(game));
-  ok('the missing null-guard on the eggs-tab tick branch is fixed', /if \(active && active\.id === 'tab-eggs'\)/.test(game));
+
+  const idx = fs.readFileSync(path.join(REPO, 'server/index.js'), 'utf8');
+  ok('the rig minute tick records live intervals', /recordLiveTick\(env, !!s\.live/.test(idx));
+
+  const reg = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
+  ok('the live log is a registered singleton', /dino_live_log:\s*\{ table: 'singletons'/.test(reg));
+
+  const cat = fs.readFileSync(path.join(REPO, 'functions/api/dino-park-catchup.js'), 'utf8');
+  ok('the VOD dependency is gone', !/helix\/videos/.test(cat));
 }
 
 /* ── Report ───────────────────────────────────────────────────────────── */

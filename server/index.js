@@ -235,10 +235,16 @@ async function main() {
     Promise.all([
       import('../functions/api/stream-info.js'),
       import('../functions/api/checkin-rewards.js'),
+      import('../functions/api/dino-park-catchup.js'),
     ])
-      .then(([info, rewards]) => info.getStreamInfo(env).then(s => (
-        s.live && s.streamId ? rewards.recordStream(env, s.streamId, s.startedAt) : false
-      )))
+      .then(([info, rewards, catchup]) => info.getStreamInfo(env).then(async (s) => {
+        /* Same live check feeds two records: the broadcast log (for check-in
+           streaks) and Dino Park's live-interval log (for offline egg
+           catch-up). The interval log is stamped every live tick, not just on
+           a new broadcast, so it captures how LONG the stream stayed up. */
+        await catchup.recordLiveTick(env, !!s.live, Date.now());
+        return s.live && s.streamId ? rewards.recordStream(env, s.streamId, s.startedAt) : false;
+      }))
       .then(added => { if (added) console.log('[stream] new broadcast recorded'); })
       .catch(err => console.error('[stream]', err.message));
   }, 60000).unref();

@@ -68,6 +68,13 @@ export const SINGLETONS = {
      as a stream and correctly breaks a streak. */
   stream_log:            { table: 'singletons', expiry: 'none' },
 
+  /* The intervals the channel was live, stamped by the same minute tick, so
+     Dino Park's offline egg catch-up can credit the live time a closed
+     browser missed without depending on Twitch VOD archiving. 'none': it is
+     the record itself, pruned to a rolling window in code (see
+     dino-park-catchup.js), not by a TTL. */
+  dino_live_log:         { table: 'singletons', expiry: 'none' },
+
   /* Where each overlay panel sits, as percentages of the canvas — set in
      the overlay editor, read by every OBS source on boot. 'none': a layout
      that expired would snap every panel back to its default corner
