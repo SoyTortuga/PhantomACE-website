@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { onRequestGet, onRequestPost } from '../../functions/api/skull-raid.js';
+import { onRequestGet, onRequestPost, spawnRaidFromRedemption } from '../../functions/api/skull-raid.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -255,6 +255,55 @@ function boss(over = {}) {
   ok(`the mini idle icon's background-size matches idle.png's ${BOSS.idle} frames`,
      gamePage.includes(`background-size: ${miniIconWidth}px 34px`));
   ok('and its steps() count matches', gamePage.includes(`steps(${BOSS.idle})`));
+}
+
+/* ══ Channel-point redemption spawn ═════════════════════════════════════
+   "Summon Raid Boss" — 10,000 points, sized to a third of the room mashing
+   at 550 clicks/min for the 10-minute fight. Cost/cooldown/per-stream cap
+   are Twitch-side reward settings, not something this code tracks. */
+{
+  const e = envWith();
+  const spawned = await spawnRaidFromRedemption(e, { viewers: 30 });
+  ok('a redemption spawns a boss', !!spawned);
+  check('HP is a third of viewers x 550/min x 10 minutes', spawned.maxHp, Math.round(30 * (1 / 3) * 550 * 10));
+  check('it runs for 10 minutes', spawned.endsAt - spawned.startedAt, 10 * 60 * 1000);
+  check('and is tagged by source', spawned.source, 'redemption');
+  check('it is stored too', e.MARKETPLACE.read('sc_raid').id, spawned.id);
+}
+{
+  /* An off-stream or test redemption (no live viewer count) still gets a
+     real fight instead of a 0-HP boss. */
+  const e = envWith();
+  const spawned = await spawnRaidFromRedemption(e, { viewers: 0 });
+  check('no/zero viewer count falls back to a minimum-sized boss', spawned.maxHp, Math.round(3 * (1 / 3) * 550 * 10));
+}
+{
+  /* A viewer paying points for a boss that already exists gets refused —
+     the caller (channel-points.js) refunds them. */
+  const e = envWith({ sc_raid: boss() });
+  const spawned = await spawnRaidFromRedemption(e, { viewers: 100 });
+  ok('refuses to spawn over an active boss', spawned === null);
+  check('the active boss is untouched', e.MARKETPLACE.read('sc_raid').id, 'r');
+}
+{
+  /* Same refusal while a just-defeated boss is still showing its banner. */
+  const e = envWith({ sc_raid: boss({ status: 'defeated', hp: 0, defeatedAt: Date.now() - 1000 }) });
+  ok('refuses to spawn over a lingering kill', (await spawnRaidFromRedemption(e, { viewers: 50 })) === null);
+}
+{
+  /* But a boss that has run out its clock, or a long-lingering kill, is
+     fair game -- nothing else will ever clear those out for a fresh
+     redemption to use. */
+  const expired = envWith({ sc_raid: boss({ endsAt: Date.now() - 1 }) });
+  ok('spawns over an expired boss', !!(await spawnRaidFromRedemption(expired, { viewers: 50 })));
+  const oldKill = envWith({ sc_raid: boss({ status: 'defeated', hp: 0, defeatedAt: Date.now() - 20000 }) });
+  ok('spawns over a long-lingering kill', !!(await spawnRaidFromRedemption(oldKill, { viewers: 50 })));
+}
+{
+  const cp = fs.readFileSync(path.join(REPO, 'functions/api/channel-points.js'), 'utf8');
+  ok('channel points routes a boss/raid reward title', /if \(lower\.includes\('boss'\) \|\| lower\.includes\('raid'\)\)/.test(cp));
+  ok('and spawns the boss on redemption', /spawnRaidFromRedemption/.test(cp));
+  ok('refunding when it refuses', /settleRedemption/.test(cp) && /CANCELED/.test(cp));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

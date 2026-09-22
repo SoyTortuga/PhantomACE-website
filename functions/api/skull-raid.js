@@ -31,6 +31,29 @@ const DEFAULT_MINUTES = 15;
 const FRENZY_MS = 10 * 60 * 1000;    /* the reward on a kill */
 const DEFEAT_LINGER_MS = 15000;      /* a defeated boss shows this long, then clears */
 
+/* ── The channel-point boss: sized to who's actually watching ────────────
+   Summoned by redeeming "Summon Raid Boss" (10,000 points) — see
+   REWARD_HANDLERS['raid-boss'] in channel-points.js. Cost, the 1-hour
+   cooldown, and the 3-per-stream cap are all configured on the reward
+   itself in the Twitch dashboard, exactly like Pham Check-in's
+   once-per-stream limit: Twitch enforces them, so there is nothing to
+   count or reset here. This file only reacts to a redemption that already
+   cleared Twitch's gate.
+
+   1 click landed on the boss = 1 damage (see the `hit` action), so HP is
+   already denominated in raw clicks -- which is what makes "550
+   clicks/minute, for a third of the room" a clean multiply rather than
+   needing a currency conversion.
+
+   FIRST PASS, DELIBERATELY. 550/min is a sustainable-but-real mashing
+   rate, not a spreadsheet number, 1/3 assumes most viewers watch rather
+   than play, and 10 minutes is what the request asked to start with. All
+   three are knobs to retune after watching a few fights actually play out. */
+const REDEMPTION_CLICKS_PER_MIN = 550;
+const REDEMPTION_MINUTES = 10;
+const REDEMPTION_PARTICIPATION = 1 / 3;
+const REDEMPTION_MIN_VIEWERS = 3;   /* a boss redeemed off-stream/in testing still gets a real fight, not 0 HP */
+
 const RAID_CODE_SECONDS = 604800;    /* 7-day redemption on defeat codes */
 const RAID_REWARD_CAP = 100;         /* most participants paid per kill */
 
@@ -145,6 +168,55 @@ async function awardRaidRewards(env, raid) {
   } catch { /* announcement is a nicety */ }
 }
 
+/* Shared by a moderator's manual `start` and the redemption spawn, so both
+   ever construct exactly one shape of raid record. `source` is carried
+   only for logs/observability -- the fight itself plays out identically
+   either way. */
+function buildRaid({ hp, minutes, name, source }) {
+  return {
+    id: 'raid_' + Date.now(),
+    name: String(name || 'Undead Executioner').slice(0, 40),
+    maxHp: hp, hp,
+    startedAt: Date.now(),
+    endsAt: Date.now() + minutes * 60 * 1000,
+    status: 'active',
+    source: source || 'manual',
+    contributors: {},
+    attackCount: 0, skillCount: 0, summonCount: 0, minionDeaths: 0,
+    shieldUntil: 0,
+    nextTickAt: Date.now() + MECH_INTERVAL_MS,
+    summonedThresholds: [],
+    minions: { hp: 0, maxHp: 0 },
+  };
+}
+
+/* Called by channel-points.js when "Summon Raid Boss" is redeemed. Twitch
+   has already collected the points and enforced the cooldown/per-stream cap
+   on the reward itself -- the only thing left to check here is whether a
+   fight is already underway, since a viewer paying 10,000 points to summon
+   a boss that already exists would just be a refund waiting to happen.
+   mutate() makes that check-and-spawn atomic against a second redemption
+   landing in the same instant.
+   @returns the spawned raid, or null if one refused (caller refunds). */
+export async function spawnRaidFromRedemption(env, { viewers } = {}) {
+  const effectiveViewers = viewers > 0 ? viewers : REDEMPTION_MIN_VIEWERS;
+  const hp = Math.min(MAX_HP, Math.max(100, Math.round(
+    effectiveViewers * REDEMPTION_PARTICIPATION * REDEMPTION_CLICKS_PER_MIN * REDEMPTION_MINUTES
+  )));
+  let spawned = null;
+  await env.MARKETPLACE.mutate(RAID_KEY, (current) => {
+    /* publicState() derives the same effective status the client sees, so
+       "already fighting" also covers a stored 'active' record that has
+       actually timed out or a 'defeated' one still lingering for its
+       banner -- not just a literal status === 'active'. */
+    const status = current ? publicState(current).status : 'none';
+    if (status === 'active' || status === 'defeated') return undefined;
+    spawned = buildRaid({ hp, minutes: REDEMPTION_MINUTES, source: 'redemption' });
+    return spawned;
+  });
+  return spawned;
+}
+
 /* Fold the live boss into the small public shape the game and overlay read —
    never the raw contributor map. Resolves the timer so every reader agrees
    without a job: an active boss past its deadline reads as expired. */
@@ -176,15 +248,17 @@ function publicState(raid) {
     shielded: (raid.shieldUntil || 0) > Date.now(),
     minions: { hp: Math.max(0, m.hp || 0), maxHp: m.maxHp || 0 },
     top,
+    source: raid.source || 'manual',
   };
 }
 
 export async function onRequestGet(context) {
   const { env, request } = context;
+  const url = new URL(request.url);
 
   /* `?reward=1` — a logged-in raider's pending defeat code, delivered
      in-game rather than only by whisper. Session only; guests have none. */
-  if (new URL(request.url).searchParams.get('reward')) {
+  if (url.searchParams.get('reward')) {
     const session = getSession(request);
     if (!session || !session.user_id) return json({ reward: null });
     const reward = await env.MARKETPLACE.get(rewardKey(session.user_id), 'json');
@@ -193,17 +267,27 @@ export async function onRequestGet(context) {
 
   /* Resolve mechanics on read too, so an idle overlay still sees the boss
      heal/guard/summon on schedule. Persist only if something changed. */
-  let changed = false;
-  const raid = await env.MARKETPLACE.get(RAID_KEY, 'json');
+  let raid = await env.MARKETPLACE.get(RAID_KEY, 'json');
   if (raid && raid.status === 'active') {
     const before = JSON.stringify([raid.attackCount, raid.skillCount, raid.hp, raid.shieldUntil, raid.nextTickAt]);
     resolveMechanics(raid);
     if (JSON.stringify([raid.attackCount, raid.skillCount, raid.hp, raid.shieldUntil, raid.nextTickAt]) !== before) {
-      changed = true;
+      await env.MARKETPLACE.put(RAID_KEY, JSON.stringify(raid));
     }
   }
-  if (changed) await env.MARKETPLACE.put(RAID_KEY, JSON.stringify(raid));
-  return json(publicState(raid));
+
+  const view = publicState(raid);
+
+  /* The stored record has run its course (expired, or a defeated boss past
+     its linger window) but nothing ever deletes it outright short of the
+     moderator's `end` action or the next redemption's spawn check. Clear it
+     here so the overlay/game don't keep re-deriving 'none' from a dead
+     record on every single poll forever. */
+  if (raid && (view.status === 'none' || view.status === 'expired')) {
+    await env.MARKETPLACE.delete(RAID_KEY);
+  }
+
+  return json(view);
 }
 
 export async function onRequestPost(context) {
@@ -228,20 +312,7 @@ export async function onRequestPost(context) {
     }
     const hp = Math.min(MAX_HP, Math.max(100, Math.floor(Number(body.hp) || DEFAULT_HP)));
     const minutes = Math.min(120, Math.max(1, Math.floor(Number(body.minutes) || DEFAULT_MINUTES)));
-    const raid = {
-      id: 'raid_' + Date.now(),
-      name: String(body.name || 'Undead Executioner').slice(0, 40),
-      maxHp: hp, hp,
-      startedAt: Date.now(),
-      endsAt: Date.now() + minutes * 60 * 1000,
-      status: 'active',
-      contributors: {},
-      attackCount: 0, skillCount: 0, summonCount: 0, minionDeaths: 0,
-      shieldUntil: 0,
-      nextTickAt: Date.now() + MECH_INTERVAL_MS,
-      summonedThresholds: [],
-      minions: { hp: 0, maxHp: 0 },
-    };
+    const raid = buildRaid({ hp, minutes, name: body.name, source: 'manual' });
     await env.MARKETPLACE.put(RAID_KEY, JSON.stringify(raid));
     return json({ success: true, raid: publicState(raid) });
   }

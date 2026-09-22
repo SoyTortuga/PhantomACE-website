@@ -126,7 +126,52 @@ const REWARD_HANDLERS = {
   'community-shoutout': async (env, userId, redemption) => {
     await queueRedemption(env, userId, 'community-shoutout', redemption);
   },
+
+  /* SUMMON RAID BOSS — 10,000 points, sized to the room. Cost, the 1-hour
+     cooldown, and the 3-per-stream cap all live on the reward itself in the
+     Twitch dashboard (same idea as Pham Check-in's once-per-stream limit),
+     so this only has to react and, if a fight is already underway, refund. */
+  'raid-boss': async (env, userId, redemption) => {
+    const { spawnRaidFromRedemption } = await import('./skull-raid.js');
+    const { getStreamInfo } = await import('./stream-info.js');
+    const { viewerCount } = await getStreamInfo(env);
+    const spawned = await spawnRaidFromRedemption(env, { viewers: viewerCount });
+    await settleRedemption(env, redemption, !!spawned);
+  },
 };
+
+/**
+ * Tell Twitch what became of a redemption: FULFILLED spends the points,
+ * CANCELED refunds them. Needed here because "a boss is already up" is a
+ * real reason to refuse a redemption Twitch already charged for — unlike
+ * the reward handlers above, which always succeed once Twitch lets them fire.
+ * Never throws: a refund that could not be sent is a lost point, not a
+ * webhook worth 500ing over.
+ */
+async function settleRedemption(env, redemption, ok) {
+  const rewardId = redemption && redemption.reward && redemption.reward.id;
+  const redemptionId = redemption && redemption.id;
+  if (!rewardId || !redemptionId) return;
+  try {
+    const { getBroadcasterToken } = await import('./bot/send-chat.js');
+    const token = await getBroadcasterToken(env);
+    if (!token) return;
+    const url = 'https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions' +
+      `?broadcaster_id=${env.TWITCH_BROADCASTER_ID}&reward_id=${rewardId}&id=${redemptionId}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Client-Id': env.TWITCH_CLIENT_ID,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status: ok ? 'FULFILLED' : 'CANCELED' }),
+    });
+    if (!res.ok) console.error(`[channel-points] could not ${ok ? 'fulfil' : 'refund'} redemption ${redemptionId}: HTTP ${res.status}`);
+  } catch (err) {
+    console.error('[channel-points] settle failed:', err.message);
+  }
+}
 
 function inventoryKey(userId) { return `inv_${userId}`; }
 async function getInventory(env, userId) {
@@ -173,6 +218,7 @@ function mapRewardTitle(title) {
   if (lower.includes('theme')) return 'theme-unlock';
   if (lower.includes('wheel') || lower.includes('spin')) return 'spin-the-wheel';
   if (lower.includes('shoutout')) return 'community-shoutout';
+  if (lower.includes('boss') || lower.includes('raid')) return 'raid-boss';
   return null;
 }
 
