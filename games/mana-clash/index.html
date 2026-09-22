@@ -79,18 +79,19 @@
     @keyframes ultPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
     @media (prefers-reduced-motion: reduce) { .ult-btn { animation: none; } }
 
-    /* The beam itself — a single rising flash over the enemy sprite,
-       filter: drop-shadow() rather than a box-shadow glow. */
-    .ult-beam { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); pointer-events: none; opacity: 0; }
-    .ult-beam img { display: block; filter: drop-shadow(0 0 10px rgba(255,60,0,0.7)); }
-    .ult-beam.firing { animation: ultBeamFire 900ms ease-out both; }
-    @keyframes ultBeamFire {
-      0%   { opacity: 0; transform: translateX(-50%) scale(0.7); }
-      15%  { opacity: 1; transform: translateX(-50%) scale(1.05); }
-      70%  { opacity: 1; transform: translateX(-50%) scale(1); }
-      100% { opacity: 0; transform: translateX(-50%) scale(1.15); }
+    /* The cast effect — Unholy Ground's own charge/rise/peak animation
+       (23 frames, stepped in JS same as the enemy sprite; see
+       fireUltimateBeam), not a single static image. filter: drop-shadow()
+       rather than a box-shadow glow. */
+    .ult-beam {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 200px; height: 171px; pointer-events: none; opacity: 0;
+      background-repeat: no-repeat; image-rendering: pixelated;
+      filter: drop-shadow(0 0 12px rgba(255, 210, 60, 0.8));
+      transition: opacity 200ms ease;
     }
-    @media (prefers-reduced-motion: reduce) { .ult-beam.firing { animation: none; opacity: 0; } }
+    .ult-beam.firing { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) { .ult-beam { transition: none; } }
 
     /* Status-effect chips */
     .enemy-status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; min-height: 0; }
@@ -609,7 +610,7 @@
     <div class="enemy-stage">
       <div class="enemy-sprite" id="enemySprite"></div>
       <div class="minion-swarm" id="minionSwarm" hidden></div>
-      <div class="ult-beam" id="ultBeam" hidden><img src="assets/fx/ultimate-beam.png" alt="" width="72" height="94"></div>
+      <div class="ult-beam" id="ultBeam" hidden></div>
     </div>
     <div class="enemy-head">
       <span class="enemy-name" id="enemyName">—</span>
@@ -1522,6 +1523,14 @@ function renderIntermission() {
 
 let boonBusy = false;
 let ultBusy = false;
+let ultBeamTimer = null;
+
+/* Unholy Ground's own charge -> rise -> peak animation (server/scripts/lib/
+   aseprite-slice-sheet.lua + aseprite-export.js, sliced from the itch.io
+   effect pack's grid sheet). 300x256 native, shown at a 2/3 scale. */
+const ULT_FX_FRAMES = 23;
+const ULT_FX_W = 200, ULT_FX_H = 171;
+const ULT_FX_MS = 70;   // per frame — 23 frames is ~1.6s, a real cast, not a blip
 
 /* Fires the ultimate. No vote, unlike a boon — there is no downside to
    using it, so nothing needs coordinating. */
@@ -1534,16 +1543,33 @@ async function useUltimate() {
   ultBusy = false;
 }
 
-/* One rising flash over the enemy, then gone. Fired the moment the player
-   presses the button rather than waiting on the next poll, so it reads as
-   an action they took, not something that happened to arrive. */
+/* The full charge/rise/peak sequence over the enemy, stepped the same way
+   animateEnemy() steps a sprite strip. Fired the moment the player presses
+   the button rather than waiting on the next poll, so it reads as an
+   action they took, not something that happened to arrive. */
 function fireUltimateBeam() {
   const beam = $('ultBeam');
-  beam.classList.remove('firing');
-  void beam.offsetWidth;   // forced reflow — restarts the animation on a rapid re-trigger
+  if (ultBeamTimer) { clearInterval(ultBeamTimer); ultBeamTimer = null; }
+
+  beam.style.backgroundImage = 'url(assets/fx/ultimate-cast.png)';
+  beam.style.backgroundSize = (ULT_FX_FRAMES * ULT_FX_W) + 'px ' + ULT_FX_H + 'px';
+  beam.style.backgroundPositionX = '0px';
   beam.hidden = false;
+  void beam.offsetWidth;   // forced reflow — restarts cleanly on a rapid re-trigger
   beam.classList.add('firing');
-  setTimeout(() => { beam.hidden = true; beam.classList.remove('firing'); }, 900);
+
+  let frame = 0;
+  ultBeamTimer = setInterval(() => {
+    frame++;
+    if (frame >= ULT_FX_FRAMES) {
+      clearInterval(ultBeamTimer);
+      ultBeamTimer = null;
+      beam.classList.remove('firing');
+      setTimeout(() => { beam.hidden = true; }, 220);   // let the fade-out transition finish
+      return;
+    }
+    beam.style.backgroundPositionX = '-' + (frame * ULT_FX_W) + 'px';
+  }, ULT_FX_MS);
 }
 
 function renderBoonPicker(boons) {

@@ -30,8 +30,11 @@ games/skull-clicker/assets/Undead executioner/
 # strips the game loads; gitignored like dino-assets, copied to the rig.
 games/mana-clash/assets/enemies/
 games/mana-clash/assets/backgrounds/
-# Same licensed source, one effect sprite for the ultimate's beam.
+# Same licensed source, effect sprites for the ultimate. The flattened
+# strip the game actually loads is games/mana-clash/assets/fx/ (also
+# ignored, same as the enemies/backgrounds art above).
 games/mana-clash/assets/fx/
+games/mana-clash/assets/Unholy Ground/
 
 # Scratch output from asset extraction runs
 _tile_*.png

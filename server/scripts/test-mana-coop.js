@@ -826,6 +826,10 @@ function coopVoteRoom(ids) {
 
   const game = fs.readFileSync(path.join(REPO, 'games/mana-clash/index.html'), 'utf8');
   ok('the client offers co-op and shows the enemy', /coop/i.test(game));
+  ok('the ultimate plays Unholy Ground’s real animation, not a static image',
+     /ultimate-cast\.png/.test(game) && /ULT_FX_FRAMES = 23/.test(game));
+  ok('the asset itself exists (gitignored -- see server/scripts/lib/aseprite-slice-sheet.lua)',
+     fs.existsSync(path.join(REPO, 'games/mana-clash/assets/fx/ultimate-cast.png')));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
