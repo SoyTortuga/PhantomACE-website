@@ -422,13 +422,22 @@ function boonsWith(over) {
   check('Bulwark softens the incoming hit', room.coop.lastAttack, 10);
 }
 {
-  // Conscripts: allies add 3% of enemy max HP each round (300 here), on top of banked damage.
+  // Conscripts: allies add 1% of enemy max HP each round (100 here), on top of
+  // banked damage. Bank 400 so total dealt (500) clears the 4% anti-stall floor
+  // (400 on a 10,000 enemy) -- otherwise the enemy self-heals and the ally
+  // contribution can't be read cleanly.
   const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
-    { coop: { enemyHp: 10000, enemyMaxHp: 10000, boons: boonsWith({ allyPct: 0.03, taken: ['army'] }) } },
-    { pending: 100, kept: [], done: null }) }) };
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, boons: boonsWith({ allyPct: 0.01, taken: ['army'] }) } },
+    { pending: 400, kept: [], done: null }) }) };
   await POST(e, { action: 'bank', code: 'AAAA' });
   const room = e.MARKETPLACE.read('mc_room_AAAA');
-  check('Conscripts add ally damage each round', room.coop.enemyHp, 9600); // 100 banked + 300 ally
+  check('Conscripts add ally damage each round', room.coop.enemyHp, 9500); // 400 banked + 100 ally (1%)
+}
+{
+  // The boon itself grants exactly 1% -- guards the tuned value, not just the mechanic.
+  const api = fs.readFileSync(path.join(REPO, 'functions/api/mana-clash.js'), 'utf8');
+  ok('the Conscripts boon grants 1% ally damage', /case 'army':\s*b\.allyPct = \(b\.allyPct \|\| 0\) \+ 0\.01;/.test(api));
+  ok('and its description says 1%', /name: 'Conscripts'[\s\S]*?1% of enemy HP/.test(api));
 }
 {
   // Regeneration: +8 team HP each round (attack 0 to read it cleanly).

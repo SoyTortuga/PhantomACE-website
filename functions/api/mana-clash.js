@@ -260,7 +260,7 @@ const COOP_BOONS = [
   { id: 'purify',  name: 'Purifier',     desc: 'Enemy minions soak 15% less' },
   { id: 'wind',    name: 'Second Wind',  desc: 'Cheat a wipe or a timeout (stacks — one save each)' },
   { id: 'bulwark', name: 'Bulwark',      desc: 'Team takes 15% less damage' },
-  { id: 'army',    name: 'Conscripts',   desc: 'An ally strikes for 3% of enemy HP each round' },
+  { id: 'army',    name: 'Conscripts',   desc: 'An ally strikes for 1% of enemy HP each round' },
   { id: 'regen',   name: 'Regeneration', desc: 'Heal 8 Team HP every round' },
 ];
 function coopBoonDefaults() {
@@ -295,7 +295,7 @@ function coopApplyBoon(c, id) {
     case 'purify': b.soakReduce += 0.15; break;
     case 'wind':   b.secondWind = (b.secondWind || 0) + 1; break;      // stacks — one revive charge each
     case 'bulwark': b.dmgTakenMult = (b.dmgTakenMult || 1) * 0.85; break;  // team shield, multiplicative
-    case 'army':    b.allyPct = (b.allyPct || 0) + 0.03; break;        // summoned ally damage per round
+    case 'army':    b.allyPct = (b.allyPct || 0) + 0.01; break;        // summoned ally damage per round
     case 'regen':   b.regen = (b.regen || 0) + 8; break;              // heal each round
     default: return false;
   }
