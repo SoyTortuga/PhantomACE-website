@@ -1106,17 +1106,24 @@ export function viewFor(room, userId, now, opts = {}) {
     serverNow: now,
   };
 
+  /* Chat goes to any real, authenticated viewer the room recognises as
+     belonging to it -- a player, OR the host of a hosting-only room who was
+     deliberately never added to `players`. It still never reaches the
+     overlay's null viewer (see the module comment above): that path is an
+     unauthenticated public browser source, not a person the room can name. */
+  if (me || (userId != null && userId === room.host)) {
+    view.chat = (room.chat || []).slice(-CHAT_KEEP);
+  }
+
   /* `you` is present whenever the player is in the room, turn or no turn.
      Gating it on me.turn meant the lobby — where turn is null until the game
      starts — sent no `you` at all, so the page could not tell the host from
      anyone else and never showed the Start button. Being in the room is the
-     fact the page needs; having a turn is not. */
+     fact the page needs; having a turn is not. A hosting-only host has no
+     `you` at all -- they have no turn, no score, nothing to roll -- and the
+     client tells "hosting" from "playing" by comparing its own id against
+     `view.host` instead. */
   if (me) {
-    /* Inside this gate on purpose: the same condition that decides whether
-       `you` is safe to send decides whether chat is. The overlay passes a
-       null viewer and therefore never reaches here. */
-    view.chat = (room.chat || []).slice(-CHAT_KEEP);
-
     const t = me.turn;
     view.you = {
       id: userId,
@@ -1320,6 +1327,14 @@ export async function onRequestPost(context) {
     const idleMs = Number(body.idleMs);
     if (!IDLE_CHOICES.includes(idleMs)) return json({ error: 'Pick a 10, 30 or 60 second timer.' }, 400);
     const practice = !coop && !!body.practice;   // co-op is its own multiplayer mode
+    /* Broadcaster mode: run the room without playing in it. Silently ignored
+       for practice -- a solo room nobody is in has no point. `host`/`hostName`
+       already live outside `players` (see kick/rematch/start-game, all gated
+       on room.host rather than a players entry), so leaving the creator out
+       of players here is the only change hosting-without-playing needed on
+       this side; everything that checks "is this the host" already does not
+       care whether the host is also a player. */
+    const hostOnly = !!body.hostOnly && !practice;
 
     let made = null;
     for (let i = 0; i < 10; i++) {
@@ -1336,7 +1351,7 @@ export async function onRequestPost(context) {
         isFinalRound: false, nextIsFinal: false, tiedPlayers: null,
         intermissionEndsAt: null,
         winner: null,
-        players: {
+        players: hostOnly ? {} : {
           [userId]: { displayName, profileImage, ready: true, total: 0, turn: null },
         },
         createdAt: Date.now(),
@@ -1499,22 +1514,29 @@ export async function onRequestPost(context) {
     let rejected = null;
     const { failed, room } = await withRoom(env, code, (r) => {
       const p = r.players[userId];
-      /* BEING IN THE ROOM IS THE WHOLE PERMISSION. Anyone holding a code
-         can poll get-state, so membership has to be checked against the
-         room rather than inferred from knowing where to post. */
-      if (!p) return json({ error: 'Join the room first.' }, 403);
+      const isHostViewer = r.host === userId;
+      /* BEING IN THE ROOM IS THE WHOLE PERMISSION -- either as a player, or
+         as the host of a hosting-only room who was deliberately never added
+         to `players`. Anyone holding a code can poll get-state, so
+         membership has to be checked against the room rather than inferred
+         from knowing where to post. */
+      if (!p && !isHostViewer) return json({ error: 'Join the room first.' }, 403);
 
       const now = Date.now();
-      const gate = chatAllowed(p, now);
-      if (gate.error) { rejected = gate.error; return null; }
-
-      p.chatAt = gate.recent.concat(now);
+      /* A non-playing host has no chatAt history to rate-limit against --
+         they're the broadcaster running their own room, not a rate-limit
+         concern the way a hundred chatters piling into a room would be. */
+      if (p) {
+        const gate = chatAllowed(p, now);
+        if (gate.error) { rejected = gate.error; return null; }
+        p.chatAt = gate.recent.concat(now);
+      }
       r.chat = Array.isArray(r.chat) ? r.chat : [];
       r.chat.push({
         id: 'm' + now.toString(36) + Math.random().toString(36).slice(2, 6),
         at: now,
         by: userId,
-        name: p.displayName,
+        name: p ? p.displayName : (r.hostName || 'Host'),
         text: cleaned.text,
       });
       /* Trimmed here rather than on read: the document is what grows, and
@@ -1534,8 +1556,14 @@ export async function onRequestPost(context) {
   if (body.action === 'leave-room') {
     let emptied = false;
     const { failed } = await withRoom(env, code, (r) => {
-      if (!r.players[userId]) return null;
-      delete r.players[userId];
+      const wasPlayer = !!r.players[userId];
+      /* A hosting-only host is never in `players`, so this used to be a
+         silent no-op for them -- their room stayed pointed at a host who
+         had walked away, with no reassignment path, forever. Treat "the
+         host is leaving" as real even when there is no players entry to
+         delete for them. */
+      if (!wasPlayer && r.host !== userId) return null;
+      if (wasPlayer) delete r.players[userId];
       if (Object.keys(r.players).length === 0) { emptied = true; return null; }
       if (r.host === userId) {
         const next = Object.keys(r.players)[0];
@@ -1560,8 +1588,11 @@ export async function onRequestPost(context) {
       if (r.status !== 'lobby') return json({ error: 'Already started' }, 400);
       const ids = Object.keys(r.players);
       /* Co-op can be run solo (a one-person gauntlet); versus still needs an
-         opponent. */
+         opponent. Co-op still needs at least ONE real player though -- that
+         used to be guaranteed for free because the host was always seeded
+         into `players`, which a hosting-only room deliberately skips. */
       if (!r.practice && r.mode !== 'coop' && ids.length < 2) return json({ error: 'Wait for someone to join.' }, 400);
+      if (r.mode === 'coop' && ids.length < 1) return json({ error: 'Wait for someone to join.' }, 400);
       if (ids.some(id => !r.players[id].ready)) return json({ error: 'Not everyone is ready.' }, 400);
       r.round = 0;
       r.tiedPlayers = null;

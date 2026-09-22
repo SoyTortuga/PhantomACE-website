@@ -1143,6 +1143,87 @@ async function playToFinish(env, code, hands) {
   check('the kicked list survives the rematch', back.status, 403);
 }
 
+/* ══ Hosting without playing ═══════════════════════════════════════════
+   The broadcaster wants to run a game -- start it, kick people, see chat --
+   without being a scoring participant themselves. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, mode: 'versus', hostOnly: true });
+  const code = made.data.code;
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  check('the host is not seeded into players', Object.keys(room.players).length, 0);
+  check('but is still recorded as the host', room.host, '101');
+
+  const hostView = await get(env, 'a', 'action=get-state&code=' + code);
+  ok('the host has no `you` -- nothing to roll or score', !hostView.data.you);
+  ok('but does see the room, including chat', Array.isArray(hostView.data.chat));
+  check('and is named as the host in the view', hostView.data.host, '101');
+
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'c', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code, ready: true });
+  await post(env, 'c', { action: 'ready', code, ready: true });
+  const started = await post(env, 'a', { action: 'start-game', code });
+  check('the host can start a game they are not in', started.data.success, true);
+
+  const chat = await post(env, 'a', { action: 'chat', code, text: 'gl everyone' });
+  check('the host can talk in their own room', chat.data.success, true);
+  const afterChat = await get(env, 'b', 'action=get-state&code=' + code);
+  ok('and the message reaches the players, named as the host',
+     afterChat.data.chat.some(m => m.text === 'gl everyone' && m.name === 'Ash'));
+}
+{
+  /* Versus still needs two real opponents even when the host is not one. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, mode: 'versus', hostOnly: true });
+  const code = made.data.code;
+  const started = await post(env, 'a', { action: 'start-game', code });
+  check('a hosting-only versus room with nobody in it refuses to start', started.status, 400);
+}
+{
+  /* Co-op can run solo, but "solo" means one real player -- the host alone
+     is not a run. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 0, idleMs: 30000, mode: 'coop', hostOnly: true });
+  const code = made.data.code;
+  const emptyStart = await post(env, 'a', { action: 'start-game', code });
+  check('a hosting-only co-op room with nobody in it refuses to start', emptyStart.status, 400);
+
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code, ready: true });
+  const started = await post(env, 'a', { action: 'start-game', code });
+  check('once one real player joins, the co-op gauntlet can start', started.data.success, true);
+}
+{
+  /* Practice is inherently solo -- hostOnly is silently ignored rather than
+     producing a room nobody can ever be in. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, practice: true, hostOnly: true });
+  const code = made.data.code;
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  check('hostOnly is ignored for practice rooms', Object.keys(room.players).length, 1);
+}
+{
+  /* A non-playing host leaving hands the room to a real player instead of
+     leaving it pointed at someone no longer there. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, mode: 'versus', hostOnly: true });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'a', { action: 'leave-room', code });
+  const room = JSON.parse(env._store.get('mc_room_' + code));
+  check('host passes to the remaining player', room.host, '202');
+}
+{
+  /* And if nobody ever joined, the host leaving cleans the room up rather
+     than abandoning an empty, unreachable record. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, mode: 'versus', hostOnly: true });
+  const code = made.data.code;
+  await post(env, 'a', { action: 'leave-room', code });
+  ok('an abandoned, empty hosting-only room is deleted', !env._store.has('mc_room_' + code));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 
 console.log('');

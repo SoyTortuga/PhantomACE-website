@@ -534,6 +534,9 @@
           <option value="60000">60 seconds</option>
         </select>
         <input class="input" id="createPassword" placeholder="Password (optional)">
+        <label class="checkbox-row" style="display:flex;align-items:center;gap:8px;margin:2px 0 8px;font-size:13px">
+          <input type="checkbox" id="createHostOnly"> Host only — I won't be playing
+        </label>
         <button class="btn btn-red" id="createBtn">Create Room</button>
         <button class="btn btn-dim" id="practiceBtn">Solo Practice</button>
         <button class="btn btn-coop" id="coopBtn">Co-op Gauntlet</button>
@@ -581,6 +584,7 @@
     <span><b id="lobbyCount">0</b> / 100 players</span>
   </div>
   <div class="feedback" id="lobbyFeedback"></div>
+  <p class="muted" id="hostOnlyHint" hidden style="text-align:center">You're hosting this room, not playing in it — start the game once everyone's ready.</p>
 
   <div class="section-hdr" style="width:100%;max-width:560px">Players</div>
   <div class="player-list" id="playerList"></div>
@@ -1300,13 +1304,22 @@ function standingsTable(el, players, meId, showDelta) {
   });
 }
 
+/* Who is looking at this room, for comparisons against `state.host` that
+   must work even when the viewer is not a player. `state.you.id` covers
+   everyone in `players`; a hosting-only host has no `you` at all (they have
+   no turn, no score — see viewFor's comment on the split), so this falls
+   back to the id from their own login. */
+function myId() {
+  return state.you ? state.you.id : (session ? String(session.user_id) : null);
+}
+
 function renderLobby() {
   $('lobbyCode').textContent = state.code;
   $('lobbyGoal').textContent = state.mode === 'coop' ? 'Co-op Gauntlet' : state.goal.toLocaleString();
   $('lobbyIdle').textContent = (state.idleMs / 1000) + 's';
   $('lobbyCount').textContent = state.playerCount;
 
-  const meId = state.you ? state.you.id : null;
+  const meId = myId();
   const isHost = state.host === meId;
   const list = $('playerList');
   list.innerHTML = '';
@@ -1331,12 +1344,18 @@ function renderLobby() {
   }
 
   const me = state.players.find(p => p.id === meId);
+  /* No `me` means this viewer is hosting, not playing — there is nothing to
+     ready up, so the button is not "not applicable", it is not theirs. */
+  $('readyBtn').hidden = !me;
   $('readyBtn').textContent = me && me.ready ? 'Not Ready' : "I'm Ready";
   $('startBtn').hidden = !isHost;
+  $('hostOnlyHint').hidden = !(isHost && !me);
   const everyoneReady = state.players.every(p => p.ready);
   /* Co-op (like practice) can start solo — mirror the server, which exempts
-     both from the two-player minimum. */
-  const needsSecond = !state.practice && state.mode !== 'coop' && state.playerCount < 2;
+     both from the two-player minimum. A hosting-only co-op room still needs
+     one real player, same as the server's own extra check. */
+  const needsSecond = !state.practice
+    && ((state.mode !== 'coop' && state.playerCount < 2) || (state.mode === 'coop' && state.playerCount < 1));
   $('startBtn').disabled = !everyoneReady || needsSecond;
 }
 
@@ -1616,7 +1635,7 @@ function renderResults() {
       + (c.enemyName ? ' at Wave ' + c.wave + ' (' + c.enemyName + ')' : '');
     $('resultsSub').textContent = 'Your team cleared ' + enemies + how + '.';
     standingsTable($('resultsTable'), state.players, meId);
-    const hostC = !!(state.you && state.host === state.you.id);
+    const hostC = state.host === myId();
     $('rematchBtn').hidden = !hostC;
     $('againBtn').className = hostC ? 'btn btn-dim' : 'btn btn-red';
     return;
@@ -1633,7 +1652,7 @@ function renderResults() {
   /* Only the host is offered it; everyone else is simply moved when it
      happens, because their next poll returns a lobby and render() routes on
      status. No "waiting for the host" state to build or keep in step. */
-  const host = !!(state.you && state.host === state.you.id);
+  const host = state.host === myId();
   $('rematchBtn').hidden = !host;
   $('againBtn').className = host ? 'btn btn-dim' : 'btn btn-red';
 }
@@ -1709,7 +1728,7 @@ function renderChat() {
   if (sig === chatSeen) return;
   chatSeen = sig;
 
-  const mine = state.you ? state.you.id : null;
+  const mine = myId();
   log.innerHTML = state.chat.map(m =>
     '<li class="chat-msg' + (m.by === mine ? ' is-mine' : '') + '">' +
       '<b>' + esc(m.name) + '</b> ' + esc(m.text) +
@@ -2025,6 +2044,7 @@ async function createRoom(opts) {
       password: opts.practice ? '' : $('createPassword').value.trim(),
       practice: !!opts.practice,
       mode: opts.coop ? 'coop' : 'versus',
+      hostOnly: !!opts.hostOnly,
     });
     roomCode = data.code;
     startPolling();
@@ -2048,14 +2068,14 @@ async function joinRoom() {
 
 /* ── Wiring ────────────────────────────────────────────────────────────── */
 
-$('createBtn').addEventListener('click', () => createRoom({}));
+$('createBtn').addEventListener('click', () => createRoom({ hostOnly: $('createHostOnly').checked }));
 $('practiceBtn').addEventListener('click', () => createRoom({ practice: true }));
-$('coopBtn').addEventListener('click', () => createRoom({ coop: true }));
+$('coopBtn').addEventListener('click', () => createRoom({ coop: true, hostOnly: $('createHostOnly').checked }));
 $('joinBtn').addEventListener('click', joinRoom);
 $('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
 
 $('readyBtn').addEventListener('click', () => {
-  const me = state.players.find(p => p.id === state.you.id);
+  const me = state.players.find(p => p.id === myId());
   act({ action: 'ready', code: roomCode, ready: !(me && me.ready) }, 'lobbyFeedback');
 });
 $('startBtn').addEventListener('click', () => act({ action: 'start-game', code: roomCode }, 'lobbyFeedback'));
