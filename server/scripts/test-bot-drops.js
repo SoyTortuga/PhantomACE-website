@@ -112,6 +112,20 @@ const fresh = (pools) => { chat = []; refuseSend = false; return makeEnv({ pools
   check('taking one from the pool', env._pools.rare.length, 4);
   check('reporting the code', r.codes, [r.code]);
   ok('the message carries the code', chat[0].includes(r.code));
+  check('in the terse "<Rarity> - <code> phantomace.tv/giveaway" format a manual drop uses',
+    chat[0], `Rare - ${r.code} phantomace.tv/giveaway`);
+}
+
+/* ── A milestone drop (sub/giftsub/raid) keeps its richer, headlined
+   message -- that format is what says WHY the drop fired, which a bare
+   manual drop from the control panel has no need to explain. ──────────── */
+{
+  const env = fresh({ rare: 5 });
+  const r = await dropCodeAction(env, 'rare', 'milestone:sub', {
+    headline: 'Ash just subscribed! Thank you!',
+  });
+  ok('the headline reaches chat', chat[0].includes('Ash just subscribed! Thank you!'));
+  ok('alongside the code', chat[0].includes(r.code));
   ok('and the entry value', chat[0].includes(String(TIER_INFO.rare.entries)));
 }
 

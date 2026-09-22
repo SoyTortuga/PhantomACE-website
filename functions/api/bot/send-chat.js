@@ -292,13 +292,16 @@ export async function dropCodeAction(env, rarity, actorLabel, opts = {}) {
 
   /* Optional headline so a milestone drop can say WHY it fired — "thanks for
      the sub" reads very differently from a bare BONUS DROP, and the reason is
-     the whole point of tying a drop to an event. */
-  const headline = (opts.headline || 'BONUS DROP!').slice(0, 120);
-
+     the whole point of tying a drop to an event. Only milestone drops
+     (sub/giftsub/raid, in milestones.js) ever pass one; a manual drop from
+     the bot control panel gets the terse code-only line instead. */
+  const rarityLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
   let sentCount = 0;
   for (const code of codes) {
-    const msg = `${info.emoji} ${headline} ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
-      `${info.entries} bonus entries! Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`;
+    const msg = opts.headline
+      ? `${info.emoji} ${opts.headline.slice(0, 120)} ${info.emoji} ${tier.toUpperCase()} code: ${code} — ` +
+        `${info.entries} bonus entries! Claim at phantomace.tv/giveaway (Twitch login required) — expires in 5 min!`
+      : `${rarityLabel} - ${code} phantomace.tv/giveaway`;
     if (await sendChatMessage(env, msg)) sentCount++;
   }
 
