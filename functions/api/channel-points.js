@@ -137,6 +137,26 @@ const REWARD_HANDLERS = {
     const { viewerCount } = await getStreamInfo(env);
     const spawned = await spawnRaidFromRedemption(env, { viewers: viewerCount });
     await settleRedemption(env, redemption, !!spawned);
+
+    /* The badge ladder counts SUMMONS, not charges -- a refunded redemption
+       (a fight was already underway) gave the points back and earns nothing
+       toward it. Best-effort: a badge that failed to grant is not a reason
+       to fail the webhook Twitch is waiting on. */
+    if (spawned) {
+      try {
+        const { recordRaidRedemption } = await import('./raid-badges.js');
+        const earned = await recordRaidRedemption(env, userId);
+        if (earned.length) {
+          const { sendWhisper } = await import('./bot/send-chat.js');
+          for (const tier of earned) {
+            await sendWhisper(env, userId,
+              `☠️ ${tier.name}! That's redemption #${tier.count} of the raid boss — check your profile.`);
+          }
+        }
+      } catch (err) {
+        console.error('[channel-points] could not record a raid-boss redemption badge:', err.message);
+      }
+    }
   },
 };
 

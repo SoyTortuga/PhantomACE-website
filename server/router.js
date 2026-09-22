@@ -53,6 +53,11 @@ const NON_ROUTE_MODULES = new Set([
      handler. Covered by server/scripts/test-checkin-badges.js. */
   'api/checkin-badges.js',
 
+  /* The Undead Executioner redemption-count badge ladder. Library, no
+     handler; channel-points.js's raid-boss handler is what calls it.
+     Covered by server/scripts/test-raid-badges.js. */
+  'api/raid-badges.js',
+
   /* The chat scramble's answers. Data, no handler — split out of
      chat-game.js when the list passed a thousand entries. */
   'api/chat-game-words.js',

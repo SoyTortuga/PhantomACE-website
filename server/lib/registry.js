@@ -270,6 +270,10 @@ export const FAMILIES = [
      'real': it carries a TTL matching the code's redemption window, so an
      unclaimed one clears itself. Matched after the sc_raid singleton. */
   { prefix: 'sc_raid_reward_',  table: 'singletons',       expiry: 'real' },
+  /* Lifetime count of "Summon Raid Boss" redemptions that actually spawned
+     a boss, per account -- what the Undead Executioner badge ladder reads.
+     'none': this is the only record of it, and it must never reset. */
+  { prefix: 'raid_redeem_count_', table: 'singletons',     expiry: 'none' },
 
   { prefix: 'item_code_',      table: 'item_codes',       expiry: 'none' },
   { prefix: 'cp_queue_',       table: 'cp_queues',        expiry: 'real' },
