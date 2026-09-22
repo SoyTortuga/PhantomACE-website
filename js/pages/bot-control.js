@@ -247,7 +247,6 @@ async function fireBotAction(payload, button) {
     if (data.success) {
       const messages = {
         drop: 'Code dropped to chat.',
-        dropitem: 'Item code dropped to chat.',
         dropegg: 'Egg code dropped to chat.',
         announce: 'Announcement sent to chat.',
       };
@@ -267,7 +266,6 @@ async function fireBotAction(payload, button) {
         showBotStatus(messages[payload.action] || 'Done.', false);
       }
       await refreshDashboard();
-      if (payload.action === 'dropitem') await loadItemQueue();
     } else {
       showBotStatus(data.error || 'Action failed.', true);
     }
@@ -276,62 +274,6 @@ async function fireBotAction(payload, button) {
   }
 
   if (button) { button.disabled = false; button.textContent = originalText; }
-}
-
-/* ── Item Code Queue ─────────────────────────── */
-
-function renderItemQueue(data) {
-  const list = document.getElementById('botItemQueue');
-  if (!list) return;
-
-  const pending = (data && data.pending) || [];
-  const active = (data && data.active) || [];
-
-  if (pending.length === 0 && active.length === 0) {
-    list.innerHTML = '<li class="bot-item-queue-empty">No item codes queued. Ask the cosmetics/item system to create one.</li>';
-    return;
-  }
-
-  const rows = [];
-
-  active.forEach(function (entry) {
-    rows.push(
-      '<li class="bot-item-row">' +
-      '<span class="bot-item-rarity ' + entry.item.rarity + '">' + entry.item.rarity + '</span>' +
-      '<span class="bot-item-name">' + escapeBotHtml(entry.item.name) + '</span>' +
-      '<span class="bot-item-active-tag">Active in chat</span>' +
-      '</li>'
-    );
-  });
-
-  pending.forEach(function (entry) {
-    rows.push(
-      '<li class="bot-item-row">' +
-      '<span class="bot-item-rarity ' + entry.item.rarity + '">' + entry.item.rarity + '</span>' +
-      '<span class="bot-item-name">' + escapeBotHtml(entry.item.name) + '</span>' +
-      '<button class="btn-secondary bot-item-drop-btn" data-code="' + escapeBotHtml(entry.code) + '">Drop</button>' +
-      '</li>'
-    );
-  });
-
-  list.innerHTML = rows.join('');
-
-  list.querySelectorAll('.bot-item-drop-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fireBotAction({ action: 'dropitem', code: btn.dataset.code }, btn);
-    });
-  });
-}
-
-async function loadItemQueue() {
-  try {
-    const res = await fetch('/api/item-codes?action=queue', { credentials: 'same-origin' });
-    if (!res.ok) return;
-    const data = await res.json();
-    renderItemQueue(data);
-  } catch {
-    /* leave the list as-is */
-  }
 }
 
 /* ── Big Prize Giveaway ─────────────────────── */
@@ -998,7 +940,6 @@ function initBotControlPanel() {
   }
 
   refreshDashboard();
-  loadItemQueue();
   initGiveawayPanel();
   initRotationPanel();
 
