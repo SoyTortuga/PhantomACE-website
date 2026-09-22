@@ -59,6 +59,11 @@
       'Leader progress bar',
       'Standings',
     ] },
+    { id: 'ovCheckin', label: 'Check-In', holds: [
+      'The reaper raising a "Pham-Check-In" sign',
+      'Fires on the button (with sound) or the timer (silent)',
+      'Shows briefly, then hides — place it where viewers will see it',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -213,7 +218,16 @@
       '<li><span>duelistThree</span><span>2,900</span></li>';
   }
 
-  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); }
+  function checkin() {
+    show('ovCheckin');
+    var el = $('ovCheckin'); if (el) el.classList.add('is-in');   // opaque for the editor
+    var sp = $('ovCheckinSprite');
+    /* Show the held overhead frame (last of 7, each 87px in the CSS sprite)
+       so the editor previews the sign raised, not the idle pose. */
+    if (sp) sp.style.backgroundPositionX = '-' + (6 * 87) + 'px';
+  }
+
+  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); checkin(); }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
 })();

@@ -28,7 +28,7 @@ const NAME_MAX = 40;
 
 /* Must match overlay-samples.js PANELS — the ids the editor drags and the
    live overlay pins. A save naming anything else is dropped, not stored. */
-const PANEL_IDS = ['ovStage', 'ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc'];
+const PANEL_IDS = ['ovStage', 'ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin'];
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {

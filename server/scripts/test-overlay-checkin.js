@@ -34,23 +34,30 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
   const ov = read('js/pages/overlay.js');
   ok('the check-in is a corner reminder, not a stage card', /function showCheckinReminder/.test(ov) && !/buildCheckinCard/.test(ov));
   ok('and it bypasses the alert queue', /ev\.type === 'pham-checkin'\) \{ showCheckinReminder\(ev\); continue; \}/.test(ov));
-  ok('it points at the strip asset', /\/assets\/overlay\/pham-checkin\.png/.test(ov));
+  ok('it drives the movable #ovCheckin panel', /getElementById\('ovCheckin'\)/.test(ov) && /getElementById\('ovCheckinSprite'\)/.test(ov));
   /* Sound only when the event asks for it (the manual button); the timer
      nudge is silent. */
   ok('sound is gated on ev.sound', /if \(ev && ev\.sound\)/.test(ov) && /new Audio\(CHECKIN_AUDIO\)/.test(ov));
   ok('the raise animation stops on the last frame', /frame >= CHECKIN_FRAMES - 1\) clearInterval/.test(ov));
 
-  /* Just the reaper and the words — no subtext line. */
-  ok('the reminder shows only the Pham Check-In text', /ov-checkin-label">Pham Check-In</.test(ov) && !/Redeem to check in/.test(ov));
+  /* The panel markup lives in overlay.html — just the reaper and the words,
+     no subtext line. */
+  const html = read('overlay.html');
+  ok('the panel is in the overlay markup', /id="ovCheckin"/.test(html) && /id="ovCheckinSprite"/.test(html));
+  ok('it shows only the Pham Check-In text', /ov-checkin-label">Pham Check-In</.test(html) && !/Redeem to check in/.test(html));
 
   const css = read('css/pages/overlay.css');
-  ok('the reminder is fixed in a corner and slides', /\.ov-checkin \{[\s\S]*position: fixed/.test(css) && /\.ov-checkin\.is-in/.test(css));
-  ok('the sprite renders crisp', /\.ov-checkin-sprite/.test(css) && /image-rendering: pixelated/.test(css));
+  ok('the panel is absolutely positioned (movable by the layout editor)', /\.ov-checkin \{[\s\S]*?position: absolute/.test(css) && /\.ov-checkin\.is-in/.test(css));
+  ok('the strip image and crisp pixels are in the sprite CSS', /\.ov-checkin-sprite[\s\S]*?pham-checkin\.png/.test(css) && /image-rendering: pixelated/.test(css));
   /* No box: the label sits over the scene on its own, in the GodOfWar face. */
   const labelBlock = (css.match(/\.ov-checkin-label \{([^}]*)\}/) || ['', ''])[1];
   ok('the label uses the GodOfWar font', /GodOfWar/.test(labelBlock));
   const checkinBlock = (css.match(/\.ov-checkin \{([^}]*)\}/) || ['', ''])[1];
   ok('there is no panel background behind it', !/background:/.test(checkinBlock));
+
+  /* Registered as a movable panel the layout editor lists. */
+  const samples = read('js/pages/overlay-samples.js');
+  ok('the layout editor lists the Check-In panel', /id: 'ovCheckin'/.test(samples) && /function checkin\(/.test(samples));
 }
 
 /* ── The strip's real width matches the declared frame count ──────────── */

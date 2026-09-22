@@ -159,12 +159,11 @@
      "Pham-Check-In" sign, stepped through the 7-frame strip and held.
      Sound only when a MODERATOR fires it by hand (ev.sound) — the timer
      version is silent, so a periodic nudge never blasts audio on a loop. */
-  var CHECKIN_STRIP = '/assets/overlay/pham-checkin.png';
-  var CHECKIN_AUDIO = '/assets/audio/phamCheckIn.mp3';
+  var CHECKIN_AUDIO = '/assets/audio/phamCheckIn.mp3';   // strip image lives in overlay.css
   var CHECKIN_FRAMES = 7;
   var CHECKIN_FW = 283, CHECKIN_FH = 424;   // native cell size in the strip
   var CHECKIN_STEP_MS = 150;                // per raise frame
-  var CHECKIN_DISP_H = 130;                 // small — it's a corner reminder
+  var CHECKIN_DISP_H = 130;                 // display height; width scales (must match the CSS sprite size)
   var CHECKIN_MS = 8000;                    // how long the nudge stays up
 
   /* ── What each event looks like on screen ── */
@@ -308,44 +307,32 @@
   }
 
   /* ── Pham Check-In reminder ────────────────────────────────────────────
-     Its own transient element in the corner, NOT an alert card — so it
-     never queues behind (or blocks) a sub or a raid. Reuses one element:
-     a fresh nudge restarts it rather than stacking. Steps the sign-raise
-     strip once and holds the overhead pose for CHECKIN_MS, then slides out.
-     Audio only when ev.sound is set (the manual button); the timer nudge
-     is silent. */
-  var checkinEl = null;
+     Drives the #ovCheckin panel — a MOVABLE panel positioned by the layout
+     editor like the raid/Mana panels, not a fixed corner and not a stage
+     alert (it bypasses the alert queue, so it never blocks a sub or raid).
+     Shows the panel, steps the sign-raise strip once and holds the overhead
+     pose for CHECKIN_MS, then fades out. Audio only when ev.sound is set
+     (the manual button); the timer nudge is silent. The sprite's size and
+     image live in overlay.css so layout mode can show it without this. */
+  var CHECKIN_DISP_W = Math.round(CHECKIN_FW * (CHECKIN_DISP_H / CHECKIN_FH));
   var checkinTimers = [];
   function clearCheckinTimers() { checkinTimers.forEach(clearTimeout); checkinTimers.forEach(clearInterval); checkinTimers = []; }
 
   function showCheckinReminder(ev) {
-    var dispW = Math.round(CHECKIN_FW * (CHECKIN_DISP_H / CHECKIN_FH));
-
-    if (!checkinEl) {
-      checkinEl = document.createElement('div');
-      checkinEl.className = 'ov-checkin';
-      checkinEl.innerHTML =
-        '<div class="ov-checkin-sprite"></div>' +
-        '<div class="ov-checkin-label">Pham Check-In</div>';
-      document.body.appendChild(checkinEl);
-    }
+    var panel = document.getElementById('ovCheckin');
+    var sprite = document.getElementById('ovCheckinSprite');
+    if (!panel || !sprite) return;
     clearCheckinTimers();
 
-    var sprite = checkinEl.querySelector('.ov-checkin-sprite');
-    sprite.style.width = dispW + 'px';
-    sprite.style.height = CHECKIN_DISP_H + 'px';
-    sprite.style.backgroundImage = 'url(' + CHECKIN_STRIP + ')';
-    sprite.style.backgroundSize = (dispW * CHECKIN_FRAMES) + 'px ' + CHECKIN_DISP_H + 'px';
     sprite.style.backgroundPositionX = '0px';
-
-    checkinEl.classList.remove('is-leaving');
-    void checkinEl.offsetWidth;             // restart the slide-in on a re-fire
-    checkinEl.classList.add('is-in');
+    panel.hidden = false;
+    void panel.offsetWidth;                 // let the fade restart on a re-fire
+    panel.classList.add('is-in');
 
     var frame = 0;
     var step = setInterval(function () {
       frame++;
-      sprite.style.backgroundPositionX = '-' + (frame * dispW) + 'px';
+      sprite.style.backgroundPositionX = '-' + (frame * CHECKIN_DISP_W) + 'px';
       if (frame >= CHECKIN_FRAMES - 1) clearInterval(step);
     }, CHECKIN_STEP_MS);
     checkinTimers.push(step);
@@ -358,10 +345,8 @@
     }
 
     checkinTimers.push(setTimeout(function () {
-      checkinEl.classList.add('is-leaving');
-      checkinTimers.push(setTimeout(function () {
-        checkinEl.classList.remove('is-in', 'is-leaving');
-      }, 400));
+      panel.classList.remove('is-in');       // fade out
+      checkinTimers.push(setTimeout(function () { panel.hidden = true; }, 360));
     }, CHECKIN_MS));
   }
 
