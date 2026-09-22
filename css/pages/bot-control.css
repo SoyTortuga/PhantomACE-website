@@ -13,8 +13,26 @@
   margin-bottom: 16px;
 }
 
-.bot-section {
-  margin-bottom: 24px;
+/* Two-up on anything wide enough, one column on narrow viewports — the
+   fallback the page used to be everywhere. `align-items: start` stops a
+   short card being stretched to match a tall neighbour in the same row,
+   which is the artifact plain `display: grid` would otherwise leave. */
+.bot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+/* The handful of sections whose content (a reel, a growing feed, a list
+   with no height cap) actually needs the room, plus the two banners that
+   were never their own section to begin with. */
+.bot-grid-full {
+  grid-column: 1 / -1;
+}
+
+.bot-grid .bot-section {
+  margin-bottom: 0;
 }
 
 .bot-section h2 {

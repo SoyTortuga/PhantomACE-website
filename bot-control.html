@@ -42,7 +42,9 @@
          role field does not say so. -->
     <div id="botControlPanel" hidden>
 
-      <div id="botWarnings"></div>
+      <div class="bot-grid">
+
+      <div id="botWarnings" class="bot-grid-full"></div>
 
       <div class="card bot-section" id="poolSection">
         <h2>Code Pools</h2>
@@ -100,7 +102,7 @@
         </ul>
       </div>
 
-      <div class="card bot-section" id="giveawaySection">
+      <div class="card bot-section bot-grid-full" id="giveawaySection">
         <h2>Big Prize Giveaway</h2>
         <p class="bot-section-desc">A live, one-off drawing. Pick a rarity and open entries — that switches on the matching channel points reward and switches the other one off, so there is only ever one draw running. Chat redeems it once each, the reel picks a name, and the winner gets a code locked to their account, waiting on their giveaway page for seven days. Reset clears the entrants for the next event — it never touches the monthly giveaway, which runs separately and keeps its own ledger.</p>
 
@@ -209,7 +211,7 @@
         </div>
       </div>
 
-      <div class="card bot-section">
+      <div class="card bot-section bot-grid-full">
         <h2>Rotating Announcements</h2>
         <p class="bot-section-desc">Messages the bot posts on a timer, one at a time, in order. It only posts while you're live — being offline is not something anyone has to remember to pause.</p>
 
@@ -233,7 +235,7 @@
         </div>
       </div>
 
-      <div id="botStatusMsg" class="bot-status-msg" hidden></div>
+      <div id="botStatusMsg" class="bot-status-msg bot-grid-full" hidden></div>
 
       <div class="card bot-section">
         <h2>Monthly Giveaway</h2>
@@ -243,7 +245,7 @@
         </div>
       </div>
 
-      <div class="card bot-section">
+      <div class="card bot-section bot-grid-full">
         <h2>Recent Bot Actions</h2>
         <ul class="bot-action-feed" id="botActionFeed">
           <li class="bot-action-feed-empty">Loading...</li>
@@ -264,7 +266,7 @@
 
       <!-- Broadcaster only. Revealed by JS on the server's isBroadcaster
            answer — managing who holds power is not itself delegated. -->
-      <div class="card bot-section" id="modSection" hidden>
+      <div class="card bot-section bot-grid-full" id="modSection" hidden>
         <h2>Moderator Access</h2>
         <p class="bot-section-desc">Accounts allowed to drop codes and run the giveaway from this panel. Removal takes effect immediately — it doesn't wait for their session to expire.</p>
 
@@ -277,6 +279,8 @@
           <button class="btn-primary" id="botModAddBtn">Add</button>
         </div>
         <p class="bot-section-desc bot-mod-hint">Type their Twitch username &mdash; the site looks up the account and stores its ID, so a later rename can&rsquo;t hand their access to someone else. A numeric ID still works if you have one.</p>
+      </div>
+
       </div>
 
     </div>
