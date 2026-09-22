@@ -1224,6 +1224,101 @@ async function playToFinish(env, code, hands) {
   ok('an abandoned, empty hosting-only room is deleted', !env._store.has('mc_room_' + code));
 }
 
+/* ══ AFK auto-removal: two idle timeouts in a row removes a player ═══════
+   The bug this fixes: someone closes the tab mid-run, and every remaining
+   round the room waits out the FULL idle clock for them, over and over. A
+   single miss still just banks and waits (a reload should cost nobody their
+   spot); two in a row is the "actually gone" signal that removes them.
+   Rolls use 111222 (two triplets = hot dice), which banks straight into
+   pending so `bank` completes the turn without a keep step. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000 });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'c', { action: 'join-room', code });
+  for (const who of ['a', 'b', 'c']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+
+  /* Round 1: a and b act, c goes idle. Time out the round. */
+  loadDice('111222'); await post(env, 'a', { action: 'roll', code }); await post(env, 'a', { action: 'bank', code });
+  loadDice('111222'); await post(env, 'b', { action: 'roll', code }); await post(env, 'b', { action: 'bank', code });
+  expireTurn(env, code, '303');
+  let st = await get(env, 'a', `action=get-state&code=${code}`);
+  const cAfterOne = st.data.players.find(p => p.id === '303');
+  ok('after one miss, c is still in the room', !!cAfterOne);
+  check('with one missed round counted', cAfterOne.missedRounds, 1);
+
+  /* Round 2: past the intermission, a and b act again, c misses again. */
+  endIntermission(env, code);
+  await get(env, 'a', `action=get-state&code=${code}`);
+  loadDice('111222'); await post(env, 'a', { action: 'roll', code }); await post(env, 'a', { action: 'bank', code });
+  loadDice('111222'); await post(env, 'b', { action: 'roll', code }); await post(env, 'b', { action: 'bank', code });
+  expireTurn(env, code, '303');
+  st = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('after two misses in a row, c is removed', !st.data.players.find(p => p.id === '303'));
+  check('leaving just the two who are actually playing', st.data.players.length, 2);
+}
+{
+  /* A missed round then a real roll resets the counter -- someone who
+     reloaded once and came back is never removed for it. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000 });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  for (const who of ['a', 'b']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+
+  /* Round 1: a banks, b misses. */
+  loadDice('111222'); await post(env, 'a', { action: 'roll', code }); await post(env, 'a', { action: 'bank', code });
+  expireTurn(env, code, '202');
+  await get(env, 'a', `action=get-state&code=${code}`);
+  /* Round 2: b is back and rolls -- clearing the miss count. */
+  endIntermission(env, code);
+  await get(env, 'a', `action=get-state&code=${code}`);
+  loadDice('111222'); await post(env, 'b', { action: 'roll', code }); await post(env, 'b', { action: 'bank', code });
+  let st = await get(env, 'a', `action=get-state&code=${code}`);
+  check('a roll clears the miss count', st.data.players.find(p => p.id === '202').missedRounds, 0);
+
+  /* a finishes round 2, then in round 3 b misses again -- but not
+     consecutively, so they stay. */
+  loadDice('111222'); await post(env, 'a', { action: 'roll', code }); await post(env, 'a', { action: 'bank', code });
+  endIntermission(env, code);
+  await get(env, 'a', `action=get-state&code=${code}`);
+  loadDice('111222'); await post(env, 'a', { action: 'roll', code }); await post(env, 'a', { action: 'bank', code });
+  expireTurn(env, code, '202');
+  st = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('so a non-consecutive second miss does not remove them', !!st.data.players.find(p => p.id === '202'));
+}
+{
+  /* The host can kick a player who has missed a round without waiting for
+     the second auto-removal clock. The kick action already existed; what is
+     asserted here is that missedRounds is exposed for the button to key on. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000 });
+  const code = made.data.code;
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'c', { action: 'join-room', code });
+  for (const who of ['a', 'b', 'c']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+
+  loadDice('111222'); await post(env, 'a', { action: 'roll', code }); await post(env, 'a', { action: 'bank', code });
+  loadDice('111222'); await post(env, 'b', { action: 'roll', code }); await post(env, 'b', { action: 'bank', code });
+  expireTurn(env, code, '303');
+  let st = await get(env, 'a', `action=get-state&code=${code}`);
+  check('the host can see who missed a round', st.data.players.find(p => p.id === '303').missedRounds, 1);
+  const kicked = await post(env, 'a', { action: 'kick', code, userId: '303' });
+  check('and kick them straight away', kicked.data.success, true);
+  st = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('removing them from the room', !st.data.players.find(p => p.id === '303'));
+}
+{
+  const gamePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../games/mana-clash/index.html');
+  const game = fs.readFileSync(gamePath, 'utf8');
+  ok('the standings strip offers a kick for a player who missed a round',
+     /missedRounds >= 1/.test(game) && /action: 'kick'/.test(game));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 
 console.log('');

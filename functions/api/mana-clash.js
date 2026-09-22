@@ -80,6 +80,17 @@ const MAX_PLAYERS = 100;
 const INTERMISSION_MS = 10000;
 const COOP_INTERMISSION_MS = 5000;   // co-op has no standings race to read — keep the pace up
 const COOP_BOON_VOTE_MS = 20000;     // an AFK vote resolves with whatever votes exist, not never
+
+/* A single idle timeout already covers "reloaded the page" or "stepped away
+   for a second" gracefully — it bans nobody, it just banks what they were
+   holding. TWO IN A ROW is a different signal: nobody reloads, sits through
+   a full idle timer doing nothing, and then does it again. That is someone
+   who is actually gone, and every round after the first was the room
+   waiting out a clock for someone who was never coming back. Auto-removing
+   at that point is what stops the wait from repeating for the rest of the
+   game. A single miss never triggers it — see the comment on `missedRounds`
+   at its one reset site (the `roll` handler). */
+const AFK_AUTO_REMOVE_MISSES = 2;
 const GOALS = [5000, 10000, 20000];
 const IDLE_CHOICES = [10000, 30000, 60000];
 
@@ -499,6 +510,12 @@ function coopInit(room) {
     teamMaxHp: teamMax, teamHp: teamMax, teamHpBonus: 0, log: [],
     boons: coopBoonDefaults(), carryover: 0, awaitingBoon: false, pendingBoons: null,
     ultCharge: 0,   // run-long, not per-enemy — deliberately worth saving for a boss
+    /* A monotonic counter, not a flag: every client fires the cast animation
+       once when it sees this climb, the same one-shot-on-a-rising-count
+       pattern renderEnemy() uses for the enemy hit-flash. A shared ultimate
+       fired by one teammate has to animate on EVERYONE's screen, which a
+       purely local trigger on the button-press could never do. */
+    ultUsed: 0,
   };
   coopSpawn(room, 1);
 }
@@ -870,6 +887,25 @@ function advance(room, now) {
         turn.done = 'timeout';
         turn.awaitingSelection = false;
         changed = true;
+
+        /* Two idle timeouts in a row with nothing in between -- see
+           AFK_AUTO_REMOVE_MISSES -- and this account is removed outright,
+           not just marked done, so nobody waits out a THIRD clock for
+           someone who was never coming back. Reset to 0 the moment they
+           actually roll (see the `roll` handler); this only ever counts
+           CONSECUTIVE misses. */
+        room.players[id].missedRounds = (room.players[id].missedRounds || 0) + 1;
+        if (room.players[id].missedRounds >= AFK_AUTO_REMOVE_MISSES) {
+          delete room.players[id];
+          if (room.tiedPlayers) room.tiedPlayers = room.tiedPlayers.filter(pid => pid !== id);
+          /* Same tolerance leave-room already has for a departing host: hand
+             it to whoever is left, or leave room.host naming nobody if the
+             room is now otherwise empty. */
+          if (room.host === id) {
+            const next = Object.keys(room.players)[0];
+            if (next) { room.host = next; room.hostName = room.players[next].displayName; }
+          }
+        }
       }
 
       if (roundIsOver(room)) { endRound(room, now); changed = true; continue; }
@@ -969,6 +1005,9 @@ function publicPlayer(id, p, { dice = false } = {}) {
     gained: p.turn ? p.turn.gained : null,
     done: p.turn ? p.turn.done : null,
     event: p.turn ? p.turn.event : null,
+    /* Consecutive missed rounds — what the host's kick control keys off of,
+       and what advance() auto-removes on at AFK_AUTO_REMOVE_MISSES. */
+    missedRounds: p.missedRounds || 0,
   };
 
   /* OPT-IN. The overlay always asks (viewFor's caller passes {dice:true});
@@ -1084,6 +1123,10 @@ export function viewFor(room, userId, now, opts = {}) {
       ultCharge: Math.min(COOP_ULT_MAX, room.coop.ultCharge || 0),
       ultMax: COOP_ULT_MAX,
       ultReady: (room.coop.ultCharge || 0) >= COOP_ULT_MAX,
+      /* Rising each time anyone fires the ultimate — the cue every client
+         plays the cast animation off, so a teammate's ultimate animates on
+         everyone's screen, not only the presser's. */
+      ultUsed: room.coop.ultUsed || 0,
     } : null,
     ranked: isRanked(room),
     round: room.round,
@@ -1650,6 +1693,7 @@ export async function onRequestPost(context) {
       c.enemyHp = Math.max(0, before - burst);
       c.teamHp = c.teamMaxHp;            // the burst's other half: a full team heal
       c.ultCharge = 0;
+      c.ultUsed = (c.ultUsed || 0) + 1;  // the animation cue every client watches
       c.lastDealt = burst;
 
       if (c.enemyHp <= 0) {
@@ -1670,6 +1714,11 @@ export async function onRequestPost(context) {
       if (blocked) return blocked;
       const t = r.players[userId].turn;
       if (t.awaitingSelection) return json({ error: 'Keep at least one die first.' }, 400);
+
+      /* A real roll is proof of presence -- this is the ONE reset site for
+         missedRounds, so the auto-removal in advance() only ever counts
+         CONSECUTIVE misses, never a lifetime tally. */
+      r.players[userId].missedRounds = 0;
 
       t.dice = rollDice(t.remaining);
       t.event = null;

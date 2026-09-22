@@ -257,6 +257,7 @@
     .die.mini img { width: 9px; height: 9px; }
     .die.mini .pip-num { display: none; }
     .standing-kept { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 4px; }
+    .standing-kick { margin-top: 5px; font-size: 9px; padding: 2px 6px; width: 100%; }
 
     .tray-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--dim); text-align: center; }
     .kept-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 0; }
@@ -1251,9 +1252,11 @@ function renderStandings() {
   const strip = $('standingsStrip');
   strip.innerHTML = '';
   const coop = state.mode === 'coop';
+  const meId = myId();
+  const isHost = state.host === meId;
   for (const p of state.players) {
     const el = document.createElement('div');
-    el.className = 'standing' + (p.id === (state.you && state.you.id) ? ' me' : '') +
+    el.className = 'standing' + (p.id === meId ? ' me' : '') +
                    (p.done ? ' done-' + p.done : '');
     const out = roundOutcome(p);
     el.innerHTML = '<span class="nm">' + esc(p.name) + '</span>' +
@@ -1268,6 +1271,19 @@ function renderStandings() {
       row.className = 'standing-kept';
       p.kept.forEach(f => row.appendChild(dieEl(f, { mini: true })));
       el.appendChild(row);
+    }
+    /* Only once they have actually missed a round -- not available for
+       someone who is simply playing, and gone again the moment they roll
+       (missedRounds resets to 0 server-side). Two consecutive misses auto-
+       removes on its own; this is for a host who doesn't want to wait for
+       that second clock to run out. */
+    if (isHost && p.id !== meId && p.missedRounds >= 1) {
+      const k = document.createElement('button');
+      k.className = 'kick-btn standing-kick';
+      k.textContent = 'Remove';
+      k.title = 'Missed the last round';
+      k.addEventListener('click', () => act({ action: 'kick', code: roomCode, userId: p.id }, 'gameFeedback'));
+      el.appendChild(k);
     }
     strip.appendChild(el);
   }
@@ -1397,6 +1413,7 @@ const COOP_BOON_NAMES = {
 };
 
 let lastEnemyHp = null;
+let lastUltUsed = null;
 function renderEnemy() {
   const c = state.coop;
   const banner = $('enemyBanner');
@@ -1414,6 +1431,14 @@ function renderEnemy() {
     spriteEl.classList.remove('hit'); void spriteEl.offsetWidth; spriteEl.classList.add('hit');
   }
   lastEnemyHp = c.enemyHp;
+
+  /* The cast animation fires off the server's rising ultUsed counter, so a
+     teammate's ultimate plays on every screen, not only the presser's. The
+     `!== null` guard skips it on the first sight of a room whose count is
+     already non-zero — joining mid-run must not replay a past cast. */
+  const ultUsed = c.ultUsed || 0;
+  if (lastUltUsed !== null && ultUsed > lastUltUsed) fireUltimateBeam();
+  lastUltUsed = ultUsed;
 
   const nameEl = $('enemyName');
   nameEl.textContent = (c.isFinal ? '☠ ' : c.isBoss ? '⚔ ' : '') + c.enemyName;
@@ -1552,12 +1577,16 @@ const ULT_FX_W = 200, ULT_FX_H = 171;
 const ULT_FX_MS = 70;   // per frame — 23 frames is ~1.6s, a real cast, not a blip
 
 /* Fires the ultimate. No vote, unlike a boon — there is no downside to
-   using it, so nothing needs coordinating. */
+   using it, so nothing needs coordinating. The cast animation is NOT
+   triggered here: it plays off the server's ultUsed counter in
+   renderEnemy(), so the presser and every teammate see the exact same
+   thing when the acted-on state lands (which act() applies immediately on
+   the response, so the presser has no perceptible wait). Triggering it
+   locally too would double-fire it on their screen alone. */
 async function useUltimate() {
   if (ultBusy) return;
   ultBusy = true;
   $('ultBtn').disabled = true;
-  fireUltimateBeam();
   await act({ action: 'use-ultimate', code: roomCode }, 'gameFeedback');
   ultBusy = false;
 }

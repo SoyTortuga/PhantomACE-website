@@ -55,7 +55,7 @@ function coopRoom(over = {}, turnOver = {}) {
     minions: { hp: 0, maxHp: 0, count: 0 }, summonedThresholds: [], roundsThisEnemy: 0,
     lastDealt: 0, lastAttack: 0, log: [], weakColor: 6, carryover: 0,
     boons: { dmgMult: 0, poisonMult: 0, healMult: 0, roundsBonus: 0, soakReduce: 0, secondWind: false, secondWindUsed: false, taken: [] },
-    awaitingBoon: false, pendingBoons: null,
+    awaitingBoon: false, pendingBoons: null, ultCharge: 0, ultUsed: 0,
   }, over.coop || {});
   return Object.assign({
     code: 'AAAA', host: '7', hostName: 'U7',
@@ -813,6 +813,19 @@ function coopVoteRoom(ids) {
   ok('a boon is offered, same as any other clear', room.coop.awaitingBoon === true);
 }
 
+/* The animation cue: firing the ultimate bumps a counter every client
+   watches, so a teammate's ultimate animates on every screen and not only
+   the presser's — the whole point of it being server-driven, not a local
+   button effect. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, ultCharge: 100 } }) }) };
+  check('the counter starts at zero', e.MARKETPLACE.read('mc_room_AAAA').coop.ultUsed, 0);
+  const res = await (await POST(e, { action: 'use-ultimate', code: 'AAAA' })).json();
+  check('firing it bumps the counter', e.MARKETPLACE.read('mc_room_AAAA').coop.ultUsed, 1);
+  check('and the view carries the counter to every client', res.room.coop.ultUsed, 1);
+}
+
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
 {
   const api = fs.readFileSync(path.join(REPO, 'functions/api/mana-clash.js'), 'utf8');
@@ -830,6 +843,13 @@ function coopVoteRoom(ids) {
      /ultimate-cast\.png/.test(game) && /ULT_FX_FRAMES = 23/.test(game));
   ok('the asset itself exists (gitignored -- see server/scripts/lib/aseprite-slice-sheet.lua)',
      fs.existsSync(path.join(REPO, 'games/mana-clash/assets/fx/ultimate-cast.png')));
+  /* The cast fires off the server counter in renderEnemy, NOT locally in
+     the click handler -- so a teammate's ultimate animates on every screen.
+     A local-only trigger is exactly the bug this replaced. */
+  ok('the cast is driven by the shared ultUsed counter, on every client',
+     /ultUsed/.test(game) && /lastUltUsed/.test(game));
+  ok('and is not fired locally from the button press', !/fireUltimateBeam\(\);\s*\n\s*await act/.test(game));
+  ok('the server sends the ultUsed cue', /ultUsed: room\.coop\.ultUsed/.test(api));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
