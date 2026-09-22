@@ -224,6 +224,28 @@ async function main() {
       .finally(() => { scrambleBusy = false; });
   }, 1000).unref();
 
+  /* Fire the Pham Check-In corner nudge on its configured interval while the
+     stream is live. Silent (no `sound`), unlike the moderator's manual
+     button — a periodic reminder must not loop audio. lastFiredAt is stamped
+     on the config so the cadence survives restarts and isn't tied to this
+     process's uptime. */
+  async function fireCheckinReminder(env) {
+    const cfg = await env.MARKETPLACE.get('checkin_reminder', 'json');
+    if (!cfg || !cfg.enabled) return;
+    const intervalMs = Math.max(1, Number(cfg.intervalMin) || 15) * 60 * 1000;
+    if (cfg.lastFiredAt && Date.now() - cfg.lastFiredAt < intervalMs) return;
+    let fire = false;
+    await env.MARKETPLACE.mutate('checkin_reminder', (c) => {
+      if (!c || !c.enabled) return undefined;
+      if (c.lastFiredAt && Date.now() - c.lastFiredAt < intervalMs) return undefined;
+      fire = true;
+      return { ...c, lastFiredAt: Date.now() };
+    });
+    if (!fire) return;
+    const { pushOverlayEvent } = await import('../functions/api/overlay/events.js');
+    await pushOverlayEvent(env, { type: 'pham-checkin', sound: false });
+  }
+
   /* ── Broadcast log ──────────────────────────────────────────────────────
      Records each stream as it goes live, so check-in streaks know what the
      previous broadcast was. Written here rather than on a check-in
@@ -238,11 +260,13 @@ async function main() {
       import('../functions/api/dino-park-catchup.js'),
     ])
       .then(([info, rewards, catchup]) => info.getStreamInfo(env).then(async (s) => {
-        /* Same live check feeds two records: the broadcast log (for check-in
-           streaks) and Dino Park's live-interval log (for offline egg
-           catch-up). The interval log is stamped every live tick, not just on
-           a new broadcast, so it captures how LONG the stream stayed up. */
+        /* Same live check feeds three things: the broadcast log (for check-in
+           streaks), Dino Park's live-interval log (for offline egg catch-up),
+           and the Pham Check-In reminder timer. The interval log is stamped
+           every live tick, not just on a new broadcast, so it captures how
+           LONG the stream stayed up. */
         await catchup.recordLiveTick(env, !!s.live, Date.now());
+        if (s.live) await fireCheckinReminder(env).catch(() => {});
         return s.live && s.streamId ? rewards.recordStream(env, s.streamId, s.startedAt) : false;
       }))
       .then(added => { if (added) console.log('[stream] new broadcast recorded'); })

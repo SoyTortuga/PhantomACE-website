@@ -249,6 +249,7 @@ async function fireBotAction(payload, button) {
         drop: 'Code dropped to chat.',
         dropegg: 'Egg code dropped to chat.',
         announce: 'Announcement sent to chat.',
+        'checkin-alert': 'Pham Check-In alert sent to the overlay.',
       };
       /* data.sent is false when Twitch accepted the request but refused to
          post — AutoMod, a link filter, follower-only mode. Saying "dropped to
@@ -274,6 +275,63 @@ async function fireBotAction(payload, button) {
   }
 
   if (button) { button.disabled = false; button.textContent = originalText; }
+}
+
+/* ── Pham Check-In reminder ─────────────────────
+   Show Now fires the nudge once (with sound); the timer repeats it silently
+   while live. The timer's on/off and interval live server-side (KV, read by
+   the rig tick), so the panel just reflects and edits that config. */
+let checkinTimerEnabled = false;
+
+function renderCheckinReminder(enabled, intervalMin) {
+  checkinTimerEnabled = !!enabled;
+  const state = document.getElementById('ovCheckinTimerState');
+  const toggle = document.getElementById('ovCheckinToggleBtn');
+  const interval = document.getElementById('ovCheckinInterval');
+  if (state) {
+    state.textContent = enabled ? 'Timer on · every ' + intervalMin + ' min' : 'Timer off';
+    state.className = 'giveaway-status' + (enabled ? ' open' : '');
+  }
+  if (toggle) toggle.textContent = enabled ? 'Turn Off Timer' : 'Turn On Timer';
+  if (interval && document.activeElement !== interval) interval.value = intervalMin;
+}
+
+async function saveCheckinReminder(enabled) {
+  const interval = document.getElementById('ovCheckinInterval');
+  const intervalMin = Math.min(120, Math.max(1, parseInt(interval && interval.value, 10) || 15));
+  try {
+    const res = await fetch('/api/bot/trigger', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'checkin-reminder-config', enabled, intervalMin }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      renderCheckinReminder(data.enabled, data.intervalMin);
+      showBotStatus(data.enabled
+        ? 'Check-In reminder on — every ' + data.intervalMin + ' min while live.'
+        : 'Check-In reminder timer off.', false);
+    } else {
+      showBotStatus(data.error || 'Could not save the reminder settings.', true);
+    }
+  } catch {
+    showBotStatus('Network error saving the reminder settings.', true);
+  }
+}
+
+function initCheckinReminder() {
+  const showBtn = document.getElementById('ovCheckinBtn');
+  const toggle = document.getElementById('ovCheckinToggleBtn');
+  const save = document.getElementById('ovCheckinSaveBtn');
+  if (showBtn) showBtn.addEventListener('click', function () { fireBotAction({ action: 'checkin-alert' }, showBtn); });
+  if (toggle) toggle.addEventListener('click', function () { saveCheckinReminder(!checkinTimerEnabled); });
+  if (save) save.addEventListener('click', function () { saveCheckinReminder(checkinTimerEnabled); });
+
+  fetch('/api/bot/trigger', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d && d.checkinReminder) renderCheckinReminder(d.checkinReminder.enabled, d.checkinReminder.intervalMin); })
+    .catch(function () { /* leave the default off/15 shown */ });
 }
 
 /* ── Big Prize Giveaway ─────────────────────── */
@@ -938,6 +996,8 @@ function initBotControlPanel() {
       fireBotAction({ action: 'announce', message: message }, announceBtn);
     });
   }
+
+  initCheckinReminder();
 
   refreshDashboard();
   initGiveawayPanel();

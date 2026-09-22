@@ -193,6 +193,20 @@
         </div>
       </div>
 
+      <div class="card bot-section" id="ovCheckinSection">
+        <h2>Pham Check-In Reminder</h2>
+        <p class="bot-section-desc">A small corner nudge on the overlay telling viewers to redeem their Pham Check-In. <b>Show Now</b> plays it once with sound; the <b>timer</b> repeats it silently every few minutes while you&rsquo;re live. Overlay only &mdash; nothing is posted to chat.</p>
+        <div class="ovmc-row">
+          <button class="btn-primary" id="ovCheckinBtn">Show Now</button>
+          <span class="giveaway-status" id="ovCheckinTimerState">Timer off</span>
+          <button class="btn-secondary" id="ovCheckinToggleBtn">Turn On Timer</button>
+          <label class="bot-rotation-interval">Every
+            <input type="number" id="ovCheckinInterval" min="1" max="120" value="15"> min
+          </label>
+          <button class="btn-secondary" id="ovCheckinSaveBtn">Save</button>
+        </div>
+      </div>
+
       <div class="card bot-section">
         <h2>Send Announcement</h2>
         <p class="bot-section-desc">Posts a custom message to chat verbatim, exactly as typed.</p>

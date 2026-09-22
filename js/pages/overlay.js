@@ -151,6 +151,22 @@
      stops spinning — long enough to read on stream before the card leaves. */
   var REEL_HOLD_MS = 2600;
 
+  /* ── Pham Check-In reminder ───────────────────────────────────────────
+     Deliberately NOT a full alert: a small nudge in the corner telling
+     viewers to go redeem their check-in, not a center-stage card that
+     queues behind subs and raids. It has its own transient element and
+     bypasses the alert queue entirely (see poll()). The reaper raises a
+     "Pham-Check-In" sign, stepped through the 7-frame strip and held.
+     Sound only when a MODERATOR fires it by hand (ev.sound) — the timer
+     version is silent, so a periodic nudge never blasts audio on a loop. */
+  var CHECKIN_STRIP = '/assets/overlay/pham-checkin.png';
+  var CHECKIN_AUDIO = '/assets/audio/phamCheckIn.mp3';
+  var CHECKIN_FRAMES = 7;
+  var CHECKIN_FW = 283, CHECKIN_FH = 424;   // native cell size in the strip
+  var CHECKIN_STEP_MS = 150;                // per raise frame
+  var CHECKIN_DISP_H = 130;                 // small — it's a corner reminder
+  var CHECKIN_MS = 8000;                    // how long the nudge stays up
+
   /* ── What each event looks like on screen ── */
   function describe(ev) {
     if (ev.type === 'drop') {
@@ -287,7 +303,66 @@
         ms: spinMs + REEL_HOLD_MS,
       };
     }
+
     return null;
+  }
+
+  /* ── Pham Check-In reminder ────────────────────────────────────────────
+     Its own transient element in the corner, NOT an alert card — so it
+     never queues behind (or blocks) a sub or a raid. Reuses one element:
+     a fresh nudge restarts it rather than stacking. Steps the sign-raise
+     strip once and holds the overhead pose for CHECKIN_MS, then slides out.
+     Audio only when ev.sound is set (the manual button); the timer nudge
+     is silent. */
+  var checkinEl = null;
+  var checkinTimers = [];
+  function clearCheckinTimers() { checkinTimers.forEach(clearTimeout); checkinTimers.forEach(clearInterval); checkinTimers = []; }
+
+  function showCheckinReminder(ev) {
+    var dispW = Math.round(CHECKIN_FW * (CHECKIN_DISP_H / CHECKIN_FH));
+
+    if (!checkinEl) {
+      checkinEl = document.createElement('div');
+      checkinEl.className = 'ov-checkin';
+      checkinEl.innerHTML =
+        '<div class="ov-checkin-sprite"></div>' +
+        '<div class="ov-checkin-label">Pham Check-In</div>';
+      document.body.appendChild(checkinEl);
+    }
+    clearCheckinTimers();
+
+    var sprite = checkinEl.querySelector('.ov-checkin-sprite');
+    sprite.style.width = dispW + 'px';
+    sprite.style.height = CHECKIN_DISP_H + 'px';
+    sprite.style.backgroundImage = 'url(' + CHECKIN_STRIP + ')';
+    sprite.style.backgroundSize = (dispW * CHECKIN_FRAMES) + 'px ' + CHECKIN_DISP_H + 'px';
+    sprite.style.backgroundPositionX = '0px';
+
+    checkinEl.classList.remove('is-leaving');
+    void checkinEl.offsetWidth;             // restart the slide-in on a re-fire
+    checkinEl.classList.add('is-in');
+
+    var frame = 0;
+    var step = setInterval(function () {
+      frame++;
+      sprite.style.backgroundPositionX = '-' + (frame * dispW) + 'px';
+      if (frame >= CHECKIN_FRAMES - 1) clearInterval(step);
+    }, CHECKIN_STEP_MS);
+    checkinTimers.push(step);
+
+    if (ev && ev.sound) {
+      try {
+        var audio = new Audio(CHECKIN_AUDIO);
+        audio.play().catch(function () { /* autoplay-with-sound blocked outside OBS — silent */ });
+      } catch (e) { /* no audio element — the nudge still shows */ }
+    }
+
+    checkinTimers.push(setTimeout(function () {
+      checkinEl.classList.add('is-leaving');
+      checkinTimers.push(setTimeout(function () {
+        checkinEl.classList.remove('is-in', 'is-leaving');
+      }, 400));
+    }, CHECKIN_MS));
   }
 
   function buildStandardCard(ev, d) {
@@ -525,6 +600,10 @@
                dropped. This is what stops a resumed cursor from replaying a
                backlog after the overlay has been closed for hours. */
             if (ev.at && now - ev.at > MAX_REPLAY_MS) continue;
+            /* The check-in nudge is not a stage alert — show it in the corner
+               directly, off the queue, so it never delays or is delayed by a
+               sub/raid card. */
+            if (ev.type === 'pham-checkin') { showCheckinReminder(ev); continue; }
             queue.push(ev);
           }
           cursor = data.latestSeq;

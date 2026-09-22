@@ -137,6 +137,12 @@ export const SINGLETONS = {
      slightly slower one. */
   community_leaderboard_cache: { table: 'singletons', expiry: 'real' },
 
+  /* The Pham Check-In overlay reminder's timer config: { enabled,
+     intervalMin, lastFiredAt }. The rig's minute tick reads it and fires the
+     silent corner nudge on schedule while live. 'none' — losing it just
+     resets the reminder to its default-off state, no lifecycle rides on it. */
+  checkin_reminder:      { table: 'singletons', expiry: 'none' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled
