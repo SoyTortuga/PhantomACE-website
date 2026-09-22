@@ -143,6 +143,11 @@ export const SINGLETONS = {
      resets the reminder to its default-off state, no lifecycle rides on it. */
   checkin_reminder:      { table: 'singletons', expiry: 'none' },
 
+  /* Overlay audio-alert volume, 0-100, set from the bot control panel and
+     applied by the overlay to its alert sounds. 'none' — a lost value just
+     falls back to full volume. */
+  overlay_alert_volume:  { table: 'singletons', expiry: 'none' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled

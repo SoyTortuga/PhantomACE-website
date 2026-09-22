@@ -39,6 +39,10 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
      nudge is silent. */
   ok('sound is gated on ev.sound', /if \(ev && ev\.sound\)/.test(ov) && /new Audio\(CHECKIN_AUDIO\)/.test(ov));
   ok('the raise animation stops on the last frame', /frame >= CHECKIN_FRAMES - 1\) clearInterval/.test(ov));
+  /* ONE reused audio element, restarted — not a fresh Audio() per fire, which
+     layered a sound per rapid press. */
+  ok('the check-in sound is a single reused element, restarted', /if \(!checkinAudio\) checkinAudio = new Audio/.test(ov) && /checkinAudio\.currentTime = 0/.test(ov));
+  ok('and it obeys the alert volume', /checkinAudio\.volume = alertVolume/.test(ov) && /data\.alertVolume/.test(ov));
 
   /* The panel markup lives in overlay.html — just the reaper and the words,
      no subtext line. */
@@ -81,6 +85,24 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
 
   ok('there is a config action for the timer', /body\.action === 'checkin-reminder-config'/.test(trig));
   ok('the GET returns the reminder config for the panel', /checkinReminder/.test(trig));
+}
+
+/* ── Alert volume ─────────────────────────────────────────────────────── */
+{
+  const trig = read('functions/api/bot/trigger.js');
+  ok('the panel can set alert volume', /body\.action === 'alert-volume'/.test(trig) && /overlay_alert_volume/.test(trig));
+  ok('and the GET returns the current volume', /alertVolume/.test(trig));
+
+  const ev = read('functions/api/overlay/events.js');
+  ok('the overlay feed carries the volume to the overlay', /overlay_alert_volume/.test(ev) && /alertVolume: alertVolume/.test(ev));
+
+  const reg = read('server/lib/registry.js');
+  ok('the volume is a registered singleton', /overlay_alert_volume:\s*\{ table: 'singletons'/.test(reg));
+
+  const js = read('js/pages/bot-control.js');
+  ok('the panel has a volume slider that saves on release', /action: 'alert-volume'/.test(js) && /getElementById\('ovAlertVolume'\)/.test(js));
+  const html = read('bot-control.html');
+  ok('the volume slider is in the markup', /id="ovAlertVolume"/.test(html));
 }
 
 /* ── Timer: server-side, silent, while live ───────────────────────────── */

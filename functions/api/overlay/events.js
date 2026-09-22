@@ -143,6 +143,11 @@ export async function onRequestGet(context) {
   const events = rec && Array.isArray(rec.events) ? rec.events : [];
   const latestSeq = Number(rec && rec.seq) || 0;
 
+  /* Alert volume (0-100), set from the control panel and applied by the
+     overlay to its audio. Defaults to 100 until the broadcaster sets it. */
+  const volRec = await env.MARKETPLACE.get('overlay_alert_volume');
+  const alertVolume = volRec == null ? 100 : Math.max(0, Math.min(100, parseInt(volRec, 10) || 0));
+
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded
      source must not replay an hour of alerts onto the stream. */
@@ -160,6 +165,7 @@ export async function onRequestGet(context) {
        once reloads every open overlay exactly once, and a page opened
        afterwards does not reload on its first poll. */
     reloadToken: await reloadToken(env),
+    alertVolume: alertVolume,
     serverNow: Date.now(),
   }), {
     status: 200,

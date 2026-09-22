@@ -39,7 +39,9 @@ export async function onRequestGet(context) {
     enabled: !!(cr && cr.enabled),
     intervalMin: (cr && cr.intervalMin) || 15,
   };
-  return json({ log, checkinReminder });
+  const vol = await env.MARKETPLACE.get('overlay_alert_volume');
+  const alertVolume = vol == null ? 100 : Math.max(0, Math.min(100, parseInt(vol, 10) || 0));
+  return json({ log, checkinReminder, alertVolume });
 }
 
 /* ── POST — fire a drop or announcement ────────── */
@@ -107,6 +109,15 @@ export async function onRequestPost(context) {
       ...(c || {}), enabled, intervalMin,
     }), { expirationTtl: 86400 });
     return json({ success: true, enabled, intervalMin });
+  }
+
+  /* Overlay audio-alert volume (0-100). The overlay reads it off its event
+     poll, so a change lands within a second — no reload. */
+  if (body.action === 'alert-volume') {
+    const volume = Math.max(0, Math.min(100, Math.round(Number(body.volume))));
+    if (!Number.isFinite(volume)) return json({ error: 'Volume must be 0-100.' }, 400);
+    await env.MARKETPLACE.put('overlay_alert_volume', String(volume));
+    return json({ success: true, volume });
   }
 
   return json({ error: 'Invalid action' }, 400);

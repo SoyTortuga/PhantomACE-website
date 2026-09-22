@@ -318,6 +318,15 @@
   var checkinTimers = [];
   function clearCheckinTimers() { checkinTimers.forEach(clearTimeout); checkinTimers.forEach(clearInterval); checkinTimers = []; }
 
+  /* ONE audio element, reused. A fresh `new Audio()` per fire meant rapid
+     presses (several events arriving in a single poll) each spawned their
+     own sound and they layered — "it plays once for every press". Restarting
+     one element plays at most one check-in sound at a time. */
+  var checkinAudio = null;
+  /* Overlay alert volume, 0..1, driven by the control panel through the poll
+     response. 1 until the first poll says otherwise. */
+  var alertVolume = 1;
+
   function showCheckinReminder(ev) {
     var panel = document.getElementById('ovCheckin');
     var sprite = document.getElementById('ovCheckinSprite');
@@ -339,8 +348,10 @@
 
     if (ev && ev.sound) {
       try {
-        var audio = new Audio(CHECKIN_AUDIO);
-        audio.play().catch(function () { /* autoplay-with-sound blocked outside OBS — silent */ });
+        if (!checkinAudio) checkinAudio = new Audio(CHECKIN_AUDIO);
+        checkinAudio.volume = alertVolume;
+        checkinAudio.currentTime = 0;      // restart the one element rather than layering a new one
+        checkinAudio.play().catch(function () { /* autoplay-with-sound blocked outside OBS — silent */ });
       } catch (e) { /* no audio element — the nudge still shows */ }
     }
 
@@ -548,6 +559,12 @@
       .then(function (data) {
         faults = 0;
         setFault(false);
+
+        /* Alert volume, set from the control panel. Sent on every poll so a
+           change reaches the open overlay within a second, no reload. */
+        if (typeof data.alertVolume === 'number') {
+          alertVolume = Math.max(0, Math.min(1, data.alertVolume / 100));
+        }
 
         /* RELOAD ON COMMAND. An OBS browser source holds this page open for
            days, so without it a change to the overlay never reaches the

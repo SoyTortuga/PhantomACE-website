@@ -320,6 +320,17 @@ async function saveCheckinReminder(enabled) {
   }
 }
 
+function saveAlertVolume(volume) {
+  fetch('/api/bot/trigger', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'alert-volume', volume }),
+  }).then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d && d.success) showBotStatus('Alert volume set to ' + d.volume + '%.', false); })
+    .catch(function () { showBotStatus('Network error saving the volume.', true); });
+}
+
 function initCheckinReminder() {
   const showBtn = document.getElementById('ovCheckinBtn');
   const toggle = document.getElementById('ovCheckinToggleBtn');
@@ -328,10 +339,25 @@ function initCheckinReminder() {
   if (toggle) toggle.addEventListener('click', function () { saveCheckinReminder(!checkinTimerEnabled); });
   if (save) save.addEventListener('click', function () { saveCheckinReminder(checkinTimerEnabled); });
 
+  const vol = document.getElementById('ovAlertVolume');
+  const volVal = document.getElementById('ovAlertVolumeVal');
+  if (vol) {
+    /* Live label as it drags; save only on release, so one drag is one POST. */
+    vol.addEventListener('input', function () { if (volVal) volVal.textContent = vol.value + '%'; });
+    vol.addEventListener('change', function () { saveAlertVolume(parseInt(vol.value, 10)); });
+  }
+
   fetch('/api/bot/trigger', { credentials: 'same-origin' })
     .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (d) { if (d && d.checkinReminder) renderCheckinReminder(d.checkinReminder.enabled, d.checkinReminder.intervalMin); })
-    .catch(function () { /* leave the default off/15 shown */ });
+    .then(function (d) {
+      if (!d) return;
+      if (d.checkinReminder) renderCheckinReminder(d.checkinReminder.enabled, d.checkinReminder.intervalMin);
+      if (typeof d.alertVolume === 'number' && vol) {
+        vol.value = d.alertVolume;
+        if (volVal) volVal.textContent = d.alertVolume + '%';
+      }
+    })
+    .catch(function () { /* leave the defaults shown */ });
 }
 
 /* ── Big Prize Giveaway ─────────────────────── */
