@@ -379,13 +379,24 @@
       });
 
       var spinMs = window.PhamReel.SPIN_MS;
-      /* Forced reflow, same trick the control panel uses: without it the
-         browser coalesces the reset transform and the travel into one
-         style change and the reel arrives with no animation at all. */
-      void strip.offsetHeight;
+      /* Start pinned at the top row. Unlike the control panel — whose strip
+         is a live element already in the document — THIS card is still
+         DETACHED here: render() appends it only after buildReelCard returns.
+         A forced reflow on a detached node does nothing, so the panel's
+         single-rAF trick would let the browser coalesce the start state and
+         the travel into one jump, and the reel lands on the winner with no
+         spin at all (which is exactly what it did). So defer both steps to
+         after the append with two rAFs: the first fires once the card is in
+         the DOM and forces a REAL layout at translateY(0); the second sets
+         the transition and the target, giving a painted start frame to
+         animate away from. */
+      strip.style.transform = 'translateY(0)';
       requestAnimationFrame(function () {
-        strip.style.transition = 'transform ' + (spinMs / 1000) + 's cubic-bezier(0.12, 0.8, 0.18, 1)';
-        strip.style.transform = 'translateY(' + plan.offset + 'px)';
+        void strip.offsetHeight;   // now attached — a real reflow at the top
+        requestAnimationFrame(function () {
+          strip.style.transition = 'transform ' + (spinMs / 1000) + 's cubic-bezier(0.12, 0.8, 0.18, 1)';
+          strip.style.transform = 'translateY(' + plan.offset + 'px)';
+        });
       });
 
       setTimeout(function () {

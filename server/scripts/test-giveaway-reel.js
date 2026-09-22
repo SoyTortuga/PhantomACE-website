@@ -165,6 +165,34 @@ function seeded(seed) {
   ok('the wheel markup is gone', !/giveaway-wheel/.test(html));
 }
 
+/* ── The on-stream OVERLAY alert uses it too — and animates correctly ──────
+   The overlay's reel card is built DETACHED (render() appends it only after
+   buildReelCard returns), so it must defer its reflow-and-transform until
+   the card is in the DOM. A single rAF (the pattern the attached panel uses)
+   left the reel jumping straight to the winner with no spin on stream: the
+   detached reflow was a no-op, so the browser coalesced the start and the
+   travel into one step. The fix is a NESTED rAF — reflow once attached, then
+   transform on the following frame. Guard that it stays nested. */
+{
+  const ov = fs.readFileSync(path.join(REPO, 'js/pages/overlay.js'), 'utf8');
+  ok('the overlay renders the reel from the shared strip', /window\.PhamReel\.strip\(/.test(ov));
+  ok('the overlay loads no separate wheel', !/renderGiveawayWheel|giveawaySegments/.test(ov));
+
+  const card = /function buildReelCard[\s\S]*?\n  \}/.exec(ov);
+  ok('buildReelCard exists', !!card);
+  const body = card ? card[0] : '';
+  /* Nested requestAnimationFrame: the animation is kicked off a frame after
+     the card is attached, not synchronously while it is still detached. */
+  ok('the reel animation is deferred with a nested rAF',
+     /requestAnimationFrame\(function[\s\S]*?requestAnimationFrame\(function/.test(body));
+  /* The transform target is set INSIDE the nested rAF, not before it. */
+  ok('the travel transform is set inside the deferred callback',
+     /requestAnimationFrame\(function[\s\S]*?requestAnimationFrame\(function[\s\S]*?transform = 'translateY\(' \+ plan\.offset/.test(body));
+
+  const ovHtml = fs.readFileSync(path.join(REPO, 'overlay.html'), 'utf8');
+  ok('the overlay page loads the reel module', /src="\/js\/giveaway-reel\.js"/.test(ovHtml));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {
