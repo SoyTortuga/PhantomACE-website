@@ -118,6 +118,16 @@ const REWARD_HANDLERS = {
       return grantOpenBadges(inv).length ? inv : undefined;
     });
 
+    /* Nudge the overlay: the same corner reminder the moderator button and
+       the timer fire, WITH sound — a viewer just redeemed, so the reaper
+       rising with its chime is the acknowledgement. Best-effort and isolated:
+       a failure here must never fail the Twitch webhook, or a redemption that
+       recorded fine would be retried and double-counted. */
+    try {
+      const { pushOverlayEvent } = await import('./overlay/events.js');
+      await pushOverlayEvent(env, { type: 'pham-checkin', sound: true });
+    } catch { /* overlay is cosmetic; the check-in above is what matters */ }
+
     await queueRedemption(env, userId, 'pham-checkin', redemption);
   },
   'spin-the-wheel': async (env, userId, redemption) => {

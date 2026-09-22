@@ -324,8 +324,9 @@
      one element plays at most one check-in sound at a time. */
   var checkinAudio = null;
   /* Overlay alert volume, 0..1, driven by the control panel through the poll
-     response. 1 until the first poll says otherwise. */
-  var alertVolume = 1;
+     response. Matches the server default (35) until the first poll lands, so a
+     redemption in the first second isn't briefly loud. */
+  var alertVolume = 0.35;
 
   function showCheckinReminder(ev) {
     var panel = document.getElementById('ovCheckin');

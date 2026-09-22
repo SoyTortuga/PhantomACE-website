@@ -40,7 +40,7 @@ export async function onRequestGet(context) {
     intervalMin: (cr && cr.intervalMin) || 15,
   };
   const vol = await env.MARKETPLACE.get('overlay_alert_volume');
-  const alertVolume = vol == null ? 100 : Math.max(0, Math.min(100, parseInt(vol, 10) || 0));
+  const alertVolume = vol == null ? 35 : Math.max(0, Math.min(100, parseInt(vol, 10) || 0));
   return json({ log, checkinReminder, alertVolume });
 }
 

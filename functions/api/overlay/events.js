@@ -146,7 +146,7 @@ export async function onRequestGet(context) {
   /* Alert volume (0-100), set from the control panel and applied by the
      overlay to its audio. Defaults to 100 until the broadcaster sets it. */
   const volRec = await env.MARKETPLACE.get('overlay_alert_volume');
-  const alertVolume = volRec == null ? 100 : Math.max(0, Math.min(100, parseInt(volRec, 10) || 0));
+  const alertVolume = volRec == null ? 35 : Math.max(0, Math.min(100, parseInt(volRec, 10) || 0));
 
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded

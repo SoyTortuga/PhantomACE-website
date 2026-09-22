@@ -5,8 +5,10 @@
      node server/scripts/test-overlay-checkin.js
 
    A small corner nudge on the overlay telling viewers to redeem their
-   check-in — NOT a stage alert. Two ways to fire it:
+   check-in — NOT a stage alert. Three ways to fire it:
      • the bot-control "Show Now" button, WITH sound (a moderator meant it);
+     • the actual Pham Check-In channel-point redemption, WITH sound (a viewer
+       just redeemed — the reaper rising with its chime is the acknowledgement);
      • the rig's minute-tick timer while live, SILENT (a periodic nudge must
        not loop audio).
    No network here — this pins the pieces of that chain together (and the
@@ -85,6 +87,18 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
 
   ok('there is a config action for the timer', /body\.action === 'checkin-reminder-config'/.test(trig));
   ok('the GET returns the reminder config for the panel', /checkinReminder/.test(trig));
+}
+
+/* ── Redemption trigger: the real reward fires it too, with sound ──────── */
+{
+  const cp = read('functions/api/channel-points.js');
+  const handler = (cp.match(/'pham-checkin': async[\s\S]*?\n  \},/) || [''])[0];
+  ok('the check-in reward pushes the overlay reminder',
+     /pushOverlayEvent\(env, \{ type: 'pham-checkin', sound: true \}\)/.test(handler));
+  /* The webhook must survive an overlay failure — a thrown push would make
+     Twitch retry a redemption that already recorded, double-counting it. */
+  ok('and the push is best-effort, isolated from the webhook',
+     /try \{[\s\S]*?pushOverlayEvent[\s\S]*?\} catch/.test(handler));
 }
 
 /* ── Alert volume ─────────────────────────────────────────────────────── */
