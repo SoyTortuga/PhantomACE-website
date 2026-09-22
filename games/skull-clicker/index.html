@@ -1033,9 +1033,17 @@
       return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * frenzyMult;
     }
 
+    /* Blood Rush multiplies the WHOLE click, not just the base term. It used
+       to sit inside `base`, so anyone with a %-of-CPS click upgrade (Void
+       Touch/Reality Shatter/Oblivion Grip) and real CPS built up saw Blood
+       Rush do almost nothing — the CPS-based term dwarfs the buffable base
+       once CPS gets big, since it's fed by getCPS() which is itself already
+       multiplied by every CPS buff going. ×100 has to apply to the total a
+       click is actually worth, or the buff is invisible for exactly the
+       players who've played long enough to unlock it. */
     function getClickPower() {
-      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * clickBuffMult;
-      return base + (getCPS() * cpsClickPct / 100);
+      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult();
+      return (base + (getCPS() * cpsClickPct / 100)) * clickBuffMult;
     }
 
     /* Every skull earned flows through here so the run total and the
