@@ -248,6 +248,40 @@ const COOP_CRIT_MULT = { 4: 1.5, 5: 2, 6: 3 };
 const COOP_ULT_MAX = 100;
 const COOP_ULT_CHARGE_PER_CLASH = 2.5;
 const COOP_ULT_BURST_PCT = 0.25;     // of the enemy's CURRENT hp, not max — always a real chunk of what's left
+/* The ultimate was a burst AND a full team heal — offence and sustain in one
+   press, which is most of why a charged team was near-unkillable. Now it
+   restores a slice, not the whole bar: still worth firing under pressure,
+   no longer a reset button. */
+const COOP_ULT_HEAL_PCT = 0.4;       // team HP restored by the ultimate (was a full heal)
+
+/* Blue trios used to extend the round budget with no ceiling, so a team that
+   kept banking Blue could stall a fight indefinitely and out-sustain it. The
+   budget can still be stretched, but only so far per enemy — past the cap a
+   Blue round is spent like any other, and stalling stops paying. */
+const COOP_BLUE_ROUNDS_CAP = 3;      // most bonus rounds Blue can add to one enemy
+
+/* ── Enemy curses: the scaling debuff system ──────────────────────────────
+   Every boon the team banks is pure upside, so a run only ever gets easier
+   relative to the enemy's linear-ish scaling. Curses are the counter-weight:
+   the enemy lays a debuff on the TEAM on a cadence, and it bites harder the
+   deeper the run goes — so the team's stacked advantages are met by a threat
+   that scales with them, and a dragged-out fight is dangerous rather than
+   safe. One curse is active at a time; a fresh cast replaces it. The three
+   rotate deterministically (by curseCount) so the effect is readable and
+   testable, and each answers a specific snowball vector:
+     • blight   — team healing cut     (counters the sustain economy)
+     • enfeeble — team damage cut       (kills slow, so the fight — and the
+                                         curses — last longer)
+     • rot      — flat DoT on Team HP   (direct, escalating HP pressure) */
+const COOP_CURSE_TYPES = ['blight', 'enfeeble', 'rot'];
+const COOP_CURSE_EVERY = 3;          // enemy casts a curse every Nth round it survives
+const COOP_CURSE_ROUNDS = 3;         // how long a cast stays active
+const COOP_BLIGHT_PCT = 0.30;        // healing reduced by this × severity
+const COOP_ENFEEBLE_PCT = 0.20;      // team damage reduced by this × severity
+const COOP_ROT_PCT = 0.05;           // Team max HP lost per round by this × severity
+/* Severity climbs one step every five waves: wave 1-5 → 1, 6-10 → 2, … so a
+   curse on wave 12 hurts twice as much as the same curse on wave 3. */
+function coopCurseSeverity(wave) { return 1 + Math.floor(Math.max(0, wave - 1) / 5); }
 
 /* Between-wave boons — the team picks one of three after every clear, building
    a run. Effects accumulate on room.coop.boons; some apply immediately. */
@@ -499,6 +533,16 @@ function coopSpawn(room, wave) {
   room.coop.minions = { hp: 0, maxHp: 0, count: 0 };
   room.coop.summonedThresholds = [];
   room.coop.roundsThisEnemy = 0;
+  /* Per-enemy: the Blue cap resets so every fight gets its own budget stretch,
+     and the active curse clears (a new enemy starts the team clean). curseCount
+     is NOT reset -- it carries across the run so the curse type keeps rotating
+     rather than always opening on the same one. */
+  room.coop.bonusRoundsThisEnemy = 0;
+  room.coop.curse = null;
+  if (typeof room.coop.curseCount !== 'number') room.coop.curseCount = 0;
+  /* A boss lays a curse the moment it arrives, so its fight opens under
+     pressure rather than easing into it. */
+  if (isBoss || isFinal) coopCastCurse(room.coop);
   room.coop.log = [];
 }
 
@@ -602,6 +646,16 @@ function coopSummon(c) {
   return 0;
 }
 
+/* Lay the next curse on the team: the type rotates by curseCount so a run
+   cycles through all three rather than repeating one, and severity is read
+   from the current wave. Replaces any active curse. Mutates coop in place. */
+function coopCastCurse(c) {
+  const type = COOP_CURSE_TYPES[(c.curseCount || 0) % COOP_CURSE_TYPES.length];
+  c.curseCount = (c.curseCount || 0) + 1;
+  c.curse = { type, sev: coopCurseSeverity(c.wave || 1), rounds: COOP_CURSE_ROUNDS };
+  return c.curse;
+}
+
 /* End the run, no winner — the team either wiped or ran out of time. */
 function coopEnd(room, now) {
   room.status = 'finished';
@@ -648,6 +702,16 @@ function endRoundCoop(room, now) {
   const crit = coopCritInfo(room);
   if (crit.mult > 1) dmg = Math.round(dmg * crit.mult);
 
+  /* The curse active THIS round (a fresh cast below takes effect next round).
+     Enfeeble cuts the team's damage; the other two are applied at their own
+     steps (blight on healing, rot on Team HP). */
+  const curse = (c.curse && c.curse.rounds > 0) ? c.curse : null;
+  if (curse && curse.type === 'enfeeble') {
+    dmg = Math.round(dmg * Math.max(0, 1 - COOP_ENFEEBLE_PCT * curse.sev));
+  }
+  const blightMult = (curse && curse.type === 'blight')
+    ? Math.max(0, 1 - COOP_BLIGHT_PCT * curse.sev) : 1;
+
   /* 3. Colourless: piercing straight damage — ignores shield and minions. */
   const pierce = eff(1) * Math.ceil(c.enemyMaxHp * COOP_COLORLESS_PCT);
 
@@ -690,7 +754,7 @@ function endRoundCoop(room, now) {
   if (crit.n) log.push('crit:' + crit.n);
 
   /* 7. Apply the colour effects that heal now or seed later rounds. */
-  if (eff(2)) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(eff(2) * COOP_WHITE_HEAL * (1 + b.healMult))); log.push('heal:' + eff(2)); }
+  if (eff(2)) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.round(eff(2) * COOP_WHITE_HEAL * (1 + b.healMult) * blightMult)); log.push('heal:' + eff(2)); }
   /* Blue (eff(3)) is applied at the round-spend step so it produces a visible
      net gain instead of being cancelled by the spend. */
   if (eff(4)) { c.poison += eff(4); log.push('poison:' + eff(4)); }
@@ -719,8 +783,17 @@ function endRoundCoop(room, now) {
   c.teamHp -= atk;
   c.lastAttack = atk;
   log.push('hit:' + atk);
-  /* Regeneration heals a flat amount every round (after the hit lands). */
-  if (b.regen > 0) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + b.regen); log.push('regen:' + b.regen); }
+  /* Rot: a flat DoT on the team's shared HP each round the curse is active,
+     scaling with severity — direct pressure that a big HP pool alone can't
+     shrug off on a long fight. */
+  if (curse && curse.type === 'rot') {
+    const rot = Math.ceil(c.teamMaxHp * COOP_ROT_PCT * curse.sev);
+    c.teamHp -= rot;
+    log.push('rot:' + rot);
+  }
+  /* Regeneration heals a flat amount every round (after the hit lands),
+     itself dulled by a Blight curse like every other heal. */
+  if (b.regen > 0) { const r = Math.round(b.regen * blightMult); if (r > 0) { c.teamHp = Math.min(c.teamMaxHp, c.teamHp + r); log.push('regen:' + r); } }
 
   /* 11. If the team barely scratched it, the enemy regenerates (anti-stall). */
   if (dealt < c.enemyMaxHp * 0.04) {
@@ -732,15 +805,30 @@ function endRoundCoop(room, now) {
   /* 12. Bosses raise a shield for the coming round on their cadence. */
   if (c.shieldEvery && c.roundsThisEnemy % c.shieldEvery === 0) { c.shieldRounds = 2; log.push('shield-up'); }
 
+  /* 12b. Curses: decay the one that was active this round, then — on the
+     enemy's cadence — cast a fresh one that bites from next round on. Casting
+     after decay means a cadence round always leaves exactly one new curse up
+     rather than instantly expiring it. */
+  if (c.curse && c.curse.rounds > 0) { c.curse.rounds -= 1; if (c.curse.rounds <= 0) c.curse = null; }
+  if (c.roundsThisEnemy % COOP_CURSE_EVERY === 0) { coopCastCurse(c); log.push('curse:' + c.curse.type + ':' + c.curse.sev); }
+
   /* 13. Tick the timed effects down and settle the round budget. Blue trios
      extend the fight: the round you bank them in isn't spent, and each trio
      banks an extra round on top — so the counter visibly climbs (doubled on a
-     Blue-weak enemy). Any other round simply spends one. */
+     Blue-weak enemy). But only up to COOP_BLUE_ROUNDS_CAP per enemy: past the
+     cap a Blue round is spent like any other, so a fight can't be stalled
+     forever. Any non-Blue round simply spends one. */
   if (c.dmgBuffRounds > 0) c.dmgBuffRounds -= 1;
   if (c.shieldRounds > 0) c.shieldRounds -= 1;
   const blueRounds = eff(3);
-  if (blueRounds > 0) { c.roundsLeft += blueRounds; log.push('rounds:' + blueRounds); }
-  else c.roundsLeft -= 1;
+  if (blueRounds > 0) {
+    const already = c.bonusRoundsThisEnemy || 0;
+    const grant = Math.max(0, Math.min(blueRounds, COOP_BLUE_ROUNDS_CAP - already));
+    if (grant > 0) { c.roundsLeft += grant; c.bonusRoundsThisEnemy = already + grant; log.push('rounds:' + grant); }
+    else { c.roundsLeft -= 1; log.push('rounds-capped'); }   // budget maxed — Blue no longer stalls
+  } else {
+    c.roundsLeft -= 1;
+  }
   c.log = log;
 
   /* 14. Loss checks — wiped, or out of time with the enemy still standing.
@@ -1100,6 +1188,11 @@ export function viewFor(room, userId, now, opts = {}) {
       log: Array.isArray(room.coop.log) ? room.coop.log.slice() : [],
       /* This enemy's weak colour (1-6); its banked effect lands doubled. */
       weakColor: room.coop.weakColor || 0,
+      /* The active enemy curse (the scaling debuff), for the HUD chip. Null
+         when the team is uncursed. */
+      curse: (room.coop.curse && room.coop.curse.rounds > 0)
+        ? { type: room.coop.curse.type, sev: room.coop.curse.sev, rounds: room.coop.curse.rounds }
+        : null,
       /* Telegraph: the hit the team should brace for next round. */
       nextAttack: coopNextAttack(room.coop),
       willEnrage: (room.coop.roundsLeft <= 2) || (room.coop.enemyMaxHp > 0 && room.coop.enemyHp / room.coop.enemyMaxHp < 0.25),
@@ -1691,7 +1784,9 @@ export async function onRequestPost(context) {
       const before = c.enemyHp;
       const burst = Math.ceil(before * COOP_ULT_BURST_PCT);
       c.enemyHp = Math.max(0, before - burst);
-      c.teamHp = c.teamMaxHp;            // the burst's other half: a full team heal
+      /* A slice, not a full bar — the ultimate is still worth firing under
+         pressure, but no longer wipes the fight's whole HP threat in one go. */
+      c.teamHp = Math.min(c.teamMaxHp, c.teamHp + Math.ceil(c.teamMaxHp * COOP_ULT_HEAL_PCT));
       c.ultCharge = 0;
       c.ultUsed = (c.ultUsed || 0) + 1;  // the animation cue every client watches
       c.lastDealt = burst;

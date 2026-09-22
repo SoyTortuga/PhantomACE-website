@@ -105,6 +105,9 @@
     .stat-chip.enrage { color: #fca5a5; border-color: #b91c1c; background: rgba(120,10,10,0.4); }
 
     .stat-chip.weak { color: #fde047; border-color: #a16207; background: rgba(90,70,5,0.4); }
+    /* A curse is a debuff on the TEAM, not the enemy — coloured apart from the
+       (often team-favourable) chips above so it reads as a threat. */
+    .stat-chip.curse { color: #d8b4fe; border-color: #7e22ce; background: rgba(70,20,110,0.42); }
 
     /* Telegraph: the incoming hit to brace for */
     .enemy-telegraph { margin-top: 6px; font-size: 12px; font-weight: 700; color: #fca5a5; text-align: center; letter-spacing: 0.02em; }
@@ -1491,6 +1494,13 @@ function renderEnemy() {
   if (c.shield) chips.push('<span class="stat-chip shield">🛡 Shield</span>');
   if ((c.log || []).includes('enrage')) chips.push('<span class="stat-chip enrage">😡 Enraged</span>');
   if (c.secondWind > 0) chips.push('<span class="stat-chip buff">🕊 Second Wind ×' + c.secondWind + '</span>');
+  /* The active enemy curse (a debuff on the team), with its severity and how
+     many rounds it has left. */
+  if (c.curse) {
+    var curseLabel = { blight: '🩸 Blight', enfeeble: '💀 Enfeeble', rot: '☣ Rot' }[c.curse.type] || 'Curse';
+    chips.push('<span class="stat-chip curse">' + curseLabel +
+      (c.curse.sev > 1 ? ' ×' + c.curse.sev : '') + ' (' + c.curse.rounds + 'r)</span>');
+  }
   $('enemyStatus').innerHTML = chips.join('');
 
   /* Telegraph: the hit coming next round, so the team can plan a defensive bank. */

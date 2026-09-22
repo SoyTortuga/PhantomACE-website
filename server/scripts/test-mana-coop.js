@@ -797,17 +797,26 @@ function coopVoteRoom(ids) {
   check('refused while a boon vote is open', res.status, 400);
 }
 
-/* use-ultimate: the burst, the heal, and spending the charge. */
+/* use-ultimate: the burst, the PARTIAL heal, and spending the charge. */
 {
   const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
     { coop: { enemyHp: 10000, enemyMaxHp: 10000, teamHp: 20, teamMaxHp: 100, ultCharge: 100 } }) }) };
   const res = await (await POST(e, { action: 'use-ultimate', code: 'AAAA' })).json();
   const room = e.MARKETPLACE.read('mc_room_AAAA');
   check('the burst deals 25% of current HP', room.coop.enemyHp, 10000 - 2500);
-  check('the team is fully healed', room.coop.teamHp, 100);
+  /* Partial now, not a full bar: 20 + 40% of 100 = 60. The ultimate is a
+     burst with sustain attached, no longer a full reset. */
+  check('the team heals a slice, not to full', room.coop.teamHp, 60);
   check('the charge is spent', room.coop.ultCharge, 0);
   ok('the view carries the burst amount', res.success === true);
   ok('and logs it', (room.coop.log || []).includes('ultimate:2500'));
+}
+{
+  /* The heal never overflows the bar. */
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, teamHp: 90, teamMaxHp: 100, ultCharge: 100 } }) }) };
+  await POST(e, { action: 'use-ultimate', code: 'AAAA' });
+  check('the ultimate heal is capped at max Team HP', e.MARKETPLACE.read('mc_room_AAAA').coop.teamHp, 100);
 }
 
 /* A lethal ultimate clears the enemy exactly like a lethal bank does.
@@ -835,6 +844,92 @@ function coopVoteRoom(ids) {
   check('and the view carries the counter to every client', res.room.coop.ultUsed, 1);
 }
 
+/* ══ Blue round-budget cap ═════════════════════════════════════════════
+   A banked Blue trio adds a round and isn't spent -- but only up to the cap
+   per enemy. Past it, a Blue round is spent like any other so a fight can't
+   be stalled forever. weakColor 6 keeps Blue from doubling; enemy/team HP
+   high so the round neither clears nor ends. */
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 100, teamMaxHp: 100,
+      roundsLeft: 5, weakColor: 6, bonusRoundsThisEnemy: 0 } },
+    { pending: 100, kept: [3, 3, 3], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a Blue trio under the cap adds a round (not spent)', room.coop.roundsLeft, 6);
+  check('and counts against the per-enemy cap', room.coop.bonusRoundsThisEnemy, 1);
+}
+{
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 100, teamMaxHp: 100,
+      roundsLeft: 5, weakColor: 6, bonusRoundsThisEnemy: 3 } },   // already at the cap
+    { pending: 100, kept: [3, 3, 3], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('a Blue trio at the cap is spent like any round', room.coop.roundsLeft, 4);
+  check('and adds nothing more to the cap', room.coop.bonusRoundsThisEnemy, 3);
+  ok('logged as capped', (room.coop.log || []).includes('rounds-capped'));
+}
+
+/* ══ Enemy curses — the scaling debuff system ══════════════════════════ */
+{
+  /* Enfeeble cuts the team's damage while active. sev 1 → -20%: 1000 raw
+     becomes 800 dealt (no crit/pierce/colour, kept empty). Enemy HP 10,000 so
+     800 clears the 4% anti-stall floor (400) and the hit actually lands. */
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 10000, enemyMaxHp: 10000, enemyAttack: 0, roundsLeft: 5, weakColor: 6,
+      curse: { type: 'enfeeble', sev: 1, rounds: 2 } } },
+    { pending: 1000, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  check('Enfeeble cuts team damage', e.MARKETPLACE.read('mc_room_AAAA').coop.enemyHp, 10000 - 800);
+}
+{
+  /* Blight dulls healing. A White trio normally heals 25; blight sev 1 (-30%)
+     makes it 18 (round(25*0.7)). Team HP 50, enemyAttack 0 → 68. */
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 50, teamMaxHp: 100, roundsLeft: 5,
+      weakColor: 6, curse: { type: 'blight', sev: 1, rounds: 2 } } },
+    { pending: 100, kept: [2, 2, 2], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  check('Blight dulls the White heal', e.MARKETPLACE.read('mc_room_AAAA').coop.teamHp, 68);
+}
+{
+  /* Rot is a flat DoT scaling with severity: sev 2 → ceil(100 * 0.05 * 2) = 10
+     off Team HP each round, on top of the (here zero) enemy hit. */
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 100, teamMaxHp: 100, roundsLeft: 5,
+      weakColor: 6, curse: { type: 'rot', sev: 2, rounds: 2 } } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  check('Rot bleeds Team HP each round, scaled by severity', room.coop.teamHp, 90);
+  ok('and logs the tick', (room.coop.log || []).some(x => x.indexOf('rot:') === 0));
+}
+{
+  /* Cadence: the enemy casts a fresh curse every COOP_CURSE_EVERY (3) rounds
+     it survives. roundsThisEnemy 2 → +1 = 3 → a curse is laid, biting next
+     round. Severity is read from the wave: wave 6 → sev 2. */
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 100, teamMaxHp: 100, roundsLeft: 5,
+      wave: 6, weakColor: 6, roundsThisEnemy: 2, curse: null } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  const room = e.MARKETPLACE.read('mc_room_AAAA');
+  ok('a curse is cast on the cadence round', !!room.coop.curse);
+  check('the first curse in the rotation is blight', room.coop.curse.type, 'blight');
+  check('severity scales with the wave (6 → 2)', room.coop.curse.sev, 2);
+}
+{
+  /* An active curse decays and clears when it runs out. rounds 1 → after this
+     round it is gone (and this is not a cadence round, so nothing replaces it). */
+  const e = { MARKETPLACE: fakeKV({ mc_room_AAAA: coopRoom(
+    { coop: { enemyHp: 100000, enemyMaxHp: 100000, enemyAttack: 0, teamHp: 100, teamMaxHp: 100, roundsLeft: 5,
+      weakColor: 6, roundsThisEnemy: 0, curse: { type: 'rot', sev: 1, rounds: 1 } } },
+    { pending: 100, kept: [], done: null }) }) };
+  await POST(e, { action: 'bank', code: 'AAAA' });
+  check('a spent curse clears', e.MARKETPLACE.read('mc_room_AAAA').coop.curse, null);
+}
+
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
 {
   const api = fs.readFileSync(path.join(REPO, 'functions/api/mana-clash.js'), 'utf8');
@@ -859,6 +954,16 @@ function coopVoteRoom(ids) {
      /ultUsed/.test(game) && /lastUltUsed/.test(game));
   ok('and is not fired locally from the button press', !/fireUltimateBeam\(\);\s*\n\s*await act/.test(game));
   ok('the server sends the ultUsed cue', /ultUsed: room\.coop\.ultUsed/.test(api));
+
+  /* The three balancing levers are wired, not just defined. */
+  ok('the ultimate heal is partial, not a full bar',
+     /COOP_ULT_HEAL_PCT/.test(api) && !/c\.teamHp = c\.teamMaxHp;\s*\/\/ the burst/.test(api));
+  ok('Blue round-budget is capped per enemy', /COOP_BLUE_ROUNDS_CAP/.test(api) && /bonusRoundsThisEnemy/.test(api));
+  ok('the curse system is defined and cast', /COOP_CURSE_TYPES/.test(api) && /function coopCastCurse/.test(api));
+  ok('curse severity scales with the wave', /function coopCurseSeverity/.test(api));
+  ok('the view carries the active curse for the HUD', /curse:\s*\(room\.coop\.curse/.test(api));
+  /* The client shows the curse as its own chip. */
+  ok('the client renders a curse chip', /stat-chip curse/.test(game) && /c\.curse/.test(game));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
