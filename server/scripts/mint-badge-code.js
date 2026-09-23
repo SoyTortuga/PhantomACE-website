@@ -75,6 +75,43 @@ const BADGES = {
     image: '/assets/badges/mtgbbb-winner.png',
     blurb: 'Won a game of MTGBBB while a sealed box was cracked on stream.',
   },
+
+  /* The Undead Executioner ladder. Normally EARNED by summoning the raid boss
+     (functions/api/raid-badges.js), but also mintable as a code so a tier can
+     be granted by hand. id / game / rarity / image MUST match the raid ladder,
+     and `type: 'badge'` MUST be present — the raid tier definitions add it at
+     grant time, so a code minted from them without it grants an item the badge
+     UI does not recognise (this is why hand-made undead codes did not work). */
+  'undead-executioner-bronze': {
+    id: 'undead-executioner-bronze', game: 'profile', type: 'badge',
+    name: 'Undead Executioner — Bronze', rarity: 'uncommon',
+    image: '/assets/badges/undead-executioner-bronze.png',
+    blurb: 'For answering the call of the Undead Executioner.',
+  },
+  'undead-executioner-silver': {
+    id: 'undead-executioner-silver', game: 'profile', type: 'badge',
+    name: 'Undead Executioner — Silver', rarity: 'rare',
+    image: '/assets/badges/undead-executioner-silver.png',
+    blurb: 'For answering the call of the Undead Executioner.',
+  },
+  'undead-executioner-gold': {
+    id: 'undead-executioner-gold', game: 'profile', type: 'badge',
+    name: 'Undead Executioner — Gold', rarity: 'rare',
+    image: '/assets/badges/undead-executioner-gold.png',
+    blurb: 'For answering the call of the Undead Executioner.',
+  },
+  'undead-executioner-platinum': {
+    id: 'undead-executioner-platinum', game: 'profile', type: 'badge',
+    name: 'Undead Executioner — Platinum', rarity: 'mythic',
+    image: '/assets/badges/undead-executioner-platinum.png',
+    blurb: 'For answering the call of the Undead Executioner.',
+  },
+  'undead-executioner-phantom': {
+    id: 'undead-executioner-phantom', game: 'profile', type: 'badge',
+    name: 'Undead Executioner — Phantom', rarity: 'mythic',
+    image: '/assets/badges/undead-executioner-phantom.png',
+    blurb: 'For answering the call of the Undead Executioner.',
+  },
 };
 
 /* EVERY FIELD OR THE MINT IS SILENTLY WRONG. createItemCode() stores what it
