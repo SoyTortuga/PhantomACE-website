@@ -105,9 +105,9 @@ inferred from the absence of an `eventsub_subscriptions` key. Two consequences:
 
 The site's entire backend runs as Cloudflare Pages Functions with Cloudflare KV as the only
 data store. We hit the free tier's daily KV write limit during normal testing, which surfaced
-a bigger question: the site owner wants to match the architecture of OnlySands.tv (a proven
-reference built by the owner's mentor) — **one Node.js process on the rig serving both the
-static site and the API, backed by Postgres.**
+a bigger question: the site owner wants to match a proven self-hosted reference
+architecture — **one Node.js process on the rig serving both the static site and the API,
+backed by Postgres.**
 
 The rig is already most of the way there: Postgres 18 is installed with two empty databases
 (`phantomace-tv`, `phantomace-tv-dev`), `cloudflared` runs as a Windows service already
