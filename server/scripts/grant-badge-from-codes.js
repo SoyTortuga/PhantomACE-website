@@ -93,6 +93,27 @@ async function main() {
   await waitForDatabase();
   const env = { MARKETPLACE: createKVStore(pool) };
 
+  /* --inspect: dump every item code so we can see what the badge codes were
+     actually stored as (id / type / redeemer count). Read-only. Use this when
+     the default scan finds nothing — the codes likely carry an item.id that
+     isn't an Undead Executioner tier, and this shows what to pass to --code /
+     --badge. */
+  if (has('inspect')) {
+    const rows = await env.MARKETPLACE.listValues({ prefix: 'item_code_' });
+    line('');
+    line(`  ${rows.length} item code(s) in ${dbName}:`);
+    line('');
+    for (const { value: rec } of rows) {
+      if (!rec || !rec.item) continue;
+      const rb = Array.isArray(rec.redeemedBy) ? rec.redeemedBy.length : 0;
+      line(`  ${String(rec.code || '?').padEnd(16)} id=${String(rec.item.id).padEnd(28)} ` +
+           `type=${String(rec.item.type || '-').padEnd(8)} redeemers=${rb}  ${rec.item.name || ''}`);
+    }
+    line('');
+    await pool.end();
+    return;
+  }
+
   /* Which code records to look at. */
   let records;
   if (onlyCode && onlyCode !== true) {
