@@ -30,7 +30,7 @@ import path from 'node:path';
 
 /* Recursively servable. Everything else at the root is denied unless it's
    an explicitly enumerated .html page (see rootHtmlFiles below). */
-const ALLOWED_DIRS = ['assets', 'css', 'js', 'games'];
+const ALLOWED_DIRS = ['assets', 'css', 'js', 'games', 'membership'];
 
 /* Paths that must never be reachable. Asserted at boot. */
 const MUST_BE_UNREACHABLE = [

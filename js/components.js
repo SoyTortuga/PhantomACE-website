@@ -25,13 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <a href="/media.html" data-page="media">Media</a>
             <a href="/games.html" data-page="games">Games</a>
             <div class="nav-has-sub" data-page="membership">
-              <a href="/membership.html" data-page="membership">Phamily</a>
+              <a class="nav-parent" data-page="membership">Phamily</a>
               <div class="nav-submenu">
-                <a href="/membership.html#viewer">Viewer</a>
-                <a href="/membership.html#follower">Follower</a>
-                <a href="/membership.html#subscriber">Subscriber</a>
-                <a href="/membership.html#vip">VIP</a>
-                <a href="/membership.html#moderator">Moderator</a>
+                <a href="/membership/viewer">Viewer &amp; Follower</a>
+                <a href="/membership/subscriber" class="nav-tier" data-tier="subscriber">Subscriber</a>
+                <a href="/membership/vip" class="nav-tier" data-tier="vip">VIP</a>
+                <a href="/membership/moderator" class="nav-tier" data-tier="moderator">Moderator</a>
               </div>
             </div>
             <div class="nav-has-sub" data-page="community">
@@ -130,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <a href="/redeem.html">Redeem Code</a>
             <a href="/media.html">Media</a>
             <a href="/games.html">Games</a>
-            <a href="/membership.html">Phamily</a>
+            <a href="/membership/viewer">Phamily</a>
             <a href="/community.html">Community</a>
           </nav>
 

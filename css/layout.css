@@ -139,6 +139,22 @@
   background: rgba(255, 0, 0, 0.08);
 }
 
+/* The Phamily parent is a hover target, not a link — you pick a tier from the
+   dropdown. It still reads like the other top-level items via .site-nav a. */
+.site-nav .nav-parent { cursor: default; }
+
+/* A tier the viewer hasn't unlocked: still listed, but greyed with a lock and
+   not clickable. nav.js strips its href, so there is nothing to follow. */
+.nav-submenu a.locked {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.nav-submenu a.locked::after {
+  content: ' 🔒';
+  font-size: 9px;
+}
+
 /* Hamburger — hidden on desktop */
 .hamburger {
   display: none;

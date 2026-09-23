@@ -48,6 +48,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /* Lock the Phamily dropdown tiers a viewer hasn't earned. Viewer & Follower
+     is always open; Subscriber/VIP unlock for subscribers and above, Moderator
+     for staff. This reads the SIGNED role from the cookie (auth.js) — it is a
+     UI affordance only, exactly like the Mod Toolbox link; the tier pages hold
+     no privileged actions, so a locked link simply doesn't navigate. */
+  function gateTiers() {
+    if (typeof hasMinimumRole !== 'function') return;
+    var reqs = { subscriber: 'sub_tier1', vip: 'sub_tier1', moderator: 'moderator' };
+    document.querySelectorAll('.site-nav .nav-tier').forEach(function (el) {
+      var need = reqs[el.dataset.tier];
+      if (need && !hasMinimumRole(need)) {
+        el.classList.add('locked');
+        el.setAttribute('aria-disabled', 'true');
+        el.removeAttribute('href');
+        el.title = el.dataset.tier === 'moderator'
+          ? 'Staff only' : 'Unlocked for subscribers';
+      }
+    });
+  }
+
   setActivePage();
+  gateTiers();
   initMobileNav();
 });
