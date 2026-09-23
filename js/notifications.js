@@ -174,20 +174,24 @@ function renderNotifPanel() {
 
   const notifications = getNotifications();
   const lastRead = getLastReadTime();
+  /* Only UNREAD forum notifications show. Opening the bell marks them read, so
+     a reply or mention appears once rather than lingering in the panel on every
+     later page load. */
+  const shownServer = serverNotifs.filter(n => n && !n.read);
 
   let html = `<div class="notif-header">
     <span class="notif-title">Notifications</span>
     <button class="notif-clear-btn" onclick="clearAllNotifications()" title="Clear all">Clear</button>
   </div>`;
 
-  if (notifications.length === 0 && serverNotifs.length === 0) {
+  if (notifications.length === 0 && shownServer.length === 0) {
     html += `<div class="notif-empty">No notifications yet</div>`;
   } else {
     html += `<div class="notif-list">`;
     /* The forum's first: they are about you specifically, and they carry
        a place to go. Unread ones stay highlighted until the panel has
        been opened once with them in it. */
-    serverNotifs.forEach(n => {
+    shownServer.forEach(n => {
       const d = describeServerNotif(n);
       const unread = n.read ? '' : ' notif-unread';
       const inner = `<span class="notif-icon">${getNotifIcon(n.kind)}</span>
@@ -238,6 +242,11 @@ function toggleNotifPanel() {
 
 function clearAllNotifications() {
   saveNotifications([]);
+  /* Clear the forum list from the panel too — before this it only emptied the
+     local live/offline list, so "Clear" left every reply and mention sitting
+     there. markAllRead() below tells the server they're read so they don't
+     come back on the next load. */
+  serverNotifs = [];
   markAllRead();
   renderNotifPanel();
 }
@@ -349,6 +358,20 @@ function dedupeConditionNotifications() {
   return list.length - kept.length;
 }
 
+/* Age out the local list. Live/offline and anniversary events are kept as a
+   little history, but without a cap by age they just accumulate — a month of
+   "PhantomACE has gone offline." lines still sitting in the panel is exactly
+   the "stale notifications" complaint. Drop anything older than the window on
+   load; recent events stay. */
+const NOTIF_MAX_AGE_MS = 14 * 86400000;   // 14 days
+function pruneOldLocalNotifications() {
+  const cutoff = Date.now() - NOTIF_MAX_AGE_MS;
+  const list = getNotifications();
+  const kept = list.filter(n => n && (n.time || 0) >= cutoff);
+  if (kept.length !== list.length) saveNotifications(kept);
+  return list.length - kept.length;
+}
+
 function checkUserNotifications(userData) {
   if (!userData) return;
   const now = Date.now();
@@ -406,6 +429,7 @@ function checkUserNotifications(userData) {
 
 document.addEventListener('DOMContentLoaded', () => {
   dedupeConditionNotifications();
+  pruneOldLocalNotifications();
   updateBadge();
   document.addEventListener('click', closeNotifPanelOnClickOutside);
 
