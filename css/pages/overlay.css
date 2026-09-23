@@ -68,10 +68,12 @@ html, body {
   align-items: center;
   gap: 20px;
   padding: 20px 28px;
-  /* Glassmorphic surface from the theme reference. Pure black, never warm. */
+  /* Near-solid black surface. NO backdrop-filter: a blur() samples and
+     re-blurs the whole live game capture behind the card every frame it is
+     visible, which in an OBS browser source grows CEF's compositor memory
+     until it crashes a long (marathon) stream. The surface is 96% opaque, so
+     the blur was invisible anyway — its only effect was the crash. */
   background: rgba(10, 10, 10, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-mid);
   border-left: 3px solid var(--red);
   border-radius: 12px;
@@ -369,8 +371,10 @@ html, body {
   bottom: 48px;
   width: min(620px, 46vw);
   padding: 22px 26px 20px;
+  /* 96% opaque, no backdrop blur — see the note on .ov-alert. This is a
+     standing panel that can be visible for a whole game, so a per-frame
+     backdrop blur here is the worst offender of all on a marathon stream. */
   background: rgba(10, 10, 10, 0.96);
-  backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 0, 0, 0.55);
   border-radius: 12px;
   color: #fff;
@@ -489,10 +493,6 @@ html, body {
 .ov-sc-scores li { display: flex; gap: 6px; }
 .ov-sc-name { color: #ddd; }
 .ov-sc-pts { color: #ff0000; font-weight: 800; }
-
-@media (prefers-reduced-motion: reduce) {
-  .ov-scramble { backdrop-filter: none; }
-}
 
 
 /* ════════════════════════════════════════════════

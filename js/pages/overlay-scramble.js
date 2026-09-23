@@ -106,7 +106,10 @@
   }
 
   function tick() {
-    if (!state || state.status === 'idle') return;
+    /* Stand down while hidden. This interval never stops (a round can start at
+       any time), so it must cost nothing between games — the same guard the
+       raid panel uses so a forever-timer can't churn on a marathon stream. */
+    if (panel.hidden || !state || state.status === 'idle') return;
     var left = Math.max(0, state.endsAtLocal - Date.now());
     /* Minutes and seconds past a minute. A three-minute round counting down
        from "180s" reads as a number rather than a clock, and nobody parses
