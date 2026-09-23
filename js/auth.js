@@ -152,6 +152,11 @@ async function refreshMyRole() {
        as "it says I have access and denies me anyway". */
     if (d.role) document.body.dataset.role = d.role;
 
+    /* The cookie was just reissued (role and/or VIP), so re-run the Phamily
+       nav gating against the fresh session — otherwise a newly-granted VIP
+       would see the tier stay locked until their next page load. */
+    if (typeof window.refreshNavTiers === 'function') window.refreshNavTiers();
+
     /* Reported honestly rather than as a success. The endpoint currently
        cannot verify anything — it holds an app token, which Twitch rejects
        for the subscription and follow lookups — so claiming "up to date"

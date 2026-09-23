@@ -194,7 +194,25 @@ export async function onRequestGet(context) {
        critically, do NOT reissue the cookie — a call that failed to inspect
        a session has no business rewriting it. */
     if (!verified) {
-      return json({ role, subTier, verified: false, reason: 'Twitch role check unavailable' });
+      /* The Twitch checks couldn't run (this endpoint holds an app token), so
+         role and subTier must stay exactly as they were — see the note above.
+         VIP is different: it comes from KV (sub_months_), not a Twitch call,
+         so it CAN be refreshed here. Reissue the cookie only when vip actually
+         changed, leaving role/subTier untouched — a failed check still never
+         rewrites those, but a VIP grant or loss reaches the session without a
+         full re-login. */
+      if (vip !== !!session.vip) {
+        const updated = { ...session, vip };
+        const { signSession } = await import('./session-crypto.js');
+        const cookieValue = await signSession(updated, env.SESSION_SECRET);
+        const flags = ['Path=/', 'Max-Age=86400', 'SameSite=Lax'];
+        if (new URL(request.url).protocol === 'https:') flags.push('Secure');
+        return new Response(
+          JSON.stringify({ role, subTier, vip, verified: false, reason: 'Twitch role check unavailable' }),
+          { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': `${COOKIE_NAME}=${cookieValue}; ${flags.join('; ')}` } }
+        );
+      }
+      return json({ role, subTier, vip, verified: false, reason: 'Twitch role check unavailable' });
     }
 
     const updatedSession = { ...session, role, subTier, vip };
@@ -209,7 +227,7 @@ export async function onRequestGet(context) {
     const flags = ['Path=/', 'Max-Age=86400', 'SameSite=Lax'];
     if (isSecure) flags.push('Secure');
 
-    return new Response(JSON.stringify({ role, subTier }), {
+    return new Response(JSON.stringify({ role, subTier, vip }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

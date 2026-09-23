@@ -67,17 +67,32 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
+  /* Reversible on purpose: it both locks AND unlocks, so re-running it after
+     the session changes (a VIP grant via Refresh) can restore a tier, not just
+     take one away. The href is rebuilt from data-tier — the same path the
+     markup ships — so a relocked-then-unlocked item points where it should. */
   function gateTiers() {
     var titles = { subscriber: 'Unlocked for subscribers', vip: 'Invite only', moderator: 'Staff only' };
     document.querySelectorAll('.site-nav .nav-tier').forEach(function (el) {
-      if (!tierUnlocked(el.dataset.tier)) {
+      var tier = el.dataset.tier;
+      if (tierUnlocked(tier)) {
+        el.classList.remove('locked');
+        el.removeAttribute('aria-disabled');
+        el.removeAttribute('title');
+        if (!el.getAttribute('href')) el.setAttribute('href', '/membership/' + tier);
+      } else {
         el.classList.add('locked');
         el.setAttribute('aria-disabled', 'true');
         el.removeAttribute('href');
-        el.title = titles[el.dataset.tier] || '';
+        el.title = titles[tier] || '';
       }
     });
   }
+
+  /* Exposed so the account menu's "Refresh" can re-lock/unlock the tiers after
+     it reissues the session cookie (e.g. a VIP grant), without a page reload.
+     Separate IIFEs share state only through window. */
+  window.refreshNavTiers = gateTiers;
 
   setActivePage();
   gateTiers();
