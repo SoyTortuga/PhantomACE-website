@@ -120,13 +120,17 @@ const REWARD_HANDLERS = {
 
     /* Nudge the overlay: the same corner reminder the moderator button and
        the timer fire, WITH sound — a viewer just redeemed, so the reaper
-       rising with its chime is the acknowledgement. Best-effort and isolated:
-       a failure here must never fail the Twitch webhook, or a redemption that
-       recorded fine would be retried and double-counted. */
-    try {
-      const { pushOverlayEvent } = await import('./overlay/events.js');
-      await pushOverlayEvent(env, { type: 'pham-checkin', sound: true });
-    } catch { /* overlay is cosmetic; the check-in above is what matters */ }
+       rising with its chime is the acknowledgement. ONLY for a genuinely new
+       check-in: `position` stays null when the mutate above treated this as a
+       redelivery of an already-recorded redemption, and Twitch can redeliver a
+       webhook, so an unconditional push here chimed twice for one redemption.
+       Best-effort and isolated: a failure here must never fail the webhook. */
+    if (position !== null) {
+      try {
+        const { pushOverlayEvent } = await import('./overlay/events.js');
+        await pushOverlayEvent(env, { type: 'pham-checkin', sound: true });
+      } catch { /* overlay is cosmetic; the check-in above is what matters */ }
+    }
 
     await queueRedemption(env, userId, 'pham-checkin', redemption);
   },

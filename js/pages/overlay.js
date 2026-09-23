@@ -327,6 +327,17 @@
      response. Matches the server default (35) until the first poll lands, so a
      redemption in the first second isn't briefly loud. */
   var alertVolume = 0.35;
+  /* Each open overlay has its OWN audio element, so a check-in with sound plays
+     once PER overlay source, and OBS mixes them all into the stream — three
+     overlay sources means viewers hear the chime three times even though the
+     streamer, monitoring one, hears it once. Add ?muted=1 (or ?sound=off) to
+     every overlay source except the ONE that should carry the chime. */
+  var audioMuted = (function () {
+    try {
+      var p = new URLSearchParams(location.search);
+      return p.get('muted') === '1' || p.get('sound') === 'off';
+    } catch (e) { return false; }
+  })();
 
   function showCheckinReminder(ev) {
     var panel = document.getElementById('ovCheckin');
@@ -347,7 +358,7 @@
     }, CHECKIN_STEP_MS);
     checkinTimers.push(step);
 
-    if (ev && ev.sound) {
+    if (ev && ev.sound && !audioMuted) {
       try {
         if (!checkinAudio) checkinAudio = new Audio(CHECKIN_AUDIO);
         checkinAudio.volume = alertVolume;
