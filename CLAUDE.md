@@ -56,6 +56,32 @@ page AND every game, and sub-agents must follow them too.
   preserving any ICC profile) to drop those chunks before committing, and don't
   commit unreferenced heavyweight source renders.
 
+## Overlay (OBS browser source)
+The stream overlay (`overlay.html`, `css/pages/overlay.css`, `js/pages/overlay*.js`)
+runs inside an OBS browser source that stays open for an entire marathon stream, so
+it MUST return to its exact idle state after anything happens — otherwise CEF's
+GPU/compositor memory grows until OBS crashes.
+- **Everything that fires must fully clear itself.** One-shot events (sub/raid/drop
+  alerts, the giveaway reel, the check-in reminder) must be removed from the DOM (or
+  set back to `display: none`) when done, and every `setTimeout`/`setInterval` they
+  start must be cleared or self-terminating. Standing game panels (raid, Mana Clash,
+  bingo, MTGBBB, maze, scramble) must hide when their game/event ends. Verified idle
+  state after a fire = the stage has 0 children and every panel computes to
+  `display: none`.
+- **A hidden panel must reach `display: none`.** The `hidden` attribute alone is not
+  enough: any author rule that sets `display` on a panel overrides the UA
+  `[hidden]{display:none}`, so every panel that sets `display` needs a matching
+  `.<panel>[hidden] { display: none; }` guard (see `.ov-raid`, `.ov-checkin`). Hiding
+  with only `opacity`/`visibility` leaves it composited over the live capture — don't.
+- **Nothing may run while hidden.** Animation/redraw loops bail immediately when
+  their panel is hidden (`if (panel.hidden) return;`), and pollers back off to a slow
+  idle interval — no per-frame work while nothing is shown.
+- **No unbounded growth.** Rebuild lists by replacing children, never appending; do
+  not retain removed nodes; reuse a single `Audio` element instead of `new Audio()`
+  per fire; overwrite a small state key rather than growing one.
+- **No `backdrop-filter`/blur** (also in Design Identity) — on the overlay it is the
+  worst offender, re-blurring the live game capture every frame it is visible.
+
 ## Project Structure
 ```
 ├── index.html, about.html, events.html, ...   # Page shells
