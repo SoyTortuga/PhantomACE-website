@@ -143,6 +143,14 @@ html, body {
    opacity fade only — a transform here would fight the editor's scaling.
    The default spot (lower-left, on-canvas) is a fallback until it's placed.
    Sprite size is fixed in CSS so layout mode shows it without the live JS. */
+/* display:flex below would override the [hidden] attribute the reminder
+   toggles (an author rule beats the UA [hidden]{display:none}), so without
+   this the panel would stay laid out and COMPOSITED even when it never fires:
+   its sprite's drop-shadow filter would be re-blended over the live game
+   capture every frame for the whole stream, growing an OBS browser source's
+   GPU memory until it crashes a marathon — with no feature ever used. Same
+   trap the raid panel guards against just above. */
+.ov-checkin[hidden] { display: none; }
 .ov-checkin {
   position: absolute;
   left: 3%;
