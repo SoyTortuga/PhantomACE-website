@@ -15,9 +15,46 @@ Static HTML/CSS/JS community website for Twitch broadcaster PhantomACE. Hosted o
 - Return only executable code. No introductory text, conversational fluff, or post-code summaries.
 - Never use placeholder comments like "rest of code goes here" — always output complete, functional blocks.
 - Minimize inline comments unless the logic is highly complex.
-- No `box-shadow` in CSS. Ever. This is a permanent design rule.
-- Gothic aesthetic: black backgrounds, red accents, system-ui fonts, border-based visual hierarchy.
-- Use `filter: drop-shadow()` only on non-box elements (logos, images) if glow is needed.
+
+## Design Identity — no generic "AI-template" tells
+The site has a deliberate gothic identity. The rules below keep it from drifting
+into the look of a default AI-generated site. They are permanent, apply to every
+page AND every game, and sub-agents must follow them too.
+- **Palette:** black / greys / red (`#FF0000`) / white only, taken from
+  `css/variables.css`. Never a cream / off-white ("Honda Tan") light mode, never a
+  slate or indigo "tech dark" (`#0b0f19`-style) background, never cyan or
+  neon-indigo accents. `--purple` exists ONLY as the MTG "rare" rarity colour —
+  never as a UI accent.
+- **Fonts:** gothic display faces (PhantomACE, GodOfWar, UnifrakturMaguntia,
+  Cinzel Decorative) for titles/headers via the `--font-*` tokens, `system-ui` for
+  body. Never Inter, Roboto, or another generic UI sans.
+- **No `box-shadow`. Ever.** Depth comes from borders. For a glow, use
+  `filter: drop-shadow()` on a NON-box element (sprite/logo/icon); to make a box
+  read as "lit", brighten or thicken its border instead — do not reach for a
+  shadow.
+- **No `backdrop-filter` / `blur()` (glassmorphism / frosted glass).** Panels use a
+  near-solid background (e.g. `rgba(10,10,10,0.96)`) plus a border. It is also
+  per-frame GPU work that crashes the broadcaster's OBS on long streams.
+- **Gradients** only as red/black gothic vignettes (see `css/pages/home.css`). No
+  `bg-gradient-to-br`-style subtle background gradients, and never a gradient
+  clipped onto headline text (a white→grey word fade).
+- **No icon libraries** (Lucide, FontAwesome, Heroicons, Feather). Use the
+  project's own sprites, Twitch emotes, or plain emoji.
+- **No eyebrow kickers** — the small category label floated above a heading. Pages
+  go straight to the shared `.page-hero` title. Those hero styles live in
+  `css/components.css` (loaded on every page) — do not re-home them in a per-page
+  stylesheet, or pages that miss it render an unstyled hero.
+- **No generic hero formula** (eyebrow → bold heading → one paragraph → one filled
+  + one outlined button) and no filler "feature-matrix" or "bento" grids of
+  interchangeable cards. Every card and section must say something specific about
+  PhantomACE, the games, or the community.
+- **Copy is specific, not marketing filler.** No hollow slogans ("Boost Your
+  Workflow", "Unlock Productivity", "Next-Generation…", "Seamlessly…"). Write in
+  the site's casual gothic voice about real things.
+- **Strip generated-image credentials.** Images made with an AI tool carry
+  C2PA/XMP provenance metadata; re-encode losslessly (e.g. open + save via Pillow,
+  preserving any ICC profile) to drop those chunks before committing, and don't
+  commit unreferenced heavyweight source renders.
 
 ## Project Structure
 ```
