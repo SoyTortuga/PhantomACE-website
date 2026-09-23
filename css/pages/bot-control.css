@@ -13,39 +13,62 @@
   margin-bottom: 16px;
 }
 
-/* Two-up on anything wide enough, one column on narrow viewports — the
-   fallback the page used to be everywhere. `align-items: start` stops a
-   short card being stretched to match a tall neighbour in the same row,
-   which is the artifact plain `display: grid` would otherwise leave. */
+/* Cards are grouped by function. Each group is a section with its own
+   header and its own grid, so cards stay uniform within a group. */
+.bot-group {
+  margin: 0 0 34px;
+}
+
+.bot-group:last-child {
+  margin-bottom: 0;
+}
+
+.bot-group-title {
+  font-family: var(--font-gothic);
+  font-size: 22px;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 14px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Smaller min column and tighter gap than the old two-up layout, so a
+   group packs more cards per row. `align-items: stretch` makes every card
+   in a row the same height — uniform within the group. */
 .bot-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: stretch;
 }
 
 /* The handful of sections whose content (a reel, a growing feed, a list
-   with no height cap) actually needs the room, plus the two banners that
-   were never their own section to begin with. */
+   with no height cap) actually needs the whole group width. */
 .bot-grid-full {
   grid-column: 1 / -1;
 }
 
 .bot-grid .bot-section {
   margin-bottom: 0;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
 }
 
-.bot-section h2 {
+.bot-section h3 {
   font-family: var(--font-gothic);
-  font-size: 20px;
+  font-size: 16px;
   color: var(--text-pri);
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
 
 .bot-section-desc {
   color: var(--text-dim);
-  font-size: 13px;
-  margin: 0 0 16px;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0 0 12px;
 }
 
 .bot-tier-buttons {

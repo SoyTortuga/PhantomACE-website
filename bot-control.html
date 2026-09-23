@@ -42,258 +42,289 @@
          role field does not say so. -->
     <div id="botControlPanel" hidden>
 
-      <div class="bot-grid">
+      <div id="botWarnings"></div>
 
-      <div id="botWarnings" class="bot-grid-full"></div>
+      <div id="botStatusMsg" class="bot-status-msg" hidden></div>
 
-      <div class="card bot-section" id="poolSection">
-        <h2>Code Pools</h2>
-        <p class="bot-section-desc">How many unclaimed codes are left in each tier. An empty pool doesn't fail loudly — the drop simply never reaches chat, so check here before you rely on one.</p>
-        <div class="bot-pool-grid" id="botPoolGrid">
-          <p class="bot-muted">Loading…</p>
-        </div>
-      </div>
+      <section class="bot-group">
+        <h2 class="bot-group-title">Codes &amp; Drops</h2>
+        <div class="bot-grid">
 
-      <div class="card bot-section">
-        <h2>Drop a Code</h2>
-        <p class="bot-section-desc">Pulls codes from that tier's pool and posts them to chat, one message each, same as a hype train drop.</p>
-        <label class="bot-drop-count">How many
-          <input type="number" id="botDropCount" min="1" max="10" value="1">
-        </label>
-        <div class="bot-tier-buttons">
-          <button class="btn-secondary bot-drop-btn" data-rarity="common">Common</button>
-          <button class="btn-secondary bot-drop-btn" data-rarity="uncommon">Uncommon</button>
-          <button class="btn-secondary bot-drop-btn" data-rarity="rare">Rare</button>
-          <button class="btn-secondary bot-drop-btn" data-rarity="mythic">Mythic</button>
-        </div>
-      </div>
-
-      <div class="card bot-section" id="checkinSection" hidden>
-        <h2>Pham Check-Ins</h2>
-        <p class="bot-section-desc">Viewers who redeemed Pham Check-In this stream, newest first, with how far into the broadcast they arrived. Twitch resets the reward each time you go live.</p>
-        <div id="botCheckins"></div>
-      </div>
-
-      <div class="card bot-section" id="liveDropSection" hidden>
-        <h2>Live Drops</h2>
-        <p class="bot-section-desc">Codes still inside their claim window, and how many people have actually redeemed each one.</p>
-        <div id="botLiveDrops"></div>
-      </div>
-
-      <div class="card bot-section">
-        <h2>Drop a Dino Egg</h2>
-        <p class="bot-section-desc">Mints a fresh Dino Park egg code and posts it to chat — same 5-minute window as any drop, redeemable once per account. Nothing to stock beforehand.</p>
-        <label class="bot-egg-mutation">
-          <input type="checkbox" id="botEggMutation"> Guaranteed mutation
-        </label>
-        <div class="bot-tier-buttons">
-          <button class="btn-secondary bot-egg-btn" data-rarity="common">Common</button>
-          <button class="btn-secondary bot-egg-btn" data-rarity="uncommon">Uncommon</button>
-          <button class="btn-secondary bot-egg-btn" data-rarity="rare">Rare</button>
-          <button class="btn-secondary bot-egg-btn" data-rarity="mythic">Mythic</button>
-        </div>
-      </div>
-
-      <div class="card bot-section bot-grid-full" id="giveawaySection">
-        <h2>Big Prize Giveaway</h2>
-        <p class="bot-section-desc">A live, one-off drawing. Pick a rarity and open entries — that switches on the matching channel points reward and switches the other one off, so there is only ever one draw running. Chat redeems it once each, the reel picks a name, and the winner gets a code locked to their account, waiting on their giveaway page for seven days. Reset clears the entrants for the next event — it never touches the monthly giveaway, which runs separately and keeps its own ledger.</p>
-
-        <div class="giveaway-toggle-row">
-          <span class="giveaway-status" id="giveawayStatus">Entries Closed</span>
-          <select id="giveawayRarity" class="giveaway-rarity-select">
-            <option value="rare">Rare draw</option>
-            <option value="mythic">Mythic draw</option>
-          </select>
-          <button class="btn-secondary" id="giveawayToggleBtn">Open Entries</button>
-          <span class="giveaway-entrant-count" id="giveawayEntrantCount">0 entrants</span>
-        </div>
-
-        <!-- ONE SLOT, NOT A WHEEL. Everyone has exactly one chance, and a
-             wheel's whole visual language is slice size — it says "some of
-             you have better odds" about a draw where nobody does. A single
-             reel flicking through names says the true thing instead, and
-             stays readable with two hundred entrants. -->
-        <div class="giveaway-reel-wrap">
-          <div class="giveaway-reel-window">
-            <div class="giveaway-reel-strip" id="giveawayReelStrip"></div>
+          <div class="card bot-section" id="poolSection">
+            <h3>Code Pools</h3>
+            <p class="bot-section-desc">Unclaimed codes left in each tier.</p>
+            <div class="bot-pool-grid" id="botPoolGrid">
+              <p class="bot-muted">Loading…</p>
+            </div>
           </div>
-        </div>
 
-        <div class="giveaway-actions">
-          <button class="btn-primary" id="giveawaySpinBtn">Spin</button>
-          <button class="btn-secondary" id="giveawayResetBtn">Reset</button>
-        </div>
-
-        <div class="giveaway-winner-panel" id="giveawayWinnerPanel" hidden>
-          <p>Winner: <b id="giveawayWinnerName"></b> <span class="giveaway-winner-rarity" id="giveawayWinnerRarity"></span></p>
-          <div class="giveaway-code-form">
-            <select id="giveawayCodeTier">
-              <option value="">— the draw's own rarity —</option>
-              <option value="common">Common</option>
-              <option value="uncommon">Uncommon</option>
-              <option value="rare">Rare</option>
-              <option value="mythic">Mythic</option>
-            </select>
-            <input type="text" id="giveawayCodeManual" placeholder="...or paste a specific code">
-            <button class="btn-primary" id="giveawaySendCodeBtn">Give Code to Winner</button>
+          <div class="card bot-section">
+            <h3>Drop a Code</h3>
+            <p class="bot-section-desc">Posts codes from that tier's pool to chat.</p>
+            <label class="bot-drop-count">How many
+              <input type="number" id="botDropCount" min="1" max="10" value="1">
+            </label>
+            <div class="bot-tier-buttons">
+              <button class="btn-secondary bot-drop-btn" data-rarity="common">Common</button>
+              <button class="btn-secondary bot-drop-btn" data-rarity="uncommon">Uncommon</button>
+              <button class="btn-secondary bot-drop-btn" data-rarity="rare">Rare</button>
+              <button class="btn-secondary bot-drop-btn" data-rarity="mythic">Mythic</button>
+            </div>
           </div>
+
+          <div class="card bot-section">
+            <h3>Drop a Dino Egg</h3>
+            <p class="bot-section-desc">Mints a fresh egg code and posts it to chat.</p>
+            <label class="bot-egg-mutation">
+              <input type="checkbox" id="botEggMutation"> Guaranteed mutation
+            </label>
+            <div class="bot-tier-buttons">
+              <button class="btn-secondary bot-egg-btn" data-rarity="common">Common</button>
+              <button class="btn-secondary bot-egg-btn" data-rarity="uncommon">Uncommon</button>
+              <button class="btn-secondary bot-egg-btn" data-rarity="rare">Rare</button>
+              <button class="btn-secondary bot-egg-btn" data-rarity="mythic">Mythic</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="liveDropSection" hidden>
+            <h3>Live Drops</h3>
+            <p class="bot-section-desc">Codes still in their claim window, and redemptions so far.</p>
+            <div id="botLiveDrops"></div>
+          </div>
+
+          <div class="card bot-section" id="checkinSection" hidden>
+            <h3>Pham Check-Ins</h3>
+            <p class="bot-section-desc">Viewers who redeemed Pham Check-In this stream.</p>
+            <div id="botCheckins"></div>
+          </div>
+
         </div>
-      </div>
+      </section>
 
-      <div class="card bot-section" id="ovMcSection">
-        <h2>Mana Clash on the Overlay</h2>
-        <p class="bot-section-desc">Puts a live game in the centre of the overlay &mdash; round, goal, every player's score and their dice as they land. Games already in progress are listed first, since those are the ones worth showing. The OBS browser source never changes: the room is chosen here.</p>
+      <section class="bot-group">
+        <h2 class="bot-group-title">Giveaways</h2>
+        <div class="bot-grid">
 
-        <div class="ovmc-row">
-          <span class="giveaway-status" id="ovMcState">Off</span>
-          <select id="ovMcRoomPick" class="giveaway-rarity-select"><option value="">Loading rooms&hellip;</option></select>
-          <button class="btn-primary" id="ovMcShowBtn">Show</button>
-          <button class="btn-secondary" id="ovMcOffBtn">Hide</button>
-          <button class="btn-secondary" id="ovMcRefreshBtn">Refresh list</button>
+          <div class="card bot-section bot-grid-full" id="giveawaySection">
+            <h3>Big Prize Giveaway</h3>
+            <p class="bot-section-desc">A live, one-off drawing for a single winner.</p>
+
+            <div class="giveaway-toggle-row">
+              <span class="giveaway-status" id="giveawayStatus">Entries Closed</span>
+              <select id="giveawayRarity" class="giveaway-rarity-select">
+                <option value="rare">Rare draw</option>
+                <option value="mythic">Mythic draw</option>
+              </select>
+              <button class="btn-secondary" id="giveawayToggleBtn">Open Entries</button>
+              <span class="giveaway-entrant-count" id="giveawayEntrantCount">0 entrants</span>
+            </div>
+
+            <!-- ONE SLOT, NOT A WHEEL. Everyone has exactly one chance, and a
+                 wheel's whole visual language is slice size — it says "some of
+                 you have better odds" about a draw where nobody does. A single
+                 reel flicking through names says the true thing instead, and
+                 stays readable with two hundred entrants. -->
+            <div class="giveaway-reel-wrap">
+              <div class="giveaway-reel-window">
+                <div class="giveaway-reel-strip" id="giveawayReelStrip"></div>
+              </div>
+            </div>
+
+            <div class="giveaway-actions">
+              <button class="btn-primary" id="giveawaySpinBtn">Spin</button>
+              <button class="btn-secondary" id="giveawayResetBtn">Reset</button>
+            </div>
+
+            <div class="giveaway-winner-panel" id="giveawayWinnerPanel" hidden>
+              <p>Winner: <b id="giveawayWinnerName"></b> <span class="giveaway-winner-rarity" id="giveawayWinnerRarity"></span></p>
+              <div class="giveaway-code-form">
+                <select id="giveawayCodeTier">
+                  <option value="">— the draw's own rarity —</option>
+                  <option value="common">Common</option>
+                  <option value="uncommon">Uncommon</option>
+                  <option value="rare">Rare</option>
+                  <option value="mythic">Mythic</option>
+                </select>
+                <input type="text" id="giveawayCodeManual" placeholder="...or paste a specific code">
+                <button class="btn-primary" id="giveawaySendCodeBtn">Give Code to Winner</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card bot-section">
+            <h3>Monthly Giveaway</h3>
+            <p class="bot-section-desc">The running entry ledger from drops and channel points.</p>
+            <div class="bot-stat-row" id="botGiveawayStats">
+              <p class="bot-muted">Loading…</p>
+            </div>
+          </div>
+
         </div>
+      </section>
 
-        <p class="bot-section-desc" style="margin-top:14px;">A change to the overlay itself &mdash; a new panel, a style fix &mdash; only reaches the stream when the OBS browser source reloads, and OBS holds a page open for days. This asks every open overlay to reload itself, so nobody has to touch the streaming PC. Choosing a room does <b>not</b> need it.</p>
-        <div class="ovmc-row">
-          <button class="btn-secondary" id="ovReloadBtn">Reload OBS Overlay</button>
+      <section class="bot-group">
+        <h2 class="bot-group-title">Overlay</h2>
+        <div class="bot-grid">
+
+          <div class="card bot-section" id="ovMcSection">
+            <h3>Mana Clash on the Overlay</h3>
+            <p class="bot-section-desc">Shows a live Mana Clash game on the stream overlay.</p>
+
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovMcState">Off</span>
+              <select id="ovMcRoomPick" class="giveaway-rarity-select"><option value="">Loading rooms&hellip;</option></select>
+              <button class="btn-primary" id="ovMcShowBtn">Show</button>
+              <button class="btn-secondary" id="ovMcOffBtn">Hide</button>
+              <button class="btn-secondary" id="ovMcRefreshBtn">Refresh list</button>
+            </div>
+
+            <p class="bot-section-desc" style="margin-top:14px;">Asks every open OBS overlay to reload itself.</p>
+            <div class="ovmc-row">
+              <button class="btn-secondary" id="ovReloadBtn">Reload OBS Overlay</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovPresetSection">
+            <h3>Overlay Preset</h3>
+            <p class="bot-section-desc">Swap which saved overlay layout is live.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovPresetState">Loading&hellip;</span>
+              <select id="ovPresetPick" class="giveaway-rarity-select"><option value="">Loading&hellip;</option></select>
+              <button class="btn-primary" id="ovPresetLiveBtn">Make Live &amp; Reload</button>
+              <button class="btn-secondary" id="ovPresetRefreshBtn">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovBingoSection">
+            <h3>Commander Bingo on the Overlay</h3>
+            <p class="bot-section-desc">Shows the live Commander Bingo game on the overlay.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovBingoState">No game running</span>
+              <button class="btn-primary" id="ovBingoShowBtn">Show</button>
+              <button class="btn-secondary" id="ovBingoOffBtn">Hide</button>
+              <button class="btn-secondary" id="ovBingoRefreshBtn">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovRaidSection">
+            <h3>Skull Clicker Raid Boss</h3>
+            <p class="bot-section-desc">Summons a shared raid boss across every open Skull Clicker.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovRaidState">No boss</span>
+              <input type="number" id="ovRaidHp" class="lb-award-tier" style="max-width:90px" value="5000" min="100" step="500" title="Boss HP (total clicks)">
+              <input type="number" id="ovRaidMin" class="lb-award-tier" style="max-width:70px" value="15" min="1" max="120" title="Minutes">
+              <button class="btn-primary" id="ovRaidStartBtn">Summon</button>
+              <button class="btn-secondary" id="ovRaidEndBtn">End</button>
+              <button class="btn-secondary" id="ovRaidRefreshBtn">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovCheckinSection">
+            <h3>Pham Check-In Reminder</h3>
+            <p class="bot-section-desc">A corner overlay nudge to redeem Pham Check-In.</p>
+            <div class="ovmc-row">
+              <button class="btn-primary" id="ovCheckinBtn">Show Now</button>
+              <span class="giveaway-status" id="ovCheckinTimerState">Timer off</span>
+              <button class="btn-secondary" id="ovCheckinToggleBtn">Turn On Timer</button>
+              <label class="bot-rotation-interval">Every
+                <input type="number" id="ovCheckinInterval" min="1" max="120" value="15"> min
+              </label>
+              <button class="btn-secondary" id="ovCheckinSaveBtn">Save</button>
+            </div>
+            <div class="ovmc-row" style="margin-top:10px">
+              <label class="bot-rotation-interval" style="flex:1 1 220px">Overlay alert volume
+                <input type="range" id="ovAlertVolume" min="0" max="100" value="35" step="5" style="vertical-align:middle;margin:0 8px;flex:1">
+              </label>
+              <span class="giveaway-status" id="ovAlertVolumeVal">35%</span>
+            </div>
+          </div>
+
+          <!-- Broadcaster only: the key in this URL is the only thing guarding
+               the alert feed. -->
+          <div class="card bot-section" id="overlaySection" hidden>
+            <h3>Stream Overlay</h3>
+            <p class="bot-section-desc">Add as an OBS Browser Source to show alerts.</p>
+            <div class="bot-overlay-row">
+              <input type="text" id="botOverlayUrl" class="bot-mod-input" readonly>
+              <button class="btn-primary" id="botOverlayCopy">Copy</button>
+            </div>
+            <p class="bot-section-desc bot-overlay-hint">Treat the URL like a password; it never replays old alerts.</p>
+          </div>
+
         </div>
-      </div>
+      </section>
 
-      <div class="card bot-section" id="ovPresetSection">
-        <h2>Overlay Preset</h2>
-        <p class="bot-section-desc">Swap which saved layout is live &mdash; "Just Chatting", "Gaming", "Bingo night". Make one live here, then the overlay picks it up on its next reload. Build and arrange presets in the Overlay Layout editor.</p>
-        <div class="ovmc-row">
-          <span class="giveaway-status" id="ovPresetState">Loading&hellip;</span>
-          <select id="ovPresetPick" class="giveaway-rarity-select"><option value="">Loading&hellip;</option></select>
-          <button class="btn-primary" id="ovPresetLiveBtn">Make Live &amp; Reload</button>
-          <button class="btn-secondary" id="ovPresetRefreshBtn">Refresh</button>
+      <section class="bot-group">
+        <h2 class="bot-group-title">Chat</h2>
+        <div class="bot-grid">
+
+          <div class="card bot-section">
+            <h3>Send Announcement</h3>
+            <p class="bot-section-desc">Posts a custom message to chat verbatim.</p>
+            <div class="bot-announce-form">
+              <textarea id="botAnnounceText" class="bot-announce-input" maxlength="450" placeholder="Type an announcement to post in chat..."></textarea>
+              <span class="bot-announce-count" id="botAnnounceCount">0 / 450</span>
+              <button class="btn-primary" id="botAnnounceBtn">Send to Chat</button>
+            </div>
+          </div>
+
+          <div class="card bot-section">
+            <h3>Rotating Announcements</h3>
+            <p class="bot-section-desc">Messages the bot cycles on a timer while you're live.</p>
+
+            <div class="bot-rotation-row">
+              <span class="bot-rotation-state" id="botRotationState">Off</span>
+              <button class="btn-secondary" id="botRotationToggle">Turn On</button>
+              <label class="bot-rotation-interval">Every
+                <input type="number" id="botRotationInterval" min="5" value="15"> min
+              </label>
+              <button class="btn-secondary" id="botRotationSave">Save</button>
+              <span class="bot-rotation-next" id="botRotationNext"></span>
+            </div>
+
+            <ul class="bot-announce-list" id="botAnnounceList">
+              <li class="bot-muted">Loading…</li>
+            </ul>
+
+            <div class="bot-announce-add">
+              <textarea id="botRotationText" class="bot-announce-input" maxlength="450" placeholder="Add a message to the rotation..."></textarea>
+              <button class="btn-primary" id="botRotationAdd">Add</button>
+            </div>
+          </div>
+
         </div>
-      </div>
+      </section>
 
-      <div class="card bot-section" id="ovBingoSection">
-        <h2>Commander Bingo on the Overlay</h2>
-        <p class="bot-section-desc">Shows the live Commander Bingo game on the overlay &mdash; call progress, players, the squares called so far, and the winners &mdash; and lets its calls and wins pop as alerts. The game finds its own room; this switch only decides whether it appears on stream. The host has the same switch on their panel.</p>
-        <div class="ovmc-row">
-          <span class="giveaway-status" id="ovBingoState">No game running</span>
-          <button class="btn-primary" id="ovBingoShowBtn">Show</button>
-          <button class="btn-secondary" id="ovBingoOffBtn">Hide</button>
-          <button class="btn-secondary" id="ovBingoRefreshBtn">Refresh</button>
+      <section class="bot-group">
+        <h2 class="bot-group-title">Activity &amp; Admin</h2>
+        <div class="bot-grid">
+
+          <div class="card bot-section bot-grid-full">
+            <h3>Recent Bot Actions</h3>
+            <ul class="bot-action-feed" id="botActionFeed">
+              <li class="bot-action-feed-empty">Loading...</li>
+            </ul>
+          </div>
+
+          <!-- Broadcaster only. Revealed by JS on the server's isBroadcaster
+               answer — managing who holds power is not itself delegated. -->
+          <div class="card bot-section bot-grid-full" id="modSection" hidden>
+            <h3>Moderator Access</h3>
+            <p class="bot-section-desc">Accounts allowed to drop codes and run giveaways here.</p>
+
+            <ul class="bot-mod-list" id="botModList">
+              <li class="bot-muted">Loading…</li>
+            </ul>
+
+            <div class="bot-mod-add">
+              <input type="text" id="botModName" class="bot-mod-input" placeholder="Twitch username" maxlength="25" autocomplete="off" spellcheck="false">
+              <button class="btn-primary" id="botModAddBtn">Add</button>
+            </div>
+            <p class="bot-section-desc bot-mod-hint">Type a Twitch username; the site stores its account ID.</p>
+          </div>
+
         </div>
-      </div>
-
-      <div class="card bot-section" id="ovRaidSection">
-        <h2>Skull Clicker Raid Boss</h2>
-        <p class="bot-section-desc">Summons the Undead Executioner across every open Skull Clicker. The whole site clicks it down together; it heals, guards and summons minions, and when it falls everyone gets a cursed-skull frenzy. The thin overlay panel shows its health &mdash; place it on the left.</p>
-        <div class="ovmc-row">
-          <span class="giveaway-status" id="ovRaidState">No boss</span>
-          <input type="number" id="ovRaidHp" class="lb-award-tier" style="max-width:90px" value="5000" min="100" step="500" title="Boss HP (total clicks)">
-          <input type="number" id="ovRaidMin" class="lb-award-tier" style="max-width:70px" value="15" min="1" max="120" title="Minutes">
-          <button class="btn-primary" id="ovRaidStartBtn">Summon</button>
-          <button class="btn-secondary" id="ovRaidEndBtn">End</button>
-          <button class="btn-secondary" id="ovRaidRefreshBtn">Refresh</button>
-        </div>
-      </div>
-
-      <div class="card bot-section" id="ovCheckinSection">
-        <h2>Pham Check-In Reminder</h2>
-        <p class="bot-section-desc">A small corner nudge on the overlay telling viewers to redeem their Pham Check-In. <b>Show Now</b> plays it once with sound; the <b>timer</b> repeats it silently every few minutes while you&rsquo;re live. Overlay only &mdash; nothing is posted to chat.</p>
-        <div class="ovmc-row">
-          <button class="btn-primary" id="ovCheckinBtn">Show Now</button>
-          <span class="giveaway-status" id="ovCheckinTimerState">Timer off</span>
-          <button class="btn-secondary" id="ovCheckinToggleBtn">Turn On Timer</button>
-          <label class="bot-rotation-interval">Every
-            <input type="number" id="ovCheckinInterval" min="1" max="120" value="15"> min
-          </label>
-          <button class="btn-secondary" id="ovCheckinSaveBtn">Save</button>
-        </div>
-        <div class="ovmc-row" style="margin-top:10px">
-          <label class="bot-rotation-interval" style="flex:1 1 220px">Overlay alert volume
-            <input type="range" id="ovAlertVolume" min="0" max="100" value="35" step="5" style="vertical-align:middle;margin:0 8px;flex:1">
-          </label>
-          <span class="giveaway-status" id="ovAlertVolumeVal">35%</span>
-        </div>
-      </div>
-
-      <div class="card bot-section">
-        <h2>Send Announcement</h2>
-        <p class="bot-section-desc">Posts a custom message to chat verbatim, exactly as typed.</p>
-        <div class="bot-announce-form">
-          <textarea id="botAnnounceText" class="bot-announce-input" maxlength="450" placeholder="Type an announcement to post in chat..."></textarea>
-          <span class="bot-announce-count" id="botAnnounceCount">0 / 450</span>
-          <button class="btn-primary" id="botAnnounceBtn">Send to Chat</button>
-        </div>
-      </div>
-
-      <div class="card bot-section bot-grid-full">
-        <h2>Rotating Announcements</h2>
-        <p class="bot-section-desc">Messages the bot posts on a timer, one at a time, in order. It only posts while you're live — being offline is not something anyone has to remember to pause.</p>
-
-        <div class="bot-rotation-row">
-          <span class="bot-rotation-state" id="botRotationState">Off</span>
-          <button class="btn-secondary" id="botRotationToggle">Turn On</button>
-          <label class="bot-rotation-interval">Every
-            <input type="number" id="botRotationInterval" min="5" value="15"> min
-          </label>
-          <button class="btn-secondary" id="botRotationSave">Save</button>
-          <span class="bot-rotation-next" id="botRotationNext"></span>
-        </div>
-
-        <ul class="bot-announce-list" id="botAnnounceList">
-          <li class="bot-muted">Loading…</li>
-        </ul>
-
-        <div class="bot-announce-add">
-          <textarea id="botRotationText" class="bot-announce-input" maxlength="450" placeholder="Add a message to the rotation..."></textarea>
-          <button class="btn-primary" id="botRotationAdd">Add</button>
-        </div>
-      </div>
-
-      <div id="botStatusMsg" class="bot-status-msg bot-grid-full" hidden></div>
-
-      <div class="card bot-section">
-        <h2>Monthly Giveaway</h2>
-        <p class="bot-section-desc">The running entry ledger everyone accumulates from drops and channel points. Separate from the wheel above, which is a one-off prize.</p>
-        <div class="bot-stat-row" id="botGiveawayStats">
-          <p class="bot-muted">Loading…</p>
-        </div>
-      </div>
-
-      <div class="card bot-section bot-grid-full">
-        <h2>Recent Bot Actions</h2>
-        <ul class="bot-action-feed" id="botActionFeed">
-          <li class="bot-action-feed-empty">Loading...</li>
-        </ul>
-      </div>
-
-      <!-- Broadcaster only: the key in this URL is the only thing guarding
-           the alert feed. -->
-      <div class="card bot-section" id="overlaySection" hidden>
-        <h2>Stream Overlay</h2>
-        <p class="bot-section-desc">Add this as a <b>Browser Source</b> in OBS — 1920&times;1080, transparent background. It shows an alert when a code drops, someone subscribes or gifts, and when a raid lands.</p>
-        <div class="bot-overlay-row">
-          <input type="text" id="botOverlayUrl" class="bot-mod-input" readonly>
-          <button class="btn-primary" id="botOverlayCopy">Copy</button>
-        </div>
-        <p class="bot-section-desc bot-overlay-hint">Treat the URL like a password — anyone holding it can watch your alerts. Reloading the source in OBS never replays old alerts.</p>
-      </div>
-
-      <!-- Broadcaster only. Revealed by JS on the server's isBroadcaster
-           answer — managing who holds power is not itself delegated. -->
-      <div class="card bot-section bot-grid-full" id="modSection" hidden>
-        <h2>Moderator Access</h2>
-        <p class="bot-section-desc">Accounts allowed to drop codes and run the giveaway from this panel. Removal takes effect immediately — it doesn't wait for their session to expire.</p>
-
-        <ul class="bot-mod-list" id="botModList">
-          <li class="bot-muted">Loading…</li>
-        </ul>
-
-        <div class="bot-mod-add">
-          <input type="text" id="botModName" class="bot-mod-input" placeholder="Twitch username" maxlength="25" autocomplete="off" spellcheck="false">
-          <button class="btn-primary" id="botModAddBtn">Add</button>
-        </div>
-        <p class="bot-section-desc bot-mod-hint">Type their Twitch username &mdash; the site looks up the account and stores its ID, so a later rename can&rsquo;t hand their access to someone else. A numeric ID still works if you have one.</p>
-      </div>
-
-      </div>
+      </section>
 
     </div>
 
