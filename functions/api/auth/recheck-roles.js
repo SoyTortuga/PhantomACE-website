@@ -52,6 +52,16 @@ export async function onRequestGet(context) {
     }
     if (!broadcasterId) return json({ error: 'Channel not found' }, 500);
 
+    /* VIP is a chat-granted status the bot records in sub_months_, not a Helix
+       fact — so re-read it here too, letting Refresh pick up a VIP grant (or
+       loss) without a full re-login. Freshly read, then written into whichever
+       cookie this reissues below. */
+    let vip = false;
+    try {
+      const sm = await env.MARKETPLACE.get(`sub_months_${session.user_id}`, 'json');
+      vip = !!(sm && sm.vip);
+    } catch { /* leave vip false; a read hiccup must not grant status */ }
+
     /* THE BROADCASTER IS NEVER RE-EVALUATED.
        Twitch reports a broadcaster as tier 3000 on their own channel, so
        running them through the subscription check below would "successfully"
@@ -69,7 +79,7 @@ export async function onRequestGet(context) {
 
          A "refresh my role" button that cannot actually change your role is
          just a way to be told the truth once and then shown a lie. */
-      const corrected = { ...session, role: 'broadcaster' };
+      const corrected = { ...session, role: 'broadcaster', vip };
       const { signSession } = await import('./session-crypto.js');
       const cookieValue = await signSession(corrected, env.SESSION_SECRET);
       const flags = ['Path=/', 'Max-Age=86400', 'SameSite=Lax'];
@@ -187,7 +197,7 @@ export async function onRequestGet(context) {
       return json({ role, subTier, verified: false, reason: 'Twitch role check unavailable' });
     }
 
-    const updatedSession = { ...session, role, subTier };
+    const updatedSession = { ...session, role, subTier, vip };
     const url = new URL(request.url);
     /* Must sign, exactly as the login flow does. An unsigned cookie issued
        here would be rejected by the server's session gate on the very next

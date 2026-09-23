@@ -184,6 +184,17 @@ export async function onRequestGet(context) {
       } catch { /* a failure here must not block a login */ }
     }
 
+    /* VIP is a hand-granted chat status Helix won't tell us about, so the bot
+       records it in sub_months_ when it sees the badge in chat. Carry it in
+       the session so the UI can gate the VIP tier on the real flag instead of
+       a proxy. Display hint only — nothing is authorised on it, and it can
+       lapse, so a stale `true` costs nothing. */
+    let vip = false;
+    try {
+      const sm = await env.MARKETPLACE.get(`sub_months_${user.id}`, 'json');
+      vip = !!(sm && sm.vip);
+    } catch { /* no VIP record, or KV hiccup — not a VIP as far as the UI knows */ }
+
     const session = {
       user_id: user.id,
       display_name: user.display_name,
@@ -194,6 +205,7 @@ export async function onRequestGet(context) {
          which moderator outranks every sub tier — cannot cost a subscribing
          moderator the thing they are paying for. */
       subTier,
+      vip,
       followedAt,
       subscribedAt,
       subExpiresAt,
