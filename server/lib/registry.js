@@ -148,6 +148,12 @@ export const SINGLETONS = {
      falls back to full volume. */
   overlay_alert_volume:  { table: 'singletons', expiry: 'none' },
 
+  /* Short-lived heartbeat registry of open overlay instances, used to elect a
+     single "audio leader" so the check-in chime plays once no matter how many
+     overlay sources are open. 'real' with a sliding TTL so it self-clears
+     once no overlay has polled for a while. */
+  overlay_instances:     { table: 'singletons', expiry: 'real' },
+
   /* Current broadcast's Pham Check-in list. One row, replaced wholesale when
      a new stream id appears — Twitch already resets the reward's per-stream
      limit on its own, and keeping only the live stream means no scheduled

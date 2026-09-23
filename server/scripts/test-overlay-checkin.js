@@ -37,12 +37,24 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
   ok('the check-in is a corner reminder, not a stage card', /function showCheckinReminder/.test(ov) && !/buildCheckinCard/.test(ov));
   ok('and it bypasses the alert queue', /ev\.type === 'pham-checkin'\) \{ showCheckinReminder\(ev\); continue; \}/.test(ov));
   ok('it drives the movable #ovCheckin panel', /getElementById\('ovCheckin'\)/.test(ov) && /getElementById\('ovCheckinSprite'\)/.test(ov));
-  /* Sound only when the event asks for it (the manual button / a redemption);
-     the timer nudge is silent, and a muted overlay source stays silent too. */
-  ok('sound is gated on ev.sound and the mute flag', /if \(ev && ev\.sound && !audioMuted\)/.test(ov) && /new Audio\(CHECKIN_AUDIO\)/.test(ov));
+  /* Sound only when the event asks for it (the manual button / a redemption),
+     AND only on the elected audio-leader source, AND not on a muted source —
+     so however many overlay sources OBS has open, the chime plays once. */
+  ok('sound is gated on ev.sound, the mute flag and the audio leader', /if \(ev && ev\.sound && !audioMuted && isAudioLeader\)/.test(ov) && /new Audio\(CHECKIN_AUDIO\)/.test(ov));
   /* ?muted=1 / ?sound=off silences THIS overlay source, so extra sources don't
      each mix a chime into the stream. */
   ok('an overlay source can be muted by URL', /var audioMuted =/.test(ov) && /get\('muted'\) === '1'/.test(ov) && /get\('sound'\) === 'off'/.test(ov));
+  /* One overlay is elected to carry the chime: the source sends a per-instance
+     id (unless muted) and only plays when the server names it the leader. */
+  ok('the overlay sends an instance id and obeys the elected leader',
+     /&iid=' \+ encodeURIComponent\(overlayIid\)/.test(ov) && /isAudioLeader = \(data\.audioLeader === overlayIid\)/.test(ov));
+  {
+    const ev = read('functions/api/overlay/events.js');
+    ok('the feed elects a single audio leader from live instances',
+       /function electAudioLeader/.test(ev) && /audioLeader: audioLeader/.test(ev));
+    const reg = read('server/lib/registry.js');
+    ok('the instance registry is a registered singleton', /overlay_instances:\s*\{ table: 'singletons'/.test(reg));
+  }
   ok('the raise animation stops on the last frame', /frame >= CHECKIN_FRAMES - 1\) clearInterval/.test(ov));
   /* ONE reused audio element, restarted — not a fresh Audio() per fire, which
      layered a sound per rapid press. */

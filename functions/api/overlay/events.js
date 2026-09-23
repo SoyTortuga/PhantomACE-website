@@ -76,6 +76,31 @@ async function reloadToken(env) {
   return (rec && rec.token) ? String(rec.token) : '';
 }
 
+/* AUDIO LEADER — one overlay plays sound, however many are open.
+   Each overlay source is its own page with its own audio element, so a
+   check-in chime plays once PER open source and OBS mixes them all onto the
+   stream (three sources = three chimes, at slightly different poll timings).
+   Every source sends a random instance id on each poll; this keeps a short-
+   lived heartbeat registry and names the lowest live id the audio leader.
+   Only that source plays the chime; the rest stay silent. A muted source
+   (?muted=1) sends no id, so it never competes and never plays. */
+const INSTANCE_STALE_MS = 6000;
+async function electAudioLeader(env, iid) {
+  if (!iid) return null;
+  const now = Date.now();
+  let reg = {};
+  await env.MARKETPLACE.mutate('overlay_instances', (cur) => {
+    reg = (cur && typeof cur === 'object') ? { ...cur } : {};
+    for (const k of Object.keys(reg)) {
+      if (now - (Number(reg[k]) || 0) > INSTANCE_STALE_MS) delete reg[k];
+    }
+    reg[iid] = now;
+    return reg;
+  }, { expirationTtl: 30 });
+  const live = Object.keys(reg).filter(k => now - (Number(reg[k]) || 0) <= INSTANCE_STALE_MS).sort();
+  return live.length ? live[0] : iid;
+}
+
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/pham_session=([^;]+)/);
@@ -148,6 +173,9 @@ export async function onRequestGet(context) {
   const volRec = await env.MARKETPLACE.get('overlay_alert_volume');
   const alertVolume = volRec == null ? 35 : Math.max(0, Math.min(100, parseInt(volRec, 10) || 0));
 
+  /* Which single open overlay may play the check-in chime — see electAudioLeader. */
+  const audioLeader = await electAudioLeader(env, url.searchParams.get('iid'));
+
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded
      source must not replay an hour of alerts onto the stream. */
@@ -166,6 +194,7 @@ export async function onRequestGet(context) {
        afterwards does not reload on its first poll. */
     reloadToken: await reloadToken(env),
     alertVolume: alertVolume,
+    audioLeader: audioLeader,
     serverNow: Date.now(),
   }), {
     status: 200,

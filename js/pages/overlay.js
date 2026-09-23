@@ -338,6 +338,13 @@
       return p.get('muted') === '1' || p.get('sound') === 'off';
     } catch (e) { return false; }
   })();
+  /* A random id for THIS overlay instance. The server sees it on every poll
+     and names one open overlay the audio leader, so the check-in chime plays
+     once however many overlay sources OBS has open. A muted source sends no id
+     and never competes. `isAudioLeader` starts true so a lone overlay plays
+     from the very first event; the server settles it within a poll. */
+  var overlayIid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  var isAudioLeader = true;
 
   function showCheckinReminder(ev) {
     var panel = document.getElementById('ovCheckin');
@@ -358,7 +365,7 @@
     }, CHECKIN_STEP_MS);
     checkinTimers.push(step);
 
-    if (ev && ev.sound && !audioMuted) {
+    if (ev && ev.sound && !audioMuted && isAudioLeader) {
       try {
         if (!checkinAudio) checkinAudio = new Audio(CHECKIN_AUDIO);
         checkinAudio.volume = alertVolume;
@@ -561,7 +568,8 @@
 
   function poll() {
     var url = '/api/overlay/events?key=' + encodeURIComponent(key) +
-              (cursor === null ? '' : '&since=' + cursor);
+              (cursor === null ? '' : '&since=' + cursor) +
+              (audioMuted ? '' : '&iid=' + encodeURIComponent(overlayIid));
 
     fetch(url, { cache: 'no-store' })
       .then(function (r) {
@@ -576,6 +584,12 @@
            change reaches the open overlay within a second, no reload. */
         if (typeof data.alertVolume === 'number') {
           alertVolume = Math.max(0, Math.min(1, data.alertVolume / 100));
+        }
+        /* One overlay plays the check-in chime. The server picks it; every
+           other open source stays silent so the stream doesn't hear it two or
+           three times. Absent field (older server) leaves us free to play. */
+        if (typeof data.audioLeader === 'string') {
+          isAudioLeader = (data.audioLeader === overlayIid);
         }
 
         /* RELOAD ON COMMAND. An OBS browser source holds this page open for
