@@ -854,7 +854,7 @@ html, body {
   text-transform: uppercase;
 }
 .ov-bingo-rarity[data-rarity="common"]   { color: #9a9a9a; }
-.ov-bingo-rarity[data-rarity="uncommon"] { color: #7fd0e6; }
+.ov-bingo-rarity[data-rarity="uncommon"] { color: #b8c4d4; }
 .ov-bingo-rarity[data-rarity="rare"]     { color: #ffb300; }
 .ov-bingo-rarity[data-rarity="mythic"]   { color: #ff5a1f; }
 
