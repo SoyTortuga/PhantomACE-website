@@ -227,9 +227,7 @@
   right: 0;
   width: 320px;
   max-height: 400px;
-  background: rgba(10, 10, 10, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 10, 10, 0.98);
   border: 1px solid var(--border-mid);
   border-radius: 12px;
   z-index: 1200;
@@ -407,9 +405,7 @@
   top: 100%;
   right: 0;
   width: 200px;
-  background: rgba(10, 10, 10, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 10, 10, 0.98);
   border: 1px solid var(--border-mid);
   border-radius: 12px;
   z-index: 1200;

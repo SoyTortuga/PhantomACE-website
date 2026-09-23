@@ -226,7 +226,7 @@
          exactly the one still being read. Marked squares stay distinct by
          their red tint and border rather than by being brighter. */
       color: #fff;
-      transition: background 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.3s;
+      transition: background 0.3s, border-color 0.3s, color 0.3s, filter 0.3s;
       position: relative;
       overflow: hidden;
       word-break: break-word;
@@ -235,9 +235,8 @@
 
     .bingo-cell.marked {
       background: rgba(152, 9, 10, 0.25);
-      border-color: rgba(255, 0, 0, 0.4);
+      border-color: rgba(255, 0, 0, 0.65);
       color: #fff;
-      box-shadow: 0 0 12px rgba(255, 0, 0, 0.1) inset;
     }
 
     .bingo-cell.free {
@@ -251,7 +250,7 @@
 
     .bingo-cell.free.marked {
       background: rgba(255, 170, 0, 0.15);
-      box-shadow: 0 0 12px rgba(255, 170, 0, 0.1) inset;
+      border-color: rgba(255, 170, 0, 0.5);
     }
 
     .bingo-cell.practice:not(.free):not(.marked) { cursor: pointer; }
@@ -271,7 +270,8 @@
 
     .bingo-cell.in-pattern {
       border-color: #ff0000;
-      box-shadow: 0 0 15px rgba(255, 0, 0, 0.15) inset, 0 0 6px rgba(255, 0, 0, 0.1);
+      border-width: 2px;
+      filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.4));
     }
 
     /* ── SCORE BAR ───────────────────────── */
@@ -491,8 +491,8 @@
     }
 
     @keyframes wildcard-glow {
-      0%, 100% { box-shadow: 0 0 8px rgba(255, 170, 0, 0.15); }
-      50% { box-shadow: 0 0 16px rgba(255, 170, 0, 0.3); }
+      0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 170, 0, 0.15)); }
+      50% { filter: drop-shadow(0 0 16px rgba(255, 170, 0, 0.3)); }
     }
 
     .bingo-cell.wildcard-target:not(.marked) {

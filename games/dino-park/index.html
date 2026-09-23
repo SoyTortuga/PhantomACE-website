@@ -317,8 +317,8 @@
       animation: pulse 1.5s infinite;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 4px #ff0000; }
-      50% { opacity: 0.3; box-shadow: 0 0 0px #ff0000; }
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px #ff0000); }
+      50% { opacity: 0.3; filter: drop-shadow(0 0 0px #ff0000); }
     }
 
     /* Park empty state */
@@ -625,8 +625,8 @@
       animation: eventGlow 2s ease-in-out infinite;
     }
     @keyframes eventGlow {
-      0%, 100% { box-shadow: 0 0 8px rgba(255,0,0,0.1); }
-      50% { box-shadow: 0 0 16px rgba(255,0,0,0.25); }
+      0%, 100% { filter: drop-shadow(0 0 8px rgba(255,0,0,0.1)); }
+      50% { filter: drop-shadow(0 0 16px rgba(255,0,0,0.25)); }
     }
     .event-banner-icon { font-size: 32px; margin-bottom: 6px; }
     .event-banner-title { font-size: 13px; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
@@ -972,7 +972,7 @@
     .dex-sub { font-size: 9px; color: #fff; margin-top: 1px; }
     .dex-mut-dots { display: flex; gap: 2px; margin-top: 3px; }
     .dex-mut-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid #ffffff28; }
-    .dex-mut-dot.found { box-shadow: 0 0 4px currentColor; }
+    .dex-mut-dot.found { filter: drop-shadow(0 0 4px currentColor); }
     .dex-detail-panel {
       background: #0a0a0a; border: 1px solid #ffffff14; border-radius: 8px;
       padding: 16px; margin-bottom: 12px;

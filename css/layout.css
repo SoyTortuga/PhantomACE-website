@@ -5,9 +5,10 @@
   left: 0;
   bottom: 0;
   width: 200px;
-  background: rgba(0, 0, 0, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* Solid black, no backdrop blur. Depth here is the border, per the project's
+     border-based hierarchy — a frosted-glass blur is both off-brand and, on a
+     fixed element over the whole page, needless per-frame GPU work. */
+  background: #000000;
   border-right: 1px solid var(--border-mid);
   z-index: 1000;
   display: flex;
@@ -112,9 +113,7 @@
   left: 100%;
   top: 0;
   min-width: 160px;
-  background: rgba(10, 10, 10, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 10, 10, 0.98);
   border: 1px solid var(--border-mid);
   border-radius: 8px;
   padding: 6px 0;
@@ -204,9 +203,7 @@
     max-height: calc(100vh - 56px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: rgba(10, 10, 10, 0.96);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: rgba(10, 10, 10, 0.98);
     border-top: 1px solid var(--border-mid);
     border-bottom: 1px solid var(--border);
     padding: 8px 0;
