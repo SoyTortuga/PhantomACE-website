@@ -1,69 +1,79 @@
 /* ── Site documents (guidelines / terms / privacy / art / cookies) ──────
-   Shared layout for the policy pages. Gothic, border-based, no box-shadow. */
+   PhantomACE house style: gothic headings marked with the site's red diamond,
+   hairline-separated sections, an underlined tab row. Border-based, no
+   box-shadow. */
 
+/* Cross-links between the documents — a gothic tab row, underlined on the
+   current page rather than a row of pill buttons. */
 .doc-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 20px 0 8px;
+  justify-content: center;
+  gap: 2px 22px;
+  padding: 22px 0 0;
+  border-bottom: 1px solid var(--border);
 }
 .doc-nav a {
-  font-family: var(--font-system);
-  font-size: 12px;
-  color: var(--text-sec);
-  padding: 6px 14px;
-  border: 1px solid var(--border-mid);
-  border-radius: 3px;
+  font-family: var(--font-gothic);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  padding: 6px 2px;
+  border-bottom: 2px solid transparent;
   transition: color 0.2s, border-color 0.2s;
 }
-.doc-nav a:hover { color: var(--white); border-color: var(--red); }
-.doc-nav a.active {
-  color: var(--red);
-  border-color: rgba(255, 0, 0, 0.5);
-}
+.doc-nav a:hover { color: var(--white); }
+.doc-nav a.active { color: var(--red); border-bottom-color: var(--red); }
 
 .doc-meta {
   font-family: var(--font-system);
   font-size: 11px;
+  letter-spacing: 0.02em;
   color: var(--text-dim);
-  opacity: 0.7;
-  padding: 8px 0 24px;
-  border-bottom: 1px solid var(--border);
+  opacity: 0.6;
+  text-align: center;
+  padding: 12px 0 4px;
   margin-bottom: 24px;
 }
-.doc-meta span { margin-right: 14px; }
 
+/* Lead paragraph — set off with a red rule down its left edge. */
 .doc-intro {
   font-family: var(--font-ui);
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.75;
   color: var(--text-pri);
-  margin-bottom: 32px;
+  border-left: 3px solid var(--red);
+  padding-left: 18px;
+  margin: 4px 0 8px;
 }
 
-.doc-section {
-  display: flex;
-  gap: 18px;
-  padding: 20px 0;
-  border-top: 1px solid var(--border);
-}
-.doc-num {
-  flex: none;
-  width: 34px;
-  font-family: var(--font-gothic);
-  font-size: 20px;
-  color: var(--red);
-  line-height: 1.1;
-}
-.doc-body { flex: 1; min-width: 0; }
+/* No numbered column — the onlysands tell. Sections are hairline-separated
+   blocks led by a gothic heading and a red diamond. The number chip the
+   markup still carries is hidden. */
+.doc-num { display: none; }
+
+.doc-section { padding: 28px 0 4px; }
+.doc-section + .doc-section { border-top: 1px solid var(--border); }
+.doc-body { min-width: 0; }
 
 .doc-heading {
   font-family: var(--font-gothic);
-  font-size: 16px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 18px;
+  letter-spacing: 0.03em;
   color: var(--text-pri);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+/* The site's accent shape — a small red diamond — instead of a big numeral. */
+.doc-heading::before {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  background: var(--red);
+  transform: rotate(45deg);
 }
 
 .doc-body p {
@@ -88,14 +98,16 @@
   color: var(--text-sec);
   padding: 5px 0 5px 18px;
 }
+/* Match the heading marker at list scale: a small rotated red square. */
 .doc-list li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 13px;
+  top: 12px;
   width: 5px;
   height: 5px;
   background: var(--red);
+  transform: rotate(45deg);
 }
 .doc-list li strong { color: var(--text-pri); font-weight: 600; }
 
@@ -117,10 +129,10 @@
 }
 .doc-table th {
   color: var(--red);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-family: var(--font-gothic);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  font-size: 12px;
 }
 
 .doc-callout {
@@ -137,8 +149,6 @@
 .doc-body a:hover { color: #ff5555; }
 
 @media (max-width: 600px) {
-  .doc-section { flex-direction: column; gap: 6px; }
-  .doc-num { width: auto; }
   .doc-table, .doc-table tbody, .doc-table tr, .doc-table td, .doc-table th { display: block; }
   .doc-table th { border-bottom: none; }
   .doc-table td { border-top: none; }
