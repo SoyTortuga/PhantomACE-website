@@ -133,6 +133,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <a href="/community.html">Community</a>
           </nav>
 
+          <nav class="footer-legal">
+            <a href="/guidelines">Community Guidelines</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Notice</a>
+            <a href="/art">Art &amp; Assets</a>
+            <a href="/cookies">Cookies</a>
+          </nav>
+
           <div class="footer-bottom">
             <span>&copy; ${year} PhantomACE. All rights reserved.</span>
           </div>
