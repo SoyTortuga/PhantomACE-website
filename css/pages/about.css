@@ -1,37 +1,4 @@
-/* Page Hero (shared pattern for inner pages) */
-.page-hero {
-  position: relative;
-  padding: 80px 24px 60px;
-  text-align: center;
-  overflow: hidden;
-}
-
-.page-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 20%, rgba(152, 9, 10, 0.12) 0%, transparent 60%);
-  pointer-events: none;
-}
-
-.page-hero-title {
-  font-family: var(--font-gothic);
-  font-size: clamp(36px, 8vw, 72px);
-  color: var(--red);
-  text-shadow: 0 0 20px rgba(255, 0, 0, 0.4), 0 0 40px rgba(255, 0, 0, 0.15);
-  line-height: 1;
-  margin-bottom: 12px;
-  position: relative;
-}
-
-.page-hero-subtitle {
-  font-family: var(--font-gothic);
-  font-size: clamp(10px, 1.5vw, 13px);
-  color: var(--text-sec);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  position: relative;
-}
+/* Page-hero styles moved to components.css (shared by every inner page). */
 
 /* Bio Section */
 .bio-section {
@@ -119,8 +86,8 @@
 
 .social-card {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  justify-content: center;
   padding: 16px 20px;
   transition: border-color 0.3s;
 }
