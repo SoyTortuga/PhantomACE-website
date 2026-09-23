@@ -298,6 +298,10 @@ export const FAMILIES = [
      a boss, per account -- what the Undead Executioner badge ladder reads.
      'none': this is the only record of it, and it must never reset. */
   { prefix: 'raid_redeem_count_', table: 'singletons',     expiry: 'none' },
+  /* Lifetime count of raid KILL-reward codes redeemed, per account -- the
+     separate ladder for helping DEFEAT the boss (see raid-badges.js). Same
+     'none' reasoning: it is the only record of it and must never reset. */
+  { prefix: 'raid_kill_count_', table: 'singletons',       expiry: 'none' },
 
   { prefix: 'item_code_',      table: 'item_codes',       expiry: 'none' },
   { prefix: 'cp_queue_',       table: 'cp_queues',        expiry: 'real' },

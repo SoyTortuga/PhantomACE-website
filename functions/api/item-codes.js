@@ -64,6 +64,14 @@ function validateItemShape(item) {
   return null;
 }
 
+/* A raid kill-reward code (skull-raid.js awardRaidRewards): a per-raid,
+   per-account badge id, in the skull-clicker game. These advance the raid
+   kill-participation ladder rather than granting the code's own item. */
+function isRaidKillCode(item) {
+  return !!item && typeof item.id === 'string' && item.id.startsWith('raid_')
+    && item.game === 'skull-clicker' && item.type === 'badge';
+}
+
 function inventoryKey(userId) {
   return `inv_${userId}`;
 }
@@ -320,6 +328,22 @@ async function handleRedeem(env, session, body) {
 
   if (!(await claimRedemption(env, code, userId))) {
     return json({ error: 'Already redeemed' }, 409);
+  }
+
+  /* Raid kill-reward codes ("<boss> Raider/Slayer", minted in skull-raid.js
+     with an id like raid_<raidId>_u_<uid>) don't grant a one-off badge — that
+     was the bug, an art-less unique badge per raid. Each one instead advances
+     the kill-participation ladder by one, whose count grants the Undead
+     Executioner tier badges (1/10/25/50/100), separate from the summon ladder. */
+  if (isRaidKillCode(record.item)) {
+    let grantedTiers = [];
+    try {
+      const { recordRaidKill } = await import('./raid-badges.js');
+      grantedTiers = await recordRaidKill(env, userId);
+    } catch (err) {
+      console.error('[item-codes] raid-kill grant failed:', err.message);
+    }
+    return json({ success: true, item: record.item, raidKill: true, grantedTiers });
   }
 
   const inv = await getInventory(env, userId);

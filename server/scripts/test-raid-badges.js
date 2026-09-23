@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   RAID_REDEMPTION_TIERS, recordRaidRedemption, backfillRaidRedemptions, getRaidRedemptionCount,
+  recordRaidKill, getRaidKillCount,
 } from '../../functions/api/raid-badges.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,35 @@ const badgeIds = (env, userId) => {
     ok(`${t.id} carries artwork`, typeof t.image === 'string' && t.image.startsWith('/assets/badges/'));
     ok(`${t.id}'s artwork exists on disk`, fs.existsSync(path.join(REPO, t.image.replace(/^\//, ''))));
   }
+}
+
+/* ── Kill-participation ladder: separate count, same badges ───────────── */
+{
+  const env = { MARKETPLACE: fakeKV() };
+
+  /* A fresh account, kills only: the kill count alone grants the tiers. */
+  await recordRaidKill(env, 'k2');
+  check('a kill alone grants bronze', badgeIds(env.MARKETPLACE, 'k2'), ['undead-executioner-bronze']);
+  check('and does not touch the summon count', await getRaidRedemptionCount(env, 'k2'), 0);
+  check('the kill count advanced', await getRaidKillCount(env, 'k2'), 1);
+
+  /* Both ladders on one account: separate counts, one shared set of badges. */
+  await recordRaidRedemption(env, 'k1');                 // summon 1 -> bronze
+  for (let i = 0; i < 10; i++) await recordRaidKill(env, 'k1');   // kill 10 -> silver
+  check('kill count is its own', await getRaidKillCount(env, 'k1'), 10);
+  check('summon count untouched by kills', await getRaidRedemptionCount(env, 'k1'), 1);
+  ok('reaching 10 kills grants silver', badgeIds(env.MARKETPLACE, 'k1').includes('undead-executioner-silver'));
+  check('badges are shared — no duplicates', badgeIds(env.MARKETPLACE, 'k1').length, new Set(badgeIds(env.MARKETPLACE, 'k1')).size);
+}
+
+/* ── Redeeming a kill code routes to the kill ladder (source check) ────── */
+{
+  const ic = fs.readFileSync(path.join(REPO, 'functions/api/item-codes.js'), 'utf8');
+  ok('item-codes detects raid kill codes', /function isRaidKillCode/.test(ic) && /game === 'skull-clicker'/.test(ic));
+  ok('and routes them to recordRaidKill, not the one-off grant',
+     /isRaidKillCode\(record\.item\)\)[\s\S]*?recordRaidKill\(env, userId\)/.test(ic));
+  const reg = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
+  ok('the kill count is a registered family', /prefix: 'raid_kill_count_'/.test(reg));
 }
 
 /* ── Live path: one redemption at a time ─────────────────────────────── */

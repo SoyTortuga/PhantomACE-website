@@ -31,6 +31,10 @@ export const RAID_REDEMPTION_TIERS = [
 ];
 
 const countKey = (userId) => `raid_redeem_count_${userId}`;
+/* A SEPARATE count for helping DEFEAT the boss (redeeming a raid kill-reward
+   code), distinct from summoning it. Same tier badges, its own ladder — a
+   viewer can reach a tier by summoning OR by helping kill, independently. */
+const killCountKey = (userId) => `raid_kill_count_${userId}`;
 const inventoryKey = (userId) => `inv_${userId}`;
 
 /**
@@ -111,4 +115,44 @@ export async function backfillRaidRedemptions(env, userId, historicalCount) {
 /** Current lifetime count, for display (e.g. a future "X/100 to Phantom"). */
 export async function getRaidRedemptionCount(env, userId) {
   return Number(await env.MARKETPLACE.get(countKey(userId))) || 0;
+}
+
+/**
+ * Called once per raid KILL-reward code redeemed (helping DEFEAT the boss).
+ * A separate ladder from summoning: its own count, the SAME tier badges. The
+ * count crossing a threshold grants that tier exactly as a summon count would,
+ * and awardTiersUpTo dedupes by id, so a viewer who reaches a tier both ways
+ * simply holds the one badge.
+ *
+ * @returns {Promise<Array>} tier(s) granted by this redemption
+ */
+export async function recordRaidKill(env, userId) {
+  let newCount = 0;
+  await env.MARKETPLACE.mutate(killCountKey(userId), (current) => {
+    newCount = (Number(current) || 0) + 1;
+    return newCount;
+  });
+  return awardTiersUpTo(env, userId, newCount);
+}
+
+/**
+ * One-time backfill for accounts that redeemed kill-reward codes before this
+ * ladder existed: raise the kill count to at least `count` and grant every
+ * tier now due. Takes the MAX of stored and given, so it never lowers a live
+ * count and is safe to re-run.
+ *
+ * @returns {Promise<Array>} every tier now due for the final count
+ */
+export async function backfillRaidKills(env, userId, count) {
+  let finalCount = 0;
+  await env.MARKETPLACE.mutate(killCountKey(userId), (current) => {
+    finalCount = Math.max(Number(current) || 0, Number(count) || 0);
+    return finalCount;
+  });
+  return awardTiersUpTo(env, userId, finalCount);
+}
+
+/** Current kill-participation count, for display and backfill. */
+export async function getRaidKillCount(env, userId) {
+  return Number(await env.MARKETPLACE.get(killCountKey(userId))) || 0;
 }
