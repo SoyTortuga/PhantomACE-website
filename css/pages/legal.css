@@ -42,7 +42,7 @@
   font-size: 16px;
   line-height: 1.75;
   color: var(--text-pri);
-  border-left: 3px solid var(--red);
+
   padding-left: 18px;
   margin: 4px 0 8px;
 }
@@ -137,7 +137,7 @@
 
 .doc-callout {
   border: 1px solid rgba(255, 0, 0, 0.4);
-  border-left: 3px solid var(--red);
+
   padding: 14px 16px;
   margin: 12px 0;
   background: rgba(255, 0, 0, 0.04);

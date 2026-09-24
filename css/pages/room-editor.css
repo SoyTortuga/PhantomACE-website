@@ -16,9 +16,9 @@
 /* Palette */
 .re-palette { border: 1px solid var(--border-mid); background: #070707; max-height: 78vh; overflow: auto; }
 .re-cats { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); }
-.re-cat { background: none; border: 0; border-left: 3px solid transparent; color: var(--text-sec); font-family: var(--font-system); font-size: 12px; text-align: left; padding: 8px 12px; cursor: pointer; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center; }
+.re-cat { background: none; border: 0; color: var(--text-sec); font-family: var(--font-system); font-size: 12px; text-align: left; padding: 8px 12px; cursor: pointer; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center; }
 .re-cat:hover { color: var(--text-pri); }
-.re-cat.active { color: var(--red); border-left-color: var(--red); background: #0c0c0c; }
+.re-cat.active { color: var(--red); background: #0c0c0c; }
 .re-cat.locked { color: var(--text-dim); }
 .re-lock { font-size: 10px; }
 .re-pieces { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
@@ -62,9 +62,8 @@
 .re-insp-empty { color: var(--text-dim); }
 
 /* Status line */
-.re-status { margin-top: 8px; font-size: 12px; padding: 6px 10px; border-left: 3px solid var(--border-mid); color: var(--text-sec); }
-.re-status-ok { border-left-color: var(--green); }
-.re-status-err { border-left-color: var(--red); color: var(--red); }
+.re-status { margin-top: 8px; font-size: 12px; padding: 6px 10px; color: var(--text-sec); }
+.re-status-err { color: var(--red); }
 
 /* A set you own pieces from but not outright: the count, and the pieces
    you cannot use yet shown dim rather than hidden — seeing what is coming

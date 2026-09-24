@@ -9,7 +9,7 @@
      border-based hierarchy — a frosted-glass blur is both off-brand and, on a
      fixed element over the whole page, needless per-frame GPU work. */
   background: #000000;
-  border-right: 1px solid var(--border-mid);
+
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -183,7 +183,7 @@
     flex-direction: row;
     align-items: center;
     padding: 0 16px;
-    border-right: none;
+
     border-bottom: 1px solid var(--border-mid);
   }
 

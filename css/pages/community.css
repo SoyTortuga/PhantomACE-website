@@ -316,9 +316,6 @@
   padding: 20px;
 }
 
-.forum-post-op {
-  border-left: 3px solid var(--red);
-}
 
 .forum-post-header {
   display: flex;
@@ -766,7 +763,7 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 .forum-page-off { color: var(--text-dim); border: 1px solid var(--border); padding: 5px 12px; border-radius: 3px; }
 .forum-page-num { color: var(--text-sec); }
 
-.forum-readonly-note { margin-top: 18px; padding: 10px 14px; border: 1px solid var(--border); border-left: 3px solid var(--red-dim); color: var(--text-sec); font-size: 0.88rem; }
+.forum-readonly-note { margin-top: 18px; padding: 10px 14px; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.88rem; }
 
 @media (max-width: 600px) {
   .forum-category-stats { display: none; }
@@ -776,7 +773,7 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 /* ── Posting ─────────────────────────────────── */
 .forum-thread-header-right { display: flex; align-items: center; gap: 14px; }
 .forum-new-form[hidden], .forum-error[hidden], .forum-post-edited[hidden] { display: none; }
-.forum-error { color: var(--red); font-size: 0.85rem; margin: 6px 0; border-left: 3px solid var(--red-dim); padding-left: 10px; }
+.forum-error { color: var(--red); font-size: 0.85rem; margin: 6px 0; padding-left: 10px; }
 .forum-post-actions { margin-left: auto; display: inline-flex; gap: 4px; }
 .forum-post-actions button { background: none; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.75rem; padding: 2px 9px; border-radius: 3px; cursor: pointer; font-family: var(--font-system); }
 .forum-post-actions button:hover { border-color: var(--red); color: var(--red); }
@@ -806,7 +803,7 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 .forum-report-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .forum-report-by { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-sec); }
 .forum-report-reason { color: var(--text-pri); margin-bottom: 10px; }
-.forum-report-post { border-left: 3px solid var(--border-mid); padding: 6px 12px; margin-bottom: 8px; }
+.forum-report-post { padding: 6px 12px; margin-bottom: 8px; }
 .forum-report-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-sec); margin-bottom: 4px; }
 .forum-report-meta a { color: var(--text-pri); text-decoration: none; }
 .forum-report-meta a:hover { color: var(--red); }

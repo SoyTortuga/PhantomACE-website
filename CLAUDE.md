@@ -32,6 +32,17 @@ page AND every game, and sub-agents must follow them too.
   `filter: drop-shadow()` on a NON-box element (sprite/logo/icon); to make a box
   read as "lit", brighten or thicken its border instead — do not reach for a
   shadow.
+- **No coloured side-border accents. Ever. UNACCEPTABLE.** No `border-left` or
+  `border-right` used as a colour rail, stripe, or divider — not red, not
+  rarity/state colours, not neutral grey — on cards, panels, list rows, notes,
+  the nav, page heroes, games, or the overlay. This is the "accent bar/rail"
+  AI-tell and must not exist anywhere in the project. Signal rarity/state with
+  text colour, a chip, or a full border instead. Allowed: full four-side box
+  borders (`border:`) and `border-top`/`border-bottom`. The ONLY permitted
+  left/right borders are functional rendering, never decoration (e.g. the
+  chat-maze wall cells that draw the maze). The gothic corner-bracket accents
+  (`.corner-accent`, the `::before/::after` corner ticks) are retired for the
+  same reason — do not reintroduce them.
 - **No `backdrop-filter` / `blur()` (glassmorphism / frosted glass).** Panels use a
   near-solid background (e.g. `rgba(10,10,10,0.96)`) plus a border. It is also
   per-frame GPU work that crashes the broadcaster's OBS on long streams.

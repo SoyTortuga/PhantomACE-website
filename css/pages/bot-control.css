@@ -305,7 +305,7 @@
   height: 56px;
   overflow: hidden;
   border: 1px solid var(--border-mid);
-  border-left: 3px solid var(--red);
+
   border-radius: 6px;
   background: var(--gray-lo);
 }
@@ -433,7 +433,7 @@
 
 .bot-warning {
   border: 1px solid var(--amber);
-  border-left-width: 4px;
+
   background: rgba(255, 170, 0, 0.06);
   color: var(--amber);
   padding: 12px 16px;

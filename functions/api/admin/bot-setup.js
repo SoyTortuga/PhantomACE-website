@@ -257,7 +257,7 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   code { background: #2a2a2a; padding: 2px 6px; border-radius: 3px; }
   #result, #giveawayResult, #checkinResult { margin-top: 12px; padding: 12px; background: #1a2a1a; border-radius: 6px; display: none; }
   .locked { background: #2a1a1a; border: 1px solid #553333; padding: 12px; border-radius: 6px; color: #ffaa88; }
-  .note { background: #1a1a22; border-left: 3px solid #6688cc; padding: 12px; border-radius: 4px; }
+  .note { background: #1a1a22; border: 1px solid #33384a; padding: 12px; border-radius: 4px; }
   .section.is-locked { opacity: 0.65; }
 </style></head><body>
 <h1>🤖 Bot Setup</h1>

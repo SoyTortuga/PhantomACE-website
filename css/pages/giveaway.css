@@ -408,10 +408,6 @@
   transition: opacity 0.5s;
 }
 
-.hype-drop-group.rarity-mythic { border-left: 3px solid #ff6600; }
-.hype-drop-group.rarity-rare { border-left: 3px solid var(--purple); }
-.hype-drop-group.rarity-uncommon { border-left: 3px solid var(--green); }
-.hype-drop-group.rarity-common { border-left: 3px solid var(--text-dim); }
 
 .hype-drop-group.hype-drop-expired {
   opacity: 0.35;
@@ -630,7 +626,7 @@
 
 .prize-card {
   border: 1px solid var(--border-mid);
-  border-left-width: 3px;
+
   border-radius: 8px;
   background: var(--gray-lo);
   padding: 18px 20px;
@@ -638,10 +634,6 @@
   text-align: center;
 }
 
-.prize-card.rarity-mythic { border-left-color: #ff6600; }
-.prize-card.rarity-rare   { border-left-color: var(--purple); }
-.prize-card.rarity-uncommon { border-left-color: var(--green); }
-.prize-card.rarity-common { border-left-color: var(--text-dim); }
 
 .prize-head {
   display: flex;
