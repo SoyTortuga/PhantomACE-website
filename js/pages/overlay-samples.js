@@ -16,6 +16,7 @@
     { id: 'ovStage', label: 'Alerts', holds: [
       'One alert at a time, queued — never stacked',
       'New subscriber · gift subs · raid',
+      'Dino hatch reveal (single + gift-bomb reel)',
       'Hype train level-up',
       'Code, item & egg drops (incl. maze rewards)',
       'MTGBBB rare & mythic PULLS show here, not in the MTGBBB panel',
