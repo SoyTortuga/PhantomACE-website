@@ -55,6 +55,10 @@ export const SINGLETONS = {
   giveaway_reward_mythic_id: { table: 'singletons', expiry: 'none' },
   checkin_reward_id:     { table: 'singletons', expiry: 'none' },
   raid_boss_reward_id:   { table: 'singletons', expiry: 'none' },
+  /* The "Hatch a Dino" channel-point reward's id, cached after bot-setup
+     creates it. 'none' like the other reward ids — redemptions are matched by
+     title, so this is only a "has it been made" marker. */
+  hatch_reward_id:       { table: 'singletons', expiry: 'none' },
 
   /* Rotating chat announcements: the list, the interval, and the rotation
      cursor. expiry 'none' — an expired row would silently stop the rotation
@@ -104,6 +108,10 @@ export const SINGLETONS = {
 
   /* Milestone drop config: on/off, the rarity per event, the raid floor. */
   milestone_drops:       { table: 'singletons', expiry: 'none' },
+
+  /* The overlay dino-hatch minigame's on/off. 'none' — losing it just resets
+     the minigame to its default-on state, no lifecycle rides on it. */
+  dino_hatch_config:     { table: 'singletons', expiry: 'none' },
 
   /* Every code currently claimable, from any drop path. expiry 'none' is
      deliberate: each ENTRY carries its own expiresAt and is pruned on write,

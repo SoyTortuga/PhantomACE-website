@@ -1140,3 +1140,108 @@ body.ov-alerting .ov-mc {
   margin: 0; padding: 0 0 0 16px; font-size: 10px; color: #ffffffaa;
   max-height: 64px; overflow: hidden;
 }
+
+/* ══ DINO HATCH — the gambling minigame's reveal ════════════════════════
+   Two phases in one alert card. `.is-hatching` shows the egg-crack strip and
+   withholds the reveal; overlay.js steps the strip once, drops the class, and
+   the rolled dino(s) appear together (one animation, batch reveal). Laid out
+   as a centred column rather than the standard icon+text row so a clutch of
+   tiles stacks cleanly under the headline. */
+.ov-hatch {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  min-width: 360px;
+  max-width: 640px;
+}
+
+/* Egg-crack strip: native 40x49 frames drawn at 4x (160x196). background-size
+   is the whole 52-frame sheet at that scale (52 x 160 = 8320 wide); overlay.js
+   steps backgroundPositionX. Pixel art — no smoothing. drop-shadow, not
+   box-shadow, per the design rules (a non-box element). */
+.ov-hatch-egg {
+  width: 160px;
+  height: 196px;
+  background-repeat: no-repeat;
+  background-size: 8320px 196px;
+  background-position: 0 0;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.5));
+}
+
+/* Withhold the reveal until the crack finishes, then swap the egg out for it. */
+.ov-hatch .ov-hatch-reveal { display: none; }
+.ov-hatch:not(.is-hatching) .ov-hatch-egg { display: none; }
+.ov-hatch:not(.is-hatching) .ov-hatch-reveal {
+  display: block;
+  animation: ov-in 300ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-hatch:not(.is-hatching) .ov-hatch-reveal { animation: none; }
+}
+
+.ov-hatch .ov-kind { text-align: center; }
+.ov-hatch .ov-title { font-size: 26px; margin-top: 4px; }
+
+.ov-hatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px 0 8px;
+}
+.ov-hatch-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 88px;
+}
+.ov-hatch-sprite {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.45));
+}
+/* The fallback mark is the site logo (baked-in background); square it off and
+   let it smooth, like .ov-mark.is-fallback does on the standard card. */
+.ov-hatch-sprite.is-fallback { border-radius: 4px; image-rendering: auto; }
+.ov-hatch-tname {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.1;
+  color: var(--text-sec);
+  overflow-wrap: anywhere;
+}
+.ov-hatch-more {
+  font-family: var(--font-system);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+/* Rarity accents. common keeps the default red; epic/legendary extend the
+   scale beyond the standard card's three (amber, and a distinct gold). */
+.ov-hatch[data-rarity="uncommon"]  { border-left-color: var(--green); }
+.ov-hatch[data-rarity="rare"]      { border-left-color: var(--purple); }
+.ov-hatch[data-rarity="epic"]      { border-left-color: var(--amber); }
+.ov-hatch[data-rarity="legendary"] { border-left-color: #ffd24a; }
+
+.ov-hatch[data-rarity="uncommon"]  .ov-kind { color: var(--green); }
+.ov-hatch[data-rarity="rare"]      .ov-kind { color: var(--purple); }
+.ov-hatch[data-rarity="epic"]      .ov-kind { color: var(--amber); }
+.ov-hatch[data-rarity="legendary"] .ov-kind { color: #ffd24a; }
+
+.ov-hatch-tile[data-rarity="uncommon"]  .ov-hatch-tname { color: var(--green); }
+.ov-hatch-tile[data-rarity="rare"]      .ov-hatch-tname { color: var(--purple); }
+.ov-hatch-tile[data-rarity="epic"]      .ov-hatch-tname { color: var(--amber); }
+.ov-hatch-tile[data-rarity="legendary"] .ov-hatch-tname { color: #ffd24a; }
+
+.ov-hatch-tile[data-rarity="rare"]      .ov-hatch-sprite { filter: drop-shadow(0 0 6px rgba(204, 136, 255, 0.55)); }
+.ov-hatch-tile[data-rarity="epic"]      .ov-hatch-sprite { filter: drop-shadow(0 0 7px rgba(255, 170, 0, 0.6)); }
+.ov-hatch-tile[data-rarity="legendary"] .ov-hatch-sprite { filter: drop-shadow(0 0 9px rgba(255, 210, 74, 0.7)); }

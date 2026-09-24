@@ -41,7 +41,11 @@ export async function onRequestGet(context) {
   };
   const vol = await env.MARKETPLACE.get('overlay_alert_volume');
   const alertVolume = vol == null ? 35 : Math.max(0, Math.min(100, parseInt(vol, 10) || 0));
-  return json({ log, checkinReminder, alertVolume });
+  /* The overlay dino-hatch minigame's on/off, so the panel can show and toggle
+     it. On by default (dino-hatch.js). */
+  const { getHatchConfig } = await import('../dino-hatch.js');
+  const hatchConfig = await getHatchConfig(env);
+  return json({ log, checkinReminder, alertVolume, hatchConfig });
 }
 
 /* ── POST — fire a drop or announcement ────────── */
@@ -80,6 +84,14 @@ export async function onRequestPost(context) {
   if (body.action === 'milestone-config') {
     const { setMilestoneConfig } = await import('../milestones.js');
     const result = await setMilestoneConfig(env, body);
+    return json(result, result.error ? 400 : 200);
+  }
+
+  /* Turn the overlay dino-hatch minigame on or off. The three triggers (gift
+     sub, 300-bit Power-up, 30,000 channel points) all check this flag. */
+  if (body.action === 'hatch-config') {
+    const { setHatchConfig } = await import('../dino-hatch.js');
+    const result = await setHatchConfig(env, body);
     return json(result, result.error ? 400 : 200);
   }
 

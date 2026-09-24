@@ -127,6 +127,31 @@
     mythic:   '/assets/images/eggs/egg-mythic.png',
   };
 
+  /* ── Dino hatch minigame ───────────────────────────────────────────────
+     A gift sub, a 300-bit Power-up or 30,000 channel points rolls the hatch
+     on the server; this plays it. The egg-crack strip runs once, THEN the
+     rolled dino(s) are revealed together — one animation, batch reveal — with
+     the triggerer's name. The strip is the same sheet Dino Park hatches with
+     (52 frames, native 40x49, drawn at 4x), tracked in the repo rather than
+     pulled from the gitignored dino-assets tree. The dino sprites themselves
+     DO come from dino-assets (server-supplied icon URLs) with an onerror
+     fallback to the PhantomACE mark, so a missing sprite never breaks on air. */
+  var HATCH_STRIP = '/assets/images/eggs/egg-hatch.png';
+  var HATCH_FRAMES = 52;
+  var HATCH_FW = 160;             // displayed frame width (native 40px, drawn 4x)
+  var HATCH_STEP_MS = 33;        // ~1.7s for the whole crack
+  var HATCH_ANIM_MS = HATCH_FRAMES * HATCH_STEP_MS;
+  var HATCH_HOLD_MS = 6500;      // how long the reveal stays up after the crack
+  var HATCH_TILE_CAP = 12;       // dino tiles shown before "+N more"
+  /* Preload the strip so the first hatch of a stream does not clip its opening
+     frames while the image is still fetching. */
+  try { new Image().src = HATCH_STRIP; } catch (e) {}
+
+  function capRarity(r) {
+    r = String(r || 'common');
+    return r.charAt(0).toUpperCase() + r.slice(1);
+  }
+
   /* 1-4 -> phamLove, 5-10 -> phamLove2, 11+ -> phamLove3. The 2-4 band was
      not specified and is folded into the first, so no gift count can fall
      through to no artwork at all. */
@@ -207,6 +232,24 @@
     }
     if (ev.type === 'hype-level') {
       return { art: ART.hype, kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
+    }
+
+    /* ── Dino hatch ──────────────────────────────────────────────────────
+       Its own card (buildHatchCard): the egg-crack strip, then the rolled
+       dino(s) revealed together. Held for the crack plus a read of the
+       reveal — the one non-standard lifetime here besides the reel. */
+    if (ev.type === 'dino-hatch') {
+      var hResults = Array.isArray(ev.results) ? ev.results : [];
+      var hTop = ev.top || (hResults[0] && hResults[0].rarity) || 'common';
+      return {
+        hatch: true,
+        who: ev.who || 'Someone',
+        count: Number(ev.count) || hResults.length || 1,
+        results: hResults,
+        more: Number(ev.more) || 0,
+        rarity: hTop,
+        ms: HATCH_ANIM_MS + HATCH_HOLD_MS,
+      };
     }
 
     /* ── MTGBBB ──────────────────────────────────────────────────────
@@ -502,11 +545,111 @@
     return card;
   }
 
+  /* ── Dino hatch card ──────────────────────────────────────────────────
+     Two phases in one card. `.is-hatching` shows the egg strip and hides the
+     reveal; the strip plays once and the class is removed, which swaps to the
+     dino(s). Names, sprites and the headline are all event-derived and set via
+     textContent / img.src — no innerHTML, so nothing here needs escaping. */
+  function buildHatchCard(ev, d) {
+    var card = document.createElement('div');
+    card.className = 'ov-alert ov-hatch is-hatching';
+    card.dataset.type = ev.type;
+    card.dataset.rarity = d.rarity || 'common';
+
+    var egg = document.createElement('div');
+    egg.className = 'ov-hatch-egg';
+    egg.style.backgroundImage = 'url(' + HATCH_STRIP + ')';
+    card.appendChild(egg);
+
+    var reveal = document.createElement('div');
+    reveal.className = 'ov-hatch-reveal';
+
+    var kind = document.createElement('span');
+    kind.className = 'ov-kind';
+    kind.textContent = d.count > 1 ? 'Dino Hatch ×' + d.count : 'Dino Hatch';
+    reveal.appendChild(kind);
+
+    var grid = document.createElement('div');
+    grid.className = 'ov-hatch-grid';
+    var shown = d.results.slice(0, HATCH_TILE_CAP);
+    var withNames = d.count <= HATCH_TILE_CAP;   // names only when it is not a crowd
+    for (var i = 0; i < shown.length; i++) {
+      var r = shown[i];
+      var tile = document.createElement('div');
+      tile.className = 'ov-hatch-tile';
+      tile.dataset.rarity = r.rarity || 'common';
+
+      var im = document.createElement('img');
+      im.className = 'ov-hatch-sprite';
+      im.alt = '';
+      im.src = r.icon || FALLBACK;
+      (function (imgEl) {
+        imgEl.addEventListener('error', function handler() {
+          imgEl.removeEventListener('error', handler);
+          imgEl.classList.add('is-fallback');
+          imgEl.src = FALLBACK;
+        });
+      })(im);
+      tile.appendChild(im);
+
+      if (withNames) {
+        var nm = document.createElement('span');
+        nm.className = 'ov-hatch-tname';
+        nm.textContent = r.name || '';
+        tile.appendChild(nm);
+      }
+      grid.appendChild(tile);
+    }
+    reveal.appendChild(grid);
+
+    if (d.more > 0) {
+      var more = document.createElement('div');
+      more.className = 'ov-hatch-more';
+      more.textContent = '+' + d.more + ' more';
+      reveal.appendChild(more);
+    }
+
+    var title = document.createElement('p');
+    title.className = 'ov-title';
+    if (d.count === 1 && d.results[0]) {
+      var only = d.results[0];
+      title.textContent = d.who + ' hatched a ' + capRarity(only.rarity) + ' ' + only.name + '!';
+    } else {
+      title.textContent = d.who + ' hatched ' + d.count + ' dinos!';
+    }
+    reveal.appendChild(title);
+
+    var sub = document.createElement('p');
+    sub.className = 'ov-sub';
+    sub.textContent = d.count > 1 ? 'Top pull: ' + capRarity(d.rarity) : 'Straight to their Dino Park';
+    reveal.appendChild(sub);
+
+    card.appendChild(reveal);
+
+    /* Run the crack, then flip to the reveal. The interval self-clears at the
+       last frame; if the card is pumped off screen first (it will not be —
+       d.ms covers the crack plus the hold) the stray ticks are harmless. */
+    var f = 0;
+    var timer = setInterval(function () {
+      f++;
+      if (f >= HATCH_FRAMES) {
+        clearInterval(timer);
+        card.classList.remove('is-hatching');
+        return;
+      }
+      egg.style.backgroundPositionX = '-' + (f * HATCH_FW) + 'px';
+    }, HATCH_STEP_MS);
+
+    return card;
+  }
+
   function render(ev) {
     var d = describe(ev);
     if (!d) return false;
 
-    var card = d.reel ? buildReelCard(ev, d) : buildStandardCard(ev, d);
+    var card = d.hatch ? buildHatchCard(ev, d)
+             : d.reel ? buildReelCard(ev, d)
+             : buildStandardCard(ev, d);
     stage.appendChild(card);
 
     /* PUBLISHED, NOT ENFORCED. The standing panels — Mana Clash, the

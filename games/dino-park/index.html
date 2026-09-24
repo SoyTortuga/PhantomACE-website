@@ -3699,15 +3699,39 @@ function scheduleServerSave() {
    renders whatever is there, and a brief overflow is a far better outcome
    than silently dropping a reward. */
 function adoptServerGrants(serverState) {
-  if (!serverState || typeof serverState !== 'object') return 0;
+  if (!serverState || typeof serverState !== 'object') return { eggs: 0, dinos: 0 };
   if (!Array.isArray(state.eggs)) state.eggs = [];
+  if (!Array.isArray(state.park)) state.park = [];
+  if (!Array.isArray(state.vault)) state.vault = [];
+  if (!Array.isArray(state.discovered)) state.discovered = [];
 
-  const known = new Set(state.eggs.map(e => e && e.grantId).filter(Boolean));
-  const missing = (serverState.eggs || []).filter(e => e && e.grantId && !known.has(e.grantId));
-  for (const e of missing) state.eggs.push(e);
+  /* Eggs the server dropped into the incubator (redeemed egg codes), matched
+     by grantId so this is safe to run repeatedly. */
+  const knownEggs = new Set(state.eggs.map(e => e && e.grantId).filter(Boolean));
+  const missingEggs = (serverState.eggs || []).filter(e => e && e.grantId && !knownEggs.has(e.grantId));
+  for (const e of missingEggs) state.eggs.push(e);
+
+  /* Fully HATCHED dinos the server granted straight into the park/vault — the
+     overlay hatch minigame. Matched by grantId across BOTH local arrays so a
+     dino already moved between park and vault here is never re-added. A granted
+     dino that finds both full is kept in the vault regardless: a brief overflow
+     is a far better outcome than silently dropping a reward the stream watched
+     hatch (the same call the egg adoption above makes). */
+  const knownDinos = new Set(
+    [...state.park, ...state.vault].map(d => d && d.grantId).filter(Boolean)
+  );
+  const serverDinos = [...(serverState.park || []), ...(serverState.vault || [])];
+  let dinos = 0;
+  for (const d of serverDinos) {
+    if (!d || !d.grantId || knownDinos.has(d.grantId)) continue;
+    if (!addNewDino(d)) state.vault.push(d);      // both full — overflow beats dropping it
+    if (!state.discovered.includes(d.speciesId)) state.discovered.push(d.speciesId);
+    knownDinos.add(d.grantId);
+    dinos++;
+  }
 
   state.grantSeq = Number(serverState.grantSeq || 0);
-  return missing.length;
+  return { eggs: missingEggs.length, dinos };
 }
 
 async function doServerSave(isRetry) {
@@ -3727,10 +3751,17 @@ async function doServerSave(isRetry) {
       try { payload = await res.json(); } catch(e) {}
       const added = adoptServerGrants(payload && payload.state);
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
-      if (added > 0) {
+      if (added.eggs > 0 || added.dinos > 0) {
         updateTopBar();
         renderEggsTab();
-        showToast(added === 1 ? 'A new egg arrived in your incubator! 🥚' : `${added} new eggs arrived! 🥚`);
+        const active = document.querySelector('.tab-content.active');
+        if (added.dinos > 0 && active && active.id === 'tab-park' && typeof renderParkWorld === 'function') renderParkWorld();
+        if (added.dinos > 0) {
+          showToast(added.dinos === 1 ? 'A hatched dino arrived in your park! 🦕' : `${added.dinos} hatched dinos arrived! 🦕`);
+        }
+        if (added.eggs > 0) {
+          showToast(added.eggs === 1 ? 'A new egg arrived in your incubator! 🥚' : `${added.eggs} new eggs arrived! 🥚`);
+        }
       }
       await doServerSave(true);
     }
@@ -6804,7 +6835,15 @@ async function useInventoryEgg(itemId) {
   }
 
   let species;
-  if (meta.mutant) {
+  if (meta.speciesId && getRosterById(meta.speciesId)) {
+    /* A specific dinosaur pinned to this egg — the overlay hatch minigame's
+       overflow, where the park AND vault were both full at hatch time so the
+       exact species the stream watched hatch was held here instead of being
+       lost. Hatch that species, not a fresh roll, and take its own rarity so
+       the incubation time matches. */
+    species = getRosterById(meta.speciesId);
+    rarity = species.rarity;
+  } else if (meta.mutant) {
     const mutations = ROSTER.filter(r => r.mutation);
     species = mutations.length > 0 ? mutations[Math.floor(Math.random() * mutations.length)] : rollSpecies(rarity);
   } else {

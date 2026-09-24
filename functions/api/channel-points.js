@@ -172,6 +172,24 @@ const REWARD_HANDLERS = {
       }
     }
   },
+
+  /* HATCH A DINO — 30,000 points, the channel-point path into the overlay
+     hatch minigame (dino-hatch.js). One roll, granted to the redeemer and
+     revealed on stream. Settled explicitly: the reward does NOT skip the
+     queue, so a redemption while the minigame is switched off is CANCELED
+     (refunded) rather than spending 30,000 points for nothing. A hatch that
+     fired always succeeds — a full park overflows to an inventory egg — so
+     res.fired is the whole test. */
+  'dino-hatch': async (env, userId, redemption) => {
+    const { runDinoHatch } = await import('./dino-hatch.js');
+    const res = await runDinoHatch(env, {
+      userId,
+      displayName: redemption.user_name || redemption.user_login || 'Someone',
+      count: 1,
+      source: 'channel-points',
+    });
+    await settleRedemption(env, redemption, !!(res && res.fired));
+  },
 };
 
 /**
@@ -253,6 +271,9 @@ function mapRewardTitle(title) {
   if (lower.includes('wheel') || lower.includes('spin')) return 'spin-the-wheel';
   if (lower.includes('shoutout')) return 'community-shoutout';
   if (lower.includes('boss') || lower.includes('raid')) return 'raid-boss';
+  /* "Hatch a Dino" and any rename that keeps the word — created by bot-setup,
+     matched by title like the rest, so it needs no reward-id subscription. */
+  if (lower.includes('hatch')) return 'dino-hatch';
   return null;
 }
 

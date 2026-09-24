@@ -33,30 +33,28 @@ function saveKey(userId) {
 const SAVE_EPOCH = 2;
 
 /* ══════════════════════════════════════════════
-   SPECIES ROSTER (by rarity) & HATCH TIMES
-   Intentionally duplicated from games/dino-park/index.html's
-   ROSTER / HATCH_TIMES constants. A Cloudflare Pages Function can't
-   import from the game's inline <script> — there is no shared module
-   between them — so keep this list in sync by hand if the client
-   roster ever changes (species added/removed/re-tiered, or hatch
-   times rebalanced).
+   SPECIES ROSTER & HATCH TIMES
+
+   The roster, per-rarity pools and the roll live in dino-species.js — the one
+   server-side source of truth, shared with the overlay hatch minigame
+   (dino-hatch.js) so the two can never disagree about what a rarity can
+   produce. HATCH_TIMES stays here because it is Dino-Park-specific (the
+   incubator clock), not something the minigame uses. Both are hand-synced from
+   games/dino-park/index.html — a Pages Function can't import the game's inline
+   <script> — so keep them in step if the client roster is re-tiered or the
+   hatch times are rebalanced.
    ══════════════════════════════════════════════ */
+
+import { ROSTER_BY_RARITY, rollSpeciesId, speciesMeta, rollHatchRarity } from './dino-species.js';
 
 const HATCH_TIMES = { common: 1800, uncommon: 3600, rare: 7200, epic: 14400, legendary: 28800 };
 
-const ROSTER_BY_RARITY = {
-  common: ['compy','proto','galli','coelo','dimetro','iguan','dimor','pachy','kentro','ovira','micro','archae','dodo','ornitho','guanl','hetero','plat','psitt','sinosaur','ptdac'],
-  uncommon: ['raptor','dilopho','stego','para','baryo','cory','styra','rhamph','ichthy','megalo','utah','deino','cerato','trood','concav','stygi','anhan','tape','nycto','notho','archel','tbird','cbear','dwolf','glypto','entelo'],
-  rare: ['trike','allo','anky','diplo','carno','plesio','pterano','brachio','smilo','therizo','amarg','cryo','deinoch','mamen','tylo','shoni','heli','megarach','wrhino','clion','gsloth','masto'],
-  epic: ['trex','spino','apato','gigano','mosa','bronto','mammoth','elasmo','hatz','dunky','krono','andrew'],
-  legendary: ['argent','megashark','quetz','liopl','anomal'],
-};
-
-function rollSpeciesId(rarity) {
-  const pool = ROSTER_BY_RARITY[rarity];
-  if (!pool || !pool.length) return null;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
+/* Park and vault caps, mirrored from games/dino-park/index.html
+   (MAX_ACTIVE_PARK / MAX_VAULT_SIZE). Only grantDino needs them server-side:
+   a hatched dino goes to the park, overflows to the vault, and — when both are
+   full — is handed back so the caller can hold it as an inventory egg. */
+const MAX_ACTIVE_PARK = 10;
+const MAX_VAULT_SIZE = 200;
 
 /* Mirrors the client's getMaxIncubatorSlots(): 3 base slots + 3 per
    subscriber tier. subTier (0-3) is read from the player's last-synced
@@ -168,6 +166,85 @@ export async function grantEgg(env, userId, rarity, opts = {}) {
       guaranteedMutation: !!outcome.egg.guaranteedMutation,
     },
   };
+}
+
+/* ── grantDino — server-authoritative grant of a fully HATCHED dino ──────
+   The overlay hatch minigame (dino-hatch.js) rolls a dinosaur live on stream
+   and gives the triggerer that EXACT species — not an egg to hatch later, and
+   not a re-roll. It lands in the park, overflows to the vault, and when BOTH
+   are full is handed back {placed:'full'} so the caller can hold it as an
+   inventory egg (never lost).
+
+   Distinct from grantEgg, which grants an EGG the player hatches themselves;
+   the dino here arrives already hatched.
+
+   The species is decided here regardless of whether it can be stored, so the
+   caller always has something to announce — an anonymous gifter (no userId)
+   gets the on-stream reveal with granted:false, and nothing is written.
+
+   Under the same advisory lock and grantSeq protocol as grantEgg: the dino
+   carries a grantId the client reconciles by (adoptServerGrants), and the bump
+   to grantSeq makes the client's next full-state save 409 and merge rather
+   than clobber the new dino.
+
+   @param {object} [opts]
+   @param {string} [opts.rarity]  force the tier (else weighted roll)
+   @param {string} [opts.source]  provenance stamp on the dino ('hatch:giftsub' …)
+   Returns { success, granted, placed:'park'|'vault'|'full'|'none',
+             speciesId, rarity, name, icon, grantId? }. */
+export async function grantDino(env, userId, opts = {}) {
+  const rarity = (opts.rarity && ROSTER_BY_RARITY[opts.rarity]) ? opts.rarity : rollHatchRarity();
+  const speciesId = rollSpeciesId(rarity);
+  if (!speciesId) return { success: false, error: 'Invalid rarity' };
+  const meta = speciesMeta(speciesId) || {};
+  const reveal = { speciesId, rarity, name: meta.name || speciesId, icon: meta.icon || '' };
+
+  /* No account to grant to (an anonymous gifter): still return the roll so the
+     overlay can show the hatch, but write nothing. */
+  if (!userId) return { success: true, granted: false, placed: 'none', ...reveal };
+
+  const grantId = crypto.randomUUID();
+  let placed = null;
+
+  await env.MARKETPLACE.mutate(saveKey(userId), (record) => {
+    /* A pre-epoch record is treated as no record — pushing into a stale state
+       would write something the client discards on next load, taking the dino
+       with it. A brand-new record is created for a viewer who has never opened
+       Dino Park; they inherit it on first login. */
+    const usable = (record && record.state && record.state.saveEpoch === SAVE_EPOCH)
+      ? record.state
+      : null;
+    const state = usable || defaultState();
+    if (!Array.isArray(state.park)) state.park = [];
+    if (!Array.isArray(state.vault)) state.vault = [];
+    if (!Array.isArray(state.discovered)) state.discovered = [];
+
+    /* Matches the client's hatched-dino shape (hatchEgg). Positions and any
+       missing stats are backfilled client-side (initParkView / ensureDinoStats),
+       so none are set here. */
+    const dino = {
+      speciesId, nickname: '', hunger: 80, thirst: 80, happiness: 80,
+      hygiene: 80, stamina: 80, careCount: 0, mutation: null, xp: 0,
+      grantId, grantedAt: Date.now(), grantSource: opts.source || 'hatch',
+    };
+
+    if (state.park.length < MAX_ACTIVE_PARK) { state.park.push(dino); placed = 'park'; }
+    else if (state.vault.length < MAX_VAULT_SIZE) { state.vault.push(dino); placed = 'vault'; }
+    else { placed = 'full'; return undefined; }   // both full — caller overflows to inventory
+
+    if (!state.discovered.includes(speciesId)) state.discovered.push(speciesId);
+    state.grantSeq = Number(state.grantSeq || 0) + 1;
+    state.lastTick = Date.now();
+    return { userId, state, savedAt: Date.now() };
+  });
+
+  if (placed === 'park' || placed === 'vault') {
+    return { success: true, granted: true, placed, grantId, ...reveal };
+  }
+  if (placed === 'full') {
+    return { success: true, granted: false, placed: 'full', ...reveal };
+  }
+  return { success: false, error: 'Grant failed', ...reveal };
 }
 
 /* ── GET — fetch the player's cloud save ──────── */

@@ -104,6 +104,7 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   const giveawayRewardId = await env.MARKETPLACE.get('giveaway_reward_id');
   const checkinRewardId = await env.MARKETPLACE.get('checkin_reward_id');
   const raidRewardId = await env.MARKETPLACE.get('raid_boss_reward_id');
+  const hatchRewardId = await env.MARKETPLACE.get('hatch_reward_id');
 
   const tokenStatus = botRefresh ? '✅ Bot token stored' : '❌ No bot token — authorize below';
   const subStatus = subs && subs.length > 0
@@ -129,6 +130,7 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
     'channel:read:hype_train': 'View Hype Train information',
     'channel:read:subscriptions': 'View a list of your subscribers',
     'channel:read:ads': 'View ads scheduled for your channel',
+    'bits:read': 'View Bits information',
   };
 
   const REQUIRED_BROADCASTER_SCOPES = [
@@ -141,6 +143,12 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
        everything else. Silence here would be the exact failure the comment
        above describes — a green tick over a permission never granted. */
     'channel:read:ads',
+    /* Bits Power-ups. Same optional-but-listed treatment as ads: the
+       channel.bits.use subscription (the 300-bit Power-up hatch trigger) is
+       added only when this is granted, but naming it here is what tells the
+       broadcaster a re-authorisation is needed rather than leaving the trigger
+       silently dead. */
+    'bits:read',
   ];
 
   let broadcasterStatus;
@@ -181,6 +189,9 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   const raidRewardStatus = raidRewardId
     ? `✅ "Summon Raid Boss" reward created (ID: ${raidRewardId})`
     : '❌ Not created yet';
+  const hatchRewardStatus = hatchRewardId
+    ? `✅ "Hatch a Dino" reward created (ID: ${hatchRewardId})`
+    : '❌ Not created yet';
 
   const callbackUrl = `${url.origin}/api/admin/bot-setup`;
   const scopes = 'user:write:chat user:bot user:read:chat user:manage:whispers';
@@ -220,8 +231,12 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
      channel:manage:ads, which is deliberately NOT requested: nothing asks
      for it yet, and it is a permission to act on the channel's monetisation
      rather than observe it. */
+  /* bits:read covers the channel.bits.use subscription — the 300-bit Power-up
+     that triggers the dino hatch minigame. Read only: it observes Bits usage,
+     it cannot spend or grant Bits. Grabbed alongside the others so the
+     broadcaster re-authorises once for every feature rather than per trigger. */
   const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train '
-    + 'channel:read:subscriptions channel:read:ads';
+    + 'channel:read:subscriptions channel:read:ads bits:read';
   const broadcasterAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
     `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}&state=broadcaster`;
@@ -325,13 +340,32 @@ PhantomACE's own channel and only they can approve those, so they are shown here
     : `<div class="locked">🔒 Broadcaster only — creates a reward in their channel.</div>`}
 </div>
 
+<div class="section${isBroadcasterUser ? '' : ' is-locked'}">
+  <h2><span class="step">Step 3d:</span> Create the "Hatch a Dino" Reward</h2>
+  <div class="status">${hatchRewardStatus}</div>
+  <p>Rolls the overlay dino hatch minigame once and gives the redeemer the dinosaur that hatches —
+  straight into their Dino Park. Like check-in and raid boss it needs no new EventSub subscription;
+  Step 4's redemption subscription covers every reward on the channel and this one is matched by title.
+  A redemption while the minigame is switched off is refunded automatically.</p>
+  <p>This is one of three ways to hatch. Gift subs (one roll per sub) hatch through the milestone
+  subscriptions, and a 300-bit Power-up hatches through <code>channel.bits.use</code> — both created
+  in Step 4.</p>
+  ${isBroadcasterUser ? `<label style="display:block;margin:10px 0">Cost (channel points):
+    <input id="hatchCost" type="number" value="30000" min="1" style="width:100px;margin-left:8px;padding:6px;background:#222;color:#eee;border:1px solid #333;border-radius:4px">
+  </label>
+  <button class="btn btn-red" onclick="createHatchReward()" ${hatchRewardId ? 'disabled' : ''}>Create Reward</button>
+  <div id="hatchResult"></div>`
+    : `<div class="locked">🔒 Broadcaster only — creates a reward in their channel.</div>`}
+</div>
+
 <div class="section">
   <h2><span class="step">Step 4:</span> Create EventSub Subscriptions</h2>
   <div class="status">${subStatus}</div>
   <p>This creates webhook subscriptions for hype train events, channel point redemptions,
   inbound chat messages (so mods/broadcaster can trigger drops with <code>!drop</code> and
-  <code>!announce</code> in chat), and giveaway reward entries (once Step 3 is done).
-  Twitch will send events to your Cloudflare functions automatically.
+  <code>!announce</code> in chat), giveaway reward entries (once Step 3 is done), subs, gift subs
+  and raids, and — when their scopes are granted in Step 2 — ad breaks and Bits Power-ups (the
+  300-bit hatch trigger). Twitch will send events to your Cloudflare functions automatically.
   Complete Step 1 first — the chat message subscription needs the bot's authorized user ID.</p>
   <button class="btn btn-red" onclick="createSubs()">Create Subscriptions</button>
   <div id="result"></div>
@@ -543,6 +577,33 @@ async function createRaidReward() {
   }
 }
 
+async function createHatchReward() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  const el = document.getElementById('hatchResult');
+  const cost = parseInt(document.getElementById('hatchCost').value, 10) || 30000;
+  try {
+    const res = await fetch('/api/admin/bot-setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create-hatch-reward', cost })
+    });
+    const data = await res.json();
+    el.style.display = 'block';
+    el.innerHTML = data.success
+      ? '<b>✅ Reward created!</b> ID: ' + esc(data.rewardId) + '. It is live now — no Step 4 needed for this one.'
+      : '<b>❌ Error:</b> ' + esc(data.error || 'Unknown error');
+  } catch (e) {
+    el.style.display = 'block';
+    el.innerHTML = '<b>❌ Error:</b> ' + esc(e.message);
+  }
+  if (!document.getElementById('hatchResult').innerHTML.includes('✅')) {
+    btn.disabled = false;
+    btn.textContent = 'Create Reward';
+  }
+}
+
 async function createGiveawayReward() {
   const btn = event.target;
   btn.disabled = true;
@@ -684,6 +745,10 @@ export async function onRequestPost(context) {
 
   if (body.action === 'create-raid-reward') {
     return await createRaidBossReward(env, body);
+  }
+
+  if (body.action === 'create-hatch-reward') {
+    return await createHatchReward(env, body);
   }
 
   return json({ error: 'Invalid action' }, 400);
@@ -899,6 +964,56 @@ async function createRaidBossReward(env, body) {
 }
 
 
+async function createHatchReward(env, body) {
+  const broadcasterId = env.TWITCH_BROADCASTER_ID;
+  if (!broadcasterId) return json({ error: 'TWITCH_BROADCASTER_ID env var not set.' }, 500);
+
+  const existing = await env.MARKETPLACE.get('hatch_reward_id');
+  if (existing) return json({ success: true, rewardId: existing, alreadyExisted: true });
+
+  const token = await getBroadcasterToken(env);
+  if (!token) return json({ error: 'Not authorized for channel points management — complete Step 2 first.' }, 400);
+
+  const cost = Math.max(1, parseInt(body.cost, 10) || 30000);
+
+  const res = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Client-Id': env.TWITCH_CLIENT_ID,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: 'Hatch a Dino',
+      cost,
+      prompt: 'Hatch a random dinosaur live on the overlay — it lands in your Dino Park to keep!',
+      is_enabled: true,
+      /* NOT skipped, exactly like Summon Raid Boss: the redemption stays
+         UNFULFILLED until channel-points.js settles it, so a redemption while
+         the minigame is switched off is CANCELED (refunded) instead of
+         spending 30,000 points for nothing. */
+      should_redemptions_skip_request_queue: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const dup = /duplicate/i.test(err.message || '');
+    return json({
+      error: dup
+        ? 'A reward called "Hatch a Dino" already exists on the channel. Delete it in the Twitch dashboard first, or leave it — redemptions are matched by title, so an existing one already works.'
+        : (err.message || 'Twitch API error creating the reward.'),
+    }, 400);
+  }
+
+  const data = await res.json();
+  const rewardId = data.data[0].id;
+  await env.MARKETPLACE.put('hatch_reward_id', rewardId);
+
+  return json({ success: true, rewardId });
+}
+
+
 async function getAppAccessToken(env, { forceRefresh = false } = {}) {
   /* Shared cached token — see functions/api/auth/app-token.js. Minting one
      here independently is what revoked everyone else's. validate:true because
@@ -1042,6 +1157,20 @@ async function createEventSubSubscriptions(env, request) {
     });
   }
 
+  /* Bits Power-ups — the 300-bit Power-up hatch trigger. Conditional on
+     bits:read for the same reason as ads: requiring it in the hard gate would
+     refuse to create ANY subscription for a broadcaster who has not re-consented
+     since this scope was added, breaking a working setup to add one feature.
+     Absent scope is one failed row below instead. */
+  if (granted.includes('bits:read')) {
+    subscriptions.push({
+      type: 'channel.bits.use',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/bits`,
+    });
+  }
+
   const results = [];
   if (!botUserId) {
     results.push({
@@ -1064,6 +1193,15 @@ async function createEventSubSubscriptions(env, request) {
       error: 'Needs channel:read:ads. Go back to Step 2 and click "Authorize Channel Points" '
            + 'again — Twitch will ask you to approve a new permission — then run this step again. '
            + 'Everything else on this page works without it.',
+    });
+  }
+  if (!granted.includes('bits:read')) {
+    results.push({
+      type: 'channel.bits.use',
+      ok: false,
+      error: 'Needs bits:read for the 300-bit Power-up dino hatch. Go back to Step 2 and click '
+           + '"Authorize Channel Points" again — Twitch will ask you to approve a new permission — '
+           + 'then run this step again. The gift-sub and channel-point hatch triggers work without it.',
     });
   }
   for (const sub of subscriptions) {

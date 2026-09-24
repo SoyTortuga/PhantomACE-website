@@ -97,6 +97,13 @@ const NON_ROUTE_MODULES = new Set([
      Library, no handler; /api/room is the route. Covered by
      server/scripts/test-room-validator.js. */
   'api/room-catalog.js',
+
+  /* The dino species table (names, rarities, sprite paths) and the hatch
+     minigame's roll + grant orchestration. Libraries, no handler; dino-park.js,
+     the milestone/bits/channel-points webhooks and the overlay consume them.
+     Covered by server/scripts/test-dino-hatch.js. */
+  'api/dino-species.js',
+  'api/dino-hatch.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

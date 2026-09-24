@@ -132,6 +132,29 @@ export async function onRequestPost(context) {
            drop — especially since re-creating it needs the admin page. */
         console.error('[milestones]', err.message);
       }
+
+      /* GIFT SUBS ALSO HATCH DINOS. Separate from the code drop above and
+         from its on/off: the hatch minigame has its own toggle (dino-hatch.js),
+         so a channel that has milestone drops switched off still hatches. One
+         roll per sub gifted, revealed as a single batch animation. An
+         anonymous gift shows the hatch but grants nothing — there is no
+         account to grant to. Isolated: a hatch failure must not fail the
+         webhook Twitch is waiting on. */
+      if (type === 'channel.subscription.gift') {
+        try {
+          const { runDinoHatch } = await import('./dino-hatch.js');
+          await runDinoHatch(env, {
+            userId: event.is_anonymous ? null : (event.user_id || null),
+            displayName: event.is_anonymous
+              ? 'An anonymous gifter'
+              : (event.user_name || event.user_login || 'Someone'),
+            count: Number(event.total) || 1,
+            source: 'giftsub',
+          });
+        } catch (err) {
+          console.error('[milestones] hatch failed:', err.message);
+        }
+      }
     }
     return json({ ok: true });
   }
