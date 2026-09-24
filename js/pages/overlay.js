@@ -389,6 +389,47 @@
   var overlayIid = Math.random().toString(36).slice(2) + Date.now().toString(36);
   var isAudioLeader = true;
 
+  /* ── Dino hatch sounds ────────────────────────────────────────────────
+     One sting per rarity, played once on the reveal keyed to the clutch's TOP
+     rarity — a 50-gift bomb is one animation and one sound, never fifty.
+
+     Marathon-safe like the check-in chime: FIVE reused Audio elements, one per
+     rarity, created once and replayed by resetting currentTime — never
+     `new Audio()` per hatch (that was the check-in duplicate-and-leak bug).
+     Gated on the audio leader, the mute flag and the shared alert volume, so it
+     plays once across however many OBS sources are open and never on a muted
+     one. Files are optional: a missing rarity simply plays nothing (play()
+     rejects and is swallowed), so this stays inert until the mp3s are in place. */
+  var HATCH_SOUND_SRC = {
+    common:    '/assets/audio/common.mp3',
+    uncommon:  '/assets/audio/uncommon.mp3',
+    rare:      '/assets/audio/rare.mp3',
+    epic:      '/assets/audio/epic.mp3',
+    legendary: '/assets/audio/legendary.mp3',
+  };
+  var hatchSounds = {};
+  (function preloadHatchSounds() {
+    try {
+      for (var k in HATCH_SOUND_SRC) {
+        var a = new Audio();
+        a.preload = 'auto';
+        a.src = HATCH_SOUND_SRC[k];
+        hatchSounds[k] = a;
+      }
+    } catch (e) { /* no Audio in this embed — hatches just play silently */ }
+  })();
+
+  function playHatchSound(rarity) {
+    if (audioMuted || !isAudioLeader) return;
+    var a = hatchSounds[rarity] || hatchSounds.common;
+    if (!a) return;
+    try {
+      a.volume = alertVolume;
+      a.currentTime = 0;
+      a.play().catch(function () { /* autoplay-with-sound blocked outside OBS, or file absent — silent */ });
+    } catch (e) { /* the reveal still shows without the sting */ }
+  }
+
   function showCheckinReminder(ev) {
     var panel = document.getElementById('ovCheckin');
     var sprite = document.getElementById('ovCheckinSprite');
@@ -627,18 +668,23 @@
     card.appendChild(reveal);
 
     /* Run the crack, then flip to the reveal. The interval self-clears at the
-       last frame; if the card is pumped off screen first (it will not be —
-       d.ms covers the crack plus the hold) the stray ticks are harmless. */
+       last frame AND is registered on the card so render() clears it the moment
+       the card leaves — a marathon runs thousands of these, and a stray timer
+       ticking against a detached node is exactly the kind of lingering piece
+       the overlay rules forbid, even when d.ms means it would normally have
+       finished on its own. */
     var f = 0;
     var timer = setInterval(function () {
       f++;
       if (f >= HATCH_FRAMES) {
         clearInterval(timer);
-        card.classList.remove('is-hatching');
+        card.classList.remove('is-hatching');   // the reveal appears
+        playHatchSound(d.rarity);                // …and the rarity sting lands with it
         return;
       }
       egg.style.backgroundPositionX = '-' + (f * HATCH_FW) + 'px';
     }, HATCH_STEP_MS);
+    card._cleanup = function () { clearInterval(timer); };
 
     return card;
   }
@@ -662,6 +708,9 @@
     setTimeout(function () {
       card.classList.add('is-leaving');
       setTimeout(function () {
+        /* Stop any per-card animation loop BEFORE detaching, so nothing keeps
+           ticking against a node that is no longer on screen. */
+        if (card._cleanup) { try { card._cleanup(); } catch (e) {} card._cleanup = null; }
         if (card.parentNode) card.parentNode.removeChild(card);
         showing = false;
         /* Cleared in the same place `showing` is, so the two can never
