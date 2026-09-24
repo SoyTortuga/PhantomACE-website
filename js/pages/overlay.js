@@ -248,7 +248,7 @@
         results: hResults,
         more: Number(ev.more) || 0,
         rarity: hTop,
-        ms: HATCH_ANIM_MS + HATCH_HOLD_MS,
+        ms: hatchRevealMs(hTop),   // hold the card as long as the rarity's sting
       };
     }
 
@@ -428,6 +428,23 @@
       a.currentTime = 0;
       a.play().catch(function () { /* autoplay-with-sound blocked outside OBS, or file absent — silent */ });
     } catch (e) { /* the reveal still shows without the sting */ }
+  }
+
+  /* How long the whole hatch card stays up: the crack plus a hold that is at
+     least long enough for the rarity's sting to finish (plus a short tail), so
+     a big legendary fanfare is never cut off by the card leaving. Read from the
+     preloaded audio's real duration, so swapping the mp3s needs no code change;
+     falls back to the base hold before metadata loads, and is capped so even a
+     very long file can't hold the stage — and every source computes the same
+     length whether or not it is the one playing audio, keeping them in sync. */
+  var HATCH_SOUND_TAIL = 500;   // card lingers this long after the sting ends
+  var HATCH_MAX_MS = 15000;     // hard ceiling on stage time
+  function hatchRevealMs(rarity) {
+    var hold = HATCH_HOLD_MS;
+    var a = hatchSounds[rarity];
+    var sndMs = (a && isFinite(a.duration) && a.duration > 0) ? (a.duration * 1000) : 0;
+    if (sndMs) hold = Math.max(hold, sndMs + HATCH_SOUND_TAIL);
+    return Math.min(HATCH_MAX_MS, HATCH_ANIM_MS + hold);
   }
 
   function showCheckinReminder(ev) {
