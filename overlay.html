@@ -130,6 +130,12 @@
     <div class="ov-checkin-label">Pham Check-In</div>
   </div>
 
+  <!-- Dino hatch: its OWN movable, transparent panel (not the shared Alerts
+       window), because the reveal is a different size than a stage alert.
+       Filled by overlay.js when a hatch fires, then hidden again. Position it
+       in the layout editor. -->
+  <div class="ov-hatch-panel" id="ovHatch" hidden></div>
+
   <script src="/js/pages/overlay-samples.js" defer></script>
   <script src="/js/pages/overlay-apply-layout.js" defer></script>
   <!-- The same reel math the Big Prize Giveaway control panel spins, so a

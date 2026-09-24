@@ -16,12 +16,17 @@
     { id: 'ovStage', label: 'Alerts', holds: [
       'One alert at a time, queued — never stacked',
       'New subscriber · gift subs · raid',
-      'Dino hatch reveal (single + gift-bomb reel)',
       'Hype train level-up',
       'Code, item & egg drops (incl. maze rewards)',
       'MTGBBB rare & mythic PULLS show here, not in the MTGBBB panel',
       'MTGBBB bingo & blackout',
       'Commander Bingo calls & wins',
+    ] },
+    { id: 'ovHatch', label: 'Dino Hatch', holds: [
+      'The dino hatch minigame reveal — its own panel',
+      'Single portrait, or a gift-bomb reel that scrolls the clutch',
+      'Transparent (no card) — a different size than the Alerts window',
+      'Shows on a hatch, then hides — place it clear of your other panels',
     ] },
     { id: 'ovScramble', label: 'Scramble', holds: [
       'Round number & countdown clock',
@@ -228,7 +233,28 @@
     if (sp) sp.style.backgroundPositionX = '-' + (6 * 87) + 'px';
   }
 
-  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); checkin(); }
+  function hatch() {
+    var panel = $('ovHatch');
+    if (!panel) return;
+    panel.hidden = false;
+    /* A single legendary reveal, laid out exactly as the live one so the editor
+       previews the real thing. No .is-hatching, so the reveal (not the egg) is
+       what shows. */
+    panel.innerHTML =
+      '<div class="ov-hatch" data-rarity="legendary">' +
+        '<div class="ov-hatch-reveal">' +
+          '<img class="ov-hatch-portrait" alt="" src="/games/dino-park/assets/portraits/Quetzalcoatlus.png">' +
+          '<div class="ov-hatch-tags">' +
+            '<span class="ov-hatch-rchip" data-rarity="legendary">Legendary</span>' +
+            '<span class="ov-hatch-mchip" style="--mc:#FF0000">&#10022; PhantomACE</span>' +
+          '</div>' +
+          '<p class="ov-title">SampleViewer hatched a PhantomACE Legendary Quetzalcoatlus!</p>' +
+          '<p class="ov-sub">Straight to their Dino Park</p>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); checkin(); hatch(); }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
 })();

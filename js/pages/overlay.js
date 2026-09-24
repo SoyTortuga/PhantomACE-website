@@ -278,29 +278,8 @@
       return { art: ART.hype, kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
     }
 
-    /* ── Dino hatch ──────────────────────────────────────────────────────
-       Its own card (buildHatchCard): the egg-crack strip, then either a single
-       portrait reveal or, for a gift bomb, a reel that scrolls through the whole
-       clutch. A single is held long enough for its rarity sting; a bomb is held
-       for the crack plus the whole scroll plus a short rest. */
-    if (ev.type === 'dino-hatch') {
-      var hResults = Array.isArray(ev.results) ? ev.results : [];
-      var hTop = ev.top || (hResults[0] && hResults[0].rarity) || 'common';
-      var hCount = Number(ev.count) || hResults.length || 1;
-      var hBomb = hCount > 1;
-      return {
-        hatch: true,
-        bomb: hBomb,
-        who: ev.who || 'Someone',
-        count: hCount,
-        results: hResults,
-        more: Number(ev.more) || 0,
-        rarity: hTop,
-        ms: hBomb
-          ? (HATCH_ANIM_MS + paradeDurMs(Math.min(hResults.length, HATCH_TILE_CAP)) + PARADE_TAIL_MS)
-          : hatchRevealMs(hTop),
-      };
-    }
+    /* Dino hatch is NOT a queued stage alert — it has its own movable panel and
+       is handled off-queue in poll() via showHatch(). See hatchData(). */
 
     /* ── MTGBBB ──────────────────────────────────────────────────────
        The card that just came out of the pack, and how much of the room
@@ -663,7 +642,9 @@
      marathon. */
   function buildHatchCard(ev, d) {
     var card = document.createElement('div');
-    card.className = 'ov-alert ov-hatch is-hatching';
+    /* NOT an .ov-alert: the hatch lives in its own movable, transparent panel
+       (#ovHatch), not the shared alert card, so it has no black card chrome. */
+    card.className = 'ov-hatch is-hatching';
     card.dataset.type = ev.type;
     card.dataset.rarity = d.rarity || 'common';
 
@@ -789,13 +770,56 @@
     });
   }
 
+  /* ── The dino hatch panel (#ovHatch) ──────────────────────────────────
+     Its own MOVABLE, transparent panel — not the shared alert queue — because
+     the reveal is a different size from the stage alerts and the broadcaster
+     places it in the layout editor. Off-queue, so a hatch never delays (or is
+     delayed by) a sub/raid card; a new hatch replaces any in-progress one, and
+     everything clears when it's done (panel back to hidden, timers cleared) so
+     nothing lingers on a marathon. */
+  var hatchHideTimer = null;
+
+  function hatchData(ev) {
+    var results = Array.isArray(ev.results) ? ev.results : [];
+    var top = ev.top || (results[0] && results[0].rarity) || 'common';
+    var count = Number(ev.count) || results.length || 1;
+    var bomb = count > 1;
+    return {
+      who: ev.who || 'Someone', count: count, results: results,
+      more: Number(ev.more) || 0, rarity: top, bomb: bomb,
+      ms: bomb
+        ? (HATCH_ANIM_MS + paradeDurMs(Math.min(results.length, HATCH_TILE_CAP)) + PARADE_TAIL_MS)
+        : hatchRevealMs(top),
+    };
+  }
+
+  function clearHatch() {
+    if (hatchHideTimer) { clearTimeout(hatchHideTimer); hatchHideTimer = null; }
+    var panel = document.getElementById('ovHatch');
+    if (!panel) return;
+    var kids = panel.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i]._cleanup) { try { kids[i]._cleanup(); } catch (e) {} }
+    }
+    panel.replaceChildren();
+    panel.hidden = true;
+  }
+
+  function showHatch(ev) {
+    var panel = document.getElementById('ovHatch');
+    if (!panel) return;
+    clearHatch();
+    var d = hatchData(ev);
+    panel.appendChild(buildHatchCard(ev, d));
+    panel.hidden = false;
+    hatchHideTimer = setTimeout(clearHatch, d.ms);
+  }
+
   function render(ev) {
     var d = describe(ev);
     if (!d) return false;
 
-    var card = d.hatch ? buildHatchCard(ev, d)
-             : d.reel ? buildReelCard(ev, d)
-             : buildStandardCard(ev, d);
+    var card = d.reel ? buildReelCard(ev, d) : buildStandardCard(ev, d);
     stage.appendChild(card);
 
     /* PUBLISHED, NOT ENFORCED. The standing panels — Mana Clash, the
@@ -924,6 +948,9 @@
                directly, off the queue, so it never delays or is delayed by a
                sub/raid card. */
             if (ev.type === 'pham-checkin') { showCheckinReminder(ev); continue; }
+            /* The hatch has its own movable panel and plays off the queue, so a
+               big reveal never blocks a sub/raid card and vice versa. */
+            if (ev.type === 'dino-hatch') { showHatch(ev); continue; }
             queue.push(ev);
           }
           cursor = data.latestSeq;

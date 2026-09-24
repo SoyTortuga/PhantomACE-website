@@ -1147,14 +1147,46 @@ body.ov-alerting .ov-mc {
    the rolled dino(s) appear together (one animation, batch reveal). Laid out
    as a centred column rather than the standard icon+text row so a clutch of
    tiles stacks cleanly under the headline. */
+/* The hatch's own movable panel — a transparent layer, not a card. Default
+   near top-centre (a centring transform the layout editor overrides once the
+   panel is placed, exactly like ovStage/ovMc). Hidden until a hatch fires. */
+.ov-hatch-panel {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+  transform-origin: top left;
+  z-index: 18;
+  pointer-events: none;
+}
+.ov-hatch-panel[hidden] { display: none; }
+
+/* The reveal content, standing on its own with NO card background or border —
+   it composites straight over the scene. Text carries a shadow so it stays
+   legible over any footage (text-shadow, not a box-shadow). */
 .ov-hatch {
+  display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 12px;
   min-width: 360px;
   max-width: 640px;
+  padding: 6px 10px;
 }
+.ov-hatch .ov-title,
+.ov-hatch .ov-sub,
+.ov-hatch-phead,
+.ov-hatch-pname,
+.ov-hatch-rchip,
+.ov-hatch-mchip,
+.ov-hatch-pmut,
+.ov-hatch-pmore {
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.9);
+}
+/* Chips get a faint solid backing so their outline reads over bright footage,
+   without reintroducing a card behind the whole reveal. */
+.ov-hatch-rchip, .ov-hatch-mchip { background: rgba(10, 10, 10, 0.55); }
 
 /* Egg-crack strip: native 40x49 frames drawn at 4x (160x196). background-size
    is the whole 52-frame sheet at that scale (52 x 160 = 8320 wide); overlay.js
