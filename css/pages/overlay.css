@@ -1181,67 +1181,63 @@ body.ov-alerting .ov-mc {
   .ov-hatch:not(.is-hatching) .ov-hatch-reveal { animation: none; }
 }
 
-.ov-hatch .ov-kind { text-align: center; }
 .ov-hatch .ov-title { font-size: 26px; margin-top: 4px; }
 
-.ov-hatch-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin: 2px 0 8px;
-}
-.ov-hatch-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 88px;
-}
-.ov-hatch-sprite {
-  width: 72px;
-  height: 72px;
+/* ── Single reveal: the detailed portrait, a rarity chip, a mutation chip ── */
+.ov-hatch-portrait {
+  width: 260px;
+  height: 188px;
   object-fit: contain;
-  image-rendering: pixelated;
-  filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.45));
+  filter: drop-shadow(0 0 18px rgba(255, 0, 0, 0.4));
 }
-/* The fallback mark is the site logo (baked-in background); square it off and
-   let it smooth, like .ov-mark.is-fallback does on the standard card. */
-.ov-hatch-sprite.is-fallback { border-radius: 4px; image-rendering: auto; }
-.ov-hatch-tname {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  line-height: 1.1;
-  color: var(--text-sec);
-  overflow-wrap: anywhere;
-}
-.ov-hatch-more {
-  font-family: var(--font-system);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  opacity: 0.8;
-  margin-bottom: 4px;
-}
+/* The fallback mark is the site logo (baked-in background); square it, let it
+   smooth, and drop any mutation recolour so the logo shows true. */
+.ov-hatch-portrait.is-fallback,
+.ov-hatch-pportrait.is-fallback { border-radius: 4px; image-rendering: auto; filter: none; }
 
-/* Rarity accents. common keeps the default red; epic/legendary extend the
-   scale beyond the standard card's three (amber, and a distinct gold). */
+.ov-hatch-tags { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.ov-hatch-rchip, .ov-hatch-mchip {
+  font-family: var(--font-system);
+  font-weight: 800; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--rc, var(--text-dim)); color: var(--rc, var(--text-dim));
+}
+.ov-hatch-mchip { border-color: var(--mc, #fff); color: var(--mc, #fff); }
+
+/* ── Gift-bomb reel: rows scroll past, edge-faded like a slot reel ── */
+.ov-hatch-phead { font-size: 22px; margin: 0 0 8px; }
+.ov-hatch-pview {
+  position: relative;
+  width: 380px; max-width: 78vw; height: 300px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 20%, #000 80%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 20%, #000 80%, transparent);
+}
+.ov-hatch-pstrip {
+  position: absolute; left: 0; right: 0; top: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 8px 6px; will-change: transform;
+}
+.ov-hatch-prow { display: flex; align-items: center; gap: 16px; justify-content: center; min-height: 92px; }
+.ov-hatch-pportrait { width: 128px; height: 92px; object-fit: contain; flex: none; filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.5)); }
+.ov-hatch-pmeta { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 152px; }
+.ov-hatch-pname { font-family: var(--font-gothic); font-size: 17px; line-height: 1.05; color: var(--text-pri); overflow-wrap: anywhere; }
+.ov-hatch-pmut { font-family: var(--font-system); font-weight: 800; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mc, #fff); }
+.ov-hatch-pmore { justify-content: center; min-height: 0; font-family: var(--font-system); font-weight: 800; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+
+/* Card left-border accent by top rarity — common keeps the default red. */
 .ov-hatch[data-rarity="uncommon"]  { border-left-color: var(--green); }
 .ov-hatch[data-rarity="rare"]      { border-left-color: var(--purple); }
 .ov-hatch[data-rarity="epic"]      { border-left-color: var(--amber); }
 .ov-hatch[data-rarity="legendary"] { border-left-color: #ffd24a; }
 
-.ov-hatch[data-rarity="uncommon"]  .ov-kind { color: var(--green); }
-.ov-hatch[data-rarity="rare"]      .ov-kind { color: var(--purple); }
-.ov-hatch[data-rarity="epic"]      .ov-kind { color: var(--amber); }
-.ov-hatch[data-rarity="legendary"] .ov-kind { color: #ffd24a; }
-
-.ov-hatch-tile[data-rarity="uncommon"]  .ov-hatch-tname { color: var(--green); }
-.ov-hatch-tile[data-rarity="rare"]      .ov-hatch-tname { color: var(--purple); }
-.ov-hatch-tile[data-rarity="epic"]      .ov-hatch-tname { color: var(--amber); }
-.ov-hatch-tile[data-rarity="legendary"] .ov-hatch-tname { color: #ffd24a; }
-
-.ov-hatch-tile[data-rarity="rare"]      .ov-hatch-sprite { filter: drop-shadow(0 0 6px rgba(204, 136, 255, 0.55)); }
-.ov-hatch-tile[data-rarity="epic"]      .ov-hatch-sprite { filter: drop-shadow(0 0 7px rgba(255, 170, 0, 0.6)); }
-.ov-hatch-tile[data-rarity="legendary"] .ov-hatch-sprite { filter: drop-shadow(0 0 9px rgba(255, 210, 74, 0.7)); }
+/* Rarity colours for the chips and reel names. */
+.ov-hatch-rchip[data-rarity="common"]    { --rc: #9a9a9a; }
+.ov-hatch-rchip[data-rarity="uncommon"]  { --rc: var(--green); }
+.ov-hatch-rchip[data-rarity="rare"]      { --rc: var(--purple); }
+.ov-hatch-rchip[data-rarity="epic"]      { --rc: var(--amber); }
+.ov-hatch-rchip[data-rarity="legendary"] { --rc: #ffd24a; }
+.ov-hatch-pname[data-rarity="uncommon"]  { color: var(--green); }
+.ov-hatch-pname[data-rarity="rare"]      { color: var(--purple); }
+.ov-hatch-pname[data-rarity="epic"]      { color: var(--amber); }
+.ov-hatch-pname[data-rarity="legendary"] { color: #ffd24a; }

@@ -25,7 +25,9 @@ const AB = '/games/dino-park/assets/dino-assets/';
 const IC = AB + 'jurassic-dino-320/icons/';
 const EX = AB + 'jurassic-dino-320-expansion160/icons/';
 const BP = AB + 'AncientBeastsPack/';
-const PT = '/assets/portraits/';
+/* SITE-ABSOLUTE, like AB above: the client's PT is 'assets/portraits/' relative
+   to games/dino-park/index.html, so the served path is under /games/dino-park/. */
+const PT = '/games/dino-park/assets/portraits/';
 
 /* Grab a balanced [...] or {...} literal following a `const NAME =`, tracking
    string state so a bracket inside a quoted path or description is ignored. */
@@ -55,11 +57,13 @@ const by = {};
 const missing = [];
 for (const r of ROSTER) {
   const a = ASSET_MAP[r.id] || {};
-  if (!a.icon) missing.push(r.id);
-  (by[r.rarity] = by[r.rarity] || []).push([r.id, r.name, a.icon || '']);
+  if (!a.icon) missing.push(r.id + ' (icon)');
+  if (!a.portrait) missing.push(r.id + ' (portrait)');
+  (by[r.rarity] = by[r.rarity] || []).push([r.id, r.name, a.icon || '', a.portrait || '']);
 }
 
-let out = '';
+/* SPECIES block (paste over `export const SPECIES = { … }`). */
+let out = '/* ── SPECIES ── */\n';
 for (const rarity of RARITIES) {
   out += `  /* ${rarity} */\n`;
   for (const [id, name, icon] of (by[rarity] || [])) {
@@ -67,8 +71,17 @@ for (const rarity of RARITIES) {
   }
 }
 
+/* PORTRAITS block (paste over `export const PORTRAITS = { … }`) — same
+   rarity-grouped order as SPECIES so the paste is a clean drop-in. */
+out += '\n/* ── PORTRAITS ── */\n';
+for (const rarity of RARITIES) {
+  for (const [id, , , portrait] of (by[rarity] || [])) {
+    out += `  ${id.padEnd(11)}: ${JSON.stringify(portrait)},\n`;
+  }
+}
+
 process.stdout.write(out);
 if (missing.length) {
-  console.error('\nWARNING — species with no icon in ASSET_MAP: ' + missing.join(', '));
+  console.error('\nWARNING — missing art in ASSET_MAP: ' + missing.join(', '));
 }
 console.error(`\n${ROSTER.length} species: ` + RARITIES.map(r => `${r} ${(by[r] || []).length}`).join(' · '));

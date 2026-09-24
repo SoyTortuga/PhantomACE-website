@@ -141,8 +141,9 @@
   var HATCH_FW = 160;             // displayed frame width (native 40px, drawn 4x)
   var HATCH_STEP_MS = 33;        // ~1.7s for the whole crack
   var HATCH_ANIM_MS = HATCH_FRAMES * HATCH_STEP_MS;
-  var HATCH_HOLD_MS = 6500;      // how long the reveal stays up after the crack
-  var HATCH_TILE_CAP = 12;       // dino tiles shown before "+N more"
+  var HATCH_HOLD_MS = 6500;      // single-hatch reveal hold after the crack
+  var HATCH_TILE_CAP = 50;       // reel scrolls up to this many, then "+N more"
+  var PARADE_TAIL_MS = 900;      // rest on the reel's last frame before leaving
   /* Preload the strip so the first hatch of a stream does not clip its opening
      frames while the image is still fetching. */
   try { new Image().src = HATCH_STRIP; } catch (e) {}
@@ -150,6 +151,49 @@
   function capRarity(r) {
     r = String(r || 'common');
     return r.charAt(0).toUpperCase() + r.slice(1);
+  }
+
+  /* Bigger clutch scrolls faster, capped so even a 50-bomb wraps up promptly
+     (~0.6s/dino at 10, ~0.2s at 50). Mirrors the server/artifact pacing. */
+  function paradeDurMs(count) {
+    return Math.round(Math.max(5500, Math.min(11000, count * 150 + 4500)));
+  }
+
+  /* Mutations — the eight Dino Park globals. The server sends only the id; this
+     maps it to a label, the CSS recolour filter the game recolours art with, and
+     a tag accent. HATCH_HUEFIX pre-rotates the far-off (mostly marine) species so
+     a fixed hue-rotate lands on the right colour — the same correction Dino
+     Park's getMutFilter applies. */
+  var MUT = {
+    albino:    { l: 'Albino',     f: 'brightness(2) saturate(0)',                                              c: '#FF6B6B' },
+    melanistic:{ l: 'Melanistic', f: 'brightness(0.28) saturate(0.4)',                                         c: '#9aa0a6' },
+    golden:    { l: 'Golden',     f: 'sepia(1) brightness(1.3) saturate(2.5)',                                 c: '#FFCE45' },
+    crystal:   { l: 'Crystal',    f: 'brightness(1.4) saturate(0.3) hue-rotate(180deg)',                       c: '#7EA8FF' },
+    volcanic:  { l: 'Volcanic',   f: 'brightness(0.7) sepia(0.6) hue-rotate(-15deg) saturate(3)',              c: '#FF6600' },
+    phantomace:{ l: 'PhantomACE', f: 'sepia(1) saturate(8) hue-rotate(-40deg) brightness(0.55) contrast(1.9)', c: '#FF0000' },
+    spectral:  { l: 'Spectral',   f: 'brightness(1.4) saturate(0.15) opacity(0.7)',                            c: '#D9CCFF' },
+    toxic:     { l: 'Toxic',      f: 'hue-rotate(90deg) saturate(2.2) brightness(0.95)',                       c: '#ADFF2F' },
+  };
+  var HATCH_HUEFIX = {apato:286,archae:205,argent:147,bronto:153,dodo:177,dunky:172,elasmo:189,ichthy:190,liopl:183,mamen:240,megalo:102,megarach:78,megashark:168,micro:312,mosa:205,plesio:189,shoni:210,sinosaur:51,therizo:105,tylo:172};
+  function mutFilter(speciesId, mut) {
+    if (!mut || !MUT[mut]) return '';
+    var fltr = MUT[mut].f, fix = HATCH_HUEFIX[speciesId];
+    return (fix && fltr.indexOf('hue-rotate') !== -1) ? ('hue-rotate(' + fix + 'deg) ' + fltr) : fltr;
+  }
+  /* One dino <img> (portrait), recoloured if mutated, falling back to the mark
+     on load error — the fallback drops the filter so the logo shows true. */
+  function hatchPortrait(dino, cls) {
+    var im = document.createElement('img');
+    im.className = cls; im.alt = '';
+    var mf = mutFilter(dino.speciesId, dino.mutation);
+    if (mf) im.style.filter = mf;
+    im.src = dino.portrait || dino.icon || FALLBACK;
+    im.addEventListener('error', function handler() {
+      im.removeEventListener('error', handler);
+      im.classList.add('is-fallback'); im.style.filter = '';
+      im.src = FALLBACK;
+    });
+    return im;
   }
 
   /* 1-4 -> phamLove, 5-10 -> phamLove2, 11+ -> phamLove3. The 2-4 band was
@@ -235,20 +279,26 @@
     }
 
     /* ── Dino hatch ──────────────────────────────────────────────────────
-       Its own card (buildHatchCard): the egg-crack strip, then the rolled
-       dino(s) revealed together. Held for the crack plus a read of the
-       reveal — the one non-standard lifetime here besides the reel. */
+       Its own card (buildHatchCard): the egg-crack strip, then either a single
+       portrait reveal or, for a gift bomb, a reel that scrolls through the whole
+       clutch. A single is held long enough for its rarity sting; a bomb is held
+       for the crack plus the whole scroll plus a short rest. */
     if (ev.type === 'dino-hatch') {
       var hResults = Array.isArray(ev.results) ? ev.results : [];
       var hTop = ev.top || (hResults[0] && hResults[0].rarity) || 'common';
+      var hCount = Number(ev.count) || hResults.length || 1;
+      var hBomb = hCount > 1;
       return {
         hatch: true,
+        bomb: hBomb,
         who: ev.who || 'Someone',
-        count: Number(ev.count) || hResults.length || 1,
+        count: hCount,
         results: hResults,
         more: Number(ev.more) || 0,
         rarity: hTop,
-        ms: hatchRevealMs(hTop),   // hold the card as long as the rarity's sting
+        ms: hBomb
+          ? (HATCH_ANIM_MS + paradeDurMs(Math.min(hResults.length, HATCH_TILE_CAP)) + PARADE_TAIL_MS)
+          : hatchRevealMs(hTop),
       };
     }
 
@@ -604,10 +654,13 @@
   }
 
   /* ── Dino hatch card ──────────────────────────────────────────────────
-     Two phases in one card. `.is-hatching` shows the egg strip and hides the
-     reveal; the strip plays once and the class is removed, which swaps to the
-     dino(s). Names, sprites and the headline are all event-derived and set via
-     textContent / img.src — no innerHTML, so nothing here needs escaping. */
+     `.is-hatching` shows the egg strip and withholds the reveal; the strip
+     plays once, then a SINGLE hatch shows one portrait and a BOMB scrolls a reel
+     through the whole clutch. Portraits, names and the headline are event-derived
+     and set via img.src / textContent — no innerHTML, so nothing needs escaping.
+     Every timer the card starts is registered on `card._cleanup`, which render()
+     calls the instant the card detaches, so nothing ticks off-screen on a
+     marathon. */
   function buildHatchCard(ev, d) {
     var card = document.createElement('div');
     card.className = 'ov-alert ov-hatch is-hatching';
@@ -621,89 +674,119 @@
 
     var reveal = document.createElement('div');
     reveal.className = 'ov-hatch-reveal';
-
-    var kind = document.createElement('span');
-    kind.className = 'ov-kind';
-    kind.textContent = d.count > 1 ? 'Dino Hatch ×' + d.count : 'Dino Hatch';
-    reveal.appendChild(kind);
-
-    var grid = document.createElement('div');
-    grid.className = 'ov-hatch-grid';
-    var shown = d.results.slice(0, HATCH_TILE_CAP);
-    var withNames = d.count <= HATCH_TILE_CAP;   // names only when it is not a crowd
-    for (var i = 0; i < shown.length; i++) {
-      var r = shown[i];
-      var tile = document.createElement('div');
-      tile.className = 'ov-hatch-tile';
-      tile.dataset.rarity = r.rarity || 'common';
-
-      var im = document.createElement('img');
-      im.className = 'ov-hatch-sprite';
-      im.alt = '';
-      im.src = r.icon || FALLBACK;
-      (function (imgEl) {
-        imgEl.addEventListener('error', function handler() {
-          imgEl.removeEventListener('error', handler);
-          imgEl.classList.add('is-fallback');
-          imgEl.src = FALLBACK;
-        });
-      })(im);
-      tile.appendChild(im);
-
-      if (withNames) {
-        var nm = document.createElement('span');
-        nm.className = 'ov-hatch-tname';
-        nm.textContent = r.name || '';
-        tile.appendChild(nm);
-      }
-      grid.appendChild(tile);
-    }
-    reveal.appendChild(grid);
-
-    if (d.more > 0) {
-      var more = document.createElement('div');
-      more.className = 'ov-hatch-more';
-      more.textContent = '+' + d.more + ' more';
-      reveal.appendChild(more);
-    }
-
-    var title = document.createElement('p');
-    title.className = 'ov-title';
-    if (d.count === 1 && d.results[0]) {
-      var only = d.results[0];
-      title.textContent = d.who + ' hatched a ' + capRarity(only.rarity) + ' ' + only.name + '!';
-    } else {
-      title.textContent = d.who + ' hatched ' + d.count + ' dinos!';
-    }
-    reveal.appendChild(title);
-
-    var sub = document.createElement('p');
-    sub.className = 'ov-sub';
-    sub.textContent = d.count > 1 ? 'Top pull: ' + capRarity(d.rarity) : 'Straight to their Dino Park';
-    reveal.appendChild(sub);
-
     card.appendChild(reveal);
 
-    /* Run the crack, then flip to the reveal. The interval self-clears at the
-       last frame AND is registered on the card so render() clears it the moment
-       the card leaves — a marathon runs thousands of these, and a stray timer
-       ticking against a detached node is exactly the kind of lingering piece
-       the overlay rules forbid, even when d.ms means it would normally have
-       finished on its own. */
+    var timer = null;
+    card._cleanup = function () { if (timer) { clearInterval(timer); timer = null; } };
+
     var f = 0;
-    var timer = setInterval(function () {
+    timer = setInterval(function () {
       f++;
       if (f >= HATCH_FRAMES) {
-        clearInterval(timer);
+        clearInterval(timer); timer = null;
         card.classList.remove('is-hatching');   // the reveal appears
         playHatchSound(d.rarity);                // …and the rarity sting lands with it
+        if (d.bomb) buildHatchParade(reveal, d);
+        else buildHatchSingle(reveal, d);
         return;
       }
       egg.style.backgroundPositionX = '-' + (f * HATCH_FW) + 'px';
     }, HATCH_STEP_MS);
-    card._cleanup = function () { clearInterval(timer); };
 
     return card;
+  }
+
+  /* One dino: the portrait, a rarity chip, the mutation chip if it rolled one,
+     and the headline. */
+  function buildHatchSingle(reveal, d) {
+    var only = d.results[0];
+    if (!only) return;
+
+    reveal.appendChild(hatchPortrait(only, 'ov-hatch-portrait'));
+
+    var tags = document.createElement('div');
+    tags.className = 'ov-hatch-tags';
+    var rc = document.createElement('span');
+    rc.className = 'ov-hatch-rchip'; rc.dataset.rarity = only.rarity || 'common';
+    rc.textContent = capRarity(only.rarity);
+    tags.appendChild(rc);
+    if (only.mutation && MUT[only.mutation]) {
+      var mc = document.createElement('span');
+      mc.className = 'ov-hatch-mchip'; mc.style.setProperty('--mc', MUT[only.mutation].c);
+      mc.textContent = '✦ ' + MUT[only.mutation].l;
+      tags.appendChild(mc);
+    }
+    reveal.appendChild(tags);
+
+    var title = document.createElement('p');
+    title.className = 'ov-title';
+    var mutName = (only.mutation && MUT[only.mutation]) ? (MUT[only.mutation].l + ' ') : '';
+    title.textContent = d.who + ' hatched a ' + mutName + capRarity(only.rarity) + ' ' + only.name + '!';
+    reveal.appendChild(title);
+
+    var sub = document.createElement('p');
+    sub.className = 'ov-sub';
+    sub.textContent = 'Straight to their Dino Park';
+    reveal.appendChild(sub);
+  }
+
+  /* A gift bomb: the whole clutch scrolls past in hatch order, edge-faded like a
+     slot reel, then rests on the last frame until the card leaves (d.ms covers
+     the crack + this scroll + a tail). No grid follows — the scroll is the
+     reveal. The reel is a CSS transform, so removing the card ends it; no timer
+     to clear here beyond the strip interval buildHatchCard already owns. */
+  function buildHatchParade(reveal, d) {
+    var head = document.createElement('p');
+    head.className = 'ov-title ov-hatch-phead';
+    head.textContent = d.who + ' hatched ' + d.count + ' dinos!';
+    reveal.appendChild(head);
+
+    var view = document.createElement('div');
+    view.className = 'ov-hatch-pview';
+    var strip = document.createElement('div');
+    strip.className = 'ov-hatch-pstrip';
+
+    var shown = d.results.slice(0, HATCH_TILE_CAP);
+    shown.forEach(function (x) {
+      var row = document.createElement('div');
+      row.className = 'ov-hatch-prow';
+      row.appendChild(hatchPortrait(x, 'ov-hatch-pportrait'));
+
+      var meta = document.createElement('div');
+      meta.className = 'ov-hatch-pmeta';
+      var rc = document.createElement('span');
+      rc.className = 'ov-hatch-rchip'; rc.dataset.rarity = x.rarity || 'common';
+      rc.textContent = x.rarity;
+      var nm = document.createElement('span');
+      nm.className = 'ov-hatch-pname'; nm.dataset.rarity = x.rarity || 'common';
+      nm.textContent = x.name;
+      meta.appendChild(rc); meta.appendChild(nm);
+      if (x.mutation && MUT[x.mutation]) {
+        var mm = document.createElement('span');
+        mm.className = 'ov-hatch-pmut'; mm.style.setProperty('--mc', MUT[x.mutation].c);
+        mm.textContent = '✦ ' + MUT[x.mutation].l;
+        meta.appendChild(mm);
+      }
+      row.appendChild(meta);
+      strip.appendChild(row);
+    });
+    if (d.more > 0) {
+      var moreRow = document.createElement('div');
+      moreRow.className = 'ov-hatch-prow ov-hatch-pmore';
+      moreRow.textContent = '+' + d.more + ' more';
+      strip.appendChild(moreRow);
+    }
+    view.appendChild(strip);
+    reveal.appendChild(view);
+
+    requestAnimationFrame(function () {
+      var dist = Math.max(0, strip.scrollHeight - view.clientHeight);
+      var dur = paradeDurMs(shown.length);
+      strip.style.transform = 'translateY(0)';
+      void strip.offsetHeight;
+      strip.style.transition = 'transform ' + dur + 'ms cubic-bezier(0.33, 0, 0.9, 1)';
+      strip.style.transform = 'translateY(-' + dist + 'px)';
+    });
   }
 
   function render(ev) {

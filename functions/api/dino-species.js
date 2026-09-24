@@ -124,9 +124,102 @@ export const ROSTER_BY_RARITY = (() => {
   return by;
 })();
 
-/** { name, rarity, icon } for a species id, or null. */
+/* id -> detailed portrait path (the Collection-detail art), hand-synced from
+   ASSET_MAP's `portrait` field. The overlay hatch reveal uses these (the small
+   icons above are for tiny tiles); both are served under /games/dino-park/. */
+export const PORTRAITS = {
+  compy      : "/games/dino-park/assets/portraits/Compsognathus.png",
+  proto      : "/games/dino-park/assets/portraits/Protoceratops.png",
+  galli      : "/games/dino-park/assets/portraits/Gallimimus.png",
+  coelo      : "/games/dino-park/assets/portraits/Coelophysis.png",
+  dimetro    : "/games/dino-park/assets/portraits/Dimetrodon.png",
+  iguan      : "/games/dino-park/assets/portraits/Iguanodon.png",
+  dimor      : "/games/dino-park/assets/portraits/Dimorphodon.png",
+  pachy      : "/games/dino-park/assets/portraits/Pachycephalosaurus.png",
+  kentro     : "/games/dino-park/assets/portraits/Kentrosaurus.png",
+  ovira      : "/games/dino-park/assets/portraits/Oviraptor.png",
+  micro      : "/games/dino-park/assets/portraits/Microraptor.png",
+  archae     : "/games/dino-park/assets/portraits/Archaeopteryx.png",
+  dodo       : "/games/dino-park/assets/portraits/Dodo.png",
+  ornitho    : "/games/dino-park/assets/portraits/Ornithomimus.png",
+  guanl      : "/games/dino-park/assets/portraits/Guanlong.png",
+  hetero     : "/games/dino-park/assets/portraits/Heterodontosaurus.png",
+  plat       : "/games/dino-park/assets/portraits/Plateosaurus.png",
+  psitt      : "/games/dino-park/assets/portraits/Psittacosaurus.png",
+  sinosaur   : "/games/dino-park/assets/portraits/Sinosauropteryx.png",
+  ptdac      : "/games/dino-park/assets/portraits/Pterodactylus.png",
+  raptor     : "/games/dino-park/assets/portraits/Raptor.png",
+  dilopho    : "/games/dino-park/assets/portraits/Dilophosaurus.png",
+  stego      : "/games/dino-park/assets/portraits/Stegosaurus.png",
+  para       : "/games/dino-park/assets/portraits/Parasaurolophus.png",
+  baryo      : "/games/dino-park/assets/portraits/Baryonyx.png",
+  cory       : "/games/dino-park/assets/portraits/Corythosaurus.png",
+  styra      : "/games/dino-park/assets/portraits/Styracosaurus.png",
+  rhamph     : "/games/dino-park/assets/portraits/Rhamphorhynchus.png",
+  ichthy     : "/games/dino-park/assets/portraits/Ichthyosaurus-72x72.png",
+  megalo     : "/games/dino-park/assets/portraits/Megalosaurus.png",
+  utah       : "/games/dino-park/assets/portraits/Utahraptor.png",
+  deino      : "/games/dino-park/assets/portraits/Deinonychus.png",
+  cerato     : "/games/dino-park/assets/portraits/Ceratosaurus.png",
+  trood      : "/games/dino-park/assets/portraits/Troodon.png",
+  concav     : "/games/dino-park/assets/portraits/Concavenator.png",
+  stygi      : "/games/dino-park/assets/portraits/Stygimoloch.png",
+  anhan      : "/games/dino-park/assets/portraits/Anhanguera.png",
+  tape       : "/games/dino-park/assets/portraits/Tapejara.png",
+  nycto      : "/games/dino-park/assets/portraits/Nyctosaurus.png",
+  notho      : "/games/dino-park/assets/portraits/Nothosaurus.png",
+  archel     : "/games/dino-park/assets/portraits/Archelon.png",
+  tbird      : "/games/dino-park/assets/portraits/TerrorBird.png",
+  cbear      : "/games/dino-park/assets/portraits/CaveBear.png",
+  dwolf      : "/games/dino-park/assets/portraits/DireWolf.png",
+  glypto     : "/games/dino-park/assets/portraits/Glyptodon.png",
+  entelo     : "/games/dino-park/assets/portraits/Entelodont.png",
+  trike      : "/games/dino-park/assets/portraits/Triceratops.png",
+  allo       : "/games/dino-park/assets/portraits/Allosaurus.png",
+  anky       : "/games/dino-park/assets/portraits/Ankylosaurus.png",
+  diplo      : "/games/dino-park/assets/portraits/Diplodocus.png",
+  carno      : "/games/dino-park/assets/portraits/Carnotaurus.png",
+  plesio     : "/games/dino-park/assets/portraits/Plesiosaurus.png",
+  pterano    : "/games/dino-park/assets/portraits/Pteranodon.png",
+  brachio    : "/games/dino-park/assets/portraits/Brachiosaurus.png",
+  smilo      : "/games/dino-park/assets/portraits/Smilodon.png",
+  therizo    : "/games/dino-park/assets/portraits/Therizinosaurus.png",
+  amarg      : "/games/dino-park/assets/portraits/Amargasaurus.png",
+  cryo       : "/games/dino-park/assets/portraits/Cryolophosaurus.png",
+  deinoch    : "/games/dino-park/assets/portraits/Deinocheirus.png",
+  mamen      : "/games/dino-park/assets/portraits/Mamenchisaurus.png",
+  tylo       : "/games/dino-park/assets/portraits/Tylosaurus.png",
+  shoni      : "/games/dino-park/assets/portraits/Shonisaurus.png",
+  heli       : "/games/dino-park/assets/portraits/Helicoprion.png",
+  megarach   : "/games/dino-park/assets/portraits/Megarachne.png",
+  wrhino     : "/games/dino-park/assets/portraits/Woolly_Rhino.png",
+  clion      : "/games/dino-park/assets/portraits/Cave_Lion.png",
+  gsloth     : "/games/dino-park/assets/portraits/Giant_Ground_Sloth.png",
+  masto      : "/games/dino-park/assets/portraits/Mastodon.png",
+  trex       : "/games/dino-park/assets/portraits/T-Rex.png",
+  spino      : "/games/dino-park/assets/portraits/Spinosaurus.png",
+  apato      : "/games/dino-park/assets/portraits/Apatosaurus.png",
+  gigano     : "/games/dino-park/assets/portraits/Giganotosaurus.png",
+  mosa       : "/games/dino-park/assets/portraits/Mosasaurus.png",
+  bronto     : "/games/dino-park/assets/portraits/Brontosaurus.png",
+  mammoth    : "/games/dino-park/assets/portraits/Woolly_Mammoth.png",
+  elasmo     : "/games/dino-park/assets/portraits/Elasmosaurus.png",
+  hatz       : "/games/dino-park/assets/portraits/Hatzegopteryx.png",
+  dunky      : "/games/dino-park/assets/portraits/Dunkleosteus.png",
+  krono      : "/games/dino-park/assets/portraits/Kronosaurus.png",
+  andrew     : "/games/dino-park/assets/portraits/Andrewsarchus.png",
+  argent     : "/games/dino-park/assets/portraits/Argentinosaurus.png",
+  megashark  : "/games/dino-park/assets/portraits/Megalodon.png",
+  quetz      : "/games/dino-park/assets/portraits/Quetzalcoatlus.png",
+  liopl      : "/games/dino-park/assets/portraits/Liopleurodon.png",
+  anomal     : "/games/dino-park/assets/portraits/Anomalocaris.png",
+};
+
+/** { name, rarity, icon, portrait } for a species id, or null. */
 export function speciesMeta(id) {
-  return SPECIES[id] || null;
+  const s = SPECIES[id];
+  if (!s) return null;
+  return { name: s.name, rarity: s.rarity, icon: s.icon, portrait: PORTRAITS[id] || '' };
 }
 
 /** A random species id AT the given rarity (uniform within the tier). */
@@ -161,4 +254,21 @@ export function rollHatchRarity() {
     if (r < 0) return rarity;
   }
   return entries[0][0];   // float dust — fall back to the first (common)
+}
+
+/* ── MUTATIONS ──────────────────────────────────────────────────────────
+   The eight global mutation ids Dino Park recognises. The hatch grants a
+   fully-formed dino server-side, so the mutation must be decided here (not
+   client-rolled at hatch as an egg would be) — that way the dino stored in the
+   park and the one the overlay shows are the same. ~18% chance, matching the
+   game's rollMutation, split evenly. The label, recolour filter and accent for
+   each id live on the overlay/client (getMutFilter / MUTATIONS); this only
+   picks which one. */
+export const DINO_MUTATIONS = ['albino', 'melanistic', 'golden', 'crystal', 'volcanic', 'phantomace', 'spectral', 'toxic'];
+const MUTATION_CHANCE = 0.18;
+
+/** A mutation id (~18% of the time), else null. */
+export function rollDinoMutation() {
+  if (Math.random() >= MUTATION_CHANCE) return null;
+  return DINO_MUTATIONS[Math.floor(Math.random() * DINO_MUTATIONS.length)];
 }

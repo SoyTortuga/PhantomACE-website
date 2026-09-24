@@ -13,6 +13,7 @@
 
 import {
   SPECIES, ROSTER_BY_RARITY, RARITIES, speciesMeta, rollSpeciesId, rollHatchRarity,
+  rollDinoMutation, DINO_MUTATIONS,
 } from '../../functions/api/dino-species.js';
 import { grantDino } from '../../functions/api/dino-park.js';
 import { runDinoHatch, getHatchConfig, setHatchConfig } from '../../functions/api/dino-hatch.js';
@@ -188,6 +189,37 @@ const dummyDino = (i) => ({ speciesId: 'compy', nickname: 'p' + i, xp: 0 });
   check('setHatchConfig turns it off', (await getHatchConfig(e)).enabled, false);
   await setHatchConfig(e, { enabled: true });
   check('and back on', (await getHatchConfig(e)).enabled, true);
+}
+
+/* ══ Portraits + mutations ═════════════════════════════════════════════ */
+{
+  const m = speciesMeta('trex');
+  ok('speciesMeta includes a portrait path', !!(m && m.portrait && m.portrait.indexOf('/games/dino-park/assets/portraits/') === 0));
+  ok('speciesMeta still includes the icon', !!(m && m.icon && m.icon.indexOf('/games/dino-park/') === 0));
+
+  let mut = 0; const N = 20000; const seen = new Set();
+  for (let i = 0; i < N; i++) { const r = rollDinoMutation(); if (r) { mut++; seen.add(r); } }
+  ok('mutation rate is roughly ~18%', mut / N > 0.14 && mut / N < 0.22);
+  check('all eight mutations are reachable', seen.size, DINO_MUTATIONS.length);
+  ok('every rolled mutation is a known id', [...seen].every(k => DINO_MUTATIONS.includes(k)));
+
+  const e = envWith({ dino_park_u1: saveWith({}) });
+  const r = await grantDino(e, 'u1', { rarity: 'epic', mutation: 'phantomace', source: 'giftsub' });
+  check('a forced mutation is returned for the reveal', r.mutation, 'phantomace');
+  ok('the grant returns a portrait for the reveal', !!(r.portrait && r.portrait.indexOf('/games/dino-park/') === 0));
+  check('the stored park dino carries the mutation', e.MARKETPLACE.read('dino_park_u1').state.park[0].mutation, 'phantomace');
+
+  const e2 = envWith({ dino_park_u2: saveWith({}) });
+  const r2 = await grantDino(e2, 'u2', { rarity: 'common', mutation: null });
+  check('a mutation can be forced off', r2.mutation, null);
+  check('a non-mutated park dino has null mutation', e2.MARKETPLACE.read('dino_park_u2').state.park[0].mutation, null);
+}
+{
+  const e = envWith({ dino_park_u1: saveWith({}) });
+  await runDinoHatch(e, { userId: 'u1', displayName: 'Gifter', count: 4, source: 'giftsub' });
+  const ev = e.MARKETPLACE.read('overlay_events').events[0];
+  ok('every overlay result carries portrait + mutation for the reel',
+    ev.results.every(r => ('portrait' in r) && ('mutation' in r) && r.speciesId && r.name && r.rarity));
 }
 
 /* ══ Report ════════════════════════════════════════════════════════════ */

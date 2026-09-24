@@ -35,10 +35,11 @@ const DEFAULTS = { enabled: true };
    still granted — only the overlay reveal is trimmed (below). */
 const HATCH_MAX_ROLLS = 100;
 
-/* How many dino tiles the batch reveal shows before collapsing the rest into a
-   "+N more" chip — a 60-gift bomb should not paint 60 sprites across the
-   stream. Every rolled dino is still granted regardless. */
-const HATCH_REVEAL_CAP = 12;
+/* How many dinos the overlay reveal scrolls through before collapsing the rest
+   into a "+N more" row — the reel shows the whole clutch, but a pathological
+   100-gift bomb is bounded so the overlay never holds a hundred portraits at
+   once. Every rolled dino is still granted regardless. */
+const HATCH_REVEAL_CAP = 50;
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
@@ -129,7 +130,10 @@ export async function runDinoHatch(env, { userId = null, displayName = 'Someone'
       granted++;
     }
 
-    results.push({ speciesId: roll.speciesId, rarity: roll.rarity, name: roll.name, icon: roll.icon });
+    results.push({
+      speciesId: roll.speciesId, rarity: roll.rarity, name: roll.name,
+      icon: roll.icon, portrait: roll.portrait, mutation: roll.mutation || null,
+    });
   }
 
   if (!results.length) return { fired: false, reason: 'nothing rolled' };
@@ -155,5 +159,32 @@ export async function runDinoHatch(env, { userId = null, displayName = 'Someone'
     console.error('[dino-hatch] could not push overlay event:', err.message);
   }
 
+  /* Tell chat what just happened — one message per event (a gift bomb is one
+     announcement, not one per sub). Best-effort and isolated: a chat failure
+     must never fail the webhook. */
+  try {
+    const msg = hatchAnnouncement(source, displayName, n);
+    if (msg) {
+      const { sendChatMessage } = await import('./bot/send-chat.js');
+      await sendChatMessage(env, msg);
+    }
+  } catch (err) {
+    console.error('[dino-hatch] chat announce failed:', err.message);
+  }
+
   return { fired: true, granted, count: n, results };
+}
+
+/* The bot's chat line for a hatch, worded per trigger. A gift bomb (count > 1)
+   reads in the plural. Unknown sources get no line. */
+function hatchAnnouncement(source, who, count) {
+  who = who || 'Someone';
+  if (source === 'channel-points') return `${who} has hatched a free dino egg with channel points!`;
+  if (source === 'bits') return `${who} has hatched a dino egg with bits!`;
+  if (source === 'giftsub') {
+    return count > 1
+      ? `${who} has hatched ${count} dino eggs by gifting ${count} subs to the community!`
+      : `${who} has hatched a dino egg by gifting a sub to the community!`;
+  }
+  return null;
 }

@@ -45,7 +45,7 @@ const SAVE_EPOCH = 2;
    hatch times are rebalanced.
    ══════════════════════════════════════════════ */
 
-import { ROSTER_BY_RARITY, rollSpeciesId, speciesMeta, rollHatchRarity } from './dino-species.js';
+import { ROSTER_BY_RARITY, rollSpeciesId, speciesMeta, rollHatchRarity, rollDinoMutation } from './dino-species.js';
 
 const HATCH_TIMES = { common: 1800, uncommon: 3600, rare: 7200, epic: 14400, legendary: 28800 };
 
@@ -197,7 +197,14 @@ export async function grantDino(env, userId, opts = {}) {
   const speciesId = rollSpeciesId(rarity);
   if (!speciesId) return { success: false, error: 'Invalid rarity' };
   const meta = speciesMeta(speciesId) || {};
-  const reveal = { speciesId, rarity, name: meta.name || speciesId, icon: meta.icon || '' };
+  /* Mutation is decided HERE (server-side), so the dino stored in the park and
+     the one the overlay reveals are the same recoloured variant. opts.mutation
+     lets a caller force it (tests); otherwise roll ~18%. */
+  const mutation = (opts.mutation !== undefined) ? opts.mutation : rollDinoMutation();
+  const reveal = {
+    speciesId, rarity, mutation: mutation || null,
+    name: meta.name || speciesId, icon: meta.icon || '', portrait: meta.portrait || '',
+  };
 
   /* No account to grant to (an anonymous gifter): still return the roll so the
      overlay can show the hatch, but write nothing. */
@@ -224,7 +231,7 @@ export async function grantDino(env, userId, opts = {}) {
        so none are set here. */
     const dino = {
       speciesId, nickname: '', hunger: 80, thirst: 80, happiness: 80,
-      hygiene: 80, stamina: 80, careCount: 0, mutation: null, xp: 0,
+      hygiene: 80, stamina: 80, careCount: 0, mutation: mutation || null, xp: 0,
       grantId, grantedAt: Date.now(), grantSource: opts.source || 'hatch',
     };
 
