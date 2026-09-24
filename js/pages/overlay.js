@@ -448,8 +448,13 @@
     } catch (e) { /* no Audio in this embed — hatches just play silently */ }
   })();
 
+  /* Hatch stings are off until the server says otherwise (muted by default,
+     flipped from the bot panel). Starts false so nothing plays before the first
+     poll settles it. */
+  var hatchSoundOn = false;
+
   function playHatchSound(rarity) {
-    if (audioMuted || !isAudioLeader) return;
+    if (!hatchSoundOn || audioMuted || !isAudioLeader) return;
     var a = hatchSounds[rarity] || hatchSounds.common;
     if (!a) return;
     try {
@@ -906,6 +911,11 @@
            three times. Absent field (older server) leaves us free to play. */
         if (typeof data.audioLeader === 'string') {
           isAudioLeader = (data.audioLeader === overlayIid);
+        }
+        /* Hatch stings on/off, set from the bot panel; reaches the overlay
+           within a poll, no reload. */
+        if (typeof data.hatchSound === 'boolean') {
+          hatchSoundOn = data.hatchSound;
         }
 
         /* RELOAD ON COMMAND. An OBS browser source holds this page open for

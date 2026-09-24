@@ -176,6 +176,12 @@ export async function onRequestGet(context) {
   /* Which single open overlay may play the check-in chime — see electAudioLeader. */
   const audioLeader = await electAudioLeader(env, url.searchParams.get('iid'));
 
+  /* Whether the dino-hatch stings are on. Muted by default (dino-hatch.js), so
+     the overlay stays silent for hatches until the broadcaster flips it — read
+     each poll, so it changes live with no reload. */
+  const hcfg = await env.MARKETPLACE.get('dino_hatch_config', 'json');
+  const hatchSound = !!(hcfg && hcfg.sound === true);
+
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded
      source must not replay an hour of alerts onto the stream. */
@@ -195,6 +201,7 @@ export async function onRequestGet(context) {
     reloadToken: await reloadToken(env),
     alertVolume: alertVolume,
     audioLeader: audioLeader,
+    hatchSound: hatchSound,
     serverNow: Date.now(),
   }), {
     status: 200,

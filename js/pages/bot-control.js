@@ -331,6 +331,39 @@ function saveAlertVolume(volume) {
     .catch(function () { showBotStatus('Network error saving the volume.', true); });
 }
 
+let hatchSoundOn = false;
+
+function renderHatchSound(on) {
+  hatchSoundOn = !!on;
+  const state = document.getElementById('ovHatchSoundState');
+  const toggle = document.getElementById('ovHatchSoundToggle');
+  if (state) {
+    state.textContent = on ? 'Sounds on' : 'Sounds off';
+    state.className = 'giveaway-status' + (on ? ' open' : '');
+  }
+  if (toggle) toggle.textContent = on ? 'Mute Sounds' : 'Turn On Sounds';
+}
+
+async function saveHatchSound(on) {
+  try {
+    const res = await fetch('/api/bot/trigger', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'hatch-config', sound: on }),
+    });
+    const data = await res.json();
+    if (data.success && data.config) {
+      renderHatchSound(data.config.sound);
+      showBotStatus(data.config.sound ? 'Dino hatch sounds on.' : 'Dino hatch sounds muted.', false);
+    } else {
+      showBotStatus(data.error || 'Could not change hatch sounds.', true);
+    }
+  } catch {
+    showBotStatus('Network error changing hatch sounds.', true);
+  }
+}
+
 function initCheckinReminder() {
   const showBtn = document.getElementById('ovCheckinBtn');
   const toggle = document.getElementById('ovCheckinToggleBtn');
@@ -338,6 +371,9 @@ function initCheckinReminder() {
   if (showBtn) showBtn.addEventListener('click', function () { fireBotAction({ action: 'checkin-alert' }, showBtn); });
   if (toggle) toggle.addEventListener('click', function () { saveCheckinReminder(!checkinTimerEnabled); });
   if (save) save.addEventListener('click', function () { saveCheckinReminder(checkinTimerEnabled); });
+
+  const hatchToggle = document.getElementById('ovHatchSoundToggle');
+  if (hatchToggle) hatchToggle.addEventListener('click', function () { saveHatchSound(!hatchSoundOn); });
 
   const vol = document.getElementById('ovAlertVolume');
   const volVal = document.getElementById('ovAlertVolumeVal');
@@ -352,6 +388,7 @@ function initCheckinReminder() {
     .then(function (d) {
       if (!d) return;
       if (d.checkinReminder) renderCheckinReminder(d.checkinReminder.enabled, d.checkinReminder.intervalMin);
+      if (d.hatchConfig) renderHatchSound(d.hatchConfig.sound);
       if (typeof d.alertVolume === 'number' && vol) {
         vol.value = d.alertVolume;
         if (volVal) volVal.textContent = d.alertVolume + '%';

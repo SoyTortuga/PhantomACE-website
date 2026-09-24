@@ -28,7 +28,11 @@ const CONFIG_KEY = 'dino_hatch_config';
    is not a spend the broadcaster tunes per stream. Still toggleable so it can
    be switched off without a deploy (see setHatchConfig, called from the bot
    panel). */
-const DEFAULTS = { enabled: true };
+/* `sound` gates the overlay's per-rarity hatch stings (the visual reveal always
+   plays). Defaults OFF so the stings stay muted until the broadcaster turns them
+   on from the bot panel — the overlay reads this on its poll, so it flips live
+   with no deploy. */
+const DEFAULTS = { enabled: true, sound: false };
 
 /* A community bomb is realistically a few dozen; the cap is a guard against a
    pathological event tying up the lock, not an expected value. All rolls are
@@ -48,11 +52,12 @@ export async function getHatchConfig(env) {
   return { ...DEFAULTS, ...(rec || {}) };
 }
 
-/** Turn the minigame on or off. Called from /api/bot/trigger, not exposed as a
-    route of its own. */
+/** Turn the minigame on/off and its sounds on/off. Called from /api/bot/trigger,
+    not exposed as a route of its own. */
 export async function setHatchConfig(env, patch) {
   const next = {};
   if (patch && patch.enabled !== undefined) next.enabled = !!patch.enabled;
+  if (patch && patch.sound !== undefined) next.sound = !!patch.sound;
   await env.MARKETPLACE.mutate(CONFIG_KEY, (cur) => ({ ...DEFAULTS, ...(cur || {}), ...next }));
   return { success: true, config: await getHatchConfig(env) };
 }

@@ -189,6 +189,14 @@ const dummyDino = (i) => ({ speciesId: 'compy', nickname: 'p' + i, xp: 0 });
   check('setHatchConfig turns it off', (await getHatchConfig(e)).enabled, false);
   await setHatchConfig(e, { enabled: true });
   check('and back on', (await getHatchConfig(e)).enabled, true);
+
+  // Sounds default muted and toggle independently of enabled.
+  check('hatch sounds default muted', (await getHatchConfig(e)).sound, false);
+  await setHatchConfig(e, { sound: true });
+  check('setHatchConfig turns sounds on', (await getHatchConfig(e)).sound, true);
+  check('and leaves the minigame enabled', (await getHatchConfig(e)).enabled, true);
+  await setHatchConfig(e, { sound: false });
+  check('and mutes them again', (await getHatchConfig(e)).sound, false);
 }
 
 /* ══ Portraits + mutations ═════════════════════════════════════════════ */
