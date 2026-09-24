@@ -1024,6 +1024,21 @@
     .hatch-overlay.show { display: flex; }
     .hatch-emoji { font-size: 80px; animation: hatchBounce 0.6s ease; }
     @keyframes hatchBounce { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.3); } 100% { transform: scale(1); opacity: 1; } }
+    /* Egg-hatch sprite strip: 52 frames of 40x49, shown at 4x. Stepped in JS. */
+    .hatch-sprite {
+      width: 160px; height: 196px; margin: 0 auto;
+      background: url(/assets/images/eggs/egg-hatch.png) no-repeat 0 0;
+      background-size: 8320px 196px;
+      image-rendering: pixelated;
+    }
+    /* While the egg is hatching, only the strip shows; the dino reveal appears
+       when it finishes. */
+    .hatch-overlay:not(.hatching) .hatch-sprite { display: none; }
+    .hatch-overlay.hatching .hatch-emoji,
+    .hatch-overlay.hatching .hatch-name,
+    .hatch-overlay.hatching .hatch-rarity,
+    .hatch-overlay.hatching .hatch-desc,
+    .hatch-overlay.hatching .hatch-close { display: none; }
     .hatch-name { font-size: 22px; font-weight: 700; color: #fff; margin-top: 16px; }
     .hatch-rarity { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
     .hatch-desc { font-size: 13px; color: #fff; margin-top: 12px; max-width: 300px; line-height: 1.5; }
@@ -1157,6 +1172,7 @@
 
 <!-- Hatch Overlay -->
 <div class="hatch-overlay" id="hatchOverlay">
+  <div class="hatch-sprite" id="hatchSprite"></div>
   <div class="hatch-emoji" id="hatchEmoji"></div>
   <div class="hatch-name" id="hatchName"></div>
   <div class="hatch-rarity" id="hatchRarity"></div>
@@ -5853,7 +5869,34 @@ function hatchEgg(idx) {
   document.getElementById('hatchRarity').textContent = spec.rarity + (mutInfo ? ' · ' + mutInfo.label + ' Mutation' : '');
   document.getElementById('hatchRarity').style.color = mutInfo ? '#ff0000' : RARITY_COLORS[spec.rarity];
   document.getElementById('hatchDesc').textContent = spec.desc + (dest === 'vault' ? ' (Park is full — sent to your Dino Vault.)' : '');
-  document.getElementById('hatchOverlay').classList.add('show');
+
+  /* Play the egg cracking open, THEN reveal the dino. The reveal content set
+     above is hidden by the .hatching class until the strip finishes. */
+  const overlay = document.getElementById('hatchOverlay');
+  overlay.classList.add('hatching');
+  overlay.classList.add('show');
+  playEggHatch();
+}
+
+const HATCH_FRAMES = 52, HATCH_FRAME_W = 160, HATCH_STEP_MS = 33;   /* ~1.7s */
+let hatchTimer = null;
+function playEggHatch() {
+  const overlay = document.getElementById('hatchOverlay');
+  const sprite = document.getElementById('hatchSprite');
+  clearInterval(hatchTimer); hatchTimer = null;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || !sprite) { overlay.classList.remove('hatching'); return; }  /* straight to the reveal */
+  sprite.style.backgroundPositionX = '0px';
+  let f = 0;
+  hatchTimer = setInterval(() => {
+    f++;
+    if (f >= HATCH_FRAMES) {
+      clearInterval(hatchTimer); hatchTimer = null;
+      overlay.classList.remove('hatching');            /* the dino reveal appears */
+      return;
+    }
+    sprite.style.backgroundPositionX = '-' + (f * HATCH_FRAME_W) + 'px';
+  }, HATCH_STEP_MS);
 }
 
 function speedUpEgg(idx) {
@@ -5871,7 +5914,10 @@ function speedUpEgg(idx) {
 }
 
 function closeHatch() {
-  document.getElementById('hatchOverlay').classList.remove('show');
+  clearInterval(hatchTimer); hatchTimer = null;
+  const overlay = document.getElementById('hatchOverlay');
+  overlay.classList.remove('show');
+  overlay.classList.remove('hatching');
   const active = document.querySelector('.tab-content.active');
   if (active && active.id === 'tab-park') renderParkWorld();
 }
