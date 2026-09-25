@@ -491,7 +491,7 @@
   font-size: 11px;
   font-weight: 600;
   background: var(--red);
-  color: var(--white);
+  color: #fff;
   border: none;
   border-radius: 6px;
   cursor: pointer;

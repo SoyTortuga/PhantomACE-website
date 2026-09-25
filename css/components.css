@@ -30,7 +30,7 @@
 .pill-btn.active {
   background: var(--red);
   border-color: var(--red);
-  color: var(--white);
+  color: #fff;
 }
 
 /* Primary Button */
@@ -38,7 +38,7 @@
   display: inline-block;
   padding: 10px 24px;
   background: var(--red);
-  color: var(--white);
+  color: #fff;
   border: none;
   border-radius: 8px;
   font-family: var(--font-ui);
@@ -48,7 +48,7 @@
 }
 .btn-primary:hover {
   opacity: 0.85;
-  color: var(--white);
+  color: #fff;
 }
 
 /* Secondary Button */
@@ -113,7 +113,7 @@
 }
 .badge-live {
   background: var(--red);
-  color: var(--white);
+  color: #fff;
 }
 .badge-offline {
   background: var(--gray-hi);
@@ -201,7 +201,7 @@
   min-width: 16px;
   height: 16px;
   background: var(--red);
-  color: var(--white);
+  color: #fff;
   font-family: var(--font-system);
   font-size: 9px;
   font-weight: 700;
@@ -699,7 +699,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  background: #0d0d0d;
+  background: var(--gray-lo);
   border: 1px solid var(--border-mid);
   border-radius: 6px;
   overflow: hidden;
@@ -726,7 +726,7 @@
   height: 24px;
   flex: none;
   border-radius: 50%;
-  background: #1a1a1a;
+  background: var(--gray-mid);
   object-fit: cover;
 }
 

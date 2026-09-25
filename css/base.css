@@ -44,7 +44,7 @@ a:hover { color: var(--red); }
 
 ::selection {
   background: var(--red);
-  color: var(--white);
+  color: #fff;
 }
 
 ::-webkit-scrollbar { width: 6px; }

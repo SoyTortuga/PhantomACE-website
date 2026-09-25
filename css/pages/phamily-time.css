@@ -239,7 +239,7 @@
 
 .pt-dot-locked {
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-mid);
 }
 
 /* ── Track Labels ────────────────────────────── */
@@ -328,7 +328,7 @@
   justify-content: center;
   font-size: 28px;
   border: 2px solid var(--border-mid);
-  background: #14100c;
+  background: var(--gray-mid);
   transition: border-color 0.2s, transform 0.15s;
 }
 
@@ -374,7 +374,7 @@
 }
 
 .pt-reward-node[data-state="locked"] .pt-reward-icon {
-  border-color: #2a2a2a;
+  border-color: var(--border-mid);
   opacity: 0.45;
 }
 .pt-reward-node[data-state="locked"] .pt-reward-badge {
@@ -439,17 +439,17 @@
 .pt-reward-node[data-state="claimed"] .pt-reward-tick { background: var(--text-dim); opacity: 0.4; }
 
 /* Rarity colors on icons */
-.pt-rarity-common .pt-reward-icon { background: #1a1a1a; }
-.pt-rarity-uncommon .pt-reward-icon { background: #0a1a0a; border-color: var(--rarity-uncommon); }
-.pt-rarity-rare .pt-reward-icon { background: #150a1e; border-color: var(--rarity-rare); }
-.pt-rarity-mythic .pt-reward-icon { background: #1e120a; border-color: var(--rarity-mythic); }
+.pt-rarity-common .pt-reward-icon { background: var(--gray-mid); }
+.pt-rarity-uncommon .pt-reward-icon { background: var(--gray-mid); border-color: var(--rarity-uncommon); }
+.pt-rarity-rare .pt-reward-icon { background: var(--gray-mid); border-color: var(--rarity-rare); }
+.pt-rarity-mythic .pt-reward-icon { background: var(--gray-mid); border-color: var(--rarity-mythic); }
 
 .pt-rarity-common[data-state="locked"] .pt-reward-icon,
 .pt-rarity-uncommon[data-state="locked"] .pt-reward-icon,
 .pt-rarity-rare[data-state="locked"] .pt-reward-icon,
 .pt-rarity-mythic[data-state="locked"] .pt-reward-icon {
-  background: #111;
-  border-color: #222;
+  background: var(--gray-mid);
+  border-color: var(--border-mid);
 }
 
 /* ── Thermometer Bar ─────────────────────────── */
@@ -463,9 +463,9 @@
 .pt-thermo-bar {
   flex: 1;
   height: 14px;
-  background: #151515;
+  background: var(--gray-mid);
   border-radius: 7px;
-  border: 1px solid #222;
+  border: 1px solid var(--border-mid);
   overflow: hidden;
   position: relative;
 }
@@ -511,8 +511,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #151515;
-  border: 2px solid #333;
+  background: var(--gray-mid);
+  border: 2px solid var(--border-mid);
   margin-left: -4px;
   display: flex;
   align-items: center;
@@ -525,7 +525,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #1a1a1a;
+  background: var(--gray-mid);
   transition: background 0.6s;
 }
 
@@ -556,7 +556,7 @@
   height: 44px;
   border-radius: 50%;
   background: var(--gray-lo);
-  border: 2px solid #333;
+  border: 2px solid var(--border-mid);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -617,10 +617,10 @@
   border-radius: 2px;
 }
 
-.pt-pop-common { background: #1a1a1a; color: var(--rarity-common); }
-.pt-pop-uncommon { background: #0a1a0a; color: var(--rarity-uncommon); }
-.pt-pop-rare { background: #150a1e; color: var(--rarity-rare); }
-.pt-pop-mythic { background: #1e120a; color: var(--rarity-mythic); }
+.pt-pop-common { background: var(--gray-mid); color: var(--rarity-common); }
+.pt-pop-uncommon { background: var(--gray-mid); color: var(--rarity-uncommon); }
+.pt-pop-rare { background: var(--gray-mid); color: var(--rarity-rare); }
+.pt-pop-mythic { background: var(--gray-mid); color: var(--rarity-mythic); }
 
 .pt-popover-level {
   font-family: var(--font-system);
@@ -717,8 +717,8 @@
   width: 18px;
   height: 18px;
   border-radius: 2px;
-  background: #111;
-  border: 1px solid #1a1a1a;
+  background: var(--gray-mid);
+  border: 1px solid var(--border);
   transition: background 0.2s;
 }
 
@@ -728,12 +728,12 @@
 }
 
 .pt-attendance-cell.missed {
-  background: #111;
+  background: var(--gray-mid);
 }
 
 .pt-attendance-cell.future {
-  background: #0a0a0a;
-  border-color: #111;
+  background: var(--gray-lo);
+  border-color: var(--border);
   opacity: 0.4;
 }
 

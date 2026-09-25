@@ -37,7 +37,7 @@
   border-radius: 50%;
   border: 2px solid var(--border-mid);
   object-fit: cover;
-  background: #111;
+  background: var(--gray-mid);
 }
 
 .prof-ident { min-width: 0; flex: 1; }
@@ -230,7 +230,7 @@
   justify-content: center;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #0d0d0d;
+  background: var(--gray-lo);
 }
 
 .prof-dino-portrait img {
