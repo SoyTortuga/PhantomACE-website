@@ -83,7 +83,7 @@ function renderItem(item, index) {
     : '';
 
   return `
-    <div class="gallery-item ${roleClass}" data-index="${index}">
+    <div class="gallery-item ${roleClass}" data-index="${index}" role="button" tabindex="0" aria-label="Open ${escapeAttr(item.title)}">
       ${mediaHtml}
       <span class="gallery-item-badge ${badgeClass}">${escapeHtml(item.category)}</span>
       ${lockHtml}
@@ -111,6 +111,15 @@ function initGalleryClicks() {
     }
     const tile = e.target.closest('.gallery-item');
     if (tile) openLightbox(Number(tile.dataset.index));
+  });
+  /* Keyboard: the tiles are role="button" tabindex="0", so Enter/Space open
+     the lightbox just like a click. */
+  grid.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tile = e.target.closest('.gallery-item');
+    if (!tile || e.target.closest('.gallery-item-remove')) return;
+    e.preventDefault();
+    openLightbox(Number(tile.dataset.index));
   });
 }
 

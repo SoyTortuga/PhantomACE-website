@@ -17,6 +17,7 @@ function launchGame(title, src) {
   const titleEl = document.getElementById('gameLauncherTitle');
 
   titleEl.textContent = title;
+  frame.title = title;
   frame.src = src;
   launcher.classList.add('open');
   document.body.style.overflow = 'hidden';

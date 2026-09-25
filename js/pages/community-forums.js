@@ -361,7 +361,7 @@
       html += '<div class="forum-topic-head">' +
         (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
         (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
-        '<h2 class="forum-post-title">' + esc(t.title) + '</h2></div>';
+        '<h1 class="forum-post-title">' + esc(t.title) + '</h1></div>';
       if (ctx.staff) html += modBarHtml(t);
       html += d.posts.map(function (p, i) { return postHtml(p, authors, ctx, d.page === 1 && i === 0); }).join('');
       html += pager(d.page, d.pages, hrefFor);
