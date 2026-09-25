@@ -99,7 +99,8 @@
     /* Status-effect chips */
     .enemy-status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; min-height: 0; }
     .enemy-status:empty { margin-top: 0; }
-    .stat-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 700;
+    .stat-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 14px;
+ text-shadow: none; font-weight: 700;
                  padding: 2px 7px; border-radius: 10px; border: 1px solid; line-height: 1.4; }
     .stat-chip.poison { color: #a3e635; border-color: #4d7c0f; background: rgba(60,90,10,0.35); }
     .stat-chip.burn   { color: #fb923c; border-color: #9a3412; background: rgba(120,40,5,0.35); }
@@ -119,7 +120,8 @@
     /* One-line recap of what the last round did */
     .combat-log { margin-top: 6px; font-size: 15px; color: var(--dim); text-align: center; min-height: 0; line-height: 1.5; }
     .combat-log:empty { margin-top: 0; }
-    .coop-boons { margin-top: 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #86efac; text-align: center; }
+    .coop-boons { margin-top: 6px; font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.08em; color: #86efac; text-align: center; }
     .coop-boons:empty { margin: 0; }
 
     /* Between-wave boon chooser */
@@ -176,12 +178,14 @@
     .player-row { display: flex; align-items: center; gap: 10px; background: var(--panel);
                   border: 1px solid var(--line); border-radius: 4px; padding: 8px 11px; font-size: 18px; }
     .player-row .name { flex: 1; }
-    .player-row .tag { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); }
+    .player-row .tag { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); }
     .player-row.is-ready { border-color: #2f5f2f; }
     .player-row.is-ready .tag { color: #6ac46a; }
     .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--gray-hi); object-fit: cover; }
     .kick-btn { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 3px;
-                font-size: 14px; padding: 3px 7px; cursor: pointer; text-transform: uppercase; }
+                font-size: 14px;
+                text-shadow: none; padding: 3px 7px; cursor: pointer; text-transform: uppercase; }
     .kick-btn:hover { border-color: var(--red); color: var(--red); }
     .lobby-actions { display: flex; gap: 10px; }
 
@@ -213,7 +217,8 @@
     .standing.me { border-color: var(--red); }
     .standing.done-banked { opacity: 0.6; }
     .standing.done-burned { opacity: 0.6; border-color: #5a2a2a; }
-    .standing .st { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+    .standing .st { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
                     display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .standing .st.gain { color: #6ac46a; font-weight: 700; }
     .standing .st.zero { color: var(--text-pri); }
@@ -263,9 +268,11 @@
     .die.mini img { width: 9px; height: 9px; }
     .die.mini .pip-num { display: none; }
     .standing-kept { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 4px; }
-    .standing-kick { margin-top: 5px; font-size: 14px; padding: 2px 6px; width: 100%; }
+    .standing-kick { margin-top: 5px; font-size: 14px;
+ text-shadow: none; padding: 2px 6px; width: 100%; }
 
-    .tray-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--dim); text-align: center; }
+    .tray-label { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.14em; color: var(--dim); text-align: center; }
     .kept-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 0; }
 
     .dice-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
@@ -289,7 +296,8 @@
     }
     .spectate-list .sp-name { flex: 1; text-align: left; }
     .spectate-list .sp-total { font-weight: 800; }
-    .spectate-list .sp-state { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; width: 116px; text-align: right; }
+    .spectate-list .sp-state { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.08em; width: 116px; text-align: right; }
     .spectate-list li.sp-ahead { border-color: var(--red); }
     .spectate-list li.sp-ahead .sp-total { color: var(--red); }
 
@@ -329,7 +337,8 @@
             border-radius: 4px; display: flex; flex-direction: column; }
     .chat-head { display: flex; align-items: center; justify-content: space-between;
                  padding: 6px 10px; border-bottom: 1px solid var(--line);
-                 font-size: 14px; text-transform: uppercase; letter-spacing: 0.16em;
+                 font-size: 14px;
+                 text-shadow: none; text-transform: uppercase; letter-spacing: 0.16em;
                  color: var(--dim); }
     .chat-toggle { background: none; border: none; color: var(--dim); cursor: pointer;
                    font-size: 21px; line-height: 1; padding: 0 4px; }
@@ -377,7 +386,8 @@
 
     .dice-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
                    margin-bottom: 8px; }
-    .dice-picker-label { font-size: 14px; text-transform: uppercase;
+    .dice-picker-label { font-size: 14px;
+ text-shadow: none; text-transform: uppercase;
                          letter-spacing: 0.14em; color: var(--dim); }
     .dice-chip { background: var(--gray-mid); color: var(--dim); border: 1px solid var(--line);
                  border-radius: 3px; font-size: 15px; padding: 3px 9px; cursor: pointer;
@@ -385,7 +395,8 @@
     .dice-chip:hover { color: var(--text-pri); border-color: var(--text-dim); }
     .dice-chip.active { color: var(--text-pri); border-color: var(--red); }
 
-    .room-live { font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
+    .room-live { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.12em;
                  color: var(--red); border: 1px solid var(--red); border-radius: 2px;
                  padding: 1px 5px; }
     .room-row .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
@@ -432,7 +443,8 @@
 
     .rules-table { width: 100%; border-collapse: collapse; font-size: 18px; }
     .rules-table th {
-      text-align: left; font-size: 14px; text-transform: uppercase;
+      text-align: left; font-size: 14px;
+ text-shadow: none; text-transform: uppercase;
       letter-spacing: 0.1em; color: var(--dim); font-weight: 600;
       padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line);
     }

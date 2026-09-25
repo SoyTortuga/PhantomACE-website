@@ -21,7 +21,8 @@
     .input { padding: 8px 12px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 4px; color: var(--text-pri); font-size: 18px; outline: none; }
     .input:focus { border-color: var(--red); }
     .input::placeholder { color: #8a8a8a; }
-    .section-hdr { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-dim); margin-bottom: 8px; }
+    .section-hdr { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-dim); margin-bottom: 8px; }
     .card-box { background: var(--gray-mid); border: 1px solid var(--border-mid); border-top: 2px solid var(--red); border-radius: 6px; padding: 14px; }
     .feedback { min-height: 20px; font-size: 17px; color: var(--text-pri); text-align: center; }
     .feedback.error { color: var(--red); }
@@ -54,8 +55,10 @@
     .player-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 4px; }
     .player-color { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
     .player-name { font-size: 18px; font-weight: 600; flex: 1; }
-    .player-host-tag { font-size: 14px; color: var(--red); text-transform: uppercase; letter-spacing: 0.1em; background: var(--red)20; padding: 2px 6px; border-radius: 3px; }
-    .player-ready-tag { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
+    .player-host-tag { font-size: 14px;
+ text-shadow: none; color: var(--red); text-transform: uppercase; letter-spacing: 0.1em; background: var(--red)20; padding: 2px 6px; border-radius: 3px; }
+    .player-ready-tag { font-size: 14px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
     .player-ready-tag.ready { color: #00cc66; background: #00cc6620; }
     .player-ready-tag.notready { color: var(--text-pri); background: var(--border-mid); }
     .kick-btn { width: 20px; height: 20px; flex-shrink: 0; border: 1px solid #660000; background: #330000; color: #ff6666; border-radius: 3px; font-size: 17px; line-height: 1; cursor: pointer; }
@@ -71,13 +74,16 @@
     .players-bar { display: flex; gap: 4px; padding: 4px 8px; background: var(--gray-lo); border-bottom: 1px solid var(--border-mid); overflow-x: auto; flex-shrink: 0; }
     .pbar-item { display: flex; align-items: center; gap: 4px; padding: 3px 6px; background: var(--gray-mid); border-radius: 4px; white-space: nowrap; min-width: 0; flex-shrink: 0; }
     .pbar-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .pbar-name { font-size: 14px; color: var(--text-pri); max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
-    .pbar-hp { font-size: 14px; font-weight: 700; color: var(--text-pri); }
+    .pbar-name { font-size: 14px;
+ text-shadow: none; color: var(--text-pri); max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
+    .pbar-hp { font-size: 14px;
+ text-shadow: none; font-weight: 700; color: var(--text-pri); }
     .pbar-item.me { border: 1px solid var(--red)60; }
     .pbar-item.dead { opacity: 0.3; }
     .pbar-item .pbar-hpbar { width: 30px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
     .pbar-item .pbar-hpfill { height: 100%; background: #00cc66; transition: width 0.3s; }
-    .pbar-submitted { font-size: 14px; color: #00cc66; }
+    .pbar-submitted { font-size: 14px;
+ text-shadow: none; color: #00cc66; }
 
     .timer-bar { height: 4px; background: var(--gray-mid); position: relative; overflow: hidden; width: 100%; flex-shrink: 0; }
     .timer-fill { height: 100%; background: #00cc66; transition: width 0.3s linear; position: absolute; left: 0; top: 0; }
@@ -95,9 +101,11 @@
        control strip gets -- and centred so a short second row does not
        hang off the left. */
     .weapon-bar { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
-    .weapon-btn { padding: 3px 8px; border: 1px solid var(--border-mid); border-radius: 3px; background: var(--gray-mid); color: var(--text-pri); font-size: 14px; cursor: pointer; white-space: nowrap; }
+    .weapon-btn { padding: 3px 8px; border: 1px solid var(--border-mid); border-radius: 3px; background: var(--gray-mid); color: var(--text-pri); font-size: 14px;
+ text-shadow: none; cursor: pointer; white-space: nowrap; }
     .weapon-btn.active { border-color: var(--red); color: var(--text-pri); background: #330000; }
-    .weapon-btn .ammo { color: #ff6666; font-size: 14px; }
+    .weapon-btn .ammo { color: #ff6666; font-size: 14px;
+ text-shadow: none; }
 
     .wind-display { font-size: 15px; color: var(--text-pri); display: flex; align-items: center; gap: 4px; }
     .wind-display .wind-arrow { color: #44aaff; font-weight: 700; }
