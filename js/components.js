@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="status-dot"></span>
               <span>Offline</span>
             </div>
+            <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()"
+                    aria-label="Toggle light and dark theme" title="Toggle theme">☾</button>
             <div class="notif-wrapper" id="notifBell">
               <button class="notif-bell-btn" onclick="toggleNotifPanel()" aria-label="Notifications" title="Notifications">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -99,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </header>
       <div class="nav-backdrop" id="navBackdrop"></div>
     `;
+    applyThemeGlyph();
   }
 
   if (footerEl) {
@@ -160,6 +163,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initAccountMenu();
 });
+
+/* Light/dark theme. Dark is the default (no data-theme attribute); a saved
+   'light' choice is applied pre-paint by the inline <head> script on every page.
+   Here we handle the toggle and keep the glyph in sync. The overlay never loads
+   this and stays dark. */
+function applyThemeGlyph() {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  btn.textContent = light ? '☀' : '☾';
+  btn.setAttribute('aria-pressed', light ? 'true' : 'false');
+}
+
+function toggleTheme() {
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  const next = light ? 'dark' : 'light';
+  if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('pham-theme', next); } catch (e) { /* private mode */ }
+  applyThemeGlyph();
+}
 
 function initAccountMenu() {
   const trigger = document.getElementById('authUserTrigger');

@@ -68,3 +68,53 @@
   --font-ui:      'Aurusenthial Gothic', Georgia, serif;
   --font-system:  system-ui, -apple-system, sans-serif;
 }
+
+/* ══════════════════════════════════════════════
+   LIGHT MODE — "grimoire on aged paper", NOT a generic white light theme.
+   Warm parchment/bone grounds, oxblood red, near-black ink. Opt-in via a nav
+   toggle (data-theme="light" on <html>); dark is the default. The token NAMES
+   still read as colours (--black/--white/--gray-*) — they are used here as
+   bg/ink ROLES, so a light value under those names is intentional. The overlay
+   is NEVER themed (OBS legibility) and opts out with data-theme stripped there.
+   ══════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  /* Paper & surfaces (bg/surface roles) */
+  --black:      #e8e0cc;   /* page background — aged paper */
+  --gray-lo:    #ddd2b8;   /* deep / inset surface */
+  --gray-mid:   #f4edda;   /* card / panel surface — lifts off the paper */
+  --gray-hi:    #cfc3a5;   /* lines / hover / subtle raised */
+
+  /* Ink (was white text) */
+  --white:      #211b12;
+  --text-pri:   #211b12;
+  --text-sec:   #3f3626;
+  --text-dim:   #6a5f49;
+
+  /* Oxblood — a red that reads on paper without vibrating */
+  --red:        #9b1c1c;
+  --red-dim:    #9b1c1c55;
+  --red-glow:   #9b1c1c12;
+
+  --border:     #cabd99;
+  --border-mid: #b3a47f;
+
+  /* Accents / rarity / roles — deepened for contrast on light paper */
+  --green:      #1c7a40;
+  --amber:      #9a6a00;
+  --purple:     #6a3aa0;
+  --rarity-common:    #211b12;
+  --rarity-uncommon:  #1c7a40;
+  --rarity-rare:      #6a3aa0;
+  --rarity-epic:      #b34d00;
+  --rarity-legendary: #8a6d1a;
+  --rarity-mythic:    #b34d00;
+  --exclusive:  #8a6d1a;
+  --medal-gold:   #a9791a;
+  --medal-silver: #6f6f6f;
+  --medal-bronze: #9a5a2c;
+  --tier-vip:   #565b62;
+  --role-broadcaster: #9b1c1c;
+  --role-moderator:   #9a6a00;
+  --role-subscriber:  #6a3aa0;
+  --role-follower:    #1c7a40;
+}

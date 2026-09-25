@@ -147,6 +147,28 @@
    (see CLAUDE.md). Hidden so any leftover .corner-accent markup renders nothing. */
 .corner-accent { display: none; }
 
+/* Theme toggle (light/dark) — matches the notif bell's sizing */
+.theme-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--text-sec);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.theme-toggle:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 /* Notification Bell */
 .notif-wrapper {
   position: relative;
