@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Commander Bingo</title>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #000;
-      color: #fff;
+      background: var(--black);
+      color: var(--text-pri);
       font-family: var(--font-ui);
       min-height: 100vh;
       display: flex;
@@ -28,7 +30,7 @@
     .game-title {
       font-family: var(--font-display);
       font-size: 28px;
-      color: #ff0000;
+      color: var(--red);
       text-align: center;
       margin-bottom: 4px;
       letter-spacing: 0.02em;
@@ -69,10 +71,10 @@
     .join-input {
       width: 100%;
       padding: 12px 16px;
-      background: #111;
-      border: 1px solid #222;
+      background: var(--gray-mid);
+      border: 1px solid var(--border-mid);
       border-radius: 4px;
-      color: #fff;
+      color: var(--text-pri);
       font-size: 20px;
       font-family: inherit;
       text-align: center;
@@ -80,7 +82,7 @@
       transition: border-color 0.2s;
     }
 
-    .join-input:focus { border-color: #ff0000; }
+    .join-input:focus { border-color: var(--red); }
     .join-input::placeholder { color: #444; }
 
     .join-input.code-input {
@@ -92,7 +94,7 @@
 
     .join-btn {
       padding: 12px 24px;
-      background: #ff0000;
+      background: var(--red);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -122,12 +124,12 @@
       content: '';
       flex: 1;
       height: 1px;
-      background: #222;
+      background: var(--gray-hi);
     }
 
     .join-gate {
       font-size: 15px;
-      color: #fff;
+      color: var(--text-pri);
       line-height: 1.6;
       text-align: center;
       max-width: 300px;
@@ -136,8 +138,8 @@
     .practice-btn {
       padding: 10px 24px;
       background: transparent;
-      color: #fff;
-      border: 1px solid #222;
+      color: var(--text-pri);
+      border: 1px solid var(--border-mid);
       border-radius: 4px;
       font-size: 17px;
       cursor: pointer;
@@ -145,11 +147,11 @@
       font-family: inherit;
     }
 
-    .practice-btn:hover { border-color: #444; color: #fff; }
+    .practice-btn:hover { border-color: #444; color: var(--text-pri); }
 
     .join-error {
       font-size: 15px;
-      color: #ff0000;
+      color: var(--red);
       text-align: center;
       min-height: 16px;
       margin-top: 4px;
@@ -171,8 +173,8 @@
       padding: 0 2px;
     }
 
-    .card-info { font-size: 15px; color: #fff; }
-    .card-info span { color: #ff0000; }
+    .card-info { font-size: 15px; color: var(--text-pri); }
+    .card-info span { color: var(--red); }
 
     .mode-badge {
       font-size: 14px;
@@ -180,7 +182,7 @@
       letter-spacing: 0.1em;
       padding: 3px 10px;
       border-radius: 2px;
-      border: 1px solid #222;
+      border: 1px solid var(--border-mid);
       color: #444;
     }
 
@@ -199,7 +201,7 @@
       text-align: center;
       font-size: 22px;
       font-weight: bold;
-      color: #ff0000;
+      color: var(--red);
       padding: 2px 0;
       opacity: 0.7;
     }
@@ -213,8 +215,8 @@
 
     .bingo-cell {
       aspect-ratio: 1;
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
       border-radius: 3px;
       display: flex;
       align-items: center;
@@ -227,7 +229,7 @@
          only if you already knew what it said — and an unmarked square is
          exactly the one still being read. Marked squares stay distinct by
          their red tint and border rather than by being brighter. */
-      color: #fff;
+      color: var(--text-pri);
       transition: background 0.3s, border-color 0.3s, color 0.3s, filter 0.3s;
       position: relative;
       overflow: hidden;
@@ -238,7 +240,7 @@
     .bingo-cell.marked {
       background: rgba(152, 9, 10, 0.25);
       border-color: rgba(255, 0, 0, 0.65);
-      color: #fff;
+      color: var(--text-pri);
     }
 
     .bingo-cell.free {
@@ -257,8 +259,8 @@
 
     .bingo-cell.practice:not(.free):not(.marked) { cursor: pointer; }
     .bingo-cell.practice:not(.free):not(.marked):hover {
-      border-color: #333;
-      background: #0f0f0f;
+      border-color: var(--border-mid);
+      background: var(--gray-lo);
     }
 
     .bingo-cell.just-marked {
@@ -271,7 +273,7 @@
     }
 
     .bingo-cell.in-pattern {
-      border-color: #ff0000;
+      border-color: var(--red);
       border-width: 2px;
       filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.4));
     }
@@ -284,14 +286,14 @@
       align-items: center;
       margin-top: 10px;
       padding: 10px 14px;
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
       border-radius: 4px;
     }
 
-    .score-item { font-size: 15px; color: #fff; }
-    .score-item span { color: #fff; font-weight: bold; }
-    .score-item.bingo-count span { color: #ff0000; font-size: 25px; }
+    .score-item { font-size: 15px; color: var(--text-pri); }
+    .score-item span { color: var(--text-pri); font-weight: bold; }
+    .score-item.bingo-count span { color: var(--red); font-size: 25px; }
 
     .bingo-alert {
       display: none;
@@ -301,7 +303,7 @@
       margin-top: 8px;
       font-size: 25px;
       font-weight: bold;
-      color: #ff0000;
+      color: var(--red);
       text-transform: uppercase;
       letter-spacing: 0.15em;
       animation: bingo-pulse 0.8s ease-in-out infinite;
@@ -323,9 +325,9 @@
     .new-card-btn, .back-btn {
       padding: 8px 18px;
       background: transparent;
-      border: 1px solid #222;
+      border: 1px solid var(--border-mid);
       border-radius: 3px;
-      color: #fff;
+      color: var(--text-pri);
       font-size: 15px;
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s;
@@ -333,8 +335,8 @@
     }
 
     .new-card-btn:hover, .back-btn:hover {
-      border-color: #ff0000;
-      color: #fff;
+      border-color: var(--red);
+      color: var(--text-pri);
     }
 
     /* ── WAITING OVERLAY ─────────────────── */
@@ -369,25 +371,25 @@
       font-size: 50px;
       font-weight: bold;
       letter-spacing: 0.3em;
-      color: #ff0000;
+      color: var(--red);
       margin: 16px 0 8px;
     }
 
     .waiting-msg {
       font-size: 17px;
-      color: #fff;
+      color: var(--text-pri);
     }
 
     /* ── RESULTS SCREEN ──────────────────── */
     .results-title {
       font-size: 34px;
-      color: #ff0000;
+      color: var(--red);
       margin-bottom: 4px;
     }
 
     .results-subtitle {
       font-size: 17px;
-      color: #fff;
+      color: var(--text-pri);
       margin-bottom: 24px;
     }
 
@@ -395,8 +397,8 @@
       width: 100%;
       max-width: 400px;
       padding: 24px;
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
       border-radius: 6px;
       text-align: center;
     }
@@ -404,7 +406,7 @@
     .results-big {
       font-size: 67px;
       font-weight: bold;
-      color: #ff0000;
+      color: var(--red);
       line-height: 1;
     }
 
@@ -424,9 +426,9 @@
 
     .results-breakdown li {
       padding: 6px 0;
-      border-bottom: 1px solid #111;
+      border-bottom: 1px solid var(--border);
       font-size: 17px;
-      color: #fff;
+      color: var(--text-pri);
       display: flex;
       justify-content: space-between;
     }
@@ -451,10 +453,10 @@
       flex: 1;
       min-width: 120px;
       padding: 8px 12px;
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
       border-radius: 3px;
-      color: #fff;
+      color: var(--text-pri);
       font-size: 15px;
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s;
@@ -465,11 +467,11 @@
       gap: 6px;
     }
 
-    .inv-btn:hover:not(:disabled) { border-color: #ff0000; color: #fff; }
+    .inv-btn:hover:not(:disabled) { border-color: var(--red); color: var(--text-pri); }
     .inv-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
     .inv-btn .inv-count {
-      background: #ff0000;
+      background: var(--red);
       color: #fff;
       font-size: 14px;
       font-weight: bold;
@@ -481,10 +483,10 @@
 
     .card-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
     .card-tab {
-      padding: 5px 14px; background: #1a1a1a; color: #fff; cursor: pointer;
+      padding: 5px 14px; background: var(--gray-mid); color: var(--text-pri); cursor: pointer;
       border: 1px solid #ffffff28; border-radius: 4px; font-size: 15px; font-weight: 700;
     }
-    .card-tab.active { border-color: #ff0000; color: #ffaaaa; }
+    .card-tab.active { border-color: var(--red); color: #ffaaaa; }
     .inv-btn.wildcard-active {
       border-color: #ffaa00;
       color: #ffaa00;

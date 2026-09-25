@@ -4,12 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Memory Match</title>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #000;
-      color: #fff;
+      background: var(--black);
+      color: var(--text-pri);
       font-family: var(--font-ui);
       display: flex;
       flex-direction: column;
@@ -21,7 +23,7 @@
     h1 {
       font-family: var(--font-display);
       font-size: 24px;
-      color: #ff0000;
+      color: var(--red);
       margin-bottom: 8px;
     }
 
@@ -30,10 +32,10 @@
       gap: 24px;
       margin-bottom: 20px;
       font-size: 18px;
-      color: #fff;
+      color: var(--text-pri);
     }
 
-    .stats span { color: #fff; }
+    .stats span { color: var(--text-pri); }
 
     .board {
       display: grid;
@@ -73,23 +75,23 @@
     }
 
     .card-front {
-      background: #111;
-      border: 1px solid #333;
+      background: var(--gray-mid);
+      border: 1px solid var(--border-mid);
     }
 
     .card-front::after {
       content: '?';
       font-size: 39px;
-      color: #ff0000;
+      color: var(--red);
       opacity: 0.4;
     }
 
     .card:hover .card-front {
-      border: 2px solid #ff0000;
+      border: 2px solid var(--red);
     }
 
     .card-back {
-      background: #1a1a1a;
+      background: var(--gray-mid);
       border: 1px solid #444;
       transform: rotateY(180deg);
     }
@@ -115,19 +117,19 @@
 
     .win-message h2 {
       font-size: 20px;
-      color: #ff0000;
+      color: var(--red);
       margin-bottom: 8px;
     }
 
     .win-message p {
       font-size: 18px;
-      color: #fff;
+      color: var(--text-pri);
       margin-bottom: 16px;
     }
 
     .restart-btn {
       padding: 8px 24px;
-      background: #ff0000;
+      background: var(--red);
       color: #fff;
       border: none;
       border-radius: 3px;
@@ -144,16 +146,16 @@
       display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center;
     }
     .cosmetic-select {
-      background: #111; border: 1px solid #333; color: #fff; padding: 4px 10px;
+      background: var(--gray-mid); border: 1px solid var(--border-mid); color: var(--text-pri); padding: 4px 10px;
       border-radius: 3px; font-size: 15px; cursor: pointer; font-family: inherit;
     }
-    .cosmetic-select option { background: #111; color: #fff; }
-    .cosmetic-label { font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; }
+    .cosmetic-select option { background: var(--gray-mid); color: var(--text-pri); }
+    .cosmetic-label { font-size: 14px; color: var(--text-pri); text-transform: uppercase; letter-spacing: 0.05em; }
 
-    .card-front.cb-basic { background: #161616; border-color: #888; }
-    .card-front.cb-basic::after { content: '♦'; color: #fff; opacity: 0.5; }
+    .card-front.cb-basic { background: var(--gray-mid); border-color: var(--text-dim); }
+    .card-front.cb-basic::after { content: '♦'; color: var(--text-pri); opacity: 0.5; }
     .card-front.cb-phamily { background: linear-gradient(135deg, #1a0000, #111); border-color: #cc0000; }
-    .card-front.cb-phamily::after { content: '💀'; color: #ff0000; opacity: 0.6; }
+    .card-front.cb-phamily::after { content: '💀'; color: var(--red); opacity: 0.6; }
     .card-front.cb-rare { background: linear-gradient(135deg, #0a0a1e, #111); border-color: #3344aa; }
     .card-front.cb-rare::after { content: '🃏'; color: #4466ee; opacity: 0.6; }
     .card-front.cb-legendary { background: linear-gradient(135deg, #1a0a1a, #111); border-color: #8833cc; }

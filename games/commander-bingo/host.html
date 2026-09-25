@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Commander Bingo - Host</title>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #000;
-      color: #fff;
+      background: var(--black);
+      color: var(--text-pri);
       font-family: var(--font-ui);
       min-height: 100vh;
       display: flex;
@@ -33,7 +35,7 @@
     .host-title {
       font-family: var(--font-display);
       font-size: 28px;
-      color: #ff0000;
+      color: var(--red);
       text-align: center;
       margin-bottom: 4px;
     }
@@ -64,7 +66,7 @@
 
     .create-btn {
       padding: 14px 40px;
-      background: #ff0000;
+      background: var(--red);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -92,8 +94,8 @@
       justify-content: space-between;
       align-items: flex-start;
       padding: 12px 16px;
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
       border-radius: 6px;
       margin-bottom: 12px;
       flex-wrap: wrap;
@@ -112,7 +114,7 @@
       font-size: 45px;
       font-weight: bold;
       letter-spacing: 0.25em;
-      color: #ff0000;
+      color: var(--red);
       line-height: 1;
     }
 
@@ -125,7 +127,7 @@
     .code-copy-btn {
       padding: 4px 12px;
       background: transparent;
-      border: 1px solid #222;
+      border: 1px solid var(--border-mid);
       border-radius: 3px;
       color: #555;
       font-size: 14px;
@@ -134,7 +136,7 @@
       font-family: inherit;
     }
 
-    .code-copy-btn:hover { border-color: #ff0000; color: #fff; }
+    .code-copy-btn:hover { border-color: var(--red); color: var(--text-pri); }
     .code-copy-btn.copied { border-color: #00cc66; color: #00cc66; }
 
     /* Show-on-overlay toggle. Reads as a switch: a red dot and ON when the
@@ -145,7 +147,7 @@
       gap: 7px;
       padding: 4px 12px;
       background: transparent;
-      border: 1px solid #222;
+      border: 1px solid var(--border-mid);
       border-radius: 3px;
       color: #666;
       font-size: 14px;
@@ -155,14 +157,14 @@
       transition: border-color 0.2s, color 0.2s;
       font-family: inherit;
     }
-    .overlay-toggle:hover { border-color: #444; color: #999; }
+    .overlay-toggle:hover { border-color: #444; color: var(--text-dim); }
     .overlay-toggle .ov-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: #333; border: 1px solid #444;
       transition: background 0.2s, border-color 0.2s;
     }
     .overlay-toggle.on { border-color: rgba(255, 0, 0, 0.4); color: #ff5555; }
-    .overlay-toggle.on .ov-dot { background: #ff0000; border-color: #ff0000; }
+    .overlay-toggle.on .ov-dot { background: var(--red); border-color: var(--red); }
     .overlay-toggle:disabled { opacity: 0.5; cursor: default; }
 
     .host-stats {
@@ -177,8 +179,8 @@
       color: #555;
     }
 
-    .stat-row span { color: #fff; font-weight: bold; }
-    .stat-row .count-red { color: #ff0000; }
+    .stat-row span { color: var(--text-pri); font-weight: bold; }
+    .stat-row .count-red { color: var(--red); }
 
     /* ── MAIN CONTENT AREA ────────────────── */
     .host-body {
@@ -200,7 +202,7 @@
     .cat-tab {
       padding: 10px 14px;
       background: transparent;
-      border: 1px solid #1a1a1a;
+      border: 1px solid var(--border);
       border-radius: 3px;
       color: #444;
       font-size: 14px;
@@ -213,8 +215,8 @@
       text-align: left;
     }
 
-    .cat-tab:hover { border-color: #333; color: #888; }
-    .cat-tab.active { border-color: #ff0000; color: #ff0000; background: rgba(255, 0, 0, 0.05); }
+    .cat-tab:hover { border-color: var(--border-mid); color: var(--text-dim); }
+    .cat-tab.active { border-color: var(--red); color: var(--red); background: rgba(255, 0, 0, 0.05); }
 
     /* ── RIGHT PANEL (search + list) ─────── */
     .events-panel {
@@ -227,10 +229,10 @@
     .search-input {
       width: 100%;
       padding: 8px 12px;
-      background: #0a0a0a;
-      border: 1px solid #1a1a1a;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
       border-radius: 4px;
-      color: #fff;
+      color: var(--text-pri);
       font-size: 17px;
       font-family: inherit;
       outline: none;
@@ -238,7 +240,7 @@
       margin-bottom: 8px;
     }
 
-    .search-input:focus { border-color: #ff0000; }
+    .search-input:focus { border-color: var(--red); }
     .search-input::placeholder { color: #333; }
 
     /* ── EVENT CARD GRID ─────────────────── */
@@ -251,9 +253,9 @@
       align-content: start;
       gap: 8px;
       padding: 8px;
-      border: 1px solid #1a1a1a;
+      border: 1px solid var(--border);
       border-radius: 4px;
-      background: #050505;
+      background: var(--gray-lo);
     }
 
     .event-card {
@@ -261,13 +263,13 @@
       flex-direction: column;
       gap: 8px;
       padding: 10px;
-      border: 1px solid #1a1a1a;
+      border: 1px solid var(--border);
       border-radius: 4px;
-      background: #0a0a0a;
+      background: var(--gray-lo);
       transition: border-color 0.15s, background 0.15s;
     }
 
-    .event-card:hover { border-color: #333; }
+    .event-card:hover { border-color: var(--border-mid); }
 
     .event-card.called {
       border-color: rgba(255, 0, 0, 0.4);
@@ -284,15 +286,15 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #1a1a1a;
-      border: 1px solid #333;
+      background: var(--gray-mid);
+      border: 1px solid var(--border-mid);
       flex-shrink: 0;
       transition: all 0.2s;
     }
 
     .event-card.called .event-dot {
-      background: #ff0000;
-      border-color: #ff0000;
+      background: var(--red);
+      border-color: var(--red);
       filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.3));
     }
 
@@ -312,7 +314,7 @@
 
     .event-text {
       font-size: 17px;
-      color: #fff;
+      color: var(--text-pri);
       line-height: 1.35;
       flex: 1;
     }
@@ -333,16 +335,16 @@
 
     .btn-call {
       background: transparent;
-      border: 1px solid #222;
+      border: 1px solid var(--border-mid);
       color: #555;
     }
 
-    .btn-call:hover { border-color: #ff0000; color: #ff0000; background: rgba(255, 0, 0, 0.05); }
+    .btn-call:hover { border-color: var(--red); color: var(--red); background: rgba(255, 0, 0, 0.05); }
 
     .btn-undo {
       background: rgba(255, 0, 0, 0.1);
       border: 1px solid rgba(255, 0, 0, 0.3);
-      color: #ff0000;
+      color: var(--red);
     }
 
     .btn-undo:hover { background: rgba(255, 0, 0, 0.2); }
@@ -354,7 +356,7 @@
       align-items: center;
       margin-top: 12px;
       padding-top: 12px;
-      border-top: 1px solid #1a1a1a;
+      border-top: 1px solid var(--border);
     }
 
     .called-summary {
@@ -362,14 +364,14 @@
       color: #444;
     }
 
-    .called-summary span { color: #ff0000; }
+    .called-summary span { color: var(--red); }
 
     .end-game-btn {
       padding: 8px 24px;
       background: transparent;
-      border: 1px solid #ff0000;
+      border: 1px solid var(--red);
       border-radius: 3px;
-      color: #ff0000;
+      color: var(--red);
       font-size: 15px;
       font-weight: bold;
       text-transform: uppercase;
@@ -388,7 +390,7 @@
 
     .results-title {
       font-size: 34px;
-      color: #ff0000;
+      color: var(--red);
       margin-bottom: 4px;
       text-align: center;
     }
@@ -415,14 +417,14 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: #444;
-      border-bottom: 1px solid #1a1a1a;
+      border-bottom: 1px solid var(--border);
     }
 
     .lb-row {
       display: grid;
       grid-template-columns: 34px 1fr 58px 62px 172px;
       padding: 10px 12px;
-      border-bottom: 1px solid #0f0f0f;
+      border-bottom: 1px solid var(--border);
       align-items: center;
       font-size: 17px;
     }
@@ -433,10 +435,10 @@
     .lb-award { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
 
     .lb-award-tier {
-      background: #111;
-      border: 1px solid #2a2a2a;
+      background: var(--gray-mid);
+      border: 1px solid var(--border-mid);
       border-radius: 3px;
-      color: #fff;
+      color: var(--text-pri);
       font-family: inherit;
       font-size: 14px;
       padding: 4px 5px;
@@ -444,7 +446,7 @@
     }
 
     .lb-award-btn {
-      background: #ff0000;
+      background: var(--red);
       border: none;
       border-radius: 3px;
       color: #fff;
@@ -475,10 +477,10 @@
       color: #555;
     }
 
-    .lb-row:first-of-type .lb-rank { color: #ff0000; }
+    .lb-row:first-of-type .lb-rank { color: var(--red); }
 
-    .lb-name { color: #ccc; overflow: hidden; text-overflow: ellipsis; }
-    .lb-bingos { color: #ff0000; text-align: center; font-weight: bold; }
+    .lb-name { color: var(--text-sec); overflow: hidden; text-overflow: ellipsis; }
+    .lb-bingos { color: var(--red); text-align: center; font-weight: bold; }
     .lb-marked { color: #555; text-align: center; }
 
     .results-actions {
@@ -489,7 +491,7 @@
 
     .new-game-btn {
       padding: 10px 28px;
-      background: #ff0000;
+      background: var(--red);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -505,7 +507,7 @@
     .back-btn {
       padding: 10px 20px;
       background: transparent;
-      border: 1px solid #222;
+      border: 1px solid var(--border-mid);
       border-radius: 4px;
       color: #555;
       font-size: 17px;
@@ -514,7 +516,7 @@
       font-family: inherit;
     }
 
-    .back-btn:hover { border-color: #ff0000; color: #fff; }
+    .back-btn:hover { border-color: var(--red); color: var(--text-pri); }
 
     .no-players {
       text-align: center;

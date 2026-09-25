@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mana Clash</title>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,10 +14,10 @@
        style beats it. This page hides a lot of things with the attribute;
        without this the intermission overlay paints over the splash screen. */
     [hidden] { display: none !important; }
-    body { background: #000; color: #fff; font-family: var(--font-ui); min-height: 100vh; user-select: none; }
+    body { background: var(--black); color: var(--text-pri); font-family: var(--font-ui); min-height: 100vh; user-select: none; }
 
     :root {
-      --red: #ff0000;
+      --red: var(--red);
       /* White like the rest of the site. Every use is a label or a unit
          -- .field-label, .tray-label, .top-bar-stats -- none of them a
          state, which is carried by opacity here. */
@@ -33,10 +35,10 @@
     .btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .btn-red { background: var(--red); color: #fff; }
     .btn-red:hover:not(:disabled) { background: #d40000; }
-    .btn-dim { background: #1a1a1a; color: #fff; border-color: var(--line); }
-    .btn-dim:hover:not(:disabled) { background: #242424; color: #fff; }
+    .btn-dim { background: var(--gray-mid); color: var(--text-pri); border-color: var(--line); }
+    .btn-dim:hover:not(:disabled) { background: var(--gray-hi); color: var(--text-pri); }
     .btn-coop { background: #240a0a; color: #ff9a9a; border-color: #5a2222; }
-    .btn-coop:hover:not(:disabled) { background: #361010; color: #fff; }
+    .btn-coop:hover:not(:disabled) { background: #361010; color: var(--text-pri); }
     .coop-note { font-size: 15px; color: var(--dim); opacity: 0.7; margin-top: 6px; line-height: 1.5; }
 
     /* Co-op enemy banner */
@@ -47,8 +49,8 @@
     .enemy-name.final { color: #ff9a9a; }
     .enemy-rounds { font-size: 15px; color: var(--dim); opacity: 0.85; }
     .enemy-track { position: relative; height: 18px; margin-top: 6px; background: #1a0000; border: 1px solid #3a0000; border-radius: 4px; overflow: hidden; }
-    .enemy-track i { display: block; height: 100%; background: linear-gradient(90deg, #ff0000, #ff5a1f); transition: width 0.5s ease; }
-    .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
+    .enemy-track i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), #ff5a1f); transition: width 0.5s ease; }
+    .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000; }
     .enemy-stage { position: relative; display: flex; justify-content: center; align-items: flex-end; height: 104px; margin-bottom: 4px; }
     .enemy-sprite { width: 96px; height: 96px; background-repeat: no-repeat; background-position: 0% 0%; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.7)); }
     .enemy-sprite.hit { animation: enemy-hit 0.3s; }
@@ -65,14 +67,14 @@
     .team-track i { display: block; height: 100%; background: linear-gradient(90deg, #16a34a, #4ade80); transition: width 0.4s ease; }
     .team-track.low i { background: linear-gradient(90deg, #b91c1c, #f59e0b); }
     .minion-track i { display: block; height: 100%; background: linear-gradient(90deg, #4d7c0f, #a3e635); transition: width 0.4s ease; }
-    .team-hp, .minion-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
+    .team-hp, .minion-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
 
     /* The ultimate: charged by Mana Clash, spent as a team-wide burst */
     .ult-track { position: relative; height: 16px; margin-top: 5px; background: #1a0a00; border: 1px solid #4a2000; border-radius: 4px; overflow: hidden; }
-    .ult-track i { display: block; height: 100%; background: linear-gradient(90deg, #ff0000, #ffb020); transition: width 0.5s ease; }
-    .ult-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
+    .ult-track i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), #ffb020); transition: width 0.5s ease; }
+    .ult-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
     .ult-btn {
-      display: block; width: 100%; margin-top: 8px; padding: 9px; background: linear-gradient(90deg, #ff0000, #ffb020);
+      display: block; width: 100%; margin-top: 8px; padding: 9px; background: linear-gradient(90deg, var(--red), #ffb020);
       border: none; border-radius: 5px; color: #000; font-family: inherit; font-size: 17px; font-weight: 800;
       text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; animation: ultPulse 1.1s infinite;
     }
@@ -123,7 +125,7 @@
     /* Between-wave boon chooser */
     .boon-picker { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 6px 0 14px; }
     .boon-card { flex: 1 1 150px; max-width: 200px; background: #180a0a; border: 1px solid #5a2222; border-radius: 8px;
-                 padding: 14px 12px; cursor: pointer; text-align: left; color: #eee; font-family: inherit; transition: border-color 0.15s, background 0.15s; }
+                 padding: 14px 12px; cursor: pointer; text-align: left; color: var(--text-sec); font-family: inherit; transition: border-color 0.15s, background 0.15s; }
     .boon-card:hover:not(:disabled) { background: #241010; border-color: var(--red); }
     .boon-card:disabled { opacity: 0.5; cursor: default; }
     .boon-card b { display: block; font-size: 20px; color: #ff9a9a; margin-bottom: 5px; }
@@ -135,7 +137,7 @@
     .btn-lg { padding: 14px 38px; font-size: 21px; }
 
     .input, .select {
-      background: #111; border: 1px solid var(--line); border-radius: 4px; color: #fff;
+      background: var(--gray-mid); border: 1px solid var(--line); border-radius: 4px; color: var(--text-pri);
       padding: 9px 11px; font-size: 18px; font-family: inherit; width: 100%;
     }
     .input:focus, .select:focus { outline: none; border-color: var(--red); }
@@ -155,7 +157,7 @@
 
     .splash-body { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; }
     .gate { max-width: 460px; text-align: center; margin: 20px 0; }
-    .gate p { font-size: 18px; color: #fff; line-height: 1.6; margin-bottom: 14px; }
+    .gate p { font-size: 18px; color: var(--text-pri); line-height: 1.6; margin-bottom: 14px; }
 
     .splash-sections { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 620px; }
     .splash-form { flex: 1 1 280px; display: flex; flex-direction: column; gap: 9px; }
@@ -167,9 +169,9 @@
     .room-code { font-weight: 800; letter-spacing: 2px; color: var(--red); font-size: 21px; }
 
     /* ════ LOBBY ════ */
-    .lobby-code { font-size: 64px; font-weight: 800; letter-spacing: 8px; color: #fff; cursor: pointer; margin: 6px 0; }
+    .lobby-code { font-size: 64px; font-weight: 800; letter-spacing: 8px; color: var(--text-pri); cursor: pointer; margin: 6px 0; }
     .lobby-meta { display: flex; gap: 16px; font-size: 17px; color: var(--dim); margin-bottom: 14px; }
-    .lobby-meta b { color: #fff; font-weight: 600; }
+    .lobby-meta b { color: var(--text-pri); font-weight: 600; }
     .player-list { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
     .player-row { display: flex; align-items: center; gap: 10px; background: var(--panel);
                   border: 1px solid var(--line); border-radius: 4px; padding: 8px 11px; font-size: 18px; }
@@ -177,7 +179,7 @@
     .player-row .tag { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); }
     .player-row.is-ready { border-color: #2f5f2f; }
     .player-row.is-ready .tag { color: #6ac46a; }
-    .avatar { width: 24px; height: 24px; border-radius: 50%; background: #222; object-fit: cover; }
+    .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--gray-hi); object-fit: cover; }
     .kick-btn { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 3px;
                 font-size: 14px; padding: 3px 7px; cursor: pointer; text-transform: uppercase; }
     .kick-btn:hover { border-color: var(--red); color: var(--red); }
@@ -189,9 +191,9 @@
                background: var(--panel); border-bottom: 2px solid var(--red); width: 100%; }
     .top-bar-title { font-family: var(--font-display); font-size: 15px; font-weight: 800; color: var(--red); letter-spacing: 1.5px; }
     .top-bar-stats { display: flex; gap: 14px; font-size: 17px; color: var(--dim); }
-    .top-bar-stats .val { color: #fff; font-weight: 700; }
+    .top-bar-stats .val { color: var(--text-pri); font-weight: 700; }
 
-    .timer-bar { width: 100%; height: 3px; background: #1a1a1a; }
+    .timer-bar { width: 100%; height: 3px; background: var(--gray-mid); }
     .timer-fill { height: 100%; background: var(--red); width: 100%; transition: width 0.25s linear; }
     .timer-fill.low { background: #ffb300; }
 
@@ -206,25 +208,25 @@
     /* Three stacked lines. Total and status used to share one, which was
        fine while the status said "banked" and ran together the moment it
        started saying "+300 pts (time)". */
-    .standing .nm { color: #fff; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .standing .tot { color: #fff; font-weight: 800; font-size: 20px; display: block; line-height: 1.2; }
+    .standing .nm { color: var(--text-pri); font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .standing .tot { color: var(--text-pri); font-weight: 800; font-size: 20px; display: block; line-height: 1.2; }
     .standing.me { border-color: var(--red); }
     .standing.done-banked { opacity: 0.6; }
     .standing.done-burned { opacity: 0.6; border-color: #5a2a2a; }
     .standing .st { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
                     display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .standing .st.gain { color: #6ac46a; font-weight: 700; }
-    .standing .st.zero { color: #fff; }
+    .standing .st.zero { color: var(--text-pri); }
     .standing .st.burn { color: #ff4040; font-weight: 700; }
     .standing .st.holding { color: #ffb300; }
 
     .play-area { display: flex; flex-direction: column; align-items: center; padding: 18px 14px; gap: 14px; width: 100%; }
     .pending-line { font-size: 18px; color: var(--dim); text-align: center; }
-    .pending-line b { color: #fff; font-size: 36px; font-weight: 800; display: block; }
+    .pending-line b { color: var(--text-pri); font-size: 36px; font-weight: 800; display: block; }
 
     .dice-tray { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; min-height: 66px; }
-    .die { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #333; position: relative;
-           display: flex; align-items: center; justify-content: center; background: #141414; cursor: default; }
+    .die { width: 60px; height: 60px; border-radius: 8px; border: 2px solid var(--border-mid); position: relative;
+           display: flex; align-items: center; justify-content: center; background: var(--gray-mid); cursor: default; }
     .die img { width: 34px; height: 34px; display: block; }
     .die .pip-num { position: absolute; bottom: 2px; right: 5px; font-size: 15px; font-weight: 800; color: #000; }
     /* Scoring dice are HELD by default and drop toward the kept row; a
@@ -232,7 +234,7 @@
        selecting what to keep, because keeping everything that scores is what
        a player wants most of the time. */
     .die.scorable { border-color: var(--red); cursor: pointer; }
-    .die.held { border-color: #fff; transform: translateY(8px); }
+    .die.held { border-color: var(--text-pri); transform: translateY(8px); }
     .die.held:hover { transform: translateY(4px); }
     .die.returned { opacity: 0.5; border-color: #444; transform: translateY(-4px); }
     .die.returned:hover { opacity: 0.8; }
@@ -277,8 +279,8 @@
       text-transform: uppercase; color: var(--red); margin-bottom: 10px;
     }
     .spectate-target { font-size: 17px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
-    .spectate-target b { display: block; font-size: 48px; color: #fff; font-weight: 800; line-height: 1.1; }
-    .spectate-sub { font-size: 18px; color: #fff; margin: 10px 0 14px; }
+    .spectate-target b { display: block; font-size: 48px; color: var(--text-pri); font-weight: 800; line-height: 1.1; }
+    .spectate-sub { font-size: 18px; color: var(--text-pri); margin: 10px 0 14px; }
     .spectate-list { display: flex; flex-direction: column; gap: 5px; }
     .spectate-list li {
       display: flex; align-items: center; gap: 10px;
@@ -302,7 +304,7 @@
     .flash { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
              align-items: center; justify-content: center; pointer-events: none; text-align: center; }
     .flash-word { font-size: 13vw; font-weight: 800; letter-spacing: 0.06em; line-height: 1; }
-    .flash-note { font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 12px; color: #fff; }
+    .flash-note { font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 12px; color: var(--text-pri); }
     .flash.burn { background: rgba(60,0,0,0.93); }
     .flash.burn .flash-word { color: #ff2020; }
     .flash.clash { background: rgba(48,32,0,0.93); }
@@ -314,7 +316,7 @@
 
     .round-progress { font-size: 15px; text-transform: uppercase; letter-spacing: 0.14em;
                       color: var(--dim); text-align: center; padding: 6px 14px; }
-    .round-progress b { color: #fff; }
+    .round-progress b { color: var(--text-pri); }
 
     /* ════ ROOM CHAT ════
        Parked in a corner rather than in the column: the lobby, the game and
@@ -331,14 +333,14 @@
                  color: var(--dim); }
     .chat-toggle { background: none; border: none; color: var(--dim); cursor: pointer;
                    font-size: 21px; line-height: 1; padding: 0 4px; }
-    .chat-toggle:hover { color: #fff; }
+    .chat-toggle:hover { color: var(--text-pri); }
     .chat-log { list-style: none; margin: 0; padding: 8px 10px; height: 168px;
                 overflow-y: auto; overflow-wrap: anywhere; font-size: 17px; line-height: 1.5; }
-    .chat-msg { color: #fff; margin-bottom: 3px; }
+    .chat-msg { color: var(--text-pri); margin-bottom: 3px; }
     .chat-msg b { color: var(--dim); font-weight: 700; }
     .chat-msg.is-mine b { color: var(--red); }
     .chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
-    .chat-input { flex: 1; min-width: 0; background: #0b0b0b; color: #fff;
+    .chat-input { flex: 1; min-width: 0; background: #0b0b0b; color: var(--text-pri);
                   border: 1px solid var(--line); border-radius: 3px;
                   padding: 5px 8px; font-size: 17px; font-family: inherit; }
     .chat-input:focus { outline: none; border-color: var(--red); }
@@ -377,11 +379,11 @@
                    margin-bottom: 8px; }
     .dice-picker-label { font-size: 14px; text-transform: uppercase;
                          letter-spacing: 0.14em; color: var(--dim); }
-    .dice-chip { background: #1a1a1a; color: var(--dim); border: 1px solid var(--line);
+    .dice-chip { background: var(--gray-mid); color: var(--dim); border: 1px solid var(--line);
                  border-radius: 3px; font-size: 15px; padding: 3px 9px; cursor: pointer;
                  font-family: inherit; }
-    .dice-chip:hover { color: #fff; border-color: #444; }
-    .dice-chip.active { color: #fff; border-color: var(--red); }
+    .dice-chip:hover { color: var(--text-pri); border-color: #444; }
+    .dice-chip.active { color: var(--text-pri); border-color: var(--red); }
 
     .room-live { font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em;
                  color: var(--red); border: 1px solid var(--red); border-radius: 2px;
@@ -401,7 +403,7 @@
 
     .sound-toggle { background: none; border: 1px solid var(--line); color: var(--dim);
                     border-radius: 3px; font-size: 15px; padding: 3px 8px; cursor: pointer; }
-    .sound-toggle:hover { color: #fff; border-color: #444; }
+    .sound-toggle:hover { color: var(--text-pri); border-color: #444; }
 
     /* ════ RULES & SCORING ════ */
     .rules { width: 100%; max-width: 620px; }
@@ -414,7 +416,7 @@
     .rules > summary::-webkit-details-marker { display: none; }
     .rules > summary::after { content: ' ▾'; color: var(--red); }
     .rules[open] > summary::after { content: ' ▴'; }
-    .rules > summary:hover { color: #fff; border-color: #3a3a3a; }
+    .rules > summary:hover { color: var(--text-pri); border-color: #3a3a3a; }
 
     .rules-body { padding: 16px 4px 4px; }
     .rules-h {
@@ -423,9 +425,9 @@
       padding-bottom: 5px;
     }
     .rules-h:first-child { margin-top: 0; }
-    .rules-p { font-size: 18px; color: #fff; line-height: 1.6; margin-bottom: 8px; }
-    .rules-p b { color: #fff; }
-    .rules-p .burn { color: #ff0000; font-weight: 700; }
+    .rules-p { font-size: 18px; color: var(--text-pri); line-height: 1.6; margin-bottom: 8px; }
+    .rules-p b { color: var(--text-pri); }
+    .rules-p .burn { color: var(--red); font-weight: 700; }
     .rules-p .clash { color: #ffb300; font-weight: 700; }
 
     .rules-table { width: 100%; border-collapse: collapse; font-size: 18px; }
@@ -436,14 +438,14 @@
     }
     .rules-table td { padding: 5px 8px 5px 0; border-bottom: 1px solid #141414; }
     .rules-table td:last-child, .rules-table th:last-child { text-align: right; padding-right: 0; }
-    .rules-table .pts { font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
-    .rules-table tr:hover td { background: #0d0d0d; }
+    .rules-table .pts { font-weight: 800; color: var(--text-pri); font-variant-numeric: tabular-nums; }
+    .rules-table tr:hover td { background: var(--gray-lo); }
 
     .rules-dice { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-    .rules-die { display: flex; align-items: center; gap: 5px; font-size: 17px; color: #fff; }
+    .rules-die { display: flex; align-items: center; gap: 5px; font-size: 17px; color: var(--text-pri); }
     .rules-die i {
       width: 20px; height: 20px; border-radius: 4px; display: inline-block;
-      border: 1px solid #333;
+      border: 1px solid var(--border-mid);
     }
 
     .rules-modal {
@@ -461,7 +463,7 @@
       background: none; border: none; color: var(--dim);
       font-size: 34px; line-height: 1; cursor: pointer;
     }
-    .rules-close:hover { color: #fff; }
+    .rules-close:hover { color: var(--text-pri); }
 
     /* ════ INTERMISSION ════ */
     .intermission { position: fixed; inset: 0; background: rgba(0,0,0,0.94); z-index: 40;
@@ -479,7 +481,7 @@
     .standings-table .srow .delta { font-size: 15px; width: 92px; text-align: right;
                                     text-transform: uppercase; letter-spacing: 0.06em; }
     .standings-table .srow .delta.gain { color: #6ac46a; }
-    .standings-table .srow .delta.zero { color: #fff; }
+    .standings-table .srow .delta.zero { color: var(--text-pri); }
     .standings-table .srow .delta.burn { color: #ff4040; font-weight: 700; }
     .standings-table .srow.me { border-color: var(--red); }
 
