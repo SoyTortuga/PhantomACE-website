@@ -46,15 +46,15 @@ page AND every game, and sub-agents must follow them too.
   NOT repurpose any of these as a button, tag, or category colour.
 - **Fonts:** **GodOfWar** is the single gothic display face for every title and
   header (`--font-display` / `--font-gothic`); **Gotfridus** is the body face
-  (`--font-ui`), with a **16px base** (`body { font-size: 16px }`). Both are owned,
+  (`--font-ui`), with a **14px base** (`body { font-size: 14px }`). Both are owned,
   self-hosted fonts in `assets/fonts/` (Gotfridus as woff2 + ttf) — no Google Fonts
   / web-font CDN, and never Inter, Roboto, or another generic UI sans.
   `--font-system` (system-ui) remains only for utilitarian tool pages. The retired
   faces (PhantomACE / UnifrakturMaguntia / Cinzel Decorative / IM Fell English /
   Aurusenthial Gothic) must not be reintroduced.
 - **Keep `--font-ui` body text readable — ~14px minimum.** It is a display-weight
-  face that turns to mush when tiny, so avoid 8–13px for `--font-ui` text; the base
-  is 16px. (GodOfWar headings and system-ui tool text are exempt.)
+  face that turns to mush when tiny, so avoid going below ~13px for `--font-ui`
+  text; the base is 14px. (GodOfWar headings and system-ui tool text are exempt.)
 - **No `box-shadow`. Ever.** Depth comes from borders. For a glow, use
   `filter: drop-shadow()` on a NON-box element (sprite/logo/icon); to make a box
   read as "lit", brighten or thicken its border instead — do not reach for a
