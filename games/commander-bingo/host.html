@@ -42,7 +42,7 @@
 
     .host-subtitle {
       font-size: 15px;
-      color: #444;
+      color: var(--text-dim);
       text-transform: uppercase;
       letter-spacing: 0.12em;
       margin-bottom: 32px;
@@ -82,7 +82,7 @@
     .create-note {
       margin-top: 16px;
       font-size: 15px;
-      color: #333;
+      color: var(--text-dim);
       text-align: center;
       max-width: 280px;
       line-height: 1.5;
@@ -106,7 +106,7 @@
       font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: #444;
+      color: var(--text-dim);
       margin-bottom: 4px;
     }
 
@@ -129,7 +129,7 @@
       background: transparent;
       border: 1px solid var(--border-mid);
       border-radius: 3px;
-      color: #555;
+      color: var(--text-dim);
       font-size: 14px;
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s;
@@ -157,7 +157,7 @@
       transition: border-color 0.2s, color 0.2s;
       font-family: inherit;
     }
-    .overlay-toggle:hover { border-color: #444; color: var(--text-dim); }
+    .overlay-toggle:hover { border-color: var(--text-dim); color: var(--text-dim); }
     .overlay-toggle .ov-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: #333; border: 1px solid #444;
@@ -176,7 +176,7 @@
 
     .stat-row {
       font-size: 15px;
-      color: #555;
+      color: var(--text-dim);
     }
 
     .stat-row span { color: var(--text-pri); font-weight: bold; }
@@ -204,7 +204,7 @@
       background: transparent;
       border: 1px solid var(--border);
       border-radius: 3px;
-      color: #444;
+      color: var(--text-dim);
       font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -241,7 +241,7 @@
     }
 
     .search-input:focus { border-color: var(--red); }
-    .search-input::placeholder { color: #333; }
+    .search-input::placeholder { color: #8a8a8a; }
 
     /* ── EVENT CARD GRID ─────────────────── */
     .events-list {
@@ -336,7 +336,7 @@
     .btn-call {
       background: transparent;
       border: 1px solid var(--border-mid);
-      color: #555;
+      color: var(--text-dim);
     }
 
     .btn-call:hover { border-color: var(--red); color: var(--red); background: rgba(255, 0, 0, 0.05); }
@@ -361,7 +361,7 @@
 
     .called-summary {
       font-size: 15px;
-      color: #444;
+      color: var(--text-dim);
     }
 
     .called-summary span { color: var(--red); }
@@ -397,7 +397,7 @@
 
     .results-sub {
       font-size: 17px;
-      color: #555;
+      color: var(--text-dim);
       margin-bottom: 20px;
       text-align: center;
     }
@@ -416,7 +416,7 @@
       font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: #444;
+      color: var(--text-dim);
       border-bottom: 1px solid var(--border);
     }
 
@@ -470,18 +470,18 @@
       color: #6ac46a;
     }
 
-    .lb-award-na { font-size: 14px; color: #444; }
+    .lb-award-na { font-size: 14px; color: var(--text-dim); }
 
     .lb-rank {
       font-weight: bold;
-      color: #555;
+      color: var(--text-dim);
     }
 
     .lb-row:first-of-type .lb-rank { color: var(--red); }
 
     .lb-name { color: var(--text-sec); overflow: hidden; text-overflow: ellipsis; }
     .lb-bingos { color: var(--red); text-align: center; font-weight: bold; }
-    .lb-marked { color: #555; text-align: center; }
+    .lb-marked { color: var(--text-dim); text-align: center; }
 
     .results-actions {
       margin-top: 20px;
@@ -509,7 +509,7 @@
       background: transparent;
       border: 1px solid var(--border-mid);
       border-radius: 4px;
-      color: #555;
+      color: var(--text-dim);
       font-size: 17px;
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s;
@@ -521,7 +521,7 @@
     .no-players {
       text-align: center;
       padding: 24px;
-      color: #333;
+      color: var(--text-dim);
       font-size: 17px;
     }
   </style>

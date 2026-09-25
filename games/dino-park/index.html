@@ -492,7 +492,7 @@
       padding: 4px 12px; background: #ffaa00; border: none; border-radius: 4px;
       color: #000; font-size: 14px; font-weight: 700; cursor: pointer;
     }
-    .market-section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 10px; }
+    .market-section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-dim); margin-bottom: 10px; }
     .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
     .market-card {
       background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 8px;
@@ -515,7 +515,7 @@
       border-radius: 4px; color: var(--text-pri); font-size: 14px; cursor: pointer; margin-top: 4px;
     }
     .market-card-cancel:hover { border-color: var(--red); color: var(--red); }
-    .market-empty { text-align: center; color: #444; font-size: 17px; padding: 30px; }
+    .market-empty { text-align: center; color: var(--text-dim); font-size: 17px; padding: 30px; }
     .market-card .rarity-chip { display: inline-block; font-size: 14px; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
     .market-card .rarity-common { background: #333; color: var(--text-pri); }
     .market-card .rarity-uncommon { background: #1a3a1a; color: #4CAF50; }
@@ -556,7 +556,7 @@
 
     /* ======================== EGGS TAB ======================== */
     .eggs-section { margin-bottom: 24px; }
-    .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 12px; }
+    .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-dim); margin-bottom: 12px; }
 
     /* Incubator */
     .incubator-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
@@ -565,7 +565,7 @@
       padding: 16px; text-align: center; min-height: 120px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .egg-slot.empty { border-style: dashed; color: #333; font-size: 15px; }
+    .egg-slot.empty { border-style: dashed; color: var(--text-dim); font-size: 15px; }
     .egg-emoji { font-size: 50px; margin-bottom: 6px; animation: eggWobble 2s infinite ease-in-out; }
     @keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
     .egg-name { font-size: 14px; color: var(--text-pri); font-weight: 600; margin-bottom: 4px; }
@@ -615,7 +615,7 @@
     .esbadge-ready { background: var(--red)33; color: #ff4444; }
     .esbadge-claimed { background: #27ae6022; color: #2ecc71; }
     .esbadge-waiting { background: var(--border-mid); color: var(--text-pri); }
-    .esbadge-locked { background: var(--border-mid); color: #333; }
+    .esbadge-locked { background: var(--border-mid); color: var(--text-dim); }
 
     /* Random event banner */
     .event-banner {
@@ -666,7 +666,7 @@
       border-radius: 4px; color: var(--text-pri); font-size: 15px; font-family: monospace;
       letter-spacing: 0.08em; text-transform: uppercase;
     }
-    .redeem-input::placeholder { color: #333; text-transform: none; letter-spacing: normal; }
+    .redeem-input::placeholder { color: #8a8a8a; text-transform: none; letter-spacing: normal; }
     .redeem-input:focus { outline: none; border-color: var(--red); }
     .redeem-btn {
       padding: 8px 16px; background: var(--red); border: none; border-radius: 4px;
@@ -826,7 +826,7 @@
     }
     .trade-cancel { background: var(--gray-mid); color: var(--text-pri); border: 1px solid var(--border-mid); }
     .trade-go { background: var(--red); color: #fff; border: 1px solid var(--red); }
-    .trade-go[disabled] { background: var(--gray-mid); color: #444; border-color: var(--text-dim); cursor: not-allowed; }
+    .trade-go[disabled] { background: var(--gray-mid); color: var(--text-dim); border-color: var(--text-dim); cursor: not-allowed; }
     /* Dimmed, not hidden: a card you cannot pick should still say why it is
        there. opacity only -- the rarity border stays readable underneath. */
     .coll-card.tu-dim { opacity: 0.28; cursor: default; }
@@ -868,7 +868,7 @@
     }
     .coll-detail-empty {
       flex: 1; display: flex; align-items: center; justify-content: center;
-      color: #333; font-size: 17px;
+      color: var(--text-dim); font-size: 17px;
     }
     .coll-sprite-large { margin-bottom: 12px; max-width: 100%; }
     .coll-name { font-size: 25px; font-weight: 700; color: var(--text-pri); margin-bottom: 4px; }
@@ -955,7 +955,7 @@
     }
     .dex-filter:hover { color: var(--text-pri); border-color: var(--text-dim); }
     .dex-filter.active { color: var(--red); border-color: var(--red); }
-    .dex-counter { font-size: 15px; color: #444; margin-bottom: 8px; }
+    .dex-counter { font-size: 15px; color: var(--text-dim); margin-bottom: 8px; }
     .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .dex-entry {
       background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 6px;
@@ -987,7 +987,7 @@
     .dex-detail-desc { font-size: 15px; color: var(--text-pri); line-height: 1.5; margin-top: 8px; font-style: italic; }
     .dex-detail-section { margin-top: 12px; }
     .dex-detail-section-title {
-      font-size: 14px; color: #444; text-transform: uppercase; letter-spacing: 0.1em;
+      font-size: 14px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em;
       margin-bottom: 6px; font-weight: 600;
     }
     .dex-mut-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }

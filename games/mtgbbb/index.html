@@ -28,7 +28,7 @@
     /* ── JOIN SCREEN ─────────────────────── */
     .game-title { font-family: var(--font-display); font-size: 28px; color: var(--red); text-align: center; margin-bottom: 4px; letter-spacing: 0.02em; }
     .game-subtitle {
-      font-size: 15px; color: #444; text-transform: uppercase; letter-spacing: 0.12em;
+      font-size: 15px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em;
       margin-bottom: 32px; text-align: center;
     }
 
@@ -40,7 +40,7 @@
       transition: border-color 0.2s;
     }
     .join-input:focus { border-color: var(--red); }
-    .join-input::placeholder { color: #444; }
+    .join-input::placeholder { color: #8a8a8a; }
     .join-input.code-input { font-size: 34px; letter-spacing: 0.3em; text-transform: uppercase; font-weight: bold; }
 
     .join-btn {
@@ -72,7 +72,7 @@
     .rank-badge .rank-num { color: var(--red); font-size: 28px; font-weight: bold; display: block; line-height: 1; }
 
     .pack-bar-wrap { width: 100%; margin-bottom: 10px; }
-    .pack-bar-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; margin-bottom: 4px; }
+    .pack-bar-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 4px; }
     .pack-bar-label span { color: var(--red); }
     .pack-bar { width: 100%; height: 4px; background: var(--gray-mid); border-radius: 2px; overflow: hidden; }
     .pack-bar-fill { height: 100%; background: var(--red); transition: width 0.4s ease; }
@@ -168,7 +168,7 @@
       width: 100%; margin-top: 10px; padding: 12px; background: var(--gray-lo); border: 1px solid var(--border);
       border-radius: 4px;
     }
-    .shot-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #444; margin-bottom: 8px; }
+    .shot-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 8px; }
     .shot-form { display: flex; flex-direction: column; gap: 8px; }
     .shot-form select, .shot-form .form-input {
       width: 100%; padding: 8px 10px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 3px;
@@ -203,7 +203,7 @@
       border-radius: 6px; text-align: center;
     }
     .results-big { font-size: 67px; font-weight: bold; color: var(--red); line-height: 1; }
-    .results-label { font-size: 14px; color: #444; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; margin-bottom: 20px; }
+    .results-label { font-size: 14px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; margin-bottom: 20px; }
     .results-breakdown { list-style: none; text-align: left; }
     .results-breakdown li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 17px; color: var(--text-pri); display: flex; justify-content: space-between; }
     .results-breakdown li span:last-child { color: var(--text-pri); font-weight: bold; }
