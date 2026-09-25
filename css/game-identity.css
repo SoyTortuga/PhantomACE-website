@@ -22,8 +22,9 @@
 }
 
 @font-face {
-  font-family: 'Aurusenthial Gothic';
-  src: url('/assets/fonts/AurusenthialGothic.ttf') format('truetype');
+  font-family: 'Gotfridus';
+  src: url('/assets/fonts/Gotfridus.woff2') format('woff2'),
+       url('/assets/fonts/Gotfridus.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -32,7 +33,7 @@
 :root {
   --font-display: 'GodOfWar', serif;
   --font-gothic:  'GodOfWar', serif;
-  --font-ui:      'Aurusenthial Gothic', Georgia, serif;
+  --font-ui:      'Gotfridus', Georgia, serif;
   --font-system:  system-ui, -apple-system, sans-serif;
 }
 
