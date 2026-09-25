@@ -49,6 +49,9 @@
       padding-bottom: 8px;
     }
     .news-ticker.fade { opacity: 0; }
+    /* Light mode: the muted mauve whisper is invisible on parchment — use a
+       muted ink-brown that reads as a whisper on paper. */
+    :root[data-theme="light"] .news-ticker { color: #8a7350; }
 
     /* Screen shake on milestones */
     .shake { animation: shake 0.5s; }
@@ -192,14 +195,14 @@
     .prestige-panel { text-align: center; padding: 20px 16px; }
     .prestige-tier { font-size: 36px; font-weight: 800; color: var(--red); }
     .prestige-mult { font-size: 21px; color: var(--text-pri); margin-top: 4px; }
-    .prestige-next { font-size: 17px; color: #ffffff99; margin: 10px 0 8px; }
-    .prestige-bar { height: 10px; background: var(--gray-mid); border: 1px solid #ffffff28; border-radius: 5px; overflow: hidden; margin: 0 auto; max-width: 320px; }
+    .prestige-next { font-size: 17px; color: var(--text-dim); margin: 10px 0 8px; }
+    .prestige-bar { height: 10px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 5px; overflow: hidden; margin: 0 auto; max-width: 320px; }
     .prestige-fill { height: 100%; background: var(--red); transition: width 0.3s; }
-    .prestige-have { font-size: 15px; color: #ffffffaa; margin-top: 6px; }
+    .prestige-have { font-size: 15px; color: var(--text-dim); margin-top: 6px; }
     .prestige-btn { margin-top: 16px; padding: 10px 22px; background: var(--red); color: #fff; border: none; border-radius: 6px; font-size: 20px; font-weight: 800; cursor: pointer; }
     .prestige-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .prestige-btn:not(:disabled):hover { background: #cc0000; }
-    .prestige-note { font-size: 14px; color: #ffffff77; margin-top: 12px; }
+    .prestige-note { font-size: 14px; color: var(--text-dim); margin-top: 12px; }
     .shard-balance { text-align: center; font-size: 20px; color: var(--text-pri); margin: 4px 0 10px; }
     .shard-balance b { color: #ff5555; }
     .perk-lvl { font-size: 14px; font-weight: 800; color: #d98fff; margin-left: 4px; }
@@ -213,7 +216,7 @@
       cursor: pointer; font-family: inherit;
     }
     .ranks-tab.active { border-color: var(--red); color: var(--red); background: rgba(255,0,0,0.06); }
-    .ranks-note { font-size: 15px; color: #ffffff88; text-align: center; margin-bottom: 6px; line-height: 1.5; }
+    .ranks-note { font-size: 15px; color: var(--text-dim); text-align: center; margin-bottom: 6px; line-height: 1.5; }
     .ranks-note b { color: #ff5555; }
     .ranks-you { font-size: 17px; color: var(--text-pri); text-align: center; margin-bottom: 12px; }
     .ranks-you b { color: #ff5555; }
@@ -278,7 +281,7 @@
     @keyframes raid-mini-idle { from { background-position-x: 0; } to { background-position-x: -136px; } }
     .raid-name { font-size: 18px; font-weight: 800; color: #ff5555; flex: 1; }
     .raid-mini-tag { font-size: 14px; color: #b060ff; font-weight: 800; }
-    .raid-timer { font-size: 15px; color: #ffffffaa; font-variant-numeric: tabular-nums; }
+    .raid-timer { font-size: 15px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
     .raid-track {
       position: relative; height: 16px; margin: 6px 0 4px; background: #1a0000;
       border: 1px solid #3a0000; border-radius: 4px; overflow: hidden;
@@ -288,7 +291,7 @@
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000;
     }
-    .raid-top { font-size: 14px; color: #ffffff99; text-align: center; }
+    .raid-top { font-size: 14px; color: var(--text-dim); text-align: center; }
     @media (prefers-reduced-motion: reduce) { .raid-track i { transition: none; } }
 
     /* Raid reward banner (claim your code in-game) */
@@ -302,7 +305,7 @@
     .reward-title { font-size: 20px; font-weight: 800; color: var(--text-pri); }
     .reward-banner.rar-rare .reward-title { color: #ffb300; }
     .reward-banner.rar-uncommon .reward-title { color: #7fd0e6; }
-    .reward-sub { font-size: 15px; color: #ffffffaa; margin: 3px 0 8px; }
+    .reward-sub { font-size: 15px; color: var(--text-dim); margin: 3px 0 8px; }
     .reward-sub b { text-transform: uppercase; color: var(--text-pri); }
     .reward-code {
       font-size: 28px; font-weight: 800; letter-spacing: 0.15em; color: var(--text-pri);
@@ -371,7 +374,7 @@
     }
     .ach-toast-kind { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--red); }
     .ach-toast-name { font-size: 21px; font-weight: 800; margin: 2px 0; }
-    .ach-toast-desc { font-size: 15px; color: #ffffff99; }
+    .ach-toast-desc { font-size: 15px; color: var(--text-dim); }
 
     /* Buy-amount toggle */
     .buy-toggle { display: flex; gap: 4px; margin-bottom: 8px; }
@@ -388,7 +391,7 @@
     .upgrade-row.locked { opacity: 0.4; cursor: default; }
 
     /* Feats grid */
-    .feats-head { font-size: 17px; color: #ffffffcc; text-align: center; padding: 6px 0 12px; }
+    .feats-head { font-size: 17px; color: var(--text-dim); text-align: center; padding: 6px 0 12px; }
     .feats-head b { color: #ff3b3b; }
     .feats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .feat { border: 1px solid var(--border); border-radius: 4px; padding: 10px; background: var(--gray-lo); }
@@ -396,7 +399,7 @@
     .feat.locked { opacity: 0.5; }
     .feat-name { font-size: 17px; font-weight: 800; color: var(--text-pri); }
     .feat.got .feat-name { color: #ff5555; }
-    .feat-desc { font-size: 14px; color: #ffffff88; margin-top: 3px; }
+    .feat-desc { font-size: 14px; color: var(--text-dim); margin-top: 3px; }
 
     @media (prefers-reduced-motion: reduce) {
       .cursed-skull { animation: none; }
@@ -547,15 +550,15 @@
     .offline-banner {
       text-align: center;
       padding: 10px;
-      background: #0a0a00;
-      border: 1px solid #332200;
+      background: var(--gray-mid);
+      border: 1px solid var(--border-mid);
       border-radius: 4px;
       margin: 8px 12px;
       font-size: 17px;
-      color: #ffaa00;
+      color: var(--amber);
       cursor: pointer;
     }
-    .offline-banner:hover { background: #111100; }
+    .offline-banner:hover { background: var(--gray-hi); }
 
     .boost-banner {
       text-align: center;
