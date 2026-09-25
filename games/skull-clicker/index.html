@@ -1919,7 +1919,7 @@
             el = document.createElement('div');
             el.id = 'boostBanner';
             el.className = 'boost-banner';
-            document.querySelector('.game-area').prepend(el);
+            document.querySelector('.game-wrap').prepend(el);
           }
           var secs = Math.max(0, Math.ceil((cpBoostExpires - Date.now()) / 1000));
           el.textContent = 'SKULL BOOST x' + cpBoostMult + ' — ' + secs + 's remaining';

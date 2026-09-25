@@ -305,10 +305,20 @@
   async function del() {
     if (!currentId) return;
     if (!confirm('Delete "' + currentId + '"? Parks using it fall back to the classic background.')) return;
-    await fetch(API, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', id: currentId }),
-    });
+    $('bgsStatus').textContent = 'Deleting…';
+    try {
+      var res = await fetch(API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id: currentId }),
+      });
+      var data = await res.json().catch(function () { return {}; });
+      // Only tear down local state once the server confirms the delete —
+      // otherwise a 403/500/network drop wiped the loaded map and lied "Deleted".
+      if (!res.ok) { $('bgsStatus').textContent = data.error || 'Delete failed'; return; }
+    } catch (e) {
+      $('bgsStatus').textContent = 'Delete failed: ' + e.message;
+      return;
+    }
     currentId = '';
     tilemap = blankMap();
     $('bgsName').value = '';

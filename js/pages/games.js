@@ -1,3 +1,7 @@
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
+
 const GAMES = [
   { id: 'memory-match', title: 'Memory Match', thumb: '/assets/images/game-memory-match.png', play: () => launchGame('Memory Match', '/games/memory-match/') },
   { id: 'skull-clicker', title: 'Skull Clicker', thumb: '/assets/images/game-skull-clicker.png', play: () => launchGame('Skull Clicker', '/games/skull-clicker/') },
@@ -93,7 +97,7 @@ async function loadSkullClickerLeaderboard() {
     }
     const top3 = lb.slice(0, 3);
     el.innerHTML = '<div class="sc-lb-title">Top Players</div>' +
-      top3.map((e, i) => `<div class="sc-lb-row"><span class="sc-lb-rank rank-${i + 1}">${i + 1}</span><span class="sc-lb-name">${e.name}</span><span class="sc-lb-score">${fmt(e.score)}</span></div>`).join('');
+      top3.map((e, i) => `<div class="sc-lb-row"><span class="sc-lb-rank rank-${i + 1}">${i + 1}</span><span class="sc-lb-name">${escHtml(e.name)}</span><span class="sc-lb-score">${fmt(e.score)}</span></div>`).join('');
   } catch { /* leaderboard is a nice-to-have, fail silently */ }
 }
 

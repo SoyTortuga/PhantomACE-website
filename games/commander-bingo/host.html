@@ -307,7 +307,7 @@
       flex-shrink: 0;
     }
 
-    .event-cat.gameplay { color: #cc88ff; border-color: rgba(204, 136, 255, 0.2); }
+    .event-cat.gameplay { color: #ff6b6b; border-color: rgba(255, 0, 0, 0.25); }
     .event-cat.social { color: #ffaa00; border-color: rgba(255, 170, 0, 0.2); }
 
     .event-text {
@@ -535,6 +535,9 @@
     <p class="create-note">
       Creates a game session with a 4-letter code. Share the code with your audience so they can join and get their bingo cards.
     </p>
+    <p class="create-note" id="authMsg" hidden style="color:var(--red,#ff0000)"></p>
+    <a class="create-btn" id="loginBtn" hidden target="_top" href="/api/auth/twitch"
+       style="display:inline-block;text-decoration:none;margin-top:10px">Log In with Twitch</a>
   </div>
 
   <!-- ════ HOST PANEL ════ -->
@@ -688,18 +691,34 @@
       gameCode = generateCode();
       showOnOverlay = true;
 
+      let res = null;
       try {
-        const res = await fetch('/api/bingo/create', {
+        res = await fetch('/api/bingo/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: gameCode })
         });
-        if (res.ok) {
-          useApi = true;
-        } else {
-          throw new Error('api fail');
-        }
       } catch {
+        res = null; /* genuine network error — offline fallback below */
+      }
+
+      /* An auth refusal must NOT silently degrade to a local "offline" room:
+         that dropped an unauthorized user into a host panel that looked real
+         but no player could ever join. Stop and tell them instead. */
+      if (res && (res.status === 401 || res.status === 403)) {
+        const msg = document.getElementById('authMsg');
+        msg.textContent = 'Only the broadcaster and moderators can host Commander Bingo.';
+        msg.hidden = false;
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.href = '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname);
+        loginBtn.hidden = false;
+        return;
+      }
+
+      if (res && res.ok) {
+        useApi = true;
+      } else {
+        /* Network error or server 5xx only — the intended offline fallback. */
         useApi = false;
         localStorage.setItem('bingo_game_' + gameCode, JSON.stringify({
           code: gameCode,

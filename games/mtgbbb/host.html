@@ -185,6 +185,8 @@
     <p class="host-subtitle">Moderator Control Panel</p>
 
     <p class="gate-msg" id="gateMsg" hidden></p>
+    <a class="create-btn" id="loginBtn" hidden target="_top" href="/api/auth/twitch"
+       style="display:inline-block;text-decoration:none;margin-top:10px">Log In with Twitch</a>
 
     <!-- A game the server says is still running. Shown before the create
          form so a host who refreshed, changed device, or lost the tab can
@@ -328,6 +330,9 @@
       if (!phamSession) {
         document.getElementById('gateMsg').hidden = false;
         document.getElementById('gateMsg').textContent = 'Log in with Twitch to open a room.';
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.href = '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname);
+        loginBtn.hidden = false;
         return;
       }
       try {
