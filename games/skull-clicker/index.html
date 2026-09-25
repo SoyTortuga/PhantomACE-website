@@ -423,9 +423,9 @@
       cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
     }
-    .building-row:hover:not(.locked) { border-color: var(--red); background: #110000; }
+    .building-row:hover:not(.locked) { border-color: var(--red); background: var(--red-glow); }
     .building-row.locked { opacity: 0.25; cursor: not-allowed; }
-    .building-row.affordable { border-color: #331111; }
+    .building-row.affordable { border-color: var(--red-dim); }
     .building-icon {
       position: relative;
       width: 40px; height: 40px;
@@ -478,7 +478,7 @@
       cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
     }
-    .upgrade-row:hover:not(.locked):not(.bought) { border-color: var(--red); background: #110000; }
+    .upgrade-row:hover:not(.locked):not(.bought) { border-color: var(--red); background: var(--red-glow); }
     .upgrade-row.locked { opacity: 0.25; cursor: not-allowed; }
     .upgrade-row.bought { opacity: 0.4; cursor: default; border-color: var(--border); }
     .upgrade-row.bought .building-cost { color: #0a0; }
