@@ -221,7 +221,7 @@
   right: 0;
   width: 320px;
   max-height: 400px;
-  background: rgba(10, 10, 10, 0.98);
+  background: var(--gray-mid);
   border: 1px solid var(--border-mid);
   border-radius: 12px;
   z-index: 1200;
@@ -283,7 +283,7 @@
 }
 
 .notif-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--red-glow);
 }
 
 .notif-unread {
@@ -398,7 +398,7 @@
   top: 100%;
   right: 0;
   width: 200px;
-  background: rgba(10, 10, 10, 0.98);
+  background: var(--gray-mid);
   border: 1px solid var(--border-mid);
   border-radius: 12px;
   z-index: 1200;
@@ -502,7 +502,7 @@
 }
 
 .account-menu-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--red-glow);
   color: var(--text-pri);
 }
 
@@ -526,7 +526,7 @@
 .account-menu-item-staff {
   color: var(--red);
   font-weight: 700;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-mid);
 }
 .account-menu-item-staff:hover {
   background: rgba(152, 9, 10, 0.1);
