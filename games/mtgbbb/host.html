@@ -23,9 +23,11 @@
     .create-screen { align-items: center; padding-top: 24px; }
     .host-title { font-family: var(--font-display);
  letter-spacing: normal; font-size: 28px; color: var(--red); text-align: center; margin-bottom: 4px; }
-    .host-subtitle { font-size: 15px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 28px; text-align: center; }
+    .host-subtitle { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 28px; text-align: center; }
 
-    .gate-msg { font-size: 17px; color: var(--text-dim); text-align: center; max-width: 360px; line-height: 1.6; }
+    .gate-msg { font-size: 17px;
+ text-shadow: none; color: var(--text-dim); text-align: center; max-width: 360px; line-height: 1.6; }
 
     .create-form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
     .form-row { display: flex; flex-direction: column; gap: 4px; }
@@ -34,7 +36,8 @@
 
     .form-input, .form-select {
       width: 100%; padding: 10px 12px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 4px;
-      color: var(--text-pri); font-size: 18px; font-family: inherit; outline: none; transition: border-color 0.2s;
+      color: var(--text-pri); font-size: 18px;
+ text-shadow: none; font-family: inherit; outline: none; transition: border-color 0.2s;
     }
     .form-input:focus, .form-select:focus { border-color: var(--red); }
     .form-hint { font-size: 14px;
@@ -56,15 +59,18 @@
     }
     .create-btn:hover:not(:disabled) { background: #cc0000; }
     .create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .create-error { font-size: 15px; color: var(--red); min-height: 14px; text-align: center; }
+    .create-error { font-size: 15px;
+ text-shadow: none; color: var(--red); min-height: 14px; text-align: center; }
     .resume-banner { width: 100%; max-width: 360px; border: 1px solid #98090a; padding: 14px 16px; margin-bottom: 18px; text-align: center; }
     .resume-label { font-size: 14px;
  text-shadow: none; text-transform: uppercase; letter-spacing: 0.12em; color: var(--red); margin-bottom: 6px; }
     .resume-code { font-size: 39px; font-weight: bold; letter-spacing: 0.2em; color: var(--red); line-height: 1; }
-    .resume-meta { font-size: 15px; color: var(--text-dim); margin: 6px 0 12px; }
+    .resume-meta { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); margin: 6px 0 12px; }
     .resume-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
     .resume-actions .create-btn { width: auto; padding: 8px 16px; }
-    .resume-end-btn { background: none; border: 1px solid var(--border-mid); color: var(--text-dim); font-size: 15px; padding: 8px 14px; cursor: pointer; font-family: inherit; }
+    .resume-end-btn { background: none; border: 1px solid var(--border-mid); color: var(--text-dim); font-size: 15px;
+ text-shadow: none; padding: 8px 14px; cursor: pointer; font-family: inherit; }
     .resume-end-btn:hover { border-color: var(--red); color: var(--red); }
 
     /* ── HOST PANEL HEADER ───────────────── */
@@ -86,13 +92,15 @@
     .mini-btn.copied { border-color: #00cc66; color: #00cc66; }
 
     .host-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-    .stat-row { font-size: 15px; color: var(--text-dim); }
+    .stat-row { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); }
     .stat-row span { color: var(--text-pri); font-weight: bold; }
 
     .pack-adjust { display: flex; align-items: center; gap: 6px; }
     .pack-btn {
       width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--border-mid); background: transparent;
-      color: var(--text-dim); font-size: 18px; cursor: pointer; line-height: 1; font-family: inherit;
+      color: var(--text-dim); font-size: 18px;
+ text-shadow: none; cursor: pointer; line-height: 1; font-family: inherit;
     }
     .pack-btn:hover { border-color: var(--red); color: var(--text-pri); }
 
@@ -100,14 +108,16 @@
     .mark-panel { background: var(--gray-lo); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 12px; }
     .search-input {
       width: 100%; padding: 10px 12px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 4px;
-      color: var(--text-pri); font-size: 18px; font-family: inherit; outline: none; transition: border-color 0.2s;
+      color: var(--text-pri); font-size: 18px;
+ text-shadow: none; font-family: inherit; outline: none; transition: border-color 0.2s;
     }
     .search-input:focus { border-color: var(--red); }
 
     .search-results { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; }
     .search-result {
       display: flex; justify-content: space-between; align-items: center; padding: 7px 10px;
-      border: 1px solid var(--border); border-radius: 3px; cursor: pointer; font-size: 17px; transition: border-color 0.15s;
+      border: 1px solid var(--border); border-radius: 3px; cursor: pointer; font-size: 17px;
+ text-shadow: none; transition: border-color 0.15s;
     }
     .search-result:hover, .search-result.active { border-color: var(--red); background: rgba(255, 0, 0, 0.05); }
     .search-result .sr-rarity { font-size: 14px;
@@ -115,16 +125,19 @@
 
     .mark-confirm { margin-top: 10px; padding: 10px; border: 1px solid var(--border-mid); border-radius: 4px; display: none; }
     .mark-confirm.show { display: block; }
-    .mark-confirm-name { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+    .mark-confirm-name { font-size: 18px;
+ text-shadow: none; font-weight: bold; margin-bottom: 8px; }
     .mark-confirm-actions { display: flex; gap: 8px; margin-top: 10px; }
     .confirm-btn {
       padding: 8px 20px; background: var(--red); color: #fff; border: none; border-radius: 3px;
-      font-size: 15px; font-weight: bold; cursor: pointer; font-family: inherit;
+      font-size: 15px;
+      text-shadow: none; font-weight: bold; cursor: pointer; font-family: inherit;
     }
     .confirm-btn:hover { background: #cc0000; }
     .cancel-btn {
       padding: 8px 16px; background: transparent; border: 1px solid var(--border-mid); border-radius: 3px; color: var(--text-dim);
-      font-size: 15px; cursor: pointer; font-family: inherit;
+      font-size: 15px;
+      text-shadow: none; cursor: pointer; font-family: inherit;
     }
     .cancel-btn:hover { border-color: var(--text-dim); color: var(--text-pri); }
 
@@ -135,6 +148,7 @@
     .pull-row {
       display: flex; justify-content: space-between; align-items: center; padding: 7px 4px;
       border-bottom: 1px solid var(--border); font-size: 17px;
+ text-shadow: none;
     }
     .pull-row:last-child { border-bottom: none; }
     .pull-main { color: var(--text-pri); }
@@ -148,14 +162,16 @@
  text-shadow: none; cursor: pointer; font-family: inherit;
     }
     .undo-btn:hover { background: rgba(255, 0, 0, 0.2); }
-    .no-pulls { text-align: center; padding: 16px; color: var(--text-dim); font-size: 15px; }
+    .no-pulls { text-align: center; padding: 16px; color: var(--text-dim); font-size: 15px;
+ text-shadow: none; }
 
     .host-footer {
       display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
     }
     .end-game-btn {
       padding: 8px 24px; background: transparent; border: 1px solid var(--red); border-radius: 3px; color: var(--red);
-      font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+      font-size: 15px;
+      text-shadow: none; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
       transition: background 0.2s; font-family: inherit;
     }
     .end-game-btn:hover { background: rgba(255, 0, 0, 0.1); }
@@ -163,10 +179,12 @@
     /* ── RESULTS ──────────────────────────── */
     .results-panel { align-items: center; }
     .results-title { font-size: 34px; color: var(--red); margin-bottom: 4px; text-align: center; }
-    .results-sub { font-size: 17px; color: var(--text-dim); margin-bottom: 20px; text-align: center; }
+    .results-sub { font-size: 17px;
+ text-shadow: none; color: var(--text-dim); margin-bottom: 20px; text-align: center; }
     .leaderboard { width: 100%; max-width: 660px; }
     .lb-header, .lb-row {
       display: grid; grid-template-columns: 34px 1fr 58px 62px 172px; padding: 9px 12px; font-size: 17px;
+ text-shadow: none;
     }
     .lb-header { font-size: 14px;
  text-shadow: none; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); border-bottom: 1px solid var(--border); }
@@ -187,11 +205,13 @@
     .lb-award-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .lb-award-done { font-size: 14px;
  text-shadow: none; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6ac46a; }
-    .no-players { text-align: center; padding: 24px; color: var(--text-dim); font-size: 17px; }
+    .no-players { text-align: center; padding: 24px; color: var(--text-dim); font-size: 17px;
+ text-shadow: none; }
     .results-actions { margin-top: 20px; }
     .back-btn {
       padding: 10px 20px; background: transparent; border: 1px solid var(--border-mid); border-radius: 4px; color: var(--text-dim);
-      font-size: 17px; cursor: pointer; transition: border-color 0.2s, color 0.2s; font-family: inherit;
+      font-size: 17px;
+      text-shadow: none; cursor: pointer; transition: border-color 0.2s, color 0.2s; font-family: inherit;
     }
     .back-btn:hover { border-color: var(--red); color: var(--text-pri); }
 

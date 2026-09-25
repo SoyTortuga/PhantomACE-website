@@ -28,7 +28,8 @@
     /* ── JOIN SCREEN ─────────────────────── */
     .game-title { font-family: var(--font-display); font-size: 28px; color: var(--red); text-align: center; margin-bottom: 4px; letter-spacing: 0.02em; }
     .game-subtitle {
-      font-size: 15px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em;
+      font-size: 15px;
+      text-shadow: none; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em;
       margin-bottom: 32px; text-align: center;
     }
 
@@ -50,8 +51,10 @@
     .join-btn:hover { background: #cc0000; }
     .join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .join-gate { font-size: 15px; color: var(--text-pri); line-height: 1.6; text-align: center; max-width: 300px; }
-    .join-error { font-size: 15px; color: var(--red); text-align: center; min-height: 16px; margin-top: 4px; }
+    .join-gate { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); line-height: 1.6; text-align: center; max-width: 300px; }
+    .join-error { font-size: 15px;
+ text-shadow: none; color: var(--red); text-align: center; min-height: 16px; margin-top: 4px; }
 
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
@@ -64,11 +67,13 @@
       width: 100%; display: flex; justify-content: space-between; align-items: flex-start;
       margin-bottom: 10px; padding: 0 2px; gap: 8px;
     }
-    .card-info { font-size: 15px; color: var(--text-pri); line-height: 1.5; }
+    .card-info { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); line-height: 1.5; }
     .card-info b { color: var(--text-pri); }
     .card-info .set-name { color: var(--red); }
 
-    .rank-badge { text-align: right; font-size: 15px; color: var(--text-pri); }
+    .rank-badge { text-align: right; font-size: 15px;
+ text-shadow: none; color: var(--text-pri); }
     .rank-badge .rank-num { color: var(--red); font-size: 28px; font-weight: bold; display: block; line-height: 1; }
 
     .pack-bar-wrap { width: 100%; margin-bottom: 10px; }
@@ -119,20 +124,23 @@
     .mtg-cell.just-marked { animation: cell-flash 0.6s ease-out; }
     .mtg-cell.wild::after {
       content: '°5'; position: absolute; top: 2px; right: 4px;
-      font-size: 15px; color: #ffcc44;
+      font-size: 15px;
+      text-shadow: none; color: #ffcc44;
     }
     .mtg-cell.wildcard-target { cursor: pointer; border-color: #ffcc4477; }
     .mtg-cell.wildcard-target:hover { border-color: #ffcc44; }
     .card-tabs { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
     .card-tab {
       padding: 5px 14px; background: var(--gray-mid); color: var(--text-pri); cursor: pointer;
-      border: 1px solid var(--border-mid); border-radius: 4px; font-size: 15px; font-weight: 700;
+      border: 1px solid var(--border-mid); border-radius: 4px; font-size: 15px;
+ text-shadow: none; font-weight: 700;
     }
     .card-tab.active { border-color: var(--red); color: #ffaaaa; }
     .inv-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
     .inv-btn {
       padding: 6px 12px; background: var(--gray-mid); color: var(--text-pri); cursor: pointer;
-      border: 1px solid var(--border-mid); border-radius: 4px; font-size: 15px; font-weight: 700;
+      border: 1px solid var(--border-mid); border-radius: 4px; font-size: 15px;
+ text-shadow: none; font-weight: 700;
     }
     .inv-btn:disabled { opacity: 0.4; cursor: default; }
     .inv-btn.wildcard-active { border-color: #ffcc44; color: #ffcc44; }
@@ -148,7 +156,8 @@
       margin-top: 10px; padding: 10px 14px; background: var(--gray-lo); border: 1px solid var(--border);
       border-radius: 4px; flex-wrap: wrap; gap: 6px;
     }
-    .score-item { font-size: 15px; color: var(--text-pri); }
+    .score-item { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); }
     .score-item span { color: var(--text-pri); font-weight: bold; }
     .score-item.total span { color: var(--red); font-size: 25px; }
 
@@ -162,7 +171,8 @@
       0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
     }
 
-    .last-pull { width: 100%; margin-top: 8px; font-size: 15px; color: var(--text-pri); text-align: center; min-height: 14px; }
+    .last-pull { width: 100%; margin-top: 8px; font-size: 15px;
+ text-shadow: none; color: var(--text-pri); text-align: center; min-height: 14px; }
     .last-pull b { color: var(--text-pri); }
 
     /* ── CALL YOUR SHOT ──────────────────── */
@@ -175,32 +185,39 @@
     .shot-form { display: flex; flex-direction: column; gap: 8px; }
     .shot-form select, .shot-form .form-input {
       width: 100%; padding: 8px 10px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 3px;
-      color: var(--text-pri); font-size: 17px; font-family: inherit; outline: none;
+      color: var(--text-pri); font-size: 17px;
+ text-shadow: none; font-family: inherit; outline: none;
     }
-    .shot-check { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text-pri); cursor: pointer; }
+    .shot-check { display: flex; align-items: center; gap: 6px; font-size: 15px;
+ text-shadow: none; color: var(--text-pri); cursor: pointer; }
     .shot-submit {
       padding: 8px 16px; background: var(--red); color: #fff; border: none; border-radius: 3px;
-      font-size: 15px; font-weight: bold; cursor: pointer; font-family: inherit;
+      font-size: 15px;
+      text-shadow: none; font-weight: bold; cursor: pointer; font-family: inherit;
     }
     .shot-submit:hover:not(:disabled) { background: #cc0000; }
     .shot-submit:disabled { opacity: 0.4; cursor: not-allowed; }
-    .shot-status { font-size: 17px; color: var(--text-pri); }
+    .shot-status { font-size: 17px;
+ text-shadow: none; color: var(--text-pri); }
     .shot-status .tier { color: var(--text-pri); font-weight: bold; text-transform: capitalize; }
     .shot-status.won { color: #6ac46a; }
     .shot-status .code { color: var(--red); font-weight: bold; letter-spacing: 0.05em; }
-    .shot-error { font-size: 15px; color: var(--red); min-height: 14px; }
+    .shot-error { font-size: 15px;
+ text-shadow: none; color: var(--red); min-height: 14px; }
 
     .card-actions { display: flex; gap: 8px; margin-top: 10px; }
     .back-btn {
       padding: 8px 18px; background: transparent; border: 1px solid var(--border-mid); border-radius: 3px;
-      color: var(--text-pri); font-size: 15px; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+      color: var(--text-pri); font-size: 15px;
+ text-shadow: none; cursor: pointer; transition: border-color 0.2s, color 0.2s;
       font-family: inherit;
     }
     .back-btn:hover { border-color: var(--red); color: var(--text-pri); }
 
     /* ── RESULTS ─────────────────────────── */
     .results-title { font-size: 34px; color: var(--red); margin-bottom: 4px; }
-    .results-subtitle { font-size: 17px; color: var(--text-pri); margin-bottom: 24px; }
+    .results-subtitle { font-size: 17px;
+ text-shadow: none; color: var(--text-pri); margin-bottom: 24px; }
     .results-card {
       width: 100%; max-width: 400px; padding: 24px; background: var(--gray-lo); border: 1px solid var(--border);
       border-radius: 6px; text-align: center;
@@ -209,7 +226,8 @@
     .results-label { font-size: 14px;
  text-shadow: none; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; margin-bottom: 20px; }
     .results-breakdown { list-style: none; text-align: left; }
-    .results-breakdown li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 17px; color: var(--text-pri); display: flex; justify-content: space-between; }
+    .results-breakdown li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 17px;
+ text-shadow: none; color: var(--text-pri); display: flex; justify-content: space-between; }
     .results-breakdown li span:last-child { color: var(--text-pri); font-weight: bold; }
     .results-actions { margin-top: 20px; }
 

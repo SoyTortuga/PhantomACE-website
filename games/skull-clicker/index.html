@@ -35,12 +35,14 @@
     .header h1 { font-family: var(--font-display);
  letter-spacing: normal; font-size: 22px; color: var(--red); margin-bottom: 2px; }
     .score-display { font-size: 45px; font-weight: 800; color: var(--text-pri); line-height: 1.2; }
-    .per-sec { font-size: 15px; color: var(--text-pri); margin-top: 2px; }
+    .per-sec { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); margin-top: 2px; }
 
     /* News ticker */
     .news-ticker {
       text-align: center;
       font-size: 15px;
+      text-shadow: none;
       font-style: italic;
       color: #c7a3a3;
       padding: 6px 16px 0;
@@ -167,6 +169,7 @@
       padding: 0 24px;
       color: #fff;
       font-size: 17px;
+      text-shadow: none;
       pointer-events: none;
     }
     @media (prefers-reduced-motion: reduce) {
@@ -198,10 +201,12 @@
     .prestige-panel { text-align: center; padding: 20px 16px; }
     .prestige-tier { font-size: 36px; font-weight: 800; color: var(--red); }
     .prestige-mult { font-size: 21px; color: var(--text-pri); margin-top: 4px; }
-    .prestige-next { font-size: 17px; color: var(--text-dim); margin: 10px 0 8px; }
+    .prestige-next { font-size: 17px;
+ text-shadow: none; color: var(--text-dim); margin: 10px 0 8px; }
     .prestige-bar { height: 10px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 5px; overflow: hidden; margin: 0 auto; max-width: 320px; }
     .prestige-fill { height: 100%; background: var(--red); transition: width 0.3s; }
-    .prestige-have { font-size: 15px; color: var(--text-dim); margin-top: 6px; }
+    .prestige-have { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); margin-top: 6px; }
     .prestige-btn { margin-top: 16px; padding: 10px 22px; background: var(--red); color: #fff; border: none; border-radius: 6px; font-size: 20px; font-weight: 800; cursor: pointer; }
     .prestige-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .prestige-btn:not(:disabled):hover { background: #cc0000; }
@@ -218,13 +223,16 @@
     .ranks-toggle { display: flex; gap: 4px; margin-bottom: 10px; }
     .ranks-tab {
       flex: 1; padding: 8px 0; background: var(--gray-lo); border: 1px solid var(--border);
-      border-radius: 4px; color: var(--text-dim); font-size: 17px; font-weight: 800;
+      border-radius: 4px; color: var(--text-dim); font-size: 17px;
+ text-shadow: none; font-weight: 800;
       cursor: pointer; font-family: inherit;
     }
     .ranks-tab.active { border-color: var(--red); color: var(--red); background: rgba(255,0,0,0.06); }
-    .ranks-note { font-size: 15px; color: var(--text-dim); text-align: center; margin-bottom: 6px; line-height: 1.5; }
+    .ranks-note { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); text-align: center; margin-bottom: 6px; line-height: 1.5; }
     .ranks-note b { color: #ff5555; }
-    .ranks-you { font-size: 17px; color: var(--text-pri); text-align: center; margin-bottom: 12px; }
+    .ranks-you { font-size: 17px;
+ text-shadow: none; color: var(--text-pri); text-align: center; margin-bottom: 12px; }
     .ranks-you b { color: #ff5555; }
     .ranks-list { display: flex; flex-direction: column; gap: 4px; }
     .rank-row {
@@ -238,7 +246,8 @@
     .rank-prestige { font-size: 14px;
  text-shadow: none; font-weight: 800; color: #d98fff; }
     .rank-score { flex: none; font-weight: 800; color: var(--text-pri); font-variant-numeric: tabular-nums; }
-    .ranks-empty { text-align: center; color: var(--text-pri); font-size: 17px; padding: 24px; }
+    .ranks-empty { text-align: center; color: var(--text-pri); font-size: 17px;
+ text-shadow: none; padding: 24px; }
     .tab-btn:hover { color: #ff4444; }
     /* Seven tabs: on a narrow phone they must NOT squeeze below their text
        (that ran the labels together). Keep each at its content width — grow
@@ -264,7 +273,8 @@
       min-height: 22px; padding: 0 12px 4px;
     }
     .buff-chip {
-      font-size: 15px; font-weight: 800; padding: 3px 9px; border-radius: 3px;
+      font-size: 15px;
+      text-shadow: none; font-weight: 800; padding: 3px 9px; border-radius: 3px;
       border: 1px solid; letter-spacing: 0.02em;
     }
     .buff-chip.frenzy { color: #ff3b3b; border-color: #ff3b3b; }
@@ -287,10 +297,12 @@
     }
     .raid-boss-mini.shielded { filter: drop-shadow(0 0 5px rgba(90,160,255,0.9)); }
     @keyframes raid-mini-idle { from { background-position-x: 0; } to { background-position-x: -136px; } }
-    .raid-name { font-size: 18px; font-weight: 800; color: #ff5555; flex: 1; }
+    .raid-name { font-size: 18px;
+ text-shadow: none; font-weight: 800; color: #ff5555; flex: 1; }
     .raid-mini-tag { font-size: 14px;
  text-shadow: none; color: #b060ff; font-weight: 800; }
-    .raid-timer { font-size: 15px; color: #fff; font-variant-numeric: tabular-nums; }
+    .raid-timer { font-size: 15px;
+ text-shadow: none; color: #fff; font-variant-numeric: tabular-nums; }
     .raid-track {
       position: relative; height: 16px; margin: 6px 0 4px; background: #1a0000;
       border: 1px solid #3a0000; border-radius: 4px; overflow: hidden;
@@ -315,7 +327,8 @@
     .reward-title { font-size: 20px; font-weight: 800; color: var(--text-pri); }
     .reward-banner.rar-rare .reward-title { color: #ffb300; }
     .reward-banner.rar-uncommon .reward-title { color: #7fd0e6; }
-    .reward-sub { font-size: 15px; color: var(--text-dim); margin: 3px 0 8px; }
+    .reward-sub { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); margin: 3px 0 8px; }
     .reward-sub b { text-transform: uppercase; color: var(--text-pri); }
     .reward-code {
       font-size: 28px; font-weight: 800; letter-spacing: 0.15em; color: var(--text-pri);
@@ -325,7 +338,8 @@
     .reward-code:hover { border-color: var(--red); }
     .reward-actions { display: flex; gap: 8px; justify-content: center; }
     .reward-btn {
-      padding: 7px 18px; border-radius: 4px; font-size: 17px; font-weight: 800;
+      padding: 7px 18px; border-radius: 4px; font-size: 17px;
+ text-shadow: none; font-weight: 800;
       cursor: pointer; font-family: inherit; text-decoration: none;
       background: var(--red); color: #fff; border: none;
     }
@@ -385,13 +399,15 @@
     .ach-toast-kind { font-size: 14px;
  text-shadow: none; text-transform: uppercase; letter-spacing: 0.14em; color: var(--red); }
     .ach-toast-name { font-size: 21px; font-weight: 800; margin: 2px 0; }
-    .ach-toast-desc { font-size: 15px; color: var(--text-dim); }
+    .ach-toast-desc { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); }
 
     /* Buy-amount toggle */
     .buy-toggle { display: flex; gap: 4px; margin-bottom: 8px; }
     .buy-amt {
       flex: 1; padding: 6px 0; background: var(--gray-lo); border: 1px solid var(--border);
-      border-radius: 4px; color: var(--text-dim); font-size: 17px; font-weight: 800;
+      border-radius: 4px; color: var(--text-dim); font-size: 17px;
+ text-shadow: none; font-weight: 800;
       cursor: pointer; font-family: inherit;
     }
     .buy-amt.active { border-color: var(--red); color: var(--red); background: rgba(255,0,0,0.06); }
@@ -403,13 +419,15 @@
     .upgrade-row.locked { opacity: 0.4; cursor: default; }
 
     /* Feats grid */
-    .feats-head { font-size: 17px; color: var(--text-dim); text-align: center; padding: 6px 0 12px; }
+    .feats-head { font-size: 17px;
+ text-shadow: none; color: var(--text-dim); text-align: center; padding: 6px 0 12px; }
     .feats-head b { color: #ff3b3b; }
     .feats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .feat { border: 1px solid var(--border); border-radius: 4px; padding: 10px; background: var(--gray-lo); }
     .feat.got { border-color: #7a1212; background: rgba(152,9,10,0.10); }
     .feat.locked { opacity: 0.5; }
-    .feat-name { font-size: 17px; font-weight: 800; color: var(--text-pri); }
+    .feat-name { font-size: 17px;
+ text-shadow: none; font-weight: 800; color: var(--text-pri); }
     .feat.got .feat-name { color: #ff5555; }
     .feat-desc { font-size: 14px;
  text-shadow: none; color: var(--text-dim); margin-top: 3px; }
@@ -472,13 +490,15 @@
       font-weight: 800;
     }
     .building-info { flex: 1; min-width: 0; }
-    .building-name { font-size: 18px; font-weight: 600; color: var(--text-pri); }
+    .building-name { font-size: 18px;
+ text-shadow: none; font-weight: 600; color: var(--text-pri); }
     .building-desc { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-top: 1px; }
     .building-cps { font-size: 14px;
  text-shadow: none; color: var(--text-dim); margin-top: 1px; }
     .building-right { text-align: right; flex-shrink: 0; }
-    .building-cost { font-size: 17px; color: var(--red); font-weight: 600; }
+    .building-cost { font-size: 17px;
+ text-shadow: none; color: var(--red); font-weight: 600; }
     .building-owned { font-size: 25px; font-weight: 800; color: var(--text-dim); }
 
     /* Upgrade rows */
@@ -528,6 +548,7 @@
       padding: 8px 0;
       border-bottom: 1px solid var(--border);
       font-size: 17px;
+      text-shadow: none;
     }
     .stat-label { color: var(--text-pri); }
     .stat-val { color: var(--text-pri); font-weight: 600; }
@@ -545,8 +566,10 @@
       z-index: 100;
       animation: ms-pop 2s ease-out forwards;
     }
-    .milestone h3 { font-size: 16px; color: var(--red); margin-bottom: 4px; }
-    .milestone p { font-size: 15px; color: var(--text-pri); }
+    .milestone h3 { font-size: 16px;
+ text-shadow: none; color: var(--red); margin-bottom: 4px; }
+    .milestone p { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); }
     @keyframes ms-pop {
       0% { transform: translate(-50%,-50%) scale(0); opacity: 0; }
       12% { transform: translate(-50%,-50%) scale(1.1); opacity: 1; }
@@ -573,6 +596,7 @@
       border-radius: 4px;
       margin: 8px 12px;
       font-size: 17px;
+      text-shadow: none;
       color: var(--amber);
       cursor: pointer;
     }
@@ -586,6 +610,7 @@
       border-radius: 4px;
       margin: 8px 12px;
       font-size: 18px;
+      text-shadow: none;
       font-weight: bold;
       color: var(--red);
       animation: boost-pulse 1.5s ease-in-out infinite;
@@ -616,7 +641,8 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 25px; flex-shrink: 0; }
     .cosmetic-info { flex: 1; }
-    .cosmetic-name { font-size: 17px; font-weight: 600; color: var(--text-pri); }
+    .cosmetic-name { font-size: 17px;
+ text-shadow: none; font-weight: 600; color: var(--text-pri); }
     .cosmetic-desc { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-top: 2px; }
     .cosmetic-badge { font-size: 14px;
@@ -628,7 +654,8 @@
     .badge-mythic { background: #1a0a1a; color: #aa44ff; }
     .cosmetic-equipped-tag { font-size: 14px;
  text-shadow: none; color: var(--red); font-weight: 700; }
-    .cosmetic-empty { text-align: center; color: var(--text-dim); padding: 30px 16px; font-size: 17px; line-height: 1.6; }
+    .cosmetic-empty { text-align: center; color: var(--text-dim); padding: 30px 16px; font-size: 17px;
+ text-shadow: none; line-height: 1.6; }
 
     .skull-btn.theme-blood { border-color: #cc0000; border-width: 3px; background: radial-gradient(circle at 40% 35%, #440000, #1a0000, #000); }
     .skull-btn.theme-void { border-color: #6600cc; border-width: 3px; background: radial-gradient(circle at 40% 35%, #2a0044, #150022, #000); }

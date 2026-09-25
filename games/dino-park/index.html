@@ -29,8 +29,10 @@
       z-index: 100;
       height: 38px;
     }
-    .top-bar-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--red); letter-spacing: 1px; }
-    .top-bar-stats { display: flex; gap: 12px; font-size: 17px; }
+    .top-bar-title { font-family: var(--font-display); font-size: 16px;
+ text-shadow: none; font-weight: 700; color: var(--red); letter-spacing: 1px; }
+    .top-bar-stats { display: flex; gap: 12px; font-size: 17px;
+ text-shadow: none; }
     .stat-item { display: flex; align-items: center; gap: 3px; color: var(--text-pri); }
     .stat-item .val { color: var(--text-pri); font-weight: 600; }
 
@@ -44,7 +46,8 @@
     }
     .tab-btn:hover { color: var(--text-pri); }
     .tab-btn.active { color: var(--red); border-bottom-color: var(--red); }
-    .tab-btn .tab-icon { font-size: 18px; display: block; margin-bottom: 1px; }
+    .tab-btn .tab-icon { font-size: 18px;
+ text-shadow: none; display: block; margin-bottom: 1px; }
 
     /* Tab Content */
     .tab-content { display: none; }
@@ -193,13 +196,16 @@
       background: rgba(0,0,0,0.75); padding: 4px 10px; border-radius: 4px;
       border: 1px solid var(--border-mid); white-space: nowrap;
     }
-    .clock-phase { font-size: 17px; line-height: 1; }
+    .clock-phase { font-size: 17px;
+ text-shadow: none; line-height: 1; }
     .clock-text { display: flex; flex-direction: column; gap: 1px; }
     .clock-name {
-      font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase;
+      font-size: 16px;
+      text-shadow: none; letter-spacing: 0.1em; text-transform: uppercase;
       color: #fff; line-height: 1;
     }
-    .clock-sub { font-size: 15px; color: #fff; line-height: 1; }
+    .clock-sub { font-size: 15px;
+ text-shadow: none; color: #fff; line-height: 1; }
     .park-clock.live { border-color: #FF000045; }
     .park-clock.live .clock-name { color: #FF3333; }
     .clock-live-dot {
@@ -218,7 +224,8 @@
       display: flex; align-items: center; gap: 5px;
       background: rgba(0,0,0,0.75); padding: 5px 9px; border-radius: 4px;
       border: 1px solid var(--border-mid); color: #fff; cursor: pointer;
-      font-family: inherit; font-size: 16px; letter-spacing: 0.06em;
+      font-family: inherit; font-size: 16px;
+ text-shadow: none; letter-spacing: 0.06em;
       text-transform: uppercase; transition: border-color 0.15s, color 0.15s;
     }
     .park-decorate-btn:hover { border-color: #FF000060; color: #fff; }
@@ -235,6 +242,7 @@
     .yard-tray-close {
       background: var(--gray-mid); color: var(--text-pri); border: 1px solid var(--border-mid);
       border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 15px;
+ text-shadow: none;
     }
     .yard-tray-hint-row { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-bottom: 6px; }
@@ -290,10 +298,12 @@
       background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px;
       border: 1px solid var(--border-mid);
     }
-    .energy-icon { font-size: 17px; }
+    .energy-icon { font-size: 17px;
+ text-shadow: none; }
     .energy-fill-ctr { width: 60px; height: 6px; background: var(--gray-hi); border-radius: 3px; overflow: hidden; }
     .energy-fill { height: 100%; background: #ffaa00; border-radius: 3px; transition: width 0.3s; }
-    .energy-text { font-size: 15px; color: #fff; font-weight: 600; min-width: 30px; }
+    .energy-text { font-size: 15px;
+ text-shadow: none; color: #fff; font-weight: 600; min-width: 30px; }
     .energy-refill {
       font-size: 14px;
       text-shadow: none; padding: 2px 6px; background: var(--gray-hi); border: 1px solid var(--border-mid);
@@ -336,7 +346,8 @@
       z-index: 20;
     }
     .park-empty-msg .big { font-size: 56px; display: block; margin-bottom: 8px; }
-    .park-empty-msg .msg { font-size: 17px; opacity: 0.8; }
+    .park-empty-msg .msg { font-size: 17px;
+ text-shadow: none; opacity: 0.8; }
 
     /* ======================== BOTTOM PANEL ======================== */
     .park-panel {
@@ -484,7 +495,8 @@
     .market-login-btn {
       display: inline-block; margin-top: 12px; padding: 10px 24px;
       background: #9146FF; border: none; border-radius: 6px;
-      color: var(--text-pri); font-size: 17px; font-weight: 700; cursor: pointer;
+      color: var(--text-pri); font-size: 17px;
+ text-shadow: none; font-weight: 700; cursor: pointer;
       text-decoration: none;
     }
     .market-login-btn:hover { background: #7c3aed; }
@@ -493,7 +505,8 @@
       padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center;
       justify-content: space-between;
     }
-    .market-earnings-text { font-size: 15px; color: #ffaa00; font-weight: 600; }
+    .market-earnings-text { font-size: 15px;
+ text-shadow: none; color: #ffaa00; font-weight: 600; }
     .market-earnings-btn {
       padding: 4px 12px; background: #ffaa00; border: none; border-radius: 4px;
       color: #000; font-size: 14px;
@@ -508,7 +521,8 @@
     }
     .market-card:hover { border-color: #ffaa00; }
     .market-card-sprite { margin-bottom: 6px; }
-    .market-card-name { font-size: 15px; font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
+    .market-card-name { font-size: 15px;
+ text-shadow: none; font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
     .market-card-meta { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-bottom: 6px; }
     .market-card-seller { font-size: 14px;
@@ -527,7 +541,8 @@
  text-shadow: none; cursor: pointer; margin-top: 4px;
     }
     .market-card-cancel:hover { border-color: var(--red); color: var(--red); }
-    .market-empty { text-align: center; color: var(--text-dim); font-size: 17px; padding: 30px; }
+    .market-empty { text-align: center; color: var(--text-dim); font-size: 17px;
+ text-shadow: none; padding: 30px; }
     .market-card .rarity-chip { display: inline-block; font-size: 14px;
  text-shadow: none; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
     .market-card .rarity-common { background: #333; color: var(--text-pri); }
@@ -552,7 +567,8 @@
     .sell-dialog-info { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-bottom: 12px; }
     .sell-dialog-price-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
-    .sell-dialog-price-row label { font-size: 15px; color: var(--text-pri); }
+    .sell-dialog-price-row label { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); }
     .sell-dialog-price-input {
       width: 80px; padding: 6px 10px; background: var(--gray-hi); border: 1px solid var(--border-mid);
       border-radius: 4px; color: #ffaa00; font-size: 20px; font-weight: 700;
@@ -562,6 +578,7 @@
     .sell-dialog-btns { display: flex; gap: 8px; justify-content: center; }
     .sell-dialog-btns button {
       padding: 8px 20px; border: none; border-radius: 4px; font-size: 15px;
+ text-shadow: none;
       font-weight: 700; cursor: pointer;
     }
     .sell-confirm { background: #ffaa00; color: #000; }
@@ -581,7 +598,8 @@
       padding: 16px; text-align: center; min-height: 120px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .egg-slot.empty { border-style: dashed; color: var(--text-dim); font-size: 15px; }
+    .egg-slot.empty { border-style: dashed; color: var(--text-dim); font-size: 15px;
+ text-shadow: none; }
     .egg-emoji { font-size: 50px; margin-bottom: 6px; animation: eggWobble 2s infinite ease-in-out; }
     @keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
     .egg-name { font-size: 14px;
@@ -600,7 +618,8 @@
     .egg-live-badge.is-paused { background: #ffb02018; color: #ffb020; border: 1px solid #ffb02044; }
     .egg-hatch-btn {
       margin-top: 8px; padding: 6px 16px; background: var(--red); border: none;
-      border-radius: 4px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+      border-radius: 4px; color: #fff; font-size: 15px;
+ text-shadow: none; font-weight: 700; cursor: pointer;
       animation: pulse 1s infinite;
     }
     .egg-speedup-btn {
@@ -624,7 +643,8 @@
     .egg-source.claimed, .egg-source.locked { opacity: 0.4; }
     .egg-source-icon { font-size: 42px; flex-shrink: 0; width: 40px; text-align: center; }
     .egg-source-info { flex: 1; min-width: 0; }
-    .egg-source-name { font-size: 17px; font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
+    .egg-source-name { font-size: 17px;
+ text-shadow: none; font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
     .egg-source-desc { font-size: 14px;
  text-shadow: none; color: var(--text-pri); line-height: 1.4; }
     .egg-source-timer { font-size: 14px;
@@ -654,13 +674,16 @@
       50% { filter: drop-shadow(0 0 16px rgba(255,0,0,0.25)); }
     }
     .event-banner-icon { font-size: 45px; margin-bottom: 6px; }
-    .event-banner-title { font-size: 18px; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
+    .event-banner-title { font-size: 18px;
+ text-shadow: none; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
     .event-banner-desc { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-bottom: 10px; }
-    .event-banner-timer { font-size: 15px; color: var(--red); font-weight: 600; margin-bottom: 8px; }
+    .event-banner-timer { font-size: 15px;
+ text-shadow: none; color: var(--red); font-weight: 600; margin-bottom: 8px; }
     .event-banner-btn {
       padding: 8px 24px; background: var(--red); border: none; border-radius: 4px;
-      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s;
+      color: #fff; font-size: 15px;
+ text-shadow: none; font-weight: 700; cursor: pointer; transition: background 0.2s;
     }
     .event-banner-btn:hover { background: #cc0000; }
     .event-banner-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -671,7 +694,8 @@
        instead of hunting for a small badge on each egg. Shown only while
        something is actually incubating; nothing to say otherwise. */
     .incubator-status {
-      font-size: 15px; font-weight: 600; text-align: center;
+      font-size: 15px;
+      text-shadow: none; font-weight: 600; text-align: center;
       padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
     }
     .incubator-status.is-live { background: #27ae6018; color: #2ecc71; border: 1px solid #2ecc7144; }
@@ -686,14 +710,16 @@
     .redeem-row { display: flex; gap: 6px; margin-top: 8px; }
     .redeem-input {
       flex: 1; padding: 8px 10px; background: var(--gray-lo); border: 1px solid var(--border-mid);
-      border-radius: 4px; color: var(--text-pri); font-size: 15px; font-family: monospace;
+      border-radius: 4px; color: var(--text-pri); font-size: 15px;
+ text-shadow: none; font-family: monospace;
       letter-spacing: 0.08em; text-transform: uppercase;
     }
     .redeem-input::placeholder { color: #8a8a8a; text-transform: none; letter-spacing: normal; }
     .redeem-input:focus { outline: none; border-color: var(--red); }
     .redeem-btn {
       padding: 8px 16px; background: var(--red); border: none; border-radius: 4px;
-      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+      color: #fff; font-size: 15px;
+ text-shadow: none; font-weight: 700; cursor: pointer;
     }
     .redeem-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
@@ -811,7 +837,8 @@
       background: var(--gray-mid); border: 2px solid #6688cc; border-radius: 10px;
       padding: 18px; width: min(560px, 92vw); max-height: 82vh; overflow-y: auto;
     }
-    .visit-head { font-size: 18px; font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
+    .visit-head { font-size: 18px;
+ text-shadow: none; font-weight: 700; color: var(--text-pri); margin-bottom: 2px; }
     .visit-sub { font-size: 14px;
  text-shadow: none; color: #9aa7bd; margin-bottom: 12px; }
     /* A real park, not a list of cards. Same square world and percentage
@@ -904,15 +931,18 @@
     .coll-vault-note {
       margin-top: 12px; padding: 10px 14px; width: 100%;
       background: var(--border-mid); border: 1px solid var(--border-mid); border-radius: 4px;
-      color: var(--text-pri); font-size: 15px; text-align: center;
+      color: var(--text-pri); font-size: 15px;
+ text-shadow: none; text-align: center;
     }
     .coll-detail-empty {
       flex: 1; display: flex; align-items: center; justify-content: center;
       color: var(--text-dim); font-size: 17px;
+ text-shadow: none;
     }
     .coll-sprite-large { margin-bottom: 12px; max-width: 100%; }
     .coll-name { font-size: 25px; font-weight: 700; color: var(--text-pri); margin-bottom: 4px; }
-    .coll-species { font-size: 15px; color: var(--text-pri); margin-bottom: 10px; }
+    .coll-species { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); margin-bottom: 10px; }
     .coll-badges { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
     .coll-badge {
       font-size: 14px;
@@ -1006,7 +1036,8 @@
     }
     .dex-filter:hover { color: var(--text-pri); border-color: var(--text-dim); }
     .dex-filter.active { color: var(--red); border-color: var(--red); }
-    .dex-counter { font-size: 15px; color: var(--text-dim); margin-bottom: 8px; }
+    .dex-counter { font-size: 15px;
+ text-shadow: none; color: var(--text-dim); margin-bottom: 8px; }
     .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .dex-entry {
       background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 6px;
@@ -1016,7 +1047,8 @@
     .dex-entry.undiscovered { opacity: 0.35; }
     .dex-emoji { font-size: 34px; flex-shrink: 0; }
     .dex-info { flex: 1; min-width: 0; }
-    .dex-name { font-size: 15px; font-weight: 600; color: var(--text-pri); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dex-name { font-size: 15px;
+ text-shadow: none; font-weight: 600; color: var(--text-pri); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dex-sub { font-size: 14px;
  text-shadow: none; color: var(--text-pri); margin-top: 1px; }
     .dex-mut-dots { display: flex; gap: 2px; margin-top: 3px; }
@@ -1030,14 +1062,16 @@
     .dex-detail-portrait { flex-shrink: 0; max-width: 100%; }
     .dex-detail-info { flex: 1; min-width: 200px; }
     .dex-detail-name { font-size: 25px; font-weight: 700; color: var(--text-pri); }
-    .dex-detail-species { font-size: 15px; color: var(--text-pri); margin-top: 2px; }
+    .dex-detail-species { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); margin-top: 2px; }
     .dex-detail-badges { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
     .dex-detail-badge {
       font-size: 14px;
       text-shadow: none; padding: 2px 8px; border-radius: 3px; text-transform: uppercase;
       font-weight: 600; letter-spacing: 0.04em;
     }
-    .dex-detail-desc { font-size: 15px; color: var(--text-pri); line-height: 1.5; margin-top: 8px; font-style: italic; }
+    .dex-detail-desc { font-size: 15px;
+ text-shadow: none; color: var(--text-pri); line-height: 1.5; margin-top: 8px; font-style: italic; }
     .dex-detail-section { margin-top: 12px; }
     .dex-detail-section-title {
       font-size: 14px;
@@ -1095,18 +1129,22 @@
     .hatch-overlay.hatching .hatch-desc,
     .hatch-overlay.hatching .hatch-close { display: none; }
     .hatch-name { font-size: 31px; font-weight: 700; color: var(--text-pri); margin-top: 16px; }
-    .hatch-rarity { font-size: 17px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
-    .hatch-desc { font-size: 18px; color: var(--text-pri); margin-top: 12px; max-width: 300px; line-height: 1.5; }
+    .hatch-rarity { font-size: 17px;
+ text-shadow: none; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
+    .hatch-desc { font-size: 18px;
+ text-shadow: none; color: var(--text-pri); margin-top: 12px; max-width: 300px; line-height: 1.5; }
     .hatch-close {
       margin-top: 24px; padding: 10px 32px; background: var(--red); border: none;
-      border-radius: 4px; color: #fff; font-size: 18px; font-weight: 700; cursor: pointer;
+      border-radius: 4px; color: #fff; font-size: 18px;
+ text-shadow: none; font-weight: 700; cursor: pointer;
     }
 
     .toast {
       position: fixed; bottom: 20px; left: 50%;
       transform: translateX(-50%) translateY(100px);
       background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 6px;
-      padding: 10px 20px; font-size: 17px; color: var(--text-pri); z-index: 150;
+      padding: 10px 20px; font-size: 17px;
+ text-shadow: none; color: var(--text-pri); z-index: 150;
       transition: transform 0.3s ease; white-space: nowrap;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
