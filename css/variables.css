@@ -61,8 +61,10 @@
   --border:     #1a1a1a;
   --border-mid: #2a2a2a;
 
-  --font-display: 'PhantomACE', 'UnifrakturMaguntia', serif;
-  --font-gothic:  'GodOfWar', 'Cinzel Decorative', serif;
-  --font-ui:      'IM Fell English', Georgia, serif;
+  /* GodOfWar is the single display face for every title and header. Body copy
+     is Aurusenthial Gothic. Both are owned/local fonts (no web-font CDN). */
+  --font-display: 'GodOfWar', serif;
+  --font-gothic:  'GodOfWar', serif;
+  --font-ui:      'Aurusenthial Gothic', Georgia, serif;
   --font-system:  system-ui, -apple-system, sans-serif;
 }

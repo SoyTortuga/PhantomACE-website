@@ -43,7 +43,7 @@
 .prof-ident { min-width: 0; flex: 1; }
 
 .prof-name {
-  font-family: var(--font-gothic, 'Cinzel Decorative', serif);
+  font-family: var(--font-gothic, serif);
   font-size: clamp(24px, 5vw, 34px);
   line-height: 1.1;
   margin: 0 0 4px;

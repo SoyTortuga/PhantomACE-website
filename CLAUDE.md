@@ -33,9 +33,13 @@ page AND every game, and sub-agents must follow them too.
   `--tier-vip` (silver/white — VIP is never purple or pink). Do NOT hardcode a
   rarity hex (`#4488ff`, `#ff6600`, `#cc88ff`, `#ffd700`, …) in a stylesheet, and do
   NOT repurpose any of these as a button, tag, or category colour.
-- **Fonts:** gothic display faces (PhantomACE, GodOfWar, UnifrakturMaguntia,
-  Cinzel Decorative) for titles/headers via the `--font-*` tokens, `system-ui` for
-  body. Never Inter, Roboto, or another generic UI sans.
+- **Fonts:** **GodOfWar** is the single gothic display face for every title and
+  header (`--font-display` / `--font-gothic`); **Aurusenthial Gothic** is the body
+  face (`--font-ui`). Both are owned, self-hosted fonts in `assets/fonts/` — no
+  Google Fonts / web-font CDN, and never Inter, Roboto, or another generic UI sans.
+  `--font-system` (system-ui) remains only for utilitarian tool pages. The old
+  PhantomACE / UnifrakturMaguntia / Cinzel Decorative / IM Fell English faces are
+  retired — do not reintroduce them.
 - **No `box-shadow`. Ever.** Depth comes from borders. For a glow, use
   `filter: drop-shadow()` on a NON-box element (sprite/logo/icon); to make a box
   read as "lit", brighten or thicken its border instead — do not reach for a

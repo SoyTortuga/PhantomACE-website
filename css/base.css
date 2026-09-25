@@ -1,14 +1,14 @@
 @font-face {
-  font-family: 'PhantomACE';
-  src: url('/assets/fonts/PHANTOMACE.otf') format('opentype');
+  font-family: 'GodOfWar';
+  src: url('/assets/fonts/GODOFWAR.TTF') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'GodOfWar';
-  src: url('/assets/fonts/GODOFWAR.TTF') format('truetype');
+  font-family: 'Aurusenthial Gothic';
+  src: url('/assets/fonts/AurusenthialGothic.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;

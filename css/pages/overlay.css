@@ -179,7 +179,7 @@ html, body {
 .ov-checkin-label {
   align-self: flex-end;
   padding-bottom: 14px;
-  font-family: 'GodOfWar', 'Cinzel Decorative', serif;
+  font-family: 'GodOfWar', serif;
   font-size: 34px;
   color: #fff;
   white-space: nowrap;
@@ -388,7 +388,7 @@ html, body {
 }
 
 .ov-sc-label {
-  font-family: 'GodOfWar', 'Cinzel Decorative', serif;
+  font-family: 'GodOfWar', serif;
   font-size: 15px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -939,7 +939,7 @@ body.ov-alerting .ov-mc {
 }
 
 .ov-mc-title {
-  font-family: 'GodOfWar', 'Cinzel Decorative', serif;
+  font-family: 'GodOfWar', serif;
   font-size: 16px;
   letter-spacing: 0.08em;
   color: #ff0000;
