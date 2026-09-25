@@ -163,7 +163,7 @@
       justify-content: center;
       text-align: center;
       padding: 0 24px;
-      color: var(--text-pri);
+      color: #fff;
       font-size: 17px;
       pointer-events: none;
     }
@@ -267,7 +267,7 @@
     /* Co-op raid banner (in-game) */
     .raid-banner {
       margin: 0 12px 8px; padding: 8px 12px;
-      background: rgba(40,0,0,0.55); border: 1px solid var(--red); border-radius: 6px;
+      background: rgba(28,0,0,0.92); border: 1px solid var(--red); border-radius: 6px;
     }
     .raid-head { display: flex; align-items: center; gap: 8px; }
     .raid-boss-mini {
@@ -282,7 +282,7 @@
     @keyframes raid-mini-idle { from { background-position-x: 0; } to { background-position-x: -136px; } }
     .raid-name { font-size: 18px; font-weight: 800; color: #ff5555; flex: 1; }
     .raid-mini-tag { font-size: 14px; color: #b060ff; font-weight: 800; }
-    .raid-timer { font-size: 15px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+    .raid-timer { font-size: 15px; color: #fff; font-variant-numeric: tabular-nums; }
     .raid-track {
       position: relative; height: 16px; margin: 6px 0 4px; background: #1a0000;
       border: 1px solid #3a0000; border-radius: 4px; overflow: hidden;
@@ -290,9 +290,9 @@
     .raid-track i { display: block; height: 100%; background: linear-gradient(90deg,var(--red),#ff5a1f); transition: width 0.4s; }
     .raid-hp {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000;
+      font-size: 14px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000;
     }
-    .raid-top { font-size: 14px; color: var(--text-dim); text-align: center; }
+    .raid-top { font-size: 14px; color: #fff; text-align: center; }
     @media (prefers-reduced-motion: reduce) { .raid-track i { transition: none; } }
 
     /* Raid reward banner (claim your code in-game) */

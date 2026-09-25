@@ -50,7 +50,7 @@
     .enemy-rounds { font-size: 15px; color: var(--dim); opacity: 0.85; }
     .enemy-track { position: relative; height: 18px; margin-top: 6px; background: #1a0000; border: 1px solid #3a0000; border-radius: 4px; overflow: hidden; }
     .enemy-track i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), #ff5a1f); transition: width 0.5s ease; }
-    .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000; }
+    .enemy-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
     .enemy-stage { position: relative; display: flex; justify-content: center; align-items: flex-end; height: 104px; margin-bottom: 4px; }
     .enemy-sprite { width: 96px; height: 96px; background-repeat: no-repeat; background-position: 0% 0%; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.7)); }
     .enemy-sprite.hit { animation: enemy-hit 0.3s; }
@@ -67,12 +67,12 @@
     .team-track i { display: block; height: 100%; background: linear-gradient(90deg, #16a34a, #4ade80); transition: width 0.4s ease; }
     .team-track.low i { background: linear-gradient(90deg, #b91c1c, #f59e0b); }
     .minion-track i { display: block; height: 100%; background: linear-gradient(90deg, #4d7c0f, #a3e635); transition: width 0.4s ease; }
-    .team-hp, .minion-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
+    .team-hp, .minion-hp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
 
     /* The ultimate: charged by Mana Clash, spent as a team-wide burst */
     .ult-track { position: relative; height: 16px; margin-top: 5px; background: #1a0a00; border: 1px solid #4a2000; border-radius: 4px; overflow: hidden; }
     .ult-track i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), #ffb020); transition: width 0.5s ease; }
-    .ult-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--text-pri); text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
+    .ult-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; letter-spacing: 0.03em; }
     .ult-btn {
       display: block; width: 100%; margin-top: 8px; padding: 9px; background: linear-gradient(90deg, var(--red), #ffb020);
       border: none; border-radius: 5px; color: #000; font-family: inherit; font-size: 17px; font-weight: 800;
