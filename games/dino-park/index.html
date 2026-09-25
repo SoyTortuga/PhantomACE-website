@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dino Park</title>
-  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <script>try{var _pt=function(t){var e=document.documentElement;if(t==="light")e.setAttribute("data-theme","light");else e.removeAttribute("data-theme");};_pt(localStorage.getItem("pham-theme"));addEventListener("storage",function(v){if(v.key==="pham-theme")_pt(v.newValue);});}catch(e){}</script>
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/game-identity.css">
   <style>
