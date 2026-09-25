@@ -63,17 +63,22 @@ function updateLiveIndicators(status) {
     }
   }
 
+}
+
+/* Build the Twitch player embed from the ACTUAL host, once, on load. Twitch
+   refuses to frame the player unless `parent` matches the serving host, so a
+   hardcoded parent=localhost in the HTML gives production a refused frame on
+   first paint. Setting src here (not after the status poll) means the FIRST
+   load is correct on every host, and the embed no longer depends on
+   /api/twitch-status resolving. */
+function setupHeroEmbed() {
   const heroEmbed = document.getElementById('heroEmbed');
-  if (heroEmbed) {
-    const iframe = heroEmbed.querySelector('iframe');
-    if (iframe) {
-      const src = iframe.getAttribute('src');
-      const hostname = window.location.hostname;
-      if (src && src.includes('parent=localhost') && hostname !== 'localhost') {
-        iframe.src = `https://player.twitch.tv/?channel=${TWITCH_CHANNEL}&parent=${hostname}&muted=true`;
-      }
-    }
-  }
+  if (!heroEmbed) return;
+  const iframe = heroEmbed.querySelector('iframe');
+  if (!iframe || iframe.src) return;
+  const channel = iframe.getAttribute('data-channel') || TWITCH_CHANNEL;
+  const hostname = window.location.hostname || 'localhost';
+  iframe.src = `https://player.twitch.tv/?channel=${channel}&parent=${hostname}&muted=true`;
 }
 
 async function pollTwitchStatus() {
@@ -142,6 +147,7 @@ async function sendPhamilyHeartbeatIfLive(status) {
 }
 
 function startTwitchPolling() {
+  setupHeroEmbed();
   pollTwitchStatus();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(pollTwitchStatus, STATUS_POLL_INTERVAL);
