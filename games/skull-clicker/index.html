@@ -21,7 +21,7 @@
     .game-wrap {
       display: flex;
       flex-direction: column;
-      max-width: 480px;
+      max-width: 720px;
       margin: 0 auto;
       min-height: 100vh;
     }
@@ -179,6 +179,7 @@
     /* Tabs */
     .tab-bar {
       display: flex;
+      flex-wrap: wrap;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
@@ -1350,10 +1351,14 @@
       el.className = 'cursed-skull';
       el.innerHTML = '<img src="/assets/images/skull.png" alt="Cursed skull">';
       el.style.top = (10 + Math.random() * 60) + 'vh';
-      el.style.left = '-90px';
+      /* Drift across the game column, not the whole viewport, so the skull
+         stays over the play area instead of the empty margins beside it. */
+      const wrap = document.querySelector('.game-wrap');
+      const wr = wrap ? wrap.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+      el.style.left = (wr.left - 90) + 'px';
       document.body.appendChild(el);
       /* Kick off the drift on the next frame so the transition runs. */
-      requestAnimationFrame(() => { el.style.left = 'calc(100vw + 90px)'; });
+      requestAnimationFrame(() => { el.style.left = (wr.right + 90) + 'px'; });
 
       let done = false;
       const life = setTimeout(() => {
