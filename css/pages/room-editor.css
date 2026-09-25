@@ -8,7 +8,7 @@
    ══════════════════════════════════════════════ */
 
 .re-wrap { padding-block: 24px 64px; }
-.re-state { color: var(--text-sec); font-size: 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.re-state { color: var(--text-sec); font-size: 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 .re-app { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 860px) { .re-app { grid-template-columns: 1fr; } }
@@ -20,17 +20,17 @@
 .re-cat:hover { color: var(--text-pri); }
 .re-cat.active { color: var(--red); background: #0c0c0c; }
 .re-cat.locked { color: var(--text-dim); }
-.re-lock { font-size: 10px; }
+.re-lock { font-size: 14px; }
 .re-pieces { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
 .re-pieces.locked .re-piece { opacity: 0.35; cursor: not-allowed; }
-.re-hint { flex-basis: 100%; font-size: 11px; color: var(--text-dim); margin: 0 0 4px; line-height: 1.5; }
+.re-hint { flex-basis: 100%; font-size: 15px; color: var(--text-dim); margin: 0 0 4px; line-height: 1.5; }
 .re-piece { width: 68px; height: 68px; background: #0f0f0f; border: 1px solid var(--border); padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .re-piece:hover { border-color: var(--border-mid); }
 .re-piece.active { border-color: var(--red); }
 .re-piece img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
 
 /* Toolbar */
-.re-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 12px; color: var(--text-sec); }
+.re-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 17px; color: var(--text-sec); }
 .re-field { display: inline-flex; align-items: center; gap: 6px; }
 .re-field select { background: #0f0f0f; color: var(--text-pri); border: 1px solid var(--border-mid); padding: 4px 6px; font-family: var(--font-system); font-size: 12px; }
 .re-tabs { display: inline-flex; border: 1px solid var(--border-mid); }
@@ -49,10 +49,10 @@
 .rm-editor .rm-selected { outline: 3px solid var(--red); outline-offset: 2px; }
 
 /* Inspector */
-.re-inspector { margin-top: 10px; border: 1px solid var(--border); padding: 8px 12px; font-size: 12px; color: var(--text-sec); min-height: 40px; }
+.re-inspector { margin-top: 10px; border: 1px solid var(--border); padding: 8px 12px; font-size: 17px; color: var(--text-sec); min-height: 40px; }
 .re-insp-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .re-insp-row b { color: var(--text-pri); font-weight: 600; }
-.re-insp-label { color: var(--text-dim); text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+.re-insp-label { color: var(--text-dim); text-transform: uppercase; font-size: 14px; letter-spacing: 0.1em; }
 .re-insp-group { display: inline-flex; align-items: center; gap: 4px; }
 .re-insp-group button { background: #0f0f0f; border: 1px solid var(--border-mid); color: var(--text-pri); font-family: var(--font-system); font-size: 12px; padding: 3px 9px; cursor: pointer; }
 .re-insp-group button:hover, .re-inspector .pill-btn:hover { border-color: var(--red); color: var(--red); }
@@ -62,13 +62,13 @@
 .re-insp-empty { color: var(--text-dim); }
 
 /* Status line */
-.re-status { margin-top: 8px; font-size: 12px; padding: 6px 10px; color: var(--text-sec); }
+.re-status { margin-top: 8px; font-size: 17px; padding: 6px 10px; color: var(--text-sec); }
 .re-status-err { color: var(--red); }
 
 /* A set you own pieces from but not outright: the count, and the pieces
    you cannot use yet shown dim rather than hidden — seeing what is coming
    is the point of a pass. */
-.re-part { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.re-part { font-size: 14px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .re-piece-locked { opacity: 0.28; cursor: not-allowed; filter: grayscale(1); }
 .re-piece-locked:hover { border-color: var(--border); }
 

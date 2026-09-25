@@ -124,7 +124,7 @@
 }
 
 .events-empty-icon {
-  font-size: 48px;
+  font-size: 67px;
   margin-bottom: 16px;
   opacity: 0.3;
 }
@@ -135,7 +135,7 @@
 }
 
 .events-empty p {
-  font-size: 13px;
+  font-size: 18px;
   max-width: 400px;
   margin: 0 auto 24px;
 }
@@ -172,7 +172,7 @@
 }
 
 .community-event-card p {
-  font-size: 13px;
+  font-size: 18px;
   line-height: 1.6;
   margin-bottom: 12px;
 }

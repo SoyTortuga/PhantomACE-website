@@ -11,7 +11,7 @@
   text-align: center;
   padding: 32px 16px;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 20px;
   font-family: var(--font-ui);
 }
 
@@ -42,7 +42,7 @@
 }
 
 .equipped-label {
-  font-size: 9px;
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-dim);
@@ -51,7 +51,7 @@
 
 .equipped-item {
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 17px;
   color: var(--text-sec);
   padding: 4px 0;
   border-radius: 3px;
@@ -78,7 +78,7 @@
 
 .inv-tab {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 18px;
   padding: 8px 18px;
 }
 
@@ -130,7 +130,7 @@
 }
 
 .item-icon-swatch {
-  font-size: 22px;
+  font-size: 31px;
   line-height: 1;
   margin-bottom: 2px;
 }
@@ -182,7 +182,7 @@
 
 .item-name {
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
   color: var(--text-pri);
   font-weight: 600;
 }
@@ -197,7 +197,7 @@
 .item-equip-btn {
   margin-top: 8px;
   align-self: flex-start;
-  font-size: 11px;
+  font-size: 15px;
   padding: 4px 12px;
 }
 
@@ -210,7 +210,7 @@
   text-align: center;
   padding: 40px 16px;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 18px;
   font-family: var(--font-ui);
   border: 1px dashed var(--border-mid);
   border-radius: 4px;
@@ -224,7 +224,7 @@
 
 .showcase-desc {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 18px;
   color: var(--text-sec);
   margin: 0 0 12px;
   max-width: 60ch;
@@ -232,7 +232,7 @@
 
 .showcase-save-btn {
   margin-top: 12px;
-  font-size: 13px;
+  font-size: 18px;
   padding: 8px 20px;
 }
 
@@ -247,7 +247,7 @@
 }
 
 .import-badges-btn {
-  font-size: 12px;
+  font-size: 17px;
   padding: 8px 20px;
 }
 
@@ -266,7 +266,7 @@
 
 .inv-footer-tip p {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 18px;
   color: var(--text-dim);
   max-width: 62ch;
   margin: 0 auto;

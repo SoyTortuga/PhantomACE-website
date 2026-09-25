@@ -152,7 +152,7 @@
 }
 .nav-submenu a.locked::after {
   content: ' 🔒';
-  font-size: 9px;
+  font-size: 14px;
 }
 
 /* Hamburger — hidden on desktop */
@@ -201,7 +201,7 @@
   }
 
   .header-brand img { height: 32px; }
-  .header-brand-name { font-size: 13px; }
+  .header-brand-name { font-size: 18px; }
 
   .hamburger { display: flex; }
   .header-live-status { display: none; }
@@ -254,7 +254,7 @@
 
   .nav-submenu a {
     padding: 10px 24px;
-    font-size: 12px;
+    font-size: 17px;
   }
 
   .nav-open .hamburger span:nth-child(1) {
@@ -340,7 +340,7 @@
 }
 
 .footer-tagline {
-  font-size: 13px;
+  font-size: 18px;
   color: var(--text-dim);
   margin-top: 4px;
 }

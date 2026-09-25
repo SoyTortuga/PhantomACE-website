@@ -40,6 +40,11 @@ page AND every game, and sub-agents must follow them too.
   `--font-system` (system-ui) remains only for utilitarian tool pages. The old
   PhantomACE / UnifrakturMaguntia / Cinzel Decorative / IM Fell English faces are
   retired — do not reintroduce them.
+- **Aurusenthial Gothic has a hard 14px minimum.** It is a display-weight face and
+  turns to mush below ~14px, so any element rendering in `--font-ui` must be
+  `font-size: 14px` or larger — never 8–13px. When adjusting a type scale, keep the
+  whole ramp proportional above that floor rather than clamping everything to 14.
+  (GodOfWar headings and system-ui tool text are exempt from the floor.)
 - **No `box-shadow`. Ever.** Depth comes from borders. For a glow, use
   `filter: drop-shadow()` on a NON-box element (sprite/logo/icon); to make a box
   read as "lit", brighten or thicken its border instead — do not reach for a

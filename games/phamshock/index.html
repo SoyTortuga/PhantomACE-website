@@ -11,23 +11,23 @@
 
     .screen { display: none; } .screen.active { display: flex; }
 
-    .btn { padding: 10px 24px; border: none; border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; transition: background 0.2s, transform 0.1s; }
+    .btn { padding: 10px 24px; border: none; border-radius: 4px; font-size: 18px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; transition: background 0.2s, transform 0.1s; }
     .btn:hover:not(:disabled) { transform: scale(1.04); }
     .btn:disabled { opacity: 0.4; cursor: default; }
     .btn-red { background: #ff0000; color: #fff; } .btn-red:hover:not(:disabled) { background: #cc0000; }
     .btn-dim { background: #333; color: #fff; } .btn-dim:hover:not(:disabled) { background: #444; }
-    .input { padding: 8px 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #fff; font-size: 13px; outline: none; }
+    .input { padding: 8px 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #fff; font-size: 18px; outline: none; }
     .input:focus { border-color: #ff0000; }
     .input::placeholder { color: #555; }
-    .section-hdr { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #555; margin-bottom: 8px; }
+    .section-hdr { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: #555; margin-bottom: 8px; }
     .card-box { background: #111; border: 1px solid #ffffff14; border-top: 2px solid #ff0000; border-radius: 6px; padding: 14px; }
-    .feedback { min-height: 20px; font-size: 12px; color: #fff; text-align: center; }
+    .feedback { min-height: 20px; font-size: 17px; color: #fff; text-align: center; }
     .feedback.error { color: #ff0000; }
 
     /* ── SPLASH ── */
     #splashScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; overflow-y: auto; }
     .splash-title { font-family: var(--font-display); font-size: 36px; font-weight: 800; color: #ff0000; text-shadow: 0 0 30px #ff000040; letter-spacing: 2px; }
-    .splash-sub { font-size: 12px; color: #fff; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
+    .splash-sub { font-size: 17px; color: #fff; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
     .splash-sections { display: flex; gap: 12px; width: 100%; max-width: 560px; flex-wrap: wrap; }
     .splash-sections > * { flex: 1; min-width: 240px; }
     .splash-form { display: flex; flex-direction: column; gap: 8px; }
@@ -35,28 +35,28 @@
     .splash-form .row .input { flex: 1; }
     .guest-bar { display: flex; gap: 8px; align-items: center; width: 100%; max-width: 560px; }
     .guest-bar .input { flex: 1; }
-    .guest-bar .val { color: #00cc66; font-size: 12px; font-weight: 600; }
+    .guest-bar .val { color: #00cc66; font-size: 17px; font-weight: 600; }
     .room-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 560px; }
     .room-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 4px; }
     .room-info { display: flex; flex-direction: column; gap: 2px; }
-    .room-code-tag { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
-    .room-host { font-size: 11px; color: #fff; }
-    .room-meta { display: flex; gap: 8px; align-items: center; font-size: 11px; color: #fff; }
+    .room-code-tag { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+    .room-host { font-size: 15px; color: #fff; }
+    .room-meta { display: flex; gap: 8px; align-items: center; font-size: 15px; color: #fff; }
 
     /* ── LOBBY ── */
     #lobbyScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; }
-    .lobby-code { font-size: 48px; font-weight: 800; letter-spacing: 8px; color: #ff0000; text-shadow: 0 0 20px #ff000050; cursor: pointer; }
+    .lobby-code { font-size: 67px; font-weight: 800; letter-spacing: 8px; color: #ff0000; text-shadow: 0 0 20px #ff000050; cursor: pointer; }
     .lobby-code:hover { text-shadow: 0 0 30px #ff000080; }
-    .lobby-status { font-size: 11px; color: #fff; text-transform: uppercase; letter-spacing: 0.12em; }
+    .lobby-status { font-size: 15px; color: #fff; text-transform: uppercase; letter-spacing: 0.12em; }
     .player-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 400px; }
     .player-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 4px; }
     .player-color { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-    .player-name { font-size: 13px; font-weight: 600; flex: 1; }
-    .player-host-tag { font-size: 9px; color: #ff0000; text-transform: uppercase; letter-spacing: 0.1em; background: #ff000020; padding: 2px 6px; border-radius: 3px; }
-    .player-ready-tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
+    .player-name { font-size: 18px; font-weight: 600; flex: 1; }
+    .player-host-tag { font-size: 14px; color: #ff0000; text-transform: uppercase; letter-spacing: 0.1em; background: #ff000020; padding: 2px 6px; border-radius: 3px; }
+    .player-ready-tag { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
     .player-ready-tag.ready { color: #00cc66; background: #00cc6620; }
     .player-ready-tag.notready { color: #fff; background: #ffffff0d; }
-    .kick-btn { width: 20px; height: 20px; flex-shrink: 0; border: 1px solid #660000; background: #330000; color: #ff6666; border-radius: 3px; font-size: 12px; line-height: 1; cursor: pointer; }
+    .kick-btn { width: 20px; height: 20px; flex-shrink: 0; border: 1px solid #660000; background: #330000; color: #ff6666; border-radius: 3px; font-size: 17px; line-height: 1; cursor: pointer; }
     .kick-btn:hover { background: #440000; }
     .color-picker { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 400px; }
     .color-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
@@ -69,13 +69,13 @@
     .players-bar { display: flex; gap: 4px; padding: 4px 8px; background: #0a0a0a; border-bottom: 1px solid #ffffff14; overflow-x: auto; flex-shrink: 0; }
     .pbar-item { display: flex; align-items: center; gap: 4px; padding: 3px 6px; background: #151515; border-radius: 4px; white-space: nowrap; min-width: 0; flex-shrink: 0; }
     .pbar-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .pbar-name { font-size: 10px; color: #fff; max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
-    .pbar-hp { font-size: 10px; font-weight: 700; color: #fff; }
+    .pbar-name { font-size: 14px; color: #fff; max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
+    .pbar-hp { font-size: 14px; font-weight: 700; color: #fff; }
     .pbar-item.me { border: 1px solid #ff000060; }
     .pbar-item.dead { opacity: 0.3; }
     .pbar-item .pbar-hpbar { width: 30px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
     .pbar-item .pbar-hpfill { height: 100%; background: #00cc66; transition: width 0.3s; }
-    .pbar-submitted { font-size: 8px; color: #00cc66; }
+    .pbar-submitted { font-size: 14px; color: #00cc66; }
 
     .timer-bar { height: 4px; background: #111; position: relative; overflow: hidden; width: 100%; flex-shrink: 0; }
     .timer-fill { height: 100%; background: #00cc66; transition: width 0.3s linear; position: absolute; left: 0; top: 0; }
@@ -85,7 +85,7 @@
     canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; cursor: crosshair; }
 
     .controls-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0a0a0a; border-top: 1px solid #ffffff14; flex-shrink: 0; flex-wrap: wrap; }
-    .aim-group { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #fff; }
+    .aim-group { display: flex; align-items: center; gap: 4px; font-size: 15px; color: #fff; }
     .aim-group input[type=range] { width: 80px; accent-color: #ff0000; }
     .aim-group .val { color: #fff; font-weight: 600; min-width: 28px; text-align: right; }
 
@@ -93,25 +93,25 @@
        control strip gets -- and centred so a short second row does not
        hang off the left. */
     .weapon-bar { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
-    .weapon-btn { padding: 3px 8px; border: 1px solid #333; border-radius: 3px; background: #1a1a1a; color: #fff; font-size: 10px; cursor: pointer; white-space: nowrap; }
+    .weapon-btn { padding: 3px 8px; border: 1px solid #333; border-radius: 3px; background: #1a1a1a; color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
     .weapon-btn.active { border-color: #ff0000; color: #fff; background: #330000; }
-    .weapon-btn .ammo { color: #ff6666; font-size: 9px; }
+    .weapon-btn .ammo { color: #ff6666; font-size: 14px; }
 
-    .wind-display { font-size: 11px; color: #fff; display: flex; align-items: center; gap: 4px; }
+    .wind-display { font-size: 15px; color: #fff; display: flex; align-items: center; gap: 4px; }
     .wind-display .wind-arrow { color: #44aaff; font-weight: 700; }
     .wind-display .wind-val { color: #fff; font-weight: 600; }
 
-    #fireBtn { padding: 6px 20px; font-size: 12px; margin-left: auto; }
+    #fireBtn { padding: 6px 20px; font-size: 17px; margin-left: auto; }
 
     .status-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 20; pointer-events: none; }
-    .status-overlay .big { font-size: 28px; font-weight: 800; color: #ff0000; text-shadow: 0 0 20px #ff000060; }
-    .status-overlay .sub { font-size: 13px; color: #fff; margin-top: 6px; }
+    .status-overlay .big { font-size: 39px; font-weight: 800; color: #ff0000; text-shadow: 0 0 20px #ff000060; }
+    .status-overlay .sub { font-size: 18px; color: #fff; margin-top: 6px; }
 
     .game-over-overlay { position: fixed; inset: 0; background: #000000dd; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; gap: 12px; }
-    .game-over-overlay .winner { font-size: 32px; font-weight: 800; text-shadow: 0 0 30px currentColor; }
-    .game-over-overlay .info { font-size: 14px; color: #fff; }
+    .game-over-overlay .winner { font-size: 45px; font-weight: 800; text-shadow: 0 0 30px currentColor; }
+    .game-over-overlay .info { font-size: 20px; color: #fff; }
     .game-over-overlay .standings { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-    .game-over-overlay .standing-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 12px; background: #111; border-radius: 4px; }
+    .game-over-overlay .standing-row { display: flex; align-items: center; gap: 8px; font-size: 17px; padding: 4px 12px; background: #111; border-radius: 4px; }
     .game-over-overlay .standing-rank { font-weight: 700; min-width: 20px; }
     .game-over-overlay .standing-color { width: 10px; height: 10px; border-radius: 50%; }
   </style>

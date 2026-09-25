@@ -112,14 +112,14 @@
 
 .hero-buttons .btn-primary {
   padding: 12px 32px;
-  font-size: 15px;
+  font-size: 21px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .hero-buttons .btn-secondary {
   padding: 12px 32px;
-  font-size: 15px;
+  font-size: 21px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -142,7 +142,7 @@
 /* Offline message */
 .hero-offline {
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
   color: var(--text-dim);
   font-style: italic;
 }
@@ -208,7 +208,7 @@
 }
 
 .event-card-desc {
-  font-size: 13px;
+  font-size: 18px;
   color: var(--text-sec);
   line-height: 1.5;
 }
@@ -254,7 +254,7 @@
 }
 
 .gallery-empty p {
-  font-size: 14px;
+  font-size: 20px;
   color: var(--text-dim);
 }
 
@@ -282,7 +282,7 @@
 .community-preview p {
   max-width: 500px;
   margin: 0 auto 24px;
-  font-size: 14px;
+  font-size: 20px;
   position: relative;
 }
 

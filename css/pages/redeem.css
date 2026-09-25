@@ -15,7 +15,7 @@
   font-family: var(--font-ui);
   color: var(--text-sec);
   margin-bottom: 12px;
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .redeem-input-row {
@@ -62,19 +62,19 @@
 .redeem-error {
   color: var(--red);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .redeem-expired {
   color: var(--amber);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .redeem-duplicate {
   color: var(--text-dim);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .redeem-success {
@@ -103,7 +103,7 @@
 .redeemed-item-name {
   font-family: var(--font-ui);
   color: var(--white);
-  font-size: 16px;
+  font-size: 22px;
   margin-bottom: 6px;
 }
 

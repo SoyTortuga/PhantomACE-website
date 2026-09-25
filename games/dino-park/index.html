@@ -28,7 +28,7 @@
       height: 38px;
     }
     .top-bar-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: #ff0000; letter-spacing: 1px; }
-    .top-bar-stats { display: flex; gap: 12px; font-size: 11px; }
+    .top-bar-stats { display: flex; gap: 12px; font-size: 15px; }
     .stat-item { display: flex; align-items: center; gap: 3px; color: #fff; }
     .stat-item .val { color: #fff; font-weight: 600; }
 
@@ -36,12 +36,12 @@
     .tab-bar { display: flex; background: #0a0a0a; border-bottom: 1px solid #ffffff14; height: 42px; }
     .tab-btn {
       flex: 1; padding: 6px 4px; background: transparent; border: none; color: #fff;
-      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
       cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s;
     }
     .tab-btn:hover { color: #fff; }
     .tab-btn.active { color: #ff0000; border-bottom-color: #ff0000; }
-    .tab-btn .tab-icon { font-size: 13px; display: block; margin-bottom: 1px; }
+    .tab-btn .tab-icon { font-size: 18px; display: block; margin-bottom: 1px; }
 
     /* Tab Content */
     .tab-content { display: none; }
@@ -78,7 +78,7 @@
       width: 28px; height: 28px;
       background: rgba(0,0,0,0.75); color: #fff;
       border: 1px solid #ffffff14; border-radius: 4px;
-      font-family: inherit; font-size: 14px; font-weight: 700;
+      font-family: inherit; font-size: 20px; font-weight: 700;
       cursor: pointer; line-height: 1;
       display: flex; align-items: center; justify-content: center;
     }
@@ -97,13 +97,13 @@
     .park-deco {
       position: absolute;
       z-index: 3;
-      font-size: 10px;
+      font-size: 14px;
       line-height: 1;
       pointer-events: none;
       opacity: 0.7;
     }
     .park-deco.flower { opacity: 0.8; }
-    .park-deco.rock { opacity: 0.5; font-size: 8px; }
+    .park-deco.rock { opacity: 0.5; font-size: 14px; }
 
     /* Roaming dino */
     .park-dino {
@@ -143,7 +143,7 @@
     .park-dino-label {
       background: rgba(0,0,0,0.7);
       color: #fff;
-      font-size: 8px;
+      font-size: 14px;
       font-weight: 600;
       padding: 1px 6px;
       border-radius: 3px;
@@ -200,13 +200,13 @@
       background: rgba(0,0,0,0.75); padding: 4px 10px; border-radius: 4px;
       border: 1px solid #ffffff14; white-space: nowrap;
     }
-    .clock-phase { font-size: 12px; line-height: 1; }
+    .clock-phase { font-size: 17px; line-height: 1; }
     .clock-text { display: flex; flex-direction: column; gap: 1px; }
     .clock-name {
-      font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+      font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;
       color: #fff; line-height: 1;
     }
-    .clock-sub { font-size: 8px; color: #fff; line-height: 1; }
+    .clock-sub { font-size: 14px; color: #fff; line-height: 1; }
     .park-clock.live { border-color: #FF000045; }
     .park-clock.live .clock-name { color: #FF3333; }
     .clock-live-dot {
@@ -225,7 +225,7 @@
       display: flex; align-items: center; gap: 5px;
       background: rgba(0,0,0,0.75); padding: 5px 9px; border-radius: 4px;
       border: 1px solid #ffffff14; color: #fff; cursor: pointer;
-      font-family: inherit; font-size: 10px; letter-spacing: 0.06em;
+      font-family: inherit; font-size: 14px; letter-spacing: 0.06em;
       text-transform: uppercase; transition: border-color 0.15s, color 0.15s;
     }
     .park-decorate-btn:hover { border-color: #FF000060; color: #fff; }
@@ -241,19 +241,19 @@
     .yard-tray.open { display: block; }
     .yard-tray-close {
       background: #1a1a1a; color: #fff; border: 1px solid #ffffff28;
-      border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+      border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 15px;
     }
-    .yard-tray-hint-row { font-size: 9px; color: #fff; margin-bottom: 6px; }
+    .yard-tray-hint-row { font-size: 14px; color: #fff; margin-bottom: 6px; }
     @media (max-width: 900px) {
       .park-stage { flex-direction: column; align-items: stretch; }
       .yard-tray { flex: 1 1 auto; max-height: 40vh; }
     }
     .yard-tray-head {
       display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 7px; font-size: 9px; letter-spacing: 0.1em;
+      margin-bottom: 7px; font-size: 14px; letter-spacing: 0.1em;
       text-transform: uppercase; color: #fff;
     }
-    .yard-tray-hint { color: #fff; text-transform: none; letter-spacing: 0; font-size: 9px; }
+    .yard-tray-hint { color: #fff; text-transform: none; letter-spacing: 0; font-size: 14px; }
     /* Vertical scroll over a wrapping grid. The old single flex row was
        fine for eight items and unusable for thirty-three. */
     /* Docked at the side there is a whole column to use; stacked below
@@ -263,12 +263,12 @@
     @media (max-width: 900px) { .yard-tray-items { max-height: 34vh; } }
     .yard-band { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
     .yard-band-label {
-      font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+      font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;
       color: #ffffff77; margin: 2px 0 4px; border-bottom: 1px solid #ffffff14;
       padding-bottom: 2px;
     }
     .yard-item-btn.scenery-btn { width: auto; min-width: 62px; padding: 6px 10px; }
-    .yard-item-btn.scenery-btn .yard-item-name { font-size: 9px; }
+    .yard-item-btn.scenery-btn .yard-item-name { font-size: 14px; }
     .yard-item-btn {
       flex: 0 0 auto; width: 62px; padding: 6px 3px 5px;
       background: #0a0a0a; border: 1px solid #ffffff12; border-radius: 3px;
@@ -279,8 +279,8 @@
     .yard-item-btn.selected { border-color: #FF0000; background: #1e0505; }
     .yard-item-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .yard-item-btn img { image-rendering: pixelated; display: block; margin: 0 auto 3px; }
-    .yard-item-name { font-size: 8px; color: #fff; letter-spacing: 0.04em; display: block; }
-    .yard-item-cost { font-size: 9px; color: #d4a017; display: block; margin-top: 1px; }
+    .yard-item-name { font-size: 14px; color: #fff; letter-spacing: 0.04em; display: block; }
+    .yard-item-cost { font-size: 14px; color: #d4a017; display: block; margin-top: 1px; }
     .yard-item-btn.selected .yard-item-name { color: #fff; }
 
     /* Energy bar */
@@ -290,12 +290,12 @@
       background: rgba(0,0,0,0.75); padding: 4px 8px; border-radius: 4px;
       border: 1px solid #ffffff14;
     }
-    .energy-icon { font-size: 12px; }
+    .energy-icon { font-size: 17px; }
     .energy-fill-ctr { width: 60px; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
     .energy-fill { height: 100%; background: #ffaa00; border-radius: 3px; transition: width 0.3s; }
-    .energy-text { font-size: 9px; color: #fff; font-weight: 600; min-width: 30px; }
+    .energy-text { font-size: 14px; color: #fff; font-weight: 600; min-width: 30px; }
     .energy-refill {
-      font-size: 8px; padding: 2px 6px; background: #222; border: 1px solid #ffffff28;
+      font-size: 14px; padding: 2px 6px; background: #222; border: 1px solid #ffffff28;
       border-radius: 3px; color: #ffaa00; cursor: pointer; font-weight: 600;
     }
     .energy-refill:hover { background: #333; border-color: #ffaa00; }
@@ -303,7 +303,7 @@
 
     /* Sell price in panel */
     .panel-sell-info { display: flex; align-items: center; gap: 6px; }
-    .panel-sell-price { font-size: 10px; color: #ffaa00; font-weight: 700; }
+    .panel-sell-price { font-size: 14px; color: #ffaa00; font-weight: 700; }
     .panel-action.sell-action { color: #ffaa00; }
     .panel-action.sell-action:hover { color: #ff6600; border-color: #ff6600; }
 
@@ -333,8 +333,8 @@
       text-shadow: 0 1px 4px rgba(0,0,0,0.5);
       z-index: 20;
     }
-    .park-empty-msg .big { font-size: 40px; display: block; margin-bottom: 8px; }
-    .park-empty-msg .msg { font-size: 12px; opacity: 0.8; }
+    .park-empty-msg .big { font-size: 56px; display: block; margin-bottom: 8px; }
+    .park-empty-msg .msg { font-size: 17px; opacity: 0.8; }
 
     /* ======================== BOTTOM PANEL ======================== */
     .park-panel {
@@ -358,12 +358,12 @@
       gap: 10px;
       padding: 10px 12px 6px;
     }
-    .panel-emoji { font-size: 32px; line-height: 0; }
+    .panel-emoji { font-size: 45px; line-height: 0; }
     .panel-info { flex: 1; min-width: 0; }
-    .panel-name { font-size: 14px; font-weight: 700; color: #fff; }
+    .panel-name { font-size: 20px; font-weight: 700; color: #fff; }
     .panel-meta { display: flex; gap: 6px; margin-top: 3px; align-items: center; }
     .panel-badge {
-      font-size: 8px; padding: 1px 6px; border-radius: 3px;
+      font-size: 14px; padding: 1px 6px; border-radius: 3px;
       text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700;
     }
     .pbadge-common { background: #7a7a7a33; color: #fff; }
@@ -374,7 +374,7 @@
     .pbadge-diet { background: #ffffff0a; color: #fff; }
     .panel-fav {
       background: none; border: none; cursor: pointer;
-      font-size: 22px; line-height: 1; padding: 0 6px;
+      font-size: 31px; line-height: 1; padding: 0 6px;
       color: #fff; transition: color 0.15s;
     }
     .panel-fav:hover { color: #ffb300; }
@@ -382,7 +382,7 @@
 
     .panel-close {
       background: transparent; border: 1px solid #333; color: #fff;
-      width: 24px; height: 24px; border-radius: 4px; font-size: 14px;
+      width: 24px; height: 24px; border-radius: 4px; font-size: 20px;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
     .panel-close:hover { border-color: #ff0000; color: #ff0000; }
@@ -401,7 +401,7 @@
       flex: 1;
       min-width: 80px;
     }
-    .panel-stat-icon { font-size: 10px; }
+    .panel-stat-icon { font-size: 14px; }
     .panel-stat-bar {
       flex: 1;
       height: 6px;
@@ -426,7 +426,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 9px;
+      font-size: 14px;
       color: #fff;
     }
     .panel-growth-bar {
@@ -456,7 +456,7 @@
       background: #0d0d0d;
       border: none;
       color: #fff;
-      font-size: 10px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       text-align: center;
@@ -464,11 +464,11 @@
     }
     .panel-action:hover:not(:disabled) { background: #1a1a1a; color: #fff; }
     .panel-action:disabled { opacity: 0.3; cursor: not-allowed; }
-    .panel-action .action-icon { font-size: 16px; display: block; margin-bottom: 2px; }
-    .panel-action .action-cd { font-size: 8px; color: #fff; display: block; margin-top: 1px; }
+    .panel-action .action-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+    .panel-action .action-cd { font-size: 14px; color: #fff; display: block; margin-top: 1px; }
     .panel-action.details-btn { max-width: 60px; color: #fff; }
     .panel-action.details-btn:hover { color: #ff0000; }
-    .panel-action.release-action { max-width: 50px; color: #fff; font-size: 9px; }
+    .panel-action.release-action { max-width: 50px; color: #fff; font-size: 14px; }
     .panel-action.release-action:hover { color: #ff0000; }
 
     /* ======================== MARKETPLACE ======================== */
@@ -476,7 +476,7 @@
     .market-login-btn {
       display: inline-block; margin-top: 12px; padding: 10px 24px;
       background: #9146FF; border: none; border-radius: 6px;
-      color: #fff; font-size: 12px; font-weight: 700; cursor: pointer;
+      color: #fff; font-size: 17px; font-weight: 700; cursor: pointer;
       text-decoration: none;
     }
     .market-login-btn:hover { background: #7c3aed; }
@@ -485,12 +485,12 @@
       padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center;
       justify-content: space-between;
     }
-    .market-earnings-text { font-size: 11px; color: #ffaa00; font-weight: 600; }
+    .market-earnings-text { font-size: 15px; color: #ffaa00; font-weight: 600; }
     .market-earnings-btn {
       padding: 4px 12px; background: #ffaa00; border: none; border-radius: 4px;
-      color: #000; font-size: 10px; font-weight: 700; cursor: pointer;
+      color: #000; font-size: 14px; font-weight: 700; cursor: pointer;
     }
-    .market-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 10px; }
+    .market-section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 10px; }
     .market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
     .market-card {
       background: #111; border: 1px solid #ffffff14; border-radius: 8px;
@@ -498,29 +498,29 @@
     }
     .market-card:hover { border-color: #ffaa00; }
     .market-card-sprite { margin-bottom: 6px; }
-    .market-card-name { font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 2px; }
-    .market-card-meta { font-size: 9px; color: #fff; margin-bottom: 6px; }
-    .market-card-seller { font-size: 8px; color: #fff; margin-bottom: 6px; }
-    .market-card-price { font-size: 14px; font-weight: 700; color: #ffaa00; margin-bottom: 6px; }
+    .market-card-name { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .market-card-meta { font-size: 14px; color: #fff; margin-bottom: 6px; }
+    .market-card-seller { font-size: 14px; color: #fff; margin-bottom: 6px; }
+    .market-card-price { font-size: 20px; font-weight: 700; color: #ffaa00; margin-bottom: 6px; }
     .market-card-buy {
       padding: 4px 16px; background: #ffaa00; border: none; border-radius: 4px;
-      color: #000; font-size: 10px; font-weight: 700; cursor: pointer;
+      color: #000; font-size: 14px; font-weight: 700; cursor: pointer;
     }
     .market-card-buy:hover { background: #ff8800; }
     .market-card-buy:disabled { opacity: 0.4; cursor: default; }
     .market-card-cancel {
       padding: 4px 12px; background: transparent; border: 1px solid #ffffff28;
-      border-radius: 4px; color: #fff; font-size: 9px; cursor: pointer; margin-top: 4px;
+      border-radius: 4px; color: #fff; font-size: 14px; cursor: pointer; margin-top: 4px;
     }
     .market-card-cancel:hover { border-color: #ff0000; color: #ff0000; }
-    .market-empty { text-align: center; color: #444; font-size: 12px; padding: 30px; }
-    .market-card .rarity-chip { display: inline-block; font-size: 8px; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+    .market-empty { text-align: center; color: #444; font-size: 17px; padding: 30px; }
+    .market-card .rarity-chip { display: inline-block; font-size: 14px; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
     .market-card .rarity-common { background: #333; color: #fff; }
     .market-card .rarity-uncommon { background: #1a3a1a; color: #4CAF50; }
     .market-card .rarity-rare { background: #1a2a4a; color: #42A5F5; }
     .market-card .rarity-epic { background: #2a1a3a; color: #AB47BC; }
     .market-card .rarity-legendary { background: #3a2a0a; color: #FFC107; }
-    .market-mut-badge { font-size: 8px; color: #ffaa00; margin-top: 2px; }
+    .market-mut-badge { font-size: 14px; color: #ffaa00; margin-top: 2px; }
 
     /* Sell dialog overlay */
     .sell-overlay {
@@ -531,20 +531,20 @@
       background: #111; border: 2px solid #ff0000; border-radius: 10px;
       padding: 20px; width: 280px; text-align: center;
     }
-    .sell-dialog-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+    .sell-dialog-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 12px; }
     .sell-dialog-sprite { margin-bottom: 8px; }
-    .sell-dialog-info { font-size: 10px; color: #fff; margin-bottom: 12px; }
+    .sell-dialog-info { font-size: 14px; color: #fff; margin-bottom: 12px; }
     .sell-dialog-price-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
-    .sell-dialog-price-row label { font-size: 11px; color: #fff; }
+    .sell-dialog-price-row label { font-size: 15px; color: #fff; }
     .sell-dialog-price-input {
       width: 80px; padding: 6px 10px; background: #222; border: 1px solid #ffffff28;
-      border-radius: 4px; color: #ffaa00; font-size: 14px; font-weight: 700;
+      border-radius: 4px; color: #ffaa00; font-size: 20px; font-weight: 700;
       text-align: center; outline: none;
     }
     .sell-dialog-price-input:focus { border-color: #ffaa00; }
     .sell-dialog-btns { display: flex; gap: 8px; justify-content: center; }
     .sell-dialog-btns button {
-      padding: 8px 20px; border: none; border-radius: 4px; font-size: 11px;
+      padding: 8px 20px; border: none; border-radius: 4px; font-size: 15px;
       font-weight: 700; cursor: pointer;
     }
     .sell-confirm { background: #ffaa00; color: #000; }
@@ -554,7 +554,7 @@
 
     /* ======================== EGGS TAB ======================== */
     .eggs-section { margin-bottom: 24px; }
-    .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 12px; }
+    .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; color: #444; margin-bottom: 12px; }
 
     /* Incubator */
     .incubator-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
@@ -563,30 +563,30 @@
       padding: 16px; text-align: center; min-height: 120px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .egg-slot.empty { border-style: dashed; color: #333; font-size: 11px; }
-    .egg-emoji { font-size: 36px; margin-bottom: 6px; animation: eggWobble 2s infinite ease-in-out; }
+    .egg-slot.empty { border-style: dashed; color: #333; font-size: 15px; }
+    .egg-emoji { font-size: 50px; margin-bottom: 6px; animation: eggWobble 2s infinite ease-in-out; }
     @keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
-    .egg-name { font-size: 10px; color: #fff; font-weight: 600; margin-bottom: 4px; }
-    .egg-timer { font-size: 18px; font-weight: 700; color: #ff0000; margin-bottom: 4px; }
+    .egg-name { font-size: 14px; color: #fff; font-weight: 600; margin-bottom: 4px; }
+    .egg-timer { font-size: 25px; font-weight: 700; color: #ff0000; margin-bottom: 4px; }
     .egg-progress { width: 80%; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
     .egg-progress-fill { height: 100%; background: #ff0000; border-radius: 2px; transition: width 1s linear; }
     /* Whether an egg is actually ticking. Was a plain 8px caption easy to miss;
        now a real badge, same visual language as .esbadge-*. */
     .egg-live-badge {
       display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 3px;
-      font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
     }
     .egg-live-badge.is-live { background: #27ae6022; color: #2ecc71; }
     .egg-live-badge.is-paused { background: #ffb02018; color: #ffb020; border: 1px solid #ffb02044; }
     .egg-hatch-btn {
       margin-top: 8px; padding: 6px 16px; background: #ff0000; border: none;
-      border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
+      border-radius: 4px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
       animation: pulse 1s infinite;
     }
     .egg-speedup-btn {
       margin-top: 6px; padding: 4px 10px; background: #ffffff08;
       border: 1px solid #d4a01744; border-radius: 4px; color: #d4a017;
-      font-size: 10px; font-weight: 700; cursor: pointer; font-family: inherit;
+      font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
     }
     .egg-speedup-btn:hover:not(:disabled) { border-color: #d4a017; color: #ffc84a; }
     .egg-speedup-btn:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -601,13 +601,13 @@
     .egg-source.available { border-color: #ff000044; cursor: pointer; }
     .egg-source.available:hover { border-color: #ff0000; background: rgba(255,0,0,0.04); }
     .egg-source.claimed, .egg-source.locked { opacity: 0.4; }
-    .egg-source-icon { font-size: 30px; flex-shrink: 0; width: 40px; text-align: center; }
+    .egg-source-icon { font-size: 42px; flex-shrink: 0; width: 40px; text-align: center; }
     .egg-source-info { flex: 1; min-width: 0; }
-    .egg-source-name { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 2px; }
-    .egg-source-desc { font-size: 10px; color: #fff; line-height: 1.4; }
-    .egg-source-timer { font-size: 10px; color: #ff0000; font-weight: 600; margin-top: 3px; }
+    .egg-source-name { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .egg-source-desc { font-size: 14px; color: #fff; line-height: 1.4; }
+    .egg-source-timer { font-size: 14px; color: #ff0000; font-weight: 600; margin-top: 3px; }
     .egg-source-badge {
-      font-size: 8px; padding: 2px 8px; border-radius: 3px; font-weight: 700;
+      font-size: 14px; padding: 2px 8px; border-radius: 3px; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0;
     }
     .esbadge-ready { background: #ff000033; color: #ff4444; }
@@ -629,13 +629,13 @@
       0%, 100% { filter: drop-shadow(0 0 8px rgba(255,0,0,0.1)); }
       50% { filter: drop-shadow(0 0 16px rgba(255,0,0,0.25)); }
     }
-    .event-banner-icon { font-size: 32px; margin-bottom: 6px; }
-    .event-banner-title { font-size: 13px; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
-    .event-banner-desc { font-size: 10px; color: #fff; margin-bottom: 10px; }
-    .event-banner-timer { font-size: 11px; color: #ff0000; font-weight: 600; margin-bottom: 8px; }
+    .event-banner-icon { font-size: 45px; margin-bottom: 6px; }
+    .event-banner-title { font-size: 18px; font-weight: 700; color: #ff4444; margin-bottom: 4px; }
+    .event-banner-desc { font-size: 14px; color: #fff; margin-bottom: 10px; }
+    .event-banner-timer { font-size: 15px; color: #ff0000; font-weight: 600; margin-bottom: 8px; }
     .event-banner-btn {
       padding: 8px 24px; background: #ff0000; border: none; border-radius: 4px;
-      color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.2s;
+      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s;
     }
     .event-banner-btn:hover { background: #cc0000; }
     .event-banner-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -646,7 +646,7 @@
        instead of hunting for a small badge on each egg. Shown only while
        something is actually incubating; nothing to say otherwise. */
     .incubator-status {
-      font-size: 11px; font-weight: 600; text-align: center;
+      font-size: 15px; font-weight: 600; text-align: center;
       padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
     }
     .incubator-status.is-live { background: #27ae6018; color: #2ecc71; border: 1px solid #2ecc7144; }
@@ -661,14 +661,14 @@
     .redeem-row { display: flex; gap: 6px; margin-top: 8px; }
     .redeem-input {
       flex: 1; padding: 8px 10px; background: #0a0a0a; border: 1px solid #ffffff14;
-      border-radius: 4px; color: #fff; font-size: 11px; font-family: monospace;
+      border-radius: 4px; color: #fff; font-size: 15px; font-family: monospace;
       letter-spacing: 0.08em; text-transform: uppercase;
     }
     .redeem-input::placeholder { color: #333; text-transform: none; letter-spacing: normal; }
     .redeem-input:focus { outline: none; border-color: #ff0000; }
     .redeem-btn {
       padding: 8px 16px; background: #ff0000; border: none; border-radius: 4px;
-      color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
+      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
     }
     .redeem-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
@@ -711,7 +711,7 @@
       border: 1px solid #ffffff14;
       color: #fff;
       font-family: inherit;
-      font-size: 9px;
+      font-size: 14px;
       font-weight: 700;
       padding: 6px 4px;
       border-radius: 3px;
@@ -748,15 +748,15 @@
     .coll-card.selected.rarity-epic { border-color: #9b59b6; }
     .coll-card.selected.rarity-legendary { border-color: #f39c12; }
     .coll-card-sprite { margin: 0 auto 4px; }
-    .coll-card-name { font-size: 9px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .coll-card-level { font-size: 8px; color: #fff; margin-top: 2px; }
+    .coll-card-name { font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .coll-card-level { font-size: 14px; color: #fff; margin-top: 2px; }
     .coll-card-bars { display: flex; gap: 2px; margin-top: 4px; height: 3px; }
     .coll-card-bars > div { flex: 1; border-radius: 1px; }
 
     .trade-open {
       width: 100%; margin-bottom: 6px; padding: 6px;
       background: #1a1a1a; color: #fff; border: 1px solid #ffffff1a;
-      border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer;
+      border-radius: 4px; font-size: 14px; font-weight: 700; cursor: pointer;
       text-transform: uppercase; letter-spacing: 0.08em;
     }
     .trade-open:hover { color: #fff; border-color: #ff000055; }
@@ -769,10 +769,10 @@
       display: flex; align-items: center; justify-content: space-between;
       gap: 8px; width: 100%; margin-bottom: 6px; padding: 6px 8px;
       background: #1a1a1a; border: 1px solid #ffffff1a; border-radius: 4px;
-      font-size: 9px; color: #fff;
+      font-size: 14px; color: #fff;
     }
     .visit-toggle button {
-      padding: 3px 8px; border-radius: 3px; font-size: 9px; font-weight: 700;
+      padding: 3px 8px; border-radius: 3px; font-size: 14px; font-weight: 700;
       cursor: pointer; background: #222; color: #fff; border: 1px solid #ffffff28;
     }
     .visit-toggle button.on { border-color: #6688cc; color: #cfe0ff; }
@@ -780,8 +780,8 @@
       background: #111; border: 2px solid #6688cc; border-radius: 10px;
       padding: 18px; width: min(560px, 92vw); max-height: 82vh; overflow-y: auto;
     }
-    .visit-head { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px; }
-    .visit-sub { font-size: 9px; color: #9aa7bd; margin-bottom: 12px; }
+    .visit-head { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .visit-sub { font-size: 14px; color: #9aa7bd; margin-bottom: 12px; }
     /* A real park, not a list of cards. Same square world and percentage
        positioning the owner sees, at whatever size the dialog allows, so a
        decorated park reads as the place its keeper arranged. */
@@ -793,19 +793,19 @@
     .visit-dino, .visit-yard { position: absolute; transform: translate(-50%, -50%); }
     .visit-dino { text-align: center; }
     .visit-dino .visit-name {
-      font-size: 7px; color: #fff; white-space: nowrap;
+      font-size: 14px; color: #fff; white-space: nowrap;
       text-shadow: 0 1px 2px #000; margin-bottom: 1px;
     }
     .visit-dino img, .visit-yard img { image-rendering: pixelated; display: block; margin: 0 auto; }
-    .visit-empty { font-size: 10px; color: #9aa7bd; text-align: center; padding: 18px; }
+    .visit-empty { font-size: 14px; color: #9aa7bd; text-align: center; padding: 18px; }
     .visit-legend {
       display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 10px;
-      font-size: 8px; color: #9aa7bd;
+      font-size: 14px; color: #9aa7bd;
     }
-    .visit-empty { font-size: 10px; color: #9aa7bd; text-align: center; padding: 18px; }
+    .visit-empty { font-size: 14px; color: #9aa7bd; text-align: center; padding: 18px; }
     .visit-btns { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
     .visit-btns button {
-      padding: 7px 14px; border-radius: 4px; font-size: 10px; font-weight: 700;
+      padding: 7px 14px; border-radius: 4px; font-size: 14px; font-weight: 700;
       cursor: pointer; background: #222; color: #fff; border: 1px solid #ffffff28;
     }
     .visit-btns button:hover { border-color: #6688cc; }
@@ -813,13 +813,13 @@
       background: #0f0f0f; border: 1px solid #ffffff14; border-radius: 4px;
       padding: 8px; margin-bottom: 8px;
     }
-    .trade-count { font-size: 14px; font-weight: 700; color: #fff; }
+    .trade-count { font-size: 20px; font-weight: 700; color: #fff; }
     .trade-count.ready { color: #2ecc71; }
-    .trade-hint { font-size: 10px; color: #fff; margin-top: 2px; }
-    .trade-avail { font-size: 9px; color: #fff; margin-top: 4px; line-height: 1.5; }
+    .trade-hint { font-size: 14px; color: #fff; margin-top: 2px; }
+    .trade-avail { font-size: 14px; color: #fff; margin-top: 4px; line-height: 1.5; }
     .trade-btns { display: flex; gap: 6px; margin-top: 8px; }
     .trade-btns button {
-      flex: 1; padding: 6px; border-radius: 4px; font-size: 10px;
+      flex: 1; padding: 6px; border-radius: 4px; font-size: 14px;
       font-weight: 700; cursor: pointer; text-transform: uppercase;
     }
     .trade-cancel { background: #1a1a1a; color: #fff; border: 1px solid #ffffff1a; }
@@ -830,7 +830,7 @@
     .coll-card.tu-dim { opacity: 0.28; cursor: default; }
     .coll-card.tu-picked { border-color: #2ecc71; background: #10200f; }
     .trade-consume {
-      font-size: 10px; color: #fff; margin: 8px 0; line-height: 1.7;
+      font-size: 14px; color: #fff; margin: 8px 0; line-height: 1.7;
       max-height: 120px; overflow-y: auto;
     }
 
@@ -846,7 +846,7 @@
     .coll-sell-btn {
       position: absolute; top: 12px; right: 12px; z-index: 2;
       background: #ffffff08; border: 1px solid #ffaa0044; color: #ffaa00;
-      font-family: inherit; font-size: 10px; font-weight: 700;
+      font-family: inherit; font-size: 14px; font-weight: 700;
       padding: 5px 10px; border-radius: 3px; cursor: pointer;
       text-transform: uppercase; letter-spacing: 0.04em;
     }
@@ -854,7 +854,7 @@
     .coll-move-btn {
       position: absolute; top: 12px; left: 12px; z-index: 2;
       background: #ffffff08; border: 1px solid #4a9eff44; color: #4a9eff;
-      font-family: inherit; font-size: 10px; font-weight: 700;
+      font-family: inherit; font-size: 14px; font-weight: 700;
       padding: 5px 10px; border-radius: 3px; cursor: pointer;
       text-transform: uppercase; letter-spacing: 0.04em;
     }
@@ -862,18 +862,18 @@
     .coll-vault-note {
       margin-top: 12px; padding: 10px 14px; width: 100%;
       background: #ffffff06; border: 1px solid #ffffff14; border-radius: 4px;
-      color: #fff; font-size: 11px; text-align: center;
+      color: #fff; font-size: 15px; text-align: center;
     }
     .coll-detail-empty {
       flex: 1; display: flex; align-items: center; justify-content: center;
-      color: #333; font-size: 12px;
+      color: #333; font-size: 17px;
     }
     .coll-sprite-large { margin-bottom: 12px; max-width: 100%; }
-    .coll-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-    .coll-species { font-size: 11px; color: #fff; margin-bottom: 10px; }
+    .coll-name { font-size: 25px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .coll-species { font-size: 15px; color: #fff; margin-bottom: 10px; }
     .coll-badges { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
     .coll-badge {
-      font-size: 9px; padding: 3px 10px; border-radius: 3px; font-weight: 700;
+      font-size: 14px; padding: 3px 10px; border-radius: 3px; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.04em;
     }
 
@@ -882,7 +882,7 @@
       display: flex; align-items: center; gap: 8px; padding: 5px 0;
       border-bottom: 1px solid #ffffff0a;
     }
-    .coll-stat-label { font-size: 10px; color: #fff; width: 70px; }
+    .coll-stat-label { font-size: 14px; color: #fff; width: 70px; }
     .coll-stat-dots { display: flex; gap: 3px; flex: 1; }
     .coll-dot {
       width: 12px; height: 12px; border-radius: 2px; background: #1a1a1a;
@@ -898,29 +898,29 @@
       display: flex; gap: 12px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap;
     }
     .coll-attr { text-align: center; }
-    .coll-attr-label { font-size: 8px; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; }
-    .coll-attr-val { font-size: 14px; font-weight: 700; color: #fff; }
+    .coll-attr-label { font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; }
+    .coll-attr-val { font-size: 20px; font-weight: 700; color: #fff; }
 
     .coll-actions { display: flex; gap: 6px; width: 100%; max-width: 280px; }
     .coll-action {
       flex: 1; padding: 10px 6px; background: #111; border: 1px solid #ffffff14;
-      border-radius: 4px; color: #fff; font-size: 10px; font-weight: 600;
+      border-radius: 4px; color: #fff; font-size: 14px; font-weight: 600;
       cursor: pointer; text-align: center; transition: all 0.2s;
     }
     .coll-action:hover:not(:disabled) { border-color: #ff0000; color: #fff; }
     .coll-action:disabled { opacity: 0.3; cursor: not-allowed; }
-    .coll-action .ca-icon { font-size: 14px; display: block; margin-bottom: 2px; }
-    .coll-action .ca-cd { font-size: 8px; color: #fff; }
+    .coll-action .ca-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+    .coll-action .ca-cd { font-size: 14px; color: #fff; }
 
     .coll-growth-section { width: 100%; max-width: 280px; margin-bottom: 16px; }
-    .coll-growth-label { font-size: 9px; color: #fff; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .coll-growth-label { font-size: 14px; color: #fff; margin-bottom: 4px; display: flex; justify-content: space-between; }
     .coll-growth-bar { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
     .coll-growth-fill { height: 100%; background: linear-gradient(90deg, #ff0000, #ff4444); border-radius: 3px; transition: width 0.5s; }
     /* Bone against the red growth bar, so two stacked bars read as two
        different things at a glance rather than one that moved. */
     .coll-growth-fill.lvl-fill { background: linear-gradient(90deg, #8a8272, #e8e2d0); }
 
-    .coll-desc { font-size: 10px; color: #fff; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
+    .coll-desc { font-size: 14px; color: #fff; text-align: center; max-width: 280px; line-height: 1.5; font-style: italic; margin-top: 8px; }
 
     /* ======================== DINODEX ======================== */
     .dex-stats-bar {
@@ -934,26 +934,26 @@
       background: #111; border: 1px solid #ffffff14; border-radius: 6px;
       padding: 8px; text-align: center;
     }
-    .dex-stat-val { font-size: 18px; font-weight: 700; color: #fff; }
-    .dex-stat-lbl { font-size: 8px; color: #fff; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; line-height: 1.3; }
+    .dex-stat-val { font-size: 25px; font-weight: 700; color: #fff; }
+    .dex-stat-lbl { font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; line-height: 1.3; }
     .dex-progress-row { display: flex; gap: 4px; margin-bottom: 12px; align-items: center; }
     .dex-progress-bar { flex: 1; height: 6px; background: #111; border-radius: 3px; overflow: hidden; }
     .dex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-    .dex-progress-lbl { font-size: 9px; color: #fff; min-width: 50px; }
+    .dex-progress-lbl { font-size: 14px; color: #fff; min-width: 50px; }
     .dex-rarity-row { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
     .dex-rarity-chip {
-      font-size: 9px; padding: 3px 8px; border-radius: 3px; border: 1px solid;
+      font-size: 14px; padding: 3px 8px; border-radius: 3px; border: 1px solid;
       display: flex; align-items: center; gap: 4px;
     }
     .dex-filters { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
     .dex-filter {
       padding: 5px 12px; background: #111; border: 1px solid #ffffff14; border-radius: 3px;
-      color: #fff; font-size: 10px; font-weight: 600; text-transform: uppercase;
+      color: #fff; font-size: 14px; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.04em; cursor: pointer; transition: all 0.2s;
     }
     .dex-filter:hover { color: #fff; border-color: #ffffff28; }
     .dex-filter.active { color: #ff0000; border-color: #ff0000; }
-    .dex-counter { font-size: 11px; color: #444; margin-bottom: 8px; }
+    .dex-counter { font-size: 15px; color: #444; margin-bottom: 8px; }
     .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .dex-entry {
       background: #111; border: 1px solid #ffffff14; border-radius: 6px;
@@ -961,10 +961,10 @@
     }
     .dex-entry:hover { border-color: #ffffff28; background: #181818; }
     .dex-entry.undiscovered { opacity: 0.35; }
-    .dex-emoji { font-size: 24px; flex-shrink: 0; }
+    .dex-emoji { font-size: 34px; flex-shrink: 0; }
     .dex-info { flex: 1; min-width: 0; }
-    .dex-name { font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dex-sub { font-size: 9px; color: #fff; margin-top: 1px; }
+    .dex-name { font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dex-sub { font-size: 14px; color: #fff; margin-top: 1px; }
     .dex-mut-dots { display: flex; gap: 2px; margin-top: 3px; }
     .dex-mut-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid #ffffff28; }
     .dex-mut-dot.found { filter: drop-shadow(0 0 4px currentColor); }
@@ -975,23 +975,23 @@
     .dex-detail-header { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
     .dex-detail-portrait { flex-shrink: 0; max-width: 100%; }
     .dex-detail-info { flex: 1; min-width: 200px; }
-    .dex-detail-name { font-size: 18px; font-weight: 700; color: #fff; }
-    .dex-detail-species { font-size: 11px; color: #fff; margin-top: 2px; }
+    .dex-detail-name { font-size: 25px; font-weight: 700; color: #fff; }
+    .dex-detail-species { font-size: 15px; color: #fff; margin-top: 2px; }
     .dex-detail-badges { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
     .dex-detail-badge {
-      font-size: 9px; padding: 2px 8px; border-radius: 3px; text-transform: uppercase;
+      font-size: 14px; padding: 2px 8px; border-radius: 3px; text-transform: uppercase;
       font-weight: 600; letter-spacing: 0.04em;
     }
-    .dex-detail-desc { font-size: 11px; color: #fff; line-height: 1.5; margin-top: 8px; font-style: italic; }
+    .dex-detail-desc { font-size: 15px; color: #fff; line-height: 1.5; margin-top: 8px; font-style: italic; }
     .dex-detail-section { margin-top: 12px; }
     .dex-detail-section-title {
-      font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: 0.1em;
+      font-size: 14px; color: #444; text-transform: uppercase; letter-spacing: 0.1em;
       margin-bottom: 6px; font-weight: 600;
     }
     .dex-mut-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
     .dex-mut-card {
       background: #111; border: 1px solid #ffffff14; border-radius: 4px;
-      padding: 6px; display: flex; align-items: center; gap: 6px; font-size: 10px;
+      padding: 6px; display: flex; align-items: center; gap: 6px; font-size: 14px;
     }
     .dex-mut-card.found { border-color: #ffffff28; }
     .dex-mut-card.unfound { opacity: 0.3; }
@@ -999,15 +999,15 @@
       width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; border: 1px solid #ffffff14;
     }
     .dex-mut-label { color: #fff; flex: 1; }
-    .dex-mut-tier { font-size: 8px; color: #fff; text-transform: uppercase; }
+    .dex-mut-tier { font-size: 14px; color: #fff; text-transform: uppercase; }
     .dex-owned-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
     .dex-owned-chip {
       background: #111; border: 1px solid #ffffff14; border-radius: 4px;
-      padding: 3px 6px; font-size: 9px; color: #fff; display: flex; align-items: center; gap: 4px;
+      padding: 3px 6px; font-size: 14px; color: #fff; display: flex; align-items: center; gap: 4px;
     }
     .dex-close-btn {
       padding: 4px 12px; background: transparent; border: 1px solid #ffffff28; border-radius: 3px;
-      color: #fff; font-size: 10px; cursor: pointer; float: right;
+      color: #fff; font-size: 14px; cursor: pointer; float: right;
     }
     .dex-close-btn:hover { color: #fff; border-color: #ff0000; }
 
@@ -1017,7 +1017,7 @@
       z-index: 200; flex-direction: column; align-items: center; justify-content: center; text-align: center;
     }
     .hatch-overlay.show { display: flex; }
-    .hatch-emoji { font-size: 80px; animation: hatchBounce 0.6s ease; }
+    .hatch-emoji { font-size: 112px; animation: hatchBounce 0.6s ease; }
     @keyframes hatchBounce { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.3); } 100% { transform: scale(1); opacity: 1; } }
     /* Egg-hatch sprite strip: 52 frames of 40x49, shown at 4x. Stepped in JS. */
     .hatch-sprite {
@@ -1034,19 +1034,19 @@
     .hatch-overlay.hatching .hatch-rarity,
     .hatch-overlay.hatching .hatch-desc,
     .hatch-overlay.hatching .hatch-close { display: none; }
-    .hatch-name { font-size: 22px; font-weight: 700; color: #fff; margin-top: 16px; }
-    .hatch-rarity { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
-    .hatch-desc { font-size: 13px; color: #fff; margin-top: 12px; max-width: 300px; line-height: 1.5; }
+    .hatch-name { font-size: 31px; font-weight: 700; color: #fff; margin-top: 16px; }
+    .hatch-rarity { font-size: 17px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
+    .hatch-desc { font-size: 18px; color: #fff; margin-top: 12px; max-width: 300px; line-height: 1.5; }
     .hatch-close {
       margin-top: 24px; padding: 10px 32px; background: #ff0000; border: none;
-      border-radius: 4px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+      border-radius: 4px; color: #fff; font-size: 18px; font-weight: 700; cursor: pointer;
     }
 
     .toast {
       position: fixed; bottom: 20px; left: 50%;
       transform: translateX(-50%) translateY(100px);
       background: #111; border: 1px solid #ffffff28; border-radius: 6px;
-      padding: 10px 20px; font-size: 12px; color: #fff; z-index: 150;
+      padding: 10px 20px; font-size: 17px; color: #fff; z-index: 150;
       transition: transform 0.3s ease; white-space: nowrap;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }

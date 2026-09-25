@@ -42,7 +42,7 @@
   border: none;
   border-radius: 8px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
   cursor: pointer;
   transition: opacity 0.2s;
 }
@@ -60,7 +60,7 @@
   border: 1px solid var(--border-mid);
   border-radius: 8px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 20px;
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
 }
@@ -269,7 +269,7 @@
 }
 
 .notif-icon {
-  font-size: 18px;
+  font-size: 25px;
   flex-shrink: 0;
   width: 24px;
   text-align: center;
@@ -541,7 +541,7 @@
 
 .auth-user-title {
   color: var(--red);
-  font-size: 10px;
+  font-size: 14px;
   font-style: italic;
   white-space: nowrap;
 }
@@ -561,12 +561,12 @@
   font-family: var(--font-system);
   font-size: 12px;
 }
-.hype-train-icon { font-size: 18px; }
+.hype-train-icon { font-size: 25px; }
 .hype-train-text {
   font-weight: bold;
   color: var(--red);
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 18px;
 }
 .hype-train-bar {
   flex: 1;
@@ -654,7 +654,7 @@
   border-radius: 4px;
   color: var(--text-pri);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 17px;
   /* Fixed width. It grew to 210px on focus, which looked tidy in isolation
      and pushed the field out past the edge of the bar the moment anyone
      clicked it — there is no spare room in a rail to grow into. */
@@ -694,7 +694,7 @@
   padding: 8px 11px;
   color: var(--text-pri);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 18px;
 }
 .member-results a:hover { background: var(--gray-lo); color: var(--red); }
 
@@ -710,7 +710,7 @@
 
 .member-result-none {
   padding: 9px 11px;
-  font-size: 12px;
+  font-size: 17px;
   color: var(--text-dim);
   font-style: italic;
 }

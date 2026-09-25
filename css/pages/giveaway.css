@@ -44,7 +44,7 @@
 
 .giveaway-prize {
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: 22px;
   color: var(--text-sec);
   margin-bottom: 24px;
   line-height: 1.6;
@@ -129,7 +129,7 @@
 
 .entry-stat-value {
   font-family: var(--font-header);
-  font-size: 26px;
+  font-size: 36px;
   line-height: 1.1;
   color: var(--red);
 }
@@ -223,11 +223,11 @@
 
 .entry-history-row:last-child { border-bottom: none; }
 .entry-history-n { color: var(--red); font-weight: 600; }
-.entry-history-when { margin-left: auto; color: var(--text-dim); font-size: 11px; }
+.entry-history-when { margin-left: auto; color: var(--text-dim); font-size: 15px; }
 
 @media (max-width: 640px) {
   .entry-stats { grid-template-columns: repeat(2, 1fr); }
-  .entry-stat-value { font-size: 22px; }
+  .entry-stat-value { font-size: 31px; }
 }
 
 /* How It Works */
@@ -335,7 +335,7 @@
 }
 
 .winner-icon {
-  font-size: 28px;
+  font-size: 39px;
   flex-shrink: 0;
 }
 
@@ -377,7 +377,7 @@
 }
 
 .hype-drops-icon {
-  font-size: 22px;
+  font-size: 31px;
 }
 
 .hype-drops-title {
@@ -609,7 +609,7 @@
    a wrong box — so the card says which. */
 .hype-drop-where {
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 15px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-dim);
@@ -643,7 +643,7 @@
   margin-bottom: 8px;
 }
 
-.prize-icon { font-size: 22px; }
+.prize-icon { font-size: 31px; }
 
 .prize-title {
   font-family: var(--font-gothic);

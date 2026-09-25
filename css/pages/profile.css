@@ -12,7 +12,7 @@
 
 .prof-state {
   color: var(--text-dim);
-  font-size: 15px;
+  font-size: 21px;
   padding: 40px 0;
   text-align: center;
 }
@@ -55,7 +55,7 @@
   margin: 0 0 8px;
   font-style: italic;
   color: var(--red);
-  font-size: 15px;
+  font-size: 21px;
 }
 
 .prof-tenure {
@@ -63,7 +63,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: 18px;
   color: var(--text-sec);
   margin-bottom: 8px;
 }
@@ -73,14 +73,14 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 15px;
 }
 .prof-founder {
   color: var(--amber);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 15px;
 }
 
 /* Keyed off a data attribute rather than a role-* class: those are the
@@ -89,7 +89,7 @@
 .prof-role {
   display: inline-block;
   width: auto;
-  font-size: 10px;
+  font-size: 14px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -120,7 +120,7 @@
 
 .prof-stat-n {
   display: block;
-  font-size: 22px;
+  font-size: 31px;
   font-weight: 800;
   color: var(--text-pri);
   font-variant-numeric: tabular-nums;
@@ -128,7 +128,7 @@
 }
 
 .prof-stat-l {
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -138,7 +138,7 @@
 .prof-section { margin-top: 30px; }
 
 .prof-section-title {
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--red);
@@ -181,19 +181,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 31px;
   color: var(--text-dim);
 }
 
 .prof-badge-name {
-  font-size: 12px;
+  font-size: 17px;
   color: var(--text-sec);
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
 .prof-rarity {
-  font-size: 9px;
+  font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   border: 1px solid currentColor;
@@ -243,7 +243,7 @@
 .prof-dino-info { flex: 1 1 220px; min-width: 0; }
 
 .prof-dino-name {
-  font-size: 18px;
+  font-size: 25px;
   font-weight: 700;
   color: var(--text-pri);
   line-height: 1.2;
@@ -251,13 +251,13 @@
 }
 
 .prof-dino-species {
-  font-size: 12px;
+  font-size: 17px;
   color: var(--text-dim);
   margin-top: 2px;
 }
 
 .prof-dino-sub {
-  font-size: 12px;
+  font-size: 17px;
   color: var(--text-sec);
   margin-top: 4px;
 }
@@ -270,7 +270,7 @@
 }
 
 .prof-dino-badge {
-  font-size: 10px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -285,7 +285,7 @@
 .prof-dino-badge.is-mut      { color: var(--red); border-color: var(--red); }
 
 .prof-dino-desc {
-  font-size: 12.5px;
+  font-size: 18px;
   font-style: italic;
   color: var(--text-dim);
   line-height: 1.55;
@@ -309,7 +309,7 @@
   padding: 10px 14px;
   background: var(--gray-lo);
   border: 1px solid var(--border);
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .prof-rank {
@@ -323,7 +323,7 @@
 .prof-game { flex: 1; color: var(--text-pri); }
 
 .prof-unit {
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -344,6 +344,6 @@
 }
 
 /* Comment wall (drawn by profile-comments.js with community.css classes). */
-.prof-comments-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-sec); margin-bottom: 12px; cursor: pointer; }
+.prof-comments-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 18px; color: var(--text-sec); margin-bottom: 12px; cursor: pointer; }
 .prof-comments-switch input { accent-color: var(--red); }
 .prof-comments-empty { padding: 20px; }

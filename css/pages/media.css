@@ -98,7 +98,7 @@
   width: 26px;
   height: 26px;
   line-height: 1;
-  font-size: 18px;
+  font-size: 25px;
   font-weight: 700;
   color: var(--text-dim);
   background: rgba(0, 0, 0, 0.72);
@@ -254,7 +254,7 @@
   border-radius: 50%;
   background: transparent;
   color: var(--text-sec);
-  font-size: 20px;
+  font-size: 28px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -318,7 +318,7 @@
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
   color: var(--text-sec);
-  font-size: 18px;
+  font-size: 25px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -342,7 +342,7 @@
 }
 
 .gallery-empty p {
-  font-size: 14px;
+  font-size: 20px;
   color: var(--text-dim);
 }
 
@@ -350,7 +350,7 @@
 .upload-btn {
   margin-left: auto;
   padding: 6px 16px;
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 0.06em;
 }
 
@@ -394,7 +394,7 @@
   position: static;
   width: 32px;
   height: 32px;
-  font-size: 16px;
+  font-size: 22px;
 }
 
 /* Form fields */
@@ -498,7 +498,7 @@
 .upload-actions .btn-primary,
 .upload-actions .btn-secondary {
   padding: 10px 24px;
-  font-size: 13px;
+  font-size: 18px;
 }
 
 /* Status message */

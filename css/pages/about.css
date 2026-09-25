@@ -134,7 +134,7 @@
 }
 
 .value-card p {
-  font-size: 13px;
+  font-size: 18px;
   line-height: 1.6;
 }
 
@@ -155,7 +155,7 @@
 
 .about-edit-note {
   margin-right: auto;
-  font-size: 0.78rem;
+  font-size: 1.092rem;
   color: var(--text-dim);
 }
 
