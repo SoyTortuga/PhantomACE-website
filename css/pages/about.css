@@ -55,6 +55,7 @@
 
 .stat-value {
   font-family: var(--font-display);
+  letter-spacing: normal;
   font-size: 32px;
   color: var(--red);
   text-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
@@ -98,12 +99,14 @@
 
 .social-card-name {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 14px;
   color: var(--text-pri);
 }
 
 .social-card-handle {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-dim);
   margin-top: 2px;
@@ -166,6 +169,7 @@
   border-radius: 4px;
   color: var(--text-pri);
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 0.95rem;
   line-height: 1.6;
   padding: 8px 10px;

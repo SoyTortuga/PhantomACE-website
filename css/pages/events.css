@@ -44,6 +44,7 @@
 
 .event-date-day {
   font-family: var(--font-display);
+  letter-spacing: normal;
   font-size: 28px;
   color: var(--text-pri);
   line-height: 1;
@@ -61,6 +62,7 @@
 /* Event info */
 .event-info-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 16px;
   color: var(--text-pri);
   margin-bottom: 4px;
@@ -75,12 +77,14 @@
 
 .event-info-time {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-sec);
 }
 
 .event-info-category {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: var(--text-dim);
   padding: 2px 8px;
@@ -153,6 +157,7 @@
 
 .events-loading p {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
 }

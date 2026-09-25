@@ -17,6 +17,7 @@
   border: 1px solid var(--border-mid);
   border-radius: 6px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-sec);
   background: transparent;
@@ -203,6 +204,7 @@
   background: var(--red);
   color: #fff;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 9px;
   font-weight: 700;
   border-radius: 8px;
@@ -243,6 +245,7 @@
 
 .notif-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-pri);
 }
@@ -305,6 +308,7 @@
 
 .notif-message {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-sec);
   line-height: 1.5;
@@ -317,6 +321,7 @@
 
 .notif-time {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: var(--text-dim);
 }
@@ -325,6 +330,7 @@
   padding: 40px 16px;
   text-align: center;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -383,6 +389,7 @@
   border-radius: 6px;
   cursor: pointer;
   font-family: var(--font-system);
+  letter-spacing: normal;
   transition: background 0.2s;
 }
 
@@ -414,6 +421,7 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-pri);
 }
@@ -470,6 +478,7 @@
 .account-role-msg:not(:empty) {
   padding: 0 16px 10px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   line-height: 1.45;
   color: var(--text-dim);
@@ -487,6 +496,7 @@
   width: 100%;
   padding: 10px 16px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-sec);
   background: transparent;
@@ -581,6 +591,7 @@
   max-width: 900px;
   margin: 0 auto;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
 }
 .hype-train-icon { font-size: 25px; }
@@ -613,6 +624,7 @@
 /* Mixed-font capitals */
 .cap {
   font-family: var(--font-display);
+  letter-spacing: normal;
 }
 
 /* Divider */
@@ -644,6 +656,7 @@
 
 .page-hero-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: clamp(36px, 8vw, 72px);
   color: var(--red);
   text-shadow: 0 0 20px rgba(255, 0, 0, 0.4), 0 0 40px rgba(255, 0, 0, 0.15);

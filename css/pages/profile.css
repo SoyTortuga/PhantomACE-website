@@ -44,6 +44,7 @@
 
 .prof-name {
   font-family: var(--font-gothic, serif);
+  letter-spacing: normal;
   font-size: clamp(24px, 5vw, 34px);
   line-height: 1.1;
   margin: 0 0 4px;

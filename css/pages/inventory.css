@@ -85,6 +85,7 @@
 .inv-tab-count {
   display: inline-block;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: inherit;
   opacity: 0.75;
@@ -100,6 +101,7 @@
   font-size: 11px;
   color: var(--text-dim);
   font-family: var(--font-system);
+  letter-spacing: normal;
 }
 
 .collection-grid {
@@ -191,6 +193,7 @@
   font-size: 11px;
   color: var(--text-dim);
   font-family: var(--font-system);
+  letter-spacing: normal;
   line-height: 1.4;
 }
 

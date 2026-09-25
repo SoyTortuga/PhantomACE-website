@@ -42,6 +42,9 @@
    1px offsets — no blurred glow, so edges stay sharp. Inherited from body; a
    per-element `text-shadow` still overrides it where a game needs one. */
 body {
+  /* Match the site: widen tracking so GrimoireOfDeath body/UI text stays legible.
+     GodOfWar titles opt back out to normal in each game's own styles. */
+  letter-spacing: 0.10em;
   text-shadow:
     -1px -1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000;
 }

@@ -82,6 +82,7 @@
 }
 .redeem-success-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   color: var(--green);
   font-size: 18px;
   margin-bottom: 16px;
@@ -109,6 +110,7 @@
 
 .redeemed-item-meta {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
   text-transform: capitalize;

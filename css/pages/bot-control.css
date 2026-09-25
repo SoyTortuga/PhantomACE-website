@@ -59,6 +59,7 @@
 
 .bot-section h3 {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 16px;
   color: var(--text-pri);
   margin: 0 0 4px;
@@ -133,6 +134,7 @@
   border-radius: 8px;
   color: var(--text-pri);
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   padding: 12px;
   box-sizing: border-box;
@@ -415,6 +417,7 @@
   padding: 8px 10px;
   font-size: 12px;
   font-family: var(--font-system);
+  letter-spacing: normal;
 }
 
 /* ══════════════════════════════════════════════
@@ -668,6 +671,7 @@
   color: var(--text-pri);
   padding: 10px 12px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
 }
 
@@ -687,6 +691,7 @@
 
 .bot-checkin-count {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-pri);
   margin-bottom: 10px;
@@ -744,6 +749,7 @@
   border-radius: 4px;
   color: var(--text-pri);
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   padding: 5px 8px;
 }
@@ -810,6 +816,7 @@
   padding: 6px 8px;
   margin: 0 6px;
   font-family: var(--font-system);
+  letter-spacing: normal;
 }
 
 .bot-rotation-next {

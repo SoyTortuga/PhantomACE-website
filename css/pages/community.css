@@ -79,6 +79,7 @@
 
 .coming-soon-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 24px;
   color: var(--red);
   margin-bottom: 12px;
@@ -86,6 +87,7 @@
 
 .coming-soon-text {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 14px;
   color: var(--text-sec);
   line-height: 1.6;
@@ -95,6 +97,7 @@
 .forum-breadcrumb {
   padding: 20px 0 8px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -152,6 +155,7 @@
 
 .forum-category-name {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 15px;
   color: var(--text-pri);
   margin-bottom: 4px;
@@ -159,6 +163,7 @@
 
 .forum-category-desc {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-sec);
   line-height: 1.4;
@@ -179,6 +184,7 @@
 
 .forum-stat-val {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-pri);
@@ -213,6 +219,7 @@
 
 .forum-thread-header h3 {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 18px;
   color: var(--text-pri);
 }
@@ -250,6 +257,7 @@
   display: flex;
   gap: 16px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-dim);
 }
@@ -273,6 +281,7 @@
 
 .forum-input {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 14px;
   padding: 10px 14px;
   background: var(--gray-lo);
@@ -289,6 +298,7 @@
 
 .forum-textarea {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   padding: 10px 14px;
   background: var(--gray-lo);
@@ -327,6 +337,7 @@
 
 .forum-post-author {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   font-weight: 600;
   color: var(--red);
@@ -334,12 +345,14 @@
 
 .forum-post-time {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-dim);
 }
 
 .forum-post-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 18px;
   color: var(--text-pri);
   margin-bottom: 12px;
@@ -393,6 +406,7 @@
 
 .stat-block-value {
   font-family: var(--font-display);
+  letter-spacing: normal;
   font-size: 36px;
   color: var(--red);
   text-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
@@ -433,6 +447,7 @@
 
 .watch-time-prompt h3 {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 18px;
   color: var(--text-pri);
   margin-bottom: 8px;
@@ -461,6 +476,7 @@
 
 .wt-stat-value {
   font-family: var(--font-display);
+  letter-spacing: normal;
   font-size: 28px;
   color: var(--red);
   text-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
@@ -570,6 +586,7 @@
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-sec);
   transition: background 0.2s;
@@ -616,6 +633,7 @@
   padding: 24px 20px;
   text-align: center;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
   font-style: italic;
@@ -776,7 +794,8 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 .forum-new-form[hidden], .forum-error[hidden], .forum-post-edited[hidden] { display: none; }
 .forum-error { color: var(--red); font-size: 1.19rem; margin: 6px 0; padding-left: 10px; }
 .forum-post-actions { margin-left: auto; display: inline-flex; gap: 4px; }
-.forum-post-actions button { background: none; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.75rem; padding: 2px 9px; border-radius: 3px; cursor: pointer; font-family: var(--font-system); }
+.forum-post-actions button { background: none; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.75rem; padding: 2px 9px; border-radius: 3px; cursor: pointer; font-family: var(--font-system);
+ letter-spacing: normal; }
 .forum-post-actions button:hover { border-color: var(--red); color: var(--red); }
 .forum-edit-form { margin-top: 8px; }
 .forum-edit-form .forum-textarea { width: 100%; }
@@ -792,7 +811,8 @@ a.forum-author:hover .forum-author-name { color: var(--red); }
 .forum-staff-bar a:hover { color: var(--red); border-color: var(--red); }
 .forum-mod-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; padding: 8px 12px; border: 1px dashed var(--border-mid); }
 .forum-mod-label { font-size: 0.98rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-right: 4px; }
-.forum-mod-bar button, .forum-mod-btn { background: none; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.75rem; padding: 2px 9px; border-radius: 3px; cursor: pointer; font-family: var(--font-system); }
+.forum-mod-bar button, .forum-mod-btn { background: none; border: 1px solid var(--border); color: var(--text-sec); font-size: 0.75rem; padding: 2px 9px; border-radius: 3px; cursor: pointer; font-family: var(--font-system);
+ letter-spacing: normal; }
 .forum-mod-bar button:hover, .forum-mod-btn:hover { border-color: var(--red); color: var(--red); }
 .forum-mod-bar .forum-error, .forum-mod-bar .forum-reason-form { flex-basis: 100%; }
 .forum-post-actions .forum-mod-btn { border-color: var(--red-dim); }

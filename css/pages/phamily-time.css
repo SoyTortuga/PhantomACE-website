@@ -25,6 +25,7 @@
 
 .pt-stat-value {
   font-family: var(--font-display);
+  letter-spacing: normal;
   font-size: 32px;
   color: var(--red);
   text-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
@@ -59,6 +60,7 @@
 
 .pt-boost-rate {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 16px;
   font-weight: 800;
   color: var(--text-pri);
@@ -114,6 +116,7 @@
 
 .pt-modal-header h3 {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 18px;
   color: var(--text-pri);
 }
@@ -140,6 +143,7 @@
 
 .pt-modal-desc {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-sec);
   line-height: 1.5;
@@ -160,6 +164,7 @@
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
 }
 
@@ -187,6 +192,7 @@
 
 .pt-modal-note {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.6;
@@ -208,6 +214,7 @@
   gap: 16px;
   padding: 16px 0 8px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-dim);
 }
@@ -624,12 +631,14 @@
 
 .pt-popover-level {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: var(--text-dim);
 }
 
 .pt-popover-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 15px;
   color: var(--text-pri);
   margin-bottom: 4px;
@@ -637,6 +646,7 @@
 
 .pt-popover-desc {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-sec);
   line-height: 1.5;
@@ -653,6 +663,7 @@
 
 .pt-popover-status {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   text-align: center;
   color: var(--text-dim);
@@ -674,6 +685,7 @@
 
 .pt-login-card h3 {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 18px;
   color: var(--text-pri);
   margin-bottom: 8px;
@@ -681,6 +693,7 @@
 
 .pt-login-card p {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-sec);
   max-width: 400px;
@@ -702,6 +715,7 @@
 
 .pt-attendance-summary {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
   margin-bottom: 12px;
@@ -756,6 +770,7 @@
 
 .pt-ps-value {
   font-family: var(--font-display);
+  letter-spacing: normal;
   font-size: 28px;
   color: var(--red);
   text-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
@@ -794,6 +809,7 @@
 
 .pt-sub-duration {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 14px;
   color: var(--text-pri);
   font-weight: 600;
@@ -801,6 +817,7 @@
 
 .pt-sub-tier {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--red);
   margin-top: 2px;
@@ -826,12 +843,14 @@
 
 .pt-grace-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 15px;
   color: var(--text-pri);
 }
 
 .pt-grace-sub {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-dim);
   margin-top: 2px;
@@ -861,6 +880,7 @@
 
 .pt-grace-item-name {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-sec);
 }
@@ -907,6 +927,7 @@
 
 .pt-accrual-text {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 15px;
   color: var(--text-pri);
 }

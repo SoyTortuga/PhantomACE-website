@@ -145,6 +145,7 @@
 
 .gallery-item-title {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--white);
   margin-bottom: 2px;
@@ -152,6 +153,7 @@
 
 .gallery-item-meta {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: var(--text-dim);
 }
@@ -296,6 +298,7 @@
 
 .lightbox-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 16px;
   color: var(--text-pri);
   margin-bottom: 4px;
@@ -303,6 +306,7 @@
 
 .lightbox-meta {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-dim);
 }
@@ -421,6 +425,7 @@
   border-radius: 8px;
   color: var(--text-pri);
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   transition: border-color 0.2s;
 }
@@ -465,6 +470,7 @@
 
 .upload-dropzone p {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-sec);
   margin-bottom: 4px;
@@ -472,6 +478,7 @@
 
 .upload-dropzone span {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: var(--text-dim);
 }
@@ -505,6 +512,7 @@
 .upload-status {
   margin-top: 12px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   text-align: center;
 }

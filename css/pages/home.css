@@ -89,6 +89,7 @@
   gap: 10px;
   margin-bottom: 36px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
   color: var(--text-dim);
   min-height: 24px;
@@ -216,6 +217,7 @@
 
 .event-card-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 16px;
   color: var(--text-pri);
   margin-bottom: 6px;
@@ -257,6 +259,7 @@
   padding: 8px 12px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-sec);
 }

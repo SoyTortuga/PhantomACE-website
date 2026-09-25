@@ -77,6 +77,7 @@
 
 .doc-body p {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 14px;
   line-height: 1.7;
   color: var(--text-sec);
@@ -92,6 +93,7 @@
 .doc-list li {
   position: relative;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-sec);
@@ -115,6 +117,7 @@
   border-collapse: collapse;
   margin: 8px 0 12px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 13px;
 }
 .doc-table th,

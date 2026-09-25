@@ -126,6 +126,7 @@ body[data-role="broadcaster"] .role-broadcaster-inline { display: inline; }
 /* Auth UI in header */
 .auth-login-btn {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-sec);
   padding: 4px 12px;
@@ -147,6 +148,7 @@ body[data-role="broadcaster"] .role-broadcaster-inline { display: inline; }
   align-items: center;
   gap: 8px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
   color: var(--text-sec);
 }

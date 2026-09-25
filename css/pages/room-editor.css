@@ -16,7 +16,8 @@
 /* Palette */
 .re-palette { border: 1px solid var(--border-mid); background: var(--gray-lo); max-height: 78vh; overflow: auto; }
 .re-cats { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); }
-.re-cat { background: none; border: 0; color: var(--text-sec); font-family: var(--font-system); font-size: 12px; text-align: left; padding: 8px 12px; cursor: pointer; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center; }
+.re-cat { background: none; border: 0; color: var(--text-sec); font-family: var(--font-system);
+ letter-spacing: normal; font-size: 12px; text-align: left; padding: 8px 12px; cursor: pointer; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center; }
 .re-cat:hover { color: var(--text-pri); }
 .re-cat.active { color: var(--red); background: var(--gray-lo); }
 .re-cat.locked { color: var(--text-dim); }
@@ -32,9 +33,11 @@
 /* Toolbar */
 .re-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 17px; color: var(--text-sec); }
 .re-field { display: inline-flex; align-items: center; gap: 6px; }
-.re-field select { background: var(--gray-lo); color: var(--text-pri); border: 1px solid var(--border-mid); padding: 4px 6px; font-family: var(--font-system); font-size: 12px; }
+.re-field select { background: var(--gray-lo); color: var(--text-pri); border: 1px solid var(--border-mid); padding: 4px 6px; font-family: var(--font-system);
+ letter-spacing: normal; font-size: 12px; }
 .re-tabs { display: inline-flex; border: 1px solid var(--border-mid); }
-.re-tab { background: none; border: 0; color: var(--text-sec); font-family: var(--font-system); font-size: 12px; padding: 5px 12px; cursor: pointer; }
+.re-tab { background: none; border: 0; color: var(--text-sec); font-family: var(--font-system);
+ letter-spacing: normal; font-size: 12px; padding: 5px 12px; cursor: pointer; }
 .re-tab.active { color: var(--red); background: #140606; }
 .re-spacer { flex: 1; }
 .re-save { padding: 6px 18px; }
@@ -54,7 +57,8 @@
 .re-insp-row b { color: var(--text-pri); font-weight: 600; }
 .re-insp-label { color: var(--text-dim); text-transform: uppercase; font-size: 14px; letter-spacing: 0.1em; }
 .re-insp-group { display: inline-flex; align-items: center; gap: 4px; }
-.re-insp-group button { background: var(--gray-lo); border: 1px solid var(--border-mid); color: var(--text-pri); font-family: var(--font-system); font-size: 12px; padding: 3px 9px; cursor: pointer; }
+.re-insp-group button { background: var(--gray-lo); border: 1px solid var(--border-mid); color: var(--text-pri); font-family: var(--font-system);
+ letter-spacing: normal; font-size: 12px; padding: 3px 9px; cursor: pointer; }
 .re-insp-group button:hover, .re-inspector .pill-btn:hover { border-color: var(--red); color: var(--red); }
 .re-scale { min-width: 40px; text-align: center; color: var(--text-pri); }
 .re-danger { border-color: var(--red-dim); }

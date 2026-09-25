@@ -74,6 +74,7 @@
   display: block;
   padding: 8px 10px 2px;
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-pri);
 }
@@ -84,6 +85,7 @@
   gap: 5px;
   padding: 4px 10px 8px;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 10px;
   color: var(--text-dim);
 }
@@ -177,6 +179,7 @@
 
 .game-card-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 16px;
   color: var(--text-pri);
   margin-bottom: 6px;
@@ -184,6 +187,7 @@
 
 .game-card-desc {
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 12px;
   color: var(--text-sec);
   line-height: 1.5;
@@ -259,6 +263,7 @@
 
 .game-launcher-title {
   font-family: var(--font-gothic);
+  letter-spacing: normal;
   font-size: 14px;
   color: var(--text-pri);
 }
@@ -309,6 +314,7 @@
   gap: 8px;
   padding: 4px 0;
   font-family: var(--font-system);
+  letter-spacing: normal;
   font-size: 11px;
 }
 .sc-lb-rank {
