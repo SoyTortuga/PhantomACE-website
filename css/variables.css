@@ -4,9 +4,9 @@
   --gray-mid:   #111111;
   --gray-lo:    #0a0a0a;
 
-  --red:        #FF0000;
-  --red-dim:    #FF000060;
-  --red-glow:   #FF000018;
+  --red:        #E60000;
+  --red-dim:    #E6000060;
+  --red-glow:   #E6000018;
 
   --white:      #FFFFFF;
   /* ALL THREE ARE WHITE, on purpose and by request. The ladder used to be
@@ -53,7 +53,7 @@
      inline role badges (they used to disagree, and reached for blue/magenta).
      Tier number is carried by the badge TEXT, so sub tiers share one colour
      rather than a rainbow. Classification colours, never a general UI accent. */
-  --role-broadcaster: #FF0000;   /* == --red */
+  --role-broadcaster: #E60000;   /* == --red */
   --role-moderator:   #ffaa00;   /* == --amber */
   --role-subscriber:  #cc88ff;   /* == --purple */
   --role-follower:    #00cc66;   /* == --green */
