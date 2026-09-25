@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mana Clash</title>
+  <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     /* The UA rule for [hidden] is display:none at the lowest specificity, so
@@ -11,7 +12,7 @@
        style beats it. This page hides a lot of things with the attribute;
        without this the intermission overlay paints over the splash screen. */
     [hidden] { display: none !important; }
-    body { background: #000; color: #fff; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; user-select: none; }
+    body { background: #000; color: #fff; font-family: var(--font-ui); min-height: 100vh; user-select: none; }
 
     :root {
       --red: #ff0000;
@@ -147,7 +148,7 @@
     .muted { color: var(--dim); font-size: 12px; }
 
     /* ════ SPLASH ════ */
-    .splash-title { font-size: 40px; font-weight: 800; color: var(--red); letter-spacing: 4px; margin-top: 34px; text-align: center; }
+    .splash-title { font-family: var(--font-display); font-size: 40px; font-weight: 800; color: var(--red); letter-spacing: 4px; margin-top: 34px; text-align: center; }
     .splash-sub { font-size: 12px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 18px; }
     .splash-mana { display: flex; gap: 8px; margin-bottom: 22px; }
     .splash-pip img { width: 30px; height: 30px; display: block; }
@@ -186,7 +187,7 @@
     #gameScreen { padding: 0 0 30px; width: 100%; }
     .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px;
                background: var(--panel); border-bottom: 2px solid var(--red); width: 100%; }
-    .top-bar-title { font-size: 15px; font-weight: 800; color: var(--red); letter-spacing: 1.5px; }
+    .top-bar-title { font-family: var(--font-display); font-size: 15px; font-weight: 800; color: var(--red); letter-spacing: 1.5px; }
     .top-bar-stats { display: flex; gap: 14px; font-size: 12px; color: var(--dim); }
     .top-bar-stats .val { color: #fff; font-weight: 700; }
 

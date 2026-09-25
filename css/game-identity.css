@@ -1,0 +1,37 @@
+/* ══════════════════════════════════════════════
+   Shared gothic identity for the standalone game iframes.
+
+   The games are self-contained documents that don't load variables.css /
+   base.css, so they had no access to the site's fonts and rendered in
+   system-ui. This makes the two owned, self-hosted faces available and exposes
+   the same --font-* tokens the rest of the site uses, so a game can say
+   `font-family: var(--font-display)` for a title and match the site exactly.
+
+   Link this BEFORE a game's own inline <style> so the tokens resolve, then set
+   the game's title/heading elements to var(--font-display) and its body/UI text
+   to var(--font-ui). Dense numeric HUDs may keep var(--font-system) for
+   legibility — that's the sanctioned utilitarian exception.
+   ══════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'GodOfWar';
+  src: url('/assets/fonts/GODOFWAR.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aurusenthial Gothic';
+  src: url('/assets/fonts/AurusenthialGothic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-display: 'GodOfWar', serif;
+  --font-gothic:  'GodOfWar', serif;
+  --font-ui:      'Aurusenthial Gothic', Georgia, serif;
+  --font-system:  system-ui, -apple-system, sans-serif;
+}

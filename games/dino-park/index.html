@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dino Park</title>
+  <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: #000;
       color: #fff;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-ui);
       height: 100vh;
       overflow: hidden;
       user-select: none;
@@ -26,7 +27,7 @@
       z-index: 100;
       height: 38px;
     }
-    .top-bar-title { font-size: 16px; font-weight: 700; color: #ff0000; letter-spacing: 1px; }
+    .top-bar-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: #ff0000; letter-spacing: 1px; }
     .top-bar-stats { display: flex; gap: 12px; font-size: 11px; }
     .stat-item { display: flex; align-items: center; gap: 3px; color: #fff; }
     .stat-item .val { color: #fff; font-weight: 600; }

@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Commander Bingo</title>
+  <link rel="stylesheet" href="/css/game-identity.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: #000;
       color: #fff;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-ui);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -25,6 +26,7 @@
 
     /* ── JOIN SCREEN ─────────────────────── */
     .game-title {
+      font-family: var(--font-display);
       font-size: 28px;
       color: #ff0000;
       text-align: center;
