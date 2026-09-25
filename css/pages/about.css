@@ -93,6 +93,7 @@
 }
 
 .social-card:hover {
+  border-color: var(--red);
 }
 
 .social-card-name {

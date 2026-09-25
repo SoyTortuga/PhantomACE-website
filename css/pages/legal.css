@@ -36,20 +36,19 @@
   margin-bottom: 24px;
 }
 
-/* Lead paragraph — set off with a red rule down its left edge. */
+/* Lead paragraph — larger and brighter than the body copy. (The old red
+   left-edge rule was removed with the site-wide side-accent purge.) */
 .doc-intro {
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.75;
   color: var(--text-pri);
-
-  padding-left: 18px;
   margin: 4px 0 8px;
 }
 
-/* No numbered column — the onlysands tell. Sections are hairline-separated
-   blocks led by a gothic heading and a red diamond. The number chip the
-   markup still carries is hidden. */
+/* No numbered column. Sections are hairline-separated blocks led by a gothic
+   heading and a red diamond. The number chip the markup still carries is
+   hidden. */
 .doc-num { display: none; }
 
 .doc-section { padding: 28px 0 4px; }

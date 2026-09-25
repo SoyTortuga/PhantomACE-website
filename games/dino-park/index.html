@@ -4053,7 +4053,6 @@ function switchTab(tab) {
   const panel = document.getElementById('tab-' + tab);
   const btn = document.querySelectorAll('.tab-btn')[idx];
   if (idx === -1 || !panel || !btn) {
-    console.warn('[dino-park] unknown tab, ignoring:', tab);
     return;
   }
 
