@@ -20,11 +20,22 @@ Static HTML/CSS/JS community website for Twitch broadcaster PhantomACE. Hosted o
 The site has a deliberate gothic identity. The rules below keep it from drifting
 into the look of a default AI-generated site. They are permanent, apply to every
 page AND every game, and sub-agents must follow them too.
-- **Palette:** black / greys / red (`#FF0000`) / white only, taken from
-  `css/variables.css`. Never a cream / off-white ("Honda Tan") light mode, never a
-  slate or indigo "tech dark" (`#0b0f19`-style) background, never cyan or
-  neon-indigo accents. `--purple` exists ONLY as the MTG "rare" rarity colour —
-  never as a UI accent.
+- **Palette:** black / greys / red (`#FF0000`) / white only for the default
+  (dark) theme, taken from `css/variables.css`. Never a slate or indigo "tech
+  dark" (`#0b0f19`-style) background, never cyan or neon-indigo accents.
+  `--purple` exists ONLY as the MTG "rare" rarity colour — never as a UI accent.
+- **Theming:** the site has TWO themes driven by tokens in `css/variables.css`:
+  the default **dark** (`:root`) and an opt-in **gothic light** mode
+  (`:root[data-theme="light"]`) — aged parchment/bone grounds, oxblood red, ink
+  text. This is a *deliberate gothic* light mode (a "grimoire on old paper"), NOT
+  the generic cream/off-white "AI-template" light mode that is still banned. To
+  keep it working: (1) style with the tokens (`--black`/`--gray-*` for surfaces,
+  `--white`/`--text-*` for text, `--red`, `--border*`), never hardcoded hexes, so
+  a surface flips with the theme; (2) text sitting on a red/accent FILL uses
+  literal `#fff` (stays white in both themes — the fill is dark red in both);
+  (3) the toggle + no-flash `<head>` script live in the header/each page and set
+  `data-theme`; standalone games also `<link>` `variables.css`; (4) **the overlay
+  is NEVER themed** (OBS legibility) — it has no toggle and no light block.
 - **Rarity / medal / tier colours are the ONE sanctioned exception** to the
   black/grey/red/white palette, and only ever to signal rarity, leaderboard rank,
   or membership tier — never as general UI accents. They must come from the tokens
