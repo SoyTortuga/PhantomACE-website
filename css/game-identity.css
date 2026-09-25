@@ -22,9 +22,9 @@
 }
 
 @font-face {
-  font-family: 'Gotfridus';
-  src: url('/assets/fonts/Gotfridus.woff2') format('woff2'),
-       url('/assets/fonts/Gotfridus.ttf') format('truetype');
+  font-family: 'GrimoireOfDeath';
+  src: url('/assets/fonts/GrimoireOfDeath.woff2') format('woff2'),
+       url('/assets/fonts/GrimoireOfDeath.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -33,17 +33,17 @@
 :root {
   --font-display: 'GodOfWar', serif;
   --font-gothic:  'GodOfWar', serif;
-  --font-ui:      'Gotfridus', Georgia, serif;
+  --font-ui:      'GrimoireOfDeath', Georgia, serif;
   --font-system:  system-ui, -apple-system, sans-serif;
 }
 
 /* Game text sits over busy sprite/map art, so ALL game text gets a crisp black
-   outline to stay legible against any background, in both themes. Inherited from
-   body; a per-element `text-shadow` still overrides it where a game needs one. */
+   outline to stay legible against any background, in both themes. Only the four
+   1px offsets — no blurred glow, so edges stay sharp. Inherited from body; a
+   per-element `text-shadow` still overrides it where a game needs one. */
 body {
   text-shadow:
-    -1px -1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000,
-    0 0 3px rgba(0, 0, 0, 0.7);
+    -1px -1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000;
 }
 /* In light mode the outline muddies dark text on the parchment panels, and the
    over-map HUD already sits on dark pills or carries its own text-shadow — so

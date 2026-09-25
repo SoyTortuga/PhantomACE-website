@@ -7,9 +7,9 @@
 }
 
 @font-face {
-  font-family: 'Gotfridus';
-  src: url('/assets/fonts/Gotfridus.woff2') format('woff2'),
-       url('/assets/fonts/Gotfridus.ttf') format('truetype');
+  font-family: 'GrimoireOfDeath';
+  src: url('/assets/fonts/GrimoireOfDeath.woff2') format('woff2'),
+       url('/assets/fonts/GrimoireOfDeath.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;

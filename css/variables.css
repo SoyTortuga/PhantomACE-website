@@ -62,10 +62,10 @@
   --border-mid: #2a2a2a;
 
   /* GodOfWar is the single display face for every title and header. Body copy
-     is Gotfridus. Both are owned/local fonts (no web-font CDN). */
+     is GrimoireOfDeath. Both are owned/local fonts (no web-font CDN). */
   --font-display: 'GodOfWar', serif;
   --font-gothic:  'GodOfWar', serif;
-  --font-ui:      'Gotfridus', Georgia, serif;
+  --font-ui:      'GrimoireOfDeath', Georgia, serif;
   --font-system:  system-ui, -apple-system, sans-serif;
 }
 

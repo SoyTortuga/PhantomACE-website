@@ -45,13 +45,13 @@ page AND every game, and sub-agents must follow them too.
   rarity hex (`#4488ff`, `#ff6600`, `#cc88ff`, `#ffd700`, …) in a stylesheet, and do
   NOT repurpose any of these as a button, tag, or category colour.
 - **Fonts:** **GodOfWar** is the single gothic display face for every title and
-  header (`--font-display` / `--font-gothic`); **Gotfridus** is the body face
+  header (`--font-display` / `--font-gothic`); **GrimoireOfDeath** is the body face
   (`--font-ui`), with a **14px base** (`body { font-size: 14px }`). Both are owned,
-  self-hosted fonts in `assets/fonts/` (Gotfridus as woff2 + ttf) — no Google Fonts
+  self-hosted fonts in `assets/fonts/` (GrimoireOfDeath as woff2 + ttf) — no Google Fonts
   / web-font CDN, and never Inter, Roboto, or another generic UI sans.
   `--font-system` (system-ui) remains only for utilitarian tool pages. The retired
   faces (PhantomACE / UnifrakturMaguntia / Cinzel Decorative / IM Fell English /
-  Aurusenthial Gothic) must not be reintroduced.
+  Aurusenthial Gothic / Gotfridus) must not be reintroduced.
 - **Keep `--font-ui` body text readable — ~14px minimum.** It is a display-weight
   face that turns to mush when tiny, so avoid going below ~13px for `--font-ui`
   text; the base is 14px. (GodOfWar headings and system-ui tool text are exempt.)
