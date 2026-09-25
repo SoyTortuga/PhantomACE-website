@@ -7,10 +7,10 @@
 }
 
 @font-face {
-  font-family: 'GrimoireOfDeath';
-  src: url('/assets/fonts/GrimoireOfDeath.woff2') format('woff2'),
-       url('/assets/fonts/GrimoireOfDeath.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'Grenze';
+  src: url('/assets/fonts/Grenze.woff2') format('woff2'),
+       url('/assets/fonts/Grenze.ttf') format('truetype');
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
@@ -20,9 +20,6 @@ body {
   color: var(--text-pri);
   font-family: var(--font-ui);
   font-size: 14px;
-  /* GrimoireOfDeath is a dense blackletter face; widen tracking so body/UI
-     text set in it stays legible. GodOfWar headings opt back out below. */
-  letter-spacing: 0.10em;
   min-height: 100vh;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;

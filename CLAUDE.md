@@ -45,16 +45,20 @@ page AND every game, and sub-agents must follow them too.
   rarity hex (`#4488ff`, `#ff6600`, `#cc88ff`, `#ffd700`, …) in a stylesheet, and do
   NOT repurpose any of these as a button, tag, or category colour.
 - **Fonts:** **GodOfWar** is the single gothic display face for every title and
-  header (`--font-display` / `--font-gothic`); **GrimoireOfDeath** is the body face
-  (`--font-ui`), with a **14px base** (`body { font-size: 14px }`). Both are owned,
-  self-hosted fonts in `assets/fonts/` (GrimoireOfDeath as woff2 + ttf) — no Google Fonts
-  / web-font CDN, and never Inter, Roboto, or another generic UI sans.
+  header (`--font-display` / `--font-gothic`); **Grenze** — a legible
+  gothic-influenced serif — is the body face (`--font-ui`), with a **14px base**
+  (`body { font-size: 14px }`). Both are owned, self-hosted fonts in
+  `assets/fonts/` (Grenze as woff2 + ttf, a variable font, weight axis 100–900) —
+  no Google Fonts / web-font CDN, and never Inter, Roboto, or another generic UI
+  sans. Blackletter/display faces are NOT body material — they turn to mush at
+  reading sizes (this is why GrimoireOfDeath was replaced); keep the gothic weight
+  in the GodOfWar display font and let the body stay a readable text face.
   `--font-system` (system-ui) remains only for utilitarian tool pages. The retired
   faces (PhantomACE / UnifrakturMaguntia / Cinzel Decorative / IM Fell English /
-  Aurusenthial Gothic / Gotfridus) must not be reintroduced.
-- **Keep `--font-ui` body text readable — ~14px minimum.** It is a display-weight
-  face that turns to mush when tiny, so avoid going below ~13px for `--font-ui`
-  text; the base is 14px. (GodOfWar headings and system-ui tool text are exempt.)
+  Aurusenthial Gothic / Gotfridus / GrimoireOfDeath) must not be reintroduced.
+- **Keep `--font-ui` body text readable — ~14px minimum.** Avoid going below ~13px
+  for `--font-ui` text; the base is 14px. (GodOfWar headings and system-ui tool
+  text are exempt.)
 - **No `box-shadow`. Ever.** Depth comes from borders. For a glow, use
   `filter: drop-shadow()` on a NON-box element (sprite/logo/icon); to make a box
   read as "lit", brighten or thicken its border instead — do not reach for a
