@@ -52,3 +52,11 @@ PhantomACE-Demo.zip
 
 # Python bytecode from tools/ (the atlas builder)
 __pycache__/
+
+# Third-party Claude Code skills installed via `npx skills add`. Kept LOCAL,
+# not committed: `.claude/skills/*` are symlinks into `.agents/` that don't
+# resolve on the rig or other clones, the bundles are third-party code, and
+# none of it is site code. Re-add any skill with `npx skills add <name>`.
+.agents/
+.claude/skills/
+skills-lock.json
