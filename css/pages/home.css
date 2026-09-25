@@ -58,6 +58,20 @@
     drop-shadow(0 0 60px rgba(255, 0, 0, 0.2));
 }
 
+/* Light mode: the hero goes to aged paper. The wordmark (black letters + red
+   outline) reads crisply on parchment, so we drop the multiply blend that was
+   tuned for the dark ground; the skull badge and red glows work as-is. */
+:root[data-theme="light"] .hero-bg {
+  background:
+    radial-gradient(circle at 50% 35%, #f2ead6 0%, #e7ddc5 38%, #d8ccae 68%, #c9bb96 100%);
+}
+:root[data-theme="light"] .hero-vignette {
+  background: radial-gradient(ellipse at center, transparent 32%, rgba(92, 64, 26, 0.14) 100%);
+}
+:root[data-theme="light"] .hero-title-img {
+  mix-blend-mode: normal;
+}
+
 .hero-subtitle {
   font-family: var(--font-gothic);
   font-size: clamp(11px, 2vw, 15px);
