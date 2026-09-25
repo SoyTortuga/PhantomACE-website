@@ -101,32 +101,25 @@ body[data-role="broadcaster"] .role-broadcaster-inline { display: inline; }
 }
 
 .role-badge-follower {
-  color: var(--green);
+  color: var(--role-follower);
   border: 1px solid rgba(0, 204, 102, 0.3);
 }
 
-.role-badge-sub_tier1 {
-  color: #b388ff;
-  border: 1px solid rgba(179, 136, 255, 0.3);
-}
-
-.role-badge-sub_tier2 {
-  color: #e040fb;
-  border: 1px solid rgba(224, 64, 251, 0.3);
-}
-
+/* Sub tiers share the subscriber colour; the tier number lives in the label. */
+.role-badge-sub_tier1,
+.role-badge-sub_tier2,
 .role-badge-sub_tier3 {
-  color: #ffd740;
-  border: 1px solid rgba(255, 215, 64, 0.3);
+  color: var(--role-subscriber);
+  border: 1px solid rgba(204, 136, 255, 0.3);
 }
 
 .role-badge-moderator {
-  color: var(--amber);
+  color: var(--role-moderator);
   border: 1px solid rgba(255, 170, 0, 0.3);
 }
 
 .role-badge-broadcaster {
-  color: var(--red);
+  color: var(--role-broadcaster);
   border: 1px solid rgba(255, 0, 0, 0.3);
 }
 

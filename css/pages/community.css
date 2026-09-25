@@ -41,16 +41,17 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #5865F2;
+  color: var(--text-dim);
   padding: 6px 14px;
-  border: 1px solid rgba(88, 101, 242, 0.3);
+  border: 1px solid var(--border-mid);
   border-radius: 6px;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
 .subnav-discord:hover {
-  background: rgba(88, 101, 242, 0.08);
-  border-color: #5865F2;
+  color: var(--red);
+  background: var(--red-glow);
+  border-color: var(--red);
 }
 
 @media (max-width: 767px) {
@@ -598,14 +599,14 @@
   cursor: default;
 }
 
-.lb-badge-common   { color: var(--text-dim); }
-.lb-badge-uncommon { color: var(--green); border-color: rgba(0, 204, 102, 0.35); }
-.lb-badge-rare     { color: var(--purple); border-color: rgba(204, 136, 255, 0.35); }
-.lb-badge-mythic   { color: #ff6600; border-color: rgba(255, 102, 0, 0.35); }
+.lb-badge-common   { color: var(--rarity-common); }
+.lb-badge-uncommon { color: var(--rarity-uncommon); border-color: rgba(0, 204, 102, 0.35); }
+.lb-badge-rare     { color: var(--rarity-rare); border-color: rgba(204, 136, 255, 0.35); }
+.lb-badge-mythic   { color: var(--rarity-mythic); border-color: rgba(255, 102, 0, 0.35); }
 
-.lb-gold .lb-col-rank { color: #ffd700; }
-.lb-silver .lb-col-rank { color: #c0c0c0; }
-.lb-bronze .lb-col-rank { color: #cd7f32; }
+.lb-gold .lb-col-rank { color: var(--medal-gold); }
+.lb-silver .lb-col-rank { color: var(--medal-silver); }
+.lb-bronze .lb-col-rank { color: var(--medal-bronze); }
 
 .lb-gold .lb-col-name,
 .lb-silver .lb-col-name,

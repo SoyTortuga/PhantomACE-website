@@ -114,16 +114,16 @@
   text-transform: capitalize;
 }
 
-.rarity-common   { color: var(--text-pri); }
-.rarity-uncommon  { color: var(--green); }
-.rarity-rare      { color: #4488ff; }
-.rarity-mythic    { color: var(--purple); }
+.rarity-common   { color: var(--rarity-common); }
+.rarity-uncommon  { color: var(--rarity-uncommon); }
+.rarity-rare      { color: var(--rarity-rare); }
+.rarity-mythic    { color: var(--rarity-mythic); }
 .rarity-exclusive { color: var(--exclusive); }
 
-.rarity-border-common   { border-color: var(--text-pri); }
-.rarity-border-uncommon  { border-color: var(--green); }
-.rarity-border-rare      { border-color: #4488ff; }
-.rarity-border-mythic    { border-color: var(--purple); }
+.rarity-border-common   { border-color: var(--rarity-common); }
+.rarity-border-uncommon  { border-color: var(--rarity-uncommon); }
+.rarity-border-rare      { border-color: var(--rarity-rare); }
+.rarity-border-mythic    { border-color: var(--rarity-mythic); }
 .rarity-border-exclusive { border-color: var(--exclusive); }
 
 @media (max-width: 500px) {

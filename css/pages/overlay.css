@@ -15,8 +15,9 @@
 
    Palette and radii follow _private/THEME-REFERENCE.md: pure blacks, solid
    dark-gray borders, 12px card radius, and no box-shadow anywhere. Depth
-   comes from borders and the glassmorphic surface; the only glow is a
-   drop-shadow on the logo, which the rules permit on non-box elements.
+   comes from borders and a near-solid dark surface (no backdrop-filter/blur);
+   the only glow is a drop-shadow on the logo, which the rules permit on
+   non-box elements.
    ══════════════════════════════════════════════ */
 
 @font-face {
@@ -643,7 +644,7 @@ html, body {
   image-rendering: pixelated;
   filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.7));
 }
-.ov-raid-art.shielded { filter: drop-shadow(0 0 8px rgba(90, 160, 255, 0.9)); }
+.ov-raid-art.shielded { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9)); }
 .ov-raid-name {
   font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
   color: #ff5555; text-align: center; line-height: 1.2;
@@ -667,7 +668,7 @@ html, body {
   background: linear-gradient(180deg, #ff5a1f, #ff0000);
   transition: height 0.4s ease;
 }
-.ov-raid-track.shielded i { background: linear-gradient(180deg, #7fb2ff, #2a6adf); }
+.ov-raid-track.shielded i { background: linear-gradient(180deg, #ffffff, #8a8a8a); }
 .ov-raid-hp { font-size: 10px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
 .ov-raid-pct { font-size: 13px; font-weight: 800; color: #ff5555; }
 /* Minions — the summoned adds */
@@ -678,10 +679,10 @@ html, body {
   width: 26px; height: 26px;
   background-repeat: no-repeat; background-position: 0 0;
   image-rendering: pixelated;
-  filter: drop-shadow(0 0 3px rgba(120, 0, 200, 0.8));
+  filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.8));
 }
-.ov-raid-mini-bar { width: 60px; height: 4px; background: #1a0022; border: 1px solid #3a1a4a; border-radius: 2px; overflow: hidden; }
-.ov-raid-mini-bar i { display: block; height: 100%; background: #b060ff; transition: width 0.3s; }
+.ov-raid-mini-bar { width: 60px; height: 4px; background: #1a0000; border: 1px solid #3a0000; border-radius: 2px; overflow: hidden; }
+.ov-raid-mini-bar i { display: block; height: 100%; background: #ff0000; transition: width 0.3s; }
 .ov-raid-toplabel {
   font-size: 8px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
   color: #6f6f6f; margin-top: 2px;

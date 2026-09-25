@@ -423,12 +423,12 @@
    NOT named .role-<x>. That namespace belongs to the role-GATING system in
    roles.css, which hides .role-sub_tier1 and friends unless body[data-role]
    matches — so the badge styled itself and then hid itself. */
-.account-role-badge[data-role="broadcaster"] { color: var(--red); border-color: var(--red); }
-.account-role-badge[data-role="moderator"]   { color: #2ecc71; border-color: #2ecc71; }
+.account-role-badge[data-role="broadcaster"] { color: var(--role-broadcaster); border-color: var(--role-broadcaster); }
+.account-role-badge[data-role="moderator"]   { color: var(--role-moderator);   border-color: var(--role-moderator); }
 .account-role-badge[data-role="sub_tier3"],
 .account-role-badge[data-role="sub_tier2"],
-.account-role-badge[data-role="sub_tier1"]   { color: #9b59b6; border-color: #9b59b6; }
-.account-role-badge[data-role="follower"]    { color: #3498db; border-color: #3498db; }
+.account-role-badge[data-role="sub_tier1"]   { color: var(--role-subscriber);  border-color: var(--role-subscriber); }
+.account-role-badge[data-role="follower"]    { color: var(--role-follower);    border-color: var(--role-follower); }
 
 .account-role-refresh {
   background: none;
@@ -454,7 +454,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-.account-role-msg.ok   { color: #2ecc71; }
+.account-role-msg.ok   { color: var(--green); }
 .account-role-msg.warn { color: #f39c12; }
 .account-role-msg.err  { color: var(--red); }
 
@@ -540,7 +540,7 @@
 }
 
 .auth-user-title {
-  color: #ff6600;
+  color: var(--red);
   font-size: 10px;
   font-style: italic;
   white-space: nowrap;
@@ -548,8 +548,8 @@
 
 /* Hype Train Banner */
 .hype-train-banner {
-  background: linear-gradient(90deg, #1a0500 0%, #330a00 50%, #1a0500 100%);
-  border-bottom: 2px solid #ff4400;
+  background: linear-gradient(90deg, #1a0300 0%, #330000 50%, #1a0300 100%);
+  border-bottom: 2px solid var(--red);
   padding: 6px 16px;
 }
 .hype-train-inner {
@@ -564,7 +564,7 @@
 .hype-train-icon { font-size: 18px; }
 .hype-train-text {
   font-weight: bold;
-  color: #ff4400;
+  color: var(--red);
   white-space: nowrap;
   font-size: 13px;
 }
@@ -578,12 +578,12 @@
 }
 .hype-train-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ff4400, #ff8800);
+  background: linear-gradient(90deg, #990000, var(--red));
   border-radius: 4px;
   transition: width 0.5s ease;
 }
 .hype-train-pct {
-  color: #ff8800;
+  color: var(--red);
   font-weight: bold;
   min-width: 30px;
   text-align: right;

@@ -100,8 +100,8 @@
   background: transparent;
 }
 .bot-drop-btn[data-rarity="mythic"] {
-  border-color: #ff6600;
-  color: #ff6600;
+  border-color: var(--rarity-mythic);
+  color: var(--rarity-mythic);
   background: transparent;
 }
 
@@ -111,7 +111,7 @@
 .bot-drop-btn[data-rarity="common"]:hover  { background: var(--text-dim); }
 .bot-drop-btn[data-rarity="uncommon"]:hover { background: var(--green); }
 .bot-drop-btn[data-rarity="rare"]:hover     { background: var(--purple); }
-.bot-drop-btn[data-rarity="mythic"]:hover   { background: #ff6600; }
+.bot-drop-btn[data-rarity="mythic"]:hover   { background: var(--rarity-mythic); }
 
 .bot-drop-btn:disabled {
   opacity: 0.4;
@@ -221,7 +221,7 @@
 .bot-action-tag.drop { color: var(--red); border-color: rgba(255, 0, 0, 0.3); }
 .bot-action-tag.announce { color: var(--amber); border-color: rgba(255, 170, 0, 0.3); }
 .bot-action-tag.giveaway-winner,
-.bot-action-tag.giveaway-code { color: var(--purple); border-color: rgba(204, 136, 255, 0.3); }
+.bot-action-tag.giveaway-code { color: var(--green); border-color: rgba(0, 204, 102, 0.3); }
 
 /* ── Rarity badge — shared by Live Drops' per-drop header ────────── */
 
@@ -238,7 +238,7 @@
 .bot-item-rarity.common   { color: var(--text-dim); border-color: var(--text-dim); }
 .bot-item-rarity.uncommon { color: var(--green);    border-color: rgba(0, 204, 102, 0.35); }
 .bot-item-rarity.rare     { color: var(--purple);   border-color: rgba(204, 136, 255, 0.35); }
-.bot-item-rarity.mythic   { color: #ff6600;         border-color: rgba(255, 102, 0, 0.35); }
+.bot-item-rarity.mythic   { color: var(--rarity-mythic); border-color: rgba(255, 102, 0, 0.35); }
 
 /* ── Big Prize Giveaway ─────────────────────── */
 
@@ -472,7 +472,7 @@
 .bot-pool[data-tier="common"]   .bot-pool-tier { color: var(--text-dim); }
 .bot-pool[data-tier="uncommon"] .bot-pool-tier { color: var(--green); }
 .bot-pool[data-tier="rare"]     .bot-pool-tier { color: var(--purple); }
-.bot-pool[data-tier="mythic"]   .bot-pool-tier { color: #ff6600; }
+.bot-pool[data-tier="mythic"]   .bot-pool-tier { color: var(--rarity-mythic); }
 
 .bot-pool-count {
   font-size: 26px;
@@ -772,7 +772,7 @@
 
 .bot-egg-btn[data-rarity="uncommon"] { border-color: var(--green);  color: var(--green); }
 .bot-egg-btn[data-rarity="rare"]     { border-color: var(--purple); color: var(--purple); }
-.bot-egg-btn[data-rarity="mythic"]   { border-color: #ff6600;       color: #ff6600; }
+.bot-egg-btn[data-rarity="mythic"]   { border-color: var(--rarity-mythic); color: var(--rarity-mythic); }
 .bot-egg-btn:disabled { opacity: 0.5; }
 
 /* ── Rotating announcements ────────────────── */

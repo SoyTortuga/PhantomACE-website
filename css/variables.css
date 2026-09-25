@@ -22,12 +22,41 @@
   --amber:      #ffaa00;
   --purple:     #cc88ff;
 
-  /* EXCLUSIVE — above every other rarity, and a token rather than a hex
-     repeated in four stylesheets. The existing four already disagree with
-     each other: rare is --purple in the inventory, #4488ff on the redeem
-     page and #cc88ff on a profile. That drift is old and is left alone
-     here, but a rarity added today has no excuse to start it. */
+  /* ── Rarity ladder — THE sanctioned exception to black/grey/red/white ──
+     These colours signal item/dino/leaderboard RARITY and nothing else. They
+     are NEVER a UI accent (button, tag, border rail, category label). Every
+     rarity colour must come from a token here, so the ladder stays consistent
+     instead of each stylesheet inventing its own (rare used to be --purple in
+     the inventory, #4488ff on redeem, #cc88ff on a profile — that is the drift
+     this block ends). See CLAUDE.md "Design Identity". */
+  --rarity-common:    #FFFFFF;
+  --rarity-uncommon:  #00cc66;   /* == --green */
+  --rarity-rare:      #cc88ff;   /* == --purple; the ONE place purple is allowed */
+  --rarity-epic:      #ff6600;   /* Dino Park ladder */
+  --rarity-legendary: #d4af37;   /* Dino Park top tier (== --exclusive gold) */
+  --rarity-mythic:    #ff6600;   /* item/leaderboard ladder top tier */
+
+  /* EXCLUSIVE — above every rarity. Kept as its own name for call sites that
+     read "exclusive" rather than a ladder step. */
   --exclusive:  #d4af37;
+
+  /* Podium medals (leaderboard ranks 1-3). Rank colours, not UI accents. */
+  --medal-gold:   #ffd700;
+  --medal-silver: #c0c0c0;
+  --medal-bronze: #cd7f32;
+
+  /* Membership tiers. VIP is a silver/white treatment — on-palette "premium",
+     never purple (which is reserved for rare rarity) and never the old pink. */
+  --tier-vip: #d3d7de;
+
+  /* Role indicators — one scheme, referenced by BOTH the account badge and the
+     inline role badges (they used to disagree, and reached for blue/magenta).
+     Tier number is carried by the badge TEXT, so sub tiers share one colour
+     rather than a rainbow. Classification colours, never a general UI accent. */
+  --role-broadcaster: #FF0000;   /* == --red */
+  --role-moderator:   #ffaa00;   /* == --amber */
+  --role-subscriber:  #cc88ff;   /* == --purple */
+  --role-follower:    #00cc66;   /* == --green */
 
   --border:     #1a1a1a;
   --border-mid: #2a2a2a;

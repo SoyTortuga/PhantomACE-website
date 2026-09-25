@@ -6,8 +6,8 @@
 
 .giveaway-banner {
   position: relative;
-  background: linear-gradient(135deg, rgba(152, 9, 10, 0.15), rgba(0, 0, 0, 0.8));
-  border: 1px solid rgba(152, 9, 10, 0.3);
+  background: linear-gradient(135deg, rgba(255, 0, 0, 0.12), rgba(0, 0, 0, 0.8));
+  border: 1px solid rgba(255, 0, 0, 0.3);
   border-radius: 12px;
   padding: 48px 32px;
   text-align: center;
@@ -192,7 +192,7 @@
   color: var(--text-dim);
 }
 
-.entry-claim-msg.ok  { color: #2ecc71; }
+.entry-claim-msg.ok  { color: var(--green); }
 .entry-claim-msg.err { color: var(--red); }
 
 .entry-history:not(:empty) {
@@ -218,7 +218,7 @@
   font-family: var(--font-system);
   font-size: 12px;
   color: var(--text-sec);
-  border-bottom: 1px solid var(--border-low, #ffffff0d);
+  border-bottom: 1px solid var(--border);
 }
 
 .entry-history-row:last-child { border-bottom: none; }
@@ -383,7 +383,7 @@
 .hype-drops-title {
   font-family: var(--font-gothic);
   font-size: 16px;
-  color: #ff4400;
+  color: var(--red);
   font-weight: bold;
 }
 
@@ -435,10 +435,10 @@
   letter-spacing: 0.08em;
 }
 
-.rarity-mythic .hype-drop-rarity { color: #ff6600; }
-.rarity-rare .hype-drop-rarity { color: var(--purple); }
-.rarity-uncommon .hype-drop-rarity { color: var(--green); }
-.rarity-common .hype-drop-rarity { color: var(--text-dim); }
+.rarity-mythic .hype-drop-rarity { color: var(--rarity-mythic); }
+.rarity-rare .hype-drop-rarity { color: var(--rarity-rare); }
+.rarity-uncommon .hype-drop-rarity { color: var(--rarity-uncommon); }
+.rarity-common .hype-drop-rarity { color: var(--rarity-common); }
 
 .hype-drop-entries {
   color: var(--text-sec);
@@ -452,8 +452,8 @@
   font-family: var(--font-system);
   font-size: 14px;
   font-weight: 700;
-  color: #ff4400;
-  background: rgba(255, 68, 0, 0.1);
+  color: var(--red);
+  background: var(--red-glow);
   padding: 4px 10px;
   border-radius: 4px;
   border: 1px solid rgba(255, 68, 0, 0.3);
@@ -500,7 +500,7 @@
 }
 
 .hype-drop-copy:hover {
-  background: #cc0000;
+  background: var(--red);
 }
 
 .hype-drop-copy.copied {
@@ -552,10 +552,10 @@
   letter-spacing: 0.08em;
 }
 
-.entry-popover-rarity.rarity-mythic { color: #ff6600; }
-.entry-popover-rarity.rarity-rare { color: var(--purple); }
-.entry-popover-rarity.rarity-uncommon { color: var(--green); }
-.entry-popover-rarity.rarity-common { color: var(--text-dim); }
+.entry-popover-rarity.rarity-mythic { color: var(--rarity-mythic); }
+.entry-popover-rarity.rarity-rare { color: var(--rarity-rare); }
+.entry-popover-rarity.rarity-uncommon { color: var(--rarity-uncommon); }
+.entry-popover-rarity.rarity-common { color: var(--rarity-common); }
 
 .entry-popover-entries {
   color: var(--white);
@@ -592,7 +592,7 @@
   display: block;
   max-width: 880px;
   margin: 0 auto 24px;
-  border: 1px solid rgba(152, 9, 10, 0.3);
+  border: 1px solid rgba(255, 0, 0, 0.3);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -653,10 +653,10 @@
 }
 
 .prize-rarity { text-transform: uppercase; }
-.rarity-mythic .prize-rarity { color: #ff6600; }
-.rarity-rare .prize-rarity   { color: var(--purple); }
-.rarity-uncommon .prize-rarity { color: var(--green); }
-.rarity-common .prize-rarity { color: var(--text-dim); }
+.rarity-mythic .prize-rarity { color: var(--rarity-mythic); }
+.rarity-rare .prize-rarity   { color: var(--rarity-rare); }
+.rarity-uncommon .prize-rarity { color: var(--rarity-uncommon); }
+.rarity-common .prize-rarity { color: var(--rarity-common); }
 
 .prize-sub,
 .prize-done {

@@ -54,7 +54,7 @@
 .prof-title {
   margin: 0 0 8px;
   font-style: italic;
-  color: var(--amber, #ffb300);
+  color: var(--red);
   font-size: 15px;
 }
 
@@ -69,14 +69,14 @@
 }
 .prof-dot { color: var(--text-dim); }
 .prof-vip {
-  color: #e91e8c;
+  color: var(--tier-vip);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 11px;
 }
 .prof-founder {
-  color: var(--amber, #ffb300);
+  color: var(--amber);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -97,10 +97,10 @@
   border-radius: 3px;
   padding: 2px 8px;
 }
-.prof-role[data-role="moderator"]   { color: #2ecc71; border-color: #2ecc71; }
-.prof-role[data-role="broadcaster"] { color: var(--red); border-color: var(--red); }
-.prof-role[data-role^="sub_"]       { color: #9b59b6; border-color: #9b59b6; }
-.prof-role[data-role="follower"]    { color: #3498db; border-color: #3498db; }
+.prof-role[data-role="moderator"]   { color: var(--role-moderator);   border-color: var(--role-moderator); }
+.prof-role[data-role="broadcaster"] { color: var(--role-broadcaster); border-color: var(--role-broadcaster); }
+.prof-role[data-role^="sub_"]       { color: var(--role-subscriber);  border-color: var(--role-subscriber); }
+.prof-role[data-role="follower"]    { color: var(--role-follower);    border-color: var(--role-follower); }
 
 /* ── Counts ───────────────────────────────────────────────────── */
 .prof-stats {
@@ -201,9 +201,9 @@
   padding: 1px 6px;
   color: var(--text-dim);
 }
-.prof-rarity.r-uncommon { color: #2ecc71; }
-.prof-rarity.r-rare     { color: #cc88ff; }
-.prof-rarity.r-mythic   { color: var(--amber, #ffb300); }
+.prof-rarity.r-uncommon { color: var(--rarity-uncommon); }
+.prof-rarity.r-rare     { color: var(--rarity-rare); }
+.prof-rarity.r-mythic   { color: var(--rarity-mythic); }
 .prof-rarity.r-exclusive { color: var(--exclusive); }
 
 /* ── Favourite dino ───────────────────────────────────────────────
@@ -278,10 +278,10 @@
   border-radius: 3px;
   padding: 2px 7px;
 }
-.prof-dino-badge.r-uncommon  { color: #2ecc71; border-color: #2ecc7144; }
-.prof-dino-badge.r-rare      { color: #3498db; border-color: #3498db44; }
-.prof-dino-badge.r-epic      { color: #9b59b6; border-color: #9b59b644; }
-.prof-dino-badge.r-legendary { color: var(--amber, #ffb300); border-color: #ffb30044; }
+.prof-dino-badge.r-uncommon  { color: var(--rarity-uncommon);  border-color: rgba(0, 204, 102, 0.27); }
+.prof-dino-badge.r-rare      { color: var(--rarity-rare);      border-color: rgba(204, 136, 255, 0.27); }
+.prof-dino-badge.r-epic      { color: var(--rarity-epic);      border-color: rgba(255, 102, 0, 0.27); }
+.prof-dino-badge.r-legendary { color: var(--rarity-legendary); border-color: rgba(212, 175, 55, 0.27); }
 .prof-dino-badge.is-mut      { color: var(--red); border-color: var(--red); }
 
 .prof-dino-desc {

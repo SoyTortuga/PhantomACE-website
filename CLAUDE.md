@@ -25,6 +25,14 @@ page AND every game, and sub-agents must follow them too.
   slate or indigo "tech dark" (`#0b0f19`-style) background, never cyan or
   neon-indigo accents. `--purple` exists ONLY as the MTG "rare" rarity colour —
   never as a UI accent.
+- **Rarity / medal / tier colours are the ONE sanctioned exception** to the
+  black/grey/red/white palette, and only ever to signal rarity, leaderboard rank,
+  or membership tier — never as general UI accents. They must come from the tokens
+  in `css/variables.css`: `--rarity-uncommon` (green), `--rarity-rare` (= `--purple`),
+  `--rarity-mythic` (orange), `--exclusive` (gold); `--medal-gold/-silver/-bronze`;
+  `--tier-vip` (silver/white — VIP is never purple or pink). Do NOT hardcode a
+  rarity hex (`#4488ff`, `#ff6600`, `#cc88ff`, `#ffd700`, …) in a stylesheet, and do
+  NOT repurpose any of these as a button, tag, or category colour.
 - **Fonts:** gothic display faces (PhantomACE, GodOfWar, UnifrakturMaguntia,
   Cinzel Decorative) for titles/headers via the `--font-*` tokens, `system-ui` for
   body. Never Inter, Roboto, or another generic UI sans.

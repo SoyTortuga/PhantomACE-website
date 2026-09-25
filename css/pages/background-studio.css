@@ -63,7 +63,7 @@
   border: 1px solid #ffffff28; border-radius: 4px; font-size: 11px;
 }
 .bgs-set-btn.active { border-color: #ff0000; color: #ffaaaa; }
-.bgs-set-btn .zone-tag { color: #66aaff; font-size: 9px; margin-left: 3px; }
+.bgs-set-btn .zone-tag { color: var(--text-dim); font-size: 9px; margin-left: 3px; }
 
 .bgs-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
 .bgs-tile-btn {

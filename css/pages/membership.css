@@ -30,8 +30,8 @@
 
 .tier-icon-viewer    { background: rgba(153, 153, 153, 0.12); border: 1px solid rgba(153, 153, 153, 0.25); }
 .tier-icon-follower  { background: rgba(0, 204, 102, 0.10); border: 1px solid rgba(0, 204, 102, 0.25); }
-.tier-icon-subscriber { background: rgba(152, 9, 10, 0.10); border: 1px solid rgba(152, 9, 10, 0.25); }
-.tier-icon-vip       { background: rgba(204, 136, 255, 0.10); border: 1px solid rgba(204, 136, 255, 0.25); }
+.tier-icon-subscriber { background: rgba(255, 0, 0, 0.10); border: 1px solid rgba(255, 0, 0, 0.25); }
+.tier-icon-vip       { background: rgba(211, 215, 222, 0.10); border: 1px solid rgba(211, 215, 222, 0.30); }
 .tier-icon-moderator { background: rgba(255, 170, 0, 0.10); border: 1px solid rgba(255, 170, 0, 0.25); }
 
 .tier-title-group { flex: 1; }
@@ -43,10 +43,10 @@
 }
 
 .tier-name-viewer    { color: var(--text-pri); }
-.tier-name-follower  { color: var(--green); }
+.tier-name-follower  { color: var(--role-follower); }
 .tier-name-subscriber { color: var(--red); }
-.tier-name-vip       { color: var(--purple); }
-.tier-name-moderator { color: var(--amber); }
+.tier-name-vip       { color: var(--tier-vip); }
+.tier-name-moderator { color: var(--role-moderator); }
 
 .tier-tagline {
   font-family: var(--font-system);
@@ -76,12 +76,12 @@
 
 .tier-badge-sub {
   color: var(--red);
-  border: 1px solid rgba(152, 9, 10, 0.3);
+  border: 1px solid rgba(255, 0, 0, 0.3);
 }
 
 .tier-badge-vip {
-  color: var(--purple);
-  border: 1px solid rgba(204, 136, 255, 0.3);
+  color: var(--tier-vip);
+  border: 1px solid rgba(211, 215, 222, 0.3);
 }
 
 .tier-badge-mod {
@@ -160,5 +160,5 @@
 /* Divider between tiers */
 .tier-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(152, 9, 10, 0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.3), transparent);
 }

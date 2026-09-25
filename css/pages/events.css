@@ -23,23 +23,8 @@
   overflow: hidden;
 }
 
-.event-full-card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--red);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.event-full-card:hover::after {
-  opacity: 1;
-}
-
 .event-full-card:hover {
+  border-color: var(--red);
 }
 
 /* Date block */
