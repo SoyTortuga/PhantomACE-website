@@ -142,20 +142,8 @@
       75% { transform: translateY(2px) rotate(-3deg); }
     }
 
-    .park-dino-label {
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      font-size: 16px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 3px;
-      white-space: nowrap;
-      margin-bottom: 2px;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .park-dino:hover .park-dino-label,
-    .park-dino.selected .park-dino-label { opacity: 1; }
+    /* Dino name labels are not shown (no hover/selected name popups in the park). */
+    .park-dino-label { display: none; }
 
     /* Debris */
     .park-debris {

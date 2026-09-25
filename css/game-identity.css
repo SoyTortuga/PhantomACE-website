@@ -45,3 +45,7 @@ body {
     -1px -1px 0 #000, 1px -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000,
     0 0 3px rgba(0, 0, 0, 0.7);
 }
+/* In light mode the outline muddies dark text on the parchment panels, and the
+   over-map HUD already sits on dark pills or carries its own text-shadow — so
+   drop the inherited outline in light to avoid the smudged look. */
+:root[data-theme="light"] body { text-shadow: none; }

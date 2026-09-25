@@ -502,7 +502,7 @@
   transform: translateX(-50%);
   font-family: var(--font-system);
   font-size: 8px;
-  color: #333;
+  color: var(--text-dim);
   letter-spacing: 0.02em;
 }
 
