@@ -86,8 +86,23 @@ export async function onRequestGet(context) {
   /* ── Hype train state, and whether the feed is even connected ─────── */
   const hype = await env.MARKETPLACE.get('hype_train_site', 'json');
   const subs = await env.MARKETPLACE.get('eventsub_subscriptions', 'json') || [];
-  const hasHypeTrainSub = Array.isArray(subs) &&
-    subs.some(s => String(s.type || '').startsWith('channel.hype_train'));
+  const subTypes = Array.isArray(subs) ? subs.map(s => String(s.type || '')) : [];
+  const hasHypeTrainSub = subTypes.some(t => t.startsWith('channel.hype_train'));
+
+  /* Which EventSub subscriptions are registered. The activity feed and every
+     milestone/drop reaction only fire for events whose subscription exists, so
+     the panel surfaces this rather than leaving a silent gap to discover live.
+     Read from the stored list bot-setup writes; a live Twitch re-check lives on
+     the bot-setup page. */
+  const subscriptions = {
+    subs: subTypes.includes('channel.subscribe'),
+    giftSubs: subTypes.includes('channel.subscription.gift'),
+    raids: subTypes.includes('channel.raid'),
+    redemptions: subTypes.includes('channel.channel_points_custom_reward_redemption.add'),
+    hypeTrain: hasHypeTrainSub,
+    chat: subTypes.includes('channel.chat.message'),
+    total: subTypes.length,
+  };
 
   /* ── Pham Check-ins for the broadcast on air ──────────────────────────
      Only shown when the stored stream id matches the one currently live —
@@ -141,6 +156,7 @@ export async function onRequestGet(context) {
       subscribed: hasHypeTrainSub,
     },
     checkins,
+    subscriptions,
     overlayUrl,
     recentActions: log.slice(-15).reverse(),
   });

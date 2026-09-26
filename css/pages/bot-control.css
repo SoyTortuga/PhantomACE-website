@@ -892,3 +892,27 @@
 .bot-overlay-hint {
   margin: 12px 0 0;
 }
+
+/* Activity feed quick link + EventSub status readout */
+.bot-quicklinks {
+  margin-bottom: 16px;
+}
+
+.bot-subs-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bot-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.bot-sub-state { flex: none; }
+.bot-sub-name { flex: 1; color: var(--text-pri); min-width: 0; }
+.bot-sub-note { flex: none; font-size: 12px; color: var(--text-dim); }
+.bot-sub-row.missing .bot-sub-note { color: var(--red); }

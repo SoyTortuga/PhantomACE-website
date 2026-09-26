@@ -125,6 +125,28 @@ function renderWarnings(data) {
   }).join('');
 }
 
+function renderSubs(subs) {
+  var grid = document.getElementById('botSubsGrid');
+  if (!grid) return;
+  if (!subs) { grid.innerHTML = '<p class="bot-muted">Subscription status unavailable.</p>'; return; }
+  var rows = [
+    ['Subscriptions', subs.subs],
+    ['Gift subs', subs.giftSubs],
+    ['Raids', subs.raids],
+    ['Channel-point redemptions', subs.redemptions],
+    ['Hype train', subs.hypeTrain],
+    ['Chat commands', subs.chat],
+  ];
+  grid.innerHTML = rows.map(function (r) {
+    var ok = !!r[1];
+    return '<div class="bot-sub-row ' + (ok ? 'ok' : 'missing') + '">' +
+      '<span class="bot-sub-state">' + (ok ? '✅' : '❌') + '</span>' +
+      '<span class="bot-sub-name">' + escapeBotHtml(r[0]) + '</span>' +
+      '<span class="bot-sub-note">' + (ok ? 'active' : 'not registered') + '</span>' +
+      '</div>';
+  }).join('');
+}
+
 function renderLiveDrops(drops) {
   const section = document.getElementById('liveDropSection');
   const box = document.getElementById('botLiveDrops');
@@ -220,6 +242,7 @@ async function refreshDashboard() {
     const data = await res.json();
 
     renderWarnings(data);
+    renderSubs(data.subscriptions);
     renderPools(data.pools);
     renderCheckins(data.checkins);
     renderLiveDrops(data.activeDrops);
