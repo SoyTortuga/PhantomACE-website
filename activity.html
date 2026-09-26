@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE stream activity feed — subs, gift subs, raids, hype train and redemptions, with their payloads.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Activity | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/activity.css">
+</head>
+<body data-page="activity">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Activity</h1>
+    <p class="page-hero-subtitle">Every sub, gift, raid, hype train and redemption — with its payload</p>
+  </section>
+
+  <section class="page-container">
+
+    <div id="activityDenied" class="card act-denied" hidden>
+      <p id="activityDeniedText">This page is for the broadcaster and moderators only.</p>
+      <button class="btn-primary" id="activityLoginBtn" hidden onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <!-- Shown only after the server confirms broadcaster/mod access via
+         /api/activity — the cookie's role field is not trusted for this. -->
+    <div id="activityPanel" hidden>
+
+      <div class="act-toolbar">
+        <div class="act-filters" id="activityFilters">
+          <button class="act-filter active" data-cat="all">All</button>
+          <button class="act-filter" data-cat="sub">Subs</button>
+          <button class="act-filter" data-cat="giftsub">Gifts</button>
+          <button class="act-filter" data-cat="raid">Raids</button>
+          <button class="act-filter" data-cat="hype">Hype</button>
+          <button class="act-filter" data-cat="redemption">Redemptions</button>
+          <button class="act-filter" data-cat="bot">Bot</button>
+        </div>
+        <label class="act-live">
+          <input type="checkbox" id="activityLive" checked> Auto-refresh
+        </label>
+      </div>
+
+      <ul class="act-feed" id="activityFeed">
+        <li class="act-empty">Loading&hellip;</li>
+      </ul>
+
+    </div>
+
+  </section>
+
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/activity.js" defer></script>
+</body>
+</html>

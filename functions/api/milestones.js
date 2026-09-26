@@ -133,6 +133,40 @@ export async function onRequestPost(context) {
         console.error('[milestones]', err.message);
       }
 
+      /* Record to the activity feed regardless of whether milestone DROPS are
+         on — the feed is a record of what happened, not of what we reacted to.
+         A gifted channel.subscribe is skipped because the gift event covers it
+         (same dedup as the drop path above). */
+      try {
+        const { recordActivity } = await import('./activity.js');
+        if (type === 'channel.subscribe' && !event.is_gift) {
+          const who = event.user_name || event.user_login || 'someone';
+          const tier = { '1000': '1', '2000': '2', '3000': '3' }[event.tier] || event.tier;
+          await recordActivity(env, {
+            category: 'sub', type,
+            summary: `${who} subscribed${tier ? ` (tier ${tier})` : ''}`,
+            payload: event,
+          });
+        } else if (type === 'channel.subscription.gift') {
+          const who = event.is_anonymous ? 'An anonymous gifter' : (event.user_name || event.user_login || 'Someone');
+          const n = Number(event.total) || 1;
+          await recordActivity(env, {
+            category: 'giftsub', type,
+            summary: `${who} gifted ${n} sub${n === 1 ? '' : 's'}`,
+            payload: event,
+          });
+        } else if (type === 'channel.raid') {
+          const who = event.from_broadcaster_user_name || 'A raider';
+          await recordActivity(env, {
+            category: 'raid', type,
+            summary: `${who} raided with ${Number(event.viewers) || 0}`,
+            payload: event,
+          });
+        }
+      } catch (err) {
+        console.error('[milestones] activity record failed:', err.message);
+      }
+
       /* GIFT SUBS ALSO HATCH DINOS. Separate from the code drop above and
          from its on/off: the hatch minigame has its own toggle (dino-hatch.js),
          so a channel that has milestone drops switched off still hatches. One

@@ -339,6 +339,18 @@ export async function onRequestPost(context) {
     const rewardTitle = event.reward ? event.reward.title : '';
     const handlerKey = mapRewardTitle(rewardTitle);
 
+    /* Every redemption goes to the activity feed, whether or not the site has a
+       handler for that reward — the feed is a record of what viewers did. */
+    try {
+      const { recordActivity } = await import('./activity.js');
+      const who = event.user_name || event.user_login || 'someone';
+      await recordActivity(env, {
+        category: 'redemption', type: rewardTitle || 'channel-point',
+        summary: `${who} redeemed "${rewardTitle || 'a reward'}"`,
+        payload: event,
+      });
+    } catch (err) { console.error('[channel-points] activity record failed:', err.message); }
+
     if (handlerKey && REWARD_HANDLERS[handlerKey]) {
       await REWARD_HANDLERS[handlerKey](env, twitchUserId, event);
     }

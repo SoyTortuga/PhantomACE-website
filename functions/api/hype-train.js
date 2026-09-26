@@ -72,6 +72,14 @@ async function handleHypeTrainProgress(env, event) {
     state.alertedLevels.push(level);
     const { pushOverlayEvent } = await import('./overlay/events.js');
     await pushOverlayEvent(env, { type: 'hype-level', level, total: event.total, goal: event.goal });
+    try {
+      const { recordActivity } = await import('./activity.js');
+      await recordActivity(env, {
+        category: 'hype', type: 'hype-level',
+        summary: `Hype train reached level ${level}`,
+        payload: { id: event.id, level, total: event.total, goal: event.goal },
+      });
+    } catch (err) { console.error('[hype-train] activity record failed:', err.message); }
   }
 
   const reward = LEVEL_REWARDS[level];
@@ -164,6 +172,15 @@ async function handleHypeTrainBegin(env, event) {
     console.error('[hype-train] could not start skull frenzy:', err.message);
   }
 
+  try {
+    const { recordActivity } = await import('./activity.js');
+    await recordActivity(env, {
+      category: 'hype', type: 'hype-begin',
+      summary: 'Hype train started',
+      payload: event,
+    });
+  } catch (err) { console.error('[hype-train] activity record failed:', err.message); }
+
   await sendChatMessage(env,
     '🚂 HYPE TRAIN STARTED! Reach higher levels for bonus giveaway codes dropped right here in chat! 🎟️'
   );
@@ -182,6 +199,15 @@ async function handleHypeTrainEnd(env, event) {
   };
   await env.MARKETPLACE.put('hype_train_site', JSON.stringify(summary), { expirationTtl: 300 });
   await env.MARKETPLACE.delete('hype_train_active');
+
+  try {
+    const { recordActivity } = await import('./activity.js');
+    await recordActivity(env, {
+      category: 'hype', type: 'hype-end',
+      summary: `Hype train ended at level ${event.level}`,
+      payload: summary,
+    });
+  } catch (err) { console.error('[hype-train] activity record failed:', err.message); }
   /* hype_train_drops is NOT deleted here any more. Codes dropped at the top
      of a train stay claimable for their full five minutes, and wiping the
      list when the train ended made them vanish from the site while still

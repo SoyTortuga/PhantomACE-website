@@ -215,10 +215,24 @@ async function checkAndSetCooldown(env, key, seconds) {
 
 /* ── Action log — feeds the control panel ─────── */
 export async function logBotAction(env, entry) {
+  const stamped = { ...entry, at: Date.now() };
   const log = await env.MARKETPLACE.get(ACTION_LOG_KEY, 'json') || [];
-  log.unshift({ ...entry, at: Date.now() });
+  log.unshift(stamped);
   if (log.length > ACTION_LOG_MAX) log.length = ACTION_LOG_MAX;
   await env.MARKETPLACE.put(ACTION_LOG_KEY, JSON.stringify(log), { expirationTtl: ACTION_LOG_TTL });
+
+  /* Mirror into the activity feed so it shows the whole picture — the events
+     viewers caused AND the drops/announcements the bot sent back. Best-effort:
+     a feed write must never break the action it is recording. */
+  try {
+    const { recordActivity } = await import('../activity.js');
+    let summary;
+    if (entry.type === 'drop') summary = `${entry.actor || 'someone'} dropped a ${entry.rarity || ''} code`.trim();
+    else if (entry.type === 'giveaway-winner') summary = `${entry.username || 'someone'} picked as giveaway winner`;
+    else if (entry.type === 'giveaway-code') summary = `Prize code sent to ${entry.username || 'someone'}`;
+    else summary = `${entry.actor || 'bot'}: ${entry.message || entry.type || 'action'}`.slice(0, 160);
+    await recordActivity(env, { category: 'bot', type: entry.type || 'action', summary, payload: stamped });
+  } catch (err) { console.error('[send-chat] activity record failed:', err.message); }
 }
 
 export async function getBotActionLog(env) {
