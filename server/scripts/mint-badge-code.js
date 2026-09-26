@@ -76,6 +76,16 @@ const BADGES = {
     blurb: 'Won a game of MTGBBB while a sealed box was cracked on stream.',
   },
 
+  'mini-golf': {
+    id: 'mini-golf',
+    game: 'profile',
+    type: 'badge',
+    name: 'PhantomACE Mini-Golf Sibling Invitational 2026 Spectator',
+    rarity: 'mythic',
+    image: '/assets/badges/mini-golf.png',
+    blurb: 'For everyone who watched the PhantomACE Mini-Golf Sibling Invitational 2026.',
+  },
+
   /* The Undead Executioner ladder. Normally EARNED by summoning the raid boss
      (functions/api/raid-badges.js), but also mintable as a code so a tier can
      be granted by hand. id / game / rarity / image MUST match the raid ladder,
