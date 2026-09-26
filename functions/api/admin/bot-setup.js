@@ -133,22 +133,103 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
     'bits:read': 'View Bits information',
   };
 
+  /* THE FULL GRANT. Josh authorizes ONCE for everything the site could ever
+     use, so no future feature has to send him back for a newly-needed scope.
+     Twitch consent is all-or-nothing, so a successful authorize grants this
+     whole set. The core five the site relies on today (channel:manage:redemptions,
+     channel:read:hype_train, channel:read:subscriptions, channel:read:ads,
+     bits:read) are in here alongside the rest.
+
+     Two things stay true: adding a scope still does NOT upgrade an
+     already-issued token — a new scope means re-running the authorize step once
+     so Twitch re-prompts — and if Twitch rejects any single scope as invalid it
+     rejects the WHOLE request, so if the consent screen errors, drop the
+     offending scope (a deprecated one like user:edit:follows is the usual
+     suspect) and re-try. */
   const REQUIRED_BROADCASTER_SCOPES = [
-    'channel:manage:redemptions',
-    'channel:read:hype_train',
-    'channel:read:subscriptions',
-    /* Ad breaks. Listed here even though the subscription step treats it as
-       optional, and the two are not in conflict: this line is what stops the
-       page claiming Step 2 is done, while Create Subscriptions still builds
-       everything else. Silence here would be the exact failure the comment
-       above describes — a green tick over a permission never granted. */
-    'channel:read:ads',
-    /* Bits Power-ups. Same optional-but-listed treatment as ads: the
-       channel.bits.use subscription (the 300-bit Power-up hatch trigger) is
-       added only when this is granted, but naming it here is what tells the
-       broadcaster a re-authorisation is needed rather than leaving the trigger
-       silently dead. */
+    'analytics:read:extensions',
+    'analytics:read:games',
     'bits:read',
+    'channel:bot',
+    'channel:manage:ads',
+    'channel:read:ads',
+    'channel:edit:commercial',
+    'channel:manage:broadcast',
+    'channel:manage:clips',
+    'channel:read:charity',
+    'channel:manage:extensions',
+    'channel:read:guest_star',
+    'channel:manage:guest_star',
+    'channel:read:editors',
+    'channel:manage:moderators',
+    'channel:manage:polls',
+    'channel:read:polls',
+    'channel:manage:predictions',
+    'channel:read:predictions',
+    'channel:manage:raids',
+    'channel:manage:redemptions',
+    'channel:read:redemptions',
+    'channel:manage:schedule',
+    'channel:manage:videos',
+    'channel:read:stream_key',
+    'channel:read:subscriptions',
+    'channel:read:vips',
+    'chat:edit',
+    'chat:read',
+    'clips:edit',
+    'editor:manage:clips',
+    'moderation:read',
+    'moderator:manage:announcements',
+    'moderator:manage:automod',
+    'moderator:manage:banned_users',
+    'moderator:manage:blocked_terms',
+    'moderator:manage:chat_messages',
+    'moderator:manage:chat_settings',
+    'moderator:manage:guest_star',
+    'moderator:manage:shield_mode',
+    'moderator:manage:shoutouts',
+    'moderator:read:automod_settings',
+    'moderator:read:banned_users',
+    'moderator:read:blocked_terms',
+    'moderator:read:chat_messages',
+    'moderator:read:chat_settings',
+    'moderator:read:chatters',
+    'moderator:read:followers',
+    'moderator:read:guest_star',
+    'moderator:read:moderators',
+    'moderator:read:shield_mode',
+    'moderator:read:shoutouts',
+    'moderator:read:suspicious_users',
+    'moderator:manage:suspicious_users',
+    'moderator:read:unban_requests',
+    'moderator:manage:unban_requests',
+    'moderator:read:vips',
+    'moderator:read:warnings',
+    'moderator:manage:warnings',
+    'user:edit',
+    'user:edit:broadcast',
+    'user:bot',
+    'user:edit:follows',
+    'user:manage:blocked_users',
+    'user:read:blocked_users',
+    'user:read:broadcast',
+    'user:read:emotes',
+    'user:read:email',
+    'user:read:follows',
+    'user:read:moderated_channels',
+    'user:read:subscriptions',
+    'user:read:chat',
+    'user:read:whispers',
+    'channel:read:goals',
+    'channel:read:hype_train',
+    'channel:manage:vips',
+    'moderator:manage:automod_settings',
+    'user:manage:chat_color',
+    'user:manage:whispers',
+    'user:write:chat',
+    'channel:moderate',
+    'whispers:read',
+    'whispers:edit',
   ];
 
   let broadcasterStatus;
@@ -235,8 +316,9 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
      that triggers the dino hatch minigame. Read only: it observes Bits usage,
      it cannot spend or grant Bits. Grabbed alongside the others so the
      broadcaster re-authorises once for every feature rather than per trigger. */
-  const broadcasterScopes = 'channel:manage:redemptions channel:read:hype_train '
-    + 'channel:read:subscriptions channel:read:ads bits:read';
+  /* One source of truth: request exactly the set the status check verifies, so
+     the two can never drift. */
+  const broadcasterScopes = REQUIRED_BROADCASTER_SCOPES.join(' ');
   const broadcasterAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
     `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}&state=broadcaster`;
