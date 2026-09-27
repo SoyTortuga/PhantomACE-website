@@ -312,6 +312,19 @@
     .energy-refill:hover { background: #333; border-color: #ffaa00; }
     .energy-refill:disabled { opacity: 0.3; cursor: default; }
 
+    /* Mobile: the three top-HUD pills (Decorate / clock / energy) all sit on one
+       row and collide at phone widths — the centered clock overlaps the Decorate
+       button. Keep the two corner controls on the top row and drop the clock to
+       its own row beneath them, lightly tightened, so nothing overlaps. */
+    @media (max-width: 600px) {
+      .park-decorate-btn { top: 12px; left: 12px; font-size: 14px; padding: 4px 8px; }
+      .park-energy-bar { top: 12px; right: 12px; padding: 3px 7px; gap: 5px; }
+      .energy-fill-ctr { width: 44px; }
+      .park-clock { top: 50px; }
+      .clock-name { font-size: 14px; }
+      .clock-sub { font-size: 13px; }
+    }
+
     /* Sell price in panel */
     .panel-sell-info { display: flex; align-items: center; gap: 6px; }
     .panel-sell-price { font-size: 14px;
