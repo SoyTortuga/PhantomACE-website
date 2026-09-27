@@ -974,6 +974,50 @@
       });
   }
 
+  /* PERIODIC IDLE SELF-RELOAD.
+     OBS holds this page open for an entire marathon, and CEF's GPU/compositor
+     memory creeps over many hours. Reloading the source flushes it — the alert
+     cursor lives in localStorage, so a reload never loses or replays an alert.
+
+     It only fires during a genuinely IDLE moment: no alert in flight, no
+     standing game panel up, no hatch/check-in, and the feed connected — so
+     nothing on stream is ever cut off. If the overlay is never idle (a game is
+     always up), it simply waits; better to grow a little than to cut a game.
+
+     Default every 3h; tune with ?reloadHours=N, disable with ?reloadHours=0. */
+  var RELOAD_AFTER_MS = 3 * 60 * 60 * 1000;
+  var reloadHoursParam = parseFloat(new URLSearchParams(location.search).get('reloadHours'));
+  if (Number.isFinite(reloadHoursParam)) RELOAD_AFTER_MS = reloadHoursParam * 3600000;
+  var RELOAD_CHECK_MS = 60000;
+  var loadedAt = Date.now();
+  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch'];
+
+  function overlayIsIdle() {
+    if (showing || queue.length) return false;
+    if (document.body.classList.contains('ov-alerting')) return false;
+    for (var i = 0; i < IDLE_PANEL_IDS.length; i++) {
+      var el = document.getElementById(IDLE_PANEL_IDS[i]);
+      if (el && !el.hidden) return false;
+    }
+    return true;
+  }
+
+  function selfReload() {
+    /* Cache-bust like the command reload does, and preserve key/muted/etc. */
+    var u = new URL(location.href);
+    u.searchParams.set('sr', String(Date.now()));
+    location.replace(u.toString());
+  }
+
+  if (RELOAD_AFTER_MS > 0) {
+    setInterval(function () {
+      if (Date.now() - loadedAt < RELOAD_AFTER_MS) return;
+      if (faults > 0) return;         // don't reload into a disconnected server
+      if (!overlayIsIdle()) return;   // wait for a quiet moment
+      selfReload();
+    }, RELOAD_CHECK_MS);
+  }
+
   poll();
   setInterval(poll, POLL_MS);
 })();
