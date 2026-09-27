@@ -195,7 +195,11 @@
       z-index: 12; display: flex; align-items: center; gap: 7px;
       background: rgba(0,0,0,0.75); padding: 4px 10px; border-radius: 4px;
       border: 1px solid var(--border-mid); white-space: nowrap;
+      transition: opacity 0.4s;
     }
+    /* The day/clock info shows briefly then fades out to declutter the park;
+       JS re-shows it for 5s on a phase/day/live change (see showParkClockBriefly). */
+    .park-clock.faded { opacity: 0; pointer-events: none; }
     .clock-phase { font-size: 17px;
  text-shadow: none; line-height: 1; }
     .clock-text { display: flex; flex-direction: column; gap: 1px; }
@@ -230,6 +234,11 @@
     }
     .park-decorate-btn:hover { border-color: #FF000060; color: #fff; }
     .park-decorate-btn.active { border-color: #FF0000; color: #FF0000; background: rgba(40,0,0,0.85); }
+    /* After 5s the button collapses to just the leaf icon; the label returns on
+       hover or while decorate mode is active. */
+    .park-decorate-btn.collapsed .decorate-label { display: none; }
+    .park-decorate-btn:hover .decorate-label,
+    .park-decorate-btn.active .decorate-label { display: inline; }
 
     .park-stage { display: flex; gap: 12px; align-items: flex-start; justify-content: center; }
     .yard-tray {
@@ -1197,7 +1206,7 @@
       <span class="energy-text" id="energyText">10/10</span>
       <button class="energy-refill" id="energyRefill" onclick="refillEnergy()">🔋 25</button>
     </div>
-    <button class="park-decorate-btn" id="decorateBtn" onclick="toggleDecorateMode()">🌿 Decorate</button>
+    <button class="park-decorate-btn" id="decorateBtn" onclick="toggleDecorateMode()"><span class="decorate-icon">🌿</span><span class="decorate-label">Decorate</span></button>
     <div class="park-clock" id="parkClock">
       <span class="clock-phase" id="clockPhase">🌙</span>
       <span class="clock-text">
@@ -6845,6 +6854,16 @@ function fmtUptime(min) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+var _clockHideTimer = null;
+var _lastClockKey = null;
+function showParkClockBriefly() {
+  const clock = document.getElementById('parkClock');
+  if (!clock) return;
+  clock.classList.remove('faded');
+  clearTimeout(_clockHideTimer);
+  _clockHideTimer = setTimeout(function () { clock.classList.add('faded'); }, 5000);
+}
+
 function renderStreamClock() {
   const phase = getStreamPhase();
   const clock = document.getElementById('parkClock');
@@ -6872,6 +6891,15 @@ function renderStreamClock() {
   if (tint) {
     tint.style.background = phase.tint;
     tint.classList.toggle('tinted', phase.id !== 'midday');
+  }
+
+  /* Show the day/clock info briefly, but only when something meaningful changes
+     (phase, day or live state) — not on the per-minute uptime refresh, which
+     would otherwise keep it on screen forever. */
+  const clockKey = phase.id + '|' + day + '|' + (isStreamLive ? 1 : 0);
+  if (clockKey !== _lastClockKey) {
+    _lastClockKey = clockKey;
+    showParkClockBriefly();
   }
 }
 
@@ -7039,6 +7067,13 @@ checkTwitchLive();
 syncCloudSave();
 setInterval(checkTwitchLive, 60000);
 setInterval(() => { gameTick(); save(); }, 2000);
+
+/* Show the Decorate label for 5s on load, then collapse to just the leaf icon
+   (it returns on hover or while decorate mode is active — see CSS). */
+setTimeout(function () {
+  const b = document.getElementById('decorateBtn');
+  if (b) b.classList.add('collapsed');
+}, 5000);
 </script>
 </body>
 </html>
