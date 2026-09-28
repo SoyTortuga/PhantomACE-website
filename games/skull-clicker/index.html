@@ -887,6 +887,7 @@
       <button class="tab-btn" onclick="switchTab('pet')">Pet</button>
       <button class="tab-btn" onclick="switchTab('grimoire')">Grimoire</button>
       <button class="tab-btn" onclick="switchTab('garden')">Garden</button>
+      <button class="tab-btn" onclick="switchTab('hallowtide')">Hallowtide</button>
       <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
       <button class="tab-btn" onclick="switchTab('ranks')">Ranks</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
@@ -900,6 +901,7 @@
     <div class="tab-content" id="tab-pet"></div>
     <div class="tab-content" id="tab-grimoire"></div>
     <div class="tab-content" id="tab-garden"></div>
+    <div class="tab-content" id="tab-hallowtide"></div>
     <div class="tab-content" id="tab-feats"></div>
     <div class="tab-content" id="tab-ranks"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
@@ -1371,6 +1373,81 @@
       }
     }
 
+    /* ═══════ HALLOWTIDE — THE SEASON OF THE DEAD (the Seasons mechanic analog) ═══════
+       Cookie Clicker has many clashing seasons; this game is already gothic, so we
+       keep ONE recurring seasonal EVENT re-themed from CC's Halloween season — no
+       Christmas/Valentine/Easter (that would break the palette identity).
+
+       Unlocked once with GRAVE BLOOMS (the reserved unlock currency: Grimoire 3,
+       Season 4, Garden 5). After unlock the player has a "Season switch": light
+       Hallowtide by paying a chunk of skulls (CC's season switch costs cookies);
+       it burns for a real-time duration stored as an END TIMESTAMP, so it expires
+       offline-correctly like garden growth / Essence regen. And, like CC auto-
+       enabling Halloween Oct 25–31, an AUTO-WINDOW (Oct 24 – Nov 2) lights it for
+       FREE — computed from the date, never stored.
+
+       While ACTIVE, popping a cursed skull can also drop WISPS (the soul-candy
+       analog). Wisps buy SEVEN permanent RELICS (CC's 7 spooky-cookie upgrades),
+       each a small bonus folded into the EXISTING multiplier stack via
+       seasonRelicCpsMult() / seasonRelicClickMult() — the same insertion pattern as
+       gardenCpsMult / gardenClickMult. Relics are PERMANENT once bought and, like
+       blooms/grimoire/garden, are NEVER cleared by resetRun (survive prestige AND
+       ascension). */
+    const SEASON_UNLOCK_BLOOMS = 4;                 /* one-time Grave Bloom cost (between Grimoire 3 and Garden 5) */
+    const SEASON_DURATION_MS = 30 * 60 * 1000;      /* a lit season burns 30 real minutes */
+    const SEASON_SWITCH_MIN = 1e6;                  /* floor on the switch cost so it is never trivially free */
+    const SEASON_SWITCH_CPS_SECONDS = 1800;         /* switch cost = ~30 min of current production (CC scales it with cookies) */
+    const WISP_DROP_CHANCE = 0.5;                   /* base chance a cursed-skull pickup also drops Wisps while active */
+    const WISP_DROP_MIN = 1, WISP_DROP_MAX = 3;     /* Wisps per drop (before the Witch's Knot bonus) */
+    const SEASON_RELIC_CPS_CAP = 0.40;              /* hard cap on combined relic production bonus — GAME-DEV-PRACTICES #8 */
+    const SEASON_RELIC_CLICK_CAP = 0.40;            /* hard cap on combined relic click bonus */
+    const WISP_ICON = '👻';                          /* soul-candy placeholder (flag pixel art to asset-manager) */
+
+    /* The seven relics — themed to our world. cpsBonus/clickBonus fold into the
+       mult stack; 'special' relics act elsewhere (bell → bloom ripen, knot → Wisp
+       drops). Modest values; the caps above are headroom, not a wall. */
+    const SEASON_RELICS = [
+      { id:'lantern', name:'Wisp Lantern',  emoji:'🏮', cost:5,  cpsBonus:0.06,                 desc:'A lantern lit with a captured wisp.',            effect:'+6% production' },
+      { id:'wreath',  name:'Grave Wreath',  emoji:'💐', cost:5,  clickBonus:0.06,               desc:'Woven from graveyard nightflowers.',             effect:'+6% click power' },
+      { id:'bell',    name:'Soul Bell',     emoji:'🔔', cost:6,  special:'ripen',               desc:'Its toll hurries the dead to bloom.',            effect:'Grave Blooms ripen 15% faster' },
+      { id:'charm',   name:'Bone Charm',    emoji:'🦴', cost:6,  cpsBonus:0.08,                 desc:'Carved from a forgotten saint’s knuckle.',  effect:'+8% production' },
+      { id:'veil',    name:'Ashen Veil',    emoji:'🌫️', cost:7,  clickBonus:0.08,               desc:'Ash of the faithful dead, worn as a shroud.',    effect:'+8% click power' },
+      { id:'knot',    name:'Witch’s Knot', emoji:'🪢', cost:7, special:'wisp',              desc:'A knot that snares drifting souls.',              effect:'+50% Wisp drops during Hallowtide' },
+      { id:'hallow',  name:'Hallow Skull',  emoji:'💀', cost:10, cpsBonus:0.10, clickBonus:0.10, desc:'The first skull, crowned for the season.',       effect:'+10% production and +10% click power' },
+    ];
+    const SEASON_RELIC_BY_ID = {}; for (const r of SEASON_RELICS) SEASON_RELIC_BY_ID[r.id] = r;
+    function seasonRelicById(id) { return SEASON_RELIC_BY_ID[id] || null; }
+
+    /* CC auto-enables Halloween Oct 25–31; we widen slightly to Oct 24 – Nov 2 so
+       the event brackets the day cleanly. Computed from the LOCAL date, never
+       stored — so it lights up on its own at the end of October. */
+    function seasonAutoWindow() {
+      const d = new Date(), m = d.getMonth(), day = d.getDate();
+      if (m === 9 && day >= 24) return true;   /* October 24–31 */
+      if (m === 10 && day <= 2) return true;   /* November 1–2 */
+      return false;
+    }
+    /* Active if the free auto-window is on OR a paid switch has not yet expired.
+       Purely timestamp-derived, so it is correct online and after an offline gap. */
+    function seasonActive() { return seasonAutoWindow() || seasonEndsAt > Date.now(); }
+    function seasonRemainingMs() { return seasonAutoWindow() ? Infinity : Math.max(0, seasonEndsAt - Date.now()); }
+    function seasonSwitchCost() { return Math.max(SEASON_SWITCH_MIN, Math.floor(getCPS() * SEASON_SWITCH_CPS_SECONDS)); }
+
+    /* Relic effect readers. Bonuses apply once bought and always (CC's spooky
+       upgrades are permanent), independent of whether the season is currently lit. */
+    function seasonRelicCpsMult() {
+      let b = 0;
+      for (const r of SEASON_RELICS) if (r.cpsBonus && seasonRelics.has(r.id)) b += r.cpsBonus;
+      return 1 + Math.min(SEASON_RELIC_CPS_CAP, b);
+    }
+    function seasonRelicClickMult() {
+      let b = 0;
+      for (const r of SEASON_RELICS) if (r.clickBonus && seasonRelics.has(r.id)) b += r.clickBonus;
+      return 1 + Math.min(SEASON_RELIC_CLICK_CAP, b);
+    }
+    function ripenSpeedMult() { return seasonRelics.has('bell') ? 1.15 : 1; }   /* Soul Bell: blooms ripen 15% faster */
+    function wispDropBonus()  { return seasonRelics.has('knot') ? 0.5 : 0; }    /* Witch's Knot: +50% Wisp drops */
+
     /* Feats — each earned one is a permanent +1% to all production (achMult).
        check() reads live state; it runs only for feats not yet earned. */
     function totalBuildings() { let n = 0; for (const b of BUILDINGS) n += owned[b.id]; return n; }
@@ -1409,6 +1486,8 @@
       { id:'grd1', name:'Grave Gardener',   desc:'Plant your first seed',   check:() => gardenPlanted >= 1 },
       { id:'grd2', name:'Necro-Botanist',   desc:'Discover 6 strains',      check:() => discoveredStrains.size >= 6 },
       { id:'grd3', name:'Bountiful Harvest',desc:'Harvest 100 plants',      check:() => gardenHarvests >= 100 },
+      { id:'hw1', name:'All Hallows',       desc:'Awaken Hallowtide',       check:() => seasonUnlocked },
+      { id:'hw2', name:'Season of the Dead',desc:'Gather all 7 Hallowtide relics', check:() => seasonRelics.size >= 7 },
     ];
 
     /* ═══════ STATE ═══════ */
@@ -1473,6 +1552,11 @@
     let gardenPlanted = 0;          /* lifetime seeds sown (feat) */
     let gardenHarvests = 0;         /* lifetime plants harvested (feat + stat) */
     let gardenSeed = null;          /* armed strain id for the next plant — transient, NEVER saved */
+    /* ── Hallowtide, the Season of the Dead (permanent meta layer — survives prestige AND ascension) ── */
+    let seasonUnlocked = false;     /* awakened once by spending Grave Blooms; never re-locked */
+    let seasonEndsAt = 0;           /* end timestamp of a lit season (ms); 0 = dormant. Expires offline-correctly. */
+    let wisps = 0;                  /* seasonal soul-candy currency, spent on relics */
+    let seasonRelics = new Set();   /* permanent relic upgrades owned */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1666,13 +1750,18 @@
     function ghoulMult() { return 1 + miasma() * ghoulFactorSum(); }
 
     /* ── Grave Bloom helpers ── */
+    /* Effective ripen interval, sped up by the Hallowtide Soul Bell relic. All
+       three readers below use this ONE helper, so the timestamp math stays
+       coherent (and offline-correct) whether or not the relic is owned. */
+    function bloomRipenMs() { return BLOOM_RIPEN_MS / ripenSpeedMult(); }
     /* Blooms fully ripened and waiting (offline-aware: derived purely from the
        timestamp, so a long absence accrues the whole gap). */
-    function readyBlooms() { return Math.max(0, Math.floor((Date.now() - bloomStart) / BLOOM_RIPEN_MS)); }
+    function readyBlooms() { return Math.max(0, Math.floor((Date.now() - bloomStart) / bloomRipenMs())); }
     /* Milliseconds until the next bloom ripens. */
     function nextBloomInMs() {
-      const rem = (Date.now() - bloomStart) % BLOOM_RIPEN_MS;
-      return Math.max(0, BLOOM_RIPEN_MS - rem);
+      const ripen = bloomRipenMs();
+      const rem = (Date.now() - bloomStart) % ripen;
+      return Math.max(0, ripen - rem);
     }
     /* Harvest everything ripe; advance the ripen clock so a partial bloom keeps
        growing. Returns how many were collected. */
@@ -1680,7 +1769,7 @@
       const n = readyBlooms();
       if (n <= 0) return 0;
       graveBlooms += n;
-      bloomStart += n * BLOOM_RIPEN_MS;
+      bloomStart += n * bloomRipenMs();
       playStinger('rare');
       save();
       renderBuildings();
@@ -1796,7 +1885,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult();
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult() * seasonRelicCpsMult();
     }
     /* Net production the player actually receives — gross minus wraith drain. */
     function getCPS() { return getGrossCPS() * wraithDrainMult(); }
@@ -1828,7 +1917,7 @@
        players who've played long enough to unlock it. */
     function getClickPower() {
       const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * metaClickMult();
-      return (base + (getCPS() * cpsClickPct / 100)) * buffClickMult() * gardenClickMult();
+      return (base + (getCPS() * cpsClickPct / 100)) * buffClickMult() * gardenClickMult() * seasonRelicClickMult();
     }
 
     /* Every skull earned flows through here so the run total and the
@@ -2162,6 +2251,14 @@
       if (pHas('luckyskull') && Math.random() < 0.12) {
         boneShards += 1;
         res.msg += ' · +1 🦴';
+      }
+      /* Hallowtide: while the season burns, a cursed skull can also shed Wisps.
+         The Witch's Knot relic boosts both the chance and the amount. */
+      if (seasonActive() && Math.random() < WISP_DROP_CHANCE * (1 + wispDropBonus())) {
+        const roll = WISP_DROP_MIN + Math.floor(Math.random() * (WISP_DROP_MAX - WISP_DROP_MIN + 1));
+        const amt = Math.max(1, Math.round(roll * (1 + wispDropBonus())));
+        wisps += amt;
+        res.msg += ' · +' + amt + ' ' + WISP_ICON + ' Wisp' + (amt === 1 ? '' : 's');
       }
       burstParticles(el);
       showBuffToast(res.msg, res.kind, res.icon);
@@ -2697,6 +2794,7 @@
       if (activeTab === 'pet') renderPet();
       if (activeTab === 'grimoire') renderGrimoire();
       if (activeTab === 'garden') renderGarden();
+      if (activeTab === 'hallowtide') renderSeason();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'feats') renderAchievements();
@@ -3027,6 +3125,7 @@
         <div class="stat-row"><span class="stat-label">Grimoire</span><span class="stat-val">${grimoireUnlocked ? 'Unearthed · ' + formatNum(Math.floor(Math.min(essence, essenceMax()))) + '/' + formatNum(essenceMax()) + ' Essence' : 'Buried'}</span></div>
         <div class="stat-row"><span class="stat-label">Spells cast / backfired</span><span class="stat-val">${formatNum(spellsCast)} / ${formatNum(spellsBackfired)}</span></div>
         <div class="stat-row"><span class="stat-label">Cursed Garden</span><span class="stat-val">${gardenUnlocked ? gardenSide() + '×' + gardenSide() + ' · ' + STRAINS.filter(s => s.plantable && discoveredStrains.has(s.id)).length + '/' + STRAINS.filter(s => s.plantable).length + ' strains · ' + formatNum(gardenHarvests) + ' harvested' : 'Untilled'}</span></div>
+        <div class="stat-row"><span class="stat-label">Hallowtide</span><span class="stat-val">${!seasonUnlocked ? 'Dormant' : (seasonActive() ? (seasonAutoWindow() ? 'Lit (auto)' : 'Lit') : 'Ready') + ' · ' + seasonRelics.size + '/' + SEASON_RELICS.length + ' relics · ' + formatNum(wisps) + ' ' + WISP_ICON}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -3044,7 +3143,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','reaping','pet','grimoire','garden','feats','ranks','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','reaping','pet','grimoire','garden','hallowtide','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         const on = tabs[i] === tab;
         btn.classList.toggle('active', on);
@@ -3196,9 +3295,10 @@
     /* Wipe the RUN (not the meta): skulls, buildings, base+synergy upgrades and
        run milestones. Lifetime, prestige, shards, feats, cosmetics and every
        Reaping stat are left alone by design. The Grave Bloom layer, the Bound
-       Reaper, the Grimoire and the Cursed Garden (grid, discovered strains,
-       harvest/plant counts) are permanent meta layers and are DELIBERATELY not
-       touched here, so they survive both prestige and ascension. */
+       Reaper, the Grimoire, the Cursed Garden (grid, discovered strains,
+       harvest/plant counts) and Hallowtide (unlock, lit-season end time, Wisps,
+       relics) are permanent meta layers and are DELIBERATELY not touched here, so
+       they survive both prestige and ascension. */
     function resetRun() {
       skulls = 0;
       totalSkulls = 0;
@@ -3812,6 +3912,132 @@
     setInterval(() => { if (activeTab === 'garden') renderGarden(); }, 1000);
     setInterval(gardenTick, GARDEN_TICK_MS);
 
+    /* ═══════ HALLOWTIDE — actions and render ═══════ */
+
+    function seasonToast(msg) { showBuffToast('🕯️ ' + msg, 'buff'); }
+
+    function unlockSeason() {
+      if (seasonUnlocked || graveBlooms < SEASON_UNLOCK_BLOOMS) return;
+      graveBlooms -= SEASON_UNLOCK_BLOOMS;
+      seasonUnlocked = true;
+      playStinger('legendary');
+      screenShake();
+      showBuffToast('🕯️ Hallowtide — the Season of the Dead awakens', 'reap');
+      checkAchievements();
+      save();
+      render();
+      renderBuildings();
+    }
+
+    /* Light the season with skulls (CC's season switch). No-op if the free auto-
+       window already has it burning. Stores an end timestamp so it survives reload
+       and expires on its own, online or off. */
+    function lightSeason() {
+      if (!seasonUnlocked) return;
+      if (seasonAutoWindow()) { seasonToast('Hallowtide already burns bright this time of year'); return; }
+      const cost = seasonSwitchCost();
+      if (skulls < cost) { seasonToast('Need ' + formatNum(cost) + ' skulls to light the season'); return; }
+      skulls -= cost;
+      seasonEndsAt = Date.now() + SEASON_DURATION_MS;
+      playStinger('epic');
+      showBuffToast('🕯️ Hallowtide is lit — Wisps drift from cursed skulls', 'frenzy');
+      save();
+      render();
+    }
+
+    /* Snuff a player-lit season early (the auto-window cannot be snuffed). */
+    function douseSeason() {
+      if (seasonAutoWindow()) { seasonToast('The season lights itself this time of year'); return; }
+      seasonEndsAt = 0;
+      save();
+      render();
+    }
+
+    function buyRelic(id) {
+      const r = seasonRelicById(id);
+      if (!r || seasonRelics.has(id)) return;
+      if (wisps < r.cost) { seasonToast('Need ' + r.cost + ' ' + WISP_ICON + ' Wisps'); return; }
+      wisps -= r.cost;
+      seasonRelics.add(id);
+      playStinger('rare');
+      checkAchievements();
+      save();
+      render();
+    }
+
+    function renderSeason() {
+      const el = document.getElementById('tab-hallowtide');
+      if (!el) return;
+
+      if (!seasonUnlocked) {
+        const can = graveBlooms >= SEASON_UNLOCK_BLOOMS;
+        el.innerHTML =
+          '<div class="prestige-panel">' +
+            '<div class="reaping-tier">Hallowtide</div>' +
+            '<div class="reaping-sub">The Season of the Dead</div>' +
+            '<div class="ascend-locked">Once a year the veil thins and the dead walk close. Awaken the ' +
+              'season with <b>' + SEASON_UNLOCK_BLOOMS + ' Grave Blooms</b> to light Hallowtide at will — ' +
+              'while it burns, cursed skulls shed <b>Wisps</b> you spend on seven permanent relics. ' +
+              'It also lights itself for free at the end of every October.<br><br>' +
+              'You have <b>' + formatNum(graveBlooms) + '</b> Grave Bloom' + (graveBlooms === 1 ? '' : 's') + '.</div>' +
+            '<button class="prestige-btn" ' + (can ? '' : 'disabled') + ' onclick="unlockSeason()">' +
+              (can ? 'Awaken Hallowtide — ' + SEASON_UNLOCK_BLOOMS + ' Blooms' : 'Need ' + SEASON_UNLOCK_BLOOMS + ' Grave Blooms') + '</button>' +
+          '</div>';
+        return;
+      }
+
+      const active = seasonActive();
+      const auto = seasonAutoWindow();
+      const owned = seasonRelics.size;
+
+      let statusLine, switchBtn;
+      if (auto) {
+        statusLine = 'Hallowtide burns <b style="color:#ff5555">FREE</b> — the veil is thin this time of year';
+        switchBtn = '';
+      } else if (active) {
+        statusLine = 'Hallowtide is <b style="color:#ff5555">LIT</b> · ' + formatTime(seasonRemainingMs()) + ' remaining';
+        switchBtn = '<button class="prestige-btn" onclick="douseSeason()">Snuff the season early</button>';
+      } else {
+        const cost = seasonSwitchCost();
+        const can = skulls >= cost;
+        statusLine = 'Hallowtide is <b>dormant</b> · auto-lights at the end of October';
+        switchBtn = '<button class="prestige-btn" ' + (can ? '' : 'disabled') + ' onclick="lightSeason()">' +
+          (can ? 'Light the season — ' + formatNum(cost) + ' skulls (30 min)' : 'Need ' + formatNum(cost) + ' skulls') + '</button>';
+      }
+
+      let head =
+        '<div class="prestige-panel">' +
+          '<div class="reaping-tier" style="font-size:28px">Hallowtide</div>' +
+          '<div class="reaping-sub">' + statusLine + '</div>' +
+          '<div class="shard-balance">' + WISP_ICON + ' <b>' + formatNum(wisps) + '</b> Wisp' + (wisps === 1 ? '' : 's') + '</div>' +
+          '<div class="ascend-summary">Relics gathered: <b>' + owned + ' / ' + SEASON_RELICS.length + '</b>' +
+            (active ? '<br>Cursed skulls are shedding Wisps — pop them while the season burns.' :
+                      '<br>Light the season (or wait for late October) to make cursed skulls shed Wisps.') + '</div>' +
+          switchBtn +
+        '</div>';
+
+      let shop = '<div class="section-label">Relics — spend Wisps</div>';
+      for (const r of SEASON_RELICS) {
+        const have = seasonRelics.has(r.id);
+        const can = !have && wisps >= r.cost;
+        const state = have ? 'bought' : can ? 'affordable' : 'locked';
+        const right = have ? 'Owned' : WISP_ICON + ' ' + r.cost;
+        shop += '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyRelic('" + r.id + "')" : '') + '">' +
+          '<div class="building-icon"><span style="font-size:24px">' + r.emoji + '</span></div>' +
+          '<div class="building-info">' +
+            '<div class="building-name">' + r.name + '</div>' +
+            '<div class="building-desc">' + r.desc + ' <span class="bldg-lv-tag">' + r.effect + '</span></div>' +
+          '</div>' +
+          '<div class="building-right"><div class="building-cost">' + right + '</div></div></div>';
+      }
+
+      el.innerHTML = head + shop;
+    }
+
+    /* Live-refresh the Hallowtide tab (the countdown) once a second while it is
+       open — cheap, and a no-op when the tab is closed or the season is dormant. */
+    setInterval(() => { if (activeTab === 'hallowtide') renderSeason(); }, 1000);
+
     /* The running total an endless meta node is currently giving, for its row. */
     function metaNowLabel(m) {
       const lv = metaLvl(m.id);
@@ -3940,7 +4166,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 9;
+    const SAVE_VERSION = 10;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -4009,6 +4235,14 @@
       if (!Array.isArray(d.discoveredStrains)) d.discoveredStrains = [];
       if (d.gardenPlanted === undefined) d.gardenPlanted = 0;
       if (d.gardenHarvests === undefined) d.gardenHarvests = 0;
+      /* v10 — Hallowtide, the Season of the Dead (permanent meta layer). A v7, v8
+         OR v9 save loads with the season un-awakened, dormant (no end time), zero
+         Wisps and no relics; the auto-window is computed from the date, never
+         stored. Nothing existing (incl. grimoire + garden fields) is touched. */
+      if (d.seasonUnlocked === undefined) d.seasonUnlocked = false;
+      if (d.seasonEndsAt === undefined) d.seasonEndsAt = 0;
+      if (d.wisps === undefined) d.wisps = 0;
+      if (!Array.isArray(d.seasonRelics)) d.seasonRelics = [];
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -4035,6 +4269,7 @@
         grimoireUnlocked, essence, spellsCast, spellsBackfired,
         gardenUnlocked, gardenTier, gardenPlots, gardenPlanted, gardenHarvests,
         discoveredStrains: [...discoveredStrains],
+        seasonUnlocked, seasonEndsAt, wisps, seasonRelics: [...seasonRelics],
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         boughtGhouls: [...boughtGhouls],
@@ -4129,6 +4364,12 @@
       gardenHarvests = d.gardenHarvests || 0;
       ensureGardenShape();
       if (gardenUnlocked) { discoveredStrains.add('bone'); discoveredStrains.add('moss'); }
+      /* Hallowtide. seasonEndsAt is an absolute timestamp, so a season lit before an
+         offline gap is correctly still-burning or expired on load with no catch-up. */
+      seasonUnlocked = !!d.seasonUnlocked;
+      seasonEndsAt = d.seasonEndsAt || 0;
+      wisps = d.wisps || 0;
+      seasonRelics = new Set(Array.isArray(d.seasonRelics) ? d.seasonRelics : []);
       boughtUpgrades = new Set(d.boughtUpgrades);
       boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
