@@ -1573,8 +1573,15 @@
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
     /* Season race: skulls gathered since this month's baseline. The baseline
        is lifetime at the season's start; when the month turns it moves up to
-       the current lifetime, so the new month counts from zero. */
+       the current lifetime, so the new month counts from zero. (LEADERBOARD
+       only — distinct from seasonEpoch below, which drives the monthly reset.) */
     let seasonBaseline = 0, seasonMonth = '';
+    /* MONTHLY SEASONAL RESET epoch (server-authoritative UTC month key, e.g.
+       '2026-10'). null = unknown/pre-migration → adopt the server epoch on load
+       WITHOUT wiping. When a loaded save's epoch is older than the server's, a
+       new season has begun: the run + prestige layer reset while the legacy
+       persists (see applySeasonReset). Never derived from the local clock. */
+    let seasonEpoch = null;
 
     /* Timed buff/debuff framework — a list of active effects, each
        { id, name, kind:'buff'|'debuff', cpsMult, clickMult, endsAt, icon, chipClass }.
@@ -3408,6 +3415,95 @@
       renderWorld();
     }
 
+    /* ═══════ MONTHLY SEASONAL RESET — "wipe the run, keep the legacy" ═══════
+       At each new server month every player's RUN and PRESTIGE layer reset to a
+       fresh start, while the permanent legacy endures. This is the ONE place the
+       WIPE-vs-KEEP partition lives, so it is trivial to adjust after review.
+
+       WIPE (reset to fresh):
+         · run: skulls, totalSkulls, click/CPS run multipliers, buildings owned,
+           base+synergy+ghoul upgrades, run milestones, run clock  (via resetRun)
+         · prestige layer: prestige tier, Bone Shards, prestige perks + perkLevels
+         · per-run event/minigame state: active buffs, the active Skullpocalypse
+           (unlock KEPT), Grimoire Essence pool, the live Garden grid contents
+           (tier/discoveries KEPT), any lit Hallowtide timer (seasonEndsAt)
+       KEEP (legacy — survives):
+         · lifetime skulls (all-time board), totalClicks + cursedPopped (lifetime
+           feat progress — see report FLAG), every earned feat/achievement
+         · the whole Ascension layer: ascensions, epitaphs, metaLevels, metaPerks,
+           highestPrestige
+         · Grave Blooms + bloom ripen clock + building LEVELS (bloom-bought)
+         · Bound Reaper: petLevel + selectedAuras
+         · Skullpocalypse UNLOCK + ever-flags; Grimoire UNLOCK + spellsCast/backfired
+         · Garden UNLOCK + tier + discoveredStrains + planted/harvest totals
+         · Hallowtide UNLOCK + seasonRelics + WISPS (hard-won like blooms — FLAG)
+         · leaderboard baseline (seasonBaseline/seasonMonth) + the seasonEpoch stamp
+       Reuses resetRun() and the same prestige-layer drop a reap performs, minus
+       the epitaph/ascension grant. */
+    function applySeasonReset() {
+      /* Drop the PRESTIGE layer (like a reap, WITHOUT granting epitaphs/ascension). */
+      prestige = 0;
+      boneShards = 0;
+      perks = new Set();
+      perkLevels = {};
+      /* Wipe the run. */
+      resetRun();
+      /* Wipe per-run event + minigame state; the permanent unlocks/legacy above
+         are deliberately left untouched. */
+      activeBuffs = [];
+      combo = 0;
+      apocActive = false; apocStart = 0; apocPacifiedUntil = 0;
+      clearWraiths(); clearTimeout(wraithTimer); wraithTimer = null;
+      essence = 0;                                   /* Grimoire consumable refills over time */
+      gardenPlots = [];                              /* clear the live grid; tier + discoveries KEPT */
+      ensureGardenShape();
+      seasonEndsAt = 0;                              /* any lit Hallowtide ends; relics + wisps KEPT */
+      /* Re-grant fresh-run starting buildings (perks were just cleared, so only
+         the permanent meta node m_start contributes now). */
+      applyStartBonuses();
+    }
+
+    /* Monotonic month index from a 'YYYY-MM' epoch; 0 (oldest) when missing. */
+    function epochNum(m) {
+      if (!m || typeof m !== 'string') return 0;
+      const [y, mo] = m.split('-').map(Number);
+      return (y && mo) ? y * 12 + (mo - 1) : 0;
+    }
+
+    /* The server's authoritative season epoch — never the local clock. Returns
+       null on any failure so the reset check can safely no-op (never wipe blind). */
+    async function fetchServerEpoch() {
+      try {
+        const res = await fetch('/api/skull-clicker?epoch=1', { cache: 'no-store' });
+        if (!res.ok) return null;
+        const d = await res.json();
+        return (d && typeof d.epoch === 'string') ? d.epoch : null;
+      } catch (e) { return null; }
+    }
+
+    /* Run once at load, AFTER the local+server saves have settled on a state.
+       Migration-safe: a missing stamp adopts the current epoch with no wipe. */
+    async function checkSeasonReset() {
+      const ep = await fetchServerEpoch();
+      if (!ep) return;                               /* cannot verify → never wipe */
+      if (seasonEpoch == null || seasonEpoch === '') {
+        seasonEpoch = ep;                            /* migration safety: adopt, do NOT wipe */
+        save();
+        return;
+      }
+      if (epochNum(seasonEpoch) < epochNum(ep)) {    /* a new season has begun */
+        submitScore();                               /* capture the outgoing month's final score once */
+        applySeasonReset();
+        seasonEpoch = ep;                            /* stamp BEFORE saving so the server merge accepts it */
+        save();
+        const banner = document.getElementById('offlineBanner');
+        if (banner) banner.innerHTML = '<div class="offline-banner" onclick="this.remove()">🕯️ A new season has begun. Your run and prestige start fresh — but your Grave Blooms, ascensions, minigame unlocks, relics and feats endure. Click to dismiss.</div>';
+        render();
+        renderWorld();
+      }
+      /* Equal epoch → normal play, nothing to do. */
+    }
+
     function buyMeta(id) {
       const m = metaDef(id);
       if (!m || metaMaxed(m)) return;
@@ -4177,7 +4273,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 10;
+    const SAVE_VERSION = 11;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -4256,6 +4352,11 @@
       if (!Array.isArray(d.seasonRelics)) d.seasonRelics = [];
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
+      /* v11 — the monthly seasonal reset epoch. CRITICAL: default to null (not the
+         current month) so an existing save is NOT wiped on the deploy itself — on
+         first load a null stamp adopts the current server epoch WITHOUT resetting
+         (see checkSeasonReset). Distinct from seasonMonth above (leaderboard). */
+      if (d.seasonEpoch === undefined) d.seasonEpoch = null;
       if (d.startTime === undefined) d.startTime = Date.now();
       if (d.prestige === undefined) d.prestige = 0;
       /* Pre-prestige saves had no lifetime field; their run total IS their
@@ -4272,7 +4373,7 @@
         skulls, totalSkulls, lifetimeSkulls, prestige,
         totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
-        boneShards, cursedPopped, seasonBaseline, seasonMonth,
+        boneShards, cursedPopped, seasonBaseline, seasonMonth, seasonEpoch,
         ascensions, epitaphs, metaLevels, highestPrestige,
         graveBlooms, bloomStart, buildingLevels,
         petLevel, selectedAuras: [...selectedAuras],
@@ -4343,6 +4444,7 @@
       cursedPopped = d.cursedPopped || 0;
       seasonBaseline = d.seasonBaseline || 0;
       seasonMonth = d.seasonMonth || '';
+      seasonEpoch = d.seasonEpoch || null;   /* '' / undefined → null → adopt on load, no wipe */
       ascensions = d.ascensions || 0;
       epitaphs = d.epitaphs || 0;
       metaLevels = (d.metaLevels && typeof d.metaLevels === 'object') ? d.metaLevels : {};
@@ -4435,9 +4537,17 @@
        lifetime, higher tier) must beat the old save so the sync never
        undoes it, and normal progress (more lifetime) still adopts forward. */
     function serverOutranks(server) {
+      /* SEASON EPOCH FIRST — kept identical to the server's outranks(). A save that
+         has taken a newer monthly seasonal reset ALWAYS wins, so the wipe (which
+         lowers prestige/run) is never reverted by a stale higher-prestige save; a
+         missing stamp counts as oldest. Within the same epoch the original
+         protection stands, so a stale/cleared device still cannot clobber a better
+         save. */
+      const se = epochNum(server.seasonEpoch), le = epochNum(seasonEpoch);
+      if (se !== le) return se > le;
       /* Ascension outranks prestige: a freshly-reaped save (prestige reset to 0,
          same lifetime) must beat a stale non-ascended save, or the sync would
-         silently undo the reap. Kept identical to the server's outranks(). */
+         silently undo the reap. */
       const sa = Number(server.ascensions || 0), la = ascensions || 0;
       if (sa !== la) return sa > la;
       const sp = Number(server.prestige || 0), lp = prestige || 0;
@@ -4751,7 +4861,10 @@
     try { soundOn = localStorage.getItem('sc_sound') === '1'; } catch(e) {}
 
     load();
-    syncFromServer();
+    /* Settle local vs server save FIRST, then evaluate the season epoch against the
+       adopted state — so the reset acts on the final save and its stamped wipe is
+       what gets pushed back up (the server merge then accepts the newer epoch). */
+    (async () => { try { await syncFromServer(); } catch (e) {} await checkSeasonReset(); })();
     loadCosmetics();
     lastTick = Date.now();
     checkAchievements();

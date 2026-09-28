@@ -127,13 +127,27 @@ function num(v) { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n :
 function lifetimeOf(state) { return Math.max(num(state && state.lifetimeSkulls), num(state && state.totalSkulls)); }
 function prestigeOf(state) { return Math.floor(num(state && state.prestige)); }
 function ascensionOf(state) { return Math.floor(num(state && state.ascensions)); }
+/* The seasonal-reset epoch as a monotonic month index (0 when missing, so a
+   pre-migration save always ranks OLDEST). A newer epoch means the save has
+   already taken this month's seasonal wipe. */
+function epochOf(state) {
+  const m = state && state.seasonEpoch;
+  if (!m || typeof m !== 'string') return 0;
+  const [y, mo] = m.split('-').map(Number);
+  return (y && mo) ? y * 12 + (mo - 1) : 0;
+}
 
 /** True when `a` should win the merge over `b`.
- *  Ascension outranks prestige, which outranks lifetime. A reap resets prestige
- *  to 0 while raising ascension, so ranking ascension FIRST is what stops the
- *  merge from silently reverting a freshly-ascended save to the old one. Kept
- *  identical to the client's serverOutranks(). */
+ *  SEASON EPOCH FIRST: a save that has taken a newer monthly seasonal reset ALWAYS
+ *  wins, bypassing the ascension/prestige/lifetime comparison — otherwise a wipe
+ *  (which lowers prestige/run) would look "worse" and the stale higher-prestige
+ *  save would silently revert it on the next sync. Within the SAME epoch the
+ *  original protection is unchanged: ascension outranks prestige outranks lifetime,
+ *  so a stale or cleared device still cannot clobber a better save. Kept identical
+ *  to the client's serverOutranks(). */
 function outranks(a, b) {
+  const ea = epochOf(a), eb = epochOf(b);
+  if (ea !== eb) return ea > eb;
   const aa = ascensionOf(a), ab = ascensionOf(b);
   if (aa !== ab) return aa > ab;
   const pa = prestigeOf(a), pb = prestigeOf(b);
@@ -144,10 +158,18 @@ function outranks(a, b) {
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
+  /* `?epoch=1` — the current server-authoritative season epoch (UTC month key).
+     The game uses THIS, never its own local clock, to decide the monthly seasonal
+     reset — so a wrong client clock/timezone can neither miss a reset nor trigger
+     a spurious self-wipe. */
+  if (url.searchParams.get('epoch')) {
+    return json({ epoch: monthKeyUTC(new Date()) });
+  }
   /* `?event=1` — the live site-wide event the game polls for; kept separate
-     from the leaderboard so the leaderboard's array shape never changes. */
+     from the leaderboard so the leaderboard's array shape never changes. The
+     current epoch rides along so a long-open tab can also see the month turn. */
   if (url.searchParams.get('event')) {
-    return json({ event: await currentEvent(env) });
+    return json({ event: await currentEvent(env), epoch: monthKeyUTC(new Date()) });
   }
   /* `?board=season` — this month's race (rolled over on read so the display
      is always current); `?board=alltime` (or no param) — the persistent
