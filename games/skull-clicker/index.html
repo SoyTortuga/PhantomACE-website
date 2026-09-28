@@ -266,6 +266,19 @@
     }
     .auto-toggle:hover { border-color: var(--red); }
     .auto-toggle.on { border-color: var(--red); color: var(--red); background: rgba(255, 0, 0, 0.06); }
+    /* Collapsible "how it works" dropdowns — native <details>, collapsed by default.
+       Full box border only, token-driven; native disclosure triangle replaced by a
+       plain ❔ glyph in the summary. No box-shadow / side accent / backdrop-filter. */
+    .help-box { margin: 0 0 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--gray-lo); }
+    .help-sum {
+      cursor: pointer; padding: 7px 10px; font-size: 13px; font-weight: 800;
+      color: var(--text-dim); list-style: none; user-select: none;
+    }
+    .help-sum::-webkit-details-marker { display: none; }
+    .help-sum:hover { color: var(--red); }
+    .help-box[open] > .help-sum { color: var(--red); border-bottom: 1px solid var(--border); }
+    .help-body { padding: 8px 10px; font-size: 13px; line-height: 1.5; color: var(--text-pri); }
+    .help-body b { color: #ff5555; }
     .ascend-summary { font-size: 15px; text-shadow: none; color: var(--text-dim); margin: 6px 0 2px; line-height: 1.5; }
     .ascend-summary b { color: #ff5555; }
     .ascend-locked { text-align: center; color: var(--text-dim); padding: 30px 18px; font-size: 16px; line-height: 1.6; }
@@ -2867,13 +2880,13 @@
       const entries = ranksData[ranksBoard];
       const me = (playerName || '').toLowerCase();
 
-      let head = '<div class="ranks-toggle">' +
+      let head = helpBox(HELP.ranks) +
+        '<div class="ranks-toggle">' +
         '<button class="ranks-tab ' + (ranksBoard === 'season' ? 'active' : '') + '" onclick="setRanksBoard(\'season\')">This Season</button>' +
         '<button class="ranks-tab ' + (ranksBoard === 'alltime' ? 'active' : '') + '" onclick="setRanksBoard(\'alltime\')">All-Time</button></div>';
 
       if (ranksBoard === 'season') {
-        head += '<div class="ranks-note">Skulls gathered this month · <b>' + daysLeftInSeason() + ' days</b> left · ' +
-          '🥇 mythic 🥈 rare 🥉 uncommon codes at season\'s end</div>' +
+        head += '<div class="ranks-note">Skulls gathered this month · <b>' + daysLeftInSeason() + ' days</b> left · resets each month, bragging rights only</div>' +
           '<div class="ranks-you">Your season: <b>' + formatNum(seasonScore()) + '</b></div>';
       } else {
         head += '<div class="ranks-note">Lifetime skulls gathered — never resets.</div>' +
@@ -2989,6 +3002,29 @@
       return 'Next bloom ripens in ' + formatTime(nextBloomInMs());
     }
 
+    /* ═══════ "HOW IT WORKS" DROPDOWNS ═══════
+       Presentational only — a native <details> per major system, collapsed by
+       default so veterans see no clutter. Content is authored to match the real
+       mechanics/numbers in this file. */
+    function helpBox(body) {
+      return '<details class="help-box"><summary class="help-sum">❔ How it works</summary>' +
+        '<div class="help-body">' + body + '</div></details>';
+    }
+    const HELP = {
+      buildings: 'Buildings are your undead workforce — each one you own adds to your skulls-per-second, forever. Use the <b>×1 / ×10 / ×100 / Max</b> toggle to buy in bulk, and once you own a building its <b>Lv</b> button spends Grave Blooms to boost its output <b>+2%</b> per level. Tip: the newest building you can afford is usually your biggest jump in production.',
+      blooms: 'Grave Blooms ripen on their own in real time — one every <b>3 hours</b>, even while you are away. Harvest them from the panel above, then spend them to level buildings or to unlock the <b>Grimoire (3)</b>, <b>Hallowtide (4)</b> and the <b>Cursed Garden (5)</b>. Tip: blooms are permanent — they survive prestige, ascension and the monthly reset.',
+      upgrades: 'Upgrades are one-time buys that permanently sharpen your run — some boost click power, some multiply whole buildings (synergies). They reset when you prestige, so grab the cheap ones early each run. Tip: <b>synergy</b> upgrades unlock once you own enough of a building and are often the best value on the board.',
+      ghouls: 'Miasma is the dread that rises from every <b>feat</b> you earn — the more feats, the thicker it gets (shown as a %). Ghouls are bought with skulls and turn that Miasma into raw production: at full Miasma each ghoul pays its listed bonus. Tip: Ghouls reset on prestige like other upgrades, but Miasma is tied to feats, so it only ever grows.',
+      prestige: 'Prestige resets your current run — skulls, buildings and upgrades — for a permanent <b>+0.1×</b> production multiplier and <b>Bone Shards</b> to spend in the shard shop. Do it once the bar is full and the next run will blow past this one. Tip: your run + prestige also reset at the start of each month, but ascension, Grave Blooms, the minigames and feats are always kept.',
+      reaping: 'The Reaping is the layer above prestige: reap at <b>Prestige ' + ASCEND_MIN_PRESTIGE + '+</b> to convert your whole prestige climb into <b>Epitaphs</b>, then spend them on a permanent meta-tree — endless production/click climbs plus one-time <b>Automation</b> unlocks (auto-click, auto-buy, auto-catch, auto-prestige). It is all kept forever. Tip: each automation has its own <b>ON/OFF</b> switch, so you can take back manual control any time.',
+      apoc: 'Unlocks at <b>1 trillion</b> lifetime skulls or <b>Prestige ' + APOC_UNLOCK_PRESTIGE + '</b>. Toggle it on for a growing production bonus, but it escalates through <b>Stirring → Rising → Full Undeath</b>: wraith-leeches latch onto the skull and drain CPS (pop them for a payout), and cursed skulls can turn wrathful — bigger buffs, but a chance to curse you. Tip: spend Bone Shards to <b>pacify</b> the uprising for a few minutes of calm.',
+      pet: 'The Bound Reaper is your companion — feed it buildings to raise its level (it demands a higher tier each time). At <b>level ' + PET_AURA_SLOT_L1 + '</b> it opens an aura slot, a second at <b>level ' + PET_AURA_SLOT_L2 + '</b>; slotted auras are always-on bonuses like extra production or more cursed skulls. Tip: the pet level and auras are permanent — feeding spends this run\'s buildings, but the level stays through prestige and ascension.',
+      grimoire: 'The Grimoire runs on <b>Necrotic Essence</b> — a pool that refills on its own over time (offline too), sized by your lifetime skulls. Spend Essence to cast spells: instant windfalls, production/click buffs, cheaper buildings. But every cast nudges up the <b>backfire</b> chance, and a backfire hits you with a curse instead. Tip: Essence caps out, so cast before it sits wasted at full.',
+      garden: 'Plant discovered strains in the grave-plot grid; they grow in real time (even offline) from seed to mature, when you harvest them for their reward. Two mature plants beside an empty plot can <b>cross-breed</b> into a new, rarer strain — that is how you discover them. Watch for <b>blight</b>: it spreads and drags production down until you cull it. Tip: unlock and expand the garden with Grave Blooms.',
+      hallowtide: 'Once a year the veil thins — light Hallowtide with skulls for <b>30 minutes</b>, or let it kindle itself for free in <b>late October</b>. While it burns, cursed skulls also drop <b>Wisps</b>, which you spend on seven permanent <b>relics</b> (small forever-bonuses). Tip: relics and Wisps are kept for good, so every Hallowtide builds on the last.',
+      ranks: 'Two boards: <b>This Season</b> ranks the skulls you gather this month, and <b>All-Time</b> ranks your lifetime total (which never resets). Your run and prestige wipe at the start of each month — <b>“wipe the run, keep the legacy”</b> — while your Grave Blooms, ascension, minigames, relics and feats always carry over.',
+    };
+
     function renderBuildings() {
       const el = document.getElementById('tab-buildings');
       const ready = readyBlooms();
@@ -3002,7 +3038,7 @@
       </div>`;
 
       const amounts = [1, 10, 100, 'max'];
-      let html = bloomPanel + '<div class="buy-toggle">' + amounts.map(a =>
+      let html = helpBox(HELP.buildings) + bloomPanel + helpBox(HELP.blooms) + '<div class="buy-toggle">' + amounts.map(a =>
         `<button class="buy-amt ${buyAmount === a ? 'active' : ''}" onclick="setBuyAmount(${a === 'max' ? "'max'" : a})">${a === 'max' ? 'Max' : '×' + a}</button>`
       ).join('') + '</div>';
       let rows = '';
@@ -3058,7 +3094,7 @@
 
     function renderUpgrades() {
       const el = document.getElementById('tab-upgrades');
-      let html = '';
+      let html = helpBox(HELP.upgrades);
 
       /* Synergy first when any are in reach — they are the interesting, deep
          buys, so surface them rather than burying them under the flat list. */
@@ -3079,6 +3115,7 @@
       if (ghoulViz.length) {
         const mp = Math.round(miasma() * 100);
         const gm = Math.round((ghoulMult() - 1) * 100);
+        html += helpBox(HELP.ghouls);
         html += '<div class="section-label">Ghouls — they feed on the Miasma</div>';
         html += '<div class="feats-head">Miasma <b>' + mp + '%</b> · your ghouls give <b>+' + gm + '%</b> production</div>';
         for (const g of ghoulViz) html += ghoulRow(g);
@@ -3594,6 +3631,7 @@
       for (const p of PERKS) if (p.type === 'tiered') shop += perkRow(p);
 
       document.getElementById('tab-prestige').innerHTML =
+        helpBox(HELP.prestige) +
         '<div class="prestige-panel">' +
           '<div class="prestige-tier">Prestige ' + prestige + '</div>' +
           '<div class="prestige-mult">' + mult.toFixed(1) + 'x to all skull gathering</div>' +
@@ -3635,6 +3673,7 @@
       }
 
       el.innerHTML =
+        helpBox(HELP.pet) +
         '<div class="pet-panel">' +
           '<div class="pet-sprite"></div>' +
           '<div class="pet-name">' + PET_NAME + '</div>' +
@@ -3657,6 +3696,7 @@
       if (!grimoireUnlocked) {
         const can = graveBlooms >= GRIMOIRE_UNLOCK_BLOOMS;
         el.innerHTML =
+          helpBox(HELP.grimoire) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">The Grimoire</div>' +
             '<div class="reaping-sub">Of the Dead</div>' +
@@ -3690,6 +3730,7 @@
       }
 
       el.innerHTML =
+        helpBox(HELP.grimoire) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">The Grimoire</div>' +
           '<div class="reaping-sub">Necrotic Essence — spend it to cast, it regenerates in time</div>' +
@@ -3928,6 +3969,7 @@
       if (!gardenUnlocked) {
         const can = graveBlooms >= GARDEN_UNLOCK_BLOOMS;
         el.innerHTML =
+          helpBox(HELP.garden) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">The Cursed</div>' +
             '<div class="reaping-sub">Garden</div>' +
@@ -3947,6 +3989,7 @@
       const totalPlantable = STRAINS.filter(s => s.plantable).length;
 
       let head =
+        helpBox(HELP.garden) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">The Cursed Garden</div>' +
           '<div class="reaping-sub">Plants grow in real time — mature them for a bonus, harvest, and cross-breed</div>' +
@@ -4098,6 +4141,7 @@
       if (!seasonUnlocked) {
         const can = graveBlooms >= SEASON_UNLOCK_BLOOMS;
         el.innerHTML =
+          helpBox(HELP.hallowtide) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">Hallowtide</div>' +
             '<div class="reaping-sub">The Season of the Dead</div>' +
@@ -4132,6 +4176,7 @@
       }
 
       let head =
+        helpBox(HELP.hallowtide) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">Hallowtide</div>' +
           '<div class="reaping-sub">' + statusLine + '</div>' +
@@ -4186,6 +4231,7 @@
          someone has ascended once, the tab stays available forever. */
       if (ascensions === 0 && !ready) {
         el.innerHTML =
+          helpBox(HELP.reaping) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">The Reaping</div>' +
             '<div class="reaping-sub">A power beyond prestige.</div>' +
@@ -4239,6 +4285,7 @@
         'Highest prestige reached: <b>' + highestPrestige + '</b></div>';
 
       el.innerHTML =
+        helpBox(HELP.reaping) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier">Ascension ' + ascensions + '</div>' +
           '<div class="reaping-sub">The Reaping — a permanent power above prestige</div>' +
@@ -4294,6 +4341,7 @@
       }
 
       return '<div class="section-label">The Skullpocalypse</div>' +
+        helpBox(HELP.apoc) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:26px">' +
             (apocActive && !calm ? '☠️ ' + APOC_PHASE_NAMES[phase] : 'Dormant') + '</div>' +
