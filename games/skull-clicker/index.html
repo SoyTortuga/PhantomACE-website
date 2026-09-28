@@ -258,6 +258,14 @@
     /* The Reaping (ascension) — reuses prestige-panel / upgrade-row / shard-balance.
        Meta levels are red (never purple) to stay on the black/grey/red/white palette. */
     .meta-lvl { font-size: 14px; text-shadow: none; font-weight: 800; color: #ff5555; margin-left: 4px; }
+    /* Per-automation ON/OFF switch (Reaping tab). Full border only, token-driven —
+       no box-shadow / side-border accent / backdrop-filter. */
+    .auto-toggle {
+      padding: 5px 14px; border-radius: 4px; font-family: inherit; font-size: 14px; font-weight: 800;
+      cursor: pointer; background: var(--gray-lo); border: 1px solid var(--border-mid); color: var(--text-dim);
+    }
+    .auto-toggle:hover { border-color: var(--red); }
+    .auto-toggle.on { border-color: var(--red); color: var(--red); background: rgba(255, 0, 0, 0.06); }
     .ascend-summary { font-size: 15px; text-shadow: none; color: var(--text-dim); margin: 6px 0 2px; line-height: 1.5; }
     .ascend-summary b { color: #ff5555; }
     .ascend-locked { text-align: center; color: var(--text-dim); padding: 30px 18px; font-size: 16px; line-height: 1.6; }
@@ -1197,6 +1205,15 @@
 
     /* ── Meta readers ── */
     function metaHas(id) { return metaPerks.has(id); }
+    /* An automation runs only if it is UNLOCKED and not PAUSED. Every tick gates on
+       this, so toggling off makes the next tick a no-op and toggling on resumes it. */
+    function autoEnabled(id) { return metaPerks.has(id) && !autoOff.has(id); }
+    function toggleAuto(id) {
+      if (!metaPerks.has(id)) return;   /* only unlocked automations can be toggled */
+      if (autoOff.has(id)) autoOff.delete(id); else autoOff.add(id);
+      save();
+      if (activeTab === 'reaping') renderReaping();
+    }
     function metaLvl(id) { return metaLevels[id] || 0; }
     function metaDef(id) { return META.find(m => m.id === id); }
     function metaCost(m) {
@@ -1533,6 +1550,7 @@
     let epitaphs = 0;               /* meta currency, spent in the Reaping tree */
     let metaLevels = {};            /* endless meta node -> level */
     let metaPerks = new Set();      /* one-time meta unlocks (automation) owned */
+    let autoOff = new Set();        /* automation ids the player has PAUSED. Default empty = every unlocked automation ON, so existing players see no change. A preference tied to the (legacy) automation unlocks — KEPT through the seasonal reset. */
     let highestPrestige = 0;        /* best prestige tier ever reached (history kept through a reap) */
     /* ── Grave Bloom (permanent meta layer — survives prestige AND ascension) ── */
     let graveBlooms = 0;            /* harvested blooms available to spend */
@@ -2238,7 +2256,7 @@
 
       /* Ever-Watchful (meta): catch the skull automatically a beat after it
          appears, so it is never missed. */
-      if (metaHas('auto_cursed')) {
+      if (autoEnabled('auto_cursed')) {
         setTimeout(() => {
           if (done) return;
           done = true;
@@ -3222,7 +3240,7 @@
        for the auto-click feel; a slower loop for the bookkeeping actions so
        buying/prestiging never floods the render or the network. */
     function autoClickTick() {
-      if (!metaHas('auto_click')) return;
+      if (!autoEnabled('auto_click')) return;
       let power = getClickPower();
       if (Math.random() < critChance()) power *= critMult();
       earn(power);
@@ -3247,11 +3265,11 @@
 
     function autoManageTick() {
       let touched = false;
-      if (metaHas('auto_buy')) {
+      if (autoEnabled('auto_buy')) {
         /* A few per second so it feels alive without a per-frame loop. */
         for (let i = 0; i < 5 && buyCheapestAffordable(); i++) touched = true;
       }
-      if (metaHas('auto_prestige') && canPrestige()) { doPrestige(true); touched = true; }
+      if (autoEnabled('auto_prestige') && canPrestige()) { doPrestige(true); touched = true; }
       if (touched) {
         checkAchievements();
         if (activeTab === 'buildings') renderBuildings();
@@ -3431,7 +3449,8 @@
          · lifetime skulls (all-time board), totalClicks + cursedPopped (lifetime
            feat progress — see report FLAG), every earned feat/achievement
          · the whole Ascension layer: ascensions, epitaphs, metaLevels, metaPerks,
-           highestPrestige
+           highestPrestige, and the per-automation ON/OFF toggles (autoOff) — a
+           preference tied to those (kept) automation unlocks
          · Grave Blooms + bloom ripen clock + building LEVELS (bloom-bought)
          · Bound Reaper: petLevel + selectedAuras
          · Skullpocalypse UNLOCK + ever-flags; Grimoire UNLOCK + spellsCast/backfired
@@ -4185,16 +4204,27 @@
         const locked = m.req && !metaHas(m.req);
         const cost = metaCost(m);
         const can = !maxed && !locked && epitaphs >= cost;
-        const state = maxed ? 'bought' : can ? 'affordable' : locked ? 'locked' : '';
+        /* An UNLOCKED automation (one-time node the player owns) gets a live ON/OFF
+           toggle instead of a static "Owned" — full opacity so the switch reads
+           clearly, no buy click on the row. Locked ones keep the normal unlock UI. */
+        const unlockedAuto = !endless && metaHas(m.id);
+        const state = unlockedAuto ? '' : maxed ? 'bought' : can ? 'affordable' : locked ? 'locked' : '';
         const lvlTag = endless
           ? ' <span class="meta-lvl">Lv ' + metaLvl(m.id) + (m.max ? '/' + m.max : '') + '</span>'
-          : (metaHas(m.id) ? ' <span class="meta-lvl">on</span>' : '');
-        const right = maxed ? (endless ? 'Maxed' : 'Owned') : locked ? 'Locked' : EPITAPH_IMG + ' ' + formatNum(cost);
+          : '';   /* once-type status is shown by the toggle, not a tag */
+        let right;
+        if (unlockedAuto) {
+          const on = autoEnabled(m.id);
+          right = '<button class="auto-toggle ' + (on ? 'on' : '') + '" onclick="event.stopPropagation();toggleAuto(\'' + m.id + '\')">' + (on ? 'ON' : 'OFF') + '</button>';
+        } else {
+          const label = maxed ? (endless ? 'Maxed' : 'Owned') : locked ? 'Locked' : EPITAPH_IMG + ' ' + formatNum(cost);
+          right = '<div class="building-cost">' + label + '</div>';
+        }
         const now = endless && metaLvl(m.id) > 0 ? ' <span class="perk-now">(now ' + metaNowLabel(m) + ')</span>' : '';
         return '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyMeta('" + m.id + "')" : '') + '">' +
           '<div class="building-info"><div class="building-name">' + m.name + lvlTag + '</div>' +
           '<div class="building-desc">' + m.desc + now + '</div></div>' +
-          '<div class="building-right"><div class="building-cost">' + right + '</div></div></div>';
+          '<div class="building-right">' + right + '</div></div>';
       }
 
       let tree = '<div class="section-label">The Reaping — Automation</div>';
@@ -4273,7 +4303,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 11;
+    const SAVE_VERSION = 12;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -4357,6 +4387,10 @@
          first load a null stamp adopts the current server epoch WITHOUT resetting
          (see checkSeasonReset). Distinct from seasonMonth above (leaderboard). */
       if (d.seasonEpoch === undefined) d.seasonEpoch = null;
+      /* v12 — per-automation ON/OFF toggles. An empty list means every unlocked
+         automation is ON, so any older save (v7–v11) loads with its automations
+         running exactly as before — no behavior change, never throws. */
+      if (!Array.isArray(d.autoOff)) d.autoOff = [];
       if (d.startTime === undefined) d.startTime = Date.now();
       if (d.prestige === undefined) d.prestige = 0;
       /* Pre-prestige saves had no lifetime field; their run total IS their
@@ -4374,7 +4408,7 @@
         totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
         boneShards, cursedPopped, seasonBaseline, seasonMonth, seasonEpoch,
-        ascensions, epitaphs, metaLevels, highestPrestige,
+        ascensions, epitaphs, metaLevels, highestPrestige, autoOff: [...autoOff],
         graveBlooms, bloomStart, buildingLevels,
         petLevel, selectedAuras: [...selectedAuras],
         apocUnlocked, apocActive, apocStart, apocPacifiedUntil, apocEverActive, apocEverFull,
@@ -4449,6 +4483,7 @@
       epitaphs = d.epitaphs || 0;
       metaLevels = (d.metaLevels && typeof d.metaLevels === 'object') ? d.metaLevels : {};
       metaPerks = new Set(d.metaPerks || []);
+      autoOff = new Set(Array.isArray(d.autoOff) ? d.autoOff : []);
       highestPrestige = d.highestPrestige || 0;
       graveBlooms = d.graveBlooms || 0;
       bloomStart = d.bloomStart || Date.now();
