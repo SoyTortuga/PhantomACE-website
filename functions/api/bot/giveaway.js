@@ -19,30 +19,50 @@ const WINNER_KEY = 'giveaway_winner';
 const CODE_MAX_LENGTH = 60;
 const STATE_TTL = 86400;
 
-/* The entry reward per rarity. Resolved BY TITLE and then cached, rather
-   than created and recorded by the admin page: these two were made by
-   server/scripts/giveaway-rewards.js, which needs nobody signed in, so
-   there is no step that would have written an id here. Looking the title up
-   once and caching the answer means the panel works the first time it is
-   opened, on whichever machine. */
+/* The DISPLAY spec per rarity — the base title, a label for the panel, and
+   the colour that tells the rarities apart in a viewer's reward list. It no
+   longer holds a reward id: each rarity is now a POOL of slots, so the id is
+   resolved per (rarity, slot) instead of once per rarity (see slotIdKey). */
 export const RARITY_REWARDS = {
-  rare:   { title: 'Enter Rare Giveaway',   idKey: 'giveaway_reward_rare_id',   colour: '#c7a550' },
-  mythic: { title: 'Enter Mythic Giveaway', idKey: 'giveaway_reward_mythic_id', colour: '#eb6726' },
+  rare:   { title: 'Enter Rare Giveaway',   label: 'Rare',   colour: '#c7a550' },
+  mythic: { title: 'Enter Mythic Giveaway', label: 'Mythic', colour: '#eb6726' },
 };
 
 export const RARITIES = Object.keys(RARITY_REWARDS);
 
+/* SLOT POOL. Twitch's only per-user limiter is max_per_user_per_stream, which
+   is per-reward and resets each stream — so a single Rare reward capped at one
+   entry per stream could host only ONE Rare draw per stream. Each rarity is
+   instead a pool of identical rewards, opened one at a time: draw two uses
+   slot 2, draw three uses slot 3, and the cap holds each viewer to exactly one
+   entry per slot. Slot 1 keeps the bare title and the ORIGINAL id key so
+   already-cached ids and live subscriptions keep working. */
+const SLOTS_PER_RARITY = 3;
+const ROMAN = ['', '', 'II', 'III'];
+const SLOT_CURSORS_KEY = 'giveaway_slot_cursors';
+
+function slotTitle(rarity, slot) {
+  const spec = RARITY_REWARDS[rarity];
+  if (!spec) return null;
+  return spec.title + (slot === 1 ? '' : ' ' + ROMAN[slot]);
+}
+
+function slotIdKey(rarity, slot) {
+  return slot === 1 ? `giveaway_reward_${rarity}_id` : `giveaway_reward_${rarity}_${slot}_id`;
+}
+
 /**
- * The channel points reward id for a draw's rarity.
+ * The channel points reward id for a draw's rarity and slot.
  *
  * A null/unknown rarity means the legacy "Enter Giveaway" reward, whose id
  * the admin page stored when it created it.
  */
-async function resolveRewardId(env, rarity) {
+async function resolveRewardId(env, rarity, slot = 1) {
   const spec = RARITY_REWARDS[rarity];
   if (!spec) return await env.MARKETPLACE.get('giveaway_reward_id');
 
-  const cached = await env.MARKETPLACE.get(spec.idKey);
+  const idKey = slotIdKey(rarity, slot);
+  const cached = await env.MARKETPLACE.get(idKey);
   if (cached) return cached;
 
   const token = await getBroadcasterToken(env);
@@ -59,12 +79,12 @@ async function resolveRewardId(env, rarity) {
   if (!res.ok) return null;
 
   const data = await res.json().catch(() => null);
-  const wanted = spec.title.toLowerCase();
+  const wanted = slotTitle(rarity, slot).toLowerCase();
   const hit = (data && Array.isArray(data.data) ? data.data : [])
     .find(r => String(r.title || '').trim().toLowerCase() === wanted);
   if (!hit) return null;
 
-  await env.MARKETPLACE.put(spec.idKey, hit.id);
+  await env.MARKETPLACE.put(idKey, hit.id);
   return hit.id;
 }
 
@@ -83,14 +103,17 @@ function publicEntrant(e) {
   return { userId: e.userId, username: e.username };
 }
 
-async function setRewardEnabled(env, enabled, rarity = null) {
-  const rewardId = await resolveRewardId(env, rarity);
+async function setRewardEnabled(env, enabled, rarity = null, slot = 1) {
+  const rewardId = await resolveRewardId(env, rarity, slot);
   if (!rewardId) {
     const spec = RARITY_REWARDS[rarity];
     return {
       ok: false,
+      /* notFound lets the disable-sweep skip slots that were never created —
+         a non-existent slot is already "off", not a stray to report. */
+      notFound: true,
       error: spec
-        ? `No "${spec.title}" reward found on the channel. Create it with: node server/scripts/giveaway-rewards.js --service phantomace-web --create --confirm`
+        ? `No "${slotTitle(rarity, slot)}" reward found on the channel. Create the pool with: node server/scripts/giveaway-rewards.js --service phantomace-web --create --confirm`
         : 'No giveaway reward configured yet — set it up in /api/admin/bot-setup first.',
     };
   }
@@ -135,7 +158,12 @@ export async function onRequestGet(context) {
 
   const state = await env.MARKETPLACE.get(STATE_KEY, 'json') || { open: false };
   const winner = await env.MARKETPLACE.get(WINNER_KEY, 'json') || null;
-  const rewardId = await env.MARKETPLACE.get('giveaway_reward_id');
+  /* Configured if ANY entry reward id is cached: the legacy single reward, or
+     either rarity's slot-1 reward. The slot pool resolves the rest by title on
+     demand, so a cached slot-1 id is enough to know the rewards exist. */
+  const rewardId = (await env.MARKETPLACE.get('giveaway_reward_id'))
+    || (await env.MARKETPLACE.get('giveaway_reward_rare_id'))
+    || (await env.MARKETPLACE.get('giveaway_reward_mythic_id'));
 
   /* THE WHEEL SPINS OVER THIS EVENT'S ENTRANTS, NOT THE MONTH.
      This read used to come from the monthly ledger, which made a
@@ -162,6 +190,7 @@ export async function onRequestGet(context) {
   return json({
     open: !!state.open,
     rarity: state.rarity || null,
+    slot: state.slot || null,
     rarities,
     entrants: entrants.map(publicEntrant),
     entrantCount: entrants.length,
@@ -216,22 +245,39 @@ export async function onRequestPost(context) {
       }
     }
 
-    const result = await setRewardEnabled(env, open, rarity);
+    /* WHICH SLOT. Opening picks the next slot in the pool by round-robin, so
+       two consecutive same-rarity draws in one stream land on different slots
+       and each gets its own fresh per-user-per-stream cap. Closing reuses the
+       slot that was actually opened, so switching a draw off never leaves the
+       wrong slot redeemable. */
+    let slot;
+    if (open) {
+      const cursors = (await env.MARKETPLACE.get(SLOT_CURSORS_KEY, 'json')) || {};
+      const last = Number(cursors[rarity]) || 0;
+      slot = (last % SLOTS_PER_RARITY) + 1;
+    } else {
+      slot = prev.slot || 1;
+    }
+
+    const result = await setRewardEnabled(env, open, rarity, slot);
     if (!result.ok) return json({ error: result.error }, 400);
 
-    /* ONE DRAW AT A TIME. Opening Rare switches Mythic off, so the two entry
-       rewards can never both be redeemable — which would let a viewer pay
-       into a draw that is not running and sit on a wheel they are not on.
-       Failure here is reported but does not undo the open: a stray enabled
-       reward is caught by the rarity check in addEntrant, and refusing to
-       open a draw because the OTHER reward would not switch off is the worse
-       outcome on a live stream. */
+    /* ONE DRAW AT A TIME. Opening a slot switches off every OTHER slot across
+       ALL rarities, so at most one entry reward is ever redeemable — a viewer
+       can never pay into a draw that is not running or sit on a wheel they are
+       not on. Failure here is reported but does not undo the open: a stray
+       enabled reward is caught by the rarity check in addEntrant, and refusing
+       to open a draw because some other slot would not switch off is the worse
+       outcome on a live stream. A slot that was never created reports notFound,
+       not a failure — it is already off, so it is not a stray. */
     let strays = [];
     if (open) {
-      for (const other of RARITIES) {
-        if (other === rarity) continue;
-        const off = await setRewardEnabled(env, false, other);
-        if (!off.ok) strays.push(RARITY_REWARDS[other].title);
+      for (const r of RARITIES) {
+        for (let i = 1; i <= SLOTS_PER_RARITY; i++) {
+          if (r === rarity && i === slot) continue;
+          const off = await setRewardEnabled(env, false, r, i);
+          if (!off.ok && !off.notFound) strays.push(slotTitle(r, i));
+        }
       }
     }
 
@@ -253,8 +299,16 @@ export async function onRequestPost(context) {
       }
     }
 
-    await env.MARKETPLACE.put(STATE_KEY, JSON.stringify({ open, rarity, changedAt: Date.now() }), { expirationTtl: STATE_TTL });
-    return json({ success: true, open, rarity, clearedPrevious, strays });
+    /* Advance the round-robin cursor only once the slot is actually open, so a
+       refused open does not burn a slot number. */
+    if (open) {
+      const cursors = (await env.MARKETPLACE.get(SLOT_CURSORS_KEY, 'json')) || {};
+      cursors[rarity] = slot;
+      await env.MARKETPLACE.put(SLOT_CURSORS_KEY, JSON.stringify(cursors));
+    }
+
+    await env.MARKETPLACE.put(STATE_KEY, JSON.stringify({ open, rarity, slot, changedAt: Date.now() }), { expirationTtl: STATE_TTL });
+    return json({ success: true, open, rarity, slot, clearedPrevious, strays });
   }
 
   if (body.action === 'pick-winner') {

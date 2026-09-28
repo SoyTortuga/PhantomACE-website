@@ -47,12 +47,23 @@ export const SINGLETONS = {
   giveaway_reward_id:    { table: 'singletons', expiry: 'none' },
   /* The rarity entry rewards' ids, resolved from Twitch by title and
      cached. Unregistered at first, which 500'd the panel the moment a
-     Mythic draw was opened on stream: they are written via a property
-     lookup (RARITY_REWARDS[rarity].idKey), a shape the registry scan did
-     not read. 'none' like the id above them — an expired cache would just
-     re-resolve, but there is nothing gained by it expiring. */
-  giveaway_reward_rare_id:   { table: 'singletons', expiry: 'none' },
-  giveaway_reward_mythic_id: { table: 'singletons', expiry: 'none' },
+     Mythic draw was opened on stream: they are written per (rarity, slot) via
+     slotIdKey() in giveaway.js. 'none' like the id above them — an expired
+     cache would just re-resolve, but there is nothing gained by it expiring.
+
+     THE SLOT POOL. Each rarity is a pool of three identical rewards so the
+     broadcaster can run up to three same-rarity draws in one stream (Twitch's
+     per-user-per-stream cap is per-reward, so one reward = one draw/stream).
+     Slot 1 keeps the bare `_id` key; slots 2 and 3 get `_2_id` / `_3_id`.
+     giveaway_slot_cursors holds the round-robin cursor {rare, mythic} = the
+     last slot opened per rarity, so consecutive opens rotate through the pool. */
+  giveaway_reward_rare_id:     { table: 'singletons', expiry: 'none' },
+  giveaway_reward_rare_2_id:   { table: 'singletons', expiry: 'none' },
+  giveaway_reward_rare_3_id:   { table: 'singletons', expiry: 'none' },
+  giveaway_reward_mythic_id:   { table: 'singletons', expiry: 'none' },
+  giveaway_reward_mythic_2_id: { table: 'singletons', expiry: 'none' },
+  giveaway_reward_mythic_3_id: { table: 'singletons', expiry: 'none' },
+  giveaway_slot_cursors:       { table: 'singletons', expiry: 'none' },
   checkin_reward_id:     { table: 'singletons', expiry: 'none' },
   raid_boss_reward_id:   { table: 'singletons', expiry: 'none' },
   /* The "Hatch a Dino" channel-point reward's id, cached after bot-setup

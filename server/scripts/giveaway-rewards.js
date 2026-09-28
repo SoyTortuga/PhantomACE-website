@@ -54,45 +54,64 @@ function arg(name, fallback = null) {
 }
 const line = (s = '') => console.log(s);
 
-/* The two entry rewards. Both cost 1: the rarity is a property of the
-   DRAW, announced up front, not something a viewer pays more for. The
-   colours are the only thing telling them apart in the reward list, so
-   they carry the weight. */
-export const ENTRY_REWARDS = [
-  {
-    title: 'Enter Rare Giveaway',
-    cost: 1,
-    background_color: '#c7a550',            // gold
-    prompt: 'Enter the Rare giveaway running now. One entry each.',
-  },
-  {
-    title: 'Enter Mythic Giveaway',
-    cost: 1,
-    background_color: '#eb6726',            // orange
-    prompt: 'Enter the Mythic giveaway running now. One entry each.',
-  },
+/* The entry rewards, as a POOL of slots per rarity. Both rarities cost 1:
+   the rarity is a property of the DRAW, announced up front, not something a
+   viewer pays more for. The colour is the only thing telling the rarities
+   apart in the reward list, so it carries the weight.
+
+   WHY THREE SLOTS PER RARITY. Twitch's only per-user limiter is
+   max_per_user_per_stream — per-reward, reset each stream. A single Rare
+   reward capped at one entry per stream could therefore host only ONE Rare
+   draw per stream. Giving each rarity a pool of three identical rewards,
+   opened one at a time, lets the broadcaster run up to three same-rarity
+   draws in one stream: draw two uses slot 2, draw three uses slot 3, and the
+   cap holds a viewer to exactly one entry per slot per stream — Twitch greys
+   the button out once they have entered, independent of any server refund.
+   Slot 1 keeps the EXISTING bare title so cached ids and live subscriptions
+   keep working; slots 2 and 3 append a roman numeral. */
+const SLOTS_PER_RARITY = 3;
+const ROMAN = ['', '', 'II', 'III'];
+const RARITY_SPECS = [
+  { rarity: 'rare',   title: 'Enter Rare Giveaway',   background_color: '#c7a550' }, // gold
+  { rarity: 'mythic', title: 'Enter Mythic Giveaway', background_color: '#eb6726' }, // orange
 ];
+
+export const ENTRY_REWARDS = RARITY_SPECS.flatMap(({ rarity, title, background_color }) => {
+  const Rarity = rarity[0].toUpperCase() + rarity.slice(1);
+  return Array.from({ length: SLOTS_PER_RARITY }, (_, i) => {
+    const slot = i + 1;
+    return {
+      title: slot === 1 ? title : `${title} ${ROMAN[slot]}`,
+      cost: 1,
+      background_color,
+      prompt: `Enter the ${Rarity} giveaway running now. One entry each.`,
+    };
+  });
+});
 
 /* Shared by every created reward. Disabled on creation: a reward is opened
    for a draw and closed after it, which the site already does through
    giveaway.js.
 
-   THE QUEUE STAYS OPEN, and it is the whole refund mechanism. A redemption
-   that skips the queue goes straight to FULFILLED, and Twitch only allows
-   status changes on UNFULFILLED ones -- so with skip on, a viewer who
-   redeemed twice was simply charged twice, with no way to give the second
-   point back. With the queue open, the entry webhook FULFILS the first
-   entry and CANCELS duplicates, which refunds them automatically. Nobody
-   approves anything by hand; the webhook is the approver.
+   THE PER-USER-PER-STREAM CAP IS THE PRIMARY LIMITER NOW. max_per_user_per_
+   stream = 1 makes Twitch itself grey the button out after a viewer's one
+   entry — one entry per user, per slot, per stream, enforced at the source
+   and not dependent on any server round-trip. The POOL of slots (see
+   ENTRY_REWARDS) is what still allows several same-rarity draws in one
+   stream: each draw opens a different slot, and the cap resets per slot.
 
-   No per-stream cap either: Twitch resets that between broadcasts, and a
-   night with a Rare draw and a Mythic draw is two giveaways in one stream.
-   "Once per GIVEAWAY" is the server's rule to enforce, and refunding is
-   how it says no. */
+   THE QUEUE STAYS OPEN as SECONDARY cleanup, not the primary rule. A
+   redemption that skips the queue goes straight to FULFILLED, and Twitch only
+   allows status changes on UNFULFILLED ones — so leaving the queue open is
+   what lets the entry webhook FULFIL the one valid entry and CANCEL (refund) a
+   redemption that arrived in the lag after a draw closed. With the cap doing
+   the heavy lifting, the refund path only mops up closed-draw-lag stragglers
+   rather than being the thing standing between a viewer and a double charge. */
 const COMMON = {
   is_enabled: false,
   should_redemptions_skip_request_queue: false,
-  is_max_per_user_per_stream_enabled: false,
+  is_max_per_user_per_stream_enabled: true,
+  max_per_user_per_stream: 1,
 };
 
 async function helix(token, clientId, method, url, body) {
@@ -227,6 +246,17 @@ async function main() {
       if (skip !== !!COMMON.should_redemptions_skip_request_queue) {
         body.should_redemptions_skip_request_queue = COMMON.should_redemptions_skip_request_queue;
         was.push(`skip_queue ${skip}`);
+      }
+      /* The per-user-per-stream cap is the primary limiter, so a reward made
+         before it was added (or one left uncapped) has to be brought up to it
+         too — otherwise a viewer could enter a slot repeatedly. */
+      const capSetting = r.max_per_user_per_stream_setting || {};
+      const capOn = !!capSetting.is_enabled;
+      const capN = capSetting.max_per_user_per_stream;
+      if (capOn !== !!COMMON.is_max_per_user_per_stream_enabled || capN !== COMMON.max_per_user_per_stream) {
+        body.is_max_per_user_per_stream_enabled = COMMON.is_max_per_user_per_stream_enabled;
+        body.max_per_user_per_stream = COMMON.max_per_user_per_stream;
+        was.push(capOn ? `cap ${capN}` : 'cap off');
       }
       if (!Object.keys(body).length) { line(`  = "${spec.title}" already matches the spec`); continue; }
       changes.push({ kind: 'update', id: r.id, title: spec.title, body, was: was.join(', ') });

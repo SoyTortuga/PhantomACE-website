@@ -43,9 +43,17 @@ const SECRET = 'a-test-eventsub-secret';
 
 /* ── The fake channel ─────────────────────────────────────────────────── */
 
+/* Each rarity is a POOL of three slots — slot 1 keeps the bare title, slots 2
+   and 3 append a roman numeral — so the control can rotate through them and run
+   several same-rarity draws in one stream. resolveRewardId finds each by its
+   exact slot title, so all six must be present here. */
 const REWARDS = [
   { id: 'rw-rare', title: 'Enter Rare Giveaway' },
+  { id: 'rw-rare-2', title: 'Enter Rare Giveaway II' },
+  { id: 'rw-rare-3', title: 'Enter Rare Giveaway III' },
   { id: 'rw-mythic', title: 'Enter Mythic Giveaway' },
+  { id: 'rw-mythic-2', title: 'Enter Mythic Giveaway II' },
+  { id: 'rw-mythic-3', title: 'Enter Mythic Giveaway III' },
   { id: 'rw-legacy', title: 'Enter Giveaway' },
 ];
 
@@ -187,6 +195,10 @@ const fresh = (pools) => { patches = []; whispers = []; settlements = []; return
      null, which is a different answer from "this is not an entry reward". */
   check('the legacy reward has no rarity of its own', entryRarityForTitle('Enter Giveaway'), null);
   check('casing and stray spaces do not matter', entryRarityForTitle('  enter MYTHIC giveaway '), 'mythic');
+  /* Numbered slots route to their rarity exactly like slot 1 does — the slot
+     is cosmetic, every slot of a rarity enters the same rarity. */
+  check('a numbered rare slot still enters rare', entryRarityForTitle('Enter Rare Giveaway II'), 'rare');
+  check('a numbered mythic slot still enters mythic', entryRarityForTitle('Enter Mythic Giveaway III'), 'mythic');
   check('an unrelated reward is not an entry', entryRarityForTitle('Hydrate!'), false);
   check('a missing title is not an entry', entryRarityForTitle(undefined), false);
 }
@@ -207,14 +219,45 @@ const fresh = (pools) => { patches = []; whispers = []; settlements = []; return
   check('and records the rarity', body.rarity, 'mythic');
   check('the state carries it too', JSON.parse(env._store.get('giveaway_state')).rarity, 'mythic');
 
-  /* ONE DRAW AT A TIME: the mythic reward on, the rare one explicitly off. */
-  check('the mythic reward was enabled', patches.find(p => p.id === 'rw-mythic'), { id: 'rw-mythic', is_enabled: true });
-  check('and the rare one disabled', patches.find(p => p.id === 'rw-rare'), { id: 'rw-rare', is_enabled: false });
-  check('nothing else was touched', patches.length, 2);
+  /* ONE DRAW AT A TIME, ACROSS THE WHOLE POOL. A fresh draw opens slot 1 and
+     switches OFF every other slot of every rarity — five disables — so exactly
+     one entry reward is ever redeemable. */
+  check('a fresh draw opens slot 1', body.slot, 1);
+  check('the mythic slot-1 reward was enabled', patches.find(p => p.id === 'rw-mythic'), { id: 'rw-mythic', is_enabled: true });
+  const disabled = patches.filter(p => p.is_enabled === false).map(p => p.id).sort();
+  check('every other slot across all rarities was disabled', disabled,
+    ['rw-mythic-2', 'rw-mythic-3', 'rw-rare', 'rw-rare-2', 'rw-rare-3']);
+  check('one enable plus five disables, nothing else', patches.length, 6);
   check('no stray reward was left on', body.strays, []);
 
-  /* Resolved by title once, then cached — the second open must not re-list. */
-  check('the reward id was cached by title', env._store.get('giveaway_reward_mythic_id'), 'rw-mythic');
+  /* Resolved by title once, then cached under the slot-1 key — the second open
+     must not re-list. */
+  check('the slot-1 reward id was cached by title', env._store.get('giveaway_reward_mythic_id'), 'rw-mythic');
+}
+
+/* ── Same-rarity draws rotate through the slot pool ───────────────────── */
+{
+  /* Twitch caps each viewer to one entry per reward per stream, so a second
+     Rare/Mythic draw in the same stream must open a DIFFERENT reward or nobody
+     could enter it. Consecutive same-rarity opens round-robin through the
+     pool: slot 1, then slot 2. */
+  const env = fresh();
+  const first = await (await post(env, { action: 'toggle', open: true, rarity: 'mythic' })).json();
+  check('the first mythic draw opens slot 1', first.slot, 1);
+  const firstId = patches.find(p => p.is_enabled === true).id;
+  check('enabling the slot-1 reward', firstId, 'rw-mythic');
+
+  patches = [];
+  const second = await (await post(env, { action: 'toggle', open: true, rarity: 'mythic' })).json();
+  check('a second mythic draw in the same stream opens slot 2', second.slot, 2);
+  const secondId = patches.find(p => p.is_enabled === true).id;
+  check('enabling a different reward', secondId, 'rw-mythic-2');
+  ok('so the two draws never share a slot', firstId !== secondId);
+
+  patches = [];
+  const closed = await (await post(env, { action: 'toggle', open: false })).json();
+  check('closing reuses the slot that was open', closed.slot, 2);
+  check('and disables exactly that slot', patches, [{ id: 'rw-mythic-2', is_enabled: false }]);
 }
 
 /* ── Closing reuses the open draw's rarity ───────────────────────────── */

@@ -12,29 +12,42 @@ import { verifyEventSub } from '../../../server/lib/eventsub.js';
 const ENTRANTS_KEY = 'giveaway_entrants';
 const STATE_KEY = 'giveaway_state';
 
-/* The three rewards that enter someone, and the rarity each one means.
-   Matched on the TITLE rather than a stored reward id, for one blunt
-   reason: a reward id condition needs its own EventSub subscription, and
-   creating one needs the broadcaster signed in at the admin page. The
-   catch-all `channel.channel_points_custom_reward_redemption.add`
-   subscription that already feeds /api/channel-points sees every redemption
-   on the channel, so routing on the title there costs nothing and needs
-   nobody to sign in.
+/* The entry rewards, and the rarity each one means. Matched on the TITLE
+   rather than a stored reward id, for one blunt reason: a reward id condition
+   needs its own EventSub subscription, and creating one needs the broadcaster
+   signed in at the admin page. The catch-all
+   `channel.channel_points_custom_reward_redemption.add` subscription that
+   already feeds /api/channel-points sees every redemption on the channel, so
+   routing on the title there costs nothing and needs nobody to sign in.
+
+   EACH RARITY IS A POOL OF SLOTS, NOT ONE REWARD. Twitch's only per-user
+   limiter is max_per_user_per_stream, which is per-reward and resets each
+   stream — so a single Rare reward capped at 1/stream could only ever run ONE
+   Rare draw per stream. To run up to three same-rarity draws in a stream, each
+   rarity gets three identical rewards ("Enter Rare Giveaway", "…II", "…III"),
+   opened one at a time; two draws use two different slots and a viewer gets
+   exactly one Twitch-enforced entry per slot. The slot number is cosmetic
+   here: every slot of a rarity enters the SAME rarity, so this router keys on
+   the rarity word in the title and ignores the roman-numeral suffix.
 
    `null` is the legacy reward, which predates rarities and matches whatever
-   draw is open. */
+   draw is open. This table stays exported as documentation of the base
+   titles; the live routing is entryRarityForTitle's substring match. */
 export const ENTRY_REWARD_RARITY = {
   'enter rare giveaway': 'rare',
   'enter mythic giveaway': 'mythic',
   'enter giveaway': null,
 };
 
-/** The rarity a reward title enters, or false when it enters nothing. */
+/** The rarity a reward title enters, or false when it enters nothing.
+    Substring match so numbered slot titles ("Enter Rare Giveaway II",
+    "Enter Mythic Giveaway III") route to their rarity like slot 1 does. */
 export function entryRarityForTitle(title) {
   const key = String(title || '').trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(ENTRY_REWARD_RARITY, key)
-    ? ENTRY_REWARD_RARITY[key]
-    : false;
+  if (!key.includes('giveaway')) return false;
+  if (key.includes('mythic')) return 'mythic';
+  if (key.includes('rare')) return 'rare';
+  return null;   // legacy "Enter Giveaway" — matches whatever draw is open
 }
 
 function json(data, status = 200) {
