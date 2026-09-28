@@ -6,10 +6,11 @@
 
    sc_leaderboard is the all-time board; the season board (sc_season) ranks
    skulls gathered THIS month and rolls over on its own — when the stored
-   month is not the current one, the previous winners are prized once and the
-   board clears. These tests cover the dual submit, the season-scoped
-   only-raise, the two GET shapes, and the rollover reset (with the prize
-   path stubbed off, since it whispers real codes).
+   month is not the current one, the board simply clears for the new month.
+   The board is DISPLAY-ONLY: Skull Clicker awards no leaderboard prizes (its
+   heavy automation makes it non-competitive), so no winners are whispered.
+   These tests cover the dual submit, the season-scoped only-raise, the two
+   GET shapes, and the rollover reset.
    ══════════════════════════════════════════════ */
 
 import fs from 'node:fs';
@@ -29,18 +30,14 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
-function fakeKV(seed = {}, opts = {}) {
+function fakeKV(seed = {}) {
   const store = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
-  const kv = {
+  return {
     store,
     read(k) { return store.has(k) ? JSON.parse(store.get(k)) : null; },
     async get(k, t) { const v = store.get(k); return v === undefined ? null : (t === 'json' ? JSON.parse(v) : v); },
     async put(k, v) { store.set(k, String(v)); },
   };
-  /* Present only when a test opts in, so we can steer the once-per-month
-     claim without the award path ever running against a real winner. */
-  if (opts.claim !== undefined) kv.claimMonthlyAward = async () => opts.claim;
-  return kv;
 }
 const cookie = (id) => ({ Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: id, display_name: 'U' + id })) });
 const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https://x/api/skull-clicker', {
@@ -87,19 +84,18 @@ const thisMonth = (() => { const d = new Date(); return d.getUTCFullYear() + '-'
 
 /* ══ Rollover: an old month resets to empty for the new one ════════════ */
 {
-  /* Guests only, so the winner filter is empty and the prize path is never
-     entered — a clean reset test. */
+  /* A stale month with a guest entry clears for the new month. */
   const e = { MARKETPLACE: fakeKV({ sc_season: { month: '2020-01', entries: [{ id: 'guest_a', name: 'G', score: 999 }] } }) };
   const season = await (await GET(e, 'board=season')).json();
   check('a stale month rolls to the current one', season.month, thisMonth);
   check('and the old entries are cleared', season.entries.length, 0);
 }
 {
-  /* A real winner is present, but the once-per-month claim is denied, so the
-     award path is skipped — the board still resets cleanly, no throw. */
-  const e = { MARKETPLACE: fakeKV({ sc_season: { month: '2020-01', entries: [{ id: 'u_1', name: 'Real', score: 999 }] } }, { claim: false }) };
+  /* A real (non-guest) entry clears too — the board is display-only, so a
+     turned month resets it with nothing prized or whispered. */
+  const e = { MARKETPLACE: fakeKV({ sc_season: { month: '2020-01', entries: [{ id: 'u_1', name: 'Real', score: 999 }] } }) };
   const season = await (await GET(e, 'board=season')).json();
-  check('rollover resets even when the prize claim is denied', season.entries.length, 0);
+  check('rollover resets a real entry too', season.entries.length, 0);
   check('to the current month', season.month, thisMonth);
 }
 

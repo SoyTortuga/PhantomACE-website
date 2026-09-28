@@ -41,77 +41,31 @@ async function currentEvent(env) {
   return ev;
 }
 
-/* ── Seasonal leaderboard ──────────────────────────────────────────────
+/* ── Seasonal leaderboard (display only — NO prizes) ────────────────────
    sc_leaderboard is the ALL-TIME board (lifetime skulls, never reset). The
-   SEASON board ranks skulls gathered THIS month, so it is a real monthly
-   race rather than lifetime with a wipe that instantly refills. It is
-   season-aware server-side: the stored month is the authority, so when the
-   month turns the previous winners are prized (once) and the board clears —
-   the client never has to get the reset moment right. */
+   SEASON board ranks skulls gathered THIS month — a fresh monthly race for
+   bragging rights. Skull Clicker deliberately awards NO leaderboard prizes:
+   its heavy automation (auto-click / auto-buy / auto-prestige from the
+   Reaping tree) makes it a solo idle game rather than a fair competitive
+   board, so a turned month simply clears the board — nothing is whispered.
+   The stored month is the authority; the client never has to get the reset
+   moment right. */
 const SEASON_KEY = 'sc_season';                 // { month:'YYYY-MM', entries:[] }
-const SEASON_CODE_SECONDS = 604800;             // 7-day redemption, like the other monthly prizes
-const SEASON_PLACEMENTS = [
-  { rarity: 'mythic',   suffix: 'Champion',    medal: '🥇' },
-  { rarity: 'rare',     suffix: 'Runner-Up',   medal: '🥈' },
-  { rarity: 'uncommon', suffix: 'Third Place', medal: '🥉' },
-];
 
 function monthKeyUTC(d) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; }
-function monthLabelFromKey(key) {
-  const [y, m] = String(key).split('-').map(Number);
-  if (!y || !m) return key;
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-}
 
 function readSeason(raw) {
   if (raw && Array.isArray(raw.entries) && raw.month) return raw;
   return { month: monthKeyUTC(new Date()), entries: [] };
 }
 
-/* Whisper the ended season's top-3 a redeemable badge code, once. Best-effort
-   per placement so one failure never aborts the rollover. */
-async function awardSeasonWinners(env, winners, endedMonth) {
-  const label = monthLabelFromKey(endedMonth);
-  const names = [];
-  const { createItemCode, activateItemCode } = await import('./item-codes.js');
-  const { sendWhisper } = await import('./bot/send-chat.js');
-  for (let i = 0; i < winners.length; i++) {
-    const w = winners[i], p = SEASON_PLACEMENTS[i];
-    try {
-      const record = await createItemCode(env, {
-        id: `season_skull-clicker_${endedMonth}_${i + 1}`,
-        game: 'skull-clicker', type: 'badge',
-        name: `Skull Clicker ${p.suffix} — ${label}`, rarity: p.rarity,
-      });
-      await activateItemCode(env, record.code, SEASON_CODE_SECONDS);
-      await sendWhisper(env, w.id,
-        `${p.medal} You placed #${i + 1} in the Skull Clicker season for ${label}! ` +
-        `Your ${p.rarity} code: ${record.code} — redeem at phantomace.tv/redeem.html within 7 days.`);
-    } catch { /* skip this placement */ }
-    names.push(`${p.medal} ${w.name}`);
-  }
-  try {
-    const { announceAction } = await import('./bot/send-chat.js');
-    if (names.length) await announceAction(env,
-      `💀 Skull Clicker ${label} champions: ${names.join(' ')} — codes whispered. Congrats!`, 'sc-season');
-  } catch { /* announcement is a nicety */ }
-}
-
-/* Ensure the season board is for the current month, rolling it over (and
-   prizing the previous winners exactly once) when the month has turned. */
+/* Ensure the season board is for the current month, clearing it when the
+   month has turned. Display-only: no winners are prized — the board simply
+   starts fresh for the new month's race. */
 async function rolloverSeason(env) {
   const cur = monthKeyUTC(new Date());
   let s = readSeason(await env.MARKETPLACE.get(SEASON_KEY, 'json'));
   if (s.month === cur) return s;
-
-  const winners = (s.entries || []).filter(e => !String(e.id).startsWith('guest_')).slice(0, 3);
-  let claimed = true;
-  try {
-    if (typeof env.MARKETPLACE.claimMonthlyAward === 'function') {
-      claimed = await env.MARKETPLACE.claimMonthlyAward('sc_season_' + s.month);
-    }
-  } catch { claimed = true; }
-  if (claimed && winners.length) await awardSeasonWinners(env, winners, s.month);
 
   s = { month: cur, entries: [] };
   await env.MARKETPLACE.put(SEASON_KEY, JSON.stringify(s));
