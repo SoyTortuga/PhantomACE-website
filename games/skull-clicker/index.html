@@ -628,6 +628,53 @@
     .aura-on { font-size: 13px; text-shadow: none; color: var(--red); font-weight: 800; letter-spacing: 0.05em; }
     @media (prefers-reduced-motion: reduce) { .pet-sprite { animation: none; } }
 
+    /* The Cursed Garden — a plot grid, a seed tray, and an almanac. Legitimate
+       new structure (a grid); kept token-driven, black/grey/red/white only, full
+       borders only — no box-shadow / side-border accent / backdrop-filter. */
+    .garden-grid { display: grid; gap: 5px; margin: 10px 0; }
+    .garden-plot {
+      position: relative; min-height: 72px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      background: var(--gray-lo); border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer; overflow: hidden; padding: 4px 2px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .garden-plot:hover { border-color: var(--red); }
+    .garden-plot.empty { background: var(--black); }
+    .garden-plot.empty.armed { border-color: var(--red); background: var(--red-glow); }
+    .garden-plot.mature { border-color: var(--red); background: rgba(255, 0, 0, 0.06); }
+    .garden-plot.blight { border-color: var(--border-mid); background: #0a0a0a; }
+    .garden-emoji { font-size: 26px; line-height: 1; }
+    .garden-plot.mature .garden-emoji { filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.6)); }
+    .garden-plot.empty .garden-emoji { opacity: 0.35; font-size: 20px; }
+    .garden-stage { font-size: 13px; text-shadow: none; color: var(--text-dim); text-align: center; line-height: 1.15; }
+    .garden-plot.mature .garden-stage { color: #ff5555; font-weight: 800; }
+    .garden-plot.blight .garden-stage { color: #ff5555; font-weight: 800; }
+    .garden-bar { width: 82%; height: 4px; background: var(--gray-mid); border-radius: 2px; overflow: hidden; }
+    .garden-fill { height: 100%; background: var(--red); transition: width 0.3s; }
+    .garden-cull {
+      position: absolute; top: 2px; right: 2px; width: 17px; height: 17px; padding: 0;
+      background: var(--black); color: var(--text-dim); border: 1px solid var(--border-mid);
+      border-radius: 3px; font-size: 13px; line-height: 1; cursor: pointer; font-family: inherit;
+    }
+    .garden-cull:hover { color: #fff; border-color: var(--red); }
+    .garden-tray { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+    .garden-seed {
+      display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+      background: var(--gray-lo); border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer; font-size: 14px; color: var(--text-pri); font-family: inherit;
+    }
+    .garden-seed:hover { border-color: var(--red); }
+    .garden-seed.armed { border-color: var(--red); background: var(--red-glow); color: #ff5555; font-weight: 800; }
+    .garden-seed .garden-emoji { font-size: 18px; }
+    .garden-almanac-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 5px; background: var(--gray-lo); }
+    .garden-almanac-row.undiscovered { opacity: 0.5; }
+    .garden-almanac-name { font-size: 15px; font-weight: 800; color: var(--text-pri); }
+    .garden-almanac-row.undiscovered .garden-almanac-name { color: var(--text-dim); }
+    .garden-almanac-desc { font-size: 13px; text-shadow: none; color: var(--text-dim); margin-top: 2px; }
+    .garden-almanac-eff { font-size: 13px; text-shadow: none; color: #ff5555; margin-top: 2px; }
+    @media (prefers-reduced-motion: reduce) { .garden-fill { transition: none; } }
+
     /* Upgrade rows */
     .upgrade-row {
       display: flex;
@@ -839,6 +886,7 @@
       <button class="tab-btn" onclick="switchTab('reaping')">Reaping</button>
       <button class="tab-btn" onclick="switchTab('pet')">Pet</button>
       <button class="tab-btn" onclick="switchTab('grimoire')">Grimoire</button>
+      <button class="tab-btn" onclick="switchTab('garden')">Garden</button>
       <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
       <button class="tab-btn" onclick="switchTab('ranks')">Ranks</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
@@ -851,6 +899,7 @@
     <div class="tab-content" id="tab-reaping"></div>
     <div class="tab-content" id="tab-pet"></div>
     <div class="tab-content" id="tab-grimoire"></div>
+    <div class="tab-content" id="tab-garden"></div>
     <div class="tab-content" id="tab-feats"></div>
     <div class="tab-content" id="tab-ranks"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
@@ -1195,6 +1244,133 @@
     const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12, 100e12, 10e15];
     const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One','Skull God','Bone Absolute'];
 
+    /* ═══════ THE CURSED GARDEN (the Garden minigame analog) ═══════
+       A necro-garden of grave plots, tilled once by spending GRAVE BLOOMS — the
+       same reserved unlock currency as the Grimoire. Plants grow in REAL TIME
+       from a planted-at timestamp, so growth is offline-aware for free, exactly
+       like the Grave Bloom ripen clock and Essence regen: a plant sown before a
+       long absence is mature (or overripe) on return, no catch-up loop needed.
+
+       A mature plant folds a small, CAPPED passive into an EXISTING system
+       (production via gardenCpsMult, click power via gardenClickMult, cursed
+       skulls via spawnCursed) or pays out on harvest; overripe plants rot and can
+       breed BLIGHT that spreads to neighbours and drags production down until it
+       is culled. Adjacent mature plants cross-breed into rarer, DISCOVERABLE
+       strains via a fixed recipe table — the discovery hook.
+
+       Data-driven (GAME-DEV-PRACTICES #1): the grid is a plain array of cells and
+       one renderGarden() draws it; mutation/blight reason over the array, not the
+       DOM. ALL garden state is a PERMANENT meta layer: like graveBlooms /
+       buildingLevels / petLevel / grimoire it is NEVER cleared by resetRun, so it
+       survives both prestige and ascension. */
+    const GARDEN_UNLOCK_BLOOMS = 5;               /* one-time Grave Bloom cost to till the garden */
+    const GARDEN_SIZES = [3, 4, 5, 6];            /* grid side per tier (CC tops out at 6×6) */
+    const GARDEN_MAX = 36;                         /* 6×6 — the FIXED backing-array length (positions stay stable across expansion) */
+    const GARDEN_EXPAND_COST = [0, 4, 8, 16];     /* Grave Blooms to REACH tier i (tier 0 is free at unlock) */
+    const GARDEN_TICK_MS = 5000;                   /* mutation / blight / lily cadence — a slow idle layer, never per-frame */
+    const GARDEN_CPS_CAP = 0.5;                    /* hard cap on the garden's total production bonus (+50%) — GAME-DEV-PRACTICES #8 */
+    const GARDEN_CLICK_CAP = 0.5;                  /* hard cap on the garden's total click bonus (+50%) */
+    const GARDEN_BLIGHT_PER = 0.02;                /* each blight plot drags production down this much … */
+    const GARDEN_BLIGHT_FLOOR = 0.5;               /* … but never below ×0.5 total */
+    const MUTATE_CHANCE = 0.10;                    /* per empty eligible plot, per garden tick */
+    const BLIGHT_SPREAD_CHANCE = 0.12;             /* per blight plot, per garden tick */
+    const DECAY_TO_BLIGHT_CHANCE = 0.06;           /* per decaying plant, per garden tick */
+    const LILY_SPAWN_CHANCE = 0.15;                /* per mature Wailing Lily, per garden tick */
+    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'mythic'];
+
+    /* A harvest pays skulls scaled to the player's current economy so it stays
+       relevant at any tier, but is bounded so it can never dwarf idle income. */
+    function gardenYield(sec) { return Math.max(getClickPower() * 15, Math.min(getCPS() * 300, getCPS() * sec)); }
+
+    const STRAINS = [
+      { id:'bone',  name:'Boneshoot',  emoji:'🌱', rarity:'common',   growMs:2 * 60000,  plantable:true, cpsBonus:0.01,
+        desc:'The first thing to grow in salted grave-soil.', effect:'+1% production while mature · harvest for skulls',
+        harvest:() => { const g = gardenYield(120); earn(g); return 'Boneshoot — +' + formatNum(g) + ' skulls'; } },
+      { id:'moss',  name:'Gravemoss',  emoji:'🍄', rarity:'common',   growMs:3 * 60000,  plantable:true, cpsBonus:0.015,
+        desc:'Creeps over headstones and old bone.', effect:'+1.5% production while mature · harvest for skulls',
+        harvest:() => { const g = gardenYield(150); earn(g); return 'Gravemoss — +' + formatNum(g) + ' skulls'; } },
+      { id:'shade', name:'Nightshade', emoji:'🌿', rarity:'uncommon', growMs:5 * 60000,  plantable:true, clickBonus:0.05,
+        desc:'A dark bloom that sharpens the reaper’s hand.', effect:'+5% click power while mature · harvest for skulls',
+        harvest:() => { const g = gardenYield(180); earn(g); return 'Nightshade — +' + formatNum(g) + ' skulls'; } },
+      { id:'lily',  name:'Wailing Lily', emoji:'🥀', rarity:'uncommon', growMs:6 * 60000, plantable:true, lily:true,
+        desc:'Its cries draw cursed skulls up from the earth.', effect:'Mature: sometimes summons a cursed skull · harvest for skulls',
+        harvest:() => { const g = gardenYield(180); earn(g); return 'Wailing Lily — +' + formatNum(g) + ' skulls'; } },
+      { id:'witch', name:'Witchgrass', emoji:'🍀', rarity:'rare',     growMs:8 * 60000,  plantable:true, cpsBonus:0.03,
+        desc:'Rank grass that thrives on old curses.', effect:'+3% production while mature · harvest for skulls',
+        harvest:() => { const g = gardenYield(240); earn(g); return 'Witchgrass — +' + formatNum(g) + ' skulls'; } },
+      { id:'ember', name:'Emberthorn', emoji:'🔥', rarity:'rare',     growMs:10 * 60000, plantable:true, clickBonus:0.10,
+        desc:'Thorns that smoulder with grave-fire.', effect:'+10% click power while mature · harvest for skulls',
+        harvest:() => { const g = gardenYield(300); earn(g); return 'Emberthorn — +' + formatNum(g) + ' skulls'; } },
+      { id:'bloomflower', name:'Gravebloom Blossom', emoji:'🌺', rarity:'mythic', growMs:20 * 60000, plantable:true,
+        desc:'The rarest flower — its seed hardens into a Grave Bloom.', effect:'Harvest yields +1 Grave Bloom',
+        harvest:() => { graveBlooms += 1; return 'Gravebloom Blossom — +1 Grave Bloom'; } },
+      { id:'blight', name:'Grave Blight', emoji:'🕸️', rarity:'weed', growMs:1, plantable:false,
+        desc:'A creeping rot. It spreads to nearby plots and drags production down — cull it fast.', effect:'Spreads to neighbours · drains production until culled' },
+    ];
+    const STRAIN_BY_ID = {}; for (const s of STRAINS) STRAIN_BY_ID[s.id] = s;
+    function strainById(id) { return STRAIN_BY_ID[id] || null; }
+    function strainRank(id) { const s = strainById(id); return s ? RARITY_ORDER.indexOf(s.rarity) : -1; }
+
+    /* Cross-breeding recipes. Keys are the two neighbour strain ids sorted and
+       joined with '|', so lookup is order-independent and deterministic — the
+       discovery is fixed by the neighbours; randomness only gates WHETHER it
+       fires. An empty plot with no matching recipe self-seeds a copy of a mature
+       neighbour so the garden still fills. */
+    const GARDEN_RECIPES = {
+      'bone|bone':   'moss',
+      'bone|moss':   'shade',
+      'moss|moss':   'lily',
+      'moss|shade':  'witch',
+      'shade|shade': 'ember',
+      'ember|lily':  'bloomflower',
+      'lily|witch':  'bloomflower',
+    };
+
+    /* Grid geometry — the active grid is the top-left SxS sub-square of the fixed
+       6-wide backing, so a plant never moves when the garden is expanded. */
+    function gardenSide() { return GARDEN_SIZES[Math.max(0, Math.min(GARDEN_SIZES.length - 1, gardenTier))]; }
+    function isActiveCell(i) { const S = gardenSide(), r = Math.floor(i / 6), c = i % 6; return r < S && c < S; }
+    function activeNeighbors(r, c, S) {
+      const out = [];
+      if (r > 0) out.push([r - 1, c]);
+      if (r < S - 1) out.push([r + 1, c]);
+      if (c > 0) out.push([r, c - 1]);
+      if (c < S - 1) out.push([r, c + 1]);
+      return out;
+    }
+    function plantAge(cell) { return Date.now() - cell.t; }
+    /* Stages: seed → sprout → mature (harvestable, effect active) → decaying
+       (overripe; effect off, can rot to blight). Pure function of the timestamp,
+       so it is identical online and after an offline gap. */
+    function plantStage(cell) {
+      if (!cell) return 'empty';
+      if (cell.s === 'blight') return 'blight';
+      const st = strainById(cell.s); if (!st) return 'empty';
+      const f = plantAge(cell) / st.growMs;
+      if (f < 0.4) return 'seed';
+      if (f < 1) return 'sprout';
+      if (f < 3) return 'mature';
+      return 'decaying';
+    }
+
+    /* Normalise the grid to the fixed 6×6 backing and drop any cell whose shape
+       or strain is invalid, or that falls outside the active grid — so a save
+       written at a different tier (a "grid shape changed") can never throw.
+       GAME-DEV-PRACTICES #7: called from applyState AND every unlock/expand. */
+    function ensureGardenShape() {
+      if (!Array.isArray(gardenPlots)) gardenPlots = [];
+      gardenPlots.length = GARDEN_MAX;
+      const S = gardenSide();
+      for (let i = 0; i < GARDEN_MAX; i++) {
+        let cell = gardenPlots[i];
+        if (cell && (typeof cell !== 'object' || typeof cell.s !== 'string' || typeof cell.t !== 'number')) cell = null;
+        if (cell && cell.s !== 'blight' && !strainById(cell.s)) cell = null;
+        const r = Math.floor(i / 6), c = i % 6;
+        if (!(r < S && c < S)) cell = null;
+        gardenPlots[i] = cell || null;
+      }
+    }
+
     /* Feats — each earned one is a permanent +1% to all production (achMult).
        check() reads live state; it runs only for feats not yet earned. */
     function totalBuildings() { let n = 0; for (const b of BUILDINGS) n += owned[b.id]; return n; }
@@ -1230,6 +1406,9 @@
       { id:'spell1', name:'Dabbler in Death', desc:'Cast your first spell',    check:() => spellsCast >= 1 },
       { id:'spell2', name:'Grave Sorcerer',   desc:'Cast 100 spells',         check:() => spellsCast >= 100 },
       { id:'spell3', name:'Spelling Mistake', desc:'Survive a spell backfire', check:() => spellsBackfired >= 1 },
+      { id:'grd1', name:'Grave Gardener',   desc:'Plant your first seed',   check:() => gardenPlanted >= 1 },
+      { id:'grd2', name:'Necro-Botanist',   desc:'Discover 6 strains',      check:() => discoveredStrains.size >= 6 },
+      { id:'grd3', name:'Bountiful Harvest',desc:'Harvest 100 plants',      check:() => gardenHarvests >= 100 },
     ];
 
     /* ═══════ STATE ═══════ */
@@ -1286,6 +1465,14 @@
     let essence = 0;                /* Necrotic Essence — regenerating spell resource, capped at essenceMax() */
     let spellsCast = 0;             /* lifetime spells cast — drives the rising backfire chance (never reset) */
     let spellsBackfired = 0;        /* lifetime backfires survived (feat + stat) */
+    /* ── The Cursed Garden (permanent meta layer — survives prestige AND ascension) ── */
+    let gardenUnlocked = false;     /* tilled once by spending Grave Blooms; never re-locked */
+    let gardenTier = 0;             /* 0..3 → 3×3 … 6×6, expanded with Grave Blooms */
+    let gardenPlots = [];           /* 6×6 backing (length GARDEN_MAX); each cell null or { s:strainId, t:plantedAtMs } */
+    let discoveredStrains = new Set();/* strains unlocked via cross-breeding — the discovery hook (persisted) */
+    let gardenPlanted = 0;          /* lifetime seeds sown (feat) */
+    let gardenHarvests = 0;         /* lifetime plants harvested (feat + stat) */
+    let gardenSeed = null;          /* armed strain id for the next plant — transient, NEVER saved */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1609,7 +1796,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult();
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult();
     }
     /* Net production the player actually receives — gross minus wraith drain. */
     function getCPS() { return getGrossCPS() * wraithDrainMult(); }
@@ -1641,7 +1828,7 @@
        players who've played long enough to unlock it. */
     function getClickPower() {
       const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * metaClickMult();
-      return (base + (getCPS() * cpsClickPct / 100)) * buffClickMult();
+      return (base + (getCPS() * cpsClickPct / 100)) * buffClickMult() * gardenClickMult();
     }
 
     /* Every skull earned flows through here so the run total and the
@@ -2509,6 +2696,7 @@
       if (activeTab === 'reaping') renderReaping();
       if (activeTab === 'pet') renderPet();
       if (activeTab === 'grimoire') renderGrimoire();
+      if (activeTab === 'garden') renderGarden();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'feats') renderAchievements();
@@ -2838,6 +3026,7 @@
         <div class="stat-row"><span class="stat-label">Skullpocalypse</span><span class="stat-val">${!apocUnlocked ? 'Locked' : apocActive ? (apocCalm() ? 'Calmed' : APOC_PHASE_NAMES[apocPhase()]) : 'Dormant'}</span></div>
         <div class="stat-row"><span class="stat-label">Grimoire</span><span class="stat-val">${grimoireUnlocked ? 'Unearthed · ' + formatNum(Math.floor(Math.min(essence, essenceMax()))) + '/' + formatNum(essenceMax()) + ' Essence' : 'Buried'}</span></div>
         <div class="stat-row"><span class="stat-label">Spells cast / backfired</span><span class="stat-val">${formatNum(spellsCast)} / ${formatNum(spellsBackfired)}</span></div>
+        <div class="stat-row"><span class="stat-label">Cursed Garden</span><span class="stat-val">${gardenUnlocked ? gardenSide() + '×' + gardenSide() + ' · ' + STRAINS.filter(s => s.plantable && discoveredStrains.has(s.id)).length + '/' + STRAINS.filter(s => s.plantable).length + ' strains · ' + formatNum(gardenHarvests) + ' harvested' : 'Untilled'}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -2855,7 +3044,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','reaping','pet','grimoire','feats','ranks','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','reaping','pet','grimoire','garden','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         const on = tabs[i] === tab;
         btn.classList.toggle('active', on);
@@ -3006,7 +3195,10 @@
 
     /* Wipe the RUN (not the meta): skulls, buildings, base+synergy upgrades and
        run milestones. Lifetime, prestige, shards, feats, cosmetics and every
-       Reaping stat are left alone by design. */
+       Reaping stat are left alone by design. The Grave Bloom layer, the Bound
+       Reaper, the Grimoire and the Cursed Garden (grid, discovered strains,
+       harvest/plant counts) are permanent meta layers and are DELIBERATELY not
+       touched here, so they survive both prestige and ascension. */
     function resetRun() {
       skulls = 0;
       totalSkulls = 0;
@@ -3290,6 +3482,336 @@
        while it is open — cheap, and never per frame. */
     setInterval(() => { if (activeTab === 'grimoire') renderGrimoire(); }, 1000);
 
+    /* ═══════ THE CURSED GARDEN — mults, actions, and the tick ═══════ */
+
+    /* Mature plants fold a small, capped bonus into production; blight drags it
+       down. Both channels iterate the (≤36-cell) array — negligible per call. */
+    function gardenCpsMult() {
+      if (!gardenUnlocked) return 1;
+      let bonus = 0, blight = 0;
+      for (const c of gardenPlots) {
+        if (!c) continue;
+        if (c.s === 'blight') { blight++; continue; }
+        if (plantStage(c) !== 'mature') continue;
+        const st = strainById(c.s);
+        if (st && st.cpsBonus) bonus += st.cpsBonus;
+      }
+      const pos = 1 + Math.min(GARDEN_CPS_CAP, bonus);
+      const pen = Math.max(GARDEN_BLIGHT_FLOOR, 1 - blight * GARDEN_BLIGHT_PER);
+      return pos * pen;
+    }
+    function gardenClickMult() {
+      if (!gardenUnlocked) return 1;
+      let bonus = 0;
+      for (const c of gardenPlots) {
+        if (!c || c.s === 'blight') continue;
+        if (plantStage(c) !== 'mature') continue;
+        const st = strainById(c.s);
+        if (st && st.clickBonus) bonus += st.clickBonus;
+      }
+      return 1 + Math.min(GARDEN_CLICK_CAP, bonus);
+    }
+
+    function gardenToast(msg) { showBuffToast('🌿 ' + msg, 'buff'); }
+
+    function unlockGarden() {
+      if (gardenUnlocked || graveBlooms < GARDEN_UNLOCK_BLOOMS) return;
+      graveBlooms -= GARDEN_UNLOCK_BLOOMS;
+      gardenUnlocked = true;
+      ensureGardenShape();
+      discoveredStrains.add('bone');
+      discoveredStrains.add('moss');
+      playStinger('legendary');
+      screenShake();
+      showBuffToast('🌱 The Cursed Garden is tilled', 'reap');
+      checkAchievements();
+      save();
+      render();
+      renderBuildings();
+    }
+
+    function expandGarden() {
+      if (!gardenUnlocked || gardenTier >= GARDEN_SIZES.length - 1) return;
+      const cost = GARDEN_EXPAND_COST[gardenTier + 1];
+      if (graveBlooms < cost) { gardenToast('Need ' + cost + ' Grave Blooms to expand'); return; }
+      graveBlooms -= cost;
+      gardenTier += 1;
+      ensureGardenShape();
+      playStinger('epic');
+      save();
+      render();
+    }
+
+    /* Arm/disarm a seed from the tray; the next click on an empty plot sows it. */
+    function armSeed(id) {
+      gardenSeed = (gardenSeed === id) ? null : id;
+      if (activeTab === 'garden') renderGarden();
+    }
+
+    /* One primary action per plot click — GAME-DEV-PRACTICES #8, each rejection
+       says why rather than silently no-opping. Non-mature plants are never culled
+       by a body click (avoids fat-finger loss); the ✕ control culls explicitly. */
+    function plotClick(i) {
+      if (!gardenUnlocked) return;
+      const c = gardenPlots[i];
+      if (c) {
+        if (c.s === 'blight') { cullPlot(i); return; }
+        const stg = plantStage(c);
+        if (stg === 'mature') { harvestPlot(i); return; }
+        gardenToast(stg === 'decaying' ? 'Overripe — cull it (✕) before it rots to blight' : 'Still growing…');
+        return;
+      }
+      if (!isActiveCell(i)) { gardenToast('That plot is not tilled yet'); return; }
+      if (!gardenSeed) { gardenToast('Pick a seed from the tray first'); return; }
+      plantSeed(i, gardenSeed);
+    }
+
+    function plantSeed(i, id) {
+      if (!gardenUnlocked) return;
+      if (!isActiveCell(i)) { gardenToast('That plot is not tilled yet'); return; }
+      if (gardenPlots[i]) { gardenToast('That plot is occupied'); return; }
+      const st = strainById(id);
+      if (!st || !st.plantable) { gardenToast('You cannot sow that'); return; }
+      if (!discoveredStrains.has(id)) { gardenToast('That strain is still undiscovered'); return; }
+      gardenPlots[i] = { s: id, t: Date.now() };
+      gardenPlanted += 1;
+      playSound('buy');
+      checkAchievements();
+      save();
+      renderGarden();
+    }
+
+    function harvestPlot(i) {
+      const c = gardenPlots[i];
+      if (!c || c.s === 'blight') return;
+      if (plantStage(c) !== 'mature') return;
+      const st = strainById(c.s);
+      const msg = (st && st.harvest) ? st.harvest() : '';
+      gardenPlots[i] = null;
+      gardenHarvests += 1;
+      if (st) discoveredStrains.add(st.id);
+      playStinger('rare');
+      checkAchievements();
+      save();
+      render();
+      renderGarden();
+      if (msg) showBuffToast('🌾 ' + msg, 'frenzy', st ? st.icon : undefined);
+    }
+
+    function cullPlot(i, e) {
+      if (e) e.stopPropagation();
+      if (!gardenPlots[i]) return;
+      gardenPlots[i] = null;
+      playSound('buy');
+      save();
+      render();
+      renderGarden();
+    }
+
+    /* Given the mature neighbour strains of an empty plot, pick the offspring:
+       the RAREST matching recipe if any pair matches, else a self-seeded copy of
+       a random neighbour so the garden keeps filling. Deterministic given the
+       neighbours; randomness lives only in whether the tick fires. */
+    function mutationOffspring(mats) {
+      const uniq = [...new Set(mats)];
+      let best = null, bestRank = -1;
+      for (let i = 0; i < uniq.length; i++) {
+        for (let j = i; j < uniq.length; j++) {
+          if (i === j && mats.filter(x => x === uniq[i]).length < 2) continue;
+          const key = [uniq[i], uniq[j]].sort().join('|');
+          const res = GARDEN_RECIPES[key];
+          if (res) { const rk = strainRank(res); if (rk > bestRank) { best = res; bestRank = rk; } }
+        }
+      }
+      if (best) return best;
+      return mats[Math.floor(Math.random() * mats.length)];
+    }
+
+    /* The slow idle loop: mature lilies summon cursed skulls, decaying plants rot
+       to blight, blight spreads, and empty plots cross-breed. Bails instantly
+       while the garden is un-tilled (marathon-safe). Growth itself needs no tick —
+       it is derived from timestamps and is already offline-aware. */
+    function gardenTick() {
+      if (!gardenUnlocked) return;
+      const S = gardenSide();
+      let changed = false, discovered = false;
+
+      for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
+        const cell = gardenPlots[r * 6 + c];
+        if (cell && cell.s !== 'blight' && plantStage(cell) === 'mature') {
+          const st = strainById(cell.s);
+          if (st && st.lily && Math.random() < LILY_SPAWN_CHANCE) spawnCursed({ storm: true });
+        }
+      }
+
+      for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
+        const idx = r * 6 + c, cell = gardenPlots[idx];
+        if (cell && cell.s !== 'blight' && plantStage(cell) === 'decaying' && Math.random() < DECAY_TO_BLIGHT_CHANCE) {
+          gardenPlots[idx] = { s: 'blight', t: Date.now() };
+          changed = true;
+        }
+      }
+
+      const blightIdx = [];
+      for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
+        const idx = r * 6 + c;
+        if (gardenPlots[idx] && gardenPlots[idx].s === 'blight') blightIdx.push([r, c]);
+      }
+      for (const [r, c] of blightIdx) {
+        if (Math.random() >= BLIGHT_SPREAD_CHANCE) continue;
+        const ns = activeNeighbors(r, c, S);
+        if (!ns.length) continue;
+        const [tr, tc] = ns[Math.floor(Math.random() * ns.length)];
+        const tIdx = tr * 6 + tc, tcell = gardenPlots[tIdx];
+        if (!tcell) { gardenPlots[tIdx] = { s: 'blight', t: Date.now() }; changed = true; }
+        else if (tcell.s !== 'blight' && Math.random() < 0.5) { gardenPlots[tIdx] = { s: 'blight', t: Date.now() }; changed = true; }
+      }
+
+      for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
+        const idx = r * 6 + c;
+        if (gardenPlots[idx]) continue;
+        const mats = [];
+        for (const [nr, nc] of activeNeighbors(r, c, S)) {
+          const ncell = gardenPlots[nr * 6 + nc];
+          if (ncell && ncell.s !== 'blight' && plantStage(ncell) === 'mature') mats.push(ncell.s);
+        }
+        if (mats.length < 2) continue;
+        if (Math.random() >= MUTATE_CHANCE) continue;
+        const off = mutationOffspring(mats);
+        if (!off) continue;
+        gardenPlots[idx] = { s: off, t: Date.now() };
+        changed = true;
+        if (!discoveredStrains.has(off)) { discoveredStrains.add(off); discovered = true; }
+      }
+
+      if (discovered) {
+        checkAchievements();
+        showBuffToast('🌾 A new strain takes root in your garden', 'frenzy');
+      }
+      /* Persist promptly only on a discovery (rare, meaningful); routine
+         mutation/blight churn rides the existing 30s autosave + beforeunload,
+         so this loop never hammers localStorage or the server. */
+      if (discovered) save();
+      if ((changed || discovered) && activeTab === 'garden') renderGarden();
+    }
+
+    function renderGarden() {
+      const el = document.getElementById('tab-garden');
+      if (!el) return;
+
+      if (!gardenUnlocked) {
+        const can = graveBlooms >= GARDEN_UNLOCK_BLOOMS;
+        el.innerHTML =
+          '<div class="prestige-panel">' +
+            '<div class="reaping-tier">The Cursed</div>' +
+            '<div class="reaping-sub">Garden</div>' +
+            '<div class="ascend-locked">Salted grave-soil waits behind your dominion. Till it with ' +
+              '<b>' + GARDEN_UNLOCK_BLOOMS + ' Grave Blooms</b> to sow strains that grow in real time — ' +
+              'each mature plant folds a small, permanent edge into your reaping, and adjacent plants ' +
+              'cross-breed into rarer, discoverable strains.<br><br>' +
+              'You have <b>' + formatNum(graveBlooms) + '</b> Grave Bloom' + (graveBlooms === 1 ? '' : 's') + '.</div>' +
+            '<button class="prestige-btn" ' + (can ? '' : 'disabled') + ' onclick="unlockGarden()">' +
+              (can ? 'Till the Garden — ' + GARDEN_UNLOCK_BLOOMS + ' Blooms' : 'Need ' + GARDEN_UNLOCK_BLOOMS + ' Grave Blooms') + '</button>' +
+          '</div>';
+        return;
+      }
+
+      const S = gardenSide();
+      const known = STRAINS.filter(s => s.plantable && discoveredStrains.has(s.id)).length;
+      const totalPlantable = STRAINS.filter(s => s.plantable).length;
+
+      let head =
+        '<div class="prestige-panel">' +
+          '<div class="reaping-tier" style="font-size:28px">The Cursed Garden</div>' +
+          '<div class="reaping-sub">Plants grow in real time — mature them for a bonus, harvest, and cross-breed</div>' +
+          '<div class="ascend-summary">Grid <b>' + S + '×' + S + '</b> · Strains discovered <b>' + known + '/' + totalPlantable + '</b>' +
+            ' · Harvested <b>' + formatNum(gardenHarvests) + '</b><br>' +
+            'Grave Blooms: <b>' + formatNum(graveBlooms) + '</b></div>';
+      if (gardenTier < GARDEN_SIZES.length - 1) {
+        const nextCost = GARDEN_EXPAND_COST[gardenTier + 1];
+        const canExp = graveBlooms >= nextCost;
+        head += '<button class="prestige-btn" ' + (canExp ? '' : 'disabled') + ' onclick="expandGarden()">' +
+          'Expand to ' + GARDEN_SIZES[gardenTier + 1] + '×' + GARDEN_SIZES[gardenTier + 1] + ' — ' + nextCost + ' Blooms</button>';
+      }
+      head += '</div>';
+
+      let grid = '<div class="garden-grid" style="grid-template-columns:repeat(' + S + ',1fr)">';
+      for (let r = 0; r < S; r++) {
+        for (let c = 0; c < S; c++) {
+          const idx = r * 6 + c;
+          const cell = gardenPlots[idx];
+          if (!cell) {
+            const armed = gardenSeed ? ' armed' : '';
+            const face = gardenSeed ? strainById(gardenSeed).emoji : '·';
+            grid += '<div class="garden-plot empty' + armed + '" onclick="plotClick(' + idx + ')" title="Empty plot">' +
+              '<span class="garden-emoji">' + face + '</span>' +
+              '<span class="garden-stage">' + (gardenSeed ? 'Plant' : 'Empty') + '</span></div>';
+            continue;
+          }
+          if (cell.s === 'blight') {
+            grid += '<div class="garden-plot blight" onclick="plotClick(' + idx + ')" title="Blight — click to cull">' +
+              '<button class="garden-cull" onclick="cullPlot(' + idx + ',event)" title="Cull">✕</button>' +
+              '<span class="garden-emoji">🕸️</span>' +
+              '<span class="garden-stage">BLIGHT</span></div>';
+            continue;
+          }
+          const st = strainById(cell.s);
+          const stg = plantStage(cell);
+          const f = Math.min(1, plantAge(cell) / st.growMs);
+          const pct = Math.round(f * 100);
+          const label = stg === 'mature' ? 'HARVEST' : stg === 'decaying' ? 'Overripe' : stg === 'sprout' ? 'Sprouting' : 'Seed';
+          const cull = '<button class="garden-cull" onclick="cullPlot(' + idx + ',event)" title="Cull">✕</button>';
+          grid += '<div class="garden-plot ' + stg + '" onclick="plotClick(' + idx + ')" title="' + st.name + '">' +
+            cull +
+            '<span class="garden-emoji">' + st.emoji + '</span>' +
+            '<span class="garden-stage">' + label + '</span>' +
+            (stg === 'mature' ? '' : '<span class="garden-bar"><span class="garden-fill" style="width:' + pct + '%"></span></span>') +
+            '</div>';
+        }
+      }
+      grid += '</div>';
+
+      let tray = '<div class="section-label">Seed Tray</div>';
+      const plantable = STRAINS.filter(s => s.plantable && discoveredStrains.has(s.id));
+      if (!plantable.length) {
+        tray += '<div class="garden-almanac-desc">No seeds yet.</div>';
+      } else {
+        tray += '<div class="garden-tray">';
+        for (const s of plantable) {
+          const armed = gardenSeed === s.id ? ' armed' : '';
+          tray += '<button class="garden-seed' + armed + '" onclick="armSeed(\'' + s.id + '\')">' +
+            '<span class="garden-emoji">' + s.emoji + '</span>' + s.name + '</button>';
+        }
+        tray += '</div>';
+        tray += '<div class="garden-almanac-desc">' +
+          (gardenSeed ? 'Armed: <b style="color:#ff5555">' + strainById(gardenSeed).name + '</b> — click an empty plot to sow.' : 'Pick a seed, then click an empty plot to sow it.') +
+          '</div>';
+      }
+
+      let almanac = '<div class="section-label">Almanac</div>';
+      for (const s of STRAINS) {
+        if (!s.plantable) continue;
+        const disc = discoveredStrains.has(s.id);
+        almanac += '<div class="garden-almanac-row' + (disc ? '' : ' undiscovered') + '">' +
+          '<div class="garden-almanac-name">' + (disc ? s.emoji + ' ' + s.name : '❓ ??? — cross-breed to discover') + '</div>' +
+          (disc ? '<div class="garden-almanac-desc">' + s.desc + '</div>' +
+                  '<div class="garden-almanac-eff">' + s.effect + '</div>' : '') +
+          '</div>';
+      }
+      /* Blight is a garden hazard, not a plantable strain — note it at the foot. */
+      almanac += '<div class="garden-almanac-row"><div class="garden-almanac-name">🕸️ Grave Blight</div>' +
+        '<div class="garden-almanac-desc">' + strainById('blight').desc + '</div>' +
+        '<div class="garden-almanac-eff">' + strainById('blight').effect + '</div></div>';
+
+      el.innerHTML = head + grid + tray + almanac;
+    }
+
+    /* Live-refresh the Garden tab (maturity bars) once a second while open, and
+       run the slow mutation/blight/lily loop on its own cadence. Both are cheap
+       no-ops until the garden is tilled. */
+    setInterval(() => { if (activeTab === 'garden') renderGarden(); }, 1000);
+    setInterval(gardenTick, GARDEN_TICK_MS);
+
     /* The running total an endless meta node is currently giving, for its row. */
     function metaNowLabel(m) {
       const lv = metaLvl(m.id);
@@ -3418,7 +3940,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 8;
+    const SAVE_VERSION = 9;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -3474,6 +3996,19 @@
       if (d.essence === undefined) d.essence = 0;
       if (d.spellsCast === undefined) d.spellsCast = 0;
       if (d.spellsBackfired === undefined) d.spellsBackfired = 0;
+      /* v9 — the Cursed Garden (permanent meta layer). A v7 OR v8 save loads with
+         the garden un-tilled, an empty grid at the smallest tier, and only the
+         starter strains known. The grid is normalised to the fixed 6×6 backing in
+         applyState via ensureGardenShape(), which drops any cell whose strain or
+         shape is invalid and clears anything outside the active grid — so a save
+         written at a different tier (a changed grid shape) can never throw.
+         Nothing existing is touched. */
+      if (d.gardenUnlocked === undefined) d.gardenUnlocked = false;
+      if (d.gardenTier === undefined) d.gardenTier = 0;
+      if (!Array.isArray(d.gardenPlots)) d.gardenPlots = [];
+      if (!Array.isArray(d.discoveredStrains)) d.discoveredStrains = [];
+      if (d.gardenPlanted === undefined) d.gardenPlanted = 0;
+      if (d.gardenHarvests === undefined) d.gardenHarvests = 0;
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -3498,6 +4033,8 @@
         petLevel, selectedAuras: [...selectedAuras],
         apocUnlocked, apocActive, apocStart, apocPacifiedUntil, apocEverActive, apocEverFull,
         grimoireUnlocked, essence, spellsCast, spellsBackfired,
+        gardenUnlocked, gardenTier, gardenPlots, gardenPlanted, gardenHarvests,
+        discoveredStrains: [...discoveredStrains],
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         boughtGhouls: [...boughtGhouls],
@@ -3580,6 +4117,18 @@
       essence = d.essence || 0;
       spellsCast = d.spellsCast || 0;
       spellsBackfired = d.spellsBackfired || 0;
+      /* The Cursed Garden. Growth is offline-aware for free: each plant carries a
+         planted-at timestamp, so plantStage() alone credits everything that grew
+         (and everything that went overripe) while away — no catch-up loop. Set the
+         tier first so ensureGardenShape() knows the active grid before normalising. */
+      gardenUnlocked = !!d.gardenUnlocked;
+      gardenTier = d.gardenTier || 0;
+      gardenPlots = Array.isArray(d.gardenPlots) ? d.gardenPlots : [];
+      discoveredStrains = new Set(Array.isArray(d.discoveredStrains) ? d.discoveredStrains : []);
+      gardenPlanted = d.gardenPlanted || 0;
+      gardenHarvests = d.gardenHarvests || 0;
+      ensureGardenShape();
+      if (gardenUnlocked) { discoveredStrains.add('bone'); discoveredStrains.add('moss'); }
       boughtUpgrades = new Set(d.boughtUpgrades);
       boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
