@@ -232,6 +232,11 @@ export async function onRequestPost(context) {
   /* Carried for display — a prestige tier beside the name is the visible
      reward for resetting. Bounded so a bad client cannot store nonsense. */
   const prestige = Math.max(0, Math.min(9999, Math.floor(Number(body.prestige) || 0)));
+  /* DISPLAY ONLY — the ascension (Reaping) count shown beside the name. It is
+     NOT a ranking key (all-time still ranks by lifetime score, season by
+     monthly skulls); it only ever ratchets up on an entry, exactly like the
+     prestige badge. Older entries have no field and render as 0 / no badge. */
+  const ascensions = Math.max(0, Math.min(99999, Math.floor(Number(body.ascensions) || 0)));
 
   /* SEASON board — skulls gathered this month, sent alongside the lifetime
      score. Handled first and independently so it still records even when the
@@ -243,8 +248,9 @@ export async function onRequestPost(context) {
     if (ex) {
       if (seasonScore > ex.score) { ex.score = seasonScore; ex.name = player.name; ex.prestige = prestige; ex.updatedAt = Date.now(); }
       else if (prestige > (ex.prestige || 0)) { ex.prestige = prestige; }
+      ex.ascensions = Math.max(ex.ascensions || 0, ascensions);   /* display badge, ratchets up */
     } else {
-      s.entries.push({ id: player.id, name: player.name, score: seasonScore, prestige, updatedAt: Date.now() });
+      s.entries.push({ id: player.id, name: player.name, score: seasonScore, prestige, ascensions, updatedAt: Date.now() });
     }
     s.entries.sort((a, b) => b.score - a.score);
     s.entries = s.entries.slice(0, 50);
@@ -259,18 +265,21 @@ export async function onRequestPost(context) {
       existing.score = score;
       existing.name = player.name;
       existing.prestige = prestige;
+      existing.ascensions = Math.max(existing.ascensions || 0, ascensions);
       existing.updatedAt = Date.now();
     } else {
-      /* Score only ever rises, but prestige can climb while the leaderboard
-         number is still catching up to a past run — keep the badge current. */
-      if (prestige > (existing.prestige || 0)) {
-        existing.prestige = prestige;
-        await env.MARKETPLACE.put(LB_KEY, JSON.stringify(lb));
-      }
+      /* Score only ever rises, but the prestige AND ascension badges can climb
+         while the leaderboard number is still catching up to a past run (a reap
+         resets prestige to 0 without changing lifetime) — keep both current. */
+      const newP = prestige > (existing.prestige || 0);
+      const newA = ascensions > (existing.ascensions || 0);
+      if (newP) existing.prestige = prestige;
+      if (newA) existing.ascensions = ascensions;
+      if (newP || newA) await env.MARKETPLACE.put(LB_KEY, JSON.stringify(lb));
       return json({ success: true, updated: false });
     }
   } else {
-    lb.push({ id: player.id, name: player.name, score, prestige, updatedAt: Date.now() });
+    lb.push({ id: player.id, name: player.name, score, prestige, ascensions, updatedAt: Date.now() });
   }
 
   lb.sort((a, b) => b.score - a.score);
