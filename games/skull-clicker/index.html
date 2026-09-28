@@ -568,6 +568,40 @@
     .bldg-lvcost .bloom-mini { width: 12px; height: 12px; object-fit: contain; image-rendering: pixelated; }
     .bldg-lv-tag { font-size: 13px; text-shadow: none; font-weight: 800; color: #ff5555; }
 
+    /* The Bound Reaper (pet) panel + animated sprite + aura rows. On-palette;
+       depth from borders and a drop-shadow on the NON-box sprite only. */
+    .pet-panel { text-align: center; padding: 14px 12px 12px; }
+    .pet-sprite {
+      width: 84px; height: 84px; margin: 0 auto;
+      background: url('assets/pet/reaper.png') 0 0 no-repeat;
+      background-size: 672px 84px;   /* 448×56 strip, 8 frames, scaled ×1.5 */
+      image-rendering: pixelated;
+      animation: pet-idle 0.9s steps(8) infinite;
+      filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.5));
+    }
+    @keyframes pet-idle { from { background-position-x: 0; } to { background-position-x: -672px; } }
+    .pet-name { font-family: var(--font-display); letter-spacing: normal; font-size: 22px; color: var(--red); margin-top: 6px; }
+    .pet-level { font-size: 17px; text-shadow: none; color: var(--text-pri); font-weight: 800; }
+    .pet-feed-info { font-size: 15px; text-shadow: none; color: var(--text-dim); margin: 8px 0 4px; }
+    .pet-feed-info b { color: #ff5555; }
+    .pet-have { color: var(--text-dim); }
+    .pet-feed-btn {
+      margin-top: 6px; padding: 9px 20px; background: var(--red); color: #fff; border: none;
+      border-radius: 6px; font-size: 17px; font-weight: 800; cursor: pointer; font-family: inherit;
+    }
+    .pet-feed-btn:not(:disabled):hover { background: #cc0000; }
+    .pet-feed-btn:disabled { opacity: 0.4; cursor: not-allowed; background: var(--gray-mid); color: var(--text-dim); }
+    .aura-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: var(--gray-lo); border: 1px solid var(--border); border-radius: 4px;
+      margin-bottom: 6px; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .aura-row:hover:not(.locked) { border-color: var(--red); }
+    .aura-row.equipped { border-color: var(--red); background: rgba(255, 0, 0, 0.06); }
+    .aura-row.locked { opacity: 0.4; cursor: not-allowed; }
+    .aura-on { font-size: 13px; text-shadow: none; color: var(--red); font-weight: 800; letter-spacing: 0.05em; }
+    @media (prefers-reduced-motion: reduce) { .pet-sprite { animation: none; } }
+
     /* Upgrade rows */
     .upgrade-row {
       display: flex;
@@ -777,6 +811,7 @@
       <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
       <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
       <button class="tab-btn" onclick="switchTab('reaping')">Reaping</button>
+      <button class="tab-btn" onclick="switchTab('pet')">Pet</button>
       <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
       <button class="tab-btn" onclick="switchTab('ranks')">Ranks</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
@@ -787,6 +822,7 @@
     <div class="tab-content" id="tab-upgrades"></div>
     <div class="tab-content" id="tab-prestige"></div>
     <div class="tab-content" id="tab-reaping"></div>
+    <div class="tab-content" id="tab-pet"></div>
     <div class="tab-content" id="tab-feats"></div>
     <div class="tab-content" id="tab-ranks"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
@@ -883,6 +919,26 @@
     const BLOOM_LEVEL_BONUS = 0.02;               /* +2% building output per level */
     const BLOOM_ICON = '/assets/images/eggs/egg-rare.png';
 
+    /* ═══════ THE BOUND REAPER (the Krumblor pet analog) ═══════
+       A companion you LEVEL by sacrificing buildings, unlocking passive AURA
+       slots as it grows. Auras are always-on while selected (not timed) and
+       each folds into a different system. Pet level + selected auras are a
+       PERMANENT meta layer — they survive prestige AND ascension (feeding
+       consumes run-reset `owned`, but the level persists, like Grave Blooms).
+       Sprite: games/skull-clicker/assets/pet/reaper.png — copied from the
+       mana-clash "Bringer of Death" enemy strip (8 frames, 56×56; itch pack). */
+    const PET_NAME = 'Bound Reaper';
+    const PET_AURA_SLOT_L1 = 3;    /* first aura slot unlocks at this level */
+    const PET_AURA_SLOT_L2 = 8;    /* second aura slot */
+    const AURAS = [
+      { id:'miasma_breath', name:'Miasma Breath', desc:'Production scales with your Miasma meter (up to ×2 at full)' },
+      { id:'ravenous',      name:'Ravenous',      desc:'×1.5 to all production' },
+      { id:'grave_fortune', name:'Grave Fortune', desc:'Cursed skulls appear 50% more often and pay 25% more' },
+      { id:'deathflight',   name:'Deathflight',   desc:'25% chance a cursed skull also grants a short Blood Rush' },
+      { id:'reapers_boon',  name:"Reaper's Boon", desc:'+25% Bone Shards and Epitaphs earned' },
+      { id:'hoard',         name:'Hoard',         desc:'+50% offline production' },
+    ];
+
     /* Prestige perks — bought with Bone Shards and kept forever across every
        future run. Two kinds:
 
@@ -971,7 +1027,7 @@
     function pendingEpitaphs() {
       const fromPrestige = Math.pow(Math.max(0, prestige), 1.5) / 4;
       const fromShards = boneShards > 0 ? Math.log10(boneShards + 1) : 0;
-      return Math.floor((fromPrestige + fromShards) * epitaphGainMult());
+      return Math.floor((fromPrestige + fromShards) * epitaphGainMult() * auraShardMult());
     }
     function canAscend() { return prestige >= ASCEND_MIN_PRESTIGE; }
 
@@ -1001,9 +1057,9 @@
        reset yields none and cannot be farmed), lifted by Bone Harvest. */
     function pendingShards() {
       const base = Math.floor(Math.cbrt(Math.max(0, totalSkulls) / 1e6));
-      return Math.floor(base * (1 + 0.04 * pLvl('t_shard')));
+      return Math.floor(base * (1 + 0.04 * pLvl('t_shard')) * auraShardMult());
     }
-    function offlineRate() { return pHas('offline2') ? 1.5 : (pHas('greed') ? 1 : 0.5); }
+    function offlineRate() { return (pHas('offline2') ? 1.5 : (pHas('greed') ? 1 : 0.5)) * (auraActive('hoard') ? 1.5 : 1); }
 
     const MILESTONES = [100, 1000, 10000, 100000, 1e6, 10e6, 100e6, 1e9, 10e9, 100e9, 1e12, 100e12, 10e15];
     const MS_NAMES = ['Apprentice','Acolyte','Dark Mage','Necromancer','Lich King','Shadow Lord','Void Walker','Chaos Weaver','Reality Bender','Cosmic Terror','Eternal One','Skull God','Bone Absolute'];
@@ -1077,6 +1133,9 @@
     let graveBlooms = 0;            /* harvested blooms available to spend */
     let bloomStart = Date.now();    /* when the currently-ripening bloom began (real-time, offline-aware) */
     let buildingLevels = {};        /* building id -> bloom level (+2% output each) */
+    /* ── The Bound Reaper (permanent meta layer — survives prestige AND ascension) ── */
+    let petLevel = 0;               /* raised by feeding (sacrificing buildings) */
+    let selectedAuras = [];         /* active passive auras, up to auraSlots() */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1308,6 +1367,47 @@
       renderWorld();
     }
 
+    /* ── Bound Reaper (pet) helpers ── */
+    function auraSlots() { return petLevel >= PET_AURA_SLOT_L2 ? 2 : petLevel >= PET_AURA_SLOT_L1 ? 1 : 0; }
+    function auraActive(id) { return selectedAuras.includes(id); }
+    /* The pet eats progressively higher building tiers as it levels; the count
+       it demands grows with its level. Consumes run-reset `owned`; level persists. */
+    function petFeedBuilding() { return BUILDINGS[Math.min(petLevel, BUILDINGS.length - 1)]; }
+    function petFeedCount() { return 10 + petLevel * 5; }
+    function feedPet(e) {
+      const b = petFeedBuilding();
+      const need = petFeedCount();
+      if ((owned[b.id] || 0) < need) { shakeReject(e); return; }
+      owned[b.id] -= need;
+      petLevel += 1;
+      playStinger('epic');
+      save();
+      render();
+      renderWorld();
+    }
+    /* Equip/unequip an aura. When a slot is full, the newest replaces the oldest
+       so switching is one click. */
+    function toggleAura(id) {
+      if (auraActive(id)) {
+        selectedAuras = selectedAuras.filter(x => x !== id);
+      } else {
+        if (auraSlots() <= 0) return;
+        if (selectedAuras.length >= auraSlots()) selectedAuras.shift();
+        selectedAuras.push(id);
+      }
+      save();
+      render();
+    }
+    /* Aura effect readers, folded into their systems below. */
+    function petAuraCpsMult() {
+      let m = 1;
+      if (auraActive('ravenous')) m *= 1.5;
+      if (auraActive('miasma_breath')) m *= (1 + miasma());
+      return m;
+    }
+    function windfallMult()   { return auraActive('grave_fortune') ? 1.25 : 1; }
+    function auraShardMult()  { return auraActive('reapers_boon') ? 1.25 : 1; }
+
     /* ═══════ TIMED BUFF / DEBUFF FRAMEWORK ═══════
        Add a timed effect; re-collecting the same id refreshes it rather than
        stacking a duplicate. cpsMult/clickMult default to 1 (no effect on that
@@ -1356,7 +1456,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * buffCpsMult();
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * buffCpsMult();
     }
 
     /* Blood Rush multiplies the WHOLE click, not just the base term. It used
@@ -1617,8 +1717,10 @@
     let cursedTimer = null;
 
     function cursedFreqMult() {
-      /* Prestige perks shorten the wait; a stream event can too. */
-      return (pHas('omen') ? 1.5 : 1) * (1 + 0.08 * pLvl('t_omen')) * (window.__streamFrenzy ? 3 : 1);
+      /* Prestige perks shorten the wait; a stream event and the Grave Fortune
+         aura can too. */
+      return (pHas('omen') ? 1.5 : 1) * (1 + 0.08 * pLvl('t_omen')) *
+        (window.__streamFrenzy ? 3 : 1) * (auraActive('grave_fortune') ? 1.5 : 1);
     }
 
     function scheduleCursed() {
@@ -1682,6 +1784,11 @@
       opts = opts || {};
       cursedPopped++;
       const res = rollCursedOutcome(!opts.storm);
+      /* Deathflight aura: a chance the skull also grants a short Blood Rush. */
+      if (auraActive('deathflight') && Math.random() < 0.25) {
+        addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:8000, icon:'🩸', chipClass:'rush' });
+        res.msg += ' · Deathflight!';
+      }
       /* Fated: a chance the skull also drops a Bone Shard. */
       if (pHas('luckyskull') && Math.random() < 0.12) {
         boneShards += 1;
@@ -1723,13 +1830,13 @@
     }
     /* Lucky — a capped windfall: 15% of the bank (cap) plus a minute of CpS. */
     function outLucky() {
-      const reward = Math.min(Math.max(skulls * 0.15, getClickPower() * 20), getCPS() * 900) + getCPS() * 60;
+      const reward = (Math.min(Math.max(skulls * 0.15, getClickPower() * 20), getCPS() * 900) + getCPS() * 60) * windfallMult();
       earn(reward);
       return { msg:'LUCKY — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon' };
     }
     /* Reap — the big windfall (scales with the Plunder perk). */
     function outReap() {
-      const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult();
+      const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult() * windfallMult();
       earn(reap);
       return { msg:'REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'epic' };
     }
@@ -1740,7 +1847,7 @@
       const b = ownedB[Math.floor(Math.random() * ownedB.length)];
       const perSec = b.baseCps * owned[b.id] * getBuildingMult(b) * globalCpsMult *
         getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult();
-      const reward = Math.max(perSec * (60 + Math.random() * 180), getClickPower() * 50);
+      const reward = Math.max(perSec * (60 + Math.random() * 180), getClickPower() * 50) * windfallMult();
       earn(reward);
       return { msg:b.name + ' SPECIAL — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon' };
     }
@@ -2029,6 +2136,7 @@
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
       if (activeTab === 'prestige') renderPrestige();
       if (activeTab === 'reaping') renderReaping();
+      if (activeTab === 'pet') renderPet();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'feats') renderAchievements();
@@ -2353,6 +2461,7 @@
         <div class="stat-row"><span class="stat-label">Epitaphs</span><span class="stat-val">${formatNum(epitaphs)}</span></div>
         <div class="stat-row"><span class="stat-label">Grave Blooms</span><span class="stat-val">${formatNum(graveBlooms)}${readyBlooms() > 0 ? ' (+' + readyBlooms() + ' ripe)' : ''}</span></div>
         <div class="stat-row"><span class="stat-label">Building levels</span><span class="stat-val">${BUILDINGS.reduce((s, b) => s + buildingLevel(b.id), 0)}</span></div>
+        <div class="stat-row"><span class="stat-label">${PET_NAME}</span><span class="stat-val">Level ${petLevel}${selectedAuras.length ? ' · ' + selectedAuras.length + ' aura' + (selectedAuras.length === 1 ? '' : 's') : ''}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -2370,7 +2479,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','reaping','feats','ranks','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','reaping','pet','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         const on = tabs[i] === tab;
         btn.classList.toggle('active', on);
@@ -2691,6 +2800,45 @@
         '</div>' + shop;
     }
 
+    /* ═══════ THE BOUND REAPER (pet) ═══════ */
+    function renderPet() {
+      const el = document.getElementById('tab-pet');
+      const b = petFeedBuilding();
+      const need = petFeedCount();
+      const have = owned[b.id] || 0;
+      const canFeed = have >= need;
+      const slots = auraSlots();
+
+      const slotText = slots === 0
+        ? 'Reach level ' + PET_AURA_SLOT_L1 + ' to unlock an aura slot'
+        : selectedAuras.length + '/' + slots + ' aura' + (slots === 1 ? '' : 's') + ' active' +
+          (slots < 2 ? ' · 2nd slot at level ' + PET_AURA_SLOT_L2 : '');
+
+      let auraHtml = '';
+      for (const a of AURAS) {
+        const active = auraActive(a.id);
+        const locked = slots <= 0;
+        const state = active ? 'equipped' : locked ? 'locked' : '';
+        auraHtml += '<div class="aura-row ' + state + '" onclick="' + (locked ? '' : "toggleAura('" + a.id + "')") + '">' +
+          '<div class="cosmetic-info"><div class="cosmetic-name">' + a.name +
+          (active ? ' <span class="aura-on">ACTIVE</span>' : '') + '</div>' +
+          '<div class="cosmetic-desc">' + a.desc + '</div></div></div>';
+      }
+
+      el.innerHTML =
+        '<div class="pet-panel">' +
+          '<div class="pet-sprite"></div>' +
+          '<div class="pet-name">' + PET_NAME + '</div>' +
+          '<div class="pet-level">Level ' + petLevel + '</div>' +
+          '<div class="pet-feed-info">Feed: sacrifice <b>' + need + '</b> ' + escSkull(b.name) + (need === 1 ? '' : 's') +
+            ' <span class="pet-have">(you have ' + formatNum(have) + ')</span></div>' +
+          '<button class="pet-feed-btn" ' + (canFeed ? '' : 'disabled') + ' onclick="feedPet(event)">' +
+            (canFeed ? 'Feed the ' + PET_NAME : 'Need ' + need + ' ' + escSkull(b.name)) + '</button>' +
+        '</div>' +
+        '<div class="section-label">Auras — ' + slotText + '</div>' +
+        auraHtml;
+    }
+
     /* The running total an endless meta node is currently giving, for its row. */
     function metaNowLabel(m) {
       const lv = metaLvl(m.id);
@@ -2770,7 +2918,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 5;
+    const SAVE_VERSION = 6;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -2808,6 +2956,9 @@
       if (d.graveBlooms === undefined) d.graveBlooms = 0;
       if (!d.bloomStart) d.bloomStart = Date.now();
       if (!d.buildingLevels || typeof d.buildingLevels !== 'object') d.buildingLevels = {};
+      /* v6 — the Bound Reaper (pet). A v5 save loads at level 0 with no auras. */
+      if (d.petLevel === undefined) d.petLevel = 0;
+      if (!Array.isArray(d.selectedAuras)) d.selectedAuras = [];
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -2829,6 +2980,7 @@
         boneShards, cursedPopped, seasonBaseline, seasonMonth,
         ascensions, epitaphs, metaLevels, highestPrestige,
         graveBlooms, bloomStart, buildingLevels,
+        petLevel, selectedAuras: [...selectedAuras],
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         boughtGhouls: [...boughtGhouls],
@@ -2899,6 +3051,8 @@
       graveBlooms = d.graveBlooms || 0;
       bloomStart = d.bloomStart || Date.now();
       buildingLevels = (d.buildingLevels && typeof d.buildingLevels === 'object') ? d.buildingLevels : {};
+      petLevel = d.petLevel || 0;
+      selectedAuras = Array.isArray(d.selectedAuras) ? d.selectedAuras : [];
       boughtUpgrades = new Set(d.boughtUpgrades);
       boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
