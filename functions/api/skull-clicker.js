@@ -126,9 +126,16 @@ async function rolloverSeason(env) {
 function num(v) { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; }
 function lifetimeOf(state) { return Math.max(num(state && state.lifetimeSkulls), num(state && state.totalSkulls)); }
 function prestigeOf(state) { return Math.floor(num(state && state.prestige)); }
+function ascensionOf(state) { return Math.floor(num(state && state.ascensions)); }
 
-/** True when `a` should win the merge over `b`. */
+/** True when `a` should win the merge over `b`.
+ *  Ascension outranks prestige, which outranks lifetime. A reap resets prestige
+ *  to 0 while raising ascension, so ranking ascension FIRST is what stops the
+ *  merge from silently reverting a freshly-ascended save to the old one. Kept
+ *  identical to the client's serverOutranks(). */
 function outranks(a, b) {
+  const aa = ascensionOf(a), ab = ascensionOf(b);
+  if (aa !== ab) return aa > ab;
   const pa = prestigeOf(a), pb = prestigeOf(b);
   if (pa !== pb) return pa > pb;
   return lifetimeOf(a) > lifetimeOf(b);

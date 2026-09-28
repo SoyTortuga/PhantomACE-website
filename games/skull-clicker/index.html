@@ -220,6 +220,16 @@
     .perk-now { color: #6ac46a; font-size: 14px;
  text-shadow: none; }
 
+    /* The Reaping (ascension) — reuses prestige-panel / upgrade-row / shard-balance.
+       Meta levels are red (never purple) to stay on the black/grey/red/white palette. */
+    .meta-lvl { font-size: 14px; text-shadow: none; font-weight: 800; color: #ff5555; margin-left: 4px; }
+    .ascend-summary { font-size: 15px; text-shadow: none; color: var(--text-dim); margin: 6px 0 2px; line-height: 1.5; }
+    .ascend-summary b { color: #ff5555; }
+    .ascend-locked { text-align: center; color: var(--text-dim); padding: 30px 18px; font-size: 16px; line-height: 1.6; }
+    .ascend-locked b { color: #ff5555; }
+    .reaping-tier { font-size: 36px; font-weight: 800; color: var(--red); }
+    .reaping-sub { font-size: 17px; text-shadow: none; color: var(--text-pri); margin-top: 4px; }
+
     /* Ranks / leaderboard */
     .ranks-toggle { display: flex; gap: 4px; margin-bottom: 10px; }
     .ranks-tab {
@@ -250,7 +260,7 @@
     .ranks-empty { text-align: center; color: var(--text-pri); font-size: 17px;
  text-shadow: none; padding: 24px; }
     .tab-btn:hover { color: #ff4444; }
-    /* Seven tabs: on a narrow phone they must NOT squeeze below their text
+    /* Eight tabs: on a narrow phone they must NOT squeeze below their text
        (that ran the labels together). Keep each at its content width — grow
        to fill on a wide screen, never shrink — and let the bar scroll
        horizontally when they don't all fit. */
@@ -708,6 +718,7 @@
       <button class="tab-btn active" onclick="switchTab('buildings')">Buildings</button>
       <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
       <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
+      <button class="tab-btn" onclick="switchTab('reaping')">Reaping</button>
       <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
       <button class="tab-btn" onclick="switchTab('ranks')">Ranks</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
@@ -717,6 +728,7 @@
     <div class="tab-content active" id="tab-buildings"></div>
     <div class="tab-content" id="tab-upgrades"></div>
     <div class="tab-content" id="tab-prestige"></div>
+    <div class="tab-content" id="tab-reaping"></div>
     <div class="tab-content" id="tab-feats"></div>
     <div class="tab-content" id="tab-ranks"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
@@ -821,6 +833,62 @@
       { id:'t_shard',   type:'tiered', name:'Bone Harvest',     base:12, growth:1.7,  max:25,  per:0.04, unit:'shards',     desc:'+4% Bone Shards earned on prestige' },
     ];
 
+    /* ═══════ ASCENSION — "THE REAPING" ═══════
+       The meta-layer above prestige. Reaping resets the whole prestige climb
+       (tier, Bone Shards, the shard shop) in exchange for EPITAPHS — a
+       permanent currency that buys an ENDLESS, geometrically-priced meta-tree.
+       Lifetime skulls, feats and cosmetics are never touched, so the
+       leaderboard and every maxed player survive a reap untouched.
+
+       META has two kinds, mirroring PERKS:
+         'once'    — a single unlock (automation), stored in the `metaPerks` Set.
+         'endless' — bought forever; the level lives in `metaLevels`, each level
+                     costs base·growth^level. Two headline nodes (production,
+                     click) are pure multipliers with NO cap, so the ceiling can
+                     never return. Effects are read live by the compute helpers. */
+    const ASCEND_MIN_PRESTIGE = 15;   /* a genuine end-game gate */
+    const META = [
+      // ── Automation (one-time unlocks) ──
+      { id:'auto_click',    type:'once', cost:3,  name:'Grasping Hands',    desc:'The skull is struck for you, without pause' },
+      { id:'auto_buy',      type:'once', cost:6,  name:'Dutiful Dead',      desc:'Your coffers buy the cheapest building on their own' },
+      { id:'auto_cursed',   type:'once', cost:10, name:'Ever-Watchful',     desc:'Cursed skulls are caught the moment they drift by' },
+      { id:'auto_prestige', type:'once', cost:25, name:'Eternal Cycle',     desc:'Prestige fires itself the instant the bar is full' },
+      // ── Endless climbs (repeatable, no ceiling) ──
+      { id:'m_prod',    type:'endless', base:1, growth:1.55, per:0.10,           unit:'prod',    name:'Deathless Toil',    desc:'+10% to all production' },
+      { id:'m_click',   type:'endless', base:1, growth:1.55, per:0.12,           unit:'click',   name:'Reapers Grip',      desc:'+12% click power' },
+      { id:'m_epitaph', type:'endless', base:2, growth:1.7,  per:0.08,           unit:'epitaph', name:'Richer Graves',     desc:'+8% Epitaphs earned when you reap' },
+      { id:'m_start',   type:'endless', base:3, growth:1.8,  per:1,              unit:'build',   name:'Grave Inheritance', desc:'Begin each run with +1 of every building' },
+      { id:'m_prcost',  type:'endless', base:2, growth:1.6,  per:0.05, max:18,   unit:'cheaper', name:'Hasten the Cycle',  desc:'Prestige needs 5% fewer skulls' },
+    ];
+
+    /* ── Meta readers ── */
+    function metaHas(id) { return metaPerks.has(id); }
+    function metaLvl(id) { return metaLevels[id] || 0; }
+    function metaDef(id) { return META.find(m => m.id === id); }
+    function metaCost(m) {
+      if (m.type !== 'endless') return m.cost;
+      return Math.ceil(m.base * Math.pow(m.growth, metaLvl(m.id)));
+    }
+    function metaMaxed(m) { return m.type !== 'endless' ? metaHas(m.id) : (m.max ? metaLvl(m.id) >= m.max : false); }
+
+    /* ── Aggregated meta effects (read live each frame) ── */
+    function metaProdMult()     { return 1 + 0.10 * metaLvl('m_prod'); }
+    function metaClickMult()    { return 1 + 0.12 * metaLvl('m_click'); }
+    function epitaphGainMult()  { return 1 + 0.08 * metaLvl('m_epitaph'); }
+    function prestigeCostMult() { return Math.max(0.1, 1 - 0.05 * metaLvl('m_prcost')); }
+
+    /* Epitaphs a reap would grant. Driven mainly by the prestige tier reached
+       this cycle (prestige^1.5, so climbing higher pays more), plus a small
+       log-scaled bonus that finally gives idle Bone Shards a purpose, all
+       lifted by Richer Graves. Monotonic in prestige, so a higher climb always
+       reaps more. */
+    function pendingEpitaphs() {
+      const fromPrestige = Math.pow(Math.max(0, prestige), 1.5) / 4;
+      const fromShards = boneShards > 0 ? Math.log10(boneShards + 1) : 0;
+      return Math.floor((fromPrestige + fromShards) * epitaphGainMult());
+    }
+    function canAscend() { return prestige >= ASCEND_MIN_PRESTIGE; }
+
     /* ── Perk readers ── */
     function pHas(id) { return perks.has(id); }
     function pLvl(id) { return perkLevels[id] || 0; }
@@ -911,6 +979,12 @@
     let boneShards = 0;             /* prestige currency, spent in the shop */
     let perks = new Set();          /* one-time prestige perks owned */
     let perkLevels = {};            /* tiered prestige perk -> level */
+    /* ── Ascension (The Reaping) ── */
+    let ascensions = 0;             /* times reaped — the meta-prestige tier */
+    let epitaphs = 0;               /* meta currency, spent in the Reaping tree */
+    let metaLevels = {};            /* endless meta node -> level */
+    let metaPerks = new Set();      /* one-time meta unlocks (automation) owned */
+    let highestPrestige = 0;        /* best prestige tier ever reached (history kept through a reap) */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1088,7 +1162,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * frenzyMult;
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * frenzyMult;
     }
 
     /* Blood Rush multiplies the WHOLE click, not just the base term. It used
@@ -1100,7 +1174,7 @@
        click is actually worth, or the buff is invisible for exactly the
        players who've played long enough to unlock it. */
     function getClickPower() {
-      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult();
+      const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * metaClickMult();
       return (base + (getCPS() * cpsClickPct / 100)) * clickBuffMult;
     }
 
@@ -1376,6 +1450,18 @@
         popCursed(el);
         scheduleCursed();
       });
+
+      /* Ever-Watchful (meta): catch the skull automatically a beat after it
+         appears, so it is never missed. */
+      if (metaHas('auto_cursed')) {
+        setTimeout(() => {
+          if (done) return;
+          done = true;
+          clearTimeout(life);
+          popCursed(el);
+          scheduleCursed();
+        }, 1500);
+      }
     }
 
     function popCursed(el) {
@@ -1667,6 +1753,7 @@
       document.getElementById('score').textContent = formatNum(Math.floor(skulls));
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
       if (activeTab === 'prestige') renderPrestige();
+      if (activeTab === 'reaping') renderReaping();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'feats') renderAchievements();
@@ -1901,6 +1988,10 @@
         <div class="stat-row"><span class="stat-label">Current skulls</span><span class="stat-val">${formatNum(skulls)}</span></div>
         <div class="stat-row"><span class="stat-label">Total clicks</span><span class="stat-val">${totalClicks.toLocaleString()}</span></div>
         <div class="stat-row"><span class="stat-label">Time played</span><span class="stat-val">${formatTime(elapsed)}</span></div>
+        <div class="stat-row"><span class="stat-label">Prestige tier</span><span class="stat-val">${prestige}</span></div>
+        <div class="stat-row"><span class="stat-label">Highest prestige</span><span class="stat-val">${highestPrestige}</span></div>
+        <div class="stat-row"><span class="stat-label">Ascensions</span><span class="stat-val">${ascensions}</span></div>
+        <div class="stat-row"><span class="stat-label">Epitaphs</span><span class="stat-val">${formatNum(epitaphs)}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -1916,7 +2007,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','feats','ranks','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','reaping','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         const on = tabs[i] === tab;
         btn.classList.toggle('active', on);
@@ -1958,6 +2049,49 @@
 
     setInterval(tick, 100);
 
+    /* ═══════ AUTOMATION (Reaping meta unlocks) ═══════
+       Each loop is a cheap no-op until its meta node is unlocked. Fast loop
+       for the auto-click feel; a slower loop for the bookkeeping actions so
+       buying/prestiging never floods the render or the network. */
+    function autoClickTick() {
+      if (!metaHas('auto_click')) return;
+      let power = getClickPower();
+      if (Math.random() < critChance()) power *= critMult();
+      earn(power);
+      totalClicks++;
+      if (raidActive()) raidQueue++;
+    }
+    setInterval(autoClickTick, 200);
+
+    /* Buy the cheapest affordable building; returns whether anything was bought. */
+    function buyCheapestAffordable() {
+      let best = null, bestCost = Infinity;
+      for (const b of BUILDINGS) {
+        const c = getBuildingCost(b);
+        if (c <= skulls && c < bestCost) { best = b; bestCost = c; }
+      }
+      if (!best) return false;
+      skulls -= bestCost;
+      owned[best.id] += 1;
+      lastBought = best.id;
+      return true;
+    }
+
+    function autoManageTick() {
+      let touched = false;
+      if (metaHas('auto_buy')) {
+        /* A few per second so it feels alive without a per-frame loop. */
+        for (let i = 0; i < 5 && buyCheapestAffordable(); i++) touched = true;
+      }
+      if (metaHas('auto_prestige') && canPrestige()) { doPrestige(true); touched = true; }
+      if (touched) {
+        checkAchievements();
+        if (activeTab === 'buildings') renderBuildings();
+        renderWorld();
+      }
+    }
+    setInterval(autoManageTick, 1000);
+
     /* ═══════ CHANNEL POINT BOOST ═══════ */
 
     function checkSkullBoost() {
@@ -1994,28 +2128,24 @@
     /* The bar to reset rises each tier: 1,000,000 this run for the first
        prestige, ten times as much for each after. Steep on purpose — a
        prestige should be earned, and the multiplier it grants is forever. */
-    function prestigeRequirement() { return 1e6 * Math.pow(10, prestige); }
+    function prestigeRequirement() { return 1e6 * Math.pow(10, prestige) * prestigeCostMult(); }
     function canPrestige() { return totalSkulls >= prestigeRequirement(); }
 
-    function doPrestige() {
-      if (!canPrestige()) return;
-      const nextMult = 1 + 0.1 * (prestige + 1);
-      const gained = pendingShards();
-      if (!confirm('Prestige to tier ' + (prestige + 1) + '? This resets this run — skulls, ' +
-                   'buildings and upgrades — but grants a permanent ' + nextMult.toFixed(1) +
-                   'x to everything, forever' + (gained > 0 ? ', and ' + gained + ' Bone Shard' + (gained === 1 ? '' : 's') + ' to spend in the shop' : '') +
-                   '. Your lifetime total and rank are kept.')) return;
+    /* Free buildings a fresh run starts with — from the Headstart/Standing
+       Legion perks AND the permanent Grave Inheritance meta node. Called by
+       both a prestige and a reap so the two stay in step. */
+    function applyStartBonuses() {
+      if (pHas('headstart')) { owned.shard += 10; owned.ghost += 5; }
+      const legion = pLvl('t_start');
+      if (legion > 0) { ['shard', 'ghost', 'crypt', 'altar', 'army'].forEach(id => { owned[id] += legion; }); }
+      const inherit = metaLvl('m_start');
+      if (inherit > 0) { BUILDINGS.forEach(b => { owned[b.id] += inherit; }); }
+    }
 
-      /* Legacy perk keeps the base upgrades; capture them before the wipe. */
-      const keptUpgrades = perks.has('legacy')
-        ? [...boughtUpgrades].filter(id => UPGRADES.some(u => u.id === id)) : [];
-
-      prestige += 1;
-      boneShards += gained;
-
-      /* Reset the RUN. Lifetime, prestige, shards and cosmetics are untouched
-         — the first two are what the leaderboard and the save-merge rank on,
-         so a reset can never cost standing or be undone by a sync. */
+    /* Wipe the RUN (not the meta): skulls, buildings, base+synergy upgrades and
+       run milestones. Lifetime, prestige, shards, feats, cosmetics and every
+       Reaping stat are left alone by design. */
+    function resetRun() {
       skulls = 0;
       totalSkulls = 0;
       clickBonus = 0;
@@ -2027,6 +2157,26 @@
       boughtUpgrades = new Set();
       hitMilestones = new Set();
       startTime = Date.now();
+    }
+
+    function doPrestige(silent) {
+      if (!canPrestige()) return;
+      const nextMult = 1 + 0.1 * (prestige + 1);
+      const gained = pendingShards();
+      if (!silent && !confirm('Prestige to tier ' + (prestige + 1) + '? This resets this run — skulls, ' +
+                   'buildings and upgrades — but grants a permanent ' + nextMult.toFixed(1) +
+                   'x to everything, forever' + (gained > 0 ? ', and ' + gained + ' Bone Shard' + (gained === 1 ? '' : 's') + ' to spend in the shop' : '') +
+                   '. Your lifetime total and rank are kept.')) return;
+
+      /* Legacy perk keeps the base upgrades; capture them before the wipe. */
+      const keptUpgrades = perks.has('legacy')
+        ? [...boughtUpgrades].filter(id => UPGRADES.some(u => u.id === id)) : [];
+
+      prestige += 1;
+      if (prestige > highestPrestige) highestPrestige = prestige;
+      boneShards += gained;
+
+      resetRun();
 
       /* Legacy: restore the kept upgrades and re-apply their baked effects
          (clickMulti/globalCpsMult were just reset). */
@@ -2034,18 +2184,73 @@
         const u = UPGRADES.find(x => x.id === id);
         if (u) { boughtUpgrades.add(id); if (u.apply) u.apply(); }
       }
-      /* Headstart: a few free buildings so the early grind is shorter. */
-      if (pHas('headstart')) { owned.shard += 10; owned.ghost += 5; }
-      /* Standing Legion: +1 of each of the first five buildings per level. */
-      const legion = pLvl('t_start');
-      if (legion > 0) { ['shard', 'ghost', 'crypt', 'altar', 'army'].forEach(id => { owned[id] += legion; }); }
+      applyStartBonuses();
+
+      if (!silent) {
+        const el = document.createElement('div');
+        el.className = 'milestone';
+        el.innerHTML = '<h3>PRESTIGE ' + prestige + '</h3><p>' + getPrestigeMult().toFixed(1) + 'x forever</p>';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2600);
+      }
+
+      /* Auto-prestige (silent) leans on the 30s autosave rather than hammering
+         the server every time the bar refills. */
+      if (!silent) save();
+      render();
+      renderWorld();
+    }
+
+    /* ═══════ THE REAPING (ascension) ═══════
+       The one meta-reset. Converts the whole prestige climb — tier, Bone
+       Shards, the entire shard shop — into Epitaphs, then wipes it so it can be
+       re-climbed with the permanent meta-tree behind you. Lifetime skulls,
+       feats, cosmetics and the meta-tree itself are kept, so no maxed player is
+       wiped and the leaderboard (lifetime) is untouched. */
+    function doAscend() {
+      if (!canAscend()) return;
+      const gained = pendingEpitaphs();
+      if (!confirm('Reap for Ascension ' + (ascensions + 1) + '?\n\n' +
+                   'This RESETS your prestige tier (' + prestige + '), your Bone Shards and the entire ' +
+                   'Bone Shard shop — converting them into ' + gained + ' Epitaph' + (gained === 1 ? '' : 's') + ' to spend ' +
+                   'in The Reaping. Your lifetime skulls, feats, cosmetics and everything you already own in ' +
+                   'The Reaping are KEPT. This cannot be undone.')) return;
+
+      ascensions += 1;
+      epitaphs += gained;
+
+      /* Meta-reset: drop the prestige layer entirely. */
+      prestige = 0;
+      boneShards = 0;
+      perks = new Set();
+      perkLevels = {};
+
+      resetRun();
+      applyStartBonuses();
 
       const el = document.createElement('div');
       el.className = 'milestone';
-      el.innerHTML = '<h3>PRESTIGE ' + prestige + '</h3><p>' + getPrestigeMult().toFixed(1) + 'x forever</p>';
+      el.innerHTML = '<h3>THE REAPING ' + ascensions + '</h3><p>+' + gained + ' Epitaph' + (gained === 1 ? '' : 's') + '</p>';
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 2600);
+      screenShake();
+      playSound('feat');
 
+      save();
+      render();
+      renderWorld();
+    }
+
+    function buyMeta(id) {
+      const m = metaDef(id);
+      if (!m || metaMaxed(m)) return;
+      if (m.req && !metaHas(m.req)) return;
+      const cost = metaCost(m);
+      if (epitaphs < cost) return;
+      epitaphs -= cost;
+      if (m.type === 'endless') metaLevels[id] = metaLvl(id) + 1;
+      else metaPerks.add(id);
+      playSound('feat');
       save();
       render();
       renderWorld();
@@ -2121,9 +2326,86 @@
         '</div>' + shop;
     }
 
+    /* The running total an endless meta node is currently giving, for its row. */
+    function metaNowLabel(m) {
+      const lv = metaLvl(m.id);
+      switch (m.id) {
+        case 'm_prod':    return '+' + Math.round(0.10 * lv * 100) + '%';
+        case 'm_click':   return '+' + Math.round(0.12 * lv * 100) + '%';
+        case 'm_epitaph': return '+' + Math.round(0.08 * lv * 100) + '%';
+        case 'm_start':   return '+' + lv + ' each';
+        case 'm_prcost':  return Math.round((1 - prestigeCostMult()) * 100) + '% cheaper';
+        default:          return 'Lv ' + lv;
+      }
+    }
+
+    function renderReaping() {
+      const el = document.getElementById('tab-reaping');
+      const ready = canAscend();
+      const gained = pendingEpitaphs();
+
+      /* Before the first reap, the tree is a locked promise — but the moment
+         someone has ascended once, the tab stays available forever. */
+      if (ascensions === 0 && !ready) {
+        el.innerHTML =
+          '<div class="prestige-panel">' +
+            '<div class="reaping-tier">The Reaping</div>' +
+            '<div class="reaping-sub">A power beyond prestige.</div>' +
+            '<div class="ascend-locked">Reach <b>Prestige ' + ASCEND_MIN_PRESTIGE + '</b> to unlock The Reaping.<br>' +
+              'You are at Prestige <b>' + prestige + '</b>.<br><br>' +
+              'Reaping trades your whole prestige climb for <b>Epitaphs</b> — a permanent currency ' +
+              'that buys an endless meta-tree. Your lifetime skulls and feats are kept.</div>' +
+          '</div>';
+        return;
+      }
+
+      function metaRow(m) {
+        const endless = m.type === 'endless';
+        const maxed = metaMaxed(m);
+        const locked = m.req && !metaHas(m.req);
+        const cost = metaCost(m);
+        const can = !maxed && !locked && epitaphs >= cost;
+        const state = maxed ? 'bought' : can ? 'affordable' : locked ? 'locked' : '';
+        const lvlTag = endless
+          ? ' <span class="meta-lvl">Lv ' + metaLvl(m.id) + (m.max ? '/' + m.max : '') + '</span>'
+          : (metaHas(m.id) ? ' <span class="meta-lvl">on</span>' : '');
+        const right = maxed ? (endless ? 'Maxed' : 'Owned') : locked ? 'Locked' : '🪦 ' + formatNum(cost);
+        const now = endless && metaLvl(m.id) > 0 ? ' <span class="perk-now">(now ' + metaNowLabel(m) + ')</span>' : '';
+        return '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyMeta('" + m.id + "')" : '') + '">' +
+          '<div class="building-info"><div class="building-name">' + m.name + lvlTag + '</div>' +
+          '<div class="building-desc">' + m.desc + now + '</div></div>' +
+          '<div class="building-right"><div class="building-cost">' + right + '</div></div></div>';
+      }
+
+      let tree = '<div class="section-label">The Reaping — Automation</div>';
+      for (const m of META) if (m.type !== 'endless') tree += metaRow(m);
+      tree += '<div class="section-label">The Reaping — Endless Climbs</div>';
+      for (const m of META) if (m.type === 'endless') tree += metaRow(m);
+
+      const summary =
+        '<div class="ascend-summary">Meta bonuses: <b>+' + Math.round((metaProdMult() - 1) * 100) + '%</b> production · ' +
+        '<b>+' + Math.round((metaClickMult() - 1) * 100) + '%</b> click · ' +
+        '<b>+' + Math.round((epitaphGainMult() - 1) * 100) + '%</b> Epitaph gain<br>' +
+        'Highest prestige reached: <b>' + highestPrestige + '</b></div>';
+
+      el.innerHTML =
+        '<div class="prestige-panel">' +
+          '<div class="reaping-tier">Ascension ' + ascensions + '</div>' +
+          '<div class="reaping-sub">The Reaping — a permanent power above prestige</div>' +
+          summary +
+          '<button class="prestige-btn" ' + (ready ? '' : 'disabled') +
+            ' onclick="doAscend()">' + (ready ? 'Reap for ' + gained + ' Epitaph' + (gained === 1 ? '' : 's') : 'Reach Prestige ' + ASCEND_MIN_PRESTIGE) + '</button>' +
+          '<div class="prestige-note">Resets your prestige tier, Bone Shards and the shard shop into Epitaphs. ' +
+            'Keeps lifetime skulls, feats, cosmetics, and everything in The Reaping.' +
+            (ready ? '' : ' You are at Prestige ' + prestige + '.') + '</div>' +
+        '</div>' +
+        '<div class="shard-balance">🪦 <b>' + formatNum(epitaphs) + '</b> Epitaph' + (epitaphs === 1 ? '' : 's') + '</div>' +
+        tree;
+    }
+
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 2;
+    const SAVE_VERSION = 3;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -2143,6 +2425,15 @@
       if (!d.achievements) d.achievements = [];
       if (d.boneShards === undefined) d.boneShards = 0;
       if (d.cursedPopped === undefined) d.cursedPopped = 0;
+      /* v3 — The Reaping. All default to nothing, so a v2 save (any maxed
+         player) loads with the meta-layer at zero and NOTHING wiped. */
+      if (d.ascensions === undefined) d.ascensions = 0;
+      if (d.epitaphs === undefined) d.epitaphs = 0;
+      if (!d.metaLevels || typeof d.metaLevels !== 'object') d.metaLevels = {};
+      if (!d.metaPerks) d.metaPerks = [];
+      /* Seed highest-prestige from the current tier so history is never lost. */
+      if (d.highestPrestige === undefined) d.highestPrestige = d.prestige || 0;
+      if (d.highestPrestige < (d.prestige || 0)) d.highestPrestige = d.prestige || 0;
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -2162,6 +2453,8 @@
         totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
         boneShards, cursedPopped, seasonBaseline, seasonMonth,
+        ascensions, epitaphs, metaLevels, highestPrestige,
+        metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         hitMilestones: [...hitMilestones],
         perks: [...perks],
@@ -2222,6 +2515,11 @@
       cursedPopped = d.cursedPopped || 0;
       seasonBaseline = d.seasonBaseline || 0;
       seasonMonth = d.seasonMonth || '';
+      ascensions = d.ascensions || 0;
+      epitaphs = d.epitaphs || 0;
+      metaLevels = (d.metaLevels && typeof d.metaLevels === 'object') ? d.metaLevels : {};
+      metaPerks = new Set(d.metaPerks || []);
+      highestPrestige = d.highestPrestige || 0;
       boughtUpgrades = new Set(d.boughtUpgrades);
       hitMilestones = new Set(d.hitMilestones);
       perks = new Set(d.perks || []);
@@ -2257,6 +2555,11 @@
        lifetime, higher tier) must beat the old save so the sync never
        undoes it, and normal progress (more lifetime) still adopts forward. */
     function serverOutranks(server) {
+      /* Ascension outranks prestige: a freshly-reaped save (prestige reset to 0,
+         same lifetime) must beat a stale non-ascended save, or the sync would
+         silently undo the reap. Kept identical to the server's outranks(). */
+      const sa = Number(server.ascensions || 0), la = ascensions || 0;
+      if (sa !== la) return sa > la;
       const sp = Number(server.prestige || 0), lp = prestige || 0;
       if (sp !== lp) return sp > lp;
       return Number(server.lifetimeSkulls || server.totalSkulls || 0) > lifetimeSkulls;
