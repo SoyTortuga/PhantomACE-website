@@ -311,6 +311,11 @@
     .buff-chip.frenzy { color: #ff3b3b; border-color: #ff3b3b; }
     .buff-chip.rush   { color: #ff9500; border-color: #ff9500; }
     .buff-chip.combo  { color: #ffd23b; border-color: #7a6a12; }
+    /* Generic buff — neutral on-palette chrome (bone-white on grey). */
+    .buff-chip.buff   { color: #e8e8e8; border-color: #555; }
+    /* Debuff — distinct red outline on a dark ground so it reads as harmful. */
+    .buff-chip.debuff { color: #ff5555; border-color: #ff3b3b; background: #1a0000; }
+    .buff-ico { font-style: normal; }
 
     /* Co-op raid banner (in-game) */
     .raid-banner {
@@ -1034,9 +1039,12 @@
        the current lifetime, so the new month counts from zero. */
     let seasonBaseline = 0, seasonMonth = '';
 
-    /* Transient buffs from cursed skulls — never saved; they expire. */
-    let frenzyMult = 1, frenzyEnd = 0;      /* multiplies all production */
-    let clickBuffMult = 1, clickBuffEnd = 0; /* multiplies click power */
+    /* Timed buff/debuff framework — a list of active effects, each
+       { id, name, kind:'buff'|'debuff', cpsMult, clickMult, endsAt, icon, chipClass }.
+       Never saved (transient); they tick down on the existing game tick and
+       stack multiplicatively into getCPS()/getClickPower(). Reusable: the Bone
+       Dragon auras and the Skullpocalypse wrath skulls hook in via addTimedBuff. */
+    let activeBuffs = [];
 
     /* Active-click combo — builds while you keep clicking, decays when you stop. */
     let combo = 0, lastClickAt = 0;
@@ -1165,6 +1173,22 @@
       renderSettings();
     }
 
+    /* Rarity stingers for buff spawn/collect. ONE Audio element per rarity,
+       created lazily and reused (never new Audio() per fire — marathon-safe). */
+    const STINGER_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+    const stingers = {};
+    function playStinger(rarity) {
+      if (!soundOn) return;
+      const r = STINGER_RARITIES.includes(rarity) ? rarity : 'common';
+      try {
+        let a = stingers[r];
+        if (!a) { a = new Audio('assets/audio/' + r + '.mp3'); a.preload = 'auto'; a.volume = 0.5; stingers[r] = a; }
+        a.currentTime = 0;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) { /* audio is a nicety; never let it break the game */ }
+    }
+
     BUILDINGS.forEach(b => owned[b.id] = 0);
 
     /* ═══════ COMPUTED ═══════ */
@@ -1199,6 +1223,35 @@
     }
     function ghoulMult() { return 1 + miasma() * ghoulFactorSum(); }
 
+    /* ═══════ TIMED BUFF / DEBUFF FRAMEWORK ═══════
+       Add a timed effect; re-collecting the same id refreshes it rather than
+       stacking a duplicate. cpsMult/clickMult default to 1 (no effect on that
+       channel). Callers pass the FINAL durationMs (any perk scaling already
+       applied). Instant payouts do not go here — they are applied directly. */
+    function addTimedBuff({ id, name, kind, cpsMult, clickMult, durationMs, icon, chipClass }) {
+      const b = {
+        id, name, kind: kind || 'buff',
+        cpsMult: cpsMult || 1, clickMult: clickMult || 1,
+        endsAt: Date.now() + durationMs,
+        icon: icon || '💀',
+        chipClass: chipClass || (kind === 'debuff' ? 'debuff' : 'buff'),
+      };
+      const i = activeBuffs.findIndex(x => x.id === id);
+      if (i >= 0) activeBuffs[i] = b; else activeBuffs.push(b);
+      renderBuffs();
+      return b;
+    }
+    function removeTimedBuff(id) { activeBuffs = activeBuffs.filter(b => b.id !== id); }
+    function buffCpsMult()   { let m = 1; for (const b of activeBuffs) m *= b.cpsMult;   return m; }
+    function buffClickMult() { let m = 1; for (const b of activeBuffs) m *= b.clickMult; return m; }
+    /* Drop expired effects; re-render only when the set actually changed. */
+    function tickTimedBuffs() {
+      const now = Date.now();
+      const before = activeBuffs.length;
+      activeBuffs = activeBuffs.filter(b => b.endsAt > now);
+      if (activeBuffs.length !== before) renderBuffs();
+    }
+
     /* Per-building multiplier from synergy upgrades: a building's own tiered
        upgrades multiply it, and a cross-boost scales it by how many of ANOTHER
        building you own. Computed live so nothing has to be baked into a saved
@@ -1218,7 +1271,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * frenzyMult;
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * buffCpsMult();
     }
 
     /* Blood Rush multiplies the WHOLE click, not just the base term. It used
@@ -1231,7 +1284,7 @@
        players who've played long enough to unlock it. */
     function getClickPower() {
       const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * metaClickMult();
-      return (base + (getCPS() * cpsClickPct / 100)) * clickBuffMult;
+      return (base + (getCPS() * cpsClickPct / 100)) * buffClickMult();
     }
 
     /* Every skull earned flows through here so the run total and the
@@ -1489,7 +1542,11 @@
       cursedTimer = setTimeout(spawnCursed, wait * 1000);
     }
 
-    function spawnCursed() {
+    /* opts.storm — a skull spawned by a Skull Storm: shorter-lived, does NOT
+       touch the main cursed-skull timer, and cannot chain another storm. */
+    function spawnCursed(opts) {
+      opts = opts || {};
+      const storm = !!opts.storm;
       const el = document.createElement('div');
       el.className = 'cursed-skull';
       el.innerHTML = '<img src="/assets/images/skull.png" alt="Cursed skull">';
@@ -1503,21 +1560,24 @@
       /* Kick off the drift on the next frame so the transition runs. */
       requestAnimationFrame(() => { el.style.left = (wr.right + 90) + 'px'; });
 
+      /* Storm skulls must not reset the main spawn timer. */
+      const reschedule = () => { if (!storm) scheduleCursed(); };
+
       let done = false;
       const life = setTimeout(() => {
         if (done) return;
         done = true;
         el.classList.add('fade');
         setTimeout(() => el.remove(), 400);
-        scheduleCursed();
-      }, 13000);
+        reschedule();
+      }, storm ? 7000 : 13000);
 
       el.addEventListener('click', () => {
         if (done) return;
         done = true;
         clearTimeout(life);
-        popCursed(el);
-        scheduleCursed();
+        popCursed(el, { storm });
+        reschedule();
       });
 
       /* Ever-Watchful (meta): catch the skull automatically a beat after it
@@ -1527,42 +1587,103 @@
           if (done) return;
           done = true;
           clearTimeout(life);
-          popCursed(el);
-          scheduleCursed();
+          popCursed(el, { storm });
+          reschedule();
         }, 1500);
       }
     }
 
-    function popCursed(el) {
+    function popCursed(el, opts) {
+      opts = opts || {};
       cursedPopped++;
-      const roll = Math.random();
-      let msg, kind;
-      const fmult = frenzyMultValue(), fdur = 20000 * buffScale(), rdur = 13000 * buffScale();
-      if (roll < 0.55) {
-        frenzyMult = fmult; frenzyEnd = Date.now() + fdur;
-        msg = 'FRENZY — ×' + fmult + ' production for ' + Math.round(fdur / 1000) + 's'; kind = 'frenzy';
-      } else if (roll < 0.80) {
-        clickBuffMult = 100; clickBuffEnd = Date.now() + rdur;
-        msg = 'BLOOD RUSH — ×100 clicks for ' + Math.round(rdur / 1000) + 's'; kind = 'rush';
-      } else {
-        const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult();
-        earn(reap);
-        msg = 'REAP — +' + formatNum(reap) + ' skulls'; kind = 'reap';
-      }
+      const res = rollCursedOutcome(!opts.storm);
       /* Fated: a chance the skull also drops a Bone Shard. */
       if (pHas('luckyskull') && Math.random() < 0.12) {
         boneShards += 1;
-        msg += ' · +1 🦴';
+        res.msg += ' · +1 🦴';
       }
       burstParticles(el);
-      showBuffToast(msg, kind);
-      playSound('cursed');
+      showBuffToast(res.msg, res.kind);
+      playStinger(res.rarity);
       el.classList.add('popped');
       setTimeout(() => el.remove(), 300);
       checkAchievements();
       render();
       renderBuffs();
     }
+
+    /* ═══════ CURSED-SKULL OUTCOMES ═══════
+       A Cookie-Clicker-style spread of golden-cookie effects. Timed effects go
+       through the buff framework; the rest pay out instantly. allowStorm is
+       false for storm-spawned skulls so a storm cannot chain into another. */
+    function rollCursedOutcome(allowStorm) {
+      const roll = Math.random();
+      if (roll < 0.34) return outFrenzy();
+      if (roll < 0.54) return outBloodRush();
+      if (roll < 0.74) return outLucky();
+      if (roll < 0.86) return outReap();
+      if (roll < 0.96) return outBuildingSpecial();
+      return allowStorm ? outSkullStorm() : outLucky();
+    }
+
+    function outFrenzy() {
+      const mult = frenzyMultValue(), dur = 20000 * buffScale();
+      addTimedBuff({ id:'frenzy', name:'Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'🔥', chipClass:'frenzy' });
+      return { msg:'FRENZY — ×' + mult + ' production for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'rare' };
+    }
+    function outBloodRush() {
+      const dur = 13000 * buffScale();
+      addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:dur, icon:'🩸', chipClass:'rush' });
+      return { msg:'BLOOD RUSH — ×100 clicks for ' + Math.round(dur / 1000) + 's', kind:'rush', rarity:'epic' };
+    }
+    /* Lucky — a capped windfall: 15% of the bank (cap) plus a minute of CpS. */
+    function outLucky() {
+      const reward = Math.min(Math.max(skulls * 0.15, getClickPower() * 20), getCPS() * 900) + getCPS() * 60;
+      earn(reward);
+      return { msg:'LUCKY — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon' };
+    }
+    /* Reap — the big windfall (scales with the Plunder perk). */
+    function outReap() {
+      const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult();
+      earn(reap);
+      return { msg:'REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'epic' };
+    }
+    /* Building Special — an instant payout scaled off one random building you own. */
+    function outBuildingSpecial() {
+      const ownedB = BUILDINGS.filter(b => owned[b.id] > 0);
+      if (!ownedB.length) return outLucky();
+      const b = ownedB[Math.floor(Math.random() * ownedB.length)];
+      const perSec = b.baseCps * owned[b.id] * getBuildingMult(b) * globalCpsMult *
+        getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult();
+      const reward = Math.max(perSec * (60 + Math.random() * 180), getClickPower() * 50);
+      earn(reward);
+      return { msg:b.name + ' SPECIAL — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon' };
+    }
+    /* Skull Storm — a short flurry of extra cursed skulls (CC's Cookie Storm). */
+    function outSkullStorm() {
+      skullStorm();
+      return { msg:'SKULL STORM — catch them all!', kind:'frenzy', rarity:'legendary' };
+    }
+    function skullStorm() {
+      const n = 8 + Math.floor(Math.random() * 7);   // 8–14 skulls over ~5s
+      for (let i = 0; i < n; i++) {
+        setTimeout(() => spawnCursed({ storm: true }), 300 * i + Math.random() * 250);
+      }
+    }
+
+    /* ═══════ DEBUFFS (defined, NOT spawned yet) ═══════
+       The Skullpocalypse "wrath" skulls will trigger these through the same
+       framework. Left unused/gated for now — nothing calls WRATH_DEBUFFS. */
+    function outClot() {
+      addTimedBuff({ id:'clot', name:'Clot', kind:'debuff', cpsMult:0.5, durationMs:30000, icon:'🩸', chipClass:'debuff' });
+      return { msg:'CLOT — production halved for 30s', kind:'reap', rarity:'common' };
+    }
+    function outRuin() {
+      const loss = Math.min(skulls * 0.05, getCPS() * 30);
+      skulls = Math.max(0, skulls - loss);
+      return { msg:'RUIN — lost ' + formatNum(loss) + ' skulls', kind:'reap', rarity:'common' };
+    }
+    const WRATH_DEBUFFS = { clot: outClot, ruin: outRuin };   /* used by the future wrath system */
 
     function showBuffToast(msg, kind) {
       const el = document.createElement('div');
@@ -1572,17 +1693,19 @@
       setTimeout(() => el.remove(), 2600);
     }
 
-    /* Standing indicator of any active buff, with a live countdown. */
+    /* Standing indicator of every active timed effect (buff or debuff) with a
+       live countdown, plus the active-click combo. */
     function renderBuffs() {
       const bar = document.getElementById('buffBar');
       if (!bar) return;
       const now = Date.now();
       let html = '';
-      if (frenzyMult > 1 && frenzyEnd > now) {
-        html += '<span class="buff-chip frenzy">Frenzy ×7 · ' + Math.ceil((frenzyEnd - now) / 1000) + 's</span>';
-      }
-      if (clickBuffMult > 1 && clickBuffEnd > now) {
-        html += '<span class="buff-chip rush">Blood Rush ×100 · ' + Math.ceil((clickBuffEnd - now) / 1000) + 's</span>';
+      for (const b of activeBuffs) {
+        const secs = Math.ceil((b.endsAt - now) / 1000);
+        if (secs <= 0) continue;
+        html += '<span class="buff-chip ' + b.chipClass + '">' +
+          (b.icon ? '<span class="buff-ico">' + b.icon + '</span> ' : '') +
+          escSkull(b.name) + ' · ' + secs + 's</span>';
       }
       if (combo > 4 && now - lastClickAt < 1200) {
         html += '<span class="buff-chip combo">Combo ×' + combo + ' · +' + Math.round((comboMult() - 1) * 100) + '%</span>';
@@ -1591,10 +1714,8 @@
     }
 
     function expireBuffs() {
-      const now = Date.now();
-      if (frenzyMult > 1 && now >= frenzyEnd) frenzyMult = 1;
-      if (clickBuffMult > 1 && now >= clickBuffEnd) clickBuffMult = 1;
-      if (combo > 0 && now - lastClickAt >= 1200) combo = 0;
+      tickTimedBuffs();
+      if (combo > 0 && Date.now() - lastClickAt >= 1200) combo = 0;
     }
 
     /* ═══════ STREAM EVENTS ═══════
