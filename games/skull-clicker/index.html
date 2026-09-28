@@ -667,6 +667,9 @@
     .garden-seed:hover { border-color: var(--red); }
     .garden-seed.armed { border-color: var(--red); background: var(--red-glow); color: #ff5555; font-weight: 800; }
     .garden-seed .garden-emoji { font-size: 18px; }
+    .garden-emoji img { width: 1.35em; height: 1.35em; object-fit: contain; image-rendering: pixelated; vertical-align: middle; }
+    .garden-alm-ico { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; margin-right: 2px; }
+    .relic-ico { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
     .garden-almanac-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 5px; background: var(--gray-lo); }
     .garden-almanac-row.undiscovered { opacity: 0.5; }
     .garden-almanac-name { font-size: 15px; font-weight: 800; color: var(--text-pri); }
@@ -999,6 +1002,13 @@
     const BLOOM_ICON = 'assets/icons/grave-bloom.png';
     const EPITAPH_ICON = 'assets/icons/epitaph.png';
     const EPITAPH_IMG = '<img class="cur-ico" src="' + EPITAPH_ICON + '" alt="Epitaph">';
+
+    /* Pixel-art icon <img> with a silent emoji fallback: if the sprite is missing
+       the img swaps itself back to the original emoji, so nothing renders broken. */
+    function icoImg(file, emoji, cls) {
+      return '<img class="' + cls + '" src="assets/icons/' + file + '.png" alt="" data-fb="' + emoji +
+        '" onerror="this.replaceWith(document.createTextNode(this.getAttribute(\'data-fb\')))">';
+    }
 
     /* ═══════ THE BOUND REAPER (the Krumblor pet analog) ═══════
        A companion you LEVEL by sacrificing buildings, unlocking passive AURA
@@ -1401,7 +1411,8 @@
     const WISP_DROP_MIN = 1, WISP_DROP_MAX = 3;     /* Wisps per drop (before the Witch's Knot bonus) */
     const SEASON_RELIC_CPS_CAP = 0.40;              /* hard cap on combined relic production bonus — GAME-DEV-PRACTICES #8 */
     const SEASON_RELIC_CLICK_CAP = 0.40;            /* hard cap on combined relic click bonus */
-    const WISP_ICON = '👻';                          /* soul-candy placeholder (flag pixel art to asset-manager) */
+    const WISP_ICON = '👻';                          /* soul-candy emoji fallback */
+    const WISP_IMG = '<img class="cur-ico" src="assets/icons/hallow-wisp.png" alt="Wisp" onerror="this.replaceWith(document.createTextNode(\'👻\'))">';
 
     /* The seven relics — themed to our world. cpsBonus/clickBonus fold into the
        mult stack; 'special' relics act elsewhere (bell → bloom ripen, knot → Wisp
@@ -3125,7 +3136,7 @@
         <div class="stat-row"><span class="stat-label">Grimoire</span><span class="stat-val">${grimoireUnlocked ? 'Unearthed · ' + formatNum(Math.floor(Math.min(essence, essenceMax()))) + '/' + formatNum(essenceMax()) + ' Essence' : 'Buried'}</span></div>
         <div class="stat-row"><span class="stat-label">Spells cast / backfired</span><span class="stat-val">${formatNum(spellsCast)} / ${formatNum(spellsBackfired)}</span></div>
         <div class="stat-row"><span class="stat-label">Cursed Garden</span><span class="stat-val">${gardenUnlocked ? gardenSide() + '×' + gardenSide() + ' · ' + STRAINS.filter(s => s.plantable && discoveredStrains.has(s.id)).length + '/' + STRAINS.filter(s => s.plantable).length + ' strains · ' + formatNum(gardenHarvests) + ' harvested' : 'Untilled'}</span></div>
-        <div class="stat-row"><span class="stat-label">Hallowtide</span><span class="stat-val">${!seasonUnlocked ? 'Dormant' : (seasonActive() ? (seasonAutoWindow() ? 'Lit (auto)' : 'Lit') : 'Ready') + ' · ' + seasonRelics.size + '/' + SEASON_RELICS.length + ' relics · ' + formatNum(wisps) + ' ' + WISP_ICON}</span></div>
+        <div class="stat-row"><span class="stat-label">Hallowtide</span><span class="stat-val">${!seasonUnlocked ? 'Dormant' : (seasonActive() ? (seasonAutoWindow() ? 'Lit (auto)' : 'Lit') : 'Ready') + ' · ' + seasonRelics.size + '/' + SEASON_RELICS.length + ' relics · ' + formatNum(wisps) + ' ' + WISP_IMG}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -3842,7 +3853,7 @@
           const cell = gardenPlots[idx];
           if (!cell) {
             const armed = gardenSeed ? ' armed' : '';
-            const face = gardenSeed ? strainById(gardenSeed).emoji : '·';
+            const face = gardenSeed ? icoImg('garden-' + gardenSeed, strainById(gardenSeed).emoji, '') : '·';
             grid += '<div class="garden-plot empty' + armed + '" onclick="plotClick(' + idx + ')" title="Empty plot">' +
               '<span class="garden-emoji">' + face + '</span>' +
               '<span class="garden-stage">' + (gardenSeed ? 'Plant' : 'Empty') + '</span></div>';
@@ -3851,7 +3862,7 @@
           if (cell.s === 'blight') {
             grid += '<div class="garden-plot blight" onclick="plotClick(' + idx + ')" title="Blight — click to cull">' +
               '<button class="garden-cull" onclick="cullPlot(' + idx + ',event)" title="Cull">✕</button>' +
-              '<span class="garden-emoji">🕸️</span>' +
+              '<span class="garden-emoji">' + icoImg('garden-blight', '🕸️', '') + '</span>' +
               '<span class="garden-stage">BLIGHT</span></div>';
             continue;
           }
@@ -3863,7 +3874,7 @@
           const cull = '<button class="garden-cull" onclick="cullPlot(' + idx + ',event)" title="Cull">✕</button>';
           grid += '<div class="garden-plot ' + stg + '" onclick="plotClick(' + idx + ')" title="' + st.name + '">' +
             cull +
-            '<span class="garden-emoji">' + st.emoji + '</span>' +
+            '<span class="garden-emoji">' + icoImg('garden-' + cell.s, st.emoji, '') + '</span>' +
             '<span class="garden-stage">' + label + '</span>' +
             (stg === 'mature' ? '' : '<span class="garden-bar"><span class="garden-fill" style="width:' + pct + '%"></span></span>') +
             '</div>';
@@ -3880,7 +3891,7 @@
         for (const s of plantable) {
           const armed = gardenSeed === s.id ? ' armed' : '';
           tray += '<button class="garden-seed' + armed + '" onclick="armSeed(\'' + s.id + '\')">' +
-            '<span class="garden-emoji">' + s.emoji + '</span>' + s.name + '</button>';
+            '<span class="garden-emoji">' + icoImg('garden-' + s.id, s.emoji, '') + '</span>' + s.name + '</button>';
         }
         tray += '</div>';
         tray += '<div class="garden-almanac-desc">' +
@@ -3893,13 +3904,13 @@
         if (!s.plantable) continue;
         const disc = discoveredStrains.has(s.id);
         almanac += '<div class="garden-almanac-row' + (disc ? '' : ' undiscovered') + '">' +
-          '<div class="garden-almanac-name">' + (disc ? s.emoji + ' ' + s.name : '❓ ??? — cross-breed to discover') + '</div>' +
+          '<div class="garden-almanac-name">' + (disc ? icoImg('garden-' + s.id, s.emoji, 'garden-alm-ico') + ' ' + s.name : '❓ ??? — cross-breed to discover') + '</div>' +
           (disc ? '<div class="garden-almanac-desc">' + s.desc + '</div>' +
                   '<div class="garden-almanac-eff">' + s.effect + '</div>' : '') +
           '</div>';
       }
       /* Blight is a garden hazard, not a plantable strain — note it at the foot. */
-      almanac += '<div class="garden-almanac-row"><div class="garden-almanac-name">🕸️ Grave Blight</div>' +
+      almanac += '<div class="garden-almanac-row"><div class="garden-almanac-name">' + icoImg('garden-blight', '🕸️', 'garden-alm-ico') + ' Grave Blight</div>' +
         '<div class="garden-almanac-desc">' + strainById('blight').desc + '</div>' +
         '<div class="garden-almanac-eff">' + strainById('blight').effect + '</div></div>';
 
@@ -4009,7 +4020,7 @@
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">Hallowtide</div>' +
           '<div class="reaping-sub">' + statusLine + '</div>' +
-          '<div class="shard-balance">' + WISP_ICON + ' <b>' + formatNum(wisps) + '</b> Wisp' + (wisps === 1 ? '' : 's') + '</div>' +
+          '<div class="shard-balance">' + WISP_IMG + ' <b>' + formatNum(wisps) + '</b> Wisp' + (wisps === 1 ? '' : 's') + '</div>' +
           '<div class="ascend-summary">Relics gathered: <b>' + owned + ' / ' + SEASON_RELICS.length + '</b>' +
             (active ? '<br>Cursed skulls are shedding Wisps — pop them while the season burns.' :
                       '<br>Light the season (or wait for late October) to make cursed skulls shed Wisps.') + '</div>' +
@@ -4021,9 +4032,9 @@
         const have = seasonRelics.has(r.id);
         const can = !have && wisps >= r.cost;
         const state = have ? 'bought' : can ? 'affordable' : 'locked';
-        const right = have ? 'Owned' : WISP_ICON + ' ' + r.cost;
+        const right = have ? 'Owned' : WISP_IMG + ' ' + r.cost;
         shop += '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyRelic('" + r.id + "')" : '') + '">' +
-          '<div class="building-icon"><span style="font-size:24px">' + r.emoji + '</span></div>' +
+          '<div class="building-icon">' + icoImg(r.id === 'hallow' ? 'hallow-skull' : 'hallow-' + r.id, r.emoji, 'relic-ico') + '</div>' +
           '<div class="building-info">' +
             '<div class="building-name">' + r.name + '</div>' +
             '<div class="building-desc">' + r.desc + ' <span class="bldg-lv-tag">' + r.effect + '</span></div>' +
