@@ -838,6 +838,7 @@
       <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
       <button class="tab-btn" onclick="switchTab('reaping')">Reaping</button>
       <button class="tab-btn" onclick="switchTab('pet')">Pet</button>
+      <button class="tab-btn" onclick="switchTab('grimoire')">Grimoire</button>
       <button class="tab-btn" onclick="switchTab('feats')">Feats</button>
       <button class="tab-btn" onclick="switchTab('ranks')">Ranks</button>
       <button class="tab-btn" onclick="switchTab('cosmetics')">Cosmetics</button>
@@ -849,6 +850,7 @@
     <div class="tab-content" id="tab-prestige"></div>
     <div class="tab-content" id="tab-reaping"></div>
     <div class="tab-content" id="tab-pet"></div>
+    <div class="tab-content" id="tab-grimoire"></div>
     <div class="tab-content" id="tab-feats"></div>
     <div class="tab-content" id="tab-ranks"></div>
     <div class="tab-content" id="tab-cosmetics"></div>
@@ -987,6 +989,86 @@
     const MAX_WRAITHS = 3;                          /* on-screen cap (marathon-safe) */
     const WRAITH_DRAIN = 0.05;                      /* each wraith drains this share of CpS */
     const WRAITH_POP_MULT = 1.5;                    /* pop pays this × what it drained */
+
+    /* ═══════ THE GRIMOIRE OF THE DEAD (the Grimoire / Spells minigame analog) ═══════
+       A book of necrotic magic, unearthed once by spending GRAVE BLOOMS — the
+       unlock currency the bloom system was always reserved for (see the Grave
+       Bloom block above). It draws on NECROTIC ESSENCE: a regenerating pool
+       whose ceiling scales off lifetime skulls (our stable, never-reset,
+       leaderboard total — the "highest raw CpS" analog), refilling a fixed
+       fraction of that max per second, offline too.
+
+       Spells cost Essence and route entirely through EXISTING systems — the
+       timed-buff framework (addTimedBuff / buffCpsMult / buffClickMult / a new
+       buffCostMult), the cursed-skull spawner, and the WRATH_DEBUFFS used for
+       backfires. Faithful to Cookie Clicker, every cast carries a BACKFIRE
+       chance that RISES with the lifetime count of spells cast (the "Spelling
+       mistakes" counter); a backfire runs a wrath/debuff instead of the boon.
+
+       ALL Grimoire state is a PERMANENT meta layer: like graveBlooms /
+       buildingLevels / petLevel / apocUnlocked, it is NEVER cleared by resetRun,
+       so it survives both prestige and ascension. */
+    const GRIMOIRE_UNLOCK_BLOOMS = 3;               /* one-time Grave Bloom cost to unearth it */
+    const ESSENCE_BASE = 25;                        /* floor of the Essence pool */
+    const ESSENCE_MAX_K = 3;                        /* pool grows with (log10 lifetime)^2 × this */
+    const ESSENCE_REGEN_FRAC = 0.0016;              /* Essence regenerated per second, as a fraction of max (~full in ~10m) */
+    const BACKFIRE_MAX = 0.15;                      /* backfire chance ceiling from the spell count alone */
+    const BACKFIRE_SCALE = 60;                      /* how fast backfire rises toward the ceiling with spells cast */
+
+    /* costFlat + costFrac × essenceMax() (CC's costMin + magicM × percent), so a
+       spell stays castable at any lifetime scale. risk scales its backfire. Each
+       cast() returns a toast message; an optional backfire() gives a thematic
+       failure — spells without one fall back to a random WRATH_DEBUFF. */
+    const SPELLS = [
+      { id:'conjure', name:'Conjure the Dead', icon:'assets/icons/buff-lucky.png', costFlat:2, costFrac:0.40, risk:1,
+        desc:'Instantly reap 15% of your bank (up to 30 min of production)',
+        cast:() => { const gain = Math.max(getClickPower() * 20, Math.min(skulls * 0.15, getCPS() * 1800)); earn(gain); return 'CONJURE THE DEAD — +' + formatNum(gain) + ' skulls'; } },
+      { id:'hand', name:'Hand of Fate', icon:'assets/icons/wrath-skull.png', costFlat:10, costFrac:0.60, risk:1.6,
+        desc:'Summon a cursed skull at once — but the dead may answer with wrath',
+        cast:() => { spawnCursed(); return 'HAND OF FATE — a cursed skull answers your call'; } },
+      { id:'hunger', name:'Ravenous Hunger', icon:'assets/icons/buff-frenzy.png', costFlat:2, costFrac:0.20, risk:1,
+        desc:'×2 to all production for 60s',
+        cast:() => { addTimedBuff({ id:'grimhunger', name:'Ravenous Hunger ×2', kind:'buff', cpsMult:2, durationMs:60000, icon:'assets/icons/buff-frenzy.png', chipClass:'frenzy' }); return 'RAVENOUS HUNGER — ×2 production for 60s'; } },
+      { id:'favor', name:"Reaper's Favor", icon:'assets/icons/buff-bloodrush.png', costFlat:4, costFrac:0.25, risk:1,
+        desc:'×50 click power for 20s',
+        cast:() => { addTimedBuff({ id:'grimfavor', name:"Reaper's Favor ×50 clicks", kind:'buff', clickMult:50, durationMs:20000, icon:'assets/icons/buff-bloodrush.png', chipClass:'rush' }); return "REAPER'S FAVOR — ×50 click power for 20s"; } },
+      { id:'bargain', name:'Grave Bargain', icon:'assets/icons/buff-building.png', costFlat:2, costFrac:0.20, risk:1,
+        desc:'Buildings 30% cheaper for 60s',
+        cast:() => { addTimedBuff({ id:'grimbargain', name:'Grave Bargain −30% cost', kind:'buff', costMult:0.7, durationMs:60000, icon:'assets/icons/buff-building.png', chipClass:'buff' }); return 'GRAVE BARGAIN — buildings 30% cheaper for 60s'; } },
+      { id:'monument', name:'Raise Monument', icon:'assets/icons/buff-skullstorm.png', costFlat:20, costFrac:0.75, risk:1.2,
+        desc:'Raise free copies of a building you own — if the earth holds',
+        cast:() => {
+          const own = BUILDINGS.filter(b => owned[b.id] > 0);
+          if (!own.length) { const g = Math.max(getClickPower() * 50, getCPS() * 300); earn(g); return 'RAISE MONUMENT — no dominion yet; +' + formatNum(g) + ' skulls instead'; }
+          const b = own[Math.floor(Math.random() * own.length)];
+          const add = Math.max(1, Math.round(owned[b.id] * 0.05));
+          owned[b.id] += add; lastBought = b.id; renderWorld();
+          return 'RAISE MONUMENT — +' + add + ' ' + b.name;
+        },
+        backfire:() => {
+          const own = BUILDINGS.filter(b => owned[b.id] > 0);
+          if (!own.length) return WRATH_DEBUFFS.ruin().msg;
+          const b = own[Math.floor(Math.random() * own.length)];
+          const lose = Math.max(1, Math.round(owned[b.id] * 0.08));
+          owned[b.id] = Math.max(0, owned[b.id] - lose); renderWorld();
+          return 'THE MONUMENT COLLAPSES — lost ' + lose + ' ' + b.name;
+        } },
+      { id:'veil', name:'Stretch the Veil', icon:'assets/icons/buff-reap.png', costFlat:8, costFrac:0.30, risk:1,
+        desc:'Prolong every active boon by 30s',
+        cast:() => {
+          if (!activeBuffs.length) return 'STRETCH THE VEIL — but nothing lingers to prolong';
+          for (const b of activeBuffs) b.endsAt += 30000;
+          renderBuffs();
+          return 'STRETCH THE VEIL — active boons prolonged by 30s';
+        },
+        backfire:() => {
+          if (!activeBuffs.length) return WRATH_DEBUFFS.clot().msg;
+          const now = Date.now();
+          for (const b of activeBuffs) b.endsAt = now + Math.max(1000, (b.endsAt - now) / 2);
+          renderBuffs();
+          return 'THE VEIL SNAPS — your boons wither early';
+        } },
+    ];
 
     /* Prestige perks — bought with Bone Shards and kept forever across every
        future run. Two kinds:
@@ -1145,6 +1227,9 @@
       { id:'cur1', name:'Cursed',          desc:'Pop a cursed skull',        check:() => cursedPopped >= 1 },
       { id:'cur2', name:'Skull Hunter',    desc:'Pop 10 cursed skulls',      check:() => cursedPopped >= 10 },
       { id:'cur3', name:'Doom Magnet',     desc:'Pop 50 cursed skulls',      check:() => cursedPopped >= 50 },
+      { id:'spell1', name:'Dabbler in Death', desc:'Cast your first spell',    check:() => spellsCast >= 1 },
+      { id:'spell2', name:'Grave Sorcerer',   desc:'Cast 100 spells',         check:() => spellsCast >= 100 },
+      { id:'spell3', name:'Spelling Mistake', desc:'Survive a spell backfire', check:() => spellsBackfired >= 1 },
     ];
 
     /* ═══════ STATE ═══════ */
@@ -1196,6 +1281,11 @@
     let apocEverFull = false;       /* feat gate — reached Full Undeath */
     let wraiths = [];               /* transient wraith-leeches: [{el, bank}] — never saved */
     let wraithTimer = null;
+    /* ── The Grimoire of the Dead (permanent meta layer — survives prestige AND ascension) ── */
+    let grimoireUnlocked = false;   /* unearthed once by spending Grave Blooms; never re-locked */
+    let essence = 0;                /* Necrotic Essence — regenerating spell resource, capped at essenceMax() */
+    let spellsCast = 0;             /* lifetime spells cast — drives the rising backfire chance (never reset) */
+    let spellsBackfired = 0;        /* lifetime backfires survived (feat + stat) */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1359,7 +1449,7 @@
     /* ═══════ COMPUTED ═══════ */
 
     function getBuildingCost(b) {
-      return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]) * buildingCostMult());
+      return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]) * buildingCostMult() * buffCostMult());
     }
 
     /* Prestige is the whole point of a resource-gathering game with no win:
@@ -1473,10 +1563,10 @@
        stacking a duplicate. cpsMult/clickMult default to 1 (no effect on that
        channel). Callers pass the FINAL durationMs (any perk scaling already
        applied). Instant payouts do not go here — they are applied directly. */
-    function addTimedBuff({ id, name, kind, cpsMult, clickMult, durationMs, icon, chipClass }) {
+    function addTimedBuff({ id, name, kind, cpsMult, clickMult, costMult, durationMs, icon, chipClass }) {
       const b = {
         id, name, kind: kind || 'buff',
-        cpsMult: cpsMult || 1, clickMult: clickMult || 1,
+        cpsMult: cpsMult || 1, clickMult: clickMult || 1, costMult: costMult || 1,
         endsAt: Date.now() + durationMs,
         icon: icon || '💀',
         chipClass: chipClass || (kind === 'debuff' ? 'debuff' : 'buff'),
@@ -1489,6 +1579,8 @@
     function removeTimedBuff(id) { activeBuffs = activeBuffs.filter(b => b.id !== id); }
     function buffCpsMult()   { let m = 1; for (const b of activeBuffs) m *= b.cpsMult;   return m; }
     function buffClickMult() { let m = 1; for (const b of activeBuffs) m *= b.clickMult; return m; }
+    /* Temporary building-cost discount from timed buffs (Grave Bargain spell). */
+    function buffCostMult()  { let m = 1; for (const b of activeBuffs) m *= (b.costMult || 1); return m; }
     /* Drop expired effects; re-render only when the set actually changed. */
     function tickTimedBuffs() {
       const now = Date.now();
@@ -1606,14 +1698,14 @@
     /* Sum of the next `amount` prices for a building — a geometric series, so
        ×10 and ×100 are one formula rather than a loop. */
     function getBulkCost(b, amount) {
-      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult();
+      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult() * buffCostMult();
       return Math.ceil(base * (Math.pow(r, amount) - 1) / (r - 1));
     }
 
     /* How many of a building the current bank can buy — the inverse of the
        series above, so "Max" is exact rather than a loop that could stall. */
     function maxAffordable(b) {
-      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult();
+      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult() * buffCostMult();
       const n = Math.floor(Math.log((skulls * (r - 1)) / base + 1) / Math.log(r));
       return Math.max(0, n);
     }
@@ -2085,6 +2177,61 @@
       wraiths = [];
     }
 
+    /* ═══════ THE GRIMOIRE OF THE DEAD — Essence, unlock, and casting ═══════ */
+
+    /* Max Essence scales off lifetime skulls (stable, never reset). */
+    function essenceMax() { return Math.floor(ESSENCE_BASE + Math.pow(Math.max(0, Math.log10(lifetimeSkulls + 1)), 2) * ESSENCE_MAX_K); }
+    function essenceRegenPerSec() { return essenceMax() * ESSENCE_REGEN_FRAC; }
+    function spellCost(s) { return Math.ceil(s.costFlat + s.costFrac * essenceMax()); }
+    /* Rises with the LIFETIME spells-cast counter toward a ceiling, then scaled
+       by the spell's own risk — the CC "spelling mistakes" mechanic. */
+    function backfireChance(s) {
+      const base = BACKFIRE_MAX * (1 - 1 / (1 + spellsCast / BACKFIRE_SCALE));
+      return Math.min(0.30, base * (s.risk || 1));
+    }
+
+    function unlockGrimoire() {
+      if (grimoireUnlocked || graveBlooms < GRIMOIRE_UNLOCK_BLOOMS) return;
+      graveBlooms -= GRIMOIRE_UNLOCK_BLOOMS;
+      grimoireUnlocked = true;
+      essence = essenceMax();          /* a full pool on the first unearthing */
+      playStinger('legendary');
+      screenShake();
+      showBuffToast('📖 The Grimoire of the Dead is unearthed', 'reap');
+      checkAchievements();
+      save();
+      render();
+      renderBuildings();
+    }
+
+    function castSpell(id) {
+      if (!grimoireUnlocked) return;
+      const s = SPELLS.find(x => x.id === id);
+      if (!s) return;
+      const cost = spellCost(s);
+      if (essence < cost) return;
+      essence -= cost;
+      spellsCast += 1;
+      let msg, kind;
+      if (Math.random() < backfireChance(s)) {
+        spellsBackfired += 1;
+        msg = s.backfire ? s.backfire() : (Math.random() < 0.5 ? WRATH_DEBUFFS.clot() : WRATH_DEBUFFS.ruin()).msg;
+        kind = 'rush';                 /* orange border reads as a warning */
+        playStinger('common');
+        screenShake();
+        msg = '⚠️ BACKFIRE — ' + msg;
+      } else {
+        msg = s.cast();
+        kind = 'frenzy';
+        playStinger('rare');
+      }
+      showBuffToast(msg, kind, s.icon);
+      checkAchievements();
+      save();
+      render();
+      renderBuffs();
+    }
+
     function showBuffToast(msg, kind, icon) {
       const el = document.createElement('div');
       el.className = 'buff-toast ' + kind;
@@ -2361,6 +2508,7 @@
       if (activeTab === 'prestige') renderPrestige();
       if (activeTab === 'reaping') renderReaping();
       if (activeTab === 'pet') renderPet();
+      if (activeTab === 'grimoire') renderGrimoire();
       if (activeTab === 'buildings') renderBuildings();
       else if (activeTab === 'upgrades') renderUpgrades();
       else if (activeTab === 'feats') renderAchievements();
@@ -2688,6 +2836,8 @@
         <div class="stat-row"><span class="stat-label">Building levels</span><span class="stat-val">${BUILDINGS.reduce((s, b) => s + buildingLevel(b.id), 0)}</span></div>
         <div class="stat-row"><span class="stat-label">${PET_NAME}</span><span class="stat-val">Level ${petLevel}${selectedAuras.length ? ' · ' + selectedAuras.length + ' aura' + (selectedAuras.length === 1 ? '' : 's') : ''}</span></div>
         <div class="stat-row"><span class="stat-label">Skullpocalypse</span><span class="stat-val">${!apocUnlocked ? 'Locked' : apocActive ? (apocCalm() ? 'Calmed' : APOC_PHASE_NAMES[apocPhase()]) : 'Dormant'}</span></div>
+        <div class="stat-row"><span class="stat-label">Grimoire</span><span class="stat-val">${grimoireUnlocked ? 'Unearthed · ' + formatNum(Math.floor(Math.min(essence, essenceMax()))) + '/' + formatNum(essenceMax()) + ' Essence' : 'Buried'}</span></div>
+        <div class="stat-row"><span class="stat-label">Spells cast / backfired</span><span class="stat-val">${formatNum(spellsCast)} / ${formatNum(spellsBackfired)}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -2705,7 +2855,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','reaping','pet','feats','ranks','cosmetics','stats'];
+      const tabs = ['buildings','upgrades','prestige','reaping','pet','grimoire','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         const on = tabs[i] === tab;
         btn.classList.toggle('active', on);
@@ -2726,6 +2876,7 @@
       const dt = (now - lastTick) / 1000;
       lastTick = now;
       expireBuffs();
+      if (grimoireUnlocked && essence < essenceMax()) essence = Math.min(essenceMax(), essence + essenceRegenPerSec() * dt);
       const earned = getCPS() * dt;
       if (earned > 0) {
         earn(earned);
@@ -3079,6 +3230,66 @@
         auraHtml;
     }
 
+    /* ═══════ THE GRIMOIRE OF THE DEAD ═══════
+       Locked → a Grave-Bloom unlock promise; unlocked → the Essence pool with a
+       regen bar, the spell list (cost + live backfire %), and the cast/backfire
+       counters. Built from existing classes only — no new colour tokens. */
+    function renderGrimoire() {
+      const el = document.getElementById('tab-grimoire');
+      if (!grimoireUnlocked) {
+        const can = graveBlooms >= GRIMOIRE_UNLOCK_BLOOMS;
+        el.innerHTML =
+          '<div class="prestige-panel">' +
+            '<div class="reaping-tier">The Grimoire</div>' +
+            '<div class="reaping-sub">Of the Dead</div>' +
+            '<div class="ascend-locked">A tome of necrotic magic lies buried in your dominion. ' +
+              'Unearth it with <b>' + GRIMOIRE_UNLOCK_BLOOMS + ' Grave Blooms</b> to draw on ' +
+              '<b>Necrotic Essence</b> — a power that regenerates over time and pays for spells.<br><br>' +
+              'You have <b>' + formatNum(graveBlooms) + '</b> Grave Bloom' + (graveBlooms === 1 ? '' : 's') + '.</div>' +
+            '<button class="prestige-btn" ' + (can ? '' : 'disabled') + ' onclick="unlockGrimoire()">' +
+              (can ? 'Unearth the Grimoire — ' + GRIMOIRE_UNLOCK_BLOOMS + ' Blooms' : 'Need ' + GRIMOIRE_UNLOCK_BLOOMS + ' Grave Blooms') + '</button>' +
+          '</div>';
+        return;
+      }
+
+      const max = essenceMax();
+      const cur = Math.min(essence, max);
+      const pct = max > 0 ? (cur / max) * 100 : 0;
+      const regen = essenceRegenPerSec();
+
+      let rows = '';
+      for (const s of SPELLS) {
+        const cost = spellCost(s);
+        const bf = Math.round(backfireChance(s) * 100);
+        const can = cur >= cost;
+        rows += '<div class="upgrade-row ' + (can ? 'affordable' : 'locked') + '" onclick="' + (can ? "castSpell('" + s.id + "')" : '') + '">' +
+          '<img class="aura-ico" src="' + s.icon + '" alt="" onerror="this.remove()">' +
+          '<div class="building-info">' +
+            '<div class="building-name">' + s.name + ' <span class="bldg-lv-tag">backfire ' + bf + '%</span></div>' +
+            '<div class="building-desc">' + s.desc + '</div>' +
+          '</div>' +
+          '<div class="building-right"><div class="building-cost">🕯️ ' + formatNum(cost) + '</div></div></div>';
+      }
+
+      el.innerHTML =
+        '<div class="prestige-panel">' +
+          '<div class="reaping-tier" style="font-size:28px">The Grimoire</div>' +
+          '<div class="reaping-sub">Necrotic Essence — spend it to cast, it regenerates in time</div>' +
+          '<div class="shard-balance">🕯️ <b>' + formatNum(Math.floor(cur)) + '</b> / ' + formatNum(max) + ' Essence</div>' +
+          '<div class="prestige-bar"><div class="prestige-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="prestige-have">Regenerating ' + formatNum(regen) + ' / sec' +
+            (cur < max ? ' · full in ' + formatTime((max - cur) / regen * 1000) : ' · at full power') + '</div>' +
+          '<div class="ascend-summary">Spells cast: <b>' + formatNum(spellsCast) + '</b> · Backfires: <b>' + formatNum(spellsBackfired) + '</b><br>' +
+            'The more you cast, the more the dead resist — every spell nudges the backfire chance higher.</div>' +
+        '</div>' +
+        '<div class="section-label">Spells</div>' +
+        rows;
+    }
+
+    /* Live-refresh the Grimoire tab (Essence bar / affordability) once a second
+       while it is open — cheap, and never per frame. */
+    setInterval(() => { if (activeTab === 'grimoire') renderGrimoire(); }, 1000);
+
     /* The running total an endless meta node is currently giving, for its row. */
     function metaNowLabel(m) {
       const lv = metaLvl(m.id);
@@ -3207,7 +3418,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 7;
+    const SAVE_VERSION = 8;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -3256,6 +3467,13 @@
       if (d.apocPacifiedUntil === undefined) d.apocPacifiedUntil = 0;
       if (d.apocEverActive === undefined) d.apocEverActive = false;
       if (d.apocEverFull === undefined) d.apocEverFull = false;
+      /* v8 — the Grimoire of the Dead (permanent meta layer). A v7 save loads
+         with the Grimoire un-unearthed, no Essence, and zero spell counters;
+         nothing existing is touched. */
+      if (d.grimoireUnlocked === undefined) d.grimoireUnlocked = false;
+      if (d.essence === undefined) d.essence = 0;
+      if (d.spellsCast === undefined) d.spellsCast = 0;
+      if (d.spellsBackfired === undefined) d.spellsBackfired = 0;
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -3279,6 +3497,7 @@
         graveBlooms, bloomStart, buildingLevels,
         petLevel, selectedAuras: [...selectedAuras],
         apocUnlocked, apocActive, apocStart, apocPacifiedUntil, apocEverActive, apocEverFull,
+        grimoireUnlocked, essence, spellsCast, spellsBackfired,
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         boughtGhouls: [...boughtGhouls],
@@ -3357,6 +3576,10 @@
       apocPacifiedUntil = d.apocPacifiedUntil || 0;
       apocEverActive = !!d.apocEverActive;
       apocEverFull = !!d.apocEverFull;
+      grimoireUnlocked = !!d.grimoireUnlocked;
+      essence = d.essence || 0;
+      spellsCast = d.spellsCast || 0;
+      spellsBackfired = d.spellsBackfired || 0;
       boughtUpgrades = new Set(d.boughtUpgrades);
       boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
@@ -3376,6 +3599,14 @@
           }
         }
       }
+
+      /* Necrotic Essence regenerates while away too (once the Grimoire is
+         unearthed), capped at the current max. */
+      if (grimoireUnlocked && d.savedAt) {
+        const awayE = (Date.now() - d.savedAt) / 1000;
+        if (awayE > 0) essence = Math.min(essenceMax(), essence + awayE * essenceRegenPerSec());
+      }
+      essence = Math.min(essence, essenceMax());
 
       /* Resume the Skullpocalypse cleanly: wraiths are transient, so drop any
          stragglers and restart the single scheduler if it should be running. */
