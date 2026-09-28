@@ -117,7 +117,24 @@
       background: linear-gradient(#0c0c0c, #050505);
       flex-shrink: 0;
     }
-    .world-ground { display: flex; flex-direction: column; min-height: 100%; }
+    .world-ground { display: flex; flex-direction: column; min-height: 100%; position: relative; z-index: 2; }
+    /* The Miasma pool — the "milk pool" analog. A rising fog at the bottom of
+       the world whose height/opacity are set from the meter on render (no
+       per-frame loop). Palette-compliant: dark blood-red / black only, NEVER
+       green. Flavor classes deepen it at feat milestones. */
+    .miasma-pool {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 0; opacity: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(40,0,0,0) 0%, rgba(60,0,0,0.35) 55%, rgba(20,0,0,0.85) 100%);
+      transition: height 0.6s ease, opacity 0.6s ease;
+    }
+    .miasma-pool.flavor-crimson { background: linear-gradient(180deg, rgba(70,0,0,0) 0%, rgba(95,0,0,0.42) 55%, rgba(32,0,0,0.9) 100%); }
+    .miasma-pool.flavor-ash     { background: linear-gradient(180deg, rgba(34,24,24,0) 0%, rgba(52,32,32,0.44) 55%, rgba(16,10,10,0.92) 100%); }
+    .miasma-pool.flavor-void    { background: linear-gradient(180deg, rgba(24,0,0,0) 0%, rgba(12,0,0,0.5) 55%, rgba(0,0,0,0.96) 100%); }
+    @media (prefers-reduced-motion: reduce) { .miasma-pool { transition: none; } }
     /* Each building gets a tier the crowd stands on. The gradient reads as
        ground the sprites sit atop rather than a flat list. */
     .world-band {
@@ -554,6 +571,7 @@
     .tag-click { background: #220000; color: #ff4444; }
     .tag-cps { background: #001122; color: #4488ff; }
     .tag-mult { background: #112200; color: #88cc44; }
+    .tag-ghoul { background: #1a0000; color: #ff5555; }
 
     /* Stats */
     .stat-row {
@@ -711,6 +729,7 @@
     <!-- The living world: every building you own appears here and stacks up,
          Cookie-Clicker style, so the screen fills as you go deeper. -->
     <div class="world-panel" id="worldPanel">
+      <div class="miasma-pool" id="miasmaPool"></div>
       <div class="world-ground" id="worldGround"></div>
       <div class="world-empty" id="worldEmpty">Your dominion is empty. Buy a building to raise it.</div>
     </div>
@@ -798,6 +817,23 @@
       { id:'s_engine1',building:'engine',req:10,  mult:2,   cost:3.3e10, name:'Overclocked Chaos', desc:'Chaos Engines ×2' },
       { id:'s_portal1',building:'portal',req:10,  mult:2,   cost:5.1e11, name:'Stable Rifts', desc:'Void Portals ×2' },
       { id:'s_horror1',building:'horror',req:10,  mult:2,   cost:7.5e12, name:'Maddening Whispers', desc:'Eldritch Horrors ×2' },
+    ];
+
+    /* GHOULS — the "kitten" analog. One-time upgrades bought with SKULLS that
+       each raise how hard the Miasma (the feat-derived "milk" meter) pushes
+       production: ghoulMult() = 1 + miasma × Σ(factor of owned ghouls), stacked
+       multiplicatively into getCPS. They RESET on prestige and are re-bought
+       each run, exactly like the base upgrades. Factors sum to 1.0, so a maxed
+       feat count (100% miasma) with every ghoul owned is a clean ×2 channel. */
+    const GHOULS = [
+      { id:'g1', name:'Ghoul Whelp',    cost:5e3,  factor:0.15, desc:'A newborn ghoul laps at the fog' },
+      { id:'g2', name:'Ghoul',          cost:5e5,  factor:0.15, desc:'A full-grown ghoul, hungry and loyal' },
+      { id:'g3', name:'Ghoul Pack',     cost:5e7,  factor:0.13, desc:'They hunt the miasma in packs now' },
+      { id:'g4', name:'Grave Ghoul',    cost:5e9,  factor:0.12, desc:'Clawed up from the deepest graves' },
+      { id:'g5', name:'Ghoul Horde',    cost:5e11, factor:0.11, desc:'A horde that drinks the dead air' },
+      { id:'g6', name:'Ancient Ghoul',  cost:5e13, factor:0.11, desc:'Older than the crypts themselves' },
+      { id:'g7', name:'Ghoul Legion',   cost:5e15, factor:0.12, desc:'A legion marching through the fog' },
+      { id:'g8', name:'Ghoul Overlord', cost:5e17, factor:0.11, desc:'It commands the miasma itself' },
     ];
 
     /* Prestige perks — bought with Bone Shards and kept forever across every
@@ -972,6 +1008,7 @@
     let cpBoostExpires = 0;
     let owned = {};
     let boughtUpgrades = new Set();
+    let boughtGhouls = new Set();     /* Ghoul upgrades owned this run — reset on prestige, like base upgrades */
     let hitMilestones = new Set();
     let startTime = Date.now();
     let lastTick = Date.now();
@@ -1147,6 +1184,21 @@
        not a trophy shelf. */
     function achMult() { return 1 + 0.01 * achievements.size; }
 
+    /* ═══════ MIASMA + GHOULS ═══════
+       Miasma is the "milk" analog: purely DERIVED from feats, no stored state.
+       +4% per feat, so the 25-feat maximum reads as a clean 100%. Ghouls (bought
+       with skulls, reset each run) turn that meter into production:
+         ghoulMult() = 1 + miasma × Σ(factor of owned ghouls).
+       With all ghouls (Σfactor = 1.0) at 100% miasma that is a ×2 channel, so
+       every feat gains a multiplicative payoff on top of its flat +1%. */
+    function miasma() { return achievements.size * 0.04; }   /* fraction: 1.0 = 100% */
+    function ghoulFactorSum() {
+      let f = 0;
+      for (const g of GHOULS) if (boughtGhouls.has(g.id)) f += g.factor;
+      return f;
+    }
+    function ghoulMult() { return 1 + miasma() * ghoulFactorSum(); }
+
     /* Per-building multiplier from synergy upgrades: a building's own tiered
        upgrades multiply it, and a cross-boost scales it by how many of ANOTHER
        building you own. Computed live so nothing has to be baked into a saved
@@ -1166,7 +1218,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * frenzyMult;
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * frenzyMult;
     }
 
     /* Blood Rush multiplies the WHOLE click, not just the base term. It used
@@ -1288,6 +1340,18 @@
       render();
     }
 
+    /* Buy a Ghoul — one-time, skulls, effect computed live in ghoulMult(). */
+    function buyGhoul(id, e) {
+      const g = GHOULS.find(x => x.id === id);
+      if (!g || boughtGhouls.has(id)) return;
+      if (skulls < g.cost) { shakeReject(e); return; }
+      skulls -= g.cost;
+      boughtGhouls.add(id);
+      playSound('buy');
+      checkAchievements();
+      render();
+    }
+
     /* Buy a synergy upgrade (separate list from UPGRADES). */
     function buySynergy(id, e) {
       const u = SYNERGY.find(x => x.id === id);
@@ -1393,6 +1457,7 @@
           showAchievement(a);
         }
       }
+      if (gained) renderMiasma();   /* a new feat raises the miasma meter */
       if (gained && activeTab === 'feats') renderAchievements();
     }
 
@@ -1893,6 +1958,21 @@
       ground.innerHTML = html;
       empty.style.display = any ? 'none' : 'flex';
       lastBought = null;
+      renderMiasma();
+    }
+
+    /* Size the Miasma pool from the meter (cheap; called on buy/load/prestige
+       and whenever a feat is earned — never per frame). Flavor deepens at feat
+       milestones, all within the black/grey/red palette. */
+    function renderMiasma() {
+      const pool = document.getElementById('miasmaPool');
+      if (!pool) return;
+      const m = Math.min(1, miasma());                 /* 0..1 for the visual */
+      pool.style.height = (m > 0 ? (8 + m * 72) : 0) + '%';
+      pool.style.opacity = (m > 0 ? (0.25 + m * 0.7) : 0).toFixed(2);
+      const n = achievements.size;
+      const flavor = n >= 22 ? 'flavor-void' : n >= 14 ? 'flavor-ash' : n >= 7 ? 'flavor-crimson' : '';
+      pool.className = 'miasma-pool ' + flavor;
     }
 
     function renderBuildings() {
@@ -1942,7 +2022,31 @@
       for (const u of UPGRADES.filter(u => u.tag === 'click')) html += upgradeRow(u);
       html += '<div class="section-label">CPS Multipliers</div>';
       for (const u of UPGRADES.filter(u => u.tag === 'mult')) html += upgradeRow(u);
+
+      /* Ghouls — feed on the Miasma. Reveal each once it is roughly in reach (or
+         already owned) so early runs are not flooded with far-off buys. */
+      const ghoulViz = GHOULS.filter(g => boughtGhouls.has(g.id) || totalSkulls >= g.cost * 0.3);
+      if (ghoulViz.length) {
+        const mp = Math.round(miasma() * 100);
+        const gm = Math.round((ghoulMult() - 1) * 100);
+        html += '<div class="section-label">Ghouls — they feed on the Miasma</div>';
+        html += '<div class="feats-head">Miasma <b>' + mp + '%</b> · your ghouls give <b>+' + gm + '%</b> production</div>';
+        for (const g of ghoulViz) html += ghoulRow(g);
+      }
+
       el.innerHTML = html;
+    }
+
+    function ghoulRow(g) {
+      const bought = boughtGhouls.has(g.id);
+      const can = skulls >= g.cost;
+      return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyGhoul('${g.id}', event)`}">
+        <div class="building-info">
+          <div class="building-name">${g.name} <span class="upgrade-tag tag-ghoul">ghoul</span></div>
+          <div class="building-desc">${g.desc} <span class="perk-now">(+${(g.factor * 100).toFixed(0)}% at full miasma)</span></div>
+        </div>
+        <div class="building-right"><div class="building-cost">${bought ? 'Owned' : formatNum(g.cost)}</div></div>
+      </div>`;
     }
 
     function synergyRow(u) {
@@ -2003,6 +2107,8 @@
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
         <div class="stat-row"><span class="stat-label">CPS multiplier</span><span class="stat-val">x${globalCpsMult}</span></div>
+        <div class="stat-row"><span class="stat-label">Miasma</span><span class="stat-val">${Math.round(miasma() * 100)}%</span></div>
+        <div class="stat-row"><span class="stat-label">Ghoul bonus</span><span class="stat-val">+${Math.round((ghoulMult() - 1) * 100)}% (${boughtGhouls.size}/${GHOULS.length} ghouls)</span></div>
         <div class="stat-row"><span class="stat-label">Buildings owned</span><span class="stat-val">${bldgTotal}</span></div>
         <div class="stat-row"><span class="stat-label">Upgrades bought</span><span class="stat-val">${boughtUpgrades.size}/${UPGRADES.length}</span></div>
         ${bldgBreakdown ? '<div class="section-label">Buildings Breakdown</div>' + bldgBreakdown : ''}
@@ -2162,6 +2268,7 @@
       owned = {};
       BUILDINGS.forEach(b => owned[b.id] = 0);
       boughtUpgrades = new Set();
+      boughtGhouls = new Set();      /* Ghouls are re-bought each run, like base upgrades */
       hitMilestones = new Set();
       startTime = Date.now();
     }
@@ -2413,7 +2520,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 3;
+    const SAVE_VERSION = 4;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -2427,6 +2534,9 @@
       if (!d.owned) d.owned = {};
       BUILDINGS.forEach(b => { if (!(b.id in d.owned)) d.owned[b.id] = 0; });
       if (!d.boughtUpgrades) d.boughtUpgrades = [];
+      /* v4 — Ghouls (the miasma servants). Bought with skulls, reset each run;
+         a v3 save simply loads with none owned. */
+      if (!d.boughtGhouls) d.boughtGhouls = [];
       if (!d.hitMilestones) d.hitMilestones = [];
       if (!d.perks) d.perks = [];
       if (!d.perkLevels || typeof d.perkLevels !== 'object') d.perkLevels = {};
@@ -2464,6 +2574,7 @@
         ascensions, epitaphs, metaLevels, highestPrestige,
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
+        boughtGhouls: [...boughtGhouls],
         hitMilestones: [...hitMilestones],
         perks: [...perks],
         perkLevels,
@@ -2529,6 +2640,7 @@
       metaPerks = new Set(d.metaPerks || []);
       highestPrestige = d.highestPrestige || 0;
       boughtUpgrades = new Set(d.boughtUpgrades);
+      boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
       perks = new Set(d.perks || []);
       perkLevels = (d.perkLevels && typeof d.perkLevels === 'object') ? d.perkLevels : {};
