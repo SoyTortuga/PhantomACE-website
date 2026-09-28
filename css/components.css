@@ -359,12 +359,15 @@
   }
 }
 
-/* Desktop sidebar: panel flies out to the right */
+/* Desktop sidebar: panel flies out to the right. Bottom-anchored for the same
+   reason as .account-menu — the bell sits low in the sidebar, so the panel
+   grows upward rather than off the bottom of the screen. */
 @media (min-width: 768px) {
   .notif-panel {
     right: auto;
     left: 100%;
-    top: 0;
+    top: auto;
+    bottom: 0;
     margin-top: 0;
     margin-left: 8px;
   }
@@ -552,14 +555,21 @@
   color: var(--white);
 }
 
-/* Desktop sidebar: menu flies out to the right, matching the notification panel */
+/* Desktop sidebar: menu flies out to the right, matching the notification panel.
+   The auth trigger is pinned to the BOTTOM of the sidebar (.header-right has
+   margin-top:auto), so the menu is anchored to the trigger's bottom and grows
+   UPWARD — anchoring it to the top ran it off the bottom of the screen. The
+   max-height keeps it inside the viewport on a short window. */
 @media (min-width: 768px) {
   .account-menu {
     right: auto;
     left: 100%;
-    top: 0;
+    top: auto;
+    bottom: 0;
     margin-top: 0;
     margin-left: 8px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
   }
 }
 
