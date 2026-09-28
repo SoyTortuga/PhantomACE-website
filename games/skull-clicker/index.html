@@ -2880,7 +2880,7 @@
       const entries = ranksData[ranksBoard];
       const me = (playerName || '').toLowerCase();
 
-      let head = helpBox(HELP.ranks) +
+      let head = helpBox('ranks', HELP.ranks) +
         '<div class="ranks-toggle">' +
         '<button class="ranks-tab ' + (ranksBoard === 'season' ? 'active' : '') + '" onclick="setRanksBoard(\'season\')">This Season</button>' +
         '<button class="ranks-tab ' + (ranksBoard === 'alltime' ? 'active' : '') + '" onclick="setRanksBoard(\'alltime\')">All-Time</button></div>';
@@ -3006,8 +3006,16 @@
        Presentational only — a native <details> per major system, collapsed by
        default so veterans see no clutter. Content is authored to match the real
        mechanics/numbers in this file. */
-    function helpBox(body) {
-      return '<details class="help-box"><summary class="help-sum">❔ How it works</summary>' +
+    /* Open/closed state is kept in this in-memory Set (keyed by a stable id per
+       placement) so it survives the per-second innerHTML rebuild on the Grimoire /
+       Garden / Hallowtide tabs — rebuilding the DOM would otherwise recreate the
+       <details> collapsed every tick. EPHEMERAL: never saved, resets on reload. */
+    let helpOpen = new Set();
+    function helpToggle(id, isOpen) { if (isOpen) helpOpen.add(id); else helpOpen.delete(id); }
+    function helpBox(id, body) {
+      return '<details class="help-box"' + (helpOpen.has(id) ? ' open' : '') +
+        ' ontoggle="helpToggle(\'' + id + '\', this.open)">' +
+        '<summary class="help-sum">❔ How it works</summary>' +
         '<div class="help-body">' + body + '</div></details>';
     }
     const HELP = {
@@ -3038,7 +3046,7 @@
       </div>`;
 
       const amounts = [1, 10, 100, 'max'];
-      let html = helpBox(HELP.buildings) + bloomPanel + helpBox(HELP.blooms) + '<div class="buy-toggle">' + amounts.map(a =>
+      let html = helpBox('buildings', HELP.buildings) + bloomPanel + helpBox('blooms', HELP.blooms) + '<div class="buy-toggle">' + amounts.map(a =>
         `<button class="buy-amt ${buyAmount === a ? 'active' : ''}" onclick="setBuyAmount(${a === 'max' ? "'max'" : a})">${a === 'max' ? 'Max' : '×' + a}</button>`
       ).join('') + '</div>';
       let rows = '';
@@ -3094,7 +3102,7 @@
 
     function renderUpgrades() {
       const el = document.getElementById('tab-upgrades');
-      let html = helpBox(HELP.upgrades);
+      let html = helpBox('upgrades', HELP.upgrades);
 
       /* Synergy first when any are in reach — they are the interesting, deep
          buys, so surface them rather than burying them under the flat list. */
@@ -3115,7 +3123,7 @@
       if (ghoulViz.length) {
         const mp = Math.round(miasma() * 100);
         const gm = Math.round((ghoulMult() - 1) * 100);
-        html += helpBox(HELP.ghouls);
+        html += helpBox('ghouls', HELP.ghouls);
         html += '<div class="section-label">Ghouls — they feed on the Miasma</div>';
         html += '<div class="feats-head">Miasma <b>' + mp + '%</b> · your ghouls give <b>+' + gm + '%</b> production</div>';
         for (const g of ghoulViz) html += ghoulRow(g);
@@ -3631,7 +3639,7 @@
       for (const p of PERKS) if (p.type === 'tiered') shop += perkRow(p);
 
       document.getElementById('tab-prestige').innerHTML =
-        helpBox(HELP.prestige) +
+        helpBox('prestige', HELP.prestige) +
         '<div class="prestige-panel">' +
           '<div class="prestige-tier">Prestige ' + prestige + '</div>' +
           '<div class="prestige-mult">' + mult.toFixed(1) + 'x to all skull gathering</div>' +
@@ -3673,7 +3681,7 @@
       }
 
       el.innerHTML =
-        helpBox(HELP.pet) +
+        helpBox('pet', HELP.pet) +
         '<div class="pet-panel">' +
           '<div class="pet-sprite"></div>' +
           '<div class="pet-name">' + PET_NAME + '</div>' +
@@ -3696,7 +3704,7 @@
       if (!grimoireUnlocked) {
         const can = graveBlooms >= GRIMOIRE_UNLOCK_BLOOMS;
         el.innerHTML =
-          helpBox(HELP.grimoire) +
+          helpBox('grimoire', HELP.grimoire) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">The Grimoire</div>' +
             '<div class="reaping-sub">Of the Dead</div>' +
@@ -3730,7 +3738,7 @@
       }
 
       el.innerHTML =
-        helpBox(HELP.grimoire) +
+        helpBox('grimoire', HELP.grimoire) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">The Grimoire</div>' +
           '<div class="reaping-sub">Necrotic Essence — spend it to cast, it regenerates in time</div>' +
@@ -3969,7 +3977,7 @@
       if (!gardenUnlocked) {
         const can = graveBlooms >= GARDEN_UNLOCK_BLOOMS;
         el.innerHTML =
-          helpBox(HELP.garden) +
+          helpBox('garden', HELP.garden) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">The Cursed</div>' +
             '<div class="reaping-sub">Garden</div>' +
@@ -3989,7 +3997,7 @@
       const totalPlantable = STRAINS.filter(s => s.plantable).length;
 
       let head =
-        helpBox(HELP.garden) +
+        helpBox('garden', HELP.garden) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">The Cursed Garden</div>' +
           '<div class="reaping-sub">Plants grow in real time — mature them for a bonus, harvest, and cross-breed</div>' +
@@ -4141,7 +4149,7 @@
       if (!seasonUnlocked) {
         const can = graveBlooms >= SEASON_UNLOCK_BLOOMS;
         el.innerHTML =
-          helpBox(HELP.hallowtide) +
+          helpBox('hallowtide', HELP.hallowtide) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">Hallowtide</div>' +
             '<div class="reaping-sub">The Season of the Dead</div>' +
@@ -4176,7 +4184,7 @@
       }
 
       let head =
-        helpBox(HELP.hallowtide) +
+        helpBox('hallowtide', HELP.hallowtide) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:28px">Hallowtide</div>' +
           '<div class="reaping-sub">' + statusLine + '</div>' +
@@ -4231,7 +4239,7 @@
          someone has ascended once, the tab stays available forever. */
       if (ascensions === 0 && !ready) {
         el.innerHTML =
-          helpBox(HELP.reaping) +
+          helpBox('reaping', HELP.reaping) +
           '<div class="prestige-panel">' +
             '<div class="reaping-tier">The Reaping</div>' +
             '<div class="reaping-sub">A power beyond prestige.</div>' +
@@ -4285,7 +4293,7 @@
         'Highest prestige reached: <b>' + highestPrestige + '</b></div>';
 
       el.innerHTML =
-        helpBox(HELP.reaping) +
+        helpBox('reaping', HELP.reaping) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier">Ascension ' + ascensions + '</div>' +
           '<div class="reaping-sub">The Reaping — a permanent power above prestige</div>' +
@@ -4341,7 +4349,7 @@
       }
 
       return '<div class="section-label">The Skullpocalypse</div>' +
-        helpBox(HELP.apoc) +
+        helpBox('apoc', HELP.apoc) +
         '<div class="prestige-panel">' +
           '<div class="reaping-tier" style="font-size:26px">' +
             (apocActive && !calm ? '☠️ ' + APOC_PHASE_NAMES[phase] : 'Dormant') + '</div>' +
