@@ -384,6 +384,9 @@
       transition: transform 0.3s ease;
       max-height: 50%;
       overflow-y: auto;
+      /* Clear the viewport/safe-area edge so the care actions (Food/Water/Play/
+         Wash/Graze) aren't clipped at the bottom and stay tappable. */
+      padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     }
     .park-panel.open { transform: translateY(0); }
 
