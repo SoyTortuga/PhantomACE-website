@@ -537,6 +537,37 @@
  text-shadow: none; color: var(--red); font-weight: 600; }
     .building-owned { font-size: 25px; font-weight: 800; color: var(--text-dim); }
 
+    /* Grave Bloom panel (top of the Buildings tab) + per-building level control.
+       On-palette black/grey/red/white, full borders only — no box-shadow /
+       side-border accent / backdrop-filter. */
+    .bloom-panel {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; margin-bottom: 8px;
+      background: var(--gray-lo); border: 1px solid var(--border); border-radius: 4px;
+    }
+    .bloom-ico { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; flex: none; }
+    .bloom-info { flex: 1; min-width: 0; }
+    .bloom-count { font-size: 15px; text-shadow: none; color: var(--text-pri); }
+    .bloom-count b { color: #ff5555; font-weight: 800; }
+    .bloom-timer { font-size: 14px; text-shadow: none; color: var(--text-dim); margin-top: 1px; }
+    .bloom-harvest {
+      flex: none; padding: 7px 14px; border-radius: 4px; font-size: 15px; font-weight: 800;
+      cursor: pointer; font-family: inherit; background: var(--red); color: #fff; border: none;
+    }
+    .bloom-harvest:not(:disabled):hover { background: #cc0000; }
+    .bloom-harvest:disabled { opacity: 0.4; cursor: default; background: var(--gray-mid); color: var(--text-dim); }
+    .bldg-level {
+      margin-top: 4px; display: inline-flex; flex-direction: column; align-items: center;
+      padding: 2px 7px; border: 1px solid var(--border-mid); border-radius: 4px;
+      cursor: pointer; line-height: 1.15;
+    }
+    .bldg-level.can { border-color: var(--red); }
+    .bldg-level:hover { border-color: var(--red); }
+    .bldg-lv { font-size: 14px; text-shadow: none; font-weight: 800; color: var(--text-pri); }
+    .bldg-lvcost { font-size: 13px; text-shadow: none; color: #ff5555; font-weight: 800; display: inline-flex; align-items: center; gap: 2px; }
+    .bldg-lvcost .bloom-mini { width: 12px; height: 12px; object-fit: contain; image-rendering: pixelated; }
+    .bldg-lv-tag { font-size: 13px; text-shadow: none; font-weight: 800; color: #ff5555; }
+
     /* Upgrade rows */
     .upgrade-row {
       display: flex;
@@ -841,6 +872,17 @@
       { id:'g8', name:'Ghoul Overlord', cost:5e17, factor:0.11, desc:'It commands the miasma itself' },
     ];
 
+    /* ═══════ GRAVE BLOOM (the sugar-lump analog) ═══════
+       A secondary currency that RIPENS in real time (offline too, via a
+       timestamp). Harvest a ripe bloom for +1, then the next begins. Spend
+       blooms to LEVEL individual buildings for +2% output each — a PERMANENT
+       meta layer that survives prestige AND ascension (never cleared in
+       resetRun). Blooms are also reserved as the unlock currency for the later
+       Grimoire/Garden minigames. */
+    const BLOOM_RIPEN_MS = 3 * 60 * 60 * 1000;   /* one bloom ripens every 3 real hours (tunable) */
+    const BLOOM_LEVEL_BONUS = 0.02;               /* +2% building output per level */
+    const BLOOM_ICON = '/assets/images/eggs/egg-rare.png';
+
     /* Prestige perks — bought with Bone Shards and kept forever across every
        future run. Two kinds:
 
@@ -1031,6 +1073,10 @@
     let metaLevels = {};            /* endless meta node -> level */
     let metaPerks = new Set();      /* one-time meta unlocks (automation) owned */
     let highestPrestige = 0;        /* best prestige tier ever reached (history kept through a reap) */
+    /* ── Grave Bloom (permanent meta layer — survives prestige AND ascension) ── */
+    let graveBlooms = 0;            /* harvested blooms available to spend */
+    let bloomStart = Date.now();    /* when the currently-ripening bloom began (real-time, offline-aware) */
+    let buildingLevels = {};        /* building id -> bloom level (+2% output each) */
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1223,6 +1269,45 @@
     }
     function ghoulMult() { return 1 + miasma() * ghoulFactorSum(); }
 
+    /* ── Grave Bloom helpers ── */
+    /* Blooms fully ripened and waiting (offline-aware: derived purely from the
+       timestamp, so a long absence accrues the whole gap). */
+    function readyBlooms() { return Math.max(0, Math.floor((Date.now() - bloomStart) / BLOOM_RIPEN_MS)); }
+    /* Milliseconds until the next bloom ripens. */
+    function nextBloomInMs() {
+      const rem = (Date.now() - bloomStart) % BLOOM_RIPEN_MS;
+      return Math.max(0, BLOOM_RIPEN_MS - rem);
+    }
+    /* Harvest everything ripe; advance the ripen clock so a partial bloom keeps
+       growing. Returns how many were collected. */
+    function harvestBlooms() {
+      const n = readyBlooms();
+      if (n <= 0) return 0;
+      graveBlooms += n;
+      bloomStart += n * BLOOM_RIPEN_MS;
+      playStinger('rare');
+      save();
+      renderBuildings();
+      return n;
+    }
+    function buildingLevel(id) { return buildingLevels[id] || 0; }
+    function buildingLevelMult(id) { return 1 + buildingLevel(id) * BLOOM_LEVEL_BONUS; }
+    /* CC-style triangular cost: leveling a building to level N costs N blooms. */
+    function bloomLevelCost(id) { return buildingLevel(id) + 1; }
+    function levelBuilding(id, e) {
+      if (e) e.stopPropagation();
+      const b = BUILDINGS.find(x => x.id === id);
+      if (!b) return;
+      const cost = bloomLevelCost(id);
+      if (graveBlooms < cost) { shakeReject(e); return; }
+      graveBlooms -= cost;
+      buildingLevels[id] = buildingLevel(id) + 1;
+      playSound('buy');
+      save();
+      render();
+      renderWorld();
+    }
+
     /* ═══════ TIMED BUFF / DEBUFF FRAMEWORK ═══════
        Add a timed effect; re-collecting the same id refreshes it rather than
        stacking a duplicate. cpsMult/clickMult default to 1 (no effect on that
@@ -1269,7 +1354,7 @@
     function getCPS() {
       let cps = 0;
       for (const b of BUILDINGS) {
-        cps += b.baseCps * owned[b.id] * getBuildingMult(b);
+        cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
       }
       return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * buffCpsMult();
     }
@@ -2096,10 +2181,26 @@
       pool.className = 'miasma-pool ' + flavor;
     }
 
+    function bloomTimerText() {
+      const ready = readyBlooms();
+      if (ready > 0) return ready + ' bloom' + (ready === 1 ? '' : 's') + ' ready to harvest';
+      return 'Next bloom ripens in ' + formatTime(nextBloomInMs());
+    }
+
     function renderBuildings() {
       const el = document.getElementById('tab-buildings');
+      const ready = readyBlooms();
+      const bloomPanel = `<div class="bloom-panel">
+        <img class="bloom-ico" src="${BLOOM_ICON}" alt="" onerror="this.style.display='none'">
+        <div class="bloom-info">
+          <div class="bloom-count"><b id="bloomCount">${formatNum(graveBlooms)}</b> Grave Bloom${graveBlooms === 1 ? '' : 's'} · spend to level buildings</div>
+          <div class="bloom-timer" id="bloomTimer">${bloomTimerText()}</div>
+        </div>
+        <button class="bloom-harvest" id="bloomHarvest" ${ready > 0 ? '' : 'disabled'} onclick="harvestBlooms()">${ready > 0 ? 'Harvest ' + ready : 'Ripening'}</button>
+      </div>`;
+
       const amounts = [1, 10, 100, 'max'];
-      let html = '<div class="buy-toggle">' + amounts.map(a =>
+      let html = bloomPanel + '<div class="buy-toggle">' + amounts.map(a =>
         `<button class="buy-amt ${buyAmount === a ? 'active' : ''}" onclick="setBuyAmount(${a === 'max' ? "'max'" : a})">${a === 'max' ? 'Max' : '×' + a}</button>`
       ).join('') + '</div>';
       let rows = '';
@@ -2110,22 +2211,48 @@
         const qty = buyAmount === 'max' ? Math.max(1, maxAffordable(b)) : buyAmount;
         const cost = getBulkCost(b, qty);
         const can = buyAmount === 'max' ? maxAffordable(b) >= 1 : skulls >= cost;
-        const cps = (b.baseCps * cnt * getBuildingMult(b) * globalCpsMult);
+        const cps = (b.baseCps * cnt * getBuildingMult(b) * buildingLevelMult(b.id) * globalCpsMult);
         const qtyBadge = buyAmount === 1 ? '' : ` <span class="buy-qty">×${qty}</span>`;
+        const lvl = buildingLevel(b.id);
+        const lvlCost = bloomLevelCost(b.id);
+        const canLvl = graveBlooms >= lvlCost;
+        /* Level control appears once you own the building; clicking it spends
+           blooms, not skulls, and never triggers the row's buy (stopPropagation). */
+        const levelCtl = cnt > 0
+          ? `<div class="bldg-level ${canLvl ? 'can' : ''}" onclick="levelBuilding('${b.id}', event)" title="Spend Grave Blooms to level this building (+${Math.round(BLOOM_LEVEL_BONUS * 100)}% output)">
+               <span class="bldg-lv">Lv ${lvl}</span>
+               <span class="bldg-lvcost">${lvlCost}<img class="bloom-mini" src="${BLOOM_ICON}" alt="" onerror="this.style.display='none'"></span>
+             </div>`
+          : '';
         rows += `<div class="building-row ${can ? 'affordable' : ''}" onclick="buyBuilding('${b.id}', event)">
           <div class="building-icon"><img src="assets/buildings/${b.id}.png" alt="" onerror="this.remove()">${cnt > 0 ? `<span class="building-count">${cnt}</span>` : ''}</div>
           <div class="building-info">
-            <div class="building-name">${b.name}</div>
+            <div class="building-name">${b.name}${lvl > 0 ? ` <span class="bldg-lv-tag">Lv ${lvl}</span>` : ''}</div>
             <div class="building-desc">${b.desc}</div>
             ${cnt > 0 ? `<div class="building-cps">${formatNum(cps)}/s total</div>` : ''}
           </div>
           <div class="building-right">
             <div class="building-cost">${formatNum(cost)}${qtyBadge}</div>
+            ${levelCtl}
           </div>
         </div>`;
       }
       el.innerHTML = html + (rows || '<div style="text-align:center;color:#333;padding:20px;font-size:12px;text-shadow:none">Keep clicking to unlock buildings!</div>');
     }
+
+    /* Live-update the bloom panel's timer/count/harvest button in place (no row
+       rebuild, so scrolling is never interrupted). Cheap; runs once a second. */
+    function updateBloomTimer() {
+      const t = document.getElementById('bloomTimer');
+      if (!t) return;   /* buildings tab not showing */
+      t.textContent = bloomTimerText();
+      const ready = readyBlooms();
+      const btn = document.getElementById('bloomHarvest');
+      if (btn) { btn.disabled = ready <= 0; btn.textContent = ready > 0 ? 'Harvest ' + ready : 'Ripening'; }
+      const c = document.getElementById('bloomCount');
+      if (c) c.textContent = formatNum(graveBlooms);
+    }
+    setInterval(updateBloomTimer, 1000);
 
     function renderUpgrades() {
       const el = document.getElementById('tab-upgrades');
@@ -2224,6 +2351,8 @@
         <div class="stat-row"><span class="stat-label">Highest prestige</span><span class="stat-val">${highestPrestige}</span></div>
         <div class="stat-row"><span class="stat-label">Ascensions</span><span class="stat-val">${ascensions}</span></div>
         <div class="stat-row"><span class="stat-label">Epitaphs</span><span class="stat-val">${formatNum(epitaphs)}</span></div>
+        <div class="stat-row"><span class="stat-label">Grave Blooms</span><span class="stat-val">${formatNum(graveBlooms)}${readyBlooms() > 0 ? ' (+' + readyBlooms() + ' ripe)' : ''}</span></div>
+        <div class="stat-row"><span class="stat-label">Building levels</span><span class="stat-val">${BUILDINGS.reduce((s, b) => s + buildingLevel(b.id), 0)}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -2641,7 +2770,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 4;
+    const SAVE_VERSION = 5;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -2673,6 +2802,12 @@
       /* Seed highest-prestige from the current tier so history is never lost. */
       if (d.highestPrestige === undefined) d.highestPrestige = d.prestige || 0;
       if (d.highestPrestige < (d.prestige || 0)) d.highestPrestige = d.prestige || 0;
+      /* v5 — Grave Bloom (permanent meta layer). A v4 save loads with 0 blooms,
+         no building levels, and the ripen clock starting now (never crediting a
+         backlog from epoch 0). */
+      if (d.graveBlooms === undefined) d.graveBlooms = 0;
+      if (!d.bloomStart) d.bloomStart = Date.now();
+      if (!d.buildingLevels || typeof d.buildingLevels !== 'object') d.buildingLevels = {};
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -2693,6 +2828,7 @@
         cpsClickPct, globalCpsMult, owned, startTime,
         boneShards, cursedPopped, seasonBaseline, seasonMonth,
         ascensions, epitaphs, metaLevels, highestPrestige,
+        graveBlooms, bloomStart, buildingLevels,
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         boughtGhouls: [...boughtGhouls],
@@ -2760,6 +2896,9 @@
       metaLevels = (d.metaLevels && typeof d.metaLevels === 'object') ? d.metaLevels : {};
       metaPerks = new Set(d.metaPerks || []);
       highestPrestige = d.highestPrestige || 0;
+      graveBlooms = d.graveBlooms || 0;
+      bloomStart = d.bloomStart || Date.now();
+      buildingLevels = (d.buildingLevels && typeof d.buildingLevels === 'object') ? d.buildingLevels : {};
       boughtUpgrades = new Set(d.boughtUpgrades);
       boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
