@@ -82,19 +82,19 @@
     /* Wraith-leeches (Skullpocalypse) — small red-tinted skulls latched on the
        click area; click to pop. Depth from a drop-shadow on the sprite only. */
     .wraith {
-      position: absolute; width: 30px; height: 30px; z-index: 6; cursor: pointer;
+      position: absolute; width: 34px; height: 34px; z-index: 6; cursor: pointer;
+      background: url('assets/icons/wraith-strip.png') 0 0 no-repeat;
+      background-size: 136px 34px;   /* 184×46 strip, 4 frames, scaled to 34 */
+      image-rendering: pixelated;
       filter: drop-shadow(0 0 6px #ff0000);
-      animation: wraith-bob 1.6s ease-in-out infinite;
+      animation: wraith-float 1s steps(4) infinite, wraith-bob 1.6s ease-in-out infinite;
     }
-    .wraith img {
-      width: 100%; height: 100%; object-fit: contain; pointer-events: none;
-      opacity: 0.9; filter: brightness(0.75) sepia(1) saturate(6) hue-rotate(-20deg);
-    }
+    @keyframes wraith-float { from { background-position-x: 0; } to { background-position-x: -136px; } }
     .wraith.pop { animation: cursed-pop 0.3s ease-out forwards; }
     @keyframes wraith-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-    /* Wrath cursed skulls — a fierce red treatment over the normal sprite. */
+    /* Wrath cursed skulls — dedicated red sprite; keep a fierce red glow. */
     .cursed-skull.wrath { filter: drop-shadow(0 0 14px #ff0000); }
-    .cursed-skull.wrath img { filter: brightness(0.85) sepia(1) saturate(7) hue-rotate(-20deg); }
+    .cursed-skull.wrath img { image-rendering: pixelated; }
     @media (prefers-reduced-motion: reduce) { .wraith { animation: none; } }
     .skull-btn {
       width: 140px; height: 140px;
@@ -336,6 +336,12 @@
     /* Skullpocalypse status — bold red on a dark ground. */
     .buff-chip.apoc { color: #fff; border-color: var(--red); background: #2a0000; }
     .buff-ico { font-style: normal; }
+    /* Pixel-art icon sprites wired into features (buff chips, toasts, currencies,
+       aura/ghoul rows). Sized by CSS; crisp scaling for pixel art. */
+    .buff-ico-img { height: 22px; width: auto; vertical-align: middle; margin-top: -2px; image-rendering: pixelated; }
+    .toast-ico { height: 30px; width: auto; vertical-align: middle; image-rendering: pixelated; }
+    .cur-ico { height: 18px; width: auto; vertical-align: middle; margin-top: -2px; image-rendering: pixelated; }
+    .aura-ico, .ghoul-ico { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; flex: none; }
 
     /* Co-op raid banner (in-game) */
     .raid-banner {
@@ -937,7 +943,9 @@
        Grimoire/Garden minigames. */
     const BLOOM_RIPEN_MS = 3 * 60 * 60 * 1000;   /* one bloom ripens every 3 real hours (tunable) */
     const BLOOM_LEVEL_BONUS = 0.02;               /* +2% building output per level */
-    const BLOOM_ICON = '/assets/images/eggs/egg-rare.png';
+    const BLOOM_ICON = 'assets/icons/grave-bloom.png';
+    const EPITAPH_ICON = 'assets/icons/epitaph.png';
+    const EPITAPH_IMG = '<img class="cur-ico" src="' + EPITAPH_ICON + '" alt="Epitaph">';
 
     /* ═══════ THE BOUND REAPER (the Krumblor pet analog) ═══════
        A companion you LEVEL by sacrificing buildings, unlocking passive AURA
@@ -951,12 +959,12 @@
     const PET_AURA_SLOT_L1 = 3;    /* first aura slot unlocks at this level */
     const PET_AURA_SLOT_L2 = 8;    /* second aura slot */
     const AURAS = [
-      { id:'miasma_breath', name:'Miasma Breath', desc:'Production scales with your Miasma meter (up to ×2 at full)' },
-      { id:'ravenous',      name:'Ravenous',      desc:'×1.5 to all production' },
-      { id:'grave_fortune', name:'Grave Fortune', desc:'Cursed skulls appear 50% more often and pay 25% more' },
-      { id:'deathflight',   name:'Deathflight',   desc:'25% chance a cursed skull also grants a short Blood Rush' },
-      { id:'reapers_boon',  name:"Reaper's Boon", desc:'+25% Bone Shards and Epitaphs earned' },
-      { id:'hoard',         name:'Hoard',         desc:'+50% offline production' },
+      { id:'miasma_breath', name:'Miasma Breath', icon:'assets/icons/aura-miasma.png',       desc:'Production scales with your Miasma meter (up to ×2 at full)' },
+      { id:'ravenous',      name:'Ravenous',      icon:'assets/icons/aura-ravenous.png',     desc:'×1.5 to all production' },
+      { id:'grave_fortune', name:'Grave Fortune', icon:'assets/icons/aura-gravefortune.png', desc:'Cursed skulls appear 50% more often and pay 25% more' },
+      { id:'deathflight',   name:'Deathflight',   icon:'assets/icons/aura-deathflight.png',  desc:'25% chance a cursed skull also grants a short Blood Rush' },
+      { id:'reapers_boon',  name:"Reaper's Boon", icon:'assets/icons/aura-reapersboon.png',  desc:'+25% Bone Shards and Epitaphs earned' },
+      { id:'hoard',         name:'Hoard',         icon:'assets/icons/aura-hoard.png',        desc:'+50% offline production' },
     ];
 
     /* ═══════ THE SKULLPOCALYPSE (Grandmapocalypse analog) ═══════
@@ -1811,7 +1819,7 @@
       const wrath = !storm && apocActive && !apocCalm() && Math.random() < apocWrathChance();
       const el = document.createElement('div');
       el.className = 'cursed-skull' + (wrath ? ' wrath' : '');
-      el.innerHTML = '<img src="/assets/images/skull.png" alt="' + (wrath ? 'Wrath skull' : 'Cursed skull') + '">';
+      el.innerHTML = '<img src="' + (wrath ? 'assets/icons/wrath-skull.png' : '/assets/images/skull.png') + '" alt="' + (wrath ? 'Wrath skull' : 'Cursed skull') + '">';
       el.style.top = (10 + Math.random() * 60) + 'vh';
       /* Drift across the game column, not the whole viewport, so the skull
          stays over the play area instead of the empty margins beside it. */
@@ -1868,7 +1876,7 @@
       }
       /* Deathflight aura: a chance the skull also grants a short Blood Rush. */
       if (auraActive('deathflight') && Math.random() < 0.25) {
-        addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:8000, icon:'🩸', chipClass:'rush' });
+        addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:8000, icon:'assets/icons/buff-bloodrush.png', chipClass:'rush' });
         res.msg += ' · Deathflight!';
       }
       /* Fated: a chance the skull also drops a Bone Shard. */
@@ -1877,7 +1885,7 @@
         res.msg += ' · +1 🦴';
       }
       burstParticles(el);
-      showBuffToast(res.msg, res.kind);
+      showBuffToast(res.msg, res.kind, res.icon);
       playStinger(res.rarity);
       el.classList.add('popped');
       setTimeout(() => el.remove(), 300);
@@ -1902,25 +1910,25 @@
 
     function outFrenzy() {
       const mult = frenzyMultValue(), dur = 20000 * buffScale();
-      addTimedBuff({ id:'frenzy', name:'Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'🔥', chipClass:'frenzy' });
-      return { msg:'FRENZY — ×' + mult + ' production for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'rare' };
+      addTimedBuff({ id:'frenzy', name:'Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'assets/icons/buff-frenzy.png', chipClass:'frenzy' });
+      return { msg:'FRENZY — ×' + mult + ' production for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'rare', icon:'assets/icons/buff-frenzy.png' };
     }
     function outBloodRush() {
       const dur = 13000 * buffScale();
-      addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:dur, icon:'🩸', chipClass:'rush' });
-      return { msg:'BLOOD RUSH — ×100 clicks for ' + Math.round(dur / 1000) + 's', kind:'rush', rarity:'epic' };
+      addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:dur, icon:'assets/icons/buff-bloodrush.png', chipClass:'rush' });
+      return { msg:'BLOOD RUSH — ×100 clicks for ' + Math.round(dur / 1000) + 's', kind:'rush', rarity:'epic', icon:'assets/icons/buff-bloodrush.png' };
     }
     /* Lucky — a capped windfall: 15% of the bank (cap) plus a minute of CpS. */
     function outLucky() {
       const reward = (Math.min(Math.max(skulls * 0.15, getClickPower() * 20), getCPS() * 900) + getCPS() * 60) * windfallMult();
       earn(reward);
-      return { msg:'LUCKY — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon' };
+      return { msg:'LUCKY — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon', icon:'assets/icons/buff-lucky.png' };
     }
     /* Reap — the big windfall (scales with the Plunder perk). */
     function outReap() {
       const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult() * windfallMult();
       earn(reap);
-      return { msg:'REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'epic' };
+      return { msg:'REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'epic', icon:'assets/icons/buff-reap.png' };
     }
     /* Building Special — an instant payout scaled off one random building you own. */
     function outBuildingSpecial() {
@@ -1931,12 +1939,12 @@
         getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult();
       const reward = Math.max(perSec * (60 + Math.random() * 180), getClickPower() * 50) * windfallMult();
       earn(reward);
-      return { msg:b.name + ' SPECIAL — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon' };
+      return { msg:b.name + ' SPECIAL — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon', icon:'assets/icons/buff-building.png' };
     }
     /* Skull Storm — a short flurry of extra cursed skulls (CC's Cookie Storm). */
     function outSkullStorm() {
       skullStorm();
-      return { msg:'SKULL STORM — catch them all!', kind:'frenzy', rarity:'legendary' };
+      return { msg:'SKULL STORM — catch them all!', kind:'frenzy', rarity:'legendary', icon:'assets/icons/buff-skullstorm.png' };
     }
     function skullStorm() {
       const n = 8 + Math.floor(Math.random() * 7);   // 8–14 skulls over ~5s
@@ -1970,12 +1978,12 @@
       }
       if (Math.random() < 0.5) {
         const mult = Math.ceil(frenzyMultValue() * 1.5), dur = 24000 * buffScale();
-        addTimedBuff({ id:'frenzy', name:'Wrath Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'🔥', chipClass:'frenzy' });
-        return { msg:'WRATH FRENZY — ×' + mult + ' for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'legendary' };
+        addTimedBuff({ id:'frenzy', name:'Wrath Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'assets/icons/buff-frenzy.png', chipClass:'frenzy' });
+        return { msg:'WRATH FRENZY — ×' + mult + ' for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'legendary', icon:'assets/icons/buff-frenzy.png' };
       }
       const reap = Math.max(getCPS() * 1200, skulls * 0.20, getClickPower() * 200) * reapMult() * windfallMult();
       earn(reap);
-      return { msg:'WRATH REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'legendary' };
+      return { msg:'WRATH REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'legendary', icon:'assets/icons/buff-reap.png' };
     }
 
     /* Auto-grant the permanent unlock the moment the gate is met. */
@@ -2040,8 +2048,9 @@
         const area = document.querySelector('.skull-area');
         if (area) {
           const el = document.createElement('div');
-          el.className = 'wraith';
-          el.innerHTML = '<img src="/assets/images/skull.png" alt="Wraith-leech">';
+          el.className = 'wraith';   /* sprite is the CSS background (animated strip) */
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-label', 'Wraith-leech');
           el.style.left = (18 + Math.random() * 64) + '%';
           el.style.top = (8 + Math.random() * 64) + '%';
           const w = { el, bank: 0 };
@@ -2076,10 +2085,14 @@
       wraiths = [];
     }
 
-    function showBuffToast(msg, kind) {
+    function showBuffToast(msg, kind, icon) {
       const el = document.createElement('div');
       el.className = 'buff-toast ' + kind;
-      el.textContent = msg;
+      /* Escape the (developer-authored) message, then swap the Epitaph token for
+         its sprite and, when given, lead with the outcome's icon. */
+      let inner = escSkull(msg).replace(/🪦/g, EPITAPH_IMG);
+      if (icon && icon.indexOf('/') >= 0) inner = '<img class="toast-ico" src="' + icon + '" alt=""> ' + inner;
+      el.innerHTML = inner;
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 2600);
     }
@@ -2103,9 +2116,12 @@
       for (const b of activeBuffs) {
         const secs = Math.ceil((b.endsAt - now) / 1000);
         if (secs <= 0) continue;
-        html += '<span class="buff-chip ' + b.chipClass + '">' +
-          (b.icon ? '<span class="buff-ico">' + b.icon + '</span> ' : '') +
-          escSkull(b.name) + ' · ' + secs + 's</span>';
+        const ico = b.icon
+          ? (b.icon.indexOf('/') >= 0
+              ? '<img class="buff-ico-img" src="' + b.icon + '" alt=""> '
+              : '<span class="buff-ico">' + b.icon + '</span> ')
+          : '';
+        html += '<span class="buff-chip ' + b.chipClass + '">' + ico + escSkull(b.name) + ' · ' + secs + 's</span>';
       }
       if (combo > 4 && now - lastClickAt < 1200) {
         html += '<span class="buff-chip combo">Combo ×' + combo + ' · +' + Math.round((comboMult() - 1) * 100) + '%</span>';
@@ -2605,6 +2621,7 @@
       const bought = boughtGhouls.has(g.id);
       const can = skulls >= g.cost;
       return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyGhoul('${g.id}', event)`}">
+        <img class="ghoul-ico" src="assets/icons/ghoul.png" alt="" onerror="this.remove()">
         <div class="building-info">
           <div class="building-name">${g.name} <span class="upgrade-tag tag-ghoul">ghoul</span></div>
           <div class="building-desc">${g.desc} <span class="perk-now">(+${(g.factor * 100).toFixed(0)}% at full miasma)</span></div>
@@ -2666,7 +2683,7 @@
         <div class="stat-row"><span class="stat-label">Prestige tier</span><span class="stat-val">${prestige}</span></div>
         <div class="stat-row"><span class="stat-label">Highest prestige</span><span class="stat-val">${highestPrestige}</span></div>
         <div class="stat-row"><span class="stat-label">Ascensions</span><span class="stat-val">${ascensions}</span></div>
-        <div class="stat-row"><span class="stat-label">Epitaphs</span><span class="stat-val">${formatNum(epitaphs)}</span></div>
+        <div class="stat-row"><span class="stat-label">Epitaphs</span><span class="stat-val">${EPITAPH_IMG} ${formatNum(epitaphs)}</span></div>
         <div class="stat-row"><span class="stat-label">Grave Blooms</span><span class="stat-val">${formatNum(graveBlooms)}${readyBlooms() > 0 ? ' (+' + readyBlooms() + ' ripe)' : ''}</span></div>
         <div class="stat-row"><span class="stat-label">Building levels</span><span class="stat-val">${BUILDINGS.reduce((s, b) => s + buildingLevel(b.id), 0)}</span></div>
         <div class="stat-row"><span class="stat-label">${PET_NAME}</span><span class="stat-val">Level ${petLevel}${selectedAuras.length ? ' · ' + selectedAuras.length + ' aura' + (selectedAuras.length === 1 ? '' : 's') : ''}</span></div>
@@ -3042,6 +3059,7 @@
         const locked = slots <= 0;
         const state = active ? 'equipped' : locked ? 'locked' : '';
         auraHtml += '<div class="aura-row ' + state + '" onclick="' + (locked ? '' : "toggleAura('" + a.id + "')") + '">' +
+          '<img class="aura-ico" src="' + a.icon + '" alt="" onerror="this.remove()">' +
           '<div class="cosmetic-info"><div class="cosmetic-name">' + a.name +
           (active ? ' <span class="aura-on">ACTIVE</span>' : '') + '</div>' +
           '<div class="cosmetic-desc">' + a.desc + '</div></div></div>';
@@ -3105,7 +3123,7 @@
         const lvlTag = endless
           ? ' <span class="meta-lvl">Lv ' + metaLvl(m.id) + (m.max ? '/' + m.max : '') + '</span>'
           : (metaHas(m.id) ? ' <span class="meta-lvl">on</span>' : '');
-        const right = maxed ? (endless ? 'Maxed' : 'Owned') : locked ? 'Locked' : '🪦 ' + formatNum(cost);
+        const right = maxed ? (endless ? 'Maxed' : 'Owned') : locked ? 'Locked' : EPITAPH_IMG + ' ' + formatNum(cost);
         const now = endless && metaLvl(m.id) > 0 ? ' <span class="perk-now">(now ' + metaNowLabel(m) + ')</span>' : '';
         return '<div class="upgrade-row ' + state + '" onclick="' + (can ? "buyMeta('" + m.id + "')" : '') + '">' +
           '<div class="building-info"><div class="building-name">' + m.name + lvlTag + '</div>' +
@@ -3135,7 +3153,7 @@
             'Keeps lifetime skulls, feats, cosmetics, and everything in The Reaping.' +
             (ready ? '' : ' You are at Prestige ' + prestige + '.') + '</div>' +
         '</div>' +
-        '<div class="shard-balance">🪦 <b>' + formatNum(epitaphs) + '</b> Epitaph' + (epitaphs === 1 ? '' : 's') + '</div>' +
+        '<div class="shard-balance">' + EPITAPH_IMG + ' <b>' + formatNum(epitaphs) + '</b> Epitaph' + (epitaphs === 1 ? '' : 's') + '</div>' +
         tree +
         apocSectionHtml();
     }
