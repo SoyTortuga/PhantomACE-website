@@ -77,7 +77,25 @@
       justify-content: center;
       padding: 20px 0;
       flex-shrink: 0;
+      position: relative;   /* anchor for wraith-leeches */
     }
+    /* Wraith-leeches (Skullpocalypse) — small red-tinted skulls latched on the
+       click area; click to pop. Depth from a drop-shadow on the sprite only. */
+    .wraith {
+      position: absolute; width: 30px; height: 30px; z-index: 6; cursor: pointer;
+      filter: drop-shadow(0 0 6px #ff0000);
+      animation: wraith-bob 1.6s ease-in-out infinite;
+    }
+    .wraith img {
+      width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+      opacity: 0.9; filter: brightness(0.75) sepia(1) saturate(6) hue-rotate(-20deg);
+    }
+    .wraith.pop { animation: cursed-pop 0.3s ease-out forwards; }
+    @keyframes wraith-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    /* Wrath cursed skulls — a fierce red treatment over the normal sprite. */
+    .cursed-skull.wrath { filter: drop-shadow(0 0 14px #ff0000); }
+    .cursed-skull.wrath img { filter: brightness(0.85) sepia(1) saturate(7) hue-rotate(-20deg); }
+    @media (prefers-reduced-motion: reduce) { .wraith { animation: none; } }
     .skull-btn {
       width: 140px; height: 140px;
       border-radius: 50%;
@@ -315,6 +333,8 @@
     .buff-chip.buff   { color: #e8e8e8; border-color: #555; }
     /* Debuff — distinct red outline on a dark ground so it reads as harmful. */
     .buff-chip.debuff { color: #ff5555; border-color: #ff3b3b; background: #1a0000; }
+    /* Skullpocalypse status — bold red on a dark ground. */
+    .buff-chip.apoc { color: #fff; border-color: var(--red); background: #2a0000; }
     .buff-ico { font-style: normal; }
 
     /* Co-op raid banner (in-game) */
@@ -939,6 +959,27 @@
       { id:'hoard',         name:'Hoard',         desc:'+50% offline production' },
     ];
 
+    /* ═══════ THE SKULLPOCALYPSE (Grandmapocalypse analog) ═══════
+       An opt-in, escalating undead uprising. Unlocks permanently at an end-game
+       gate; the player toggles it on to gain a global production bonus at the
+       cost of chaos — WRAITH-LEECHES that latch on the skull and drain CpS
+       (but disgorge MORE when popped) and WRATH cursed skulls (bigger buffs, but
+       a chance to inflict the WRATH_DEBUFFS clot/ruin from the buff framework).
+       A Pacify lever buys temporary calm with Bone Shards. All meta state is
+       permanent — never cleared by resetRun. */
+    const APOC_UNLOCK_LIFETIME = 1e12;              /* 1 Trillion lifetime skulls … */
+    const APOC_UNLOCK_PRESTIGE = 5;                 /* … or Prestige 5, whichever first */
+    const APOC_PHASE2_MS = 5 * 60 * 1000;           /* Rising after 5 min active */
+    const APOC_PHASE3_MS = 15 * 60 * 1000;          /* Full Undeath after 15 min active */
+    const APOC_PHASE_NAMES = ['—', 'Stirring', 'Rising', 'Full Undeath'];
+    const APOC_PROD_BONUS = [0, 0.15, 0.35, 0.60];  /* +production per phase */
+    const APOC_WRATH_CHANCE = [0, 0.20, 0.40, 0.60];/* chance a cursed skull turns wrathful, per phase */
+    const APOC_PACIFY_COST = 5;                     /* Bone Shards to pacify */
+    const APOC_PACIFY_MS = 3 * 60 * 1000;           /* duration of calm */
+    const MAX_WRAITHS = 3;                          /* on-screen cap (marathon-safe) */
+    const WRAITH_DRAIN = 0.05;                      /* each wraith drains this share of CpS */
+    const WRAITH_POP_MULT = 1.5;                    /* pop pays this × what it drained */
+
     /* Prestige perks — bought with Bone Shards and kept forever across every
        future run. Two kinds:
 
@@ -1091,6 +1132,8 @@
       { id:'pr2',  name:'Cycle of Bone',   desc:'Reach prestige 5',          check:() => prestige >= 5 },
       { id:'pr3',  name:'Eternal Return',  desc:'Reach prestige 10',         check:() => prestige >= 10 },
       { id:'asc1', name:'The First Reaping', desc:'Ascend once beyond prestige', check:() => ascensions >= 1 },
+      { id:'apoc1', name:'Unquiet Earth',   desc:'Begin the Skullpocalypse',    check:() => apocEverActive },
+      { id:'apoc2', name:'Full Undeath',    desc:'Reach the final phase of the uprising', check:() => apocEverFull },
       { id:'cur1', name:'Cursed',          desc:'Pop a cursed skull',        check:() => cursedPopped >= 1 },
       { id:'cur2', name:'Skull Hunter',    desc:'Pop 10 cursed skulls',      check:() => cursedPopped >= 10 },
       { id:'cur3', name:'Doom Magnet',     desc:'Pop 50 cursed skulls',      check:() => cursedPopped >= 50 },
@@ -1136,6 +1179,15 @@
     /* ── The Bound Reaper (permanent meta layer — survives prestige AND ascension) ── */
     let petLevel = 0;               /* raised by feeding (sacrificing buildings) */
     let selectedAuras = [];         /* active passive auras, up to auraSlots() */
+    /* ── The Skullpocalypse (permanent meta layer) ── */
+    let apocUnlocked = false;       /* permanent once the gate is reached */
+    let apocActive = false;         /* is the uprising currently raging */
+    let apocStart = 0;              /* when it was (re)activated — drives phases */
+    let apocPacifiedUntil = 0;      /* calm window end (Pacify lever) */
+    let apocEverActive = false;     /* feat gate */
+    let apocEverFull = false;       /* feat gate — reached Full Undeath */
+    let wraiths = [];               /* transient wraith-leeches: [{el, bank}] — never saved */
+    let wraithTimer = null;
     let achievements = new Set();   /* earned feats — each is a permanent boost */
     let cursedPopped = 0;           /* lifetime cursed skulls clicked */
     let buyAmount = 1;              /* 1 | 10 | 100 | 'max' */
@@ -1451,13 +1503,33 @@
       return m;
     }
 
-    function getCPS() {
+    /* Gross production — everything the buildings make before wraith drain. */
+    function getGrossCPS() {
       let cps = 0;
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * buffCpsMult();
+      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult();
     }
+    /* Net production the player actually receives — gross minus wraith drain. */
+    function getCPS() { return getGrossCPS() * wraithDrainMult(); }
+
+    /* ── Skullpocalypse computed state ── */
+    function apocCalm() { return apocPacifiedUntil > Date.now(); }
+    function apocPhase() {
+      if (!apocActive || apocCalm()) return 0;
+      const el = Date.now() - apocStart;
+      if (el >= APOC_PHASE3_MS) return 3;
+      if (el >= APOC_PHASE2_MS) return 2;
+      return 1;
+    }
+    function apocProdMult() { return 1 + APOC_PROD_BONUS[apocPhase()]; }
+    function apocWrathChance() { return APOC_WRATH_CHANCE[apocPhase()]; }
+    function wraithDrainMult() {
+      const n = (apocActive && !apocCalm()) ? wraiths.length : 0;
+      return n <= 0 ? 1 : Math.max(0.4, 1 - WRAITH_DRAIN * n);
+    }
+    function apocUnlockable() { return lifetimeSkulls >= APOC_UNLOCK_LIFETIME || prestige >= APOC_UNLOCK_PRESTIGE; }
 
     /* Blood Rush multiplies the WHOLE click, not just the base term. It used
        to sit inside `base`, so anyone with a %-of-CPS click upgrade (Void
@@ -1734,9 +1806,12 @@
     function spawnCursed(opts) {
       opts = opts || {};
       const storm = !!opts.storm;
+      /* During the uprising a non-storm skull can turn WRATHFUL (bigger boon,
+         but it can bite back with a debuff). Distinct red tint on the sprite. */
+      const wrath = !storm && apocActive && !apocCalm() && Math.random() < apocWrathChance();
       const el = document.createElement('div');
-      el.className = 'cursed-skull';
-      el.innerHTML = '<img src="/assets/images/skull.png" alt="Cursed skull">';
+      el.className = 'cursed-skull' + (wrath ? ' wrath' : '');
+      el.innerHTML = '<img src="/assets/images/skull.png" alt="' + (wrath ? 'Wrath skull' : 'Cursed skull') + '">';
       el.style.top = (10 + Math.random() * 60) + 'vh';
       /* Drift across the game column, not the whole viewport, so the skull
          stays over the play area instead of the empty margins beside it. */
@@ -1763,7 +1838,7 @@
         if (done) return;
         done = true;
         clearTimeout(life);
-        popCursed(el, { storm });
+        popCursed(el, { storm, wrath });
         reschedule();
       });
 
@@ -1774,7 +1849,7 @@
           if (done) return;
           done = true;
           clearTimeout(life);
-          popCursed(el, { storm });
+          popCursed(el, { storm, wrath });
           reschedule();
         }, 1500);
       }
@@ -1783,7 +1858,14 @@
     function popCursed(el, opts) {
       opts = opts || {};
       cursedPopped++;
-      const res = rollCursedOutcome(!opts.storm);
+      const res = opts.wrath ? rollWrathOutcome() : rollCursedOutcome(!opts.storm);
+      /* Wrath skulls drip bonus Bone Shards (and a small Epitaph chance). */
+      if (opts.wrath) {
+        const bonus = 1 + apocPhase();
+        boneShards += bonus;
+        res.msg += ' · +' + bonus + ' 🦴';
+        if (Math.random() < 0.08) { epitaphs += 1; res.msg += ' · +1 🪦'; }
+      }
       /* Deathflight aura: a chance the skull also grants a short Blood Rush. */
       if (auraActive('deathflight') && Math.random() < 0.25) {
         addTimedBuff({ id:'rush', name:'Blood Rush ×100', kind:'buff', clickMult:100, durationMs:8000, icon:'🩸', chipClass:'rush' });
@@ -1875,7 +1957,124 @@
       skulls = Math.max(0, skulls - loss);
       return { msg:'RUIN — lost ' + formatNum(loss) + ' skulls', kind:'reap', rarity:'common' };
     }
-    const WRATH_DEBUFFS = { clot: outClot, ruin: outRuin };   /* used by the future wrath system */
+    const WRATH_DEBUFFS = { clot: outClot, ruin: outRuin };   /* triggered by wrath skulls, below */
+
+    /* ═══════ SKULLPOCALYPSE — wrath outcomes, wraiths, and the levers ═══════ */
+
+    /* A wrath cursed skull: mostly a BIGGER boon, but a 30% chance the uprising
+       bites back with one of the WRATH_DEBUFFS. Everything routes through the
+       buff framework / the shared debuff helpers. */
+    function rollWrathOutcome() {
+      if (Math.random() < 0.30) {
+        return (Math.random() < 0.5) ? WRATH_DEBUFFS.clot() : WRATH_DEBUFFS.ruin();
+      }
+      if (Math.random() < 0.5) {
+        const mult = Math.ceil(frenzyMultValue() * 1.5), dur = 24000 * buffScale();
+        addTimedBuff({ id:'frenzy', name:'Wrath Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'🔥', chipClass:'frenzy' });
+        return { msg:'WRATH FRENZY — ×' + mult + ' for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'legendary' };
+      }
+      const reap = Math.max(getCPS() * 1200, skulls * 0.20, getClickPower() * 200) * reapMult() * windfallMult();
+      earn(reap);
+      return { msg:'WRATH REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'legendary' };
+    }
+
+    /* Auto-grant the permanent unlock the moment the gate is met. */
+    function checkApocUnlock() {
+      if (!apocUnlocked && apocUnlockable()) {
+        apocUnlocked = true;
+        showBuffToast('☠️ A dread power stirs — The Skullpocalypse can be unearthed', 'reap');
+      }
+    }
+
+    function beginApocalypse() {
+      if (!apocUnlocked || apocActive) return;
+      apocActive = true;
+      apocEverActive = true;
+      apocStart = Date.now();
+      apocPacifiedUntil = 0;
+      playStinger('legendary');
+      screenShake();
+      showBuffToast('☠️ THE SKULLPOCALYPSE BEGINS', 'reap');
+      scheduleWraith();
+      checkAchievements();
+      save();
+      render();
+    }
+
+    function endApocalypse() {
+      apocActive = false;
+      apocPacifiedUntil = 0;
+      clearTimeout(wraithTimer); wraithTimer = null;
+      clearWraiths();
+      save();
+      render();
+      renderBuffs();
+    }
+
+    function pacifyApocalypse() {
+      if (!apocActive || apocCalm()) return;
+      if (boneShards < APOC_PACIFY_COST) return;
+      boneShards -= APOC_PACIFY_COST;
+      apocPacifiedUntil = Date.now() + APOC_PACIFY_MS;
+      clearTimeout(wraithTimer); wraithTimer = null;
+      clearWraiths();            /* calm removes the leeches; the bonus is suspended too */
+      playStinger('uncommon');
+      save();
+      render();
+      renderBuffs();
+    }
+
+    /* ── Wraith-leeches (the wrinkler analog) ── */
+    function scheduleWraith() {
+      clearTimeout(wraithTimer);
+      if (!apocActive || apocCalm()) { wraithTimer = null; return; }
+      const p = Math.max(1, apocPhase());
+      const wait = (30000 + Math.random() * 20000) / p;   /* faster at higher phases */
+      wraithTimer = setTimeout(spawnWraith, wait);
+    }
+
+    function spawnWraith() {
+      wraithTimer = null;
+      if (!apocActive || apocCalm()) return;
+      if (wraiths.length < MAX_WRAITHS) {
+        const area = document.querySelector('.skull-area');
+        if (area) {
+          const el = document.createElement('div');
+          el.className = 'wraith';
+          el.innerHTML = '<img src="/assets/images/skull.png" alt="Wraith-leech">';
+          el.style.left = (18 + Math.random() * 64) + '%';
+          el.style.top = (8 + Math.random() * 64) + '%';
+          const w = { el, bank: 0 };
+          el.addEventListener('click', () => popWraith(w));
+          area.appendChild(el);
+          wraiths.push(w);
+        }
+      }
+      scheduleWraith();
+    }
+
+    function popWraith(w) {
+      const i = wraiths.indexOf(w);
+      if (i < 0) return;
+      wraiths.splice(i, 1);
+      const payout = Math.max(w.bank * WRAITH_POP_MULT, getClickPower() * 20);
+      earn(payout);
+      const bonusShards = 1 + apocPhase();
+      boneShards += bonusShards;
+      let msg = 'WRAITH DISGORGES — +' + formatNum(payout) + ' skulls · +' + bonusShards + ' 🦴';
+      if (Math.random() < 0.10) { epitaphs += 1; msg += ' · +1 🪦'; }
+      showBuffToast(msg, 'reap');
+      playStinger('rare');
+      burstParticles(w.el);
+      if (w.el) { w.el.classList.add('pop'); setTimeout(() => w.el.remove(), 300); }
+      checkAchievements();
+      render();
+    }
+
+    function clearWraiths() {
+      for (const w of wraiths) if (w.el) w.el.remove();
+      wraiths = [];
+    }
 
     function showBuffToast(msg, kind) {
       const el = document.createElement('div');
@@ -1892,6 +2091,15 @@
       if (!bar) return;
       const now = Date.now();
       let html = '';
+      /* Skullpocalypse status leads the bar while it rages (or calms). */
+      if (apocActive) {
+        if (apocCalm()) {
+          html += '<span class="buff-chip buff">☠️ Uprising calmed · ' + Math.ceil((apocPacifiedUntil - now) / 1000) + 's</span>';
+        } else {
+          const ph = apocPhase();
+          html += '<span class="buff-chip apoc">☠️ ' + APOC_PHASE_NAMES[ph] + ' · +' + Math.round(APOC_PROD_BONUS[ph] * 100) + '%</span>';
+        }
+      }
       for (const b of activeBuffs) {
         const secs = Math.ceil((b.endsAt - now) / 1000);
         if (secs <= 0) continue;
@@ -2462,6 +2670,7 @@
         <div class="stat-row"><span class="stat-label">Grave Blooms</span><span class="stat-val">${formatNum(graveBlooms)}${readyBlooms() > 0 ? ' (+' + readyBlooms() + ' ripe)' : ''}</span></div>
         <div class="stat-row"><span class="stat-label">Building levels</span><span class="stat-val">${BUILDINGS.reduce((s, b) => s + buildingLevel(b.id), 0)}</span></div>
         <div class="stat-row"><span class="stat-label">${PET_NAME}</span><span class="stat-val">Level ${petLevel}${selectedAuras.length ? ' · ' + selectedAuras.length + ' aura' + (selectedAuras.length === 1 ? '' : 's') : ''}</span></div>
+        <div class="stat-row"><span class="stat-label">Skullpocalypse</span><span class="stat-val">${!apocUnlocked ? 'Locked' : apocActive ? (apocCalm() ? 'Calmed' : APOC_PHASE_NAMES[apocPhase()]) : 'Dormant'}</span></div>
         <div class="section-label">Production</div>
         <div class="stat-row"><span class="stat-label">Click power</span><span class="stat-val">${formatNum(cp)}</span></div>
         <div class="stat-row"><span class="stat-label">Per second</span><span class="stat-val">${formatNum(cps)}</span></div>
@@ -2505,13 +2714,26 @@
         earn(earned);
         checkMilestones();
       }
+      /* Wraith-leeches fatten on the gross production the drain removed. */
+      if (wraiths.length) {
+        const perW = getGrossCPS() * WRAITH_DRAIN * dt;
+        for (const w of wraiths) w.bank += perW;
+      }
       document.getElementById('score').textContent = formatNum(Math.floor(skulls));
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
       renderBuffs();
 
       /* Passive feats (skulls/buildings) caught about once a second — cheap,
          and no need to check 10×/s. */
-      if (++tickCount % 10 === 0) checkAchievements();
+      if (++tickCount % 10 === 0) {
+        checkAchievements();
+        checkApocUnlock();
+        /* Reach Full Undeath → flag the feat; restart wraith spawns after a calm. */
+        if (apocActive && !apocCalm()) {
+          if (apocPhase() >= 3 && !apocEverFull) { apocEverFull = true; checkAchievements(); }
+          if (!wraithTimer) scheduleWraith();
+        }
+      }
 
       if (now - lastSave > 30000) {
         save();
@@ -2868,7 +3090,8 @@
               'You are at Prestige <b>' + prestige + '</b>.<br><br>' +
               'Reaping trades your whole prestige climb for <b>Epitaphs</b> — a permanent currency ' +
               'that buys an endless meta-tree. Your lifetime skulls and feats are kept.</div>' +
-          '</div>';
+          '</div>' +
+          apocSectionHtml();   /* the Skullpocalypse unlocks before ascension, so show it here too */
         return;
       }
 
@@ -2913,12 +3136,60 @@
             (ready ? '' : ' You are at Prestige ' + prestige + '.') + '</div>' +
         '</div>' +
         '<div class="shard-balance">🪦 <b>' + formatNum(epitaphs) + '</b> Epitaph' + (epitaphs === 1 ? '' : 's') + '</div>' +
-        tree;
+        tree +
+        apocSectionHtml();
+    }
+
+    /* The Skullpocalypse control panel, shown at the foot of the Reaping tab. */
+    function apocSectionHtml() {
+      /* Hidden entirely until it is close to unlockable, then a teaser, then the
+         live controls once permanently unlocked. */
+      if (!apocUnlocked) {
+        const near = lifetimeSkulls >= APOC_UNLOCK_LIFETIME * 0.2 || prestige >= 3;
+        if (!near) return '';
+        return '<div class="section-label">The Skullpocalypse</div>' +
+          '<div class="ascend-locked">A dread power stirs beneath your dominion. ' +
+          'Reach <b>' + formatNum(APOC_UNLOCK_LIFETIME) + '</b> lifetime skulls or <b>Prestige ' + APOC_UNLOCK_PRESTIGE + '</b> to unearth it.</div>';
+      }
+
+      const phase = apocPhase();
+      const calm = apocCalm();
+      let body;
+      if (!apocActive) {
+        body =
+          '<div class="ascend-summary">An opt-in undead uprising. It raises production through escalating ' +
+          'phases (Stirring → Rising → Full Undeath), but wraith-leeches will latch onto your skull and ' +
+          'cursed skulls turn wrathful. Pop the wraiths for a windfall; pacify the uprising when it gets ' +
+          'to be too much.</div>' +
+          '<button class="prestige-btn" onclick="beginApocalypse()">Begin the Skullpocalypse</button>';
+      } else if (calm) {
+        body =
+          '<div class="ascend-summary">The uprising is <b>calmed</b> for ' + Math.ceil((apocPacifiedUntil - Date.now()) / 1000) +
+          's — no wraiths, no wrath, and no production bonus while calm.</div>' +
+          '<button class="prestige-btn" onclick="endApocalypse()">End the Uprising</button>';
+      } else {
+        const canPacify = boneShards >= APOC_PACIFY_COST;
+        body =
+          '<div class="ascend-summary">Phase: <b>' + APOC_PHASE_NAMES[phase] + '</b> · ' +
+          '<b>+' + Math.round(APOC_PROD_BONUS[phase] * 100) + '%</b> production · ' +
+          'wraiths on skull: <b>' + wraiths.length + '/' + MAX_WRAITHS + '</b> · ' +
+          'wrath chance: <b>' + Math.round(APOC_WRATH_CHANCE[phase] * 100) + '%</b></div>' +
+          '<button class="prestige-btn" ' + (canPacify ? '' : 'disabled') + ' onclick="pacifyApocalypse()">Pacify — ' +
+            APOC_PACIFY_COST + ' 🦴 (calm ' + Math.round(APOC_PACIFY_MS / 60000) + 'm)</button> ' +
+          '<button class="reward-btn ghost" onclick="endApocalypse()">End the Uprising</button>';
+      }
+
+      return '<div class="section-label">The Skullpocalypse</div>' +
+        '<div class="prestige-panel">' +
+          '<div class="reaping-tier" style="font-size:26px">' +
+            (apocActive && !calm ? '☠️ ' + APOC_PHASE_NAMES[phase] : 'Dormant') + '</div>' +
+          body +
+        '</div>';
     }
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 6;
+    const SAVE_VERSION = 7;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -2959,6 +3230,14 @@
       /* v6 — the Bound Reaper (pet). A v5 save loads at level 0 with no auras. */
       if (d.petLevel === undefined) d.petLevel = 0;
       if (!Array.isArray(d.selectedAuras)) d.selectedAuras = [];
+      /* v7 — the Skullpocalypse. A v6 save loads locked/inactive. Wraiths are
+         transient (respawn on load if active) and never persisted. */
+      if (d.apocUnlocked === undefined) d.apocUnlocked = false;
+      if (d.apocActive === undefined) d.apocActive = false;
+      if (d.apocStart === undefined) d.apocStart = 0;
+      if (d.apocPacifiedUntil === undefined) d.apocPacifiedUntil = 0;
+      if (d.apocEverActive === undefined) d.apocEverActive = false;
+      if (d.apocEverFull === undefined) d.apocEverFull = false;
       if (d.seasonBaseline === undefined) d.seasonBaseline = 0;
       if (typeof d.seasonMonth !== 'string') d.seasonMonth = '';
       if (d.startTime === undefined) d.startTime = Date.now();
@@ -2981,6 +3260,7 @@
         ascensions, epitaphs, metaLevels, highestPrestige,
         graveBlooms, bloomStart, buildingLevels,
         petLevel, selectedAuras: [...selectedAuras],
+        apocUnlocked, apocActive, apocStart, apocPacifiedUntil, apocEverActive, apocEverFull,
         metaPerks: [...metaPerks],
         boughtUpgrades: [...boughtUpgrades],
         boughtGhouls: [...boughtGhouls],
@@ -3053,6 +3333,12 @@
       buildingLevels = (d.buildingLevels && typeof d.buildingLevels === 'object') ? d.buildingLevels : {};
       petLevel = d.petLevel || 0;
       selectedAuras = Array.isArray(d.selectedAuras) ? d.selectedAuras : [];
+      apocUnlocked = !!d.apocUnlocked;
+      apocActive = !!d.apocActive;
+      apocStart = d.apocStart || 0;
+      apocPacifiedUntil = d.apocPacifiedUntil || 0;
+      apocEverActive = !!d.apocEverActive;
+      apocEverFull = !!d.apocEverFull;
       boughtUpgrades = new Set(d.boughtUpgrades);
       boughtGhouls = new Set(d.boughtGhouls || []);
       hitMilestones = new Set(d.hitMilestones);
@@ -3072,6 +3358,12 @@
           }
         }
       }
+
+      /* Resume the Skullpocalypse cleanly: wraiths are transient, so drop any
+         stragglers and restart the single scheduler if it should be running. */
+      clearWraiths();
+      clearTimeout(wraithTimer); wraithTimer = null;
+      if (apocActive && !apocCalm()) scheduleWraith();
 
       /* Back-grant any state-based feats the loaded save already qualifies for
          (e.g. "The First Reaping" for an ascensions>=1 save) so a load can
