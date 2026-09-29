@@ -216,9 +216,20 @@
      less. Pulls get four. */
   var PULL_MS = 4000;
 
-  /* How long the winner's name stays up, landed, after the reel itself
-     stops spinning — long enough to read on stream before the card leaves. */
-  var REEL_HOLD_MS = 2600;
+  /* How long the winner's name stays up, landed, after the reel stops — long
+     enough for the celebration (name pop, glow, embers, reaper) to read on
+     stream before the card leaves. Mythic is grander than rare, so it holds
+     longer. describe() adds the matching hold onto the spin time, so the
+     alert's total life covers the FULL reveal and never cuts it off. */
+  var REEL_HOLD_RARE = 3800;
+  var REEL_HOLD_MYTHIC = 4800;
+
+  /* Bounded ember counts for the landing burst — a hard cap per rarity so a
+     mythic win can never spawn an unbounded number of particle nodes. Each
+     ember is a plain colour div animated with transform/opacity only (no
+     filter/blur) that removes itself on animationend; see .ov-ember in
+     overlay.css. */
+  var REEL_EMBERS = { rare: 16, mythic: 28 };
 
   /* ── Pham Check-In reminder ───────────────────────────────────────────
      Deliberately NOT a full alert: a small nudge in the corner telling
@@ -365,13 +376,14 @@
     if (ev.type === 'giveaway-spin') {
       var rarity = ev.rarity === 'mythic' ? 'mythic' : 'rare';
       var spinMs = (window.PhamReel && window.PhamReel.SPIN_MS) || 6000;
+      var hold = rarity === 'mythic' ? REEL_HOLD_MYTHIC : REEL_HOLD_RARE;
       return {
         reel: true,
         entrants: Array.isArray(ev.entrants) ? ev.entrants : [],
         winnerIndex: ev.winnerIndex,
         who: ev.who || '',
         rarity: rarity,
-        ms: spinMs + REEL_HOLD_MS,
+        ms: spinMs + hold,
       };
     }
 
@@ -594,6 +606,19 @@
     caption.textContent = 'Spinning for the winner…';
     card.appendChild(caption);
 
+    /* Every timer/frame this card starts is registered here; render() calls
+       card._cleanup the instant the card detaches, so nothing ticks or holds
+       a node off-screen on a marathon. The celebration nodes celebrateReel()
+       adds (winner pop, prize line, embers, reaper) are children of the card
+       and leave with it — the embers also self-remove on animationend — so
+       none survive the reveal even if the card is torn down mid-flight. */
+    var landTimer = null, raf1 = 0, raf2 = 0;
+    card._cleanup = function () {
+      if (landTimer) { clearTimeout(landTimer); landTimer = null; }
+      if (raf1) { cancelAnimationFrame(raf1); raf1 = 0; }
+      if (raf2) { cancelAnimationFrame(raf2); raf2 = 0; }
+    };
+
     if (window.PhamReel && d.entrants.length) {
       var plan = window.PhamReel.strip(d.entrants, d.winnerIndex);
       plan.names.forEach(function (name, i) {
@@ -616,25 +641,92 @@
          the transition and the target, giving a painted start frame to
          animate away from. */
       strip.style.transform = 'translateY(0)';
-      requestAnimationFrame(function () {
+      raf1 = requestAnimationFrame(function () {
         void strip.offsetHeight;   // now attached — a real reflow at the top
-        requestAnimationFrame(function () {
+        raf2 = requestAnimationFrame(function () {
           strip.style.transition = 'transform ' + (spinMs / 1000) + 's cubic-bezier(0.12, 0.8, 0.18, 1)';
           strip.style.transform = 'translateY(' + plan.offset + 'px)';
         });
       });
 
-      setTimeout(function () {
-        /* textContent, not the innerHTML esc() elsewhere is for — a plain
-           string assignment here needs no escaping of its own. */
-        caption.textContent = d.who ? (d.who + ' wins!') : 'We have a winner!';
-        card.classList.add('is-landed');
+      landTimer = setTimeout(function () {
+        landTimer = null;
+        celebrateReel(card, caption, d);
       }, spinMs + 100);
     } else {
       caption.textContent = 'No entrants to draw from.';
     }
 
     return card;
+  }
+
+  /* ── The landing moment ────────────────────────────────────────────────
+     The reel has stopped on the winner. This turns the stop into the hype
+     beat: the name pops up big and centred, the prize and claim URL appear,
+     the card border flares (via .is-landed in overlay.css), a reaper flourish
+     rises to present the winner, and a bounded burst of rarity-coloured embers
+     rises and clears itself. MYTHIC is grander than RARE — bigger name, gold
+     glow, TWO reapers, more embers, a longer hold — all driven by
+     [data-rarity] in the stylesheet.
+
+     This reveal is PURELY VISUAL — it plays no sound and creates no Audio
+     element, and it does not touch the overlay's audio plumbing.
+
+     MARATHON-SAFE: every node here is a child of the card, so render()'s
+     removal takes them all; embers additionally remove themselves on
+     animationend. Nothing starts a timer, interval, or rAF loop — the
+     pop/rise/ember motion is one-shot CSS that ends on its own. */
+  function celebrateReel(card, caption, d) {
+    card.classList.add('is-landed');
+    /* textContent, not the innerHTML esc() elsewhere is for — plain string
+       assignments here need no escaping of their own. */
+    caption.textContent = 'Claim at phantomace.tv/giveaway';
+
+    var winner = document.createElement('p');
+    winner.className = 'ov-reel-winner';
+    winner.textContent = d.who || 'We have a winner';   // a Twitch username, not markup
+    card.insertBefore(winner, caption);
+
+    var prize = document.createElement('p');
+    prize.className = 'ov-reel-prize';
+    prize.textContent = 'wins the ' + (d.rarity === 'mythic' ? 'Mythic' : 'Rare') + ' prize!';
+    card.insertBefore(prize, caption);
+
+    /* Reaper flourish — frame 0 of the check-in sprite (the standing pose,
+       which carries no sign text), reused so no new art is needed. Rare
+       presents one; mythic flanks the card with two. The drop-shadow glow is
+       allowed on this non-box sprite. */
+    var sides = d.rarity === 'mythic' ? ['is-right', 'is-left'] : ['is-right'];
+    sides.forEach(function (side) {
+      var reaper = document.createElement('div');
+      reaper.className = 'ov-reel-reaper ' + side;
+      card.appendChild(reaper);
+    });
+
+    /* Embers — a bounded, one-shot burst. Skipped entirely under reduced
+       motion. Each removes itself on animationend, and any still mid-flight
+       when the card leaves go with it. */
+    if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      var fx = document.createElement('div');
+      fx.className = 'ov-reel-fx';
+      var count = REEL_EMBERS[d.rarity] || REEL_EMBERS.rare;
+      for (var i = 0; i < count; i++) {
+        var ember = document.createElement('span');
+        ember.className = 'ov-ember';
+        var sz = 4 + Math.round(Math.random() * 5);
+        ember.style.left = Math.round(Math.random() * 100) + '%';
+        ember.style.width = sz + 'px';
+        ember.style.height = sz + 'px';
+        ember.style.animationDuration = (1.5 + Math.random() * 1.3).toFixed(2) + 's';
+        ember.style.animationDelay = (Math.random() * 0.7).toFixed(2) + 's';
+        ember.addEventListener('animationend', function (e) {
+          var t = e.currentTarget;
+          if (t && t.parentNode) t.parentNode.removeChild(t);
+        });
+        fx.appendChild(ember);
+      }
+      card.appendChild(fx);
+    }
   }
 
   /* ── Dino hatch card ──────────────────────────────────────────────────

@@ -346,15 +346,148 @@ html, body {
   transition: color 200ms ease;
 }
 
-/* Once the reel lands, the caption swaps from "Spinning…" to the winner's
-   name — this is the moment the card exists for, so it takes the rarity
-   colour rather than staying the muted default. */
-.ov-reel-card.is-landed .ov-reel-caption { color: var(--text-pri); font-weight: 700; }
-
 .ov-reel-card[data-rarity="mythic"] .ov-reel-row.winner { color: var(--amber); }
 .ov-reel-card[data-rarity="rare"]   .ov-reel-row.winner { color: var(--purple); }
-.ov-reel-card.is-landed[data-rarity="mythic"] .ov-reel-caption { color: var(--amber); }
-.ov-reel-card.is-landed[data-rarity="rare"]   .ov-reel-caption { color: var(--purple); }
+
+/* ══ THE LANDING CELEBRATION ════════════════════════════════════════════
+   Everything below appears only on .is-landed. overlay.js builds these nodes
+   the instant the reel stops and they leave with the card (embers also self-
+   remove on animationend), so the overlay returns to its exact idle state
+   after the reveal. Every glow here is a filter: drop-shadow() on TEXT or a
+   NON-box sprite — never box-shadow — and depth/"lit" reads come from thicker,
+   brighter BORDERS. Mythic is deliberately grander than rare. */
+
+/* Border flare — the card border thickens and takes the rarity colour to read
+   as "lit". Width only grows the (border-box) frame inward, so it never nudges
+   the stage or the reel geometry. The reel window keeps its 1px border (its
+   height is shared with the reel transform math) and only recolours. */
+.ov-reel-card.is-landed { border-width: 2px; border-color: var(--red); }
+.ov-reel-card.is-landed[data-rarity="rare"]   { border-color: var(--purple); }
+.ov-reel-card.is-landed[data-rarity="mythic"] { border-color: var(--amber); }
+.ov-reel-card.is-landed[data-rarity="rare"]   .ov-reel-window { border-color: var(--purple); }
+.ov-reel-card.is-landed[data-rarity="mythic"] .ov-reel-window { border-color: var(--amber); }
+
+/* The CTA line — the caption becomes the claim URL once landed; kept quiet so
+   the winner's name is the loudest thing on the card. */
+.ov-reel-card.is-landed .ov-reel-caption { color: var(--text-sec); font-weight: 600; }
+
+/* Winner pop — the name front-and-centre in the big gothic face, scaling up on
+   arrival. The glow is a drop-shadow on the text element (transparent
+   background, so it traces the glyphs, not a box). Mythic is bigger and gold. */
+.ov-reel-winner {
+  margin: 6px 0 0;
+  font-family: var(--font-gothic);
+  font-size: 46px;
+  line-height: 1.05;
+  color: #fff;
+  overflow-wrap: anywhere;
+  animation: ov-reel-pop 460ms cubic-bezier(0.2, 1.5, 0.3, 1) both;
+}
+.ov-reel-card[data-rarity="rare"]   .ov-reel-winner { filter: drop-shadow(0 0 10px rgba(204, 136, 255, 0.75)); }
+.ov-reel-card[data-rarity="mythic"] .ov-reel-winner {
+  font-size: 60px;
+  filter: drop-shadow(0 0 16px rgba(255, 170, 0, 0.85));
+}
+
+/* Prize line — names the tier the winner just took, in the rarity colour. */
+.ov-reel-prize {
+  margin: 4px 0 0;
+  font-family: var(--font-system);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--red);
+  animation: ov-reel-rise 420ms ease both 130ms;
+}
+.ov-reel-card[data-rarity="rare"]   .ov-reel-prize { color: var(--purple); }
+.ov-reel-card[data-rarity="mythic"] .ov-reel-prize { color: var(--amber); }
+
+@keyframes ov-reel-pop {
+  0%   { opacity: 0; transform: scale(0.4); }
+  70%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes ov-reel-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Reaper flourish — frame 0 of the check-in sprite (standing pose, no sign),
+   rising in beside the card to present the winner. drop-shadow glow is allowed
+   on this non-box sprite. Positioned OUTSIDE the card so it never covers the
+   name; pointer-events off; pixel art kept crisp. */
+.ov-reel-reaper {
+  position: absolute;
+  bottom: -6px;
+  width: 87px;
+  height: 130px;
+  background-image: url(/assets/overlay/pham-checkin.png);
+  background-repeat: no-repeat;
+  background-position: 0 0;             /* frame 0 — standing reaper, no sign text */
+  background-size: 609px 130px;         /* 87 x 7 frames */
+  image-rendering: pixelated;
+  pointer-events: none;
+  animation: ov-reel-reaper-in 520ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.ov-reel-reaper.is-right { right: -72px; }
+.ov-reel-reaper.is-left  { left: -72px; }
+.ov-reel-card[data-rarity="rare"]   .ov-reel-reaper { filter: drop-shadow(0 0 8px rgba(204, 136, 255, 0.7)); }
+.ov-reel-card[data-rarity="mythic"] .ov-reel-reaper {
+  width: 116px;
+  height: 174px;
+  filter: drop-shadow(0 0 13px rgba(255, 170, 0, 0.8));
+}
+.ov-reel-card[data-rarity="mythic"] .ov-reel-reaper.is-right { right: -100px; }
+.ov-reel-card[data-rarity="mythic"] .ov-reel-reaper.is-left  { left: -100px; }
+
+@keyframes ov-reel-reaper-in {
+  from { opacity: 0; transform: translateY(48px); }
+  to   { opacity: 0.92; transform: translateY(0); }
+}
+
+/* Embers — a bounded one-shot burst overlaid on the card. Plain colour dots
+   animated with transform + opacity ONLY (no filter, no blur, no box-shadow).
+   overlay.js sets each one's left / size / duration / delay inline and removes
+   it on animationend. */
+.ov-reel-fx {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.ov-ember {
+  position: absolute;
+  bottom: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  opacity: 0;
+  animation-name: ov-ember-rise;
+  animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 1);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+.ov-reel-card[data-rarity="rare"]   .ov-ember { background: var(--purple); }
+.ov-reel-card[data-rarity="mythic"] .ov-ember { background: var(--amber); }
+
+@keyframes ov-ember-rise {
+  0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-200px) scale(1); }
+}
+
+/* The overlay's whole job is motion, so reduced-motion drops the celebration's
+   movement rather than the celebration — the name, prize and reaper still
+   appear, just without the pop/rise. (overlay.js also skips spawning embers
+   under reduced motion.) */
+@media (prefers-reduced-motion: reduce) {
+  .ov-reel-winner,
+  .ov-reel-prize,
+  .ov-reel-reaper { animation: none; }
+  .ov-reel-reaper { opacity: 0.92; }
+}
 
 @media (max-width: 560px) {
   .ov-reel-card { min-width: 0; width: 92vw; }
