@@ -216,13 +216,23 @@
      less. Pulls get four. */
   var PULL_MS = 4000;
 
-  /* How long the winner's name stays up, landed, after the reel stops — long
-     enough for the celebration (name pop, glow, embers, reaper) to read on
-     stream before the card leaves. Mythic is grander than rare, so it holds
-     longer. describe() adds the matching hold onto the spin time, so the
-     alert's total life covers the FULL reveal and never cuts it off. */
-  var REEL_HOLD_RARE = 3800;
-  var REEL_HOLD_MYTHIC = 4800;
+  /* After the reel lands, the reveal rains confetti for CONFETTI_MS, so the
+     card holds the stage for the spin plus the full confetti window plus a
+     small tail (so the last piece is never clipped). CONFETTI_MS is the single
+     knob for how long the confetti lasts; describe() adds it onto the spin
+     time. NOTE: at 30s the whole giveaway alert holds the stage ~36s, blocking
+     other alerts for that window. */
+  var CONFETTI_MS = 30000;
+  var REEL_LAND_BUFFER = 900;   // tail after the confetti before the card leaves
+
+  /* Bounded confetti piece counts — a hard cap per rarity so a win can never
+     spawn an unbounded number of nodes; density scales a little with rarity.
+     A bounded set is spread across the whole ~30s with randomized delays and
+     fall durations so it reads as continuous rain. Each piece is a plain
+     red/black/white rect animated with transform/opacity only (no
+     filter/blur/shadow) that removes itself on animationend; see .ov-confetti
+     in overlay.css. */
+  var CONFETTI_PIECES = { rare: 300, mythic: 400 };
 
   /* Bounded ember counts for the landing burst — a hard cap per rarity so a
      mythic win can never spawn an unbounded number of particle nodes. Each
@@ -376,7 +386,6 @@
     if (ev.type === 'giveaway-spin') {
       var rarity = ev.rarity === 'mythic' ? 'mythic' : 'rare';
       var spinMs = (window.PhamReel && window.PhamReel.SPIN_MS) || 6000;
-      var hold = rarity === 'mythic' ? REEL_HOLD_MYTHIC : REEL_HOLD_RARE;
       return {
         reel: true,
         entrants: Array.isArray(ev.entrants) ? ev.entrants : [],
@@ -389,7 +398,9 @@
            the Big Prize spin, which keeps its rarity heading and no note. */
         label: ev.label ? String(ev.label) : '',
         note: ev.note ? String(ev.note) : '',
-        ms: spinMs + hold,
+        /* Life covers the spin, the landing pop, and the FULL confetti window
+           plus a tail — so nothing is cut off. Same for both rarities. */
+        ms: spinMs + CONFETTI_MS + REEL_LAND_BUFFER,
       };
     }
 
@@ -627,9 +638,10 @@
     /* Every timer/frame this card starts is registered here; render() calls
        card._cleanup the instant the card detaches, so nothing ticks or holds
        a node off-screen on a marathon. The celebration nodes celebrateReel()
-       adds (winner pop, prize line, embers, reaper) are children of the card
-       and leave with it — the embers also self-remove on animationend — so
-       none survive the reveal even if the card is torn down mid-flight. */
+       adds (winner pop, prize line, embers, confetti) are children of the card
+       and leave with it — the embers and confetti also self-remove on
+       animationend — so none survive the reveal even if the card is torn down
+       mid-flight. */
     var landTimer = null, raf1 = 0, raf2 = 0;
     card._cleanup = function () {
       if (landTimer) { clearTimeout(landTimer); landTimer = null; }
@@ -681,19 +693,21 @@
   /* ── The landing moment ────────────────────────────────────────────────
      The reel has stopped on the winner. This turns the stop into the hype
      beat: the name pops up big and centred, the prize and claim URL appear,
-     the card border flares (via .is-landed in overlay.css), a reaper flourish
-     rises to present the winner, and a bounded burst of rarity-coloured embers
-     rises and clears itself. MYTHIC is grander than RARE — bigger name, gold
-     glow, TWO reapers, more embers, a longer hold — all driven by
-     [data-rarity] in the stylesheet.
+     the card border flares (via .is-landed in overlay.css),
+     a bounded burst of rarity-coloured embers rises and clears itself, and
+     then RED/BLACK/WHITE confetti rains for ~CONFETTI_MS. MYTHIC is grander
+     than RARE — bigger name, gold glow, more embers, denser confetti — all
+     driven by [data-rarity] in the stylesheet.
 
      This reveal is PURELY VISUAL — it plays no sound and creates no Audio
      element, and it does not touch the overlay's audio plumbing.
 
      MARATHON-SAFE: every node here is a child of the card, so render()'s
-     removal takes them all; embers additionally remove themselves on
-     animationend. Nothing starts a timer, interval, or rAF loop — the
-     pop/rise/ember motion is one-shot CSS that ends on its own. */
+     removal takes them all; embers AND confetti additionally remove themselves
+     on animationend. Nothing starts a timer, interval, or rAF loop — the
+     pop/rise/fall motion is one-shot CSS that ends on its own, and the confetti
+     is a BOUNDED set whose randomized delays spread it across the whole window
+     rather than an ongoing spawner. */
   function celebrateReel(card, caption, d) {
     card.classList.add('is-landed');
     /* textContent, not the innerHTML esc() elsewhere is for — plain string
@@ -710,21 +724,17 @@
     prize.textContent = 'wins the ' + (d.rarity === 'mythic' ? 'Mythic' : 'Rare') + ' prize!';
     card.insertBefore(prize, caption);
 
-    /* Reaper flourish — frame 0 of the check-in sprite (the standing pose,
-       which carries no sign text), reused so no new art is needed. Rare
-       presents one; mythic flanks the card with two. The drop-shadow glow is
-       allowed on this non-box sprite. */
-    var sides = d.rarity === 'mythic' ? ['is-right', 'is-left'] : ['is-right'];
-    sides.forEach(function (side) {
-      var reaper = document.createElement('div');
-      reaper.className = 'ov-reel-reaper ' + side;
-      card.appendChild(reaper);
-    });
+    /* One shared handler so every particle removes itself the instant its
+       animation ends — bounded set in, nothing left behind. */
+    var removeSelf = function (e) {
+      var t = e.currentTarget;
+      if (t && t.parentNode) t.parentNode.removeChild(t);
+    };
 
-    /* Embers — a bounded, one-shot burst. Skipped entirely under reduced
-       motion. Each removes itself on animationend, and any still mid-flight
-       when the card leaves go with it. */
+    /* Motion is skipped entirely under reduced motion — the winner card still
+       shows, just without the embers/confetti. */
     if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      /* Embers — a bounded, one-shot rising burst at the moment of landing. */
       var fx = document.createElement('div');
       fx.className = 'ov-reel-fx';
       var count = REEL_EMBERS[d.rarity] || REEL_EMBERS.rare;
@@ -737,13 +747,39 @@
         ember.style.height = sz + 'px';
         ember.style.animationDuration = (1.5 + Math.random() * 1.3).toFixed(2) + 's';
         ember.style.animationDelay = (Math.random() * 0.7).toFixed(2) + 's';
-        ember.addEventListener('animationend', function (e) {
-          var t = e.currentTarget;
-          if (t && t.parentNode) t.parentNode.removeChild(t);
-        });
+        ember.addEventListener('animationend', removeSelf);
         fx.appendChild(ember);
       }
       card.appendChild(fx);
+
+      /* Confetti — RED / BLACK / WHITE only. A BOUNDED set of small rects whose
+         randomized delays are spread across [0, CONFETTI_MS - fall] and whose
+         fall durations vary, so the fixed set reads as continuous rain for the
+         whole window while every piece still finishes (delay + duration never
+         exceeds CONFETTI_MS) and removes itself on animationend. Falls, drifts
+         and rotates via transform + opacity only — no filter/blur/shadow. */
+      var confetti = document.createElement('div');
+      confetti.className = 'ov-reel-confetti';
+      var colours = ['is-red', 'is-black', 'is-white'];
+      var pieces = CONFETTI_PIECES[d.rarity] || CONFETTI_PIECES.rare;
+      for (var c = 0; c < pieces; c++) {
+        var bit = document.createElement('span');
+        bit.className = 'ov-confetti ' + colours[Math.floor(Math.random() * colours.length)];
+        var durMs = 2200 + Math.round(Math.random() * 2300);          // 2.2–4.5s fall
+        var maxDelay = Math.max(0, CONFETTI_MS - durMs);              // finish within the window
+        var bw = 5 + Math.round(Math.random() * 4);
+        var bh = 8 + Math.round(Math.random() * 7);
+        bit.style.left = (Math.random() * 100).toFixed(2) + '%';
+        bit.style.width = bw + 'px';
+        bit.style.height = bh + 'px';
+        bit.style.animationDuration = durMs + 'ms';
+        bit.style.animationDelay = Math.round(Math.random() * maxDelay) + 'ms';
+        bit.style.setProperty('--dx', (Math.round(Math.random() * 120) - 60) + 'px');
+        bit.style.setProperty('--rot', (360 + Math.round(Math.random() * 720)) + 'deg');
+        bit.addEventListener('animationend', removeSelf);
+        confetti.appendChild(bit);
+      }
+      card.appendChild(confetti);
     }
   }
 
