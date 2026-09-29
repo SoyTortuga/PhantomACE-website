@@ -542,9 +542,100 @@ async function loadGiveawayState() {
     setGiveawayOpenUI(data.open, data.entrantCount, data.rarity);
     renderGiveawayReel(data.entrants);
     if (data.winner) showGiveawayWinner(data.winner);
+    /* The monthly-ledger draw is a separate event with its own winner record;
+       show it if one has been drawn this month. */
+    if (data.monthlyWinner) showMonthlyWinner(data.monthlyWinner);
   } catch {
     /* leave panel as-is */
   }
+}
+
+/* ── Monthly ledger draw ──────────────────────
+   A separate event from the Big Prize spin above: WEIGHTED by entry count,
+   drawn over the whole month's ledger, its own winner record. The grand reel
+   plays on the OBS overlay; this panel just runs the draw and hands out the
+   locked prize code, mirroring the Big Prize send-code flow. */
+function showMonthlyWinner(w) {
+  if (!w) return;
+  const panel = document.getElementById('monthlyWinnerPanel');
+  const nameEl = document.getElementById('monthlyWinnerName');
+  const metaEl = document.getElementById('monthlyWinnerMeta');
+  if (nameEl) nameEl.textContent = w.username || '';
+  if (metaEl) {
+    const bits = [];
+    if (w.entries != null) bits.push(w.entries + (w.entries === 1 ? ' entry' : ' entries'));
+    if (w.totalEntries != null) bits.push('pool ' + w.totalEntries);
+    if (w.sent) bits.push('code sent');
+    metaEl.textContent = bits.length ? '— ' + bits.join(' • ') : '';
+    metaEl.className = 'giveaway-winner-rarity rarity-mythic';
+  }
+  if (panel) panel.hidden = false;
+}
+
+async function drawMonthlyWinnerAction() {
+  const btn = document.getElementById('monthlyDrawBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Drawing...'; }
+  document.getElementById('monthlyWinnerPanel').hidden = true;
+  try {
+    const res = await fetch('/api/bot/giveaway', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'draw-monthly' }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showMonthlyWinner({
+        username: data.winner.username,
+        entries: data.winner.entries,
+        totalEntries: data.totalEntries,
+        totalPeople: data.totalPeople,
+        sent: false,
+      });
+      showBotStatus(
+        'Monthly winner drawn: ' + data.winner.username + ' (' + data.winner.entries +
+        ' entries, from ' + data.totalEntries + ' across ' + data.totalPeople +
+        (data.totalPeople === 1 ? ' person' : ' people') + '). The reel is spinning on the overlay.',
+        false
+      );
+    } else {
+      showBotStatus(data.error || 'Could not draw a monthly winner.', true);
+    }
+  } catch {
+    showBotStatus('Network error drawing the monthly winner.', true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Draw Monthly Winner'; }
+}
+
+async function sendMonthlyCode() {
+  const btn = document.getElementById('monthlySendCodeBtn');
+  const tier = document.getElementById('monthlyCodeTier').value;
+  const manualCode = document.getElementById('monthlyCodeManual').value.trim();
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  try {
+    const res = await fetch('/api/bot/giveaway', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'send-monthly-code', rarity: tier || undefined, code: manualCode || undefined }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showBotStatus(
+        String(data.rarity || '').toUpperCase() + ' code locked to ' + (data.winner ? data.winner.username : 'the winner') +
+        ' — waiting on their giveaway page for 7 days.' +
+        (data.whispered ? ' Whisper sent too.' : ' The whisper did not send; the page has it.'),
+        false
+      );
+      await loadGiveawayState();
+    } else {
+      showBotStatus(data.error || 'Could not send the code.', true);
+    }
+  } catch {
+    showBotStatus('Network error sending the code.', true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Give Code to Winner'; }
 }
 
 async function toggleGiveawayEntries() {
@@ -682,6 +773,11 @@ function initGiveawayPanel() {
   if (spinBtn) spinBtn.addEventListener('click', spinGiveawayWheel);
   if (sendBtn) sendBtn.addEventListener('click', sendGiveawayCode);
   if (resetBtn) resetBtn.addEventListener('click', resetGiveaway);
+
+  const monthlyDrawBtn = document.getElementById('monthlyDrawBtn');
+  const monthlySendBtn = document.getElementById('monthlySendCodeBtn');
+  if (monthlyDrawBtn) monthlyDrawBtn.addEventListener('click', drawMonthlyWinnerAction);
+  if (monthlySendBtn) monthlySendBtn.addEventListener('click', sendMonthlyCode);
 
   /* WATCH THE ENTRIES ARRIVE.
      This state was read once at page load and then only after a reset, so a

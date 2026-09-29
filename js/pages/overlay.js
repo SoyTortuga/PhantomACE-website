@@ -383,6 +383,12 @@
         winnerIndex: ev.winnerIndex,
         who: ev.who || '',
         rarity: rarity,
+        /* Optional overrides so the SAME grand reveal can serve the monthly
+           ledger draw: a custom heading ("Monthly Giveaway") in place of the
+           rarity label, and a pool note ("drawn from N entries…"). Absent for
+           the Big Prize spin, which keeps its rarity heading and no note. */
+        label: ev.label ? String(ev.label) : '',
+        note: ev.note ? String(ev.note) : '',
         ms: spinMs + hold,
       };
     }
@@ -588,7 +594,8 @@
 
     var kind = document.createElement('span');
     kind.className = 'ov-kind';
-    kind.textContent = (d.rarity === 'mythic' ? 'Mythic' : 'Rare') + ' Giveaway';
+    /* A custom label (the monthly draw) overrides the rarity heading. */
+    kind.textContent = d.label || ((d.rarity === 'mythic' ? 'Mythic' : 'Rare') + ' Giveaway');
     card.appendChild(kind);
 
     var wrap = document.createElement('div');
@@ -605,6 +612,17 @@
     caption.className = 'ov-sub ov-reel-caption';
     caption.textContent = 'Spinning for the winner…';
     card.appendChild(caption);
+
+    /* Optional pool note (the monthly draw), e.g. "Drawn from N entries across
+       M people". A server-composed plain string; textContent needs no escaping.
+       It is a child of the card, so it leaves with the card like everything
+       else — no extra teardown. */
+    if (d.note) {
+      var note = document.createElement('p');
+      note.className = 'ov-reel-note';
+      note.textContent = d.note;
+      card.appendChild(note);
+    }
 
     /* Every timer/frame this card starts is registered here; render() calls
        card._cleanup the instant the card detaches, so nothing ticks or holds

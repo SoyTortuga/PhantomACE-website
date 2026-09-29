@@ -16,6 +16,11 @@ import { pullGiveawayCode, sendWhisper, getBroadcasterToken, logBotAction, TIER_
 const ENTRANTS_KEY = 'giveaway_entrants';
 const STATE_KEY = 'giveaway_state';
 const WINNER_KEY = 'giveaway_winner';
+/* The MONTHLY-ledger draw's winner lives under its OWN key, never WINNER_KEY.
+   The two draws are different events — the Big Prize is a live channel-points
+   spin, the monthly draw is over the accumulated ledger — and sharing a record
+   would let one draw's pending-winner guard block or clobber the other. */
+const MONTHLY_WINNER_KEY = 'giveaway_monthly_winner';
 const CODE_MAX_LENGTH = 60;
 const STATE_TTL = 86400;
 
@@ -187,6 +192,14 @@ export async function onRequestGet(context) {
     entries: (TIER_INFO[r] || {}).entries || 0,
   }));
 
+  /* The monthly-ledger draw, shown alongside the Big Prize event but entirely
+     separate: its own winner record, and a live pool preview (current month's
+     non-guest entry totals) so the panel can say what a draw would pull from
+     WITHOUT drawing anyone — the totals are a read, the draw is a POST. */
+  const { monthlyLedgerTotals } = await import('../giveaway-entries.js');
+  const monthly = await monthlyLedgerTotals(env);
+  const monthlyWinner = await env.MARKETPLACE.get(MONTHLY_WINNER_KEY, 'json') || null;
+
   return json({
     open: !!state.open,
     rarity: state.rarity || null,
@@ -196,6 +209,8 @@ export async function onRequestGet(context) {
     entrantCount: entrants.length,
     winner,
     rewardConfigured: !!rewardId,
+    monthly,
+    monthlyWinner,
   });
 }
 
@@ -452,6 +467,123 @@ export async function onRequestPost(context) {
     await env.MARKETPLACE.delete(WINNER_KEY);
     await env.MARKETPLACE.delete(ENTRANTS_KEY);
     return json({ success: true, note: 'Event cleared. Monthly giveaway entries are untouched.' });
+  }
+
+  /* ── THE MONTHLY LEDGER DRAW ──────────────────────────────────────────
+     A separate event from the Big Prize spin above: it draws over the month's
+     accumulated entry ledger, WEIGHTED by entry count, and never touches the
+     Big Prize keys. Re-drawing simply overwrites the monthly winner record —
+     there is no pending-winner guard here, so a moderator can re-roll freely,
+     and the Big Prize draw cannot be blocked by (or block) this one. */
+  if (body.action === 'draw-monthly') {
+    const { drawMonthlyWinner, buildWeightedReelPool } = await import('../giveaway-entries.js');
+    const draw = await drawMonthlyWinner(env);
+    if (!draw.winner) {
+      return json({ error: 'Nobody has entered this month yet.' }, 400);
+    }
+
+    /* The prize is drawn at the grand (mythic) tier — this is the big monthly
+       giveaway — but the reveal LABEL says "Monthly Giveaway" rather than a
+       rarity, and send-monthly-code still lets a moderator override the tier. */
+    const winner = {
+      userId: draw.winner.userId,
+      username: draw.winner.username,
+      entries: draw.winner.entries,
+      month: draw.month,
+      totalEntries: draw.totalEntries,
+      totalPeople: draw.totalPeople,
+      rarity: 'mythic',
+      pickedAt: Date.now(),
+      sent: false,
+    };
+    await env.MARKETPLACE.put(MONTHLY_WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
+
+    await logBotAction(env, {
+      type: 'giveaway-winner',
+      username: winner.username,
+      actor: session.display_name || 'broadcaster',
+    });
+
+    /* Put the same grand reel on stream, at mythic-tier grandeur, labelled as
+       the monthly draw and noting the pool it came from. The reel pool is a
+       BOUNDED, WEIGHTED, cosmetic strip — the weighted pick above is
+       authoritative — and PhamReel lands it on that winner. */
+    const reel = buildWeightedReelPool(draw.entrants, draw.winner);
+    const { pushOverlayEvent } = await import('../overlay/events.js');
+    await pushOverlayEvent(env, {
+      type: 'giveaway-spin',
+      entrants: reel.pool,
+      winnerIndex: reel.winnerIndex,
+      rarity: 'mythic',
+      who: winner.username,
+      label: 'Monthly Giveaway',
+      note: `Drawn from ${draw.totalEntries} entries across ${draw.totalPeople} ${draw.totalPeople === 1 ? 'person' : 'people'}`,
+    });
+
+    return json({
+      success: true,
+      winner: { userId: winner.userId, username: winner.username, entries: winner.entries },
+      totalEntries: draw.totalEntries,
+      totalPeople: draw.totalPeople,
+      month: draw.month,
+    });
+  }
+
+  if (body.action === 'send-monthly-code') {
+    const winner = await env.MARKETPLACE.get(MONTHLY_WINNER_KEY, 'json');
+    if (!winner) return json({ error: 'No monthly winner drawn yet.' }, 400);
+    if (winner.sent) return json({ error: 'A code was already sent to this monthly winner.' }, 400);
+
+    /* Defaults to the draw's tier (mythic), but a moderator can hand out a
+       different tier deliberately — same shape as the Big Prize send-code. */
+    const tier = String(body.rarity || winner.rarity || 'mythic').toLowerCase();
+    if (!TIER_INFO[tier]) return json({ error: `Unknown rarity "${tier}".` }, 400);
+
+    let code = (body.code || '').trim();
+    if (!code) code = await pullGiveawayCode(env, tier);
+    if (!code) return json({ error: `No codes left in the ${tier} pool.` }, 400);
+    if (code.length > CODE_MAX_LENGTH) return json({ error: 'Code is too long.' }, 400);
+
+    /* Register it AND record the prize, locked to the winner for the 7-day
+       window, so it is claimable on /giveaway exactly like a Big Prize win. */
+    const { registerDropCode, recordPrize, PRIZE_WINDOW_SECONDS } = await import('../giveaway-entries.js');
+    const entries = (TIER_INFO[tier] || {}).entries || 0;
+    await registerDropCode(env, code, tier, entries, {
+      source: 'giveaway-monthly-win',
+      lockedTo: winner.userId,
+      ttlSeconds: PRIZE_WINDOW_SECONDS,
+      announce: false,
+    });
+    const prize = await recordPrize(env, winner.userId, { code, tier, entries });
+
+    const message = `🏆 You won the MONTHLY giveaway! Your code: ${code} — it is locked to your account and waiting on phantomace.tv/giveaway for 7 days. Congrats!`;
+    const sent = await sendWhisper(env, winner.userId, message);
+
+    winner.sent = true;
+    winner.whispered = sent;
+    winner.code = code;
+    winner.rarity = tier;
+    winner.sentAt = Date.now();
+    await env.MARKETPLACE.put(MONTHLY_WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
+
+    await logBotAction(env, {
+      type: 'giveaway-code',
+      username: winner.username,
+      rarity: tier,
+      code,
+      actor: session.display_name || 'broadcaster',
+      sent,
+    });
+
+    return json({
+      success: true,
+      sent: true,
+      whispered: sent,
+      rarity: tier,
+      entries,
+      expiresAt: prize ? prize.expiresAt : null,
+      winner: { ...publicEntrant(winner), sent: true, sentAt: winner.sentAt },
+    });
   }
 
   return json({ error: 'Invalid action' }, 400);

@@ -343,6 +343,137 @@ export async function getGiveawaySummary(env, session) {
   };
 }
 
+/* ══════════════════════════════════════════════
+   THE MONTHLY LEDGER DRAW
+
+   The ledger accumulates entries all month (bingo, maze, scramble, check-ins,
+   chat drops, Phamily Time). This is the draw that turns it into a winner.
+
+   WEIGHTED, unlike the Big Prize channel-points spin: a viewer who earned 90
+   entries this month should win nine times as often as one who earned 10, so
+   the pick is probability ∝ entries, not one-slice-each.
+
+   GUESTS NEVER WIN A REAL PRIZE. A guest_ id is a throwaway local identity
+   with no account behind it to hand a code to — the same rule leaderboards.js
+   and the Big Prize draw apply to their winners.
+
+   The RNG is injectable so the weighting can be tested deterministically
+   (server/scripts/test-giveaway-monthly.js), and nothing here mutates the
+   ledger — a draw is a read.
+   ══════════════════════════════════════════════ */
+
+function isGuestId(id) {
+  return String(id).startsWith('guest_');
+}
+
+/** Current month's real (non-guest) entry totals, without drawing anyone. */
+export async function monthlyLedgerTotals(env, month = monthKey()) {
+  const rows = await env.MARKETPLACE.listValues({ prefix: LEDGER_PREFIX });
+  let totalEntries = 0;
+  let totalPeople = 0;
+  for (const { value } of rows) {
+    if (!value || value.month !== month) continue;
+    const n = Math.floor(Number(value.entries || 0));
+    if (n <= 0 || isGuestId(value.userId)) continue;
+    totalEntries += n;
+    totalPeople += 1;
+  }
+  return { month, totalEntries, totalPeople };
+}
+
+/**
+ * Draw ONE winner from a month's ledger, weighted by entry count.
+ *
+ * @param {object} env
+ * @param {object} [opts]
+ * @param {string} [opts.month]  YYYY-MM; defaults to the current UTC month.
+ * @param {function} [opts.rng]  0..1 source, injectable for deterministic tests.
+ * @returns {Promise<{winner: {userId,username,entries}|null,
+ *                    entrants: Array<{userId,username,entries}>,
+ *                    totalEntries: number, totalPeople: number, month: string}>}
+ *          winner is null when the month has no non-guest entrants — a clean
+ *          "nobody has entered" the caller turns into an error, not a throw.
+ */
+export async function drawMonthlyWinner(env, opts = {}) {
+  const month = opts.month || monthKey();
+  const rng = typeof opts.rng === 'function' ? opts.rng : Math.random;
+
+  const rows = await env.MARKETPLACE.listValues({ prefix: LEDGER_PREFIX });
+  const entrants = [];
+  let totalEntries = 0;
+  for (const { value } of rows) {
+    if (!value || value.month !== month) continue;
+    const n = Math.floor(Number(value.entries || 0));
+    if (n <= 0 || isGuestId(value.userId)) continue;
+    entrants.push({ userId: String(value.userId), username: value.username || '', entries: n });
+    totalEntries += n;
+  }
+
+  if (!entrants.length || totalEntries <= 0) {
+    return { winner: null, entrants: [], totalEntries: 0, totalPeople: 0, month };
+  }
+
+  /* Stable order (most entries first, then userId) so an injected RNG maps to
+     a deterministic winner — the whole point of making rng injectable. */
+  entrants.sort((a, b) => (b.entries - a.entries) || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
+
+  /* One ticket in [0, totalEntries); walk the cumulative weights. Each
+     entrant owns a band the width of their entries, so the chance of landing
+     in it is exactly entries / totalEntries. */
+  let ticket = rng() * totalEntries;
+  let winner = entrants[entrants.length - 1];
+  for (let i = 0; i < entrants.length; i++) {
+    ticket -= entrants[i].entries;
+    if (ticket < 0) { winner = entrants[i]; break; }
+  }
+
+  return { winner, entrants, totalEntries, totalPeople: entrants.length, month };
+}
+
+/* How many names the cosmetic reel shows. Bounded so a month with two
+   thousand entrants still spins a fixed-size strip. */
+const REEL_POOL_CAP = 48;
+
+/**
+ * A BOUNDED, WEIGHTED display pool for the on-stream reel.
+ *
+ * The reel is cosmetic — the server's weighted pick above is authoritative —
+ * but it should LOOK weighted: a viewer with more entries flicks past more
+ * often. Sampling with replacement in proportion to entries gives that, and
+ * caps the strip length regardless of how many people entered. The winner is
+ * then forced into one known slot so PhamReel.strip lands the reel on the name
+ * the server actually drew.
+ *
+ * @returns {{pool: Array<{username:string}>, winnerIndex: number}}
+ */
+export function buildWeightedReelPool(entrants, winner, opts = {}) {
+  const rng = typeof opts.rng === 'function' ? opts.rng : Math.random;
+  const cap = Math.max(1, Math.floor(opts.cap || REEL_POOL_CAP));
+  const list = (Array.isArray(entrants) ? entrants : [])
+    .filter(e => e && e.username != null && Math.floor(Number(e.entries) || 0) > 0);
+
+  if (!winner) return { pool: [], winnerIndex: 0 };
+  if (!list.length) return { pool: [{ username: winner.username }], winnerIndex: 0 };
+
+  const total = list.reduce((s, e) => s + Math.floor(Number(e.entries) || 0), 0);
+  const pool = [];
+  for (let i = 0; i < cap; i++) {
+    let ticket = rng() * total;
+    let pick = list[list.length - 1];
+    for (let j = 0; j < list.length; j++) {
+      ticket -= Math.floor(Number(list[j].entries) || 0);
+      if (ticket < 0) { pick = list[j]; break; }
+    }
+    pool.push({ username: pick.username });
+  }
+
+  /* Guarantee the drawn winner is on the strip, at a slot we return, so the
+     reel's landing row is always the real winner however the sampling fell. */
+  const idx = Math.min(cap - 1, Math.floor(rng() * cap));
+  pool[idx] = { username: winner.username };
+  return { pool, winnerIndex: idx };
+}
+
 /* ── GET — the giveaway page's data ──────────── */
 
 export async function onRequestGet(context) {

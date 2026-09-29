@@ -346,6 +346,17 @@ html, body {
   transition: color 200ms ease;
 }
 
+/* Pool note for the monthly draw ("Drawn from N entries across M people").
+   A quiet line under the reel, present through the whole reveal. */
+.ov-reel-note {
+  margin: 2px 0 0;
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
 .ov-reel-card[data-rarity="mythic"] .ov-reel-row.winner { color: var(--amber); }
 .ov-reel-card[data-rarity="rare"]   .ov-reel-row.winner { color: var(--purple); }
 
