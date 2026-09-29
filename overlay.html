@@ -133,6 +133,20 @@
        in the layout editor. -->
   <div class="ov-hatch-panel" id="ovHatch" hidden></div>
 
+  <!-- Channel point Prediction: a movable standing panel (position it in the
+       layout editor). Shows while a prediction is ACTIVE or LOCKED with a live
+       bar per outcome and a countdown to lock, reveals the winner briefly on
+       resolve, then hides. Driven by 'prediction' overlay events off the alert
+       queue, so it never blocks a sub/raid alert. -->
+  <div class="ov-prediction" id="ovPrediction" hidden>
+    <div class="ov-pred-head">
+      <span class="ov-pred-label" id="ovPredLabel">Prediction</span>
+      <span class="ov-pred-timer" id="ovPredTimer"></span>
+    </div>
+    <p class="ov-pred-title" id="ovPredTitle"></p>
+    <ol class="ov-pred-outcomes" id="ovPredOutcomes"></ol>
+  </div>
+
   <script src="/js/pages/overlay-samples.js" defer></script>
   <script src="/js/pages/overlay-apply-layout.js" defer></script>
   <!-- The same reel math the Big Prize Giveaway control panel spins, so a

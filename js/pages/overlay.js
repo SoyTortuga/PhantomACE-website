@@ -966,6 +966,152 @@
     hatchHideTimer = setTimeout(clearHatch, d.ms);
   }
 
+  /* ── Channel point Prediction panel (#ovPrediction) ────────────────────
+     A MOVABLE standing panel, off the alert queue (so it never blocks a
+     sub/raid card). Driven by 'prediction' overlay events: it shows while a
+     prediction is ACTIVE or LOCKED, reveals the winner briefly on resolve,
+     then HIDES to display:none.
+
+     MARATHON-SAFE: the ONLY timer is the lock countdown (a 1s interval while
+     ACTIVE) plus a single hide timeout on end/cancel — both registered in
+     predTimers and cleared on every state change and on clear. The countdown
+     bails the instant the panel is hidden or the lock time passes, so nothing
+     ticks while the panel is down. The outcome list is REBUILT by replacing
+     children each update (never appended), and clearPrediction empties it so no
+     removed node is retained. The panel reaches display:none via its
+     .ov-prediction[hidden] guard in overlay.css. */
+  var PRED_REVEAL_MS = 8000;    // how long the resolved winner stays before hiding
+  var PRED_CANCEL_MS = 3500;    // brief "canceled" note, then hide
+  var predTimers = [];
+  function clearPredTimers() {
+    predTimers.forEach(clearInterval);
+    predTimers.forEach(clearTimeout);
+    predTimers = [];
+  }
+
+  function renderPredOutcomes(ev, winningId) {
+    var list = document.getElementById('ovPredOutcomes');
+    if (!list) return;
+    var outcomes = Array.isArray(ev.outcomes) ? ev.outcomes : [];
+    var total = 0;
+    for (var t = 0; t < outcomes.length; t++) total += Number(outcomes[t].points) || 0;
+
+    var rows = outcomes.map(function (o) {
+      var pts = Number(o.points) || 0;
+      var users = Number(o.users) || 0;
+      var pct = total > 0 ? Math.round((pts / total) * 100) : 0;
+
+      var row = document.createElement('li');
+      row.className = 'ov-pred-outcome' + (winningId && o.id === winningId ? ' is-winner' : '');
+
+      var head = document.createElement('div');
+      head.className = 'ov-pred-outcome-head';
+      var name = document.createElement('span');
+      name.className = 'ov-pred-outcome-name';
+      name.textContent = o.title || '';                 // broadcaster text — textContent, not markup
+      var pctEl = document.createElement('span');
+      pctEl.className = 'ov-pred-outcome-pct';
+      pctEl.textContent = pct + '%';
+      head.appendChild(name);
+      head.appendChild(pctEl);
+
+      var bar = document.createElement('div');
+      bar.className = 'ov-pred-bar';
+      var fill = document.createElement('i');
+      fill.style.width = pct + '%';
+      bar.appendChild(fill);
+
+      var meta = document.createElement('div');
+      meta.className = 'ov-pred-outcome-meta';
+      meta.textContent = pts.toLocaleString() + ' pts · ' + users + (users === 1 ? ' voter' : ' voters');
+
+      row.appendChild(head);
+      row.appendChild(bar);
+      row.appendChild(meta);
+      return row;
+    });
+
+    /* Rebuild by REPLACING children — never append onto a growing list. */
+    list.replaceChildren.apply(list, rows);
+  }
+
+  function clearPrediction() {
+    clearPredTimers();
+    var panel = document.getElementById('ovPrediction');
+    if (!panel) return;
+    var list = document.getElementById('ovPredOutcomes');
+    if (list) list.replaceChildren();   // retain no removed nodes
+    panel.hidden = true;                // → display:none via the [hidden] guard
+  }
+
+  function showPrediction(ev) {
+    var panel = document.getElementById('ovPrediction');
+    if (!panel) return;
+    /* Every update starts by clearing the previous state's timers, so at most
+       one countdown/hide timer is ever live. */
+    clearPredTimers();
+
+    var labelEl = document.getElementById('ovPredLabel');
+    var titleEl = document.getElementById('ovPredTitle');
+    var timerEl = document.getElementById('ovPredTimer');
+    if (titleEl) titleEl.textContent = ev.title || 'Prediction';
+
+    var state = ev.state;
+
+    if (state === 'end') {
+      var status = String(ev.status || '').toUpperCase();
+      if (status === 'CANCELED') {
+        panel.dataset.state = 'canceled';
+        if (labelEl) labelEl.textContent = 'Canceled';
+        if (timerEl) timerEl.textContent = '';
+        renderPredOutcomes(ev, null);
+        panel.hidden = false;
+        predTimers.push(setTimeout(clearPrediction, PRED_CANCEL_MS));
+      } else {
+        panel.dataset.state = 'resolved';
+        if (labelEl) labelEl.textContent = 'Winner';
+        if (timerEl) timerEl.textContent = '';
+        renderPredOutcomes(ev, ev.winningOutcomeId);
+        panel.hidden = false;
+        predTimers.push(setTimeout(clearPrediction, PRED_REVEAL_MS));
+      }
+      return;
+    }
+
+    if (state === 'lock') {
+      panel.dataset.state = 'locked';
+      if (labelEl) labelEl.textContent = 'Locked';
+      if (timerEl) timerEl.textContent = 'LOCKED';
+      renderPredOutcomes(ev, null);
+      panel.hidden = false;
+      return;                            // locked — no countdown, nothing ticking
+    }
+
+    /* begin / progress → ACTIVE */
+    panel.dataset.state = 'active';
+    if (labelEl) labelEl.textContent = 'Prediction';
+    renderPredOutcomes(ev, null);
+    panel.hidden = false;
+
+    var locksAt = ev.locksAt ? Date.parse(ev.locksAt) : 0;
+    if (!timerEl) return;
+    if (!locksAt || Number.isNaN(locksAt)) { timerEl.textContent = ''; return; }
+
+    var tick = function () {
+      /* NOTHING RUNS WHILE HIDDEN: bail (and stop) the instant the panel is
+         down or the lock time has passed. */
+      if (panel.hidden) { clearInterval(iv); return; }
+      var ms = locksAt - Date.now();
+      if (ms <= 0) { timerEl.textContent = 'Locking…'; clearInterval(iv); return; }
+      var secs = Math.ceil(ms / 1000);
+      var mins = Math.floor(secs / 60);
+      timerEl.textContent = mins + ':' + String(secs % 60).padStart(2, '0');
+    };
+    var iv = setInterval(tick, 1000);
+    predTimers.push(iv);
+    tick();
+  }
+
   function render(ev) {
     var d = describe(ev);
     if (!d) return false;
@@ -1107,6 +1253,10 @@
             /* The hatch has its own movable panel and plays off the queue, so a
                big reveal never blocks a sub/raid card and vice versa. */
             if (ev.type === 'dino-hatch') { showHatch(ev); continue; }
+            /* The prediction panel is a movable standing panel driven off the
+               queue — begin/progress/lock/end update it in place; it never
+               blocks (or is blocked by) a sub/raid card. */
+            if (ev.type === 'prediction') { showPrediction(ev); continue; }
             queue.push(ev);
           }
           cursor = data.latestSeq;
@@ -1136,7 +1286,7 @@
   if (Number.isFinite(reloadHoursParam)) RELOAD_AFTER_MS = reloadHoursParam * 3600000;
   var RELOAD_CHECK_MS = 60000;
   var loadedAt = Date.now();
-  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch'];
+  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovPrediction'];
 
   function overlayIsIdle() {
     if (showing || queue.length) return false;

@@ -1182,6 +1182,36 @@ async function createEventSubSubscriptions(env, request) {
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/channel-points`,
     },
+    /* CHANNEL POINT PREDICTIONS — begin / progress / lock / end, all v1.
+       channel:read:predictions (and channel:manage:predictions) are already in
+       the requested scopes, so these create alongside the rest; the overlay
+       prediction panel and the activity feed are driven from the webhook at
+       /api/prediction-events. Progress is high-frequency but only ever updates
+       the overlay — it never records to the activity feed (see the handler). */
+    {
+      type: 'channel.prediction.begin',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/prediction-events`,
+    },
+    {
+      type: 'channel.prediction.progress',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/prediction-events`,
+    },
+    {
+      type: 'channel.prediction.lock',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/prediction-events`,
+    },
+    {
+      type: 'channel.prediction.end',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/prediction-events`,
+    },
     /* Milestone drops. They fire nothing until milestone drops are switched
        on in the panel, so subscribing early is harmless and saves coming
        back to this page later. channel.raid is conditioned on the

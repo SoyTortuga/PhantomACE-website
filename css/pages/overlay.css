@@ -1269,6 +1269,126 @@ body.ov-alerting .ov-mc {
   max-height: 64px; overflow: hidden;
 }
 
+/* ══ CHANNEL POINT PREDICTION — a movable standing panel ═════════════════
+   Shows while a prediction is ACTIVE or LOCKED, reveals the winner briefly on
+   resolve, then hides. Positioned by the layout editor; the default corner is
+   just a fallback. Marathon rules: it MUST reach display:none when hidden, so
+   the [hidden] guard sits before the rule that sets display. Near-solid bg + a
+   full border (no box-shadow, no coloured side-border, no backdrop-filter). */
+.ov-prediction[hidden] { display: none; }
+.ov-prediction {
+  position: fixed;
+  right: 32px;
+  top: calc(32px + env(safe-area-inset-top, 0px));
+  width: 300px;
+  padding: 14px 16px 12px;
+  background: rgba(10, 10, 10, 0.96);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  font-family: var(--font-system);
+  color: #fff;
+  z-index: 16;
+}
+
+.ov-pred-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ov-pred-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+/* Locked/resolved shift the label colour to signal the state change — colour
+   only, no shadow, no side accent. */
+.ov-prediction[data-state="locked"] .ov-pred-label { color: var(--amber); }
+.ov-prediction[data-state="resolved"] .ov-pred-label,
+.ov-prediction[data-state="canceled"] .ov-pred-label { color: #fff; }
+
+.ov-pred-timer {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #ddd;
+}
+
+.ov-pred-title {
+  font-family: var(--font-gothic);
+  font-size: 18px;
+  line-height: 1.15;
+  margin: 0 0 10px;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+
+.ov-pred-outcomes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* A transparent full border is reserved on every row so the winner highlight
+   (a full four-side border) never shifts the layout when it appears. */
+.ov-pred-outcome {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+.ov-pred-outcome.is-winner { border-color: var(--amber); }
+
+.ov-pred-outcome-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+.ov-pred-outcome-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #eee;
+}
+.ov-pred-outcome.is-winner .ov-pred-outcome-name { color: #fff; font-weight: 700; }
+.ov-pred-outcome-pct {
+  flex: none;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.ov-pred-bar {
+  height: 6px;
+  background: #1c1c1c;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ov-pred-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--red);
+  transition: width 0.4s ease;
+}
+.ov-pred-outcome.is-winner .ov-pred-bar i { background: var(--amber); }
+
+.ov-pred-outcome-meta {
+  font-size: 11px;
+  color: #8a8a8a;
+  margin-top: 3px;
+}
+
+/* A sliding bar is exactly the motion reduced-motion asks to stop. */
+@media (prefers-reduced-motion: reduce) { .ov-pred-bar i { transition: none; } }
+
 /* ══ DINO HATCH — the gambling minigame's reveal ════════════════════════
    Two phases in one alert card. `.is-hatching` shows the egg-crack strip and
    withholds the reveal; overlay.js steps the strip once, drops the class, and

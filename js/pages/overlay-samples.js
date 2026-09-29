@@ -70,6 +70,12 @@
       'Fires on the button (with sound) or the timer (silent)',
       'Shows briefly, then hides — place it where viewers will see it',
     ] },
+    { id: 'ovPrediction', label: 'Prediction', holds: [
+      'Prediction title & a countdown to lock',
+      'Each outcome: a live bar with points, voters and %',
+      'ACTIVE → LOCKED → the winner highlighted, then hides',
+      'Driven by Twitch channel-point prediction events',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -254,7 +260,26 @@
       '</div>';
   }
 
-  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); checkin(); hatch(); }
+  function prediction() {
+    show('ovPrediction');
+    var p = $('ovPrediction'); if (p) p.dataset.state = 'active';
+    set('ovPredLabel', 'Prediction'); set('ovPredTimer', '1:12');
+    set('ovPredTitle', 'Will PhantomACE win this game?');
+    var list = $('ovPredOutcomes');
+    if (list) list.innerHTML =
+      '<li class="ov-pred-outcome is-winner">' +
+        '<div class="ov-pred-outcome-head"><span class="ov-pred-outcome-name">Yes, easy win</span><span class="ov-pred-outcome-pct">72%</span></div>' +
+        '<div class="ov-pred-bar"><i style="width:72%"></i></div>' +
+        '<div class="ov-pred-outcome-meta">18,400 pts · 34 voters</div>' +
+      '</li>' +
+      '<li class="ov-pred-outcome">' +
+        '<div class="ov-pred-outcome-head"><span class="ov-pred-outcome-name">No chance</span><span class="ov-pred-outcome-pct">28%</span></div>' +
+        '<div class="ov-pred-bar"><i style="width:28%"></i></div>' +
+        '<div class="ov-pred-outcome-meta">7,150 pts · 12 voters</div>' +
+      '</li>';
+  }
+
+  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); checkin(); hatch(); prediction(); }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
 })();
