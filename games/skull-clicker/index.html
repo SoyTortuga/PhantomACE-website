@@ -430,9 +430,12 @@
     .reward-btn.ghost { background: transparent; border: 1px solid var(--border-mid); color: var(--text-dim); }
     .reward-btn.ghost:hover { border-color: #666; color: var(--text-pri); }
 
-    /* Buff toast (transient, centre-top) */
+    /* Buff toast (transient, centre-top). Sits ABOVE the main click-skull and is
+       click-transparent so rapid clicks on the skull pass straight through it —
+       otherwise the collect message would eat clicks and break the combo streak. */
     .buff-toast {
-      position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+      position: fixed; top: 6%; left: 50%; transform: translateX(-50%);
+      pointer-events: none;
       z-index: 1200; padding: 12px 22px; border-radius: 6px;
       font-size: 25px; font-weight: 800; letter-spacing: 0.03em; text-align: center;
       background: var(--black); border: 2px solid var(--red); color: var(--text-pri);
