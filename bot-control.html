@@ -190,6 +190,62 @@
       </section>
 
       <section class="bot-group">
+        <h2 class="bot-group-title">Predictions</h2>
+        <div class="bot-grid">
+
+          <div class="card bot-section bot-grid-full" id="predictionSection">
+            <h3>Channel Point Prediction</h3>
+            <p class="bot-section-desc">Runs a real channel-point prediction. Broadcaster-only on Twitch, so this stays off until the broadcaster grants prediction access in bot setup.</p>
+
+            <div id="predictionInert" class="pred-inert" hidden>
+              <p class="bot-muted" id="predictionInertText">Predictions are not authorized yet.</p>
+            </div>
+
+            <div id="predictionCreate" hidden>
+              <label class="pred-field">Title
+                <input type="text" id="predictionTitle" maxlength="45" placeholder="Will the boss go down this attempt?">
+              </label>
+
+              <div class="pred-outcomes" id="predictionOutcomes">
+                <input type="text" class="pred-outcome-input" maxlength="25" placeholder="Outcome 1">
+                <input type="text" class="pred-outcome-input" maxlength="25" placeholder="Outcome 2">
+              </div>
+              <button class="btn-secondary pred-add-outcome" id="predictionAddOutcome" type="button">+ Add outcome</button>
+
+              <label class="pred-field pred-window">Prediction window
+                <select id="predictionWindow">
+                  <option value="30">30 seconds</option>
+                  <option value="60">1 minute</option>
+                  <option value="120" selected>2 minutes</option>
+                  <option value="300">5 minutes</option>
+                  <option value="600">10 minutes</option>
+                  <option value="1800">30 minutes</option>
+                </select>
+              </label>
+
+              <div class="pred-actions">
+                <button class="btn-primary" id="predictionStartBtn">Start Prediction</button>
+              </div>
+            </div>
+
+            <div id="predictionLive" hidden>
+              <div class="pred-live-head">
+                <span class="giveaway-status" id="predictionState">Active</span>
+                <b class="pred-live-title" id="predictionLiveTitle"></b>
+              </div>
+              <ul class="pred-outcome-list" id="predictionOutcomeList"></ul>
+              <div class="pred-actions">
+                <button class="btn-secondary" id="predictionLockBtn">Lock</button>
+                <button class="btn-secondary pred-cancel" id="predictionCancelBtn">Cancel (refund)</button>
+              </div>
+              <p class="bot-section-desc pred-resolve-hint" id="predictionResolveHint" hidden>Pick the winning outcome above to pay out.</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="bot-group">
         <h2 class="bot-group-title">Overlay</h2>
         <div class="bot-grid">
 

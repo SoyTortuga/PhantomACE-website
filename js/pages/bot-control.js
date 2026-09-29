@@ -37,6 +37,9 @@ function renderBotActionFeed(log) {
     } else if (entry.type === 'giveaway-code') {
       tag = 'Prize';
       body = 'Prize code whispered to <b>' + escapeBotHtml(entry.username || 'unknown') + '</b> by ' + escapeBotHtml(entry.actor || 'unknown') + failedNote;
+    } else if (entry.type === 'prediction-create' || entry.type === 'prediction-resolve' || entry.type === 'prediction-cancel') {
+      tag = 'Prediction';
+      body = escapeBotHtml(entry.message || 'prediction updated') + ' — by ' + escapeBotHtml(entry.actor || 'unknown');
     }
 
     return '<li class="bot-action-item">' +
@@ -792,10 +795,205 @@ function initGiveawayPanel() {
   }, 5000);
 
   loadGiveawayState();
+  initPredictionPanel();
   initOvMc();
   initOvBingo();
   initOvRaid();
   initOvPreset();
+}
+
+/* ── Channel point predictions ──────────────────────────────────────────
+   Mods run these; the endpoint drives them with the broadcaster token. The
+   card shows one of three faces — a create form, the live prediction with its
+   running totals, or an "authorization needed" note when the broadcaster has
+   not granted the scope. It polls only while a prediction is live, so an idle
+   panel open beside a stream is not hammering Twitch. */
+
+var predictionActive = false;
+var PRED_MAX_OUTCOMES = 10;
+
+function showPredictionFace(face, message) {
+  var faces = { inert: 'predictionInert', create: 'predictionCreate', live: 'predictionLive' };
+  Object.keys(faces).forEach(function (k) {
+    var el = document.getElementById(faces[k]);
+    if (el) el.hidden = (k !== face);
+  });
+  if (face === 'inert') {
+    var t = document.getElementById('predictionInertText');
+    if (t) t.textContent = message || 'Predictions are not authorized yet.';
+  }
+}
+
+function renderPredictionLive(p) {
+  var titleEl = document.getElementById('predictionLiveTitle');
+  var stateEl = document.getElementById('predictionState');
+  var list = document.getElementById('predictionOutcomeList');
+  var lockBtn = document.getElementById('predictionLockBtn');
+  var cancelBtn = document.getElementById('predictionCancelBtn');
+  var resolveHint = document.getElementById('predictionResolveHint');
+  if (!list) return;
+
+  if (titleEl) titleEl.textContent = p.title || '';
+  var active = p.status === 'ACTIVE';
+  var locked = p.status === 'LOCKED';
+  if (stateEl) {
+    stateEl.textContent = active ? 'Entries open' : (locked ? 'Locked' : (p.status || ''));
+    stateEl.className = 'giveaway-status' + (active ? ' open' : '');
+  }
+
+  var totalPoints = (p.outcomes || []).reduce(function (s, o) { return s + (o.channelPoints || 0); }, 0);
+
+  list.innerHTML = (p.outcomes || []).map(function (o) {
+    var pct = totalPoints > 0 ? Math.round((o.channelPoints / totalPoints) * 100) : 0;
+    /* While ACTIVE or LOCKED a winner can be picked. Twitch pays out on
+       RESOLVED, so the button is here for both states. */
+    var resolveBtn = (active || locked)
+      ? '<button class="btn-secondary pred-resolve" data-outcome="' + escapeBotHtml(o.id) + '">Resolve — pick this</button>'
+      : '';
+    return '<li class="pred-outcome-row">' +
+      '<div class="pred-outcome-top">' +
+      '<span class="pred-outcome-name">' + escapeBotHtml(o.title) + '</span>' +
+      '<span class="pred-outcome-nums">' + (o.channelPoints || 0).toLocaleString() + ' pts · ' +
+      (o.users || 0) + (o.users === 1 ? ' voter' : ' voters') + ' · ' + pct + '%</span>' +
+      '</div>' +
+      '<span class="pred-outcome-bar"><i style="width:' + pct + '%"></i></span>' +
+      resolveBtn +
+      '</li>';
+  }).join('');
+
+  list.querySelectorAll('.pred-resolve').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (!confirm('Resolve the prediction to this outcome? Winners are paid out and it cannot be undone.')) return;
+      predictionAction({ action: 'resolve', id: p.id, winningOutcomeId: b.dataset.outcome }, b);
+    });
+  });
+
+  if (lockBtn) {
+    lockBtn.hidden = !active;
+    lockBtn.onclick = function () { predictionAction({ action: 'lock', id: p.id }, lockBtn); };
+  }
+  if (cancelBtn) {
+    cancelBtn.onclick = function () {
+      if (!confirm('Cancel the prediction? All channel points are refunded.')) return;
+      predictionAction({ action: 'cancel', id: p.id }, cancelBtn);
+    };
+  }
+  if (resolveHint) resolveHint.hidden = false;
+}
+
+function applyPredictionState(data) {
+  if (data && data.authorized === false) {
+    predictionActive = false;
+    showPredictionFace('inert', data.error);
+    return;
+  }
+  var p = data && data.prediction;
+  if (p && (p.status === 'ACTIVE' || p.status === 'LOCKED')) {
+    predictionActive = true;
+    showPredictionFace('live');
+    renderPredictionLive(p);
+  } else {
+    predictionActive = false;
+    showPredictionFace('create');
+  }
+}
+
+async function loadPredictionStatus() {
+  try {
+    var res = await fetch('/api/bot/predictions', { credentials: 'same-origin', cache: 'no-store' });
+    var data = await res.json().catch(function () { return {}; });
+    /* A 400 carrying authorized:false is the inert state, not a failure — it
+       is the broadcaster not having granted the scope yet. */
+    if (!res.ok && !(data && data.authorized === false)) {
+      showPredictionFace('create');
+      return;
+    }
+    applyPredictionState(data);
+  } catch {
+    /* leave the last face on screen */
+  }
+}
+
+async function predictionAction(payload, button) {
+  var original = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '...'; }
+  try {
+    var res = await fetch('/api/bot/predictions', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    var data = await res.json().catch(function () { return {}; });
+    if (data.success) {
+      var msgs = {
+        create: 'Prediction started — chat can vote now.',
+        lock: 'Prediction locked — voting is closed.',
+        resolve: 'Prediction resolved — winners paid out.',
+        cancel: 'Prediction canceled — points refunded.',
+      };
+      showBotStatus(msgs[payload.action] || 'Done.', false);
+      applyPredictionState(data);
+      await refreshDashboard();
+    } else if (data.authorized === false) {
+      showPredictionFace('inert', data.error);
+      showBotStatus(data.error || 'Predictions are not authorized yet.', true);
+    } else {
+      showBotStatus(data.error || 'Could not update the prediction.', true);
+    }
+  } catch {
+    showBotStatus('Network error updating the prediction.', true);
+  }
+  if (button) { button.disabled = false; button.textContent = original; }
+}
+
+function startPrediction(button) {
+  var titleEl = document.getElementById('predictionTitle');
+  var windowEl = document.getElementById('predictionWindow');
+  var inputs = document.querySelectorAll('#predictionOutcomes .pred-outcome-input');
+  var title = titleEl ? titleEl.value.trim() : '';
+  if (!title) { showBotStatus('Give the prediction a title first.', true); return; }
+
+  var outcomes = [];
+  inputs.forEach(function (i) { var v = i.value.trim(); if (v) outcomes.push(v); });
+  if (outcomes.length < 2) { showBotStatus('Add at least two outcomes.', true); return; }
+
+  var window = parseInt(windowEl && windowEl.value, 10) || 120;
+  predictionAction({ action: 'create', title: title, outcomes: outcomes, window: window }, button);
+}
+
+function initPredictionPanel() {
+  var section = document.getElementById('predictionSection');
+  if (!section) return;
+
+  var addBtn = document.getElementById('predictionAddOutcome');
+  var outcomes = document.getElementById('predictionOutcomes');
+  if (addBtn && outcomes) {
+    addBtn.addEventListener('click', function () {
+      var count = outcomes.querySelectorAll('.pred-outcome-input').length;
+      if (count >= PRED_MAX_OUTCOMES) { showBotStatus('A prediction allows at most 10 outcomes.', true); return; }
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'pred-outcome-input';
+      input.maxLength = 25;
+      input.placeholder = 'Outcome ' + (count + 1);
+      outcomes.appendChild(input);
+      if (count + 1 >= PRED_MAX_OUTCOMES) addBtn.disabled = true;
+    });
+  }
+
+  var startBtn = document.getElementById('predictionStartBtn');
+  if (startBtn) startBtn.addEventListener('click', function () { startPrediction(startBtn); });
+
+  /* Poll only while a prediction is live and the tab is visible — an idle card
+     showing the create form does not need to talk to Twitch every few
+     seconds. */
+  setInterval(function () {
+    if (document.hidden || !predictionActive) return;
+    loadPredictionStatus();
+  }, 5000);
+
+  loadPredictionStatus();
 }
 
 /* ── Mana Clash on the overlay ──────────────────────────────────── */
