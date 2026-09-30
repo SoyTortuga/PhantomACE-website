@@ -62,15 +62,50 @@
       to their profile, equipped badge, equipped title. `authors` is the map
       the API sends alongside the page. */
   function authorLine(authors, userId, cls) {
-    var a = (authors && authors[userId]) || { displayName: 'Someone', login: '', avatar: '', title: null, badge: null };
+    var a = (authors && authors[userId]) || { displayName: 'Someone', login: '', avatar: '', title: null, badge: null, nameEffect: null };
+    /* The equipped name-effect variant rides along in a data attribute the
+       server filled; paintNameEffects() turns it into the glow after the
+       markup is live. Absent → the element stays plain. */
+    var fx = a.nameEffect ? ' data-name-fx="' + esc(a.nameEffect) + '"' : '';
     var inner =
       (a.avatar ? '<img class="forum-author-avatar" src="' + esc(a.avatar) + '" alt="">' : '<span class="forum-author-avatar forum-author-blank"></span>') +
-      '<span class="forum-author-name">' + esc(a.displayName) + '</span>' +
+      '<span class="forum-author-name"' + fx + '>' + esc(a.displayName) + '</span>' +
       (a.badge ? badgeArt(a.badge) : '') +
       (a.title ? '<span class="forum-author-title">' + esc(a.title.name) + '</span>' : '');
     return a.login
       ? '<a class="forum-author ' + (cls || '') + '" href="/user/' + encodeURIComponent(a.login) + '">' + inner + '</a>'
       : '<span class="forum-author ' + (cls || '') + '">' + inner + '</span>';
+  }
+
+  /* ── Name effects ─────────────────────────────────────────────────────
+     The shared cosmetics module (js/cosmetic-variants.js) owns the glow and
+     its in-view/count-capped animation manager. We only feed it the name
+     elements. `managed: true` is required so a busy board never animates
+     more than the cap at once and only visible names animate. Every call is
+     guarded: if the module failed to load, these are silent no-ops and chat
+     still works. */
+  function paintNameEffects(root) {
+    var CV = window.CosmeticVariants;
+    if (!CV || !root) return;
+    var names = root.querySelectorAll('.forum-author-name');
+    for (var i = 0; i < names.length; i++) {
+      CV.applyNameFx(names[i], names[i].getAttribute('data-name-fx') || null, { managed: true });
+    }
+  }
+  /* Release the manager's hold on names about to be discarded, so a
+     re-render never leaks dead nodes into the animation cap or observer. */
+  function clearNameEffects(root) {
+    var CV = window.CosmeticVariants;
+    if (!CV || !root) return;
+    var names = root.querySelectorAll('.forum-author-name');
+    for (var i = 0; i < names.length; i++) CV.applyNameFx(names[i], null);
+  }
+  /* Replace a view's contents and (re)apply name effects in one step: the
+     old names are unregistered before they vanish, the new ones painted. */
+  function setViewHtml(view, html) {
+    clearNameEffects(view);
+    view.innerHTML = html;
+    paintNameEffects(view);
   }
 
   function badgeArt(b) {
@@ -110,6 +145,7 @@
   }
 
   function failed(view, what) {
+    clearNameEffects(view);
     view.innerHTML = '<div class="forum-empty card"><p>' + esc(what) + '</p></div>';
   }
 
@@ -159,7 +195,7 @@
       var staffBar = looksLikeStaff(me())
         ? '<div class="forum-staff-bar"><a href="/community?view=reports">Moderation queue</a></div>'
         : '';
-      view.innerHTML = staffBar + '<div class="forum-categories">' + r.data.categories.map(function (c) {
+      setViewHtml(view, staffBar + '<div class="forum-categories">' + r.data.categories.map(function (c) {
         var newest = c.newest
           ? '<div class="forum-category-newest">' +
               '<a href="/thread/' + esc(c.newest.id) + '">' + esc(c.newest.title) + '</a>' +
@@ -185,7 +221,7 @@
             '<div class="forum-stat"><span class="forum-stat-val">' + c.postCount + '</span><span class="forum-stat-label">Posts</span></div>' +
           '</div>' +
         '</div>';
-      }).join('') + '</div>';
+      }).join('') + '</div>');
     }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
   }
 
@@ -242,7 +278,7 @@
           '</div>';
         }).join('') + '</div>';
       }
-      view.innerHTML = html + pager(d.page, d.pages, hrefFor);
+      setViewHtml(view, html + pager(d.page, d.pages, hrefFor));
       wireComposer(view, categoryId);
     }).catch(function () { failed(view, 'The forum is unavailable right now.'); });
   }
@@ -366,7 +402,7 @@
       html += d.posts.map(function (p, i) { return postHtml(p, authors, ctx, d.page === 1 && i === 0); }).join('');
       html += pager(d.page, d.pages, hrefFor);
       html += replyBoxHtml(t);
-      view.innerHTML = html + '</div>';
+      setViewHtml(view, html + '</div>');
       wireThread(view, id);
 
       if (location.hash && /^#post-[0-9]+$/.test(location.hash)) {
@@ -533,7 +569,7 @@
         view.innerHTML = '<div class="forum-empty card"><p>Nothing reported. Quiet is good.</p></div>';
         return;
       }
-      view.innerHTML = '<div class="forum-thread-header"><h3>Reports</h3>' +
+      setViewHtml(view, '<div class="forum-thread-header"><h3>Reports</h3>' +
         '<span class="forum-thread-count">' + reports.length + ' open</span></div>' +
         reports.map(function (rep) {
           var where = rep.threadId
@@ -556,7 +592,7 @@
             '</div>' +
             (rep.postDeleted ? '' : reasonForm('delete-post', rep.postId, 'Reason (the author will see it)', 'Remove post')) +
           '</div>';
-        }).join('');
+        }).join(''));
       view.addEventListener('click', function (e) {
         var act = e.target.closest('[data-act]');
         if (!act) return;

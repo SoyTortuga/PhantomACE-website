@@ -65,10 +65,11 @@
   }
 
   function authorLine(authors, userId) {
-    var a = (authors && authors[userId]) || { displayName: 'Someone', login: '', avatar: '', title: null, badge: null };
+    var a = (authors && authors[userId]) || { displayName: 'Someone', login: '', avatar: '', title: null, badge: null, nameEffect: null };
+    var fx = a.nameEffect ? ' data-name-fx="' + esc(a.nameEffect) + '"' : '';
     var inner =
       (a.avatar ? '<img class="forum-author-avatar" src="' + esc(a.avatar) + '" alt="">' : '<span class="forum-author-avatar forum-author-blank"></span>') +
-      '<span class="forum-author-name">' + esc(a.displayName) + '</span>' +
+      '<span class="forum-author-name"' + fx + '>' + esc(a.displayName) + '</span>' +
       (a.badge ? (a.badge.image
         ? '<img class="forum-author-badge" src="' + esc(a.badge.image) + '" alt="" title="' + esc(a.badge.name) + '">'
         : '<span class="forum-author-badge forum-author-badge-fallback" title="' + esc(a.badge.name) + '">' + (a.badge.founder ? '★' : '◆') + '</span>') : '') +
@@ -81,6 +82,25 @@
   /* The identities the wall arrived with, so an edit that names somebody
      new can link them without a reload. */
   var currentAuthors = {};
+
+  /* Name effects: the shared cosmetics module glows the name and caps the
+     animation. We only feed it the elements; `managed: true` bounds a busy
+     wall. Guarded so a load-order hiccup never breaks comments. Clear the
+     old set before a re-render so discarded nodes leave the animation cap. */
+  function paintNameEffects(root) {
+    var CV = window.CosmeticVariants;
+    if (!CV || !root) return;
+    var names = root.querySelectorAll('.forum-author-name');
+    for (var i = 0; i < names.length; i++) {
+      CV.applyNameFx(names[i], names[i].getAttribute('data-name-fx') || null, { managed: true });
+    }
+  }
+  function clearNameEffects(root) {
+    var CV = window.CosmeticVariants;
+    if (!CV || !root) return;
+    var names = root.querySelectorAll('.forum-author-name');
+    for (var i = 0; i < names.length; i++) CV.applyNameFx(names[i], null);
+  }
 
   /* A body, escaped, with the @names the SERVER resolved turned into
      profile links — those and no others. Escaped first, then linked. */
@@ -156,6 +176,7 @@
   function render(host, userId, page) {
     api('/api/forum/comments?id=' + encodeURIComponent(userId) + '&page=' + page).then(function (r) {
       if (!r.ok) {
+        clearNameEffects(host);
         host.innerHTML = '<div class="forum-empty card"><p>' + esc(r.data.error || 'Comments are unavailable right now.') + '</p></div>';
         return;
       }
@@ -182,9 +203,12 @@
           '</nav>';
         }
       }
+      clearNameEffects(host);
       host.innerHTML = html;
+      paintNameEffects(host);
       wire(host, userId, page);
     }).catch(function () {
+      clearNameEffects(host);
       host.innerHTML = '<div class="forum-empty card"><p>Comments are unavailable right now.</p></div>';
     });
   }
