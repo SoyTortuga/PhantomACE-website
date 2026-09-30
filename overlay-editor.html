@@ -5,109 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Overlay Layout | PhantomACE</title>
   <link rel="icon" href="/assets/images/favicon.ico">
+  <!-- MOVED. The overlay layout editor now lives inside the Overlay Dashboard's
+       "Overlay Layout" section, so everything overlay is in one place. This page
+       is kept only so old links/bookmarks don't 404 — it redirects there. -->
+  <meta http-equiv="refresh" content="0; url=/overlay-dashboard.html#odLayoutSection">
+  <script>location.replace('/overlay-dashboard.html#odLayoutSection');</script>
   <style>
-    /* Self-contained, like the toolbox and the background studio. Border-based
-       hierarchy; no box-shadow, per the house rule. */
-    body { background: #0a0a0a; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 20px; }
-    .wrap { max-width: 1200px; margin: 0 auto; }
-    h1 { color: #ff0000; font-size: 20px; letter-spacing: 0.06em; margin: 0 0 4px; }
-    .sub { color: #ffffffaa; font-size: 12px; margin-bottom: 14px; max-width: 780px; }
-    .bar {
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-      background: #111; border: 1px solid #ffffff1f; border-radius: 8px;
-      padding: 10px; margin-bottom: 14px;
-    }
-    .btn {
-      padding: 8px 14px; background: #1a1a1a; color: #fff; cursor: pointer;
-      border: 1px solid #ffffff28; border-radius: 4px; font-size: 13px; font-weight: 700;
-    }
-    .btn:hover { border-color: #ff0000; }
-    .btn-primary { border-color: #ff0000; }
-    .btn-danger { border-color: #772222; color: #ff9999; }
-    .status { font-size: 12px; color: #fff; margin-left: auto; }
-    .notice { background: #111; border: 1px solid #ff000040; border-radius: 8px; padding: 16px; font-size: 14px; }
-
-    /* The stage is the 16:9 canvas, scaled to fit. The iframe inside it is
-       the REAL overlay at 1920×1080 in layout mode — dragging moves its
-       actual panels, so there is no second copy to drift. */
-    .stage-frame {
-      position: relative; width: 100%; aspect-ratio: 16 / 9;
-      background: #000 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%230d0d0d"/><rect width="20" height="20" fill="%23111"/><rect x="20" y="20" width="20" height="20" fill="%23111"/></svg>');
-      border: 1px solid #ffffff28; border-radius: 6px; overflow: hidden;
-    }
-    #ovFrame {
-      position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
-      transform-origin: top left; border: 0; background: transparent;
-    }
-    .drag-hint { font-size: 11px; color: #ffffff88; margin-top: 8px; }
-    .edit-main { min-width: 0; }
-    /* The legend now sits BELOW the preview, full width, as a grid of cards. */
-    .legend {
-      background: #111; border: 1px solid #ffffff1f;
-      border-radius: 8px; padding: 14px; margin-top: 14px;
-    }
-    .legend h2 { font-size: 13px; color: #ff4444; letter-spacing: 0.05em; margin: 0 0 12px; }
-    .legend #legendBody {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px;
-    }
-    .legend .lg-panel {
-      border: 1px solid #ffffff14; border-radius: 6px; padding: 10px 12px; background: #0c0c0c;
-    }
-    .legend .lg-panel.is-hidden { opacity: 0.55; }
-    .lg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-    .legend .lg-name {
-      font-size: 12px; font-weight: 800; color: #fff;
-    }
-    .lg-toggle {
-      flex: none; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 4px;
-      cursor: pointer; font-family: inherit; border: 1px solid #2f6a2f; background: #0e1a0e; color: #6ac46a;
-    }
-    .lg-toggle.hidden-state { border-color: #772222; background: #1a0e0e; color: #ff9999; }
-    .legend ul { margin: 0; padding-left: 18px; }
-    .legend li { font-size: 11px; color: #ffffffcc; line-height: 1.5; }
+    body { background: #0a0a0a; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 40px; }
+    a { color: #ff5a5a; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>🖥 Overlay Layout</h1>
-    <p class="sub">Keep several layouts as <b>presets</b> — "Just Chatting", "Gaming", "Bingo night" —
-      and switch which one is <b>live</b> as the stream changes. Drag each panel where you want it, Save,
-      then Make Live; the overlay uses the live preset on its next load (hit "Reload OBS Overlay" in Bot
-      Control to swap it instantly). Panels show sample content and only air while their game is running.
-      Positions are percentages, so they hold at any OBS source size.</p>
-
-    <div id="notice" class="notice">Checking access…</div>
-
-    <div id="editor" style="display:none">
-      <div class="bar">
-        <label style="font-size:13px;color:#ffffffcc">Preset:
-          <select id="presetSelect" class="btn" style="font-weight:700"></select>
-        </label>
-        <button class="btn" id="newBtn">+ New</button>
-        <button class="btn btn-primary" id="activateBtn">Make Live</button>
-        <button class="btn btn-danger" id="deleteBtn">Delete Preset</button>
-        <span id="liveTag" style="font-size:12px;color:#6ac46a;font-weight:700"></span>
-      </div>
-      <div class="bar">
-        <button class="btn btn-primary" id="saveBtn">Save Layout</button>
-        <button class="btn" id="reloadBtn">Revert</button>
-        <button class="btn btn-danger" id="resetBtn">Reset to defaults</button>
-        <span class="status" id="status"></span>
-      </div>
-      <div class="edit-main">
-        <div class="stage-frame" id="stageFrame">
-          <iframe id="ovFrame" src="/overlay?layout=1" title="overlay preview"></iframe>
-        </div>
-        <p class="drag-hint">Drag a panel to move it; drag its bottom-right corner to resize. Use <b>Hide</b> to remove a panel from this preset. The dashed area is the 16:9 stream canvas.</p>
-      </div>
-      <aside class="legend" id="legend">
-        <h2>Panels — what each shows, and whether it airs in this preset</h2>
-        <div id="legendBody"></div>
-      </aside>
-    </div>
-  </div>
-
-  <script src="/js/pages/overlay-samples.js" defer></script>
-  <script src="/js/pages/overlay-editor.js" defer></script>
+  <p>The overlay layout editor has moved into the
+    <a href="/overlay-dashboard.html#odLayoutSection">Overlay Dashboard → Overlay Layout</a>.
+    Redirecting…</p>
 </body>
 </html>

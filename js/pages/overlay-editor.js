@@ -22,6 +22,22 @@
   var notice = document.getElementById('notice');
   var scale = 1;
 
+  /* SNAP TO GRID. A dragged panel snaps to a square canvas-pixel grid, then is
+     stored as the usual % so it stays resolution-independent. On by default,
+     with a toggle; faint gridlines show while it is on. Free drag returns the
+     moment it is switched off. */
+  var SNAP_PX = 40;                 // grid step in CANVAS pixels
+  var snapOn = true;
+  var snapGrid = null, snapToggle = null;
+
+  function snap(vPct, canvasDim) {
+    var stepPct = SNAP_PX / canvasDim * 100;
+    return clamp(Math.round(vPct / stepPct) * stepPct);
+  }
+  function updateSnapGrid() {
+    if (snapGrid) snapGrid.classList.toggle('on', snapOn);
+  }
+
   /* Multi-preset state. `presets` mirrors the server: name -> { panels }.
      `activeName` is the live one; `currentName` is the one being edited. */
   var presets = {};
@@ -96,10 +112,21 @@
     });
   }
 
+  /* Fit the 1920-wide canvas into the stage's current width. When the editor is
+     embedded in the Overlay Dashboard it may be measured while its section is
+     still display:none (the dashboard reveals #odPanel after its own gate), so
+     a zero width means "not visible yet" — retry on the next frame (capped) and
+     also re-fit on the next resize, rather than locking in scale 0. */
+  var fitTries = 0;
   function fitScale() {
-    scale = stageFrame.clientWidth / CANVAS_W;
+    var w = stageFrame.clientWidth;
+    if (!w) { if (fitTries++ < 600) requestAnimationFrame(fitScale); return; }
+    fitTries = 0;
+    scale = w / CANVAS_W;
     frame.style.transform = 'scale(' + scale + ')';
     stageFrame.style.height = (CANVAS_H * scale) + 'px';
+    /* Keep the gridlines aligned with the canvas grid at the current scale. */
+    if (snapGrid) snapGrid.style.backgroundSize = (SNAP_PX * scale) + 'px ' + (SNAP_PX * scale) + 'px';
   }
 
   async function boot() {
@@ -122,6 +149,11 @@
 
     notice.style.display = 'none';
     document.getElementById('editor').style.display = '';
+
+    snapGrid = document.getElementById('snapGrid');
+    snapToggle = document.getElementById('snapToggle');
+    if (snapToggle) snapOn = snapToggle.checked;
+    updateSnapGrid();
 
     /* The iframe must not run its own live fetch under us. */
     try { frame.contentWindow.__ovLayoutManaged = true; } catch (e) {}
@@ -244,6 +276,9 @@
       var dxPct = (e.clientX - startX) / CANVAS_W * 100;
       var dyPct = (e.clientY - startY) / CANVAS_H * 100;
       var x = clamp(startPx + dxPct), y = clamp(startPy + dyPct);
+      /* Snap the position (in canvas %) to the grid when snap is on; otherwise
+         it stays a free drag. Stored as % either way. */
+      if (snapOn) { x = snap(x, CANVAS_W); y = snap(y, CANVAS_H); }
       el.dataset.px = x; el.dataset.py = y;
       if (apply) apply(el, x, y, Number(el.dataset.ps) || 1);
     });
@@ -328,6 +363,8 @@
   }
 
   function bindButtons() {
+    if (snapToggle) snapToggle.onchange = function () { snapOn = snapToggle.checked; updateSnapGrid(); };
+
     document.getElementById('presetSelect').onchange = function (e) { selectPreset(e.target.value); };
 
     document.getElementById('newBtn').onclick = function () {
@@ -398,5 +435,8 @@
     };
   }
 
+  /* Exposed so the host page (or a test) can re-run boot after auth/visibility
+     settles; also auto-boots on load for the ordinary case. */
+  window.OverlayEditor = { boot: boot };
   boot();
 })();

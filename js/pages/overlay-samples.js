@@ -16,8 +16,10 @@
     { id: 'ovStage', label: 'Alerts', holds: [
       'One alert at a time, queued — never stacked',
       'New subscriber · gift subs · raid',
+      'Follows & cheers (Twitch-native)',
       'Hype train level-up',
       'Code, item & egg drops (incl. maze rewards)',
+      'Giveaway winner reel & the customizable Wheel spin',
       'MTGBBB rare & mythic PULLS show here, not in the MTGBBB panel',
       'MTGBBB bingo & blackout',
       'Commander Bingo calls & wins',

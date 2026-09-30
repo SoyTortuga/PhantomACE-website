@@ -224,14 +224,38 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
 
   const eEd = fs.readFileSync(path.join(REPO, 'js/pages/overlay-editor.js'), 'utf8');
   ok('the editor renders the legend from PANELS', /function renderLegend/.test(eEd) && /window\.OverlaySamples && window\.OverlaySamples\.PANELS/.test(eEd));
-  const eHtml = fs.readFileSync(path.join(REPO, 'overlay-editor.html'), 'utf8');
-  ok('the editor page has a legend column', /id="legendBody"/.test(eHtml));
-  ok('and loads the shared samples for it', /overlay-samples\.js/.test(eHtml));
+
+  /* The editor now lives INSIDE the Overlay Dashboard (one overlay iframe, not a
+     nested editor iframe), so its markup and scripts are on that page. */
+  const dashHtml = fs.readFileSync(path.join(REPO, 'overlay-dashboard.html'), 'utf8');
+  ok('the dashboard hosts the editor legend column', /id="legendBody"/.test(dashHtml));
+  ok('and the single overlay preview iframe', /id="ovFrame"[^>]*src="\/overlay\?layout=1"/.test(dashHtml));
+  ok('and loads the shared samples + the editor script', /overlay-samples\.js/.test(dashHtml) && /overlay-editor\.js/.test(dashHtml));
+  ok('the dashboard has a Layout section anchor', /id="odLayoutSection"/.test(dashHtml));
 
   /* Multi-preset editing: the editor reads every preset and can switch,
      create, make-live and delete. */
-  ok('the editor page has the preset controls',
-     /id="presetSelect"/.test(eHtml) && /id="newBtn"/.test(eHtml) && /id="activateBtn"/.test(eHtml) && /id="deleteBtn"/.test(eHtml));
+  ok('the dashboard has the preset controls',
+     /id="presetSelect"/.test(dashHtml) && /id="newBtn"/.test(dashHtml) && /id="activateBtn"/.test(dashHtml) && /id="deleteBtn"/.test(dashHtml));
+
+  /* Back-compat: the old standalone editor URL must not 404 — it redirects to
+     the dashboard's Layout section. */
+  const oldEd = fs.readFileSync(path.join(REPO, 'overlay-editor.html'), 'utf8');
+  ok('the old editor page redirects to the dashboard Layout section',
+     /overlay-dashboard\.html#odLayoutSection/.test(oldEd));
+
+  /* Every panel is fully customizable: moved (makeDraggable) AND resized
+     (addResizeHandle), for the SAME PANELS list — the editor wires both onto
+     each panel it iterates. */
+  ok('every panel is made draggable and resizable',
+     /samples\.forEach\(function \(spec\)/.test(eEd) && /makeDraggable\(el, apply\)/.test(eEd) && /addResizeHandle\(el, apply\)/.test(eEd));
+
+  /* SNAP TO GRID: a snap step in canvas pixels, snapping the drag position, a
+     toggle, and gridlines — all resolution-independent (stored as %). */
+  ok('the editor snaps the drag to a grid', /function snap\(/.test(eEd) && /SNAP_PX/.test(eEd) && /if \(snapOn\)/.test(eEd));
+  ok('the snap grid step is in canvas pixels', /SNAP_PX = \d+/.test(eEd));
+  ok('the dashboard has the snap toggle and gridlines',
+     /id="snapToggle"/.test(dashHtml) && /id="snapGrid"/.test(dashHtml));
   ok('the editor loads every preset (full)', /API \+ '\?full=1'/.test(eEd));
   ok('and switches, activates and pins from the chosen preset',
      /function selectPreset/.test(eEd) && /action: 'activate'/.test(eEd) && /function currentPanels/.test(eEd));
@@ -240,8 +264,10 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   ok('the live overlay removes a hidden panel', /p\.hidden/.test(apply) && /display = 'none'/.test(apply));
   ok('the legend cards carry a show/hide toggle', /class="lg-toggle"/.test(eEd) && /function updateLegendToggle/.test(eEd));
 
-  const bc = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
-  ok('bot control can swap the live preset', /function initOvPreset/.test(bc) && /action: 'activate'/.test(bc));
+  /* The live-preset switcher moved to the Overlay Dashboard (it sits with the
+     layout editor). It still activates via the same endpoint. */
+  const dash = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  ok('the dashboard can swap the live preset', /function initOvPreset/.test(dash) && /action: 'activate'/.test(dash));
 
   const ids = [...samples.matchAll(/id: '(ov\w+)'/g)].map(m => m[1]).sort();
   /* The panel list the editor drags must match the ids the ROUTE stores, or a

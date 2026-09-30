@@ -67,17 +67,6 @@
             </div>
           </div>
 
-          <div class="card bot-section" id="ovPresetSection">
-            <h3>Overlay Preset</h3>
-            <p class="bot-section-desc">Swap which saved overlay layout is live.</p>
-            <div class="ovmc-row">
-              <span class="giveaway-status" id="ovPresetState">Loading&hellip;</span>
-              <select id="ovPresetPick" class="giveaway-rarity-select"><option value="">Loading&hellip;</option></select>
-              <button class="btn-primary" id="ovPresetLiveBtn">Make Live &amp; Reload</button>
-              <button class="btn-secondary" id="ovPresetRefreshBtn">Refresh</button>
-            </div>
-          </div>
-
           <div class="card bot-section" id="ovBingoSection">
             <h3>Commander Bingo on the Overlay</h3>
             <p class="bot-section-desc">Shows the live Commander Bingo game on the overlay.</p>
@@ -165,6 +154,64 @@
         </div>
       </section>
 
+      <!-- ── OVERLAY LAYOUT ─────────────────────────────────────────────
+           The layout editor is native here (one iframe of the overlay itself,
+           not a nested iframe of the old editor page). The preset switcher and
+           the drag editor sit together. Driven by overlay-editor.js against the
+           unchanged /api/overlay/layout endpoints. -->
+      <section class="bot-group" id="odLayoutSection">
+        <h2 class="bot-group-title">Overlay Layout</h2>
+        <div class="bot-grid">
+          <div class="card bot-section" id="ovPresetSection">
+            <h3>Live Preset</h3>
+            <p class="bot-section-desc">Swap which saved overlay layout is live. Build and arrange presets in the editor below.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovPresetState">Loading&hellip;</span>
+              <select id="ovPresetPick" class="giveaway-rarity-select"><option value="">Loading&hellip;</option></select>
+              <button class="btn-primary" id="ovPresetLiveBtn">Make Live &amp; Reload</button>
+              <button class="btn-secondary" id="ovPresetRefreshBtn">Refresh</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card bot-section bot-grid-full od-layout" id="odLayoutEditor">
+          <h3>🖥 Layout Editor</h3>
+          <p class="bot-section-desc">Keep several layouts as <b>presets</b> and switch which is <b>live</b> as the stream changes. Drag each panel where you want it (drag its bottom-right corner to resize), Save, then Make Live — the overlay uses the live preset on its next load (hit "Reload OBS Overlay" in Bot Control to swap it instantly). Panels show sample content and only air while their game is running. Positions are percentages, so they hold at any OBS source size.</p>
+
+          <div id="notice" class="notice">Checking access…</div>
+
+          <div id="editor" style="display:none">
+            <div class="bar">
+              <label style="font-size:13px">Preset:
+                <select id="presetSelect" class="btn" style="font-weight:700"></select>
+              </label>
+              <button class="btn" id="newBtn">+ New</button>
+              <button class="btn btn-primary" id="activateBtn">Make Live</button>
+              <button class="btn btn-danger" id="deleteBtn">Delete Preset</button>
+              <span id="liveTag"></span>
+            </div>
+            <div class="bar">
+              <button class="btn btn-primary" id="saveBtn">Save Layout</button>
+              <button class="btn" id="reloadBtn">Revert</button>
+              <button class="btn btn-danger" id="resetBtn">Reset to defaults</button>
+              <label class="snap-label"><input type="checkbox" id="snapToggle" checked> Snap to grid</label>
+              <span class="status" id="status"></span>
+            </div>
+            <div class="edit-main">
+              <div class="stage-frame" id="stageFrame">
+                <iframe id="ovFrame" src="/overlay?layout=1" title="overlay preview"></iframe>
+                <div class="snap-grid" id="snapGrid"></div>
+              </div>
+              <p class="drag-hint">Drag a panel to move it; drag its bottom-right corner to resize. Use <b>Hide</b> to remove a panel from this preset. The dashed area is the 16:9 stream canvas.</p>
+            </div>
+            <aside class="legend" id="legend">
+              <h2>Panels — what each shows, and whether it airs in this preset</h2>
+              <div id="legendBody"></div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
       <!-- ── ALERTS & TOOLS ─────────────────────────────────────────── -->
       <section class="bot-group">
         <h2 class="bot-group-title">Alerts &amp; Tools</h2>
@@ -241,5 +288,10 @@
   <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
   <script src="/js/pages/overlay-dashboard.js" defer></script>
+  <!-- The layout editor, native to this page: the shared panel samples for the
+       legend + preview, then the editor itself (one overlay iframe, no nesting).
+       It self-gates via /api/overlay/layout and drives the unchanged endpoints. -->
+  <script src="/js/pages/overlay-samples.js" defer></script>
+  <script src="/js/pages/overlay-editor.js" defer></script>
 </body>
 </html>

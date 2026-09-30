@@ -129,8 +129,11 @@ async function GET(e, h) {
   for (const h of hrefs) {
     if (h.startsWith('/api/')) {
       if (!routes.has(h)) dead.push(h);
-    } else if (!fs.existsSync(path.join(REPO, h.replace(/^\//, '')))) {
-      dead.push(h);
+    } else {
+      /* Strip any #fragment / ?query before checking the file exists — a card
+         may deep-link into a page section (e.g. overlay-dashboard.html#...). */
+      const file = h.replace(/^\//, '').replace(/[#?].*$/, '');
+      if (!fs.existsSync(path.join(REPO, file))) dead.push(h);
     }
   }
   check('no link points at a missing page or route', dead, []);

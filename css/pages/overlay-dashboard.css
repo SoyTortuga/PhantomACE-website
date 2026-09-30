@@ -36,6 +36,80 @@
 }
 .od-toggle input { cursor: pointer; }
 
+/* ── Layout editor (embedded) ──────────────────
+   The drag editor, moved in from the standalone overlay-editor page. Scoped
+   under .od-layout so its generic class names (.bar, .btn, .legend, …) don't
+   collide with the rest of the dashboard. Border-based hierarchy, no box-shadow.
+   The stage is a 16:9 canvas holding the REAL overlay iframe at 1920×1080,
+   scaled by overlay-editor.js — dragging moves the actual panels. */
+.od-layout .bar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: var(--gray-lo); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px; margin-bottom: 12px;
+}
+.od-layout .bar label { font-size: 13px; color: var(--text-sec); }
+.od-layout .btn {
+  padding: 8px 14px; background: var(--gray-lo); color: var(--text-pri); cursor: pointer;
+  border: 1px solid var(--border-mid); border-radius: 4px; font-size: 13px; font-weight: 700;
+  font-family: inherit;
+}
+.od-layout .btn:hover { border-color: var(--red); }
+.od-layout .btn.btn-primary { border-color: var(--red); }
+.od-layout .btn.btn-danger { border-color: #772222; color: #ff9999; }
+.od-layout .status { font-size: 12px; color: var(--text-pri); margin-left: auto; }
+.od-layout #liveTag { font-size: 12px; color: var(--green); font-weight: 700; }
+.od-layout .notice {
+  background: var(--gray-lo); border: 1px solid var(--red-dim, rgba(230,0,0,0.25));
+  border-radius: 8px; padding: 16px; font-size: 14px; color: var(--text-sec);
+}
+
+.od-layout .stage-frame {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  background: #000 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%230d0d0d"/><rect width="20" height="20" fill="%23111"/><rect x="20" y="20" width="20" height="20" fill="%23111"/></svg>');
+  border: 1px solid var(--border-mid); border-radius: 6px; overflow: hidden;
+}
+.od-layout #ovFrame {
+  position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+  transform-origin: top left; border: 0; background: transparent;
+}
+/* Faint snap gridlines over the canvas, shown only while snap is on. A
+   background pattern (not decorative borders); pointer-events off so drags pass
+   through to the overlay iframe. background-size is set by the editor from the
+   current scale so the lines align with the canvas grid. */
+.od-layout .snap-grid {
+  position: absolute; inset: 0; pointer-events: none; display: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.10) 1px, transparent 1px);
+}
+.od-layout .snap-grid.on { display: block; }
+.od-layout .snap-label { font-size: 13px; color: var(--text-sec); display: inline-flex; align-items: center; gap: 6px; }
+.od-layout .snap-label input { cursor: pointer; }
+.od-layout .drag-hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+.od-layout .edit-main { min-width: 0; }
+
+.od-layout .legend {
+  background: var(--gray-lo); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px; margin-top: 14px;
+}
+.od-layout .legend h2 { font-size: 13px; color: #ff4444; letter-spacing: 0.05em; margin: 0 0 12px; }
+.od-layout #legendBody {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px;
+}
+.od-layout .lg-panel {
+  border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; background: var(--black);
+}
+.od-layout .lg-panel.is-hidden { opacity: 0.55; }
+.od-layout .lg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.od-layout .lg-name { font-size: 12px; font-weight: 800; color: var(--text-pri); }
+.od-layout .lg-toggle {
+  flex: none; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 4px;
+  cursor: pointer; font-family: inherit; border: 1px solid #2f6a2f; background: #0e1a0e; color: #6ac46a;
+}
+.od-layout .lg-toggle.hidden-state { border-color: #772222; background: #1a0e0e; color: #ff9999; }
+.od-layout .legend ul { margin: 0; padding-left: 18px; }
+.od-layout .legend li { font-size: 11px; color: var(--text-sec); line-height: 1.5; }
+
 /* ── Games on Overlay ──────────────────────────
    One row per game: a fixed-width name label, its status, then its controls.
    Rows stack their controls on a narrow screen (inherits .ovmc-row wrap). */
