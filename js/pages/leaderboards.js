@@ -16,6 +16,43 @@
     return score.toLocaleString();
   }
 
+  /* Remove a row's banner backdrop (rows are reused across polls). */
+  function clearRowBanner(row) {
+    row.classList.remove('has-banner');
+    var old = row.querySelectorAll('.lb-banner-bg, .lb-banner-scrim');
+    for (var i = 0; i < old.length; i++) {
+      if (old[i].parentNode) old[i].parentNode.removeChild(old[i]);
+    }
+  }
+
+  /* Render a faint banner image + dark scrim behind the row. variant is a fixed
+     word, so the src is not user-controlled. If the art is missing (it may land
+     after this ships) the onerror handler strips it back to a normal row. */
+  function applyRowBanner(row, variant) {
+    clearRowBanner(row);
+    if (!variant) return;
+    var CV = window.CosmeticVariants;
+    var src = CV ? CV.bannerPath(variant) : '/assets/banners/banner-' + variant + '.png';
+
+    var img = document.createElement('img');
+    img.className = 'lb-banner-bg';
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    img.addEventListener('error', function () { clearRowBanner(row); });
+
+    var scrim = document.createElement('div');
+    scrim.className = 'lb-banner-scrim';
+    scrim.setAttribute('aria-hidden', 'true');
+
+    row.insertBefore(scrim, row.firstChild);
+    row.insertBefore(img, row.firstChild);
+    row.classList.add('has-banner');
+
+    img.src = src;
+    /* A cached/instant 404 can error before the listener attaches. */
+    if (img.complete && img.naturalWidth === 0) clearRowBanner(row);
+  }
+
   function populateBoard(game, entries) {
     /* Scoped to the TABLE, not the panel. A panel holding two boards would
        otherwise have the first board fill both tables' rows. */
@@ -23,19 +60,29 @@
     if (!panel) return;
     var rows = panel.querySelectorAll('.lb-row');
     var empty = panel.querySelector('.lb-empty');
+    var CV = window.CosmeticVariants;
 
     for (var i = 0; i < rows.length; i++) {
       var entry = entries[i];
-      var nameEl = rows[i].querySelector('.lb-col-name');
-      var scoreEl = rows[i].querySelector('.lb-col-score');
+      var row = rows[i];
+      var nameEl = row.querySelector('.lb-col-name');
+      var scoreEl = row.querySelector('.lb-col-score');
       if (entry) {
         nameEl.innerHTML = '<span class="lb-name-text">' + esc(entry.name) + '</span>';
         nameEl.dataset.userId = entry.id || '';
         scoreEl.textContent = formatScore(game, entry.score);
-        rows[i].style.display = '';
+        row.style.display = '';
+        /* Name effect on the name text — managed, so only in-view names animate
+           and the board never runs more than the cap at once. Banner behind the
+           whole row. */
+        if (CV) CV.applyNameFx(nameEl.querySelector('.lb-name-text'), entry.nameEffect || null, { managed: true });
+        applyRowBanner(row, entry.banner || null);
       } else {
         nameEl.dataset.userId = '';
-        rows[i].style.display = 'none';
+        var txt = nameEl.querySelector('.lb-name-text');
+        if (CV && txt) CV.applyNameFx(txt, null);
+        clearRowBanner(row);
+        row.style.display = 'none';
       }
     }
 

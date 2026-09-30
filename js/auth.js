@@ -177,33 +177,17 @@ async function refreshMyRole() {
   }
 }
 
-/* name-effect variant mapping — extracted & tested by test-name-effects.js
-   Maps an equipped name-effect inventory item to one of the three visual
-   variants defined in components.css. Robust to LEGACY items already in
-   inventories, which carry only rarity + name and no effect id:
-     - exclusive when it is the Eternal reward (name contains "Exclusive", or
-       a forward-looking meta.effect === 'exclusive');
-     - else mythic when rarity is mythic (or meta.effect === 'mythic');
-     - else rare.
-   Every already-granted item therefore resolves to a visible effect. */
-function nameEffectVariant(item) {
-  if (!item) return null;
-  var meta = item.meta || {};
-  var effect = meta.effect || '';
-  var name = String(item.name || '');
-  if (effect === 'exclusive' || /exclusive/i.test(name)) return 'exclusive';
-  if (effect === 'mythic') return 'mythic';
-  if (effect === 'rare') return 'rare';
-  if (item.rarity === 'mythic') return 'mythic';
-  return 'rare';
-}
-/* end name-effect variant mapping */
-
+/* The variant mapping + applier live in js/cosmetic-variants.js (loaded before
+   this script), so nav / profile / leaderboards / chat share one source of
+   truth. This applies the equipped name effect to the header name; the header
+   is a single name, so it animates unmanaged (no in-view cap needed). Guarded
+   so a page that somehow loaded without the module simply shows no glow rather
+   than throwing. */
 function applyNameEffect(el, item) {
   if (!el) return;
-  el.classList.remove('name-fx-rare', 'name-fx-mythic', 'name-fx-exclusive');
-  var variant = nameEffectVariant(item);
-  if (variant) el.classList.add('name-fx-' + variant);
+  var CV = window.CosmeticVariants;
+  if (!CV) { el.classList.remove('name-fx-rare', 'name-fx-mythic', 'name-fx-exclusive', 'name-fx-animate'); return; }
+  CV.applyNameFx(el, CV.nameEffectVariant(item));
 }
 
 function loadProfileCosmetics() {

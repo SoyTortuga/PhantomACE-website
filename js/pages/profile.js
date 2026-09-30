@@ -96,44 +96,24 @@
       '<h2 class="prof-section-title">' + esc(title) + '</h2>' + inner + '</section>';
   }
 
-  /* banner variant mapping — extracted & tested by test-banner.js
-     Mirrors nameEffectVariant() in js/auth.js: maps an equipped banner item to
-     one of the three tiered images. Robust to LEGACY banners (Phamily Time
-     tiers carry only rarity + name, no effect id) and to the public-profile
-     item shape, which flattens meta.effect onto `effect`. null item → no
-     banner. */
-  function bannerVariant(item) {
-    if (!item) return null;
-    var effect = (item.meta && item.meta.effect) || item.effect || '';
-    var name = String(item.name || '');
-    if (effect === 'exclusive' || /exclusive/i.test(name)) return 'exclusive';
-    if (effect === 'mythic') return 'mythic';
-    if (effect === 'rare') return 'rare';
-    if (item.rarity === 'mythic') return 'mythic';
-    return 'rare';
-  }
-  /* end banner variant mapping */
-
   function render(p) {
     var equipped = p.equipped || {};
     var title = equipped.title ? equipped.title.name : '';
 
-    /* The owner's equipped Name Effect glows their profile heading, the same
-       variants as the nav header. nameEffectVariant is the global from
-       auth.js (loaded before this script on every page with the nav); the
-       guard degrades to no effect if it somehow is not present. The profile
-       API's public item carries rarity + name but not meta, so this resolves
-       through the same legacy rarity/name path. */
-    var variantOf = (typeof nameEffectVariant === 'function') ? nameEffectVariant : function () { return null; };
-    var nameFx = equipped['name-effect'] ? variantOf(equipped['name-effect']) : null;
-    var nameCls = 'prof-name' + (nameFx ? ' name-fx-' + nameFx : '');
+    /* Variant mapping is shared — js/cosmetic-variants.js, loaded before this
+       script — so nav / profile / leaderboards / chat agree. The profile API's
+       public item carries rarity + name (and a flattened effect), which the
+       shared mapping resolves the same as a raw inventory item. The name effect
+       itself is applied post-render (see below) via the shared applier. */
+    var CV = window.CosmeticVariants;
+    var nameFx = (CV && equipped['name-effect']) ? CV.nameEffectVariant(equipped['name-effect']) : null;
 
     /* The equipped banner is a tiered image behind the whole identity card,
        under a dark red/black scrim that keeps the name legible in either
        theme. variant is a fixed word, so the src is not user-controlled. If no
        banner is equipped the strip is simply absent; if the file is missing
        the onerror handler below strips it back to the plain card. */
-    var bannerVar = equipped.banner ? bannerVariant(equipped.banner) : null;
+    var bannerVar = (CV && equipped.banner) ? CV.bannerVariant(equipped.banner) : null;
     var headCls = 'prof-head' + (bannerVar ? ' has-banner' : '');
     var bannerHtml = bannerVar
       ? '<img class="prof-banner-img" alt="" src="/assets/banners/banner-' + bannerVar + '.png">' +
@@ -145,7 +125,7 @@
         bannerHtml +
         (p.avatar ? '<img class="prof-avatar" src="' + esc(p.avatar) + '" alt="">' : '<div class="prof-avatar"></div>') +
         '<div class="prof-ident">' +
-          '<h1 class="' + nameCls + '">' + esc(p.displayName) + '</h1>' +
+          '<h1 class="prof-name">' + esc(p.displayName) + '</h1>' +
           (title ? '<p class="prof-title">' + esc(title) + '</p>' : '') +
           tenureLine(p.tenure) +
           /* A data attribute, NOT a role-* class. Those are the site's
@@ -274,6 +254,11 @@
        leave a broken image behind the name. The complete/naturalWidth check
        covers a cached or instant 404 that already errored before this
        listener could attach. */
+    /* Apply the owner's name effect to the heading via the shared applier. One
+       name on the page, so it animates unmanaged (no in-view cap). */
+    var nameH1 = body.querySelector('.prof-name');
+    if (nameH1 && CV) CV.applyNameFx(nameH1, nameFx);
+
     var bannerImg = body.querySelector('.prof-banner-img');
     if (bannerImg) {
       var dropBanner = function () {

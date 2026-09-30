@@ -5,6 +5,7 @@
 
 import { createItemCode, activateItemCode } from './item-codes.js';
 import { sendWhisper, announceAction } from './bot/send-chat.js';
+import { resolveEquippedCosmetics } from './cosmetics.js';
 
 const MAX_ENTRIES = 50;
 
@@ -158,18 +159,34 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const game = url.searchParams.get('game');
 
+  /* Stamp each shown entry with its owner's equipped { nameEffect, banner }
+     variant, resolved once per response over the deduped set of shown ids —
+     not once per row — so a name effect / banner backdrop can render without
+     each row fetching its own inventory. Guests resolve to nulls. */
+  const enrich = (entries, cosmetics) =>
+    entries.map(e => {
+      const c = (e && cosmetics[String(e.id)]) || { nameEffect: null, banner: null };
+      return { ...e, nameEffect: c.nameEffect, banner: c.banner };
+    });
+
   if (game === 'all') {
-    const result = {};
+    const boards = {};
+    const ids = new Set();
     for (const [name, board] of Object.entries(BOARDS)) {
-      const data = await env.MARKETPLACE.get(board.key, 'json') || [];
-      result[name] = data.slice(0, 10);
+      const data = (await env.MARKETPLACE.get(board.key, 'json') || []).slice(0, 10);
+      boards[name] = data;
+      for (const e of data) if (e && e.id) ids.add(String(e.id));
     }
+    const cosmetics = await resolveEquippedCosmetics(env, [...ids]);
+    const result = {};
+    for (const [name, data] of Object.entries(boards)) result[name] = enrich(data, cosmetics);
     return json(result);
   }
 
   if (game && BOARDS[game]) {
-    const data = await env.MARKETPLACE.get(BOARDS[game].key, 'json') || [];
-    return json(data.slice(0, 10));
+    const data = (await env.MARKETPLACE.get(BOARDS[game].key, 'json') || []).slice(0, 10);
+    const cosmetics = await resolveEquippedCosmetics(env, data.map(e => e && e.id).filter(Boolean));
+    return json(enrich(data, cosmetics));
   }
 
   return json({ error: 'Specify ?game=all or ?game=<name>' }, 400);

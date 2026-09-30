@@ -799,10 +799,16 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
   text-shadow: 0 0 5px var(--red), 0 0 11px var(--red-dim);
 }
 
-/* mythic — a stronger red glow with a white core, breathing on a slow loop. */
+/* mythic — a stronger red glow with a white core. The base class is the static
+   glow; the breathing loop runs only with .name-fx-animate, which the shared
+   applier (js/cosmetic-variants.js) adds — always for a single name (nav,
+   profile) and, for dense lists (leaderboards, chat), only while the name is in
+   view and under the count cap, so a long board never animates dozens at once. */
 .name-fx-mythic {
   color: var(--white);
   text-shadow: 0 0 6px var(--red), 0 0 13px var(--red), 0 0 22px var(--red-dim);
+}
+.name-fx-mythic.name-fx-animate {
   animation: nameFxPulse 3.2s ease-in-out infinite;
 }
 
@@ -814,10 +820,13 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
 /* exclusive (the Eternal reward) — a gold treatment: a gold glow that
    shimmers as the light lifts and falls across the letters. The shimmer is a
    brightness/glow breathe on the text element (filter + text-shadow), NOT a
-   gradient clipped onto the text. */
+   gradient clipped onto the text. Static glow on the base class; shimmer only
+   with .name-fx-animate. */
 .name-fx-exclusive {
   color: var(--exclusive);
   text-shadow: 0 0 6px var(--exclusive), 0 0 13px var(--exclusive);
+}
+.name-fx-exclusive.name-fx-animate {
   animation: nameFxShimmer 3.6s ease-in-out infinite;
 }
 
@@ -834,9 +843,56 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
 
 /* Reduced motion — keep the static glow, drop every loop. */
 @media (prefers-reduced-motion: reduce) {
-  .name-fx-mythic,
-  .name-fx-exclusive {
+  .name-fx-mythic.name-fx-animate,
+  .name-fx-exclusive.name-fx-animate {
     animation: none;
     filter: none;
   }
 }
+
+/* ── Leaderboard row banner backdrop ──────────────────────────────────
+   A user's equipped banner shows as a FAINT image behind their leaderboard
+   row, under a dark red/black gothic vignette so the row text stays legible in
+   both themes. Glow/borders only — no box-shadow, no side-border accent, no
+   backdrop-filter. Text over the banner is forced #fff (the "text on a dark
+   fill" rule); the name effect keeps its own colour where it sets one. */
+.lb-row.has-banner {
+  position: relative;
+  overflow: hidden;
+}
+
+.lb-banner-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.32;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lb-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.66) 55%, rgba(0, 0, 0, 0.42) 100%),
+    radial-gradient(130% 150% at 3% 50%, rgba(230, 0, 0, 0.14) 0%, transparent 60%);
+}
+
+.lb-row.has-banner > .lb-col-rank,
+.lb-row.has-banner > .lb-col-name,
+.lb-row.has-banner > .lb-col-score {
+  position: relative;
+  z-index: 2;
+}
+
+.lb-row.has-banner .lb-col-name,
+.lb-row.has-banner .lb-name-text,
+.lb-row.has-banner .lb-col-score {
+  color: #fff;
+}
+.lb-row.has-banner .lb-name-text.name-fx-exclusive { color: var(--exclusive); }

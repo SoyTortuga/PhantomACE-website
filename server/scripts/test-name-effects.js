@@ -11,9 +11,10 @@
    one of the three visuals defined in css/components.css. Nobody's earned
    reward may resolve to nothing, so every case here must land on a variant.
 
-   Rather than keep a second copy of the mapping, this extracts the real
-   function out of js/auth.js and evaluates it — the same "test the file's own
-   copy" approach as test-phamily-rewards.js — so the two cannot drift.
+   The mapping now lives once in js/cosmetic-variants.js (function variantOf,
+   aliased to nameEffectVariant). This extracts that real function and
+   evaluates it — the same "test the file's own copy" approach as
+   test-phamily-rewards.js — so the test tracks the shipped code.
    ══════════════════════════════════════════════ */
 
 import { readFileSync } from 'node:fs';
@@ -21,16 +22,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(here, '../../js/auth.js'), 'utf8');
+const src = readFileSync(join(here, '../../js/cosmetic-variants.js'), 'utf8');
 
-const start = src.indexOf('function nameEffectVariant');
-const end = src.indexOf('/* end name-effect variant mapping */');
+const start = src.indexOf('function variantOf');
+const end = src.indexOf('/* end variant mapping */');
 if (start === -1 || end === -1 || end < start) {
-  console.error('Could not locate nameEffectVariant in js/auth.js — markers moved?');
+  console.error('Could not locate variantOf in js/cosmetic-variants.js — markers moved?');
   process.exit(1);
 }
 // eslint-disable-next-line no-eval
-const nameEffectVariant = (0, eval)(src.slice(start, end).trim() + '\nnameEffectVariant;');
+const nameEffectVariant = (0, eval)(src.slice(start, end).trim() + '\nvariantOf;');
 
 let passed = 0;
 const failures = [];

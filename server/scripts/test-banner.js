@@ -11,8 +11,9 @@
    which flattens meta.effect onto `effect`. Nobody's earned banner may map to
    nothing; a null item maps to no banner.
 
-   Like test-name-effects.js, this extracts the real function out of
-   profile.js and evaluates it, so the two cannot drift.
+   The mapping now lives once in js/cosmetic-variants.js (function variantOf,
+   aliased to bannerVariant). This extracts that real function and evaluates
+   it, so the test tracks the shipped code.
    ══════════════════════════════════════════════ */
 
 import { readFileSync } from 'node:fs';
@@ -20,16 +21,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(here, '../../js/pages/profile.js'), 'utf8');
+const src = readFileSync(join(here, '../../js/cosmetic-variants.js'), 'utf8');
 
-const start = src.indexOf('function bannerVariant');
-const end = src.indexOf('/* end banner variant mapping */');
+const start = src.indexOf('function variantOf');
+const end = src.indexOf('/* end variant mapping */');
 if (start === -1 || end === -1 || end < start) {
-  console.error('Could not locate bannerVariant in js/pages/profile.js — markers moved?');
+  console.error('Could not locate variantOf in js/cosmetic-variants.js — markers moved?');
   process.exit(1);
 }
 // eslint-disable-next-line no-eval
-const bannerVariant = (0, eval)(src.slice(start, end).trim() + '\nbannerVariant;');
+const bannerVariant = (0, eval)(src.slice(start, end).trim() + '\nvariantOf;');
 
 /* The fixed image contract (asset-manager produces these). */
 const pathFor = (v) => (v ? '/assets/banners/banner-' + v + '.png' : null);
