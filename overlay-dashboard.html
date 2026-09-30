@@ -44,31 +44,6 @@
         <a class="btn-secondary" href="/activity">📜 Activity Feed</a>
       </div>
 
-      <!-- ── STATUS BAR ─────────────────────────────────────────────── -->
-      <section class="bot-group">
-        <h2 class="bot-group-title">Status</h2>
-        <div class="od-statusbar">
-
-          <div class="card od-panic">
-            <h3>Clear / Reload Overlay</h3>
-            <p class="bot-section-desc">Asks every open OBS overlay to reload, which drops it back to a clean idle state — the fastest way to kill anything stuck on screen.</p>
-            <button class="btn-primary od-panic-btn" id="odClearBtn">🚨 Clear / Reload Overlay</button>
-          </div>
-
-          <div class="card od-alertbar">
-            <div class="od-alertbar-head">
-              <h3>Live Alerts</h3>
-              <span class="od-alertbar-note" id="odAlertNote">Auto-refreshing</span>
-            </div>
-            <p class="bot-section-desc">What fired on the overlay lately — subs, gifts, raids, hype, redemptions and drops, newest first.</p>
-            <ul class="od-alert-list" id="odAlertList">
-              <li class="od-alert-empty">Loading&hellip;</li>
-            </ul>
-          </div>
-
-        </div>
-      </section>
-
       <!-- ── STANDING PANELS ────────────────────────────────────────── -->
       <section class="bot-group">
         <h2 class="bot-group-title">Overlay Panels</h2>
@@ -154,6 +129,37 @@
               <span class="giveaway-status" id="ovHatchSoundState">Sounds off</span>
               <button class="btn-secondary" id="ovHatchSoundToggle">Turn On Sounds</button>
             </div>
+          </div>
+
+          <div class="card bot-section bot-grid-full" id="odGamesSection">
+            <h3>Games on Overlay</h3>
+            <p class="bot-section-desc">Start or stop the chat games directly — their overlay panels appear while running and hide when the game ends. Normally these are chat- or host-driven.</p>
+
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Chat Maze</span>
+              <span class="giveaway-status" id="odMazeState">Loading&hellip;</span>
+              <button class="btn-primary" id="odMazeStartBtn">Start</button>
+              <button class="btn-secondary" id="odMazeStopBtn">Stop</button>
+              <button class="btn-secondary" id="odMazeRefreshBtn">Refresh</button>
+            </div>
+
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Chat Scramble</span>
+              <span class="giveaway-status" id="odScrambleState">Loading&hellip;</span>
+              <button class="btn-primary" id="odScrambleStartBtn">Start</button>
+              <button class="btn-secondary" id="odScrambleSkipBtn">Skip</button>
+              <button class="btn-secondary" id="odScrambleStopBtn">Stop</button>
+              <button class="btn-secondary" id="odScrambleRefreshBtn">Refresh</button>
+            </div>
+
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">MTGBBB</span>
+              <span class="giveaway-status" id="odMtgState">Loading&hellip;</span>
+              <a class="btn-secondary" id="odMtgHostLink" href="/games/mtgbbb/host.html" target="_blank" rel="noopener">Open Host UI</a>
+              <button class="btn-secondary" id="odMtgEndBtn" disabled>End Game</button>
+              <button class="btn-secondary" id="odMtgRefreshBtn">Refresh</button>
+            </div>
+            <p class="bot-section-desc" style="margin-top:10px">MTGBBB is a hosted game — create and run it from the Host UI. This only shows the live game and can end it.</p>
           </div>
 
         </div>

@@ -46,7 +46,6 @@ async function fireBotAction(payload, button) {
         'checkin-alert': 'Pham Check-In alert sent to the overlay.',
       };
       showBotStatus(messages[payload.action] || 'Done.', false);
-      fetchAlerts();
     } else {
       showBotStatus(data.error || 'Action failed.', true);
     }
@@ -81,75 +80,6 @@ async function reloadOverlay(btn) {
     showBotStatus('Network error asking the overlay to reload.', true);
   }
   if (btn) { btn.disabled = false; btn.textContent = original; }
-}
-
-/* ── Live alert bar ───────────────────────────────────────────────────────
-   Consumes the existing activity feed (/api/activity, broadcaster/mod-gated),
-   the same one the Activity page reads. Newest first, timestamped. Polls only
-   while the tab is visible and stops when hidden — this page sits open beside a
-   running stream. */
-var OD_ALERT_POLL_MS = 5000;
-var odAlertTimer = null;
-
-var OD_ALERT_CHIP = {
-  sub: 'Sub', giftsub: 'Gift', raid: 'Raid',
-  hype: 'Hype', redemption: 'Redeem', bot: 'Bot', drop: 'Drop', event: 'Event',
-};
-
-function odClockTime(ts) {
-  try { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); }
-  catch { return ''; }
-}
-
-function renderAlerts(events) {
-  const list = document.getElementById('odAlertList');
-  if (!list) return;
-  if (!events || events.length === 0) {
-    list.innerHTML = '<li class="od-alert-empty">Nothing yet — alerts show here as they fire.</li>';
-    return;
-  }
-  list.innerHTML = events.map(function (e) {
-    const chip = OD_ALERT_CHIP[e.category] || (e.category || 'event');
-    return '<li class="od-alert-row">' +
-      '<span class="od-alert-time" title="' + escapeBotHtml(new Date(e.at).toLocaleString()) + '">' +
-        escapeBotHtml(odClockTime(e.at)) + '</span>' +
-      '<span class="od-alert-chip cat-' + escapeBotHtml(e.category || 'event') + '">' + escapeBotHtml(chip) + '</span>' +
-      '<span class="od-alert-summary">' + escapeBotHtml(e.summary || e.type || 'event') + '</span>' +
-      '</li>';
-  }).join('');
-}
-
-async function fetchAlerts() {
-  const note = document.getElementById('odAlertNote');
-  try {
-    const res = await fetch('/api/activity?limit=40', { credentials: 'same-origin', cache: 'no-store' });
-    if (!res.ok) { if (note) note.textContent = 'Feed unavailable'; return; }
-    const data = await res.json();
-    renderAlerts(data.events || []);
-    if (note) note.textContent = 'Updated ' + odClockTime(Date.now());
-  } catch {
-    if (note) note.textContent = 'Offline — retrying';
-  }
-}
-
-function startAlertPolling() {
-  if (odAlertTimer) clearInterval(odAlertTimer);
-  odAlertTimer = setInterval(fetchAlerts, OD_ALERT_POLL_MS);
-}
-function stopAlertPolling() {
-  if (odAlertTimer) { clearInterval(odAlertTimer); odAlertTimer = null; }
-}
-
-function initStatusBar() {
-  const clearBtn = document.getElementById('odClearBtn');
-  if (clearBtn) clearBtn.addEventListener('click', function () { reloadOverlay(clearBtn); });
-
-  fetchAlerts();
-  startAlertPolling();
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) stopAlertPolling();
-    else { fetchAlerts(); startAlertPolling(); }
-  });
 }
 
 /* ── Pham Check-In reminder + hatch sounds + alert volume ─────────────────
@@ -726,6 +656,162 @@ function initGiveawayReplay() {
   loadReplayState();
 }
 
+/* ── Games on Overlay ──────────────────────────────────────────────────────
+   Manual start/stop for the three chat games whose overlay panels are
+   otherwise only chat/host-driven. All reuse existing staff-gated routes; the
+   overlay panels appear while running and hide (to display:none) when the game
+   ends. Status is loaded on demand (init + after an action + Refresh), not
+   polled — the scramble's GET advances its own clock, so a fast poll would
+   nudge rounds along. */
+function odGameState(id, text, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'giveaway-status' + (on ? ' open' : '');
+}
+
+/* Chat Maze — /api/bot/maze { start | stop }. */
+async function loadOdMaze() {
+  try {
+    const res = await fetch('/api/bot/maze', { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 404) { odGameState('odMazeState', 'Route missing — restart the server', false); return; }
+    if (!res.ok) { odGameState('odMazeState', 'Could not load (HTTP ' + res.status + ')', false); return; }
+    const d = await res.json();
+    const running = d.status === 'active';
+    odGameState('odMazeState', running ? 'Running — maze ' + d.level + ' (' + d.size + '×' + d.size + ')' : 'Idle', running);
+    const start = document.getElementById('odMazeStartBtn');
+    const stop = document.getElementById('odMazeStopBtn');
+    if (start) start.disabled = running;
+    if (stop) stop.disabled = !running;
+  } catch { odGameState('odMazeState', 'Could not reach the server', false); }
+}
+async function odMazePost(action, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/bot/maze', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus(action === 'start' ? 'Chat Maze started — its panel is on the overlay.' : 'Chat Maze stopped — its panel hides.', false);
+    } else if (res.status === 403) {
+      showBotStatus(d.error || 'Staff only.', true);
+    } else if (res.status === 404) {
+      showBotStatus('The maze route returned 404. The server needs restarting after the last pull.', true);
+    } else {
+      showBotStatus(d.error || 'Could not change the maze.', true);
+    }
+  } catch { showBotStatus('Network error changing the maze.', true); }
+  loadOdMaze();
+}
+
+/* Chat Scramble — /api/chat-game { start | skip | stop }. The heartbeat only
+   ADVANCES a running game; starting it is this POST. Start runs continuous
+   rounds until Stop returns it to idle (which hides the panel). */
+async function loadOdScramble() {
+  try {
+    const res = await fetch('/api/chat-game', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) { odGameState('odScrambleState', 'Could not load (HTTP ' + res.status + ')', false); return; }
+    const d = await res.json();
+    const live = d.status === 'running' || d.status === 'reveal';
+    const label = d.status === 'running' ? 'Running — round ' + d.round
+      : d.status === 'reveal' ? 'Revealing — round ' + d.round
+      : 'Idle';
+    odGameState('odScrambleState', label, live);
+    const skip = document.getElementById('odScrambleSkipBtn');
+    const stop = document.getElementById('odScrambleStopBtn');
+    if (skip) skip.disabled = !live;
+    if (stop) stop.disabled = !live;
+  } catch { odGameState('odScrambleState', 'Could not reach the server', false); }
+}
+async function odScramblePost(action, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/chat-game', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus(action === 'start' ? 'Chat Scramble started — first word is on the overlay.'
+        : action === 'skip' ? 'Skipped to the next word.'
+        : 'Chat Scramble stopped — panel returns to idle.', false);
+    } else if (res.status === 403) {
+      showBotStatus(d.error || 'Staff only.', true);
+    } else {
+      showBotStatus(d.error || 'Could not change the scramble.', true);
+    }
+  } catch { showBotStatus('Network error changing the scramble.', true); }
+  loadOdScramble();
+}
+
+/* MTGBBB — hosted game. Show the live game and offer End; create/run is the
+   Host UI. /api/mtgbbb/state?current=1 (404 = nothing live), /api/mtgbbb/end. */
+let odMtgCode = null;
+async function loadOdMtg() {
+  const end = document.getElementById('odMtgEndBtn');
+  try {
+    const res = await fetch('/api/mtgbbb/state?current=1', { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 404) { odMtgCode = null; odGameState('odMtgState', 'No game running', false); if (end) end.disabled = true; return; }
+    if (!res.ok) { odGameState('odMtgState', 'Could not load (HTTP ' + res.status + ')', false); return; }
+    const d = await res.json();
+    odMtgCode = d.code || null;
+    const running = d.status === 'active';
+    odGameState('odMtgState',
+      (running ? 'Running' : 'Ended') + ' — ' + d.code + ' · ' + (d.setName || d.setCode || 'set') +
+      ' · ' + (d.packsOpened || 0) + '/' + (d.packCount || 0) + ' packs · ' +
+      (d.playerCount || 0) + (d.playerCount === 1 ? ' player' : ' players'), running);
+    if (end) end.disabled = !running;
+  } catch { odGameState('odMtgState', 'Could not reach the server', false); }
+}
+async function odMtgEnd(btn) {
+  if (!odMtgCode) { showBotStatus('No MTGBBB game to end.', true); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/mtgbbb/end', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: odMtgCode }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus('MTGBBB game ended — its overlay panel hides.', false);
+    } else if (res.status === 403) {
+      showBotStatus(d.error || 'Staff only.', true);
+    } else {
+      showBotStatus(d.error || 'Could not end the game.', true);
+    }
+  } catch { showBotStatus('Network error ending the game.', true); }
+  loadOdMtg();
+}
+
+function initGamesOnOverlay() {
+  const mStart = document.getElementById('odMazeStartBtn');
+  if (mStart) mStart.addEventListener('click', function () { odMazePost('start', mStart); });
+  const mStop = document.getElementById('odMazeStopBtn');
+  if (mStop) mStop.addEventListener('click', function () { odMazePost('stop', mStop); });
+  const mRefresh = document.getElementById('odMazeRefreshBtn');
+  if (mRefresh) mRefresh.addEventListener('click', function () { loadOdMaze(); });
+
+  const sStart = document.getElementById('odScrambleStartBtn');
+  if (sStart) sStart.addEventListener('click', function () { odScramblePost('start', sStart); });
+  const sSkip = document.getElementById('odScrambleSkipBtn');
+  if (sSkip) sSkip.addEventListener('click', function () { odScramblePost('skip', sSkip); });
+  const sStop = document.getElementById('odScrambleStopBtn');
+  if (sStop) sStop.addEventListener('click', function () { odScramblePost('stop', sStop); });
+  const sRefresh = document.getElementById('odScrambleRefreshBtn');
+  if (sRefresh) sRefresh.addEventListener('click', function () { loadOdScramble(); });
+
+  const gEnd = document.getElementById('odMtgEndBtn');
+  if (gEnd) gEnd.addEventListener('click', function () { odMtgEnd(gEnd); });
+  const gRefresh = document.getElementById('odMtgRefreshBtn');
+  if (gRefresh) gRefresh.addEventListener('click', function () { loadOdMtg(); });
+
+  loadOdMaze();
+  loadOdScramble();
+  loadOdMtg();
+}
+
 /* ── Access ────────────────────────────────────────────────────────────────
    Same gate as Bot Control: the client does not decide. It asks
    /api/bot/dashboard and renders whatever the server is prepared to answer for
@@ -741,12 +827,12 @@ function showOdDenied(message, offerLogin) {
 }
 
 function initOverlayDashboard(data) {
-  initStatusBar();
   initOvMc();
   initOvBingo();
   initOvRaid();
   initOvPreset();
   initCheckinReminder();
+  initGamesOnOverlay();
   initTestAlerts();
   initGiveawayReplay();
   if (data.isBroadcaster) initOverlayPanel(data.overlayUrl);
