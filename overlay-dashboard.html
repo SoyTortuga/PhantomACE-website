@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PhantomACE overlay dashboard — panic clear, live alert log, and every overlay panel control in one place.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Overlay Dashboard | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/bot-control.css">
+  <link rel="stylesheet" href="/css/pages/overlay-dashboard.css">
+</head>
+<body data-page="overlay-dashboard">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Overlay Dashboard</h1>
+    <p class="page-hero-subtitle">Everything on the stream overlay — one panic button, one live log, every panel</p>
+  </section>
+
+  <section class="page-container">
+
+    <div id="odDenied" class="card bot-denied" hidden>
+      <p id="odDeniedText">This page is for the broadcaster and approved moderators.</p>
+      <button class="btn-primary" id="odLoginBtn" hidden onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <!-- Revealed only after /api/bot/dashboard answers 200 (its own isModerator
+         gate). The cookie's role field is not trusted for access. -->
+    <div id="odPanel" hidden>
+
+      <div id="odStatusMsg" class="bot-status-msg" hidden></div>
+
+      <div class="bot-quicklinks">
+        <a class="btn-secondary" href="/bot-control.html">🤖 Bot Control</a>
+        <a class="btn-secondary" href="/activity">📜 Activity Feed</a>
+      </div>
+
+      <!-- ── STATUS BAR ─────────────────────────────────────────────── -->
+      <section class="bot-group">
+        <h2 class="bot-group-title">Status</h2>
+        <div class="od-statusbar">
+
+          <div class="card od-panic">
+            <h3>Clear / Reload Overlay</h3>
+            <p class="bot-section-desc">Asks every open OBS overlay to reload, which drops it back to a clean idle state — the fastest way to kill anything stuck on screen.</p>
+            <button class="btn-primary od-panic-btn" id="odClearBtn">🚨 Clear / Reload Overlay</button>
+          </div>
+
+          <div class="card od-alertbar">
+            <div class="od-alertbar-head">
+              <h3>Live Alerts</h3>
+              <span class="od-alertbar-note" id="odAlertNote">Auto-refreshing</span>
+            </div>
+            <p class="bot-section-desc">What fired on the overlay lately — subs, gifts, raids, hype, redemptions and drops, newest first.</p>
+            <ul class="od-alert-list" id="odAlertList">
+              <li class="od-alert-empty">Loading&hellip;</li>
+            </ul>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── STANDING PANELS ────────────────────────────────────────── -->
+      <section class="bot-group">
+        <h2 class="bot-group-title">Overlay Panels</h2>
+        <div class="bot-grid">
+
+          <div class="card bot-section" id="ovMcSection">
+            <h3>Mana Clash on the Overlay</h3>
+            <p class="bot-section-desc">Shows a live Mana Clash game on the stream overlay.</p>
+
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovMcState">Off</span>
+              <select id="ovMcRoomPick" class="giveaway-rarity-select"><option value="">Loading rooms&hellip;</option></select>
+              <button class="btn-primary" id="ovMcShowBtn">Show</button>
+              <button class="btn-secondary" id="ovMcOffBtn">Hide</button>
+              <button class="btn-secondary" id="ovMcRefreshBtn">Refresh list</button>
+            </div>
+
+            <p class="bot-section-desc" style="margin-top:14px;">Asks every open OBS overlay to reload itself.</p>
+            <div class="ovmc-row">
+              <button class="btn-secondary" id="ovReloadBtn">Reload OBS Overlay</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovPresetSection">
+            <h3>Overlay Preset</h3>
+            <p class="bot-section-desc">Swap which saved overlay layout is live.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovPresetState">Loading&hellip;</span>
+              <select id="ovPresetPick" class="giveaway-rarity-select"><option value="">Loading&hellip;</option></select>
+              <button class="btn-primary" id="ovPresetLiveBtn">Make Live &amp; Reload</button>
+              <button class="btn-secondary" id="ovPresetRefreshBtn">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovBingoSection">
+            <h3>Commander Bingo on the Overlay</h3>
+            <p class="bot-section-desc">Shows the live Commander Bingo game on the overlay.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovBingoState">No game running</span>
+              <button class="btn-primary" id="ovBingoShowBtn">Show</button>
+              <button class="btn-secondary" id="ovBingoOffBtn">Hide</button>
+              <button class="btn-secondary" id="ovBingoRefreshBtn">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovRaidSection">
+            <h3>Skull Clicker Raid Boss</h3>
+            <p class="bot-section-desc">Summons a shared raid boss across every open Skull Clicker.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovRaidState">No boss</span>
+              <input type="number" id="ovRaidHp" class="lb-award-tier" style="max-width:90px" value="5000" min="100" step="500" title="Boss HP (total clicks)">
+              <input type="number" id="ovRaidMin" class="lb-award-tier" style="max-width:70px" value="15" min="1" max="120" title="Minutes">
+              <button class="btn-primary" id="ovRaidStartBtn">Summon</button>
+              <button class="btn-secondary" id="ovRaidEndBtn">End</button>
+              <button class="btn-secondary" id="ovRaidRefreshBtn">Refresh</button>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovCheckinSection">
+            <h3>Pham Check-In Reminder</h3>
+            <p class="bot-section-desc">A corner overlay nudge to redeem Pham Check-In.</p>
+            <div class="ovmc-row">
+              <button class="btn-primary" id="ovCheckinBtn">Show Now</button>
+              <span class="giveaway-status" id="ovCheckinTimerState">Timer off</span>
+              <button class="btn-secondary" id="ovCheckinToggleBtn">Turn On Timer</button>
+              <label class="bot-rotation-interval">Every
+                <input type="number" id="ovCheckinInterval" min="1" max="120" value="15"> min
+              </label>
+              <button class="btn-secondary" id="ovCheckinSaveBtn">Save</button>
+            </div>
+            <div class="ovmc-row" style="margin-top:10px">
+              <label class="bot-rotation-interval" style="flex:1 1 220px">Overlay alert volume
+                <input type="range" id="ovAlertVolume" min="0" max="100" value="35" step="5" style="vertical-align:middle;margin:0 8px;flex:1">
+              </label>
+              <span class="giveaway-status" id="ovAlertVolumeVal">35%</span>
+            </div>
+          </div>
+
+          <div class="card bot-section" id="ovHatchSection">
+            <h3>Dino Hatch Sounds</h3>
+            <p class="bot-section-desc">Per-rarity stings when a dino hatches. The reveal still shows when off.</p>
+            <div class="ovmc-row">
+              <span class="giveaway-status" id="ovHatchSoundState">Sounds off</span>
+              <button class="btn-secondary" id="ovHatchSoundToggle">Turn On Sounds</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── OVERLAY OUTPUT ─────────────────────────────────────────── -->
+      <section class="bot-group">
+        <h2 class="bot-group-title">Overlay Output</h2>
+        <div class="bot-grid">
+
+          <!-- Broadcaster only: the key in this URL is the only thing guarding
+               the alert feed. -->
+          <div class="card bot-section" id="overlaySection" hidden>
+            <h3>Stream Overlay</h3>
+            <p class="bot-section-desc">Add as an OBS Browser Source to show alerts.</p>
+            <div class="bot-overlay-row">
+              <input type="text" id="botOverlayUrl" class="bot-mod-input" readonly>
+              <button class="btn-primary" id="botOverlayCopy">Copy</button>
+            </div>
+            <p class="bot-section-desc bot-overlay-hint">Treat the URL like a password; it never replays old alerts.</p>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/overlay-dashboard.js" defer></script>
+</body>
+</html>

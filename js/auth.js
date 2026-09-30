@@ -80,6 +80,11 @@ function applyRole() {
     const toolbox = document.getElementById('accountMenuToolbox');
     if (toolbox) toolbox.hidden = !(role === 'moderator' || role === 'broadcaster');
 
+    /* The Overlay Dashboard link, same staff gate as the toolbox. Cosmetic —
+       the dashboard page re-checks against /api/bot/dashboard on load. */
+    const overlayDash = document.getElementById('accountMenuDashboard');
+    if (overlayDash) overlayDash.hidden = !(role === 'moderator' || role === 'broadcaster');
+
     renderRoleBadge(session.role);
     if (userAvatar && session.profile_image) {
       userAvatar.src = session.profile_image;
