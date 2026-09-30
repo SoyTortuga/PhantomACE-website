@@ -4362,7 +4362,7 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 12;
+    const SAVE_VERSION = 13;
 
     function migrateSave(d) {
       if (typeof d.version !== 'number') d.version = 1;
@@ -4457,6 +4457,23 @@
          total on any load. */
       if (d.lifetimeSkulls === undefined) d.lifetimeSkulls = d.totalSkulls || 0;
       if (d.lifetimeSkulls < d.totalSkulls) d.lifetimeSkulls = d.totalSkulls;
+      /* v13 — scrub a known-corrupted lifetimeSkulls. Confirmed live on three
+         unrelated accounts with different prestige/ascension: same mantissa
+         (7.067758797128936), exponent still climbing over time, meaning some
+         still-unidentified formula produced this exact runaway value and it
+         swamped their real total via float addition (once one addend is far
+         enough beyond the other's magnitude, float64 addition just keeps the
+         bigger one). NOT a magnitude clamp — the top of this board legitimately
+         reaches past 1e200, so clamping by size would wrongly punish real
+         whales. This matches only the exact known-bad mantissa, regardless of
+         its current exponent, so it can never false-positive on a real value. */
+      if (Number.isFinite(d.lifetimeSkulls) && d.lifetimeSkulls > 0) {
+        const exp = Math.floor(Math.log10(d.lifetimeSkulls));
+        const mantissa = d.lifetimeSkulls / Math.pow(10, exp);
+        if (Math.abs(mantissa - 7.067758797128936) < 1e-9) {
+          d.lifetimeSkulls = d.totalSkulls || 0;
+        }
+      }
       d.version = SAVE_VERSION;
       return d;
     }
