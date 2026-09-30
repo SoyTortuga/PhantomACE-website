@@ -100,11 +100,21 @@
     var equipped = p.equipped || {};
     var title = equipped.title ? equipped.title.name : '';
 
+    /* The owner's equipped Name Effect glows their profile heading, the same
+       variants as the nav header. nameEffectVariant is the global from
+       auth.js (loaded before this script on every page with the nav); the
+       guard degrades to no effect if it somehow is not present. The profile
+       API's public item carries rarity + name but not meta, so this resolves
+       through the same legacy rarity/name path. */
+    var variantOf = (typeof nameEffectVariant === 'function') ? nameEffectVariant : function () { return null; };
+    var nameFx = equipped['name-effect'] ? variantOf(equipped['name-effect']) : null;
+    var nameCls = 'prof-name' + (nameFx ? ' name-fx-' + nameFx : '');
+
     var head =
       '<header class="prof-head">' +
         (p.avatar ? '<img class="prof-avatar" src="' + esc(p.avatar) + '" alt="">' : '<div class="prof-avatar"></div>') +
         '<div class="prof-ident">' +
-          '<h1 class="prof-name">' + esc(p.displayName) + '</h1>' +
+          '<h1 class="' + nameCls + '">' + esc(p.displayName) + '</h1>' +
           (title ? '<p class="prof-title">' + esc(title) + '</p>' : '') +
           tenureLine(p.tenure) +
           /* A data attribute, NOT a role-* class. Those are the site's

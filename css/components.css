@@ -776,3 +776,67 @@
 /* Forum notifications in the bell carry a place to go. */
 a.notif-item.notif-link { text-decoration: none; color: inherit; display: flex; }
 a.notif-item.notif-link:hover .notif-message { color: var(--red); }
+
+/* ── Name effects (the equipped "Name Effect" cosmetic) ────────────────
+   Applied to the wearer's own displayed name — the nav header (js/auth.js)
+   and their profile heading (js/pages/profile.js). One name per view, so a
+   running animation here is cheap.
+
+   The glow is a text-shadow on the TEXT (or a filter on the text element) —
+   never box-shadow, which is banned. No backdrop-filter, and no gradient
+   clipped onto the letters. Every colour is a token, so each effect reads in
+   both the dark and the gothic-light theme: --red is oxblood in both, and
+   --white / --exclusive flip with the theme. */
+.name-fx-rare,
+.name-fx-mythic,
+.name-fx-exclusive {
+  /* Keep the glow inside the line box so it never nudges neighbours. */
+  will-change: text-shadow;
+}
+
+/* rare — a steady oxblood-red glow. */
+.name-fx-rare {
+  text-shadow: 0 0 5px var(--red), 0 0 11px var(--red-dim);
+}
+
+/* mythic — a stronger red glow with a white core, breathing on a slow loop. */
+.name-fx-mythic {
+  color: var(--white);
+  text-shadow: 0 0 6px var(--red), 0 0 13px var(--red), 0 0 22px var(--red-dim);
+  animation: nameFxPulse 3.2s ease-in-out infinite;
+}
+
+@keyframes nameFxPulse {
+  0%, 100% { text-shadow: 0 0 4px var(--red), 0 0 9px var(--red-dim); }
+  50%      { text-shadow: 0 0 8px var(--red), 0 0 17px var(--red), 0 0 26px var(--red-dim); }
+}
+
+/* exclusive (the Eternal reward) — a gold treatment: a gold glow that
+   shimmers as the light lifts and falls across the letters. The shimmer is a
+   brightness/glow breathe on the text element (filter + text-shadow), NOT a
+   gradient clipped onto the text. */
+.name-fx-exclusive {
+  color: var(--exclusive);
+  text-shadow: 0 0 6px var(--exclusive), 0 0 13px var(--exclusive);
+  animation: nameFxShimmer 3.6s ease-in-out infinite;
+}
+
+@keyframes nameFxShimmer {
+  0%, 100% {
+    text-shadow: 0 0 5px var(--exclusive), 0 0 11px var(--exclusive);
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow: 0 0 9px var(--exclusive), 0 0 19px var(--exclusive), 0 0 4px var(--white);
+    filter: brightness(1.28);
+  }
+}
+
+/* Reduced motion — keep the static glow, drop every loop. */
+@media (prefers-reduced-motion: reduce) {
+  .name-fx-mythic,
+  .name-fx-exclusive {
+    animation: none;
+    filter: none;
+  }
+}
