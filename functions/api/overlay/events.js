@@ -82,6 +82,17 @@ async function isAlertDisabled(env, type) {
   return cfg[type] === false;                                       // missing/true = enabled
 }
 
+/**
+ * Whether an alert type may fire — the same check pushOverlayEvent gates on,
+ * exported so webhook handlers can ALSO skip the activity-feed entry for a
+ * disabled type (disabled = no overlay alert AND no feed row). A non-toggleable
+ * type (a control event, or a feed category that is not an alert) is always
+ * "enabled", so unrelated activity is never suppressed.
+ */
+export async function isAlertEnabled(env, type) {
+  return !(await isAlertDisabled(env, type));
+}
+
 /** The shared secret in the OBS URL. Generated once, then stable. */
 export async function getOverlayKey(env) {
   const existing = await env.MARKETPLACE.get(KEYFILE);

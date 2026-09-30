@@ -124,36 +124,51 @@ const activityRows = (env, category) => {
   check('with its bits', anon.bits, 100);
 }
 
-/* ── The per-alert toggle drops a disabled type before it enqueues ─────── */
+/* ── The per-alert toggle drops a disabled type: no overlay AND no feed ── */
 {
   const env = makeEnv();
   env._store.set('alert_toggles', JSON.stringify({ follow: false }));   // follow OFF, cheer default ON
 
   await notify(env, 'channel.follow', { user_id: '9', user_name: 'erin' });
   check('a disabled follow is never enqueued', overlayEvents(env, 'follow').length, 0);
+  check('and records no feed row', activityRows(env, 'follow').length, 0);
 
   await notify(env, 'channel.cheer', { user_id: '10', user_name: 'frank', bits: 200 });
   check('an enabled cheer still fires', overlayEvents(env, 'cheer').length, 1);
+  check('and still records to the feed', activityRows(env, 'cheer').length, 1);
 }
 
-/* ── Existing milestone alerts still fire (no regression) ─────────────── */
+/* ── A disabled sub: neither overlay alert nor feed entry ─────────────── */
 {
   const env = makeEnv();
-  /* sub/raid alerts sit behind the milestone-DROPS toggle (existing behaviour),
-     unlike follow/cheer which are pure alerts and fire regardless. Enable drops
-     so this checks the existing path still works. */
-  env._store.set('milestone_drops', JSON.stringify({ enabled: true }));
+  env._store.set('alert_toggles', JSON.stringify({ sub: false }));
+  env._store.set('milestone_drops', JSON.stringify({ enabled: true }));   // drops on, but the type is off
+  await notify(env, 'channel.subscribe', { user_id: '40', user_name: 'zed', tier: '1000', is_gift: false });
+  check('a disabled sub shows no overlay alert', overlayEvents(env, 'sub').length, 0);
+  check('and records no feed row', activityRows(env, 'sub').length, 0);
+}
+
+/* ── sub/gift/raid alerts are DECOUPLED from the milestone-DROPS toggle ── */
+{
+  const env = makeEnv();   // no milestone_drops → drops default OFF
   await notify(env, 'channel.subscribe', { user_id: '3', user_name: 'grace', tier: '1000', is_gift: false });
-  check('a sub still pushes its alert', overlayEvents(env, 'sub').length, 1);
-  await notify(env, 'channel.raid', { from_broadcaster_user_name: 'raidLeader', viewers: 20 });
-  check('a raid still pushes its alert', overlayEvents(env, 'raid').length, 1);
+  check('a sub alerts with drops off', overlayEvents(env, 'sub').length, 1);
+  check('and records to the feed', activityRows(env, 'sub').length, 1);
+
+  await notify(env, 'channel.subscription.gift', { user_id: '31', user_name: 'gigi', total: 5 });
+  check('a gift alerts with drops off', overlayEvents(env, 'giftsub').length, 1);
+  check('and records to the feed', activityRows(env, 'giftsub').length, 1);
+
+  /* A small raid (below the drop threshold) still ALERTS — the threshold only
+     gates the code drop now. */
+  await notify(env, 'channel.raid', { from_broadcaster_user_name: 'raidLeader', viewers: 2 });
+  check('a below-threshold raid still alerts with drops off', overlayEvents(env, 'raid').length, 1);
+  check('and records to the feed', activityRows(env, 'raid').length, 1);
 }
 
 /* ── follow/cheer fire even with milestone DROPS off ──────────────────── */
 {
   const env = makeEnv();
-  /* No milestone_drops config → drops default OFF. follow/cheer must still
-     alert, because they are pure alerts placed before the drops gate. */
   await notify(env, 'channel.follow', { user_id: '4', user_name: 'heidi' });
   check('a follow fires with milestone drops off', overlayEvents(env, 'follow').length, 1);
   await notify(env, 'channel.cheer', { user_id: '5', user_name: 'ivan', bits: 300 });

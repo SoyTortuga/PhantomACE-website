@@ -58,18 +58,14 @@ export async function getMilestoneConfig(env) {
 /* ── The events ──────────────────────────────── */
 
 async function handleEvent(env, type, event) {
-  /* Raised before any drop is attempted, and independently of it. A drop can be
-     refused by the shared cooldown — two milestones inside fifteen seconds — and
-     the second is still worth putting on screen even when no code goes with it.
-     Tying the alert to the drop would silently swallow it. */
-  const { pushOverlayEvent } = await import('./overlay/events.js');
+  const { pushOverlayEvent, isAlertEnabled } = await import('./overlay/events.js');
 
   /* Follow and cheer are PURE ALERTS — Twitch-native events we put on OUR
      overlay so they stop fighting Streamlabs for screen space. They drop no
-     code and are NOT gated by the milestone-drop toggle; they alert and record
-     whenever they arrive (once the subscription exists). Both push + record
-     here so the follow dedupe covers the alert and the feed together. */
+     code and are NOT gated by the milestone-drop toggle. When their per-alert
+     toggle is OFF they do nothing at all — no overlay alert AND no feed row. */
   if (type === 'channel.follow') {
+    if (!(await isAlertEnabled(env, 'follow'))) return { fired: false, reason: 'follow alerts disabled' };
     const who = event.user_name || event.user_login || 'someone';
     const uid = event.user_id ? String(event.user_id) : who.toLowerCase();
     const seenKey = `follow_seen_${uid}`;
@@ -84,6 +80,7 @@ async function handleEvent(env, type, event) {
   }
 
   if (type === 'channel.cheer') {
+    if (!(await isAlertEnabled(env, 'cheer'))) return { fired: false, reason: 'cheer alerts disabled' };
     const who = event.is_anonymous ? 'An anonymous cheerer' : (event.user_name || event.user_login || 'Someone');
     const bits = Number(event.bits) || 0;
     const message = event.message ? String(event.message).slice(0, 200) : '';
@@ -95,16 +92,21 @@ async function handleEvent(env, type, event) {
     return { fired: true, alert: 'cheer' };
   }
 
+  /* TWO SEPARATE CONCERNS for sub/gift/raid: the on-screen ALERT and the code
+     DROP. The alert fires whenever the event arrives (subject only to its
+     per-alert toggle, enforced inside pushOverlayEvent) — it does NOT depend on
+     milestone drops being on. The code DROP is what the drops toggle governs, so
+     only the dropCodeAction below is behind cfg.enabled. */
   const cfg = await getMilestoneConfig(env);
-  if (!cfg.enabled) return { fired: false, reason: 'milestone drops are off' };
 
   if (type === 'channel.subscribe') {
     /* is_gift subs arrive here AND as channel.subscription.gift. Firing on
-       both would drop twice for one act of generosity, so the gift event
+       both would alert/drop twice for one act of generosity, so the gift event
        owns gifts and this one ignores them. */
     if (event.is_gift) return { fired: false, reason: 'gift — handled by the gift event' };
     const who = event.user_name || event.user_login || 'someone';
     await pushOverlayEvent(env, { type: 'sub', who, tier: event.tier || null });
+    if (!cfg.enabled) return { fired: false, reason: 'alert shown; milestone drops are off' };
     return await dropCodeAction(env, cfg.subRarity, 'milestone:sub', {
       headline: `${who} just subscribed! Thank you!`,
     });
@@ -114,6 +116,7 @@ async function handleEvent(env, type, event) {
     const who = event.is_anonymous ? 'An anonymous gifter' : (event.user_name || event.user_login || 'Someone');
     const n = Number(event.total) || 1;
     await pushOverlayEvent(env, { type: 'giftsub', who, count: n });
+    if (!cfg.enabled) return { fired: false, reason: 'alert shown; milestone drops are off' };
     return await dropCodeAction(env, cfg.giftRarity, 'milestone:giftsub', {
       headline: `${who} gifted ${n} sub${n === 1 ? '' : 's'}!`,
     });
@@ -121,11 +124,15 @@ async function handleEvent(env, type, event) {
 
   if (type === 'channel.raid') {
     const viewers = Number(event.viewers) || 0;
-    if (viewers < cfg.raidMinViewers) {
-      return { fired: false, reason: `raid of ${viewers} below threshold ${cfg.raidMinViewers}` };
-    }
     const who = event.from_broadcaster_user_name || 'A raider';
+    /* The alert fires for any raid; the min-viewers threshold gates only the
+       DROP ("two friends passing through" earns no code, but is still a raid
+       worth showing). */
     await pushOverlayEvent(env, { type: 'raid', who, viewers });
+    if (!cfg.enabled) return { fired: false, reason: 'alert shown; milestone drops are off' };
+    if (viewers < cfg.raidMinViewers) {
+      return { fired: false, reason: `raid of ${viewers} below drop threshold ${cfg.raidMinViewers}` };
+    }
     return await dropCodeAction(env, cfg.raidRarity, 'milestone:raid', {
       headline: `${who} raided with ${viewers}! Welcome raiders!`,
     });
@@ -173,31 +180,42 @@ export async function onRequestPost(context) {
          on — the feed is a record of what happened, not of what we reacted to.
          A gifted channel.subscribe is skipped because the gift event covers it
          (same dedup as the drop path above). */
+      /* The feed entry follows the per-alert toggle too: a disabled alert type
+         records nothing, matching the overlay (disabled = no alert AND no feed
+         row). Follow/cheer record inside handleEvent; sub/gift/raid record here.
+         A gifted channel.subscribe is skipped because the gift event covers it. */
       try {
         const { recordActivity } = await import('./activity.js');
+        const { isAlertEnabled } = await import('./overlay/events.js');
         if (type === 'channel.subscribe' && !event.is_gift) {
-          const who = event.user_name || event.user_login || 'someone';
-          const tier = { '1000': '1', '2000': '2', '3000': '3' }[event.tier] || event.tier;
-          await recordActivity(env, {
-            category: 'sub', type,
-            summary: `${who} subscribed${tier ? ` (tier ${tier})` : ''}`,
-            payload: event,
-          });
+          if (await isAlertEnabled(env, 'sub')) {
+            const who = event.user_name || event.user_login || 'someone';
+            const tier = { '1000': '1', '2000': '2', '3000': '3' }[event.tier] || event.tier;
+            await recordActivity(env, {
+              category: 'sub', type,
+              summary: `${who} subscribed${tier ? ` (tier ${tier})` : ''}`,
+              payload: event,
+            });
+          }
         } else if (type === 'channel.subscription.gift') {
-          const who = event.is_anonymous ? 'An anonymous gifter' : (event.user_name || event.user_login || 'Someone');
-          const n = Number(event.total) || 1;
-          await recordActivity(env, {
-            category: 'giftsub', type,
-            summary: `${who} gifted ${n} sub${n === 1 ? '' : 's'}`,
-            payload: event,
-          });
+          if (await isAlertEnabled(env, 'giftsub')) {
+            const who = event.is_anonymous ? 'An anonymous gifter' : (event.user_name || event.user_login || 'Someone');
+            const n = Number(event.total) || 1;
+            await recordActivity(env, {
+              category: 'giftsub', type,
+              summary: `${who} gifted ${n} sub${n === 1 ? '' : 's'}`,
+              payload: event,
+            });
+          }
         } else if (type === 'channel.raid') {
-          const who = event.from_broadcaster_user_name || 'A raider';
-          await recordActivity(env, {
-            category: 'raid', type,
-            summary: `${who} raided with ${Number(event.viewers) || 0}`,
-            payload: event,
-          });
+          if (await isAlertEnabled(env, 'raid')) {
+            const who = event.from_broadcaster_user_name || 'A raider';
+            await recordActivity(env, {
+              category: 'raid', type,
+              summary: `${who} raided with ${Number(event.viewers) || 0}`,
+              payload: event,
+            });
+          }
         }
       } catch (err) {
         console.error('[milestones] activity record failed:', err.message);
