@@ -104,6 +104,11 @@ const NON_ROUTE_MODULES = new Set([
      Covered by server/scripts/test-dino-hatch.js. */
   'api/dino-species.js',
   'api/dino-hatch.js',
+
+  /* Equipped-cosmetic resolver (name effect / banner variants). Library, no
+     handler; the leaderboards route and the forum author choke point consume
+     it. Covered by server/scripts/test-cosmetics.js. */
+  'api/cosmetics.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */
