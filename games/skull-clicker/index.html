@@ -2818,14 +2818,28 @@
 
     /* ═══════ FORMATTING ═══════ */
 
+    /* Tiers beyond Vigintillion (10^63) have no common name, so they fall back to
+       a two-letter code (AA, AB, ... ZZ) the same way most incremental games do
+       once they run out of "-illion" names — covers up to 10^63 + 676*3 ≈ 10^2091,
+       comfortably beyond anything a finite double can ever hold (~1.8e308). */
+    function letterSuffix(n) {
+      const a = Math.floor(n / 26), b = n % 26;
+      /* lowercase so it can never be mistaken for a named suffix above (e.g.
+         "dc" vs "Dc" — 300 orders of magnitude apart) even on a quick glance. */
+      return String.fromCharCode(97 + a) + String.fromCharCode(97 + b);
+    }
+    const NUM_UNITS = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc',
+      'Ud','DD','Td','Qad','Qid','Sxd','Spd','Ocd','Nod','Vg'];
+
     function formatNum(n) {
       if (n < 0) return '-' + formatNum(-n);
+      if (!Number.isFinite(n)) return 'Infinity';
       if (n < 1000) return Math.floor(n).toLocaleString();
-      const units = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
-      const tier = Math.min(Math.floor(Math.log10(n) / 3), units.length - 1);
+      const tier = Math.floor(Math.log10(n) / 3);
       const scaled = n / Math.pow(10, tier * 3);
       const str = scaled < 10 ? scaled.toFixed(2) : scaled < 100 ? scaled.toFixed(1) : scaled.toFixed(0);
-      return str + ' ' + units[tier];
+      const suffix = tier < NUM_UNITS.length ? NUM_UNITS[tier] : letterSuffix(tier - NUM_UNITS.length);
+      return str + ' ' + suffix;
     }
 
     function formatTime(ms) {
