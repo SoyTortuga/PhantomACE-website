@@ -27,6 +27,12 @@ import { dropCodeAction } from './bot/send-chat.js';
 
 const CONFIG_KEY = 'milestone_drops';
 
+/* Follows can be resent by Twitch or replayed; a per-user dedupe window stops
+   one follow alerting twice. The KV key self-expires, so "seen" is just its
+   presence. Ten minutes is generous against resends and short enough that a
+   genuine unfollow/refollow later still alerts. */
+const FOLLOW_DEDUPE_SECONDS = 600;
+
 /* Defaults. Stored in one row so they can be tuned without a deploy, and so
    the whole thing can be switched off when a stream does not want it. */
 const DEFAULTS = {
@@ -52,15 +58,45 @@ export async function getMilestoneConfig(env) {
 /* ── The events ──────────────────────────────── */
 
 async function handleEvent(env, type, event) {
+  /* Raised before any drop is attempted, and independently of it. A drop can be
+     refused by the shared cooldown — two milestones inside fifteen seconds — and
+     the second is still worth putting on screen even when no code goes with it.
+     Tying the alert to the drop would silently swallow it. */
+  const { pushOverlayEvent } = await import('./overlay/events.js');
+
+  /* Follow and cheer are PURE ALERTS — Twitch-native events we put on OUR
+     overlay so they stop fighting Streamlabs for screen space. They drop no
+     code and are NOT gated by the milestone-drop toggle; they alert and record
+     whenever they arrive (once the subscription exists). Both push + record
+     here so the follow dedupe covers the alert and the feed together. */
+  if (type === 'channel.follow') {
+    const who = event.user_name || event.user_login || 'someone';
+    const uid = event.user_id ? String(event.user_id) : who.toLowerCase();
+    const seenKey = `follow_seen_${uid}`;
+    if (await env.MARKETPLACE.get(seenKey)) return { fired: false, reason: 'duplicate follow within window' };
+    await env.MARKETPLACE.put(seenKey, String(Date.now()), { expirationTtl: FOLLOW_DEDUPE_SECONDS });
+    await pushOverlayEvent(env, { type: 'follow', user: who });
+    try {
+      const { recordActivity } = await import('./activity.js');
+      await recordActivity(env, { category: 'follow', type, summary: `${who} followed`, payload: event });
+    } catch (err) { console.error('[milestones] activity record failed:', err.message); }
+    return { fired: true, alert: 'follow' };
+  }
+
+  if (type === 'channel.cheer') {
+    const who = event.is_anonymous ? 'An anonymous cheerer' : (event.user_name || event.user_login || 'Someone');
+    const bits = Number(event.bits) || 0;
+    const message = event.message ? String(event.message).slice(0, 200) : '';
+    await pushOverlayEvent(env, { type: 'cheer', user: who, bits, message });
+    try {
+      const { recordActivity } = await import('./activity.js');
+      await recordActivity(env, { category: 'cheer', type, summary: `${who} cheered ${bits} bit${bits === 1 ? '' : 's'}`, payload: event });
+    } catch (err) { console.error('[milestones] activity record failed:', err.message); }
+    return { fired: true, alert: 'cheer' };
+  }
+
   const cfg = await getMilestoneConfig(env);
   if (!cfg.enabled) return { fired: false, reason: 'milestone drops are off' };
-
-  /* Raised before the drop is attempted, and independently of it. A drop
-     can be refused by the shared cooldown — two milestones inside fifteen
-     seconds — and the second one is still worth putting on screen even when
-     no code goes with it. Tying the alert to the drop would silently swallow
-     it. */
-  const { pushOverlayEvent } = await import('./overlay/events.js');
 
   if (type === 'channel.subscribe') {
     /* is_gift subs arrive here AND as channel.subscription.gift. Firing on

@@ -548,6 +548,8 @@ var OD_TEST_ALERTS = [
   { type: 'sub', label: 'New Sub' },
   { type: 'giftsub', label: 'Gift Subs' },
   { type: 'raid', label: 'Raid' },
+  { type: 'follow', label: 'Follow' },
+  { type: 'cheer', label: 'Cheer' },
   { type: 'hype-level', label: 'Hype Level' },
   { type: 'drop', label: 'Code Drop' },
   { type: 'dino-hatch', label: 'Dino Hatch' },
@@ -592,6 +594,66 @@ function initTestAlerts() {
     btn.addEventListener('click', function () { fireTestAlert(a.type, a.label, btn); });
     box.appendChild(btn);
   });
+}
+
+/* ── Alerts on/off ──────────────────────────────────────────────────────────
+   A master switch per alert type. Enforced centrally in pushOverlayEvent, so a
+   disabled type never reaches the overlay by any path. Default on. */
+var OD_ALERT_LABELS = {
+  sub: 'New Sub', giftsub: 'Gift Subs', raid: 'Raid', follow: 'Follow', cheer: 'Cheer',
+  'hype-level': 'Hype Level', drop: 'Code/Item Drop', 'dino-hatch': 'Dino Hatch',
+  'giveaway-spin': 'Giveaway Reel', prediction: 'Prediction', 'bingo-call': 'Bingo Call',
+  'bingo-win': 'Bingo Win', 'mtgbbb-pull': 'MTGBBB Pull', 'mtgbbb-bingo': 'MTGBBB Bingo',
+};
+
+function renderAlertToggles(toggles) {
+  const box = document.getElementById('odAlertToggles');
+  if (!box || !toggles) return;
+  box.innerHTML = '';
+  Object.keys(toggles).forEach(function (type) {
+    const label = document.createElement('label');
+    label.className = 'od-toggle';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = toggles[type] !== false;
+    cb.addEventListener('change', function () { setAlertToggle(type, cb.checked, cb); });
+    const span = document.createElement('span');
+    span.textContent = OD_ALERT_LABELS[type] || type;
+    label.appendChild(cb);
+    label.appendChild(span);
+    box.appendChild(label);
+  });
+}
+
+async function setAlertToggle(type, enabled, cb) {
+  if (cb) cb.disabled = true;
+  try {
+    const res = await fetch('/api/bot/trigger', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'alert-toggle', type: type, enabled: enabled }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus((OD_ALERT_LABELS[type] || type) + ' alerts ' + (enabled ? 'on' : 'off') + '.', false);
+    } else {
+      if (cb) cb.checked = !enabled;              // revert on failure
+      showBotStatus(d.error || 'Could not change the alert toggle.', true);
+    }
+  } catch {
+    if (cb) cb.checked = !enabled;
+    showBotStatus('Network error changing the alert toggle.', true);
+  }
+  if (cb) cb.disabled = false;
+}
+
+function initAlertToggles() {
+  const box = document.getElementById('odAlertToggles');
+  if (!box) return;
+  fetch('/api/bot/trigger', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d && d.alertToggles) renderAlertToggles(d.alertToggles); })
+    .catch(function () { /* leave empty */ });
 }
 
 /* ── Giveaway: replay last reveal ──────────────────────────────────────────
@@ -990,6 +1052,7 @@ function initOverlayDashboard(data) {
   initCheckinReminder();
   initGamesOnOverlay();
   initTestAlerts();
+  initAlertToggles();
   initWheel();
   initGiveawayReplay();
   if (data.isBroadcaster) initOverlayPanel(data.overlayUrl);

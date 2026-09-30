@@ -17,6 +17,25 @@
   flex: 0 0 auto;
 }
 
+/* ── Alerts on/off ─────────────────────────────
+   A wrapped grid of labelled checkboxes, one per alert type. */
+.od-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.od-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-sec);
+  cursor: pointer;
+  flex: 0 0 auto;
+  min-width: 130px;
+}
+.od-toggle input { cursor: pointer; }
+
 /* ── Games on Overlay ──────────────────────────
    One row per game: a fixed-width name label, its status, then its controls.
    Rows stack their controls on a narrow screen (inherits .ovmc-row wrap). */

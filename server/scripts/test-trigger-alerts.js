@@ -97,6 +97,16 @@ const lastEvent = (env) => {
   const gv = lastEvent(env3);
   ok('the giveaway sample carries a reel to spin', Array.isArray(gv.entrants) && gv.entrants.length > 1);
   ok('landing on a real index', gv.entrants[gv.winnerIndex] && gv.entrants[gv.winnerIndex].username === gv.who);
+
+  /* The two new Twitch-native samples (Phase 6a). */
+  const envF = makeEnv();
+  await post(envF, { action: 'test-alert', type: 'follow' });
+  check('the follow sample uses the test name', lastEvent(envF).user, 'TestFollower');
+  const envC = makeEnv();
+  await post(envC, { action: 'test-alert', type: 'cheer' });
+  const cv = lastEvent(envC);
+  check('the cheer sample carries bits', cv.bits, 500);
+  ok('and a message', typeof cv.message === 'string' && cv.message.length > 0);
 }
 
 /* ── Unknown type is refused ─────────────────────────────────────────── */
@@ -113,6 +123,30 @@ const lastEvent = (env) => {
   const res = await post(env, { action: 'test-alert', type: 'sub' }, '12345');
   check('a viewer cannot fire a test alert', res.status, 403);
   check('and nothing was pushed', env._store.get('overlay_events') || null, null);
+}
+
+/* ── Per-alert toggle: a disabled type's test does not enqueue ─────────── */
+{
+  const env = makeEnv();
+  const off = await post(env, { action: 'alert-toggle', type: 'follow', enabled: false });
+  check('toggling a known alert off succeeds', off.status, 200);
+
+  await post(env, { action: 'test-alert', type: 'follow' });
+  check('a disabled type\'s test is dropped', lastEvent(env), null);
+
+  await post(env, { action: 'test-alert', type: 'sub' });
+  check('an enabled type still fires', lastEvent(env) && lastEvent(env).type, 'sub');
+
+  /* Re-enabling brings it back. */
+  await post(env, { action: 'alert-toggle', type: 'follow', enabled: true });
+  await post(env, { action: 'test-alert', type: 'follow' });
+  check('re-enabled, the type fires again', lastEvent(env).type, 'follow');
+
+  const bad = await post(env, { action: 'alert-toggle', type: 'not-a-type', enabled: false });
+  check('toggling an unknown type is refused', bad.status, 400);
+
+  const denied = await post(env, { action: 'alert-toggle', type: 'follow', enabled: false }, '12345');
+  check('a viewer cannot change a toggle', denied.status, 403);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

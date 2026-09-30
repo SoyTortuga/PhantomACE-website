@@ -1235,6 +1235,23 @@ async function createEventSubSubscriptions(env, request) {
       condition: { to_broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/milestones`,
     },
+    /* Twitch-native FOLLOW and CHEER alerts, run through our own overlay queue
+       (so they stop fighting Streamlabs). Same callback as sub/raid/gift.
+       channel.follow is v2 and needs moderator_user_id — the standard self-mod
+       pattern uses the broadcaster's own id (scope moderator:read:followers is
+       already requested). channel.cheer is v1 (bits:read, already requested). */
+    {
+      type: 'channel.follow',
+      version: '2',
+      condition: { broadcaster_user_id: broadcasterId, moderator_user_id: broadcasterId },
+      callback: `${origin}/api/milestones`,
+    },
+    {
+      type: 'channel.cheer',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/milestones`,
+    },
   ];
 
   if (botUserId) {

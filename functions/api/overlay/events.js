@@ -37,6 +37,51 @@ const KEY = 'overlay_events';
 const KEYFILE = 'overlay_key';
 const MAX_EVENTS = 60;
 
+/* ── Per-alert enable/disable ──────────────────────────────────────────────
+   The broadcaster can switch any one-shot ALERT type on or off from the Overlay
+   Dashboard. Enforcement is CENTRAL, here: a disabled alert type is never even
+   enqueued, so it can never reach the overlay however it was triggered
+   (webhook, milestone, test-fire). Default is ALL ENABLED — a missing key means
+   on. Control/panel events (reload, mana-clash, checkin nudge, layout, …) are
+   NOT in this set and always pass; only the celebratory one-shot alerts are
+   toggleable. */
+const ALERT_TOGGLES_KEY = 'alert_toggles';
+export const TOGGLEABLE_ALERT_TYPES = [
+  'sub', 'giftsub', 'raid', 'hype-level', 'follow', 'cheer', 'drop',
+  'dino-hatch', 'giveaway-spin', 'prediction', 'bingo-call', 'bingo-win',
+  'mtgbbb-pull', 'mtgbbb-bingo',
+];
+
+/* A short per-env cache so a gift-sub bomb (twenty pushes in a second) does not
+   read the config twenty times. Keyed by env (WeakMap) so tests with separate
+   fake envs never see each other's config, and single-instance prod shares one
+   entry. The dashboard's setter calls invalidateAlertTogglesCache(env) so a
+   change applies immediately rather than after the TTL. */
+const TOGGLES_TTL_MS = 3000;
+const _togglesCache = new WeakMap();
+
+async function alertTogglesConfig(env) {
+  const cached = _togglesCache.get(env);
+  const now = Date.now();
+  if (cached && now - cached.at < TOGGLES_TTL_MS) return cached.cfg;
+  let rec = null;
+  try { rec = await env.MARKETPLACE.get(ALERT_TOGGLES_KEY, 'json'); } catch (e) { /* default on */ }
+  const cfg = (rec && typeof rec === 'object') ? rec : {};
+  _togglesCache.set(env, { cfg, at: now });
+  return cfg;
+}
+
+export function invalidateAlertTogglesCache(env) {
+  if (env) _togglesCache.delete(env);
+}
+
+/** True only for a toggleable alert type the broadcaster has switched OFF. */
+async function isAlertDisabled(env, type) {
+  if (TOGGLEABLE_ALERT_TYPES.indexOf(type) === -1) return false;   // control events always pass
+  const cfg = await alertTogglesConfig(env);
+  return cfg[type] === false;                                       // missing/true = enabled
+}
+
 /** The shared secret in the OBS URL. Generated once, then stable. */
 export async function getOverlayKey(env) {
   const existing = await env.MARKETPLACE.get(KEYFILE);
@@ -54,6 +99,9 @@ export async function getOverlayKey(env) {
 export async function pushOverlayEvent(env, event) {
   if (!event || !event.type) return;
   try {
+    /* Central enable/disable gate: a toggled-off alert type is dropped before
+       it is ever enqueued, so it cannot reach the overlay by any path. */
+    if (await isAlertDisabled(env, event.type)) return;
     await env.MARKETPLACE.mutate(KEY, (current) => {
       const rec = current && Array.isArray(current.events)
         ? current

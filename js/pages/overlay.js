@@ -308,6 +308,24 @@
     if (ev.type === 'hype-level') {
       return { art: ART.hype, kind: 'Hype Train', title: 'Level ' + esc(ev.level) + '!', sub: 'Keep it rolling', rarity: 'mythic' };
     }
+    /* Twitch-native FOLLOW — a warm, low-key alert (common tier). */
+    if (ev.type === 'follow') {
+      return { art: ART.love, kind: 'New Follower', title: esc(ev.user || 'Someone') + ' followed!', sub: 'Welcome to the crypt', rarity: 'common' };
+    }
+    /* Twitch-native CHEER — bits amount headlined, tier by amount using the
+       existing rarity emphasis (no new colours). Shows the message if there is
+       one. */
+    if (ev.type === 'cheer') {
+      var bits = Number(ev.bits) || 0;
+      var cheerRarity = bits >= 10000 ? 'mythic' : bits >= 1000 ? 'rare' : bits >= 100 ? 'uncommon' : 'common';
+      return {
+        art: ART.coinroll,
+        kind: 'Cheer',
+        title: esc(ev.user || 'Someone') + ' cheered ' + bits + ' bit' + (bits === 1 ? '' : 's') + '!',
+        sub: ev.message ? esc(ev.message) : 'Thank you for the bits',
+        rarity: cheerRarity,
+      };
+    }
 
     /* Dino hatch is NOT a queued stage alert — it has its own movable panel and
        is handled off-queue in poll() via showHatch(). See hatchData(). */

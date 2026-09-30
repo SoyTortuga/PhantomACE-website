@@ -28,6 +28,8 @@ const TEST_ALERT_SAMPLES = {
   sub:        () => ({ type: 'sub', who: 'TestReaper' }),
   giftsub:    () => ({ type: 'giftsub', who: 'TestReaper', count: 10 }),
   raid:       () => ({ type: 'raid', who: 'TestRaider', viewers: 42 }),
+  follow:     () => ({ type: 'follow', user: 'TestFollower' }),
+  cheer:      () => ({ type: 'cheer', user: 'TestCheerer', bits: 500, message: 'Test cheer message!' }),
   'hype-level': () => ({ type: 'hype-level', level: 15 }),
   drop:       () => ({ type: 'drop', code: 'TEST-CODE-1234', rarity: 'rare', entries: 15 }),
   'dino-hatch': () => ({
@@ -93,7 +95,15 @@ export async function onRequestGet(context) {
      it. On by default (dino-hatch.js). */
   const { getHatchConfig } = await import('../dino-hatch.js');
   const hatchConfig = await getHatchConfig(env);
-  return json({ log, checkinReminder, alertVolume, hatchConfig });
+
+  /* Per-alert on/off, resolved to a full map (default ON) for the dashboard's
+     "Alerts on/off" card. */
+  const { TOGGLEABLE_ALERT_TYPES } = await import('../overlay/events.js');
+  const rawToggles = await env.MARKETPLACE.get('alert_toggles', 'json') || {};
+  const alertToggles = {};
+  TOGGLEABLE_ALERT_TYPES.forEach(function (t) { alertToggles[t] = rawToggles[t] !== false; });
+
+  return json({ log, checkinReminder, alertVolume, hatchConfig, alertToggles });
 }
 
 /* ── POST — fire a drop or announcement ────────── */
@@ -148,9 +158,23 @@ export async function onRequestPost(context) {
     return json(result, result.success ? 200 : 400);
   }
 
+  /* Turn one alert type on or off. Enforced centrally in pushOverlayEvent, so a
+     disabled type never reaches the overlay by ANY path (webhook, milestone or
+     test-fire). Default is on; this only writes the exceptions. */
+  if (body.action === 'alert-toggle') {
+    const { TOGGLEABLE_ALERT_TYPES, invalidateAlertTogglesCache } = await import('../overlay/events.js');
+    const type = String(body.type || '');
+    if (TOGGLEABLE_ALERT_TYPES.indexOf(type) === -1) return json({ error: `Unknown alert type "${type}".` }, 400);
+    const enabled = !!body.enabled;
+    await env.MARKETPLACE.mutate('alert_toggles', (c) => ({ ...(c || {}), [type]: enabled }));
+    invalidateAlertTogglesCache(env);
+    return json({ success: true, type, enabled });
+  }
+
   /* Fire a representative sample of one alert type onto the overlay, to preview
      and position it. Goes through the ordinary overlay event path, so it queues,
-     shows and self-clears exactly like the real thing. */
+     shows and self-clears exactly like the real thing — and respects the
+     per-alert toggle above, so a disabled type's test does not show either. */
   if (body.action === 'test-alert') {
     const type = String(body.type || '');
     const sample = TEST_ALERT_SAMPLES[type];
