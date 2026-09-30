@@ -970,9 +970,14 @@
     }
 
     function copyLink() {
-      const base = window.location.href.replace(/host\.html.*/, 'index.html');
-      const link = base + '?code=' + gameCode;
-      navigator.clipboard.writeText(link).then(() => {
+      /* Resolve the PLAYER page relative to this host page's directory, so the
+         join link points at index.html whether the host page is served as
+         host.html or at a clean/extensionless URL (.../commander-bingo/host).
+         The old string-replace on "host.html" silently no-op'd on the clean
+         URL and handed out a link back to the host page. */
+      const url = new URL('index.html', window.location.href);
+      url.search = '?code=' + gameCode;
+      navigator.clipboard.writeText(url.href).then(() => {
         flashBtn('copyLinkBtn', 'Copied!');
       }).catch(() => {});
     }
