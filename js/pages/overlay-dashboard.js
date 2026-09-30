@@ -812,6 +812,162 @@ function initGamesOnOverlay() {
   loadOdMtg();
 }
 
+/* ── Customizable Wheel ────────────────────────────────────────────────────
+   Edit segments (label + weight + on-palette colour), Save, and Spin. The spin
+   is a one-shot overlay reveal (rides the alert queue, self-clears). Colours are
+   LOCKED to a curated palette the server returns — no free colour picker, to
+   keep the gothic identity. */
+var OD_WHEEL_MIN = 2, OD_WHEEL_MAX = 12;
+var odWheelPalette = { oxblood: '#6b0f0f', charcoal: '#1a1a1a', crimson: '#b31217', bone: '#4a4133', gold: '#8a6d1a' };
+
+function odWheelRowEl(seg) {
+  const names = Object.keys(odWheelPalette);
+  const color = seg && seg.color && odWheelPalette[seg.color] ? seg.color : names[0];
+
+  const row = document.createElement('div');
+  row.className = 'od-wheel-row';
+
+  const label = document.createElement('input');
+  label.type = 'text'; label.className = 'bot-mod-input od-wheel-label';
+  label.maxLength = 24; label.placeholder = 'Label';
+  label.value = seg && seg.label ? seg.label : '';
+
+  const weight = document.createElement('input');
+  weight.type = 'number'; weight.className = 'lb-award-tier od-wheel-weight';
+  weight.min = '1'; weight.max = '1000'; weight.step = '1'; weight.title = 'Weight (heavier = better odds)';
+  weight.value = seg && Number(seg.weight) > 0 ? seg.weight : 1;
+
+  const swatch = document.createElement('span');
+  swatch.className = 'od-wheel-swatch';
+  swatch.style.background = odWheelPalette[color];
+
+  const select = document.createElement('select');
+  select.className = 'giveaway-rarity-select od-wheel-color';
+  names.forEach(function (n) {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    if (n === color) o.selected = true;
+    select.appendChild(o);
+  });
+  select.addEventListener('change', function () { swatch.style.background = odWheelPalette[select.value] || '#6b0f0f'; });
+
+  const remove = document.createElement('button');
+  remove.className = 'btn-secondary od-wheel-remove'; remove.type = 'button'; remove.textContent = 'Remove';
+  remove.addEventListener('click', function () { row.remove(); odWheelSyncButtons(); });
+
+  row.appendChild(label);
+  row.appendChild(weight);
+  row.appendChild(swatch);
+  row.appendChild(select);
+  row.appendChild(remove);
+  return row;
+}
+
+function odWheelSyncButtons() {
+  const rows = document.querySelectorAll('#odWheelRows .od-wheel-row');
+  const add = document.getElementById('odWheelAddBtn');
+  if (add) add.disabled = rows.length >= OD_WHEEL_MAX;
+  rows.forEach(function (r) {
+    const rm = r.querySelector('.od-wheel-remove');
+    if (rm) rm.disabled = rows.length <= OD_WHEEL_MIN;
+  });
+}
+
+function renderWheelRows(segments) {
+  const box = document.getElementById('odWheelRows');
+  if (!box) return;
+  box.innerHTML = '';
+  const segs = (segments && segments.length) ? segments : [{ label: '', weight: 1 }, { label: '', weight: 1 }];
+  segs.slice(0, OD_WHEEL_MAX).forEach(function (s) { box.appendChild(odWheelRowEl(s)); });
+  odWheelSyncButtons();
+}
+
+function collectWheelSegments() {
+  return [].map.call(document.querySelectorAll('#odWheelRows .od-wheel-row'), function (r) {
+    return {
+      label: (r.querySelector('.od-wheel-label') || {}).value || '',
+      weight: Number((r.querySelector('.od-wheel-weight') || {}).value) || 1,
+      color: (r.querySelector('.od-wheel-color') || {}).value || 'oxblood',
+    };
+  });
+}
+
+async function loadWheel() {
+  const state = document.getElementById('odWheelState');
+  try {
+    const res = await fetch('/api/wheel', { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 403) { if (state) state.textContent = 'Staff only.'; return; }
+    if (!res.ok) { if (state) state.textContent = 'Could not load (HTTP ' + res.status + ')'; return; }
+    const d = await res.json();
+    if (d.palette) odWheelPalette = d.palette;
+    renderWheelRows(d.config && d.config.segments);
+    if (state) {
+      state.textContent = d.lastWinner && d.lastWinner.label ? 'Last winner: ' + d.lastWinner.label : 'Ready';
+      state.className = 'giveaway-status' + (d.lastWinner && d.lastWinner.label ? ' open' : '');
+    }
+  } catch { if (state) state.textContent = 'Could not reach the server.'; }
+}
+
+async function saveWheel(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/wheel', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save', segments: collectWheelSegments() }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) showBotStatus('Wheel saved (' + d.config.segments.length + ' segments).', false);
+    else if (res.status === 403) showBotStatus(d.error || 'Staff only.', true);
+    else showBotStatus(d.error || 'Could not save the wheel.', true);
+  } catch { showBotStatus('Network error saving the wheel.', true); }
+  if (btn) btn.disabled = false;
+}
+
+async function spinWheel(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Spinning…'; }
+  try {
+    /* Save the current edits first, so a spin always reflects what is on screen. */
+    await fetch('/api/wheel', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save', segments: collectWheelSegments() }),
+    });
+    const res = await fetch('/api/wheel', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'spin' }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus('Spinning the wheel on the overlay — landing on "' + d.winner.label + '".', false);
+      const state = document.getElementById('odWheelState');
+      if (state) { state.textContent = 'Last winner: ' + d.winner.label; state.className = 'giveaway-status open'; }
+    } else if (res.status === 403) {
+      showBotStatus(d.error || 'Staff only.', true);
+    } else {
+      showBotStatus(d.error || 'Could not spin the wheel.', true);
+    }
+  } catch { showBotStatus('Network error spinning the wheel.', true); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Spin the Wheel'; }
+}
+
+function initWheel() {
+  const rows = document.getElementById('odWheelRows');
+  if (!rows) return;
+  const add = document.getElementById('odWheelAddBtn');
+  if (add) add.addEventListener('click', function () {
+    if (document.querySelectorAll('#odWheelRows .od-wheel-row').length >= OD_WHEEL_MAX) return;
+    rows.appendChild(odWheelRowEl({ label: '', weight: 1 }));
+    odWheelSyncButtons();
+  });
+  const save = document.getElementById('odWheelSaveBtn');
+  if (save) save.addEventListener('click', function () { saveWheel(save); });
+  const spin = document.getElementById('odWheelSpinBtn');
+  if (spin) spin.addEventListener('click', function () { spinWheel(spin); });
+  loadWheel();
+}
+
 /* ── Access ────────────────────────────────────────────────────────────────
    Same gate as Bot Control: the client does not decide. It asks
    /api/bot/dashboard and renders whatever the server is prepared to answer for
@@ -834,6 +990,7 @@ function initOverlayDashboard(data) {
   initCheckinReminder();
   initGamesOnOverlay();
   initTestAlerts();
+  initWheel();
   initGiveawayReplay();
   if (data.isBroadcaster) initOverlayPanel(data.overlayUrl);
 }

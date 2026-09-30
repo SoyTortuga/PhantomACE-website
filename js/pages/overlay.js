@@ -241,6 +241,16 @@
      overlay.css. */
   var REEL_EMBERS = { rare: 16, mythic: 28 };
 
+  /* ── Customizable wheel reveal ─────────────────────────────────────────
+     A one-shot stage reveal like the giveaway reel: the wheel spins with a
+     SINGLE CSS rotate transition (no rAF loop, no interval), decelerates onto
+     the winning segment the SERVER chose, holds the result, then the card
+     leaves and the stage returns to idle. describe() sets ms to cover the whole
+     thing. */
+  var WHEEL_SPIN_MS = 5200;
+  var WHEEL_HOLD_MS = 4800;
+  var WHEEL_SPINS = 6;          // full turns before it lands, so it reads as a spin
+
   /* ── Pham Check-In reminder ───────────────────────────────────────────
      Deliberately NOT a full alert: a small nudge in the corner telling
      viewers to go redeem their check-in, not a center-stage card that
@@ -401,6 +411,20 @@
         /* Life covers the spin, the landing pop, and the FULL confetti window
            plus a tail — so nothing is cut off. Same for both rarities. */
         ms: spinMs + CONFETTI_MS + REEL_LAND_BUFFER,
+      };
+    }
+
+    /* ── Customizable wheel ─────────────────────────────────────────────
+       A one-shot stage reveal: the wheel spins and lands on the segment the
+       server weighted-picked. Segments carry their own on-palette colour and
+       weight (arc size ∝ weight, so the wheel reads honestly). */
+    if (ev.type === 'wheel-spin') {
+      return {
+        wheel: true,
+        segments: Array.isArray(ev.segments) ? ev.segments : [],
+        winnerIndex: ev.winnerIndex,
+        who: ev.who || '',
+        ms: WHEEL_SPIN_MS + WHEEL_HOLD_MS,
       };
     }
 
@@ -1112,11 +1136,143 @@
     tick();
   }
 
+  /* ── Customizable wheel card ───────────────────────────────────────────
+     A one-shot stage reveal. The wheel is an <svg> whose whole element rotates
+     via a SINGLE CSS transform transition (no rAF loop, no interval); a fixed
+     HTML pointer sits over the top. Slices are sized by weight so the picture is
+     honest, and the wheel lands the winning slice's centre under the pointer —
+     the SERVER's weighted pick is authoritative. Every node is a child of the
+     card, so render()'s end-of-life teardown removes them; card._cleanup also
+     clears the one landing timer and cancels the two deferred-start rAFs. */
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function wheelPoint(cx, cy, r, deg) {
+    var t = deg * Math.PI / 180;                 // clockwise from the top (12 o'clock)
+    return { x: cx + r * Math.sin(t), y: cy - r * Math.cos(t) };
+  }
+
+  function buildWheelCard(ev, d) {
+    var card = document.createElement('div');
+    card.className = 'ov-alert ov-wheel-card';
+    card.dataset.type = ev.type;
+
+    var kind = document.createElement('span');
+    kind.className = 'ov-kind';
+    kind.textContent = 'Wheel';
+    card.appendChild(kind);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'ov-wheel-wrap';
+    var svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'ov-wheel');
+    svg.setAttribute('viewBox', '0 0 220 220');
+    var spinG = document.createElementNS(SVGNS, 'g');   // (the whole svg rotates; g just groups)
+    svg.appendChild(spinG);
+    /* Fixed pointer over the top, drawn as an SVG triangle (no border-triangle,
+       no shadow); it does not rotate with the wheel. */
+    var pointer = document.createElementNS(SVGNS, 'svg');
+    pointer.setAttribute('class', 'ov-wheel-pointer');
+    pointer.setAttribute('viewBox', '0 0 24 20');
+    var tri = document.createElementNS(SVGNS, 'polygon');
+    tri.setAttribute('points', '12,20 0,0 24,0');
+    pointer.appendChild(tri);
+    var hub = document.createElement('div');
+    hub.className = 'ov-wheel-hub';
+    wrap.appendChild(svg);
+    wrap.appendChild(pointer);
+    wrap.appendChild(hub);
+    card.appendChild(wrap);
+
+    var caption = document.createElement('p');
+    caption.className = 'ov-sub ov-wheel-caption';
+    caption.textContent = 'Spinning the wheel…';
+    card.appendChild(caption);
+
+    var winner = document.createElement('p');
+    winner.className = 'ov-wheel-winner';
+    card.appendChild(winner);
+
+    var landTimer = null, raf1 = 0, raf2 = 0;
+    card._cleanup = function () {
+      if (landTimer) { clearTimeout(landTimer); landTimer = null; }
+      if (raf1) { cancelAnimationFrame(raf1); raf1 = 0; }
+      if (raf2) { cancelAnimationFrame(raf2); raf2 = 0; }
+    };
+
+    var segs = d.segments || [];
+    if (segs.length >= 2) {
+      var cx = 110, cy = 110, r = 100;
+      var total = 0;
+      for (var t = 0; t < segs.length; t++) total += Number(segs[t].weight) > 0 ? Number(segs[t].weight) : 1;
+
+      var angle = 0;
+      var winnerCenter = 0;
+      segs.forEach(function (seg, i) {
+        var w = Number(seg.weight) > 0 ? Number(seg.weight) : 1;
+        var arc = (w / total) * 360;
+        var a0 = angle, a1 = angle + arc;
+        var p0 = wheelPoint(cx, cy, r, a0), p1 = wheelPoint(cx, cy, r, a1);
+        var large = arc > 180 ? 1 : 0;
+
+        var path = document.createElementNS(SVGNS, 'path');
+        path.setAttribute('d', 'M ' + cx + ' ' + cy + ' L ' + p0.x.toFixed(2) + ' ' + p0.y.toFixed(2) +
+          ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1.x.toFixed(2) + ' ' + p1.y.toFixed(2) + ' Z');
+        /* seg.color is a curated on-palette hex the server resolved; a fallback
+           keeps a missing colour on-brand rather than transparent. */
+        path.setAttribute('fill', seg.color || (i % 2 ? '#1a1a1a' : '#6b0f0f'));
+        path.setAttribute('stroke', '#0a0a0a');
+        path.setAttribute('stroke-width', '1.5');
+        spinG.appendChild(path);
+
+        var mid = a0 + arc / 2;
+        var lp = wheelPoint(cx, cy, r * 0.62, mid);
+        var label = document.createElementNS(SVGNS, 'text');
+        label.setAttribute('x', lp.x.toFixed(2));
+        label.setAttribute('y', lp.y.toFixed(2));
+        label.setAttribute('class', 'ov-wheel-label');
+        /* Radial text, kept upright-ish; the dark stroke (paint-order) makes
+           #fff readable on any curated fill without a box-shadow. */
+        label.setAttribute('transform', 'rotate(' + mid.toFixed(2) + ' ' + lp.x.toFixed(2) + ' ' + lp.y.toFixed(2) + ')');
+        label.textContent = (seg.label == null ? '' : String(seg.label)).slice(0, 24);
+        spinG.appendChild(label);
+
+        if (i === d.winnerIndex) winnerCenter = mid;
+        angle = a1;
+      });
+
+      /* Rotating the group clockwise by R brings the winner's centre (at
+         clockwise angle winnerCenter) to the top pointer: R ≡ -winnerCenter,
+         plus whole turns for the spin. */
+      var targetRot = WHEEL_SPINS * 360 + (360 - winnerCenter);
+
+      svg.style.transform = 'rotate(0deg)';
+      raf1 = requestAnimationFrame(function () {
+        void svg.getBoundingClientRect();       // now attached — a real reflow at 0deg
+        raf2 = requestAnimationFrame(function () {
+          svg.style.transition = 'transform ' + (WHEEL_SPIN_MS / 1000) + 's cubic-bezier(0.16, 0.84, 0.2, 1)';
+          svg.style.transform = 'rotate(' + targetRot.toFixed(2) + 'deg)';
+        });
+      });
+
+      landTimer = setTimeout(function () {
+        landTimer = null;
+        card.classList.add('is-landed');
+        caption.textContent = 'Winner';
+        winner.textContent = d.who || (segs[d.winnerIndex] && segs[d.winnerIndex].label) || '';
+      }, WHEEL_SPIN_MS + 100);
+    } else {
+      caption.textContent = 'No wheel configured.';
+    }
+
+    return card;
+  }
+
   function render(ev) {
     var d = describe(ev);
     if (!d) return false;
 
-    var card = d.reel ? buildReelCard(ev, d) : buildStandardCard(ev, d);
+    var card = d.reel ? buildReelCard(ev, d)
+      : d.wheel ? buildWheelCard(ev, d)
+      : buildStandardCard(ev, d);
     stage.appendChild(card);
 
     /* PUBLISHED, NOT ENFORCED. The standing panels — Mana Clash, the
