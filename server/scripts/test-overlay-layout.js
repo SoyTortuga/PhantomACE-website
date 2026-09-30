@@ -244,10 +244,15 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   ok('bot control can swap the live preset', /function initOvPreset/.test(bc) && /action: 'activate'/.test(bc));
 
   const ids = [...samples.matchAll(/id: '(ov\w+)'/g)].map(m => m[1]).sort();
-  /* The panel list the editor drags must match the ids the route stores,
-     or a panel can be arranged and then silently not saved. */
-  ok('the sample panel ids are exactly the stored ones',
-     JSON.stringify(ids) === JSON.stringify(['ovBingo', 'ovCheckin', 'ovMaze', 'ovMc', 'ovMtg', 'ovRaid', 'ovScramble', 'ovStage']));
+  /* The panel list the editor drags must match the ids the ROUTE stores, or a
+     panel can be arranged and then silently not saved (validatePanels drops any
+     id not in PANEL_IDS). Read PANEL_IDS from the route dynamically so this
+     catches real drift, not a stale hardcoded copy. */
+  const layoutSrc = fs.readFileSync(path.join(REPO, 'functions/api/overlay/layout.js'), 'utf8');
+  const idsMatch = layoutSrc.match(/const PANEL_IDS = \[([^\]]*)\]/);
+  const storedIds = idsMatch ? [...idsMatch[1].matchAll(/'(ov\w+)'/g)].map(m => m[1]).sort() : [];
+  ok('the sample panel ids are exactly the ids the route stores',
+     ids.length > 0 && JSON.stringify(ids) === JSON.stringify(storedIds));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
