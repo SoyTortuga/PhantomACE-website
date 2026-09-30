@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ══════════════════════════════════════════════
-   MOD TOOLBOX — the staff landing page and its refusal
+   ADMIN DASHBOARD — the staff landing page and its refusal
 
      node server/scripts/test-mod-toolbox.js
 
@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { onRequestGet } from '../../functions/api/admin/toolbox.js';
+import { onRequestGet, renderToolCard } from '../../functions/api/admin/toolbox.js';
 import { buildRoutes } from '../router.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -78,9 +78,13 @@ async function GET(e, h) {
   const mod = await GET(env(), as('222', 'HelperMod'));
   check('a moderator gets the page', mod.status, 200);
   const body = await mod.text();
+  ok('the page is titled Admin Dashboard', /🛠 Admin Dashboard/.test(body));
+  ok('the page is no longer called Mod Toolbox', !/Mod Toolbox/.test(body));
   for (const name of ['Bot Control', 'Bot &amp; EventSub Setup', 'Background Studio', 'Media Uploads', 'Commander Bingo Host']) {
     ok(`it maps ${name.replace('&amp;', '&')}`, body.includes(name));
   }
+  ok('the cards are grouped by the Moderator access level', /class="section-label">Moderator</.test(body));
+  ok('and a Broadcaster only section is labelled', /class="section-label">Broadcaster only</.test(body));
   ok('the staff list is shown', /HelperMod/.test(body));
   ok('with the broadcaster listed', /PhantomACE \(broadcaster\)/.test(body));
   ok('and the caller named', /HelperMod<\/b>\s*— moderator/.test(body));
@@ -88,6 +92,30 @@ async function GET(e, h) {
   const bc = await GET(env(), as('111', 'PhantomACE'));
   ok('the broadcaster is recognised as such', /— broadcaster/.test(await bc.text()));
   ok('the answer is never cached', mod.headers.get('Cache-Control') === 'no-store');
+}
+
+/* ── Access-level rendering: broadcaster-only cards lock for a moderator ──
+   Exercised through the exported card renderer with a synthetic tool, so the
+   lock mechanism is proven regardless of how the real TOOLS are classified. */
+{
+  const bcTool = { href: '/broadcaster-only-thing', name: 'Broadcaster Tool',
+    desc: 'A tool only the broadcaster can use.', access: 'broadcaster', tags: ['Broadcaster only'] };
+  const modTool = { href: '/mod-thing', name: 'Mod Tool',
+    desc: 'A tool moderators can use.', access: 'moderator', tags: ['Moderators'] };
+
+  const lockedForMod = renderToolCard(bcTool, false);
+  ok('a broadcaster-only card is locked for a moderator', /class="tool locked"/.test(lockedForMod));
+  ok('the locked card shows the padlock', /🔒/.test(lockedForMod));
+  ok('the locked card is marked disabled', /aria-disabled="true"/.test(lockedForMod));
+  ok('the locked card is not a clickable link', !/<a\b/.test(lockedForMod));
+
+  const openForBc = renderToolCard(bcTool, true);
+  ok('the same card is a normal link for the broadcaster', /<a class="tool" href="\/broadcaster-only-thing"/.test(openForBc));
+  ok('and is not rendered locked for the broadcaster', !/class="tool locked"/.test(openForBc));
+
+  const modForMod = renderToolCard(modTool, false);
+  ok('a moderator card is always a clickable link', /<a class="tool" href="\/mod-thing"/.test(modForMod));
+  ok('and never locked', !/class="tool locked"/.test(modForMod));
 }
 
 /* ── Every link the map makes is a real destination ──────────────────── */

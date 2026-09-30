@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           onclick="refreshMyRole()" title="Re-check with Twitch">Refresh</button>
                 </div>
                 <div class="account-role-msg" id="accountRoleMsg"></div>
-                <a href="/mod-toolbox.html" class="account-menu-item account-menu-item-staff" id="accountMenuToolbox" hidden>🛠 Mod Toolbox</a>
+                <a href="/mod-toolbox.html" class="account-menu-item account-menu-item-staff" id="accountMenuToolbox" hidden>🛠 Admin Dashboard</a>
                 <a href="/overlay-dashboard.html" class="account-menu-item account-menu-item-staff" id="accountMenuDashboard" hidden>🖥 Overlay Dashboard</a>
                 <a href="/profile" class="account-menu-item" id="accountMenuProfile">Profile</a>
                 <a href="/redeem.html" class="account-menu-item">Redeems</a>

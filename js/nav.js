@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /* Lock the Phamily dropdown tiers a viewer hasn't earned. Viewer & Follower
      is always open; Subscriber/VIP unlock for subscribers and above, Moderator
      for staff. This reads the SIGNED role from the cookie (auth.js) — it is a
-     UI affordance only, exactly like the Mod Toolbox link; the tier pages hold
+     UI affordance only, exactly like the Admin Dashboard link; the tier pages hold
      no privileged actions, so a locked link simply doesn't navigate. */
   function tierUnlocked(tier) {
     if (typeof hasMinimumRole !== 'function') return true;

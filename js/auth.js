@@ -74,8 +74,8 @@ function applyRole() {
     const menuProfile = document.getElementById('accountMenuProfile');
     if (menuProfile && session.login) menuProfile.href = '/user/' + session.login;
 
-    /* The Mod Toolbox link, for staff only. Cosmetic gate on the signed
-       role — the toolbox page and every tool behind it re-check on the
+    /* The Admin Dashboard link, for staff only. Cosmetic gate on the signed
+       role — the dashboard page and every tool behind it re-check on the
        server, so a forged link reveals nothing it can act on. */
     const toolbox = document.getElementById('accountMenuToolbox');
     if (toolbox) toolbox.hidden = !(role === 'moderator' || role === 'broadcaster');
