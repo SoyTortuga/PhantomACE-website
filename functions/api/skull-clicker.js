@@ -23,6 +23,52 @@ const EVENT_MAX_MS = 30 * 60 * 1000;   /* cap a frenzy at 30 min, whoever sets i
 
 const saveKey = (userId) => `sc_save_${userId}`;
 
+/* A finite, sane ceiling for every stored number. The top of the board legitimately
+   reaches past 1e200, so this sits far above real play while staying well below
+   Number.MAX_VALUE (~1.8e308) — anything past it is corruption, not a whale.
+   finite() coerces any value into [0, cap]: Infinity → cap, NaN/-Infinity/negative → 0.
+   Used on WRITE (a bad client's Infinity/NaN never persists) and on READ (an
+   already-stored non-finite value heals to a finite number instead of rendering
+   as "Infinity", so mvgfamous's bad entry stops showing Infinity before it's even
+   overwritten). */
+const SCORE_CAP = 1e300;
+function finite(v, cap = SCORE_CAP) {
+  const n = Number(v);
+  if (Number.isFinite(n)) return n < 0 ? 0 : (n > cap ? cap : n);
+  return n === Infinity ? cap : 0;
+}
+
+/* Every save-state scalar that participates in arithmetic (mirrors the client's
+   SC_NUM_FIELDS). Timestamps are numbers too and pass through untouched — they sit
+   well under the cap, and a non-finite one heals to 0, which every reader treats as
+   "unset". clickMulti/globalCpsMult are cleaned separately so they never heal to 0
+   (which would zero out production/clicks). */
+const SC_STATE_NUM_FIELDS = ['skulls','totalSkulls','lifetimeSkulls','prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','seasonBaseline','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
+function sanitizeState(state) {
+  if (!state || typeof state !== 'object') return state;
+  for (const k of SC_STATE_NUM_FIELDS) if (typeof state[k] === 'number') state[k] = finite(state[k]);
+  for (const key of ['owned', 'metaLevels', 'buildingLevels', 'perkLevels']) {
+    const map = state[key];
+    if (map && typeof map === 'object') for (const k in map) if (typeof map[k] === 'number') map[k] = finite(map[k]);
+  }
+  state.clickMulti = finite(state.clickMulti) > 0 ? finite(state.clickMulti) : 1;
+  state.globalCpsMult = finite(state.globalCpsMult) > 0 ? finite(state.globalCpsMult) : 1;
+  return state;
+}
+
+/* A leaderboard row, healed on READ. Non-destructive (returns a copy) — the stored
+   entry keeps its bad value until it is next written or explicitly scrubbed, but the
+   display never shows Infinity. */
+function sanitizeEntry(e) {
+  if (!e || typeof e !== 'object') return e;
+  return {
+    ...e,
+    score: finite(e.score),
+    prestige: Math.max(0, Math.min(9999, Math.floor(finite(e.prestige)))),
+    ascensions: Math.max(0, Math.min(99999, Math.floor(finite(e.ascensions)))),
+  };
+}
+
 /**
  * Start a site-wide Skull Clicker event (a cursed-skull frenzy). Shared so
  * the hype-train webhook can call it too. Best-effort by contract: callers
@@ -77,6 +123,8 @@ async function rolloverSeason(env) {
    the merge ranked on run total, a prestige (total 0) would lose to the old
    save and the sync would silently undo it. lifetime is monotonic and
    prestige only climbs, so this is safe from both directions. */
+/* Coerces non-finite (Infinity/NaN/-Infinity) and negatives to 0, so a corrupt save
+   ranks as LOWEST in outranks() below and can never win the merge over a good save. */
 function num(v) { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; }
 function lifetimeOf(state) { return Math.max(num(state && state.lifetimeSkulls), num(state && state.totalSkulls)); }
 function prestigeOf(state) { return Math.floor(num(state && state.prestige)); }
@@ -130,10 +178,10 @@ export async function onRequestGet(context) {
      lifetime board, unchanged in shape for any existing caller. */
   if (url.searchParams.get('board') === 'season') {
     const s = await rolloverSeason(env);
-    return json({ month: s.month, entries: s.entries.slice(0, 15) });
+    return json({ month: s.month, entries: s.entries.slice(0, 15).map(sanitizeEntry) });
   }
   const lb = await env.MARKETPLACE.get(LB_KEY, 'json') || [];
-  return json(lb.slice(0, 15));
+  return json(lb.slice(0, 15).map(sanitizeEntry));
 }
 
 /**
@@ -152,6 +200,11 @@ async function saveState(env, session, body) {
   if (!state || typeof state !== 'object') return json({ error: 'No state' }, 400);
   if (JSON.stringify(state).length > SAVE_MAX_BYTES) return json({ error: 'Save too large' }, 400);
 
+  /* Clamp every numeric field to finite before it can persist — a bad client can
+     never push Infinity/NaN into KV, and the outranks() comparison below sees clean
+     values. */
+  sanitizeState(state);
+
   let winner = state;
 
   await env.MARKETPLACE.mutate(saveKey(session.user_id), (current) => {
@@ -167,7 +220,9 @@ async function saveState(env, session, body) {
 
 async function loadState(env, session) {
   const state = await env.MARKETPLACE.get(saveKey(session.user_id), 'json');
-  return json({ state: state || null });
+  /* Heal on read: an already-corrupted save (e.g. mvgfamous's) returns finite values,
+     so the client never adopts an Infinity/NaN even before the next write overwrites it. */
+  return json({ state: state ? sanitizeState(state) : null });
 }
 
 export async function onRequestPost(context) {
@@ -203,7 +258,11 @@ export async function onRequestPost(context) {
   const player = getPlayer(request, body);
   if (!player) return json({ error: 'Not authenticated' }, 401);
 
-  const score = typeof body.score === 'number' ? Math.floor(body.score) : 0;
+  /* finite() first: Math.floor(Infinity) is Infinity and Infinity > 0, so a raw
+     Math.floor guard would let a non-finite score PASS and sort to the top as
+     "Infinity". Coerce to [0, cap] up front — a JSON'd Infinity arrives as null → 0
+     and is rejected, a genuinely huge value clamps to the cap. */
+  const score = Math.floor(finite(body.score));
   if (score <= 0) return json({ error: 'Invalid score' }, 400);
   /* Carried for display — a prestige tier beside the name is the visible
      reward for resetting. Bounded so a bad client cannot store nonsense. */
@@ -217,7 +276,9 @@ export async function onRequestPost(context) {
   /* SEASON board — skulls gathered this month, sent alongside the lifetime
      score. Handled first and independently so it still records even when the
      lifetime board's early-return fires below. */
-  const seasonScore = Math.max(0, Math.floor(Number(body.seasonScore) || 0));
+  /* finite() closes the same Math.floor(Infinity) hole here — Math.max(0, Infinity)
+     would otherwise store Infinity on the season board. */
+  const seasonScore = Math.floor(finite(body.seasonScore));
   if (seasonScore > 0) {
     const s = await rolloverSeason(env);
     const ex = s.entries.find(e => e.id === player.id);

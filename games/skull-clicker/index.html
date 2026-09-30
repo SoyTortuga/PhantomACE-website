@@ -1921,6 +1921,39 @@
        upgrades multiply it, and a cross-boost scales it by how many of ANOTHER
        building you own. Computed live so nothing has to be baked into a saved
        stat. (SYNERGY is filled in Phase B; empty here means ×1.) */
+    /* ── Non-finite guard ──────────────────────────────────────────────
+       A long enough auto-buy/auto-prestige idle run grows owned[] and the multiplier
+       stack until getGrossCPS()'s product (or the running lifetimeSkulls += sum) crosses
+       Number.MAX_VALUE and rounds to Infinity; earn() then propagates it into every
+       total and it displays as "Infinity". VALUE_CAP is a finite ceiling far above real
+       play (top of the board ~1e200) but below MAX_VALUE (~1.8e308), so the compute
+       paths clamp to it instead of overflowing, and a corrupted save is scrubbed on
+       load. This is the root fix the v13 value-only scrub missed: the enormous (but
+       finite) building/multiplier state survives a save, so the next tick just
+       recomputes Infinity unless the compute itself is capped. */
+    const VALUE_CAP = 1e300;
+    function clampFinite(v, cap = VALUE_CAP) {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n < 0 ? 0 : (n > cap ? cap : n);
+      return n === Infinity ? cap : 0;
+    }
+    /* Every persisted scalar that participates in arithmetic — sanitised on load and
+       before save so a non-finite value can never enter (or leave) the game. Timestamps
+       are numbers too and pass through untouched (well under the cap; a non-finite one
+       heals to 0, which every caller treats as "unset"). clickMulti/globalCpsMult are
+       handled separately so they never heal to 0 (that would zero out clicks/CPS). */
+    const SC_NUM_FIELDS = ['skulls','totalSkulls','lifetimeSkulls','prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','seasonBaseline','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
+    function sanitizeSaveNumbers(d) {
+      if (!d || typeof d !== 'object') return d;
+      for (const k of SC_NUM_FIELDS) if (typeof d[k] === 'number') d[k] = clampFinite(d[k]);
+      for (const map of [d.owned, d.metaLevels, d.buildingLevels, d.perkLevels]) {
+        if (map && typeof map === 'object') for (const k in map) if (typeof map[k] === 'number') map[k] = clampFinite(map[k]);
+      }
+      d.clickMulti = clampFinite(d.clickMulti) > 0 ? clampFinite(d.clickMulti) : 1;
+      d.globalCpsMult = clampFinite(d.globalCpsMult) > 0 ? clampFinite(d.globalCpsMult) : 1;
+      return d;
+    }
+
     function getBuildingMult(b) {
       let m = 1;
       for (const u of SYNERGY) {
@@ -1937,7 +1970,7 @@
       for (const b of BUILDINGS) {
         cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
       }
-      return cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult() * seasonRelicCpsMult();
+      return clampFinite(cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult() * seasonRelicCpsMult());
     }
     /* Net production the player actually receives — gross minus wraith drain. */
     function getCPS() { return getGrossCPS() * wraithDrainMult(); }
@@ -1969,16 +2002,22 @@
        players who've played long enough to unlock it. */
     function getClickPower() {
       const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * metaClickMult();
-      return (base + (getCPS() * cpsClickPct / 100)) * buffClickMult() * gardenClickMult() * seasonRelicClickMult();
+      return clampFinite((base + (getCPS() * cpsClickPct / 100)) * buffClickMult() * gardenClickMult() * seasonRelicClickMult());
     }
 
     /* Every skull earned flows through here so the run total and the
        lifetime total can never drift apart — lifetime is the leaderboard
        score and the save-merge key, so it must count every path. */
     function earn(amount) {
+      amount = clampFinite(amount);
       skulls += amount;
       totalSkulls += amount;
       lifetimeSkulls += amount;
+      /* Clamp the running totals so a huge addend can never push a total past
+         Number.MAX_VALUE into Infinity (which then sticks and displays forever). */
+      skulls = clampFinite(skulls);
+      totalSkulls = clampFinite(totalSkulls);
+      lifetimeSkulls = clampFinite(lifetimeSkulls);
     }
 
     /* ═══════ ACTIONS ═══════ */
@@ -3376,7 +3415,7 @@
     /* The bar to reset rises each tier: 1,000,000 this run for the first
        prestige, ten times as much for each after. Steep on purpose — a
        prestige should be earned, and the multiplier it grants is forever. */
-    function prestigeRequirement() { return 1e6 * Math.pow(10, prestige) * prestigeCostMult(); }
+    function prestigeRequirement() { return clampFinite(1e6 * Math.pow(10, prestige) * prestigeCostMult()); }
     function canPrestige() { return totalSkulls >= prestigeRequirement(); }
 
     /* Free buildings a fresh run starts with — from the Headstart/Standing
@@ -4379,6 +4418,10 @@
     const SAVE_VERSION = 13;
 
     function migrateSave(d) {
+      /* Generalises the v13 lifetimeSkulls scrub to the WHOLE save: any persisted
+         number that is non-finite (or absurd) is healed before it can re-enter the
+         compute path, whether the save came from localStorage or the server. */
+      sanitizeSaveNumbers(d);
       if (typeof d.version !== 'number') d.version = 1;
       if (d.skulls === undefined) d.skulls = 0;
       if (d.totalSkulls === undefined) d.totalSkulls = 0;
@@ -4516,6 +4559,8 @@
         savedAt: Date.now(),
         version: SAVE_VERSION
       };
+      /* Never write a non-finite value to localStorage OR up to the server. */
+      sanitizeSaveNumbers(data);
       try {
         localStorage.setItem('sc_save', JSON.stringify(data));
         const msg = document.getElementById('saveMsg');
@@ -4672,12 +4717,14 @@
       if (se !== le) return se > le;
       /* Ascension outranks prestige: a freshly-reaped save (prestige reset to 0,
          same lifetime) must beat a stale non-ascended save, or the sync would
-         silently undo the reap. */
-      const sa = Number(server.ascensions || 0), la = ascensions || 0;
+         silently undo the reap. clampFinite keeps a corrupt (non-finite) server save
+         from ranking above real local progress. */
+      const f = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+      const sa = f(server.ascensions), la = f(ascensions);
       if (sa !== la) return sa > la;
-      const sp = Number(server.prestige || 0), lp = prestige || 0;
+      const sp = f(server.prestige), lp = f(prestige);
       if (sp !== lp) return sp > lp;
-      return Number(server.lifetimeSkulls || server.totalSkulls || 0) > lifetimeSkulls;
+      return f(server.lifetimeSkulls || server.totalSkulls) > f(lifetimeSkulls);
     }
 
     /* THE RECOVERY. A logged-in player's save also lives on the server;

@@ -9,6 +9,14 @@ import { resolveEquippedCosmetics } from './cosmetics.js';
 
 const MAX_ENTRIES = 50;
 
+/* A stored/incoming score must be a finite, non-negative number. Guards this
+   shared board against a non-finite or overflowed value (e.g. a Skull Clicker
+   run that overflowed to Infinity) rendering as "Infinity" or sorting to the
+   top — clamp on write so it can't persist, and on read so an already-stored
+   bad value self-heals. */
+const SCORE_CAP = 1e300;
+function finiteScore(v) { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(SCORE_CAP, n)) : 0; }
+
 const BOARDS = {
   'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc' },
   'memory-match':     { key: 'lb_memory_match', label: 'Best Moves',  sort: 'asc' },
@@ -166,7 +174,7 @@ export async function onRequestGet(context) {
   const enrich = (entries, cosmetics) =>
     entries.map(e => {
       const c = (e && cosmetics[String(e.id)]) || { nameEffect: null, banner: null };
-      return { ...e, nameEffect: c.nameEffect, banner: c.banner };
+      return { ...e, score: finiteScore(e && e.score), nameEffect: c.nameEffect, banner: c.banner };
     });
 
   if (game === 'all') {
@@ -229,7 +237,7 @@ export async function onRequestPost(context) {
     return json({ success: true, updated: true });
   }
 
-  const score = typeof body.score === 'number' ? body.score : 0;
+  const score = finiteScore(body.score);
   if (score <= 0) return json({ error: 'Invalid score' }, 400);
 
   const lb = await env.MARKETPLACE.get(board.key, 'json') || [];
