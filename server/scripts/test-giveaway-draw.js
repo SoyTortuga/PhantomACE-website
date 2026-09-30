@@ -535,6 +535,33 @@ const fresh = (pools) => { patches = []; whispers = []; settlements = []; return
   check('and nothing was switched on', patches.length, 0);
 }
 
+/* ── Replay last reveal (Overlay Dashboard) ──────────────────────────── */
+{
+  const env = fresh();
+  /* Nothing spun yet → a clean refusal. */
+  const none = await post(env, { action: 'replay', which: 'big' });
+  check('replaying with no Big Prize winner is refused', none.status, 400);
+
+  await post(env, { action: 'toggle', open: true, rarity: 'mythic' });
+  await addEntrant(env, '1', 'alice', 'mythic');
+  await addEntrant(env, '2', 'bob', 'mythic');
+  await post(env, { action: 'pick-winner' });
+
+  /* The pick stores its reel payload so the dashboard can replay it. */
+  const stored = JSON.parse(env._store.get('giveaway_winner'));
+  ok('the Big Prize winner stores its reel payload', stored.reveal && Array.isArray(stored.reveal.entrants) && typeof stored.reveal.winnerIndex === 'number');
+
+  const before = JSON.parse(env._store.get('overlay_events')).events.filter(e => e.type === 'giveaway-spin').length;
+  const rr = await (await post(env, { action: 'replay', which: 'big' })).json();
+  check('replay succeeds', rr.success, true);
+  const after = JSON.parse(env._store.get('overlay_events')).events.filter(e => e.type === 'giveaway-spin');
+  check('replay re-pushes another giveaway-spin', after.length, before + 1);
+  const replayed = after[after.length - 1];
+  check('the replayed reveal lands on the same winner', replayed.who, stored.username);
+  check('at the same rarity', replayed.rarity, stored.rarity);
+  ok('and it is not labelled monthly', !replayed.label);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

@@ -278,9 +278,34 @@ const M = monthKey();
   ok('and the strip is a bounded, weighted pool', Array.isArray(spin.entrants) && spin.entrants.length === 48);
   ok('whose landing index names the winner', spin.entrants[spin.winnerIndex].username === r.winner.username);
 
+  /* The reveal is stored on the winner so it can be replayed later. */
+  ok('the monthly winner stores its reel payload for replay', stored.reveal && Array.isArray(stored.reveal.entrants) && stored.reveal.entrants.length === 48);
+
   /* Re-drawing just overwrites — no pending-winner guard on this event. */
   const again = await (await post(env, { action: 'draw-monthly' })).json();
   check('re-drawing is allowed (no pending guard)', again.success, true);
+}
+
+/* ── Replay last reveal (the Overlay Dashboard button) ────────────────── */
+{
+  const env = makeEnv();
+  /* Nothing drawn yet → a clean refusal, not a crash. */
+  const none = await post(env, { action: 'replay', which: 'monthly' });
+  check('replaying with no monthly winner is refused', none.status, 400);
+
+  seedLedger(env, M, { alice: 8, bob: 2 });
+  await post(env, { action: 'draw-monthly' });
+  const before = JSON.parse(env._store.get('overlay_events')).events.filter(e => e.type === 'giveaway-spin').length;
+
+  const rr = await (await post(env, { action: 'replay', which: 'monthly' })).json();
+  check('replay succeeds once a winner is stored', rr.success, true);
+
+  const after = JSON.parse(env._store.get('overlay_events')).events.filter(e => e.type === 'giveaway-spin');
+  check('replay re-pushes another giveaway-spin', after.length, before + 1);
+  const replayed = after[after.length - 1];
+  check('the replayed reveal keeps the monthly label', replayed.label, 'Monthly Giveaway');
+  check('and lands on the same stored winner', replayed.who, rr.who);
+  check('and is the full bounded weighted strip', replayed.entrants.length, 48);
 }
 
 /* ── An empty month is a clean error, not a 500 ──────────────────────── */

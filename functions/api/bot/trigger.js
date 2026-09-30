@@ -11,6 +11,54 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+/* ── TEST-ALERT SAMPLES ────────────────────────────────────────────────────
+   One representative event per ONE-SHOT overlay alert type describe() handles,
+   for previewing/positioning on the overlay. Each is a FACTORY returning a
+   fresh object, pushed through the SAME pushOverlayEvent path real events use —
+   so they render identically and self-clear identically (nothing is left on the
+   overlay). Obvious fake data ("TestReaper", round sample counts) makes it
+   clear on stream that it is a test.
+
+   The prediction entry fires the RESOLVED end state on purpose: the prediction
+   panel is a standing panel that only hides on end, so an end-state sample
+   shows the winner reveal and then auto-hides (~8s, PRED_REVEAL_MS in
+   overlay.js) rather than leaving a panel stuck. Live show/lock of the
+   prediction panel stays EventSub-driven (Bot Control), per the plan. */
+const TEST_ALERT_SAMPLES = {
+  sub:        () => ({ type: 'sub', who: 'TestReaper' }),
+  giftsub:    () => ({ type: 'giftsub', who: 'TestReaper', count: 10 }),
+  raid:       () => ({ type: 'raid', who: 'TestRaider', viewers: 42 }),
+  'hype-level': () => ({ type: 'hype-level', level: 15 }),
+  drop:       () => ({ type: 'drop', code: 'TEST-CODE-1234', rarity: 'rare', entries: 15 }),
+  'dino-hatch': () => ({
+    type: 'dino-hatch', who: 'TestReaper', count: 1, top: 'legendary', more: 0,
+    results: [{ rarity: 'legendary', name: 'Test Rex', speciesId: 'therizo', mutation: null, portrait: '', icon: '' }],
+  }),
+  'giveaway-spin': () => ({
+    type: 'giveaway-spin', rarity: 'mythic', who: 'TestReaper', winnerIndex: 1,
+    entrants: [{ username: 'TestOne' }, { username: 'TestReaper' }, { username: 'TestTwo' }, { username: 'TestThree' }],
+  }),
+  prediction: () => ({
+    type: 'prediction', state: 'end', status: 'RESOLVED', title: 'Test: who wins this game?',
+    winningOutcomeId: 'o1', locksAt: null,
+    outcomes: [
+      { id: 'o1', title: 'TestReaper', points: 18400, users: 34, color: 'BLUE' },
+      { id: 'o2', title: 'The Other One', points: 7150, users: 12, color: 'PINK' },
+    ],
+  }),
+  'pham-checkin': () => ({ type: 'pham-checkin', sound: true }),
+  'bingo-call': () => ({ type: 'bingo-call', label: 'Someone scoops early', called: 12, total: 68 }),
+  'bingo-win':  () => ({ type: 'bingo-win', who: 'TestReaper', rarity: 'mythic', entries: 50 }),
+  'mtgbbb-pull': () => ({
+    type: 'mtgbbb-pull', rarity: 'mythic', card: 'Test Mythic Rare', image: '',
+    holders: 3, players: 62, treatments: ['Foil', 'Borderless'],
+  }),
+  'mtgbbb-bingo': () => ({ type: 'mtgbbb-bingo', who: 'TestReaper', pattern: 'Blackout', points: 25 }),
+};
+
+/** The types the test suite can fire, for the dashboard to build its buttons. */
+export const TEST_ALERT_TYPES = Object.keys(TEST_ALERT_SAMPLES);
+
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/pham_session=([^;]+)/);
@@ -98,6 +146,18 @@ export async function onRequestPost(context) {
   if (body.action === 'announce') {
     const result = await announceAction(env, body.message, actor);
     return json(result, result.success ? 200 : 400);
+  }
+
+  /* Fire a representative sample of one alert type onto the overlay, to preview
+     and position it. Goes through the ordinary overlay event path, so it queues,
+     shows and self-clears exactly like the real thing. */
+  if (body.action === 'test-alert') {
+    const type = String(body.type || '');
+    const sample = TEST_ALERT_SAMPLES[type];
+    if (!sample) return json({ error: `Unknown test alert type "${type}".` }, 400);
+    const { pushOverlayEvent } = await import('../overlay/events.js');
+    await pushOverlayEvent(env, sample());
+    return json({ success: true, type });
   }
 
   /* ── Pham Check-In reminder ───────────────────────────────────────────

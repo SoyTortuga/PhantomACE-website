@@ -608,6 +608,124 @@ function initOverlayPanel(url) {
   }
 }
 
+/* ── Test-alert suite ─────────────────────────────────────────────────────
+   One button per one-shot overlay alert type. Each POSTs { action:'test-alert',
+   type } to /api/bot/trigger, which pushes a representative sample through the
+   ordinary overlay event path — so it renders and SELF-CLEARS like the real
+   alert (nothing is left on the overlay). Standing panels are not here: the
+   prediction entry fires its RESOLVED end-state, which auto-hides. */
+var OD_TEST_ALERTS = [
+  { type: 'sub', label: 'New Sub' },
+  { type: 'giftsub', label: 'Gift Subs' },
+  { type: 'raid', label: 'Raid' },
+  { type: 'hype-level', label: 'Hype Level' },
+  { type: 'drop', label: 'Code Drop' },
+  { type: 'dino-hatch', label: 'Dino Hatch' },
+  { type: 'giveaway-spin', label: 'Giveaway Reel' },
+  { type: 'prediction', label: 'Prediction (result)' },
+  { type: 'pham-checkin', label: 'Check-In Nudge' },
+  { type: 'bingo-call', label: 'Bingo Call' },
+  { type: 'bingo-win', label: 'Bingo Win' },
+  { type: 'mtgbbb-pull', label: 'MTGBBB Pull' },
+  { type: 'mtgbbb-bingo', label: 'MTGBBB Bingo' },
+];
+
+async function fireTestAlert(type, label, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/bot/trigger', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'test-alert', type: type }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus('Test "' + label + '" fired on the overlay — it will clear itself.', false);
+    } else {
+      showBotStatus(d.error || 'Could not fire that test alert.', true);
+    }
+  } catch {
+    showBotStatus('Network error firing the test alert.', true);
+  }
+  if (btn) btn.disabled = false;
+}
+
+function initTestAlerts() {
+  const box = document.getElementById('odTestAlertBtns');
+  if (!box) return;
+  box.innerHTML = '';
+  OD_TEST_ALERTS.forEach(function (a) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary od-test-btn';
+    btn.textContent = a.label;
+    btn.addEventListener('click', function () { fireTestAlert(a.type, a.label, btn); });
+    box.appendChild(btn);
+  });
+}
+
+/* ── Giveaway: replay last reveal ──────────────────────────────────────────
+   The draws live on Bot Control; this only re-pushes the last stored reel.
+   Each button is greyed until the server reports a stored reveal for it. */
+async function loadReplayState() {
+  const big = document.getElementById('odReplayBigBtn');
+  const monthly = document.getElementById('odReplayMonthlyBtn');
+  const state = document.getElementById('odReplayState');
+  let d;
+  try {
+    const res = await fetch('/api/bot/giveaway', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) { if (state) state.textContent = 'Could not load giveaway state (HTTP ' + res.status + ').'; return; }
+    d = await res.json();
+  } catch {
+    if (state) state.textContent = 'Could not reach the server.';
+    return;
+  }
+  const r = d.replay || {};
+  if (big) big.disabled = !r.big;
+  if (monthly) monthly.disabled = !r.monthly;
+  if (state) {
+    const bits = [];
+    bits.push(r.big ? 'Big Prize: ' + (r.big.who || 'winner') + (r.big.rarity ? ' (' + r.big.rarity + ')' : '') : 'Big Prize: nothing to replay yet');
+    bits.push(r.monthly ? 'Monthly: ' + (r.monthly.who || 'winner') : 'Monthly: nothing to replay yet');
+    state.textContent = bits.join(' · ');
+  }
+}
+
+async function fireReplay(which, btn) {
+  if (btn) btn.disabled = true;
+  const original = btn ? btn.textContent : '';
+  if (btn) btn.textContent = 'Replaying…';
+  try {
+    const res = await fetch('/api/bot/giveaway', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'replay', which: which }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus('Replaying the ' + (which === 'monthly' ? 'Monthly' : 'Big Prize') + ' reveal for ' + (d.who || 'the winner') + ' on the overlay.', false);
+    } else {
+      showBotStatus(d.error || 'Could not replay that reveal.', true);
+    }
+  } catch {
+    showBotStatus('Network error replaying the reveal.', true);
+  }
+  if (btn) { btn.textContent = original; }
+  loadReplayState();
+}
+
+function initGiveawayReplay() {
+  const big = document.getElementById('odReplayBigBtn');
+  const monthly = document.getElementById('odReplayMonthlyBtn');
+  const refresh = document.getElementById('odReplayRefreshBtn');
+  if (!big && !monthly) return;
+  if (big) big.addEventListener('click', function () { fireReplay('big', big); });
+  if (monthly) monthly.addEventListener('click', function () { fireReplay('monthly', monthly); });
+  if (refresh) refresh.addEventListener('click', function () { loadReplayState(); });
+  loadReplayState();
+}
+
 /* ── Access ────────────────────────────────────────────────────────────────
    Same gate as Bot Control: the client does not decide. It asks
    /api/bot/dashboard and renders whatever the server is prepared to answer for
@@ -629,6 +747,8 @@ function initOverlayDashboard(data) {
   initOvRaid();
   initOvPreset();
   initCheckinReminder();
+  initTestAlerts();
+  initGiveawayReplay();
   if (data.isBroadcaster) initOverlayPanel(data.overlayUrl);
 }
 

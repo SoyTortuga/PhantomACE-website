@@ -159,6 +159,31 @@
         </div>
       </section>
 
+      <!-- ── ALERTS & TOOLS ─────────────────────────────────────────── -->
+      <section class="bot-group">
+        <h2 class="bot-group-title">Alerts &amp; Tools</h2>
+        <div class="bot-grid">
+
+          <div class="card bot-section" id="odTestAlertsSection">
+            <h3>Test Alerts</h3>
+            <p class="bot-section-desc">Fire a sample of any alert onto the overlay to preview and position it. Each uses obvious fake data and clears itself exactly like the real alert.</p>
+            <div class="od-test-btns" id="odTestAlertBtns"></div>
+          </div>
+
+          <div class="card bot-section" id="odReplaySection">
+            <h3>Giveaway — Replay Last Reveal</h3>
+            <p class="bot-section-desc">Re-plays the most recent giveaway reel on the overlay. Draws stay on <a href="/bot-control.html">Bot Control</a>; this only re-shows a reveal that already happened.</p>
+            <div class="ovmc-row">
+              <button class="btn-primary" id="odReplayBigBtn" disabled>Replay Big Prize</button>
+              <button class="btn-primary" id="odReplayMonthlyBtn" disabled>Replay Monthly</button>
+              <button class="btn-secondary" id="odReplayRefreshBtn">Refresh</button>
+            </div>
+            <p class="bot-section-desc" id="odReplayState" style="margin-top:10px">Loading…</p>
+          </div>
+
+        </div>
+      </section>
+
       <!-- ── OVERLAY OUTPUT ─────────────────────────────────────────── -->
       <section class="bot-group">
         <h2 class="bot-group-title">Overlay Output</h2>

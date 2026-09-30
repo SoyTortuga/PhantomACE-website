@@ -142,3 +142,14 @@
   overflow-wrap: anywhere;
   min-width: 0;
 }
+
+/* ── Test-alert suite ──────────────────────────
+   A wrapped grid of small buttons, one per alert type. */
+.od-test-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.od-test-btn {
+  flex: 0 0 auto;
+}

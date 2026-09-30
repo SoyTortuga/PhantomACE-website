@@ -211,6 +211,13 @@ export async function onRequestGet(context) {
     rewardConfigured: !!rewardId,
     monthly,
     monthlyWinner,
+    /* Whether each reveal can be replayed onto the overlay (a winner with a
+       stored reel payload exists), plus who, for the Overlay Dashboard's
+       "Replay last reveal" buttons to enable/label themselves. */
+    replay: {
+      big: winner && winner.reveal ? { who: winner.username, rarity: winner.rarity || null } : null,
+      monthly: monthlyWinner && monthlyWinner.reveal ? { who: monthlyWinner.username, month: monthlyWinner.month || null } : null,
+    },
   });
 }
 
@@ -345,6 +352,14 @@ export async function onRequestPost(context) {
     const chosen = pool[winnerIndex];
 
     const entrants = pool;
+    /* The exact overlay reel payload, stored on the winner so "Replay last
+       reveal" can re-push the SAME spin later (same names, same landing row). */
+    const reveal = {
+      entrants: entrants.map(e => ({ username: e.username })),
+      winnerIndex,
+      rarity: state.rarity || null,
+      who: chosen.username,
+    };
     /* The rarity is stamped on the winner, not read again at send-code time.
        Between picking and sending, a moderator may well have reopened
        entries for the next draw — and the prize belongs to the draw that was
@@ -356,6 +371,7 @@ export async function onRequestPost(context) {
       entrantCount: pool.length,
       pickedAt: Date.now(),
       sent: false,
+      reveal,
     };
     await env.MARKETPLACE.put(WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
 
@@ -369,13 +385,7 @@ export async function onRequestPost(context) {
        panel. Only usernames and the index the reel has to land on — nothing
        here is more than what is already on screen at the control panel. */
     const { pushOverlayEvent } = await import('../overlay/events.js');
-    await pushOverlayEvent(env, {
-      type: 'giveaway-spin',
-      entrants: entrants.map(e => ({ username: e.username })),
-      winnerIndex,
-      rarity: winner.rarity,
-      who: winner.username,
-    });
+    await pushOverlayEvent(env, { type: 'giveaway-spin', ...reveal });
 
     return json({
       success: true,
@@ -485,6 +495,19 @@ export async function onRequestPost(context) {
     /* The prize is drawn at the grand (mythic) tier — this is the big monthly
        giveaway — but the reveal LABEL says "Monthly Giveaway" rather than a
        rarity, and send-monthly-code still lets a moderator override the tier. */
+    /* The exact overlay reel payload, stored so "Replay last reveal" can
+       re-push the SAME monthly spin (same bounded weighted strip, same landing
+       row, same label/note) without re-drawing a different winner. */
+    const reel = buildWeightedReelPool(draw.entrants, draw.winner);
+    const reveal = {
+      entrants: reel.pool,
+      winnerIndex: reel.winnerIndex,
+      rarity: 'mythic',
+      who: draw.winner.username,
+      label: 'Monthly Giveaway',
+      note: `Drawn from ${draw.totalEntries} entries across ${draw.totalPeople} ${draw.totalPeople === 1 ? 'person' : 'people'}`,
+    };
+
     const winner = {
       userId: draw.winner.userId,
       username: draw.winner.username,
@@ -495,6 +518,7 @@ export async function onRequestPost(context) {
       rarity: 'mythic',
       pickedAt: Date.now(),
       sent: false,
+      reveal,
     };
     await env.MARKETPLACE.put(MONTHLY_WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
 
@@ -508,17 +532,8 @@ export async function onRequestPost(context) {
        the monthly draw and noting the pool it came from. The reel pool is a
        BOUNDED, WEIGHTED, cosmetic strip — the weighted pick above is
        authoritative — and PhamReel lands it on that winner. */
-    const reel = buildWeightedReelPool(draw.entrants, draw.winner);
     const { pushOverlayEvent } = await import('../overlay/events.js');
-    await pushOverlayEvent(env, {
-      type: 'giveaway-spin',
-      entrants: reel.pool,
-      winnerIndex: reel.winnerIndex,
-      rarity: 'mythic',
-      who: winner.username,
-      label: 'Monthly Giveaway',
-      note: `Drawn from ${draw.totalEntries} entries across ${draw.totalPeople} ${draw.totalPeople === 1 ? 'person' : 'people'}`,
-    });
+    await pushOverlayEvent(env, { type: 'giveaway-spin', ...reveal });
 
     return json({
       success: true,
@@ -584,6 +599,27 @@ export async function onRequestPost(context) {
       expiresAt: prize ? prize.expiresAt : null,
       winner: { ...publicEntrant(winner), sent: true, sentAt: winner.sentAt },
     });
+  }
+
+  /* ── REPLAY LAST REVEAL ───────────────────────────────────────────────
+     Re-push a stored winner's giveaway-spin reveal to the overlay, for the
+     Overlay Dashboard's "Replay last reveal" buttons. The draws themselves
+     stay on Bot Control; this only re-shows the reel that already happened.
+     which='monthly' replays the monthly draw, anything else the Big Prize. */
+  if (body.action === 'replay') {
+    const which = body.which === 'monthly' ? 'monthly' : 'big';
+    const key = which === 'monthly' ? MONTHLY_WINNER_KEY : WINNER_KEY;
+    const winner = await env.MARKETPLACE.get(key, 'json');
+    if (!winner || !winner.reveal) {
+      return json({
+        error: which === 'monthly'
+          ? 'No monthly winner to replay yet — draw one from Bot Control first.'
+          : 'No Big Prize winner to replay yet — spin one from Bot Control first.',
+      }, 400);
+    }
+    const { pushOverlayEvent } = await import('../overlay/events.js');
+    await pushOverlayEvent(env, { type: 'giveaway-spin', ...winner.reveal });
+    return json({ success: true, which, who: winner.username });
   }
 
   return json({ error: 'Invalid action' }, 400);
