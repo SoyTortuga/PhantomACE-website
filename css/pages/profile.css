@@ -30,6 +30,54 @@
   flex-wrap: wrap;
 }
 
+/* ── Equipped banner (hero behind the identity card) ──────────────
+   The banner image fills the card; a dark red/black gothic vignette sits over
+   it so the name reads in both themes. Glow/borders only — no box-shadow, no
+   side-border accent, no backdrop-filter. The scrim is dark in BOTH themes, so
+   the overlaid text is forced to #fff (the "text on a dark fill" rule) rather
+   than the theme's ink, which would vanish here. */
+.prof-head.has-banner {
+  position: relative;
+  overflow: hidden;
+  min-height: 168px;
+  align-items: flex-end;
+}
+
+.prof-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.prof-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.55) 50%, rgba(0, 0, 0, 0.30) 100%),
+    radial-gradient(140% 130% at 6% 100%, rgba(230, 0, 0, 0.16) 0%, transparent 55%);
+}
+
+.prof-head.has-banner > .prof-avatar,
+.prof-head.has-banner > .prof-ident {
+  position: relative;
+  z-index: 2;
+}
+
+.prof-head.has-banner .prof-name { color: #fff; }
+.prof-head.has-banner .prof-name.name-fx-exclusive { color: var(--exclusive); }
+.prof-head.has-banner .prof-title,
+.prof-head.has-banner .prof-tenure,
+.prof-head.has-banner .prof-role,
+.prof-head.has-banner .prof-dot { color: #fff; }
+.prof-head.has-banner .prof-vip { color: var(--tier-vip); }
+
 .prof-avatar {
   width: 88px;
   height: 88px;

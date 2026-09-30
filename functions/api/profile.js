@@ -154,6 +154,11 @@ export async function onRequestGet(context) {
     image: (i.meta && (i.meta.image || i.meta.imageUrl4x || i.meta.imageUrl2x || i.meta.imageUrl1x)) || null,
     months: (i.meta && i.meta.monthThreshold) || null,
     founder: !!(i.meta && i.meta.founder),
+    /* The variant id a cosmetic may carry (name-effect, banner). Legacy items
+       don't have it — the client falls back to rarity + name — but exposing it
+       lets a future explicit id win, and it is a short opaque string, not the
+       rest of meta. */
+    effect: (i.meta && i.meta.effect) || null,
   });
 
   const byId = (id) => items.find(i => i.id === id) || null;
