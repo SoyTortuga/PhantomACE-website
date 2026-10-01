@@ -23,14 +23,9 @@ const EVENT_MAX_MS = 30 * 60 * 1000;   /* cap a frenzy at 30 min, whoever sets i
 
 const saveKey = (userId) => `sc_save_${userId}`;
 
-/* A finite, sane ceiling for every stored number. The top of the board legitimately
-   reaches past 1e200, so this sits far above real play while staying well below
-   Number.MAX_VALUE (~1.8e308) — anything past it is corruption, not a whale.
-   finite() coerces any value into [0, cap]: Infinity → cap, NaN/-Infinity/negative → 0.
-   Used on WRITE (a bad client's Infinity/NaN never persists) and on READ (an
-   already-stored non-finite value heals to a finite number instead of rendering
-   as "Infinity", so mvgfamous's bad entry stops showing Infinity before it's even
-   overwritten). */
+/* finite() coerces a BOUNDED numeric field (prestige, ascensions, timestamps,
+   counters) into [0, cap]: Infinity → cap, NaN/-Infinity/negative → 0. These
+   fields never approach the cap in real play; it is purely a corruption guard. */
 const SCORE_CAP = 1e300;
 function finite(v, cap = SCORE_CAP) {
   const n = Number(v);
@@ -38,12 +33,41 @@ function finite(v, cap = SCORE_CAP) {
   return n === Infinity ? cap : 0;
 }
 
+/* ── Big-number scores ───────────────────────────────────────────────────
+   Lifetime skulls can now exceed the JS double ceiling (~1.8e308), so a score
+   is stored as a STRING ("1.23e500") and ranked by scoreLog (= log10, a tiny
+   finite number like 500 that never overflows). parseScoreLog accepts BOTH the
+   new {score:string, scoreLog:number} shape AND legacy numeric scores (the live
+   board holds values like 1.48e191 and the two entries pinned to the real top),
+   so reads and sorts stay correct across the migration. */
+function parseScoreLog(score, scoreLog) {
+  const sl = Number(scoreLog);
+  if (Number.isFinite(sl) && sl > 0) return sl;
+  const n = Number(score);
+  if (Number.isFinite(n)) return n > 0 ? Math.log10(n) : 0;
+  const m = String(score).match(/^(\d+(?:\.\d+)?)[eE]\+?(\d+)$/);
+  if (m) return Math.log10(parseFloat(m[1])) + parseFloat(m[2]);
+  return 0;
+}
+/* Canonical stored score. Keeps a finite legacy Number as-is (back-compat with
+   any numeric consumer), keeps a new string as-is, and neutralises a non-finite
+   legacy value to 0. */
+function cleanScore(score) {
+  if (typeof score === 'string') return score;
+  const n = Number(score);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 /* Every save-state scalar that participates in arithmetic (mirrors the client's
    SC_NUM_FIELDS). Timestamps are numbers too and pass through untouched — they sit
    well under the cap, and a non-finite one heals to 0, which every reader treats as
    "unset". clickMulti/globalCpsMult are cleaned separately so they never heal to 0
    (which would zero out production/clicks). */
-const SC_STATE_NUM_FIELDS = ['skulls','totalSkulls','lifetimeSkulls','prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','seasonBaseline','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
+/* skulls/totalSkulls/lifetimeSkulls/seasonBaseline are DELIBERATELY absent: they
+   are big-number strings now, so finite() must never touch them (it would parse
+   "1.2e500" to Infinity and overwrite the string with the cap). They pass through
+   untouched; the client parses them back into Decimals on load. */
+const SC_STATE_NUM_FIELDS = ['prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
 function sanitizeState(state) {
   if (!state || typeof state !== 'object') return state;
   for (const k of SC_STATE_NUM_FIELDS) if (typeof state[k] === 'number') state[k] = finite(state[k]);
@@ -61,12 +85,14 @@ function sanitizeState(state) {
    display never shows Infinity. */
 function sanitizeEntry(e) {
   if (!e || typeof e !== 'object') return e;
-  return {
+  const out = {
     ...e,
-    score: finite(e.score),
+    score: cleanScore(e.score),
+    scoreLog: parseScoreLog(e.score, e.scoreLog),
     prestige: Math.max(0, Math.min(9999, Math.floor(finite(e.prestige)))),
     ascensions: Math.max(0, Math.min(99999, Math.floor(finite(e.ascensions)))),
   };
+  return out;
 }
 
 /**
@@ -126,7 +152,10 @@ async function rolloverSeason(env) {
 /* Coerces non-finite (Infinity/NaN/-Infinity) and negatives to 0, so a corrupt save
    ranks as LOWEST in outranks() below and can never win the merge over a good save. */
 function num(v) { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; }
-function lifetimeOf(state) { return Math.max(num(state && state.lifetimeSkulls), num(state && state.totalSkulls)); }
+/* lifetime now ranks by log10 — the raw value is a big-number string that would
+   overflow Number() to Infinity. Compares legacy numeric saves and new string
+   saves alike, and a corrupt/missing value ranks lowest (log 0). */
+function lifetimeOf(state) { return Math.max(parseScoreLog(state && state.lifetimeSkulls), parseScoreLog(state && state.totalSkulls)); }
 function prestigeOf(state) { return Math.floor(num(state && state.prestige)); }
 function ascensionOf(state) { return Math.floor(num(state && state.ascensions)); }
 /* The seasonal-reset epoch as a monotonic month index (0 when missing, so a
@@ -258,12 +287,12 @@ export async function onRequestPost(context) {
   const player = getPlayer(request, body);
   if (!player) return json({ error: 'Not authenticated' }, 401);
 
-  /* finite() first: Math.floor(Infinity) is Infinity and Infinity > 0, so a raw
-     Math.floor guard would let a non-finite score PASS and sort to the top as
-     "Infinity". Coerce to [0, cap] up front — a JSON'd Infinity arrives as null → 0
-     and is rejected, a genuinely huge value clamps to the cap. */
-  const score = Math.floor(finite(body.score));
-  if (score <= 0) return json({ error: 'Invalid score' }, 400);
+  /* Big-number score: travels as a string + scoreLog (log10). Rank/compare by
+     scoreLog, store the string. A JSON'd Infinity arrives as null → log 0 → rejected;
+     real scores (lifetime ≥ 100) have scoreLog ≥ 2. */
+  const scoreLog = parseScoreLog(body.score, body.scoreLog);
+  if (!(scoreLog > 0)) return json({ error: 'Invalid score' }, 400);
+  const score = cleanScore(body.score);
   /* Carried for display — a prestige tier beside the name is the visible
      reward for resetting. Bounded so a bad client cannot store nonsense. */
   const prestige = Math.max(0, Math.min(9999, Math.floor(Number(body.prestige) || 0)));
@@ -275,21 +304,20 @@ export async function onRequestPost(context) {
 
   /* SEASON board — skulls gathered this month, sent alongside the lifetime
      score. Handled first and independently so it still records even when the
-     lifetime board's early-return fires below. */
-  /* finite() closes the same Math.floor(Infinity) hole here — Math.max(0, Infinity)
-     would otherwise store Infinity on the season board. */
-  const seasonScore = Math.floor(finite(body.seasonScore));
-  if (seasonScore > 0) {
+     lifetime board's early-return fires below. Same string+scoreLog shape. */
+  const seasonLog = parseScoreLog(body.seasonScore, body.seasonScoreLog);
+  const seasonScore = cleanScore(body.seasonScore);
+  if (seasonLog > 0) {
     const s = await rolloverSeason(env);
     const ex = s.entries.find(e => e.id === player.id);
     if (ex) {
-      if (seasonScore > ex.score) { ex.score = seasonScore; ex.name = player.name; ex.prestige = prestige; ex.updatedAt = Date.now(); }
+      if (seasonLog > parseScoreLog(ex.score, ex.scoreLog)) { ex.score = seasonScore; ex.scoreLog = seasonLog; ex.name = player.name; ex.prestige = prestige; ex.updatedAt = Date.now(); }
       else if (prestige > (ex.prestige || 0)) { ex.prestige = prestige; }
       ex.ascensions = Math.max(ex.ascensions || 0, ascensions);   /* display badge, ratchets up */
     } else {
-      s.entries.push({ id: player.id, name: player.name, score: seasonScore, prestige, ascensions, updatedAt: Date.now() });
+      s.entries.push({ id: player.id, name: player.name, score: seasonScore, scoreLog: seasonLog, prestige, ascensions, updatedAt: Date.now() });
     }
-    s.entries.sort((a, b) => b.score - a.score);
+    s.entries.sort((a, b) => parseScoreLog(b.score, b.scoreLog) - parseScoreLog(a.score, a.scoreLog));
     s.entries = s.entries.slice(0, 50);
     await env.MARKETPLACE.put(SEASON_KEY, JSON.stringify(s));
   }
@@ -298,8 +326,9 @@ export async function onRequestPost(context) {
 
   const existing = lb.find(e => e.id === player.id);
   if (existing) {
-    if (score > existing.score) {
+    if (scoreLog > parseScoreLog(existing.score, existing.scoreLog)) {
       existing.score = score;
+      existing.scoreLog = scoreLog;
       existing.name = player.name;
       existing.prestige = prestige;
       existing.ascensions = Math.max(existing.ascensions || 0, ascensions);
@@ -316,10 +345,10 @@ export async function onRequestPost(context) {
       return json({ success: true, updated: false });
     }
   } else {
-    lb.push({ id: player.id, name: player.name, score, prestige, ascensions, updatedAt: Date.now() });
+    lb.push({ id: player.id, name: player.name, score, scoreLog, prestige, ascensions, updatedAt: Date.now() });
   }
 
-  lb.sort((a, b) => b.score - a.score);
+  lb.sort((a, b) => parseScoreLog(b.score, b.scoreLog) - parseScoreLog(a.score, a.scoreLog));
   const trimmed = lb.slice(0, 50);
   await env.MARKETPLACE.put(LB_KEY, JSON.stringify(trimmed));
 

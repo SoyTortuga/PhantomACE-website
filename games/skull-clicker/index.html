@@ -938,6 +938,10 @@
   <div class="save-msg" id="saveMsg">Saved</div>
 
   <script src="/js/session-read.js"></script>
+  <!-- break_infinity.js (vendored, self-hosted — no CDN): Decimal big-number type
+       so skulls/production/costs grow past the JS double ceiling (~1.8e308)
+       without overflowing to Infinity. Loaded before the game script below. -->
+  <script src="break_infinity.min.js"></script>
 <script>
     /* ═══════ CONSTANTS ═══════ */
 
@@ -1107,7 +1111,7 @@
     const SPELLS = [
       { id:'conjure', name:'Conjure the Dead', icon:'assets/icons/buff-lucky.png', costFlat:2, costFrac:0.40, risk:1,
         desc:'Instantly reap 15% of your bank (up to 30 min of production)',
-        cast:() => { const gain = Math.max(getClickPower() * 20, Math.min(skulls * 0.15, getCPS() * 1800)); earn(gain); return 'CONJURE THE DEAD — +' + formatNum(gain) + ' skulls'; } },
+        cast:() => { const gain = Decimal.max(getClickPower().mul(20), Decimal.min(skulls.mul(0.15), getCPS().mul(1800))); earn(gain); return 'CONJURE THE DEAD — +' + formatNum(gain) + ' skulls'; } },
       { id:'hand', name:'Hand of Fate', icon:'assets/icons/wrath-skull.png', costFlat:10, costFrac:0.60, risk:1.6,
         desc:'Summon a cursed skull at once — but the dead may answer with wrath',
         cast:() => { spawnCursed(); return 'HAND OF FATE — a cursed skull answers your call'; } },
@@ -1124,7 +1128,7 @@
         desc:'Raise free copies of a building you own — if the earth holds',
         cast:() => {
           const own = BUILDINGS.filter(b => owned[b.id] > 0);
-          if (!own.length) { const g = Math.max(getClickPower() * 50, getCPS() * 300); earn(g); return 'RAISE MONUMENT — no dominion yet; +' + formatNum(g) + ' skulls instead'; }
+          if (!own.length) { const g = Decimal.max(getClickPower().mul(50), getCPS().mul(300)); earn(g); return 'RAISE MONUMENT — no dominion yet; +' + formatNum(g) + ' skulls instead'; }
           const b = own[Math.floor(Math.random() * own.length)];
           const add = Math.max(1, Math.round(owned[b.id] * 0.05));
           owned[b.id] += add; lastBought = b.id; renderWorld();
@@ -1281,7 +1285,11 @@
     /* Shards a prestige would grant — cube-root of the run total (so a fresh
        reset yields none and cannot be farmed), lifted by Bone Harvest. */
     function pendingShards() {
-      const base = Math.floor(Math.cbrt(Math.max(0, totalSkulls) / 1e6));
+      /* cube-root of the run total / 1e6, kept finite even for astronomical runs:
+         the Decimal cbrt never overflows, and we clamp before leaving Decimal so
+         boneShards (a plain Number spent in a small shop) stays finite. */
+      const cb = Decimal.max(0, totalSkulls).div(1e6).cbrt();
+      const base = cb.gte(1e300) ? 1e300 : Math.floor(cb.toNumber());
       return Math.floor(base * (1 + 0.04 * pLvl('t_shard')) * auraShardMult());
     }
     function offlineRate() { return (pHas('offline2') ? 1.5 : (pHas('greed') ? 1 : 0.5)) * (auraActive('hoard') ? 1.5 : 1); }
@@ -1325,7 +1333,7 @@
 
     /* A harvest pays skulls scaled to the player's current economy so it stays
        relevant at any tier, but is bounded so it can never dwarf idle income. */
-    function gardenYield(sec) { return Math.max(getClickPower() * 15, Math.min(getCPS() * 300, getCPS() * sec)); }
+    function gardenYield(sec) { return Decimal.max(getClickPower().mul(15), Decimal.min(getCPS().mul(300), getCPS().mul(sec))); }
 
     const STRAINS = [
       { id:'bone',  name:'Boneshoot',  emoji:'🌱', rarity:'common',   growMs:2 * 60000,  plantable:true, cpsBonus:0.01,
@@ -1475,7 +1483,7 @@
        Purely timestamp-derived, so it is correct online and after an offline gap. */
     function seasonActive() { return seasonAutoWindow() || seasonEndsAt > Date.now(); }
     function seasonRemainingMs() { return seasonAutoWindow() ? Infinity : Math.max(0, seasonEndsAt - Date.now()); }
-    function seasonSwitchCost() { return Math.max(SEASON_SWITCH_MIN, Math.floor(getCPS() * SEASON_SWITCH_CPS_SECONDS)); }
+    function seasonSwitchCost() { return Decimal.max(SEASON_SWITCH_MIN, getCPS().mul(SEASON_SWITCH_CPS_SECONDS).floor()); }
 
     /* Relic effect readers. Bonuses apply once bought and always (CC's spooky
        upgrades are permanent), independent of whether the season is currently lit. */
@@ -1501,10 +1509,10 @@
       { id:'clk2', name:'Relentless',      desc:'Click 1,000 times',         check:() => totalClicks >= 1000 },
       { id:'clk3', name:'Bonebreaker',     desc:'Click 10,000 times',        check:() => totalClicks >= 10000 },
       { id:'clk4', name:'Carpal Tunnel',   desc:'Click 100,000 times',       check:() => totalClicks >= 100000 },
-      { id:'sk1',  name:'First Blood',     desc:'Gather 1M skulls',          check:() => lifetimeSkulls >= 1e6 },
-      { id:'sk2',  name:'Charnel Lord',    desc:'Gather 1B skulls',          check:() => lifetimeSkulls >= 1e9 },
-      { id:'sk3',  name:'Bone Tycoon',     desc:'Gather 1T skulls',          check:() => lifetimeSkulls >= 1e12 },
-      { id:'sk4',  name:'Ossuary Emperor', desc:'Gather 1Qa skulls',         check:() => lifetimeSkulls >= 1e15 },
+      { id:'sk1',  name:'First Blood',     desc:'Gather 1M skulls',          check:() => lifetimeSkulls.gte(1e6) },
+      { id:'sk2',  name:'Charnel Lord',    desc:'Gather 1B skulls',          check:() => lifetimeSkulls.gte(1e9) },
+      { id:'sk3',  name:'Bone Tycoon',     desc:'Gather 1T skulls',          check:() => lifetimeSkulls.gte(1e12) },
+      { id:'sk4',  name:'Ossuary Emperor', desc:'Gather 1Qa skulls',         check:() => lifetimeSkulls.gte(1e15) },
       { id:'bld1', name:'Groundskeeper',   desc:'Own 10 buildings',          check:() => totalBuildings() >= 10 },
       { id:'bld2', name:'Warden',          desc:'Own 50 buildings',          check:() => totalBuildings() >= 50 },
       { id:'bld3', name:'Overseer',        desc:'Own 100 buildings',         check:() => totalBuildings() >= 100 },
@@ -1536,9 +1544,16 @@
 
     /* ═══════ STATE ═══════ */
 
-    let skulls = 0;
-    let totalSkulls = 0;         /* this run — resets on prestige */
-    let lifetimeSkulls = 0;      /* every skull ever gathered — never resets */
+    /* ── Big-number currencies (break_infinity Decimal) ──────────────────
+       skulls / totalSkulls / lifetimeSkulls / seasonBaseline grow past the JS
+       double ceiling (~1.8e308) in long play, so they are Decimal, not Number.
+       Everything that produces or spends them (CPS, click power, building costs,
+       prestige requirement) is Decimal too. Bounded counters (prestige,
+       ascensions, currencies spent in small shops, levels, timestamps) stay
+       plain Number — they never approach 1e308. */
+    let skulls = new Decimal(0);
+    let totalSkulls = new Decimal(0);   /* this run — resets on prestige */
+    let lifetimeSkulls = new Decimal(0);/* every skull ever gathered — never resets */
     let prestige = 0;            /* permanent multiplier tier */
     let totalClicks = 0;
     let clickBonus = 0;
@@ -1609,7 +1624,7 @@
        is lifetime at the season's start; when the month turns it moves up to
        the current lifetime, so the new month counts from zero. (LEADERBOARD
        only — distinct from seasonEpoch below, which drives the monthly reset.) */
-    let seasonBaseline = 0, seasonMonth = '';
+    let seasonBaseline = new Decimal(0), seasonMonth = '';   /* Decimal: snapshot of lifetime at season start */
     /* MONTHLY SEASONAL RESET epoch (server-authoritative UTC month key, e.g.
        '2026-10'). null = unknown/pre-migration → adopt the server epoch on load
        WITHOUT wiping. When a loaded save's epoch is older than the server's, a
@@ -1772,7 +1787,9 @@
     /* ═══════ COMPUTED ═══════ */
 
     function getBuildingCost(b) {
-      return Math.ceil(b.baseCost * Math.pow(1.15, owned[b.id]) * buildingCostMult() * buffCostMult());
+      /* Decimal: cost = baseCost · 1.15^owned, which overflows a double around
+         owned ≈ 4900. */
+      return new Decimal(b.baseCost).mul(new Decimal(1.15).pow(owned[b.id])).mul(buildingCostMult() * buffCostMult()).ceil();
     }
 
     /* Prestige is the whole point of a resource-gathering game with no win:
@@ -1921,36 +1938,39 @@
        upgrades multiply it, and a cross-boost scales it by how many of ANOTHER
        building you own. Computed live so nothing has to be baked into a saved
        stat. (SYNERGY is filled in Phase B; empty here means ×1.) */
-    /* ── Non-finite guard ──────────────────────────────────────────────
-       A long enough auto-buy/auto-prestige idle run grows owned[] and the multiplier
-       stack until getGrossCPS()'s product (or the running lifetimeSkulls += sum) crosses
-       Number.MAX_VALUE and rounds to Infinity; earn() then propagates it into every
-       total and it displays as "Infinity". VALUE_CAP is a finite ceiling far above real
-       play (top of the board ~1e200) but below MAX_VALUE (~1.8e308), so the compute
-       paths clamp to it instead of overflowing, and a corrupted save is scrubbed on
-       load. This is the root fix the v13 value-only scrub missed: the enormous (but
-       finite) building/multiplier state survives a save, so the next tick just
-       recomputes Infinity unless the compute itself is capped. */
-    const VALUE_CAP = 1e300;
-    function clampFinite(v, cap = VALUE_CAP) {
-      const n = Number(v);
-      if (Number.isFinite(n)) return n < 0 ? 0 : (n > cap ? cap : n);
-      return n === Infinity ? cap : 0;
+    /* ── Big-number helpers (break_infinity) ─────────────────────────────
+       The old overflow problem — a long auto-buy/auto-prestige idle run growing
+       the multiplier stack until getGrossCPS()'s product crossed Number.MAX_VALUE
+       and rounded to Infinity, which then stuck in every total and displayed as
+       "Infinity"/"MAX" — cannot happen with Decimal: there is no overflow and no
+       ceiling, so the VALUE_CAP / clampFinite clamp is gone. toDec() is the one
+       guard the Decimal path still needs: it coerces anything (legacy Number, a
+       saved string, undefined, or a stray non-finite) into a sane Decimal, since
+       new Decimal(NaN/Infinity) is not useful. The four big-number currencies
+       serialize to strings on save and parse back through toDec on load. */
+    const SC_DECIMAL_FIELDS = ['skulls', 'totalSkulls', 'lifetimeSkulls', 'seasonBaseline'];
+    function toDec(v) {
+      if (v instanceof Decimal) return v;
+      if (v === undefined || v === null || v === '') return new Decimal(0);
+      if (typeof v === 'number' && !Number.isFinite(v)) return new Decimal(0);
+      let d;
+      try { d = new Decimal(v); } catch (e) { return new Decimal(0); }
+      return (d && Number.isFinite(d.mantissa) && Number.isFinite(d.exponent)) ? d : new Decimal(0);
     }
-    /* Every persisted scalar that participates in arithmetic — sanitised on load and
-       before save so a non-finite value can never enter (or leave) the game. Timestamps
-       are numbers too and pass through untouched (well under the cap; a non-finite one
-       heals to 0, which every caller treats as "unset"). clickMulti/globalCpsMult are
-       handled separately so they never heal to 0 (that would zero out clicks/CPS). */
-    const SC_NUM_FIELDS = ['skulls','totalSkulls','lifetimeSkulls','prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','seasonBaseline','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
-    function sanitizeSaveNumbers(d) {
+    /* Heal the plain-Number fields of a loaded save blob so a non-finite/negative
+       value can never enter the game. The four Decimal fields are handled by toDec
+       in migrateSave; everything else is a bounded Number. clickMulti/globalCpsMult
+       never heal to 0 (that would zero out clicks/CPS). */
+    function healPlainNumbers(d) {
       if (!d || typeof d !== 'object') return d;
-      for (const k of SC_NUM_FIELDS) if (typeof d[k] === 'number') d[k] = clampFinite(d[k]);
       for (const map of [d.owned, d.metaLevels, d.buildingLevels, d.perkLevels]) {
-        if (map && typeof map === 'object') for (const k in map) if (typeof map[k] === 'number') map[k] = clampFinite(map[k]);
+        if (map && typeof map === 'object') for (const k in map) {
+          const n = Number(map[k]);
+          if (!Number.isFinite(n) || n < 0) map[k] = 0;
+        }
       }
-      d.clickMulti = clampFinite(d.clickMulti) > 0 ? clampFinite(d.clickMulti) : 1;
-      d.globalCpsMult = clampFinite(d.globalCpsMult) > 0 ? clampFinite(d.globalCpsMult) : 1;
+      if (!(Number(d.clickMulti) > 0)) d.clickMulti = 1;
+      if (!(Number(d.globalCpsMult) > 0)) d.globalCpsMult = 1;
       return d;
     }
 
@@ -1964,16 +1984,19 @@
       return m;
     }
 
-    /* Gross production — everything the buildings make before wraith drain. */
+    /* Gross production — everything the buildings make before wraith drain.
+       Returns a Decimal: the building sum can climb past the double ceiling, so
+       the per-building contributions accumulate as Decimal. The global multiplier
+       stack is all bounded Numbers, folded into one Number factor. */
     function getGrossCPS() {
-      let cps = 0;
+      let cps = new Decimal(0);
       for (const b of BUILDINGS) {
-        cps += b.baseCps * owned[b.id] * getBuildingMult(b) * buildingLevelMult(b.id);
+        cps = cps.add(new Decimal(b.baseCps).mul(owned[b.id]).mul(getBuildingMult(b)).mul(buildingLevelMult(b.id)));
       }
-      return clampFinite(cps * globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult() * seasonRelicCpsMult());
+      return cps.mul(globalCpsMult * cpBoostMult * getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult() * petAuraCpsMult() * apocProdMult() * buffCpsMult() * gardenCpsMult() * seasonRelicCpsMult());
     }
     /* Net production the player actually receives — gross minus wraith drain. */
-    function getCPS() { return getGrossCPS() * wraithDrainMult(); }
+    function getCPS() { return getGrossCPS().mul(wraithDrainMult()); }
 
     /* ── Skullpocalypse computed state ── */
     function apocCalm() { return apocPacifiedUntil > Date.now(); }
@@ -1990,7 +2013,7 @@
       const n = (apocActive && !apocCalm()) ? wraiths.length : 0;
       return n <= 0 ? 1 : Math.max(0.4, 1 - WRAITH_DRAIN * n);
     }
-    function apocUnlockable() { return lifetimeSkulls >= APOC_UNLOCK_LIFETIME || prestige >= APOC_UNLOCK_PRESTIGE; }
+    function apocUnlockable() { return lifetimeSkulls.gte(APOC_UNLOCK_LIFETIME) || prestige >= APOC_UNLOCK_PRESTIGE; }
 
     /* Blood Rush multiplies the WHOLE click, not just the base term. It used
        to sit inside `base`, so anyone with a %-of-CPS click upgrade (Void
@@ -2002,22 +2025,18 @@
        players who've played long enough to unlock it. */
     function getClickPower() {
       const base = ((1 + clickBonus) * clickMulti) * getPrestigeMult() * achMult() * perkClickMult() * metaClickMult();
-      return clampFinite((base + (getCPS() * cpsClickPct / 100)) * buffClickMult() * gardenClickMult() * seasonRelicClickMult());
+      return new Decimal(base).add(getCPS().mul(cpsClickPct / 100)).mul(buffClickMult() * gardenClickMult() * seasonRelicClickMult());
     }
 
     /* Every skull earned flows through here so the run total and the
        lifetime total can never drift apart — lifetime is the leaderboard
-       score and the save-merge key, so it must count every path. */
+       score and the save-merge key, so it must count every path. All three
+       are Decimal, so there is no overflow to guard against. */
     function earn(amount) {
-      amount = clampFinite(amount);
-      skulls += amount;
-      totalSkulls += amount;
-      lifetimeSkulls += amount;
-      /* Clamp the running totals so a huge addend can never push a total past
-         Number.MAX_VALUE into Infinity (which then sticks and displays forever). */
-      skulls = clampFinite(skulls);
-      totalSkulls = clampFinite(totalSkulls);
-      lifetimeSkulls = clampFinite(lifetimeSkulls);
+      const a = (amount instanceof Decimal) ? amount : toDec(amount);
+      skulls = skulls.add(a);
+      totalSkulls = totalSkulls.add(a);
+      lifetimeSkulls = lifetimeSkulls.add(a);
     }
 
     /* ═══════ ACTIONS ═══════ */
@@ -2037,9 +2056,9 @@
       combo = (now - lastClickAt < 1200) ? Math.min(combo + 1, 100) : 1;
       lastClickAt = now;
 
-      let power = getClickPower() * comboMult();
+      let power = getClickPower().mul(comboMult());
       const crit = Math.random() < critChance();
-      if (crit) power *= critMult();
+      if (crit) power = power.mul(critMult());
 
       earn(power);
       totalClicks++;
@@ -2065,16 +2084,22 @@
     /* Sum of the next `amount` prices for a building — a geometric series, so
        ×10 and ×100 are one formula rather than a loop. */
     function getBulkCost(b, amount) {
-      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult() * buffCostMult();
-      return Math.ceil(base * (Math.pow(r, amount) - 1) / (r - 1));
+      const r = COST_RATE;
+      const base = new Decimal(b.baseCost).mul(new Decimal(r).pow(owned[b.id])).mul(buildingCostMult() * buffCostMult());
+      return base.mul(Math.pow(r, amount) - 1).div(r - 1).ceil();
     }
 
     /* How many of a building the current bank can buy — the inverse of the
-       series above, so "Max" is exact rather than a loop that could stall. */
+       series above, so "Max" is exact rather than a loop that could stall.
+       Returns a plain integer count; the Decimal log keeps it correct even when
+       skulls/base are astronomically large. */
     function maxAffordable(b) {
-      const r = COST_RATE, base = b.baseCost * Math.pow(r, owned[b.id]) * buildingCostMult() * buffCostMult();
-      const n = Math.floor(Math.log((skulls * (r - 1)) / base + 1) / Math.log(r));
-      return Math.max(0, n);
+      const r = COST_RATE;
+      const base = new Decimal(b.baseCost).mul(new Decimal(r).pow(owned[b.id])).mul(buildingCostMult() * buffCostMult());
+      /* n = floor( log_r( skulls·(r-1)/base + 1 ) ) = floor( log10(X) / log10(r) ) */
+      const X = skulls.mul(r - 1).div(base).add(1);
+      const n = Math.floor(X.log10() / Math.log10(r));
+      return Math.max(0, Number.isFinite(n) ? n : 0);
     }
 
     /* The quantity a click will buy right now, honouring the ×1/×10/×100/Max
@@ -2090,8 +2115,8 @@
       const qty = buyQuantity(b);
       if (qty < 1) { shakeReject(e); return; }
       const cost = getBulkCost(b, qty);
-      if (skulls < cost) { shakeReject(e); return; }
-      skulls -= cost;
+      if (skulls.lt(cost)) { shakeReject(e); return; }
+      skulls = skulls.sub(cost);
       owned[b.id] += qty;
       lastBought = b.id;
       playSound('buy');
@@ -2109,8 +2134,8 @@
     function buyUpgrade(id, e) {
       const u = UPGRADES.find(x => x.id === id);
       if (!u || boughtUpgrades.has(id)) return;
-      if (skulls < u.cost) { shakeReject(e); return; }
-      skulls -= u.cost;
+      if (skulls.lt(u.cost)) { shakeReject(e); return; }
+      skulls = skulls.sub(u.cost);
       boughtUpgrades.add(id);
       if (u.apply) u.apply();   /* synergy upgrades have no apply — computed live */
       checkAchievements();
@@ -2121,8 +2146,8 @@
     function buyGhoul(id, e) {
       const g = GHOULS.find(x => x.id === id);
       if (!g || boughtGhouls.has(id)) return;
-      if (skulls < g.cost) { shakeReject(e); return; }
-      skulls -= g.cost;
+      if (skulls.lt(g.cost)) { shakeReject(e); return; }
+      skulls = skulls.sub(g.cost);
       boughtGhouls.add(id);
       playSound('buy');
       checkAchievements();
@@ -2134,8 +2159,8 @@
       const u = SYNERGY.find(x => x.id === id);
       if (!u || boughtUpgrades.has(id)) return;
       if ((owned[u.building] || 0) < u.req) { shakeReject(e); return; }
-      if (skulls < u.cost) { shakeReject(e); return; }
-      skulls -= u.cost;
+      if (skulls.lt(u.cost)) { shakeReject(e); return; }
+      skulls = skulls.sub(u.cost);
       boughtUpgrades.add(id);
       checkAchievements();
       render();
@@ -2149,7 +2174,7 @@
       const rect = btn.getBoundingClientRect();
       const pop = document.createElement('div');
       pop.className = 'click-pop' + (crit ? ' crit' : '');
-      pop.textContent = (crit ? 'CRIT +' : '+') + formatNum(Math.floor(val));
+      pop.textContent = (crit ? 'CRIT +' : '+') + formatNum(toDec(val).floor());
       pop.style.left = (e.clientX - rect.left) + 'px';
       pop.style.top = (e.clientY - rect.top - 10) + 'px';
       btn.appendChild(pop);
@@ -2159,7 +2184,7 @@
     function checkMilestones() {
       for (let i = 0; i < MILESTONES.length; i++) {
         const m = MILESTONES[i];
-        if (totalSkulls >= m && !hitMilestones.has(m)) {
+        if (totalSkulls.gte(m) && !hitMilestones.has(m)) {
           hitMilestones.add(m);
           showMilestone(m, MS_NAMES[i] || 'Unknown');
         }
@@ -2208,7 +2233,7 @@
       if (tb >= 100) dyn.push('Your dominion numbers ' + tb + ' and grows restless.');
       else if (tb >= 20) dyn.push('Word spreads of a growing necropolis.');
       if (achievements.size >= 10) dyn.push('Scholars catalogue your ' + achievements.size + ' dread feats.');
-      if (getCPS() > 1e9) dyn.push('The skull-tide rises by ' + formatNum(getCPS()) + ' every second.');
+      if (getCPS().gt(1e9)) dyn.push('The skull-tide rises by ' + formatNum(getCPS()) + ' every second.');
       const pool = dyn.length && Math.random() < 0.6 ? dyn : NEWS_GENERIC;
       return pool[Math.floor(Math.random() * pool.length)];
     }
@@ -2387,13 +2412,13 @@
     }
     /* Lucky — a capped windfall: 15% of the bank (cap) plus a minute of CpS. */
     function outLucky() {
-      const reward = (Math.min(Math.max(skulls * 0.15, getClickPower() * 20), getCPS() * 900) + getCPS() * 60) * windfallMult();
+      const reward = Decimal.min(Decimal.max(skulls.mul(0.15), getClickPower().mul(20)), getCPS().mul(900)).add(getCPS().mul(60)).mul(windfallMult());
       earn(reward);
       return { msg:'LUCKY — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon', icon:'assets/icons/buff-lucky.png' };
     }
     /* Reap — the big windfall (scales with the Plunder perk). */
     function outReap() {
-      const reap = Math.max(getCPS() * 600, skulls * 0.10, getClickPower() * 100) * reapMult() * windfallMult();
+      const reap = Decimal.max(getCPS().mul(600), skulls.mul(0.10), getClickPower().mul(100)).mul(reapMult() * windfallMult());
       earn(reap);
       return { msg:'REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'epic', icon:'assets/icons/buff-reap.png' };
     }
@@ -2402,9 +2427,9 @@
       const ownedB = BUILDINGS.filter(b => owned[b.id] > 0);
       if (!ownedB.length) return outLucky();
       const b = ownedB[Math.floor(Math.random() * ownedB.length)];
-      const perSec = b.baseCps * owned[b.id] * getBuildingMult(b) * globalCpsMult *
-        getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult();
-      const reward = Math.max(perSec * (60 + Math.random() * 180), getClickPower() * 50) * windfallMult();
+      const perSec = new Decimal(b.baseCps).mul(owned[b.id]).mul(getBuildingMult(b) * globalCpsMult *
+        getPrestigeMult() * achMult() * perkCpsMult() * metaProdMult() * ghoulMult());
+      const reward = Decimal.max(perSec.mul(60 + Math.random() * 180), getClickPower().mul(50)).mul(windfallMult());
       earn(reward);
       return { msg:b.name + ' SPECIAL — +' + formatNum(reward) + ' skulls', kind:'reap', rarity:'uncommon', icon:'assets/icons/buff-building.png' };
     }
@@ -2428,8 +2453,8 @@
       return { msg:'CLOT — production halved for 30s', kind:'reap', rarity:'common' };
     }
     function outRuin() {
-      const loss = Math.min(skulls * 0.05, getCPS() * 30);
-      skulls = Math.max(0, skulls - loss);
+      const loss = Decimal.min(skulls.mul(0.05), getCPS().mul(30));
+      skulls = Decimal.max(0, skulls.sub(loss));
       return { msg:'RUIN — lost ' + formatNum(loss) + ' skulls', kind:'reap', rarity:'common' };
     }
     const WRATH_DEBUFFS = { clot: outClot, ruin: outRuin };   /* triggered by wrath skulls, below */
@@ -2448,7 +2473,7 @@
         addTimedBuff({ id:'frenzy', name:'Wrath Frenzy ×' + mult, kind:'buff', cpsMult:mult, durationMs:dur, icon:'assets/icons/buff-frenzy.png', chipClass:'frenzy' });
         return { msg:'WRATH FRENZY — ×' + mult + ' for ' + Math.round(dur / 1000) + 's', kind:'frenzy', rarity:'legendary', icon:'assets/icons/buff-frenzy.png' };
       }
-      const reap = Math.max(getCPS() * 1200, skulls * 0.20, getClickPower() * 200) * reapMult() * windfallMult();
+      const reap = Decimal.max(getCPS().mul(1200), skulls.mul(0.20), getClickPower().mul(200)).mul(reapMult() * windfallMult());
       earn(reap);
       return { msg:'WRATH REAP — +' + formatNum(reap) + ' skulls', kind:'reap', rarity:'legendary', icon:'assets/icons/buff-reap.png' };
     }
@@ -2520,7 +2545,7 @@
           el.setAttribute('aria-label', 'Wraith-leech');
           el.style.left = (18 + Math.random() * 64) + '%';
           el.style.top = (8 + Math.random() * 64) + '%';
-          const w = { el, bank: 0 };
+          const w = { el, bank: new Decimal(0) };
           el.addEventListener('click', () => popWraith(w));
           area.appendChild(el);
           wraiths.push(w);
@@ -2533,7 +2558,7 @@
       const i = wraiths.indexOf(w);
       if (i < 0) return;
       wraiths.splice(i, 1);
-      const payout = Math.max(w.bank * WRAITH_POP_MULT, getClickPower() * 20);
+      const payout = Decimal.max(toDec(w.bank).mul(WRAITH_POP_MULT), getClickPower().mul(20));
       earn(payout);
       const bonusShards = 1 + apocPhase();
       boneShards += bonusShards;
@@ -2555,7 +2580,7 @@
     /* ═══════ THE GRIMOIRE OF THE DEAD — Essence, unlock, and casting ═══════ */
 
     /* Max Essence scales off lifetime skulls (stable, never reset). */
-    function essenceMax() { return Math.floor(ESSENCE_BASE + Math.pow(Math.max(0, Math.log10(lifetimeSkulls + 1)), 2) * ESSENCE_MAX_K); }
+    function essenceMax() { return Math.floor(ESSENCE_BASE + Math.pow(Math.max(0, lifetimeSkulls.add(1).log10()), 2) * ESSENCE_MAX_K); }
     function essenceRegenPerSec() { return essenceMax() * ESSENCE_REGEN_FRAC; }
     function spellCost(s) { return Math.ceil(s.costFlat + s.costFrac * essenceMax()); }
     /* Rises with the LIFETIME spells-cast counter toward a ceiling, then scaled
@@ -2862,21 +2887,31 @@
        once they run out of "-illion" names — covers up to 10^63 + 676*3 ≈ 10^2091,
        comfortably beyond anything a finite double can ever hold (~1.8e308). */
     function letterSuffix(n) {
-      const a = Math.floor(n / 26), b = n % 26;
-      /* lowercase so it can never be mistaken for a named suffix above (e.g.
-         "dc" vs "Dc" — 300 orders of magnitude apart) even on a quick glance. */
-      return String.fromCharCode(97 + a) + String.fromCharCode(97 + b);
+      /* Bijective-ish base-26, lowercase so it can never be mistaken for a named
+         suffix above (e.g. "dc" vs "Dc"). Two letters cover aa…zz (0…675) exactly
+         as before; past that it simply grows (baa, bab, …), so the scheme works for
+         ARBITRARILY large exponents now that Decimal has no ceiling. */
+      let s = '';
+      n = Math.floor(n);
+      do { s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26); } while (n > 0);
+      if (s.length < 2) s = 'a' + s;
+      return s;
     }
     const NUM_UNITS = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc',
       'Ud','DD','Td','Qad','Qid','Sxd','Spd','Ocd','Nod','Vg'];
 
+    /* Format a Decimal (or Number/string) in the short-scale suffix style, driven
+       by the Decimal's exponent/mantissa so there is no upper bound. For a
+       normalised Decimal, mantissa ∈ [1,10) and floor(log10) === exponent, so the
+       tier and scaled value fall straight out of exponent/mantissa — no overflow,
+       no VALUE_CAP, no "MAX". */
     function formatNum(n) {
-      if (n < 0) return '-' + formatNum(-n);
-      if (!Number.isFinite(n)) return 'MAX';
-      if (n >= VALUE_CAP) return 'MAX';   /* at the ceiling: read as MAX, not a bare "1.00 da" that looks like a glitch */
-      if (n < 1000) return Math.floor(n).toLocaleString();
-      const tier = Math.floor(Math.log10(n) / 3);
-      const scaled = n / Math.pow(10, tier * 3);
+      const d = (n instanceof Decimal) ? n : toDec(n);
+      if (!Number.isFinite(d.mantissa) || !Number.isFinite(d.exponent)) return '0';
+      if (d.lt(0)) return '-' + formatNum(d.neg());
+      if (d.lt(1000)) return Math.floor(d.toNumber()).toLocaleString();
+      const tier = Math.floor(d.exponent / 3);
+      const scaled = d.mantissa * Math.pow(10, d.exponent - tier * 3);
       const str = scaled < 10 ? scaled.toFixed(2) : scaled < 100 ? scaled.toFixed(1) : scaled.toFixed(0);
       const suffix = tier < NUM_UNITS.length ? NUM_UNITS[tier] : letterSuffix(tier - NUM_UNITS.length);
       return str + ' ' + suffix;
@@ -2893,7 +2928,7 @@
     /* ═══════ RENDER ═══════ */
 
     function render() {
-      document.getElementById('score').textContent = formatNum(Math.floor(skulls));
+      document.getElementById('score').textContent = formatNum(skulls.floor());
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
       if (activeTab === 'prestige') renderPrestige();
       if (activeTab === 'reaping') renderReaping();
@@ -2947,7 +2982,7 @@
           '<div class="ranks-you">Your season: <b>' + formatNum(seasonScore()) + '</b></div>';
       } else {
         head += '<div class="ranks-note">Lifetime skulls gathered — never resets.</div>' +
-          '<div class="ranks-you">Your lifetime: <b>' + formatNum(Math.floor(lifetimeSkulls)) + '</b></div>';
+          '<div class="ranks-you">Your lifetime: <b>' + formatNum(lifetimeSkulls.floor()) + '</b></div>';
       }
 
       let rows;
@@ -3109,12 +3144,12 @@
       let rows = '';
       for (const b of BUILDINGS) {
         const cnt = owned[b.id];
-        const revealed = totalSkulls >= b.baseCost * 0.5 || cnt > 0;
+        const revealed = totalSkulls.gte(b.baseCost * 0.5) || cnt > 0;
         if (!revealed) continue;
         const qty = buyAmount === 'max' ? Math.max(1, maxAffordable(b)) : buyAmount;
         const cost = getBulkCost(b, qty);
-        const can = buyAmount === 'max' ? maxAffordable(b) >= 1 : skulls >= cost;
-        const cps = (b.baseCps * cnt * getBuildingMult(b) * buildingLevelMult(b.id) * globalCpsMult);
+        const can = buyAmount === 'max' ? maxAffordable(b) >= 1 : skulls.gte(cost);
+        const cps = new Decimal(b.baseCps).mul(cnt).mul(getBuildingMult(b) * buildingLevelMult(b.id) * globalCpsMult);
         const qtyBadge = buyAmount === 1 ? '' : ` <span class="buy-qty">×${qty}</span>`;
         const lvl = buildingLevel(b.id);
         const lvlCost = bloomLevelCost(b.id);
@@ -3176,7 +3211,7 @@
 
       /* Ghouls — feed on the Miasma. Reveal each once it is roughly in reach (or
          already owned) so early runs are not flooded with far-off buys. */
-      const ghoulViz = GHOULS.filter(g => boughtGhouls.has(g.id) || totalSkulls >= g.cost * 0.3);
+      const ghoulViz = GHOULS.filter(g => boughtGhouls.has(g.id) || totalSkulls.gte(g.cost * 0.3));
       if (ghoulViz.length) {
         const mp = Math.round(miasma() * 100);
         const gm = Math.round((ghoulMult() - 1) * 100);
@@ -3191,7 +3226,7 @@
 
     function ghoulRow(g) {
       const bought = boughtGhouls.has(g.id);
-      const can = skulls >= g.cost;
+      const can = skulls.gte(g.cost);
       return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyGhoul('${g.id}', event)`}">
         <img class="ghoul-ico" src="assets/icons/ghoul.png" alt="" onerror="this.remove()">
         <div class="building-info">
@@ -3206,7 +3241,7 @@
       const bought = boughtUpgrades.has(u.id);
       const have = owned[u.building] || 0;
       const unlocked = have >= u.req;
-      const can = unlocked && skulls >= u.cost;
+      const can = unlocked && skulls.gte(u.cost);
       const state = bought ? 'bought' : can ? 'affordable' : unlocked ? '' : 'locked';
       const right = bought ? 'Owned' : unlocked ? formatNum(u.cost) : ('Needs ' + u.req);
       return `<div class="upgrade-row ${state}" onclick="${bought || !unlocked ? '' : `buySynergy('${u.id}', event)`}">
@@ -3220,7 +3255,7 @@
 
     function upgradeRow(u) {
       const bought = boughtUpgrades.has(u.id);
-      const can = skulls >= u.cost;
+      const can = skulls.gte(u.cost);
       const tagClass = u.tag === 'click' ? 'tag-click' : u.tag === 'cps' ? 'tag-cps' : 'tag-mult';
       return `<div class="upgrade-row ${bought ? 'bought' : can ? 'affordable' : ''}" onclick="${bought ? '' : `buyUpgrade('${u.id}', event)`}">
         <div class="building-info">
@@ -3241,7 +3276,7 @@
       let bldgBreakdown = '';
       for (const b of BUILDINGS) {
         if (owned[b.id] > 0) {
-          const c = b.baseCps * owned[b.id] * globalCpsMult;
+          const c = new Decimal(b.baseCps).mul(owned[b.id]).mul(globalCpsMult);
           bldgTotal += owned[b.id];
           bldgBreakdown += `<div class="stat-row"><span class="stat-label">${b.name}</span><span class="stat-val">x${owned[b.id]} (${formatNum(c)}/s)</span></div>`;
         }
@@ -3303,17 +3338,17 @@
       lastTick = now;
       expireBuffs();
       if (grimoireUnlocked && essence < essenceMax()) essence = Math.min(essenceMax(), essence + essenceRegenPerSec() * dt);
-      const earned = getCPS() * dt;
-      if (earned > 0) {
+      const earned = getCPS().mul(dt);
+      if (earned.gt(0)) {
         earn(earned);
         checkMilestones();
       }
       /* Wraith-leeches fatten on the gross production the drain removed. */
       if (wraiths.length) {
-        const perW = getGrossCPS() * WRAITH_DRAIN * dt;
-        for (const w of wraiths) w.bank += perW;
+        const perW = getGrossCPS().mul(WRAITH_DRAIN * dt);
+        for (const w of wraiths) w.bank = toDec(w.bank).add(perW);
       }
-      document.getElementById('score').textContent = formatNum(Math.floor(skulls));
+      document.getElementById('score').textContent = formatNum(skulls.floor());
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
       renderBuffs();
 
@@ -3344,7 +3379,7 @@
     function autoClickTick() {
       if (!autoEnabled('auto_click')) return;
       let power = getClickPower();
-      if (Math.random() < critChance()) power *= critMult();
+      if (Math.random() < critChance()) power = power.mul(critMult());
       earn(power);
       totalClicks++;
       if (raidActive()) raidQueue++;
@@ -3353,13 +3388,13 @@
 
     /* Buy the cheapest affordable building; returns whether anything was bought. */
     function buyCheapestAffordable() {
-      let best = null, bestCost = Infinity;
+      let best = null, bestCost = null;
       for (const b of BUILDINGS) {
         const c = getBuildingCost(b);
-        if (c <= skulls && c < bestCost) { best = b; bestCost = c; }
+        if (c.lte(skulls) && (bestCost === null || c.lt(bestCost))) { best = b; bestCost = c; }
       }
       if (!best) return false;
-      skulls -= bestCost;
+      skulls = skulls.sub(bestCost);
       owned[best.id] += 1;
       lastBought = best.id;
       return true;
@@ -3416,8 +3451,8 @@
     /* The bar to reset rises each tier: 1,000,000 this run for the first
        prestige, ten times as much for each after. Steep on purpose — a
        prestige should be earned, and the multiplier it grants is forever. */
-    function prestigeRequirement() { return clampFinite(1e6 * Math.pow(10, prestige) * prestigeCostMult()); }
-    function canPrestige() { return totalSkulls >= prestigeRequirement(); }
+    function prestigeRequirement() { return new Decimal(1e6).mul(new Decimal(10).pow(prestige)).mul(prestigeCostMult()); }
+    function canPrestige() { return totalSkulls.gte(prestigeRequirement()); }
 
     /* Free buildings a fresh run starts with — from the Headstart/Standing
        Legion perks AND the permanent Grave Inheritance meta node. Called by
@@ -3438,8 +3473,8 @@
        relics) are permanent meta layers and are DELIBERATELY not touched here, so
        they survive both prestige and ascension. */
     function resetRun() {
-      skulls = 0;
-      totalSkulls = 0;
+      skulls = new Decimal(0);
+      totalSkulls = new Decimal(0);
       clickBonus = 0;
       clickMulti = 1;
       cpsClickPct = 0;
@@ -3671,7 +3706,7 @@
       const mult = getPrestigeMult();
       const req = prestigeRequirement();
       const ready = canPrestige();
-      const pct = Math.min(100, (totalSkulls / req) * 100);
+      const pct = Math.min(100, totalSkulls.div(req).toNumber() * 100);
       const gained = pendingShards();
 
       function perkRow(p) {
@@ -3703,7 +3738,7 @@
           '<div class="prestige-next">Next tier: ' + (mult + 0.1).toFixed(1) + 'x at ' +
             formatNum(req) + ' skulls this run</div>' +
           '<div class="prestige-bar"><div class="prestige-fill" style="width:' + pct + '%"></div></div>' +
-          '<div class="prestige-have">' + formatNum(Math.floor(totalSkulls)) + ' / ' + formatNum(req) + '</div>' +
+          '<div class="prestige-have">' + formatNum(totalSkulls.floor()) + ' / ' + formatNum(req) + '</div>' +
           '<button class="prestige-btn" ' + (ready ? '' : 'disabled') +
             ' onclick="doPrestige()">' + (ready ? 'Prestige now' : 'Not yet') + '</button>' +
           '<div class="prestige-note">Resets this run. Keeps your lifetime total, rank, the multiplier, and your Bone Shards' +
@@ -4170,8 +4205,8 @@
       if (!seasonUnlocked) return;
       if (seasonAutoWindow()) { seasonToast('Hallowtide already burns bright this time of year'); return; }
       const cost = seasonSwitchCost();
-      if (skulls < cost) { seasonToast('Need ' + formatNum(cost) + ' skulls to light the season'); return; }
-      skulls -= cost;
+      if (skulls.lt(cost)) { seasonToast('Need ' + formatNum(cost) + ' skulls to light the season'); return; }
+      skulls = skulls.sub(cost);
       seasonEndsAt = Date.now() + SEASON_DURATION_MS;
       playStinger('epic');
       showBuffToast('🕯️ Hallowtide is lit — Wisps drift from cursed skulls', 'frenzy');
@@ -4234,7 +4269,7 @@
         switchBtn = '<button class="prestige-btn" onclick="douseSeason()">Snuff the season early</button>';
       } else {
         const cost = seasonSwitchCost();
-        const can = skulls >= cost;
+        const can = skulls.gte(cost);
         statusLine = 'Hallowtide is <b>dormant</b> · auto-lights at the end of October';
         switchBtn = '<button class="prestige-btn" ' + (can ? '' : 'disabled') + ' onclick="lightSeason()">' +
           (can ? 'Light the season — ' + formatNum(cost) + ' skulls (30 min)' : 'Need ' + formatNum(cost) + ' skulls') + '</button>';
@@ -4371,7 +4406,7 @@
       /* Hidden entirely until it is close to unlockable, then a teaser, then the
          live controls once permanently unlocked. */
       if (!apocUnlocked) {
-        const near = lifetimeSkulls >= APOC_UNLOCK_LIFETIME * 0.2 || prestige >= 3;
+        const near = lifetimeSkulls.gte(APOC_UNLOCK_LIFETIME * 0.2) || prestige >= 3;
         if (!near) return '';
         return '<div class="section-label">The Skullpocalypse</div>' +
           '<div class="ascend-locked">A dread power stirs beneath your dominion. ' +
@@ -4416,13 +4451,24 @@
 
     /* ═══════ SAVE / LOAD ═══════ */
 
-    const SAVE_VERSION = 13;
+    /* v14 — big-number migration: skulls/totalSkulls/lifetimeSkulls/seasonBaseline
+       are now break_infinity Decimals, serialized as strings. migrateSave parses
+       legacy Numbers (incl. old 1e300-pinned values) back into Decimals; additive
+       and never-wipe, like every version before it. */
+    const SAVE_VERSION = 14;
 
     function migrateSave(d) {
       /* Generalises the v13 lifetimeSkulls scrub to the WHOLE save: any persisted
          number that is non-finite (or absurd) is healed before it can re-enter the
          compute path, whether the save came from localStorage or the server. */
-      sanitizeSaveNumbers(d);
+      healPlainNumbers(d);
+      /* Parse the four big-number currencies into Decimals up front — a legacy
+         save stores them as Numbers (including an old 1e300-pinned lifetime, which
+         is a REAL stored value and simply carries across), a current save as
+         strings. All subsequent comparisons below are then Decimal, never string. */
+      d.totalSkulls = toDec(d.totalSkulls);
+      d.skulls = toDec(d.skulls);
+      d.seasonBaseline = toDec(d.seasonBaseline);
       if (typeof d.version !== 'number') d.version = 1;
       if (d.skulls === undefined) d.skulls = 0;
       if (d.totalSkulls === undefined) d.totalSkulls = 0;
@@ -4513,8 +4559,9 @@
       /* Pre-prestige saves had no lifetime field; their run total IS their
          lifetime so far, so seed it there. Never let it drop below the run
          total on any load. */
-      if (d.lifetimeSkulls === undefined) d.lifetimeSkulls = d.totalSkulls || 0;
-      if (d.lifetimeSkulls < d.totalSkulls) d.lifetimeSkulls = d.totalSkulls;
+      d.lifetimeSkulls = (d.lifetimeSkulls === undefined || d.lifetimeSkulls === null)
+        ? d.totalSkulls : toDec(d.lifetimeSkulls);
+      if (d.lifetimeSkulls.lt(d.totalSkulls)) d.lifetimeSkulls = d.totalSkulls;
       /* v13 — scrub a known-corrupted lifetimeSkulls. Confirmed live on three
          unrelated accounts with different prestige/ascension: same mantissa
          (7.067758797128936), exponent still climbing over time, meaning some
@@ -4525,11 +4572,10 @@
          reaches past 1e200, so clamping by size would wrongly punish real
          whales. This matches only the exact known-bad mantissa, regardless of
          its current exponent, so it can never false-positive on a real value. */
-      if (Number.isFinite(d.lifetimeSkulls) && d.lifetimeSkulls > 0) {
-        const exp = Math.floor(Math.log10(d.lifetimeSkulls));
-        const mantissa = d.lifetimeSkulls / Math.pow(10, exp);
+      if (d.lifetimeSkulls.gt(0)) {
+        const mantissa = d.lifetimeSkulls.mantissa;
         if (Math.abs(mantissa - 7.067758797128936) < 1e-9) {
-          d.lifetimeSkulls = d.totalSkulls || 0;
+          d.lifetimeSkulls = d.totalSkulls;
         }
       }
       d.version = SAVE_VERSION;
@@ -4538,10 +4584,13 @@
 
     function save() {
       const data = {
-        skulls, totalSkulls, lifetimeSkulls, prestige,
+        /* The four big-number currencies serialize as strings (Decimal.toString),
+           parsed back by migrateSave/toDec on load. */
+        skulls: skulls.toString(), totalSkulls: totalSkulls.toString(),
+        lifetimeSkulls: lifetimeSkulls.toString(), prestige,
         totalClicks, clickBonus, clickMulti,
         cpsClickPct, globalCpsMult, owned, startTime,
-        boneShards, cursedPopped, seasonBaseline, seasonMonth, seasonEpoch,
+        boneShards, cursedPopped, seasonBaseline: seasonBaseline.toString(), seasonMonth, seasonEpoch,
         ascensions, epitaphs, metaLevels, highestPrestige, autoOff: [...autoOff],
         graveBlooms, bloomStart, buildingLevels,
         petLevel, selectedAuras: [...selectedAuras],
@@ -4560,8 +4609,9 @@
         savedAt: Date.now(),
         version: SAVE_VERSION
       };
-      /* Never write a non-finite value to localStorage OR up to the server. */
-      sanitizeSaveNumbers(data);
+      /* Heal the plain-Number fields before writing to localStorage OR up to the
+         server. The four Decimal fields are already safe strings above. */
+      healPlainNumbers(data);
       try {
         localStorage.setItem('sc_save', JSON.stringify(data));
         const msg = document.getElementById('saveMsg');
@@ -4609,10 +4659,10 @@
       owned = d.owned;
       startTime = d.startTime;
       prestige = d.prestige || 0;
-      lifetimeSkulls = d.lifetimeSkulls || 0;
+      lifetimeSkulls = d.lifetimeSkulls;   /* Decimal, set by migrateSave */
       boneShards = d.boneShards || 0;
       cursedPopped = d.cursedPopped || 0;
-      seasonBaseline = d.seasonBaseline || 0;
+      seasonBaseline = d.seasonBaseline;   /* Decimal, set by migrateSave */
       seasonMonth = d.seasonMonth || '';
       seasonEpoch = d.seasonEpoch || null;   /* '' / undefined → null → adopt on load, no wipe */
       ascensions = d.ascensions || 0;
@@ -4665,8 +4715,8 @@
         const away = (Date.now() - d.savedAt) / 1000;
         if (away > 10) {
           const cps = getCPS();
-          if (cps > 0) {
-            const earned = cps * away * offlineRate();
+          if (cps.gt(0)) {
+            const earned = cps.mul(away * offlineRate());
             earn(earned);
             const banner = document.getElementById('offlineBanner');
             banner.innerHTML = `<div class="offline-banner" onclick="this.remove()">Welcome back! You earned <b>${formatNum(earned)}</b> skulls while away (${formatTime(away * 1000)}). Click to dismiss.</div>`;
@@ -4725,7 +4775,11 @@
       if (sa !== la) return sa > la;
       const sp = f(server.prestige), lp = f(prestige);
       if (sp !== lp) return sp > lp;
-      return f(server.lifetimeSkulls || server.totalSkulls) > f(lifetimeSkulls);
+      /* Decimal compare — server lifetime may be a bignum string past the double
+         ceiling; toDec handles both legacy Numbers and new strings. */
+      const sLife = (server.lifetimeSkulls !== undefined && server.lifetimeSkulls !== null && server.lifetimeSkulls !== '')
+        ? server.lifetimeSkulls : server.totalSkulls;
+      return toDec(sLife).gt(lifetimeSkulls);
     }
 
     /* THE RECOVERY. A logged-in player's save also lives on the server;
@@ -4798,23 +4852,31 @@
     function seasonScore() {
       const cur = currentMonthKey();
       if (seasonMonth !== cur) { seasonMonth = cur; seasonBaseline = lifetimeSkulls; }
-      return Math.max(0, Math.floor(lifetimeSkulls - seasonBaseline));
+      return Decimal.max(0, lifetimeSkulls.sub(seasonBaseline).floor());
     }
 
     async function submitScore() {
-      if (totalSkulls < 100) return;
+      if (totalSkulls.lt(100)) return;
       const player = getPlayerId();
+      /* Scores can now exceed the JS double ceiling, so they travel as strings;
+         scoreLog (log10, a small Number) is what the server sorts and ranks by. */
+      const lifeFloor = lifetimeSkulls.floor();
+      const seasonS = seasonScore();
+      const lifeStr = lifeFloor.toString();
+      const lifeLog = lifeFloor.gt(0) ? lifeFloor.log10() : 0;
+      const seasonStr = seasonS.toString();
+      const seasonLog = seasonS.gt(0) ? seasonS.log10() : 0;
       try {
         await fetch('/api/skull-clicker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'submit-score', score: Math.floor(lifetimeSkulls), seasonScore: seasonScore(), prestige, ascensions, ...player })
+          body: JSON.stringify({ action: 'submit-score', score: lifeStr, scoreLog: lifeLog, seasonScore: seasonStr, seasonScoreLog: seasonLog, prestige, ascensions, ...player })
         });
         fetch('/api/leaderboards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ game: 'skull-clicker', score: Math.floor(lifetimeSkulls) }),
+          body: JSON.stringify({ game: 'skull-clicker', score: lifeStr, scoreLog: lifeLog }),
         }).catch(function () {});
       } catch(e) {}
     }

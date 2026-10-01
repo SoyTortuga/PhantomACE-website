@@ -17,8 +17,30 @@ const MAX_ENTRIES = 50;
 const SCORE_CAP = 1e300;
 function finiteScore(v) { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(SCORE_CAP, n)) : 0; }
 
+/* ── Big-number scores (skull-clicker only) ───────────────────────────────
+   Skull Clicker lifetime scores can exceed the JS double ceiling, so on its
+   board a score is a STRING ("1.23e500") ranked by scoreLog (= log10). This
+   board (sc_leaderboard) is written by BOTH this file and skull-clicker.js, so
+   the two MUST agree on this shape. parseScoreLog accepts the new
+   {score:string, scoreLog:number} AND legacy numeric scores; cleanScore keeps a
+   finite legacy Number as-is and a string as-is. Other games are unaffected. */
+function parseScoreLog(score, scoreLog) {
+  const sl = Number(scoreLog);
+  if (Number.isFinite(sl) && sl > 0) return sl;
+  const n = Number(score);
+  if (Number.isFinite(n)) return n > 0 ? Math.log10(n) : 0;
+  const m = String(score).match(/^(\d+(?:\.\d+)?)[eE]\+?(\d+)$/);
+  if (m) return Math.log10(parseFloat(m[1])) + parseFloat(m[2]);
+  return 0;
+}
+function cleanScore(score) {
+  if (typeof score === 'string') return score;
+  const n = Number(score);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 const BOARDS = {
-  'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc' },
+  'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc', bignum: true },
   'memory-match':     { key: 'lb_memory_match', label: 'Best Moves',  sort: 'asc' },
   'commander-bingo':  { key: 'lb_bingo',        label: 'Bingos',      sort: 'desc' },
   /* Both Mana Clash boards are written by the game server from the
@@ -174,7 +196,12 @@ export async function onRequestGet(context) {
   const enrich = (entries, cosmetics) =>
     entries.map(e => {
       const c = (e && cosmetics[String(e.id)]) || { nameEffect: null, banner: null };
-      return { ...e, score: finiteScore(e && e.score), nameEffect: c.nameEffect, banner: c.banner };
+      /* A string score is a big-number (skull-clicker); keep it verbatim and carry
+         its scoreLog. Numeric scores (every other game) still clamp via finiteScore. */
+      const score = (e && typeof e.score === 'string') ? e.score : finiteScore(e && e.score);
+      const out = { ...e, score, nameEffect: c.nameEffect, banner: c.banner };
+      if (e && e.scoreLog !== undefined) out.scoreLog = parseScoreLog(e.score, e.scoreLog);
+      return out;
     });
 
   if (game === 'all') {
@@ -234,6 +261,28 @@ export async function onRequestPost(context) {
     }
     lb.sort((a, b) => b.score - a.score);
     await env.MARKETPLACE.put(board.key, JSON.stringify(lb.slice(0, MAX_ENTRIES)));
+    return json({ success: true, updated: true });
+  }
+
+  /* Big-number board (skull-clicker): score is a string, ranked by scoreLog.
+     Shares sc_leaderboard with skull-clicker.js, so the stored shape matches. */
+  if (board.bignum) {
+    const scoreLog = parseScoreLog(body.score, body.scoreLog);
+    if (!(scoreLog > 0)) return json({ error: 'Invalid score' }, 400);
+    const scoreVal = cleanScore(body.score);
+    const lbB = await env.MARKETPLACE.get(board.key, 'json') || [];
+    const ex = lbB.find(e => e.id === player.id);
+    if (ex) {
+      if (scoreLog > parseScoreLog(ex.score, ex.scoreLog)) {
+        ex.score = scoreVal; ex.scoreLog = scoreLog; ex.name = player.name; ex.updatedAt = Date.now();
+      } else {
+        return json({ success: true, updated: false });
+      }
+    } else {
+      lbB.push({ id: player.id, name: player.name, score: scoreVal, scoreLog, updatedAt: Date.now() });
+    }
+    lbB.sort((a, b) => parseScoreLog(b.score, b.scoreLog) - parseScoreLog(a.score, a.scoreLog));
+    await env.MARKETPLACE.put(board.key, JSON.stringify(lbB.slice(0, MAX_ENTRIES)));
     return json({ success: true, updated: true });
   }
 

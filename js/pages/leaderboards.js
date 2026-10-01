@@ -10,9 +10,44 @@
     return d.innerHTML;
   }
 
-  function formatScore(game, score) {
+  /* Short-scale big-number formatter for Skull Clicker, matching the in-game
+     style (K/M/B/T/… then two-letter suffixes). Scores arrive as a big-number
+     string ("1.23e500"), a legacy Number, or with a scoreLog; all are handled
+     without needing a Decimal library on this page. */
+  var SC_UNITS = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc',
+    'Ud', 'DD', 'Td', 'Qad', 'Qid', 'Sxd', 'Spd', 'Ocd', 'Nod', 'Vg'];
+  function scLetter(n) {
+    var s = '';
+    n = Math.floor(n);
+    do { s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26); } while (n > 0);
+    if (s.length < 2) s = 'a' + s;
+    return s;
+  }
+  function formatBigScore(score, scoreLog) {
+    var exp, mant;
+    var n = Number(score);
+    if (isFinite(n) && n > 0) { exp = Math.floor(Math.log10(n)); mant = n / Math.pow(10, exp); }
+    else if (typeof scoreLog === 'number' && isFinite(scoreLog) && scoreLog > 0) {
+      exp = Math.floor(scoreLog); mant = Math.pow(10, scoreLog - exp);
+    } else {
+      var m = String(score).match(/^(\d+(?:\.\d+)?)[eE]\+?(\d+)$/);
+      if (!m) return String(score);
+      mant = parseFloat(m[1]); exp = parseInt(m[2], 10);
+      var le = Math.floor(Math.log10(mant)); exp += le; mant = mant / Math.pow(10, le);
+    }
+    if (!isFinite(exp) || !isFinite(mant)) return '0';
+    if (exp < 3) return Math.floor(mant * Math.pow(10, exp)).toLocaleString();
+    var tier = Math.floor(exp / 3);
+    var scaled = mant * Math.pow(10, exp - tier * 3);
+    var str = scaled < 10 ? scaled.toFixed(2) : scaled < 100 ? scaled.toFixed(1) : scaled.toFixed(0);
+    var suffix = tier < SC_UNITS.length ? SC_UNITS[tier] : scLetter(tier - SC_UNITS.length);
+    return str + ' ' + suffix;
+  }
+
+  function formatScore(game, score, scoreLog) {
     if (game === 'memory-match') return score + ' moves';
     if (game === 'commander-bingo') return score;
+    if (game === 'skull-clicker') return formatBigScore(score, scoreLog);
     return score.toLocaleString();
   }
 
@@ -70,7 +105,7 @@
       if (entry) {
         nameEl.innerHTML = '<span class="lb-name-text">' + esc(entry.name) + '</span>';
         nameEl.dataset.userId = entry.id || '';
-        scoreEl.textContent = formatScore(game, entry.score);
+        scoreEl.textContent = formatScore(game, entry.score, entry.scoreLog);
         row.style.display = '';
         /* Name effect on the name text — managed, so only in-view names animate
            and the board never runs more than the cap at once. Banner behind the
