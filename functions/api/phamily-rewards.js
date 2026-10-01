@@ -70,7 +70,7 @@ function defineFollowerRewards() {
   r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
     cosmeticId:'bone',
     name:'Bone Dice', desc:'Cosmetic bone-themed dice for Mana Clash' });
-  /* MY ROOM — this month's drip: the first tenth of each set, rounded
+  /* MY ROOM — this month's drip: one tenth of each set (advances each month), rounded
      down, interleaved so the sets arrive mixed rather than seven snacks
      in a row. Next month is the next tenth, and the rule carries itself.
      Duplicated in js/pages/phamily-time.js; test-phamily-rewards.js
@@ -150,7 +150,7 @@ function definePhamilyRewards() {
   r.push({ level:130, rarity:'mythic', type:'dice', icon:REWARD_ICONS.dice,
     cosmeticId:'fracture',
     name:'Reality Fracture Dice', desc:'Mythic animated dice for Mana Clash' });
-  /* MY ROOM — this month's drip: the first tenth of each set, rounded
+  /* MY ROOM — this month's drip: one tenth of each set (advances each month), rounded
      down, interleaved so the sets arrive mixed rather than seven snacks
      in a row. Next month is the next tenth, and the rule carries itself.
      Duplicated in js/pages/phamily-time.js; test-phamily-rewards.js
