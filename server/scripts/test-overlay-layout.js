@@ -256,6 +256,16 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   ok('the snap grid step is in canvas pixels', /SNAP_PX = \d+/.test(eEd));
   ok('the dashboard has the snap toggle and gridlines',
      /id="snapToggle"/.test(dashHtml) && /id="snapGrid"/.test(dashHtml));
+
+  /* MOBILE: the drag tool is usable on a phone — pointer events (not mouse-
+     only), touch-action:none so a finger drags instead of scrolling, a finger-
+     sized handle on coarse pointers, and a recompute on orientation change. */
+  ok('drag/resize use pointer events', /addEventListener\('pointerdown'/.test(eEd) && /addEventListener\('pointermove'/.test(eEd));
+  ok('panels and the handle opt out of touch scrolling', /touchAction = 'none'/.test(eEd) && /touch-action:none/.test(eEd));
+  ok('the resize handle is finger-sized on touch', /pointer: coarse/.test(eEd) && /coarse \? 28 : 16/.test(eEd));
+  ok('the canvas recomputes on orientation change', /orientationchange/.test(eEd));
+  const dashCss = fs.readFileSync(path.join(REPO, 'css/pages/overlay-dashboard.css'), 'utf8');
+  ok('the dashboard stacks the editor on small screens', /@media \(max-width: 600px\)/.test(dashCss) && /\.od-layout/.test(dashCss));
   ok('the editor loads every preset (full)', /API \+ '\?full=1'/.test(eEd));
   ok('and switches, activates and pins from the chosen preset',
      /function selectPreset/.test(eEd) && /action: 'activate'/.test(eEd) && /function currentPanels/.test(eEd));

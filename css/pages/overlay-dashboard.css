@@ -110,6 +110,20 @@
 .od-layout .legend ul { margin: 0; padding-left: 18px; }
 .od-layout .legend li { font-size: 11px; color: var(--text-sec); line-height: 1.5; }
 
+/* ── Mobile: the editor is a drag tool, but keep it usable on a phone ──────
+   Bars/legend stack, nothing overflows the viewport, and tap targets grow to
+   finger size. The canvas (scaled overlay iframe) already fits width:100% and
+   overlay-editor.js recomputes its scale on resize/orientationchange. */
+@media (max-width: 600px) {
+  .od-layout .bar { gap: 6px; padding: 8px; }
+  .od-layout .bar label { flex: 1 1 100%; }
+  .od-layout .btn { padding: 10px 12px; min-height: 42px; }
+  .od-layout #presetSelect { max-width: 100%; width: 100%; }
+  .od-layout .snap-label { min-height: 42px; }
+  .od-layout .status { margin-left: 0; flex: 1 1 100%; }
+  .od-layout #legendBody { grid-template-columns: 1fr; }
+}
+
 /* ── Games on Overlay ──────────────────────────
    One row per game: a fixed-width name label, its status, then its controls.
    Rows stack their controls on a narrow screen (inherits .ovmc-row wrap). */

@@ -162,6 +162,9 @@
     renderPresetBar();
     fitScale();
     window.addEventListener('resize', function () { fitScale(); });
+    /* Recompute when a phone rotates — the viewport width changes without a
+       classic resize on some browsers. */
+    window.addEventListener('orientationchange', function () { setTimeout(fitScale, 150); });
 
     if (frame.contentDocument && frame.contentDocument.readyState === 'complete') wireFrame();
     else frame.addEventListener('load', wireFrame);
@@ -247,6 +250,9 @@
     el.style.pointerEvents = 'auto';
     el.style.cursor = 'move';
     el.style.outline = '1px dashed #ff000066';
+    /* So a finger dragging a panel moves it instead of scrolling the page —
+       and the pointer stream isn't cancelled mid-drag by a scroll gesture. */
+    el.style.touchAction = 'none';
     var tag = frame.contentDocument.createElement('div');
     tag.textContent = label;
     tag.style.cssText =
@@ -305,9 +311,13 @@
     var doc = frame.contentDocument;
     var h = doc.createElement('div');
     h.className = 'ov-resize-handle';
+    /* Finger-sized on a touch screen, smaller for a mouse. touch-action:none so
+       dragging the corner resizes instead of scrolling the page. */
+    var coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    var hs = coarse ? 28 : 16, off = -hs / 2;
     h.style.cssText =
-      'position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;' +
-      'background:#ff0000;border:2px solid #fff;border-radius:3px;' +
+      'position:absolute;right:' + off + 'px;bottom:' + off + 'px;width:' + hs + 'px;height:' + hs + 'px;' +
+      'background:#ff0000;border:2px solid #fff;border-radius:3px;touch-action:none;' +
       'cursor:nwse-resize;z-index:1000;transform-origin:bottom right;';
     el.appendChild(h);
 
