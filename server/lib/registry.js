@@ -166,6 +166,9 @@ export const SINGLETONS = {
      applied by the overlay to its alert sounds. 'none' — a lost value just
      falls back to full volume. */
   overlay_alert_volume:  { table: 'singletons', expiry: 'none' },
+  /* Per-alert on/off map (bot/trigger.js alert-toggle + isAlertEnabled in
+     overlay/events.js). 'none' — a lost value falls back to every alert on. */
+  alert_toggles:         { table: 'singletons', expiry: 'none' },
 
   /* Short-lived heartbeat registry of open overlay instances, used to elect a
      single "audio leader" so the check-in chime plays once no matter how many
@@ -222,6 +225,11 @@ export const SINGLETONS = {
   giveaway_state:        { table: 'singletons', expiry: 'real' },
   giveaway_entrants:     { table: 'singletons', expiry: 'real' },
   giveaway_winner:       { table: 'singletons', expiry: 'real' },
+  /* The monthly-ledger draw's winner record (MONTHLY_WINNER_KEY in bot/giveaway.js),
+     written with a 24h TTL like giveaway_winner. Was missed in the migration, which
+     made every GET /api/bot/giveaway 500 (the page swallowed it) and would have made
+     the monthly draw's write throw too. */
+  giveaway_monthly_winner: { table: 'singletons', expiry: 'real' },
   hype_train_active:     { table: 'singletons', expiry: 'real' },
   hype_train_site:       { table: 'singletons', expiry: 'real' },
   hype_train_drops:      { table: 'singletons', expiry: 'real' },
