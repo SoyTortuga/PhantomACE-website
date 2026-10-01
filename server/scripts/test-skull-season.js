@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { onRequestGet, onRequestPost } from '../../functions/api/skull-clicker.js';
+import { monthKey } from '../../functions/api/season-time.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -44,7 +45,7 @@ const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https
   method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify(body) }) });
 const GET = (e, qs) => onRequestGet({ env: e, request: new Request('https://x/api/skull-clicker?' + qs) });
 
-const thisMonth = (() => { const d = new Date(); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'); })();
+const thisMonth = monthKey();   /* the season calendar (SEASON_TZ), same as the handler */
 
 /* ══ Dual submit: season and all-time both recorded ════════════════════ */
 {
@@ -109,7 +110,10 @@ const thisMonth = (() => { const d = new Date(); return d.getUTCFullYear() + '-'
   ok('sc_season is a registered singleton', /sc_season:\s*\{ table: 'singletons'/.test(reg));
 
   const game = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
-  ok('the game submits a season score', /seasonScore: seasonScore\(\)/.test(game) && /function seasonScore/.test(game));
+  /* Post break_infinity migration the game submits the season score as a Decimal
+     string plus its log10 (seasonScore: seasonStr, seasonScoreLog), not a bare
+     number. */
+  ok('the game submits a season score', /seasonScore: seasonStr/.test(game) && /seasonScoreLog/.test(game) && /function seasonScore/.test(game));
   ok('the game has a Ranks screen reading both boards',
      /function renderRanks/.test(game) && /board=season/.test(game) && /board=alltime/.test(game));
   ok('the season baseline persists', /seasonBaseline/.test(game) && /if \(d\.seasonBaseline === undefined\)/.test(game));

@@ -24,9 +24,9 @@ const CACHE_KEY = 'community_leaderboard_cache';
 const CACHE_MS = 60000;
 const TOP_N = 10;
 
-function monthKey(d = new Date()) {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
+/* Shared season calendar (SEASON_TZ) so this view's month matches every other
+   monthly system. */
+import { monthKey } from './season-time.js';
 
 /* A name we are willing to print. Anyone with no display name recorded
    shows as Anonymous rather than leaking the id we chose not to publish. */

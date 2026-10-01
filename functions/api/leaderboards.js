@@ -88,18 +88,10 @@ const MONTHLY_PLACEMENTS = [
 
 const MONTHLY_CODE_DURATION_SECONDS = 604800; // 7 days
 
-function monthKey(d) {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-function isLastDayOfMonth(d) {
-  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
-  return next.getUTCMonth() !== d.getUTCMonth();
-}
-
-function monthLabel(d) {
-  return d.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-}
+/* Month boundary + labels come from the shared season calendar (SEASON_TZ), so
+   leaderboard awards settle on the same month as the giveaway ledger and Phamily
+   Time — not on a separate UTC clock. */
+import { monthKey, isLastDayOfMonth, monthLabel } from './season-time.js';
 
 async function maybeRunMonthlyAwards(env) {
   const now = new Date();

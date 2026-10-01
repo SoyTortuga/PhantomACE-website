@@ -109,6 +109,9 @@ const NON_ROUTE_MODULES = new Set([
      handler; the leaderboards route and the forum author choke point consume
      it. Covered by server/scripts/test-cosmetics.js. */
   'api/cosmetics.js',
+  /* The one calendar every monthly cycle (giveaway ledger, leaderboard awards,
+     Phamily Time, Skull Clicker season) rolls on. Library, no handler. */
+  'api/season-time.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */

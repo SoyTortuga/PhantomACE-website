@@ -124,7 +124,11 @@ async function currentEvent(env) {
    moment right. */
 const SEASON_KEY = 'sc_season';                 // { month:'YYYY-MM', entries:[] }
 
-function monthKeyUTC(d) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; }
+/* The seasonal reset rolls on the shared season calendar (SEASON_TZ), the same
+   month boundary as the giveaway ledger / leaderboard awards / Phamily Time, so
+   the Skull Clicker "wipe the run" happens at local month-end, not UTC's.
+   Kept named monthKeyUTC to minimise churn at its many call sites. */
+import { monthKey as monthKeyUTC } from './season-time.js';
 
 function readSeason(raw) {
   if (raw && Array.isArray(raw.entries) && raw.month) return raw;

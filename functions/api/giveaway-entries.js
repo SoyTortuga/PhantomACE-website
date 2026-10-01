@@ -51,24 +51,12 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
-/* UTC, matching leaderboards.js and phamily-time.js. Using local time here
-   would put a viewer's entry in a different month from their watch time on
-   the last day of a month. */
-export function monthKey(d = new Date()) {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-/* The UTC month immediately before `d`'s month, 'YYYY-MM'. Used for the "draw
-   last month" grace window, so a broadcaster west of UTC can still draw the
-   just-ended month after the ledger rolls over at UTC midnight. */
-export function prevMonthKey(d = new Date()) {
-  return monthKey(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)));
-}
-
-/** Millisecond timestamp of the instant the current month's giveaway closes. */
-export function monthEndsAt(d = new Date()) {
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0);
-}
+/* The month boundary lives in the shared season calendar (SEASON_TZ, not UTC)
+   so a viewer's entries and their Phamily Time watch minutes always land in the
+   same month. Imported for internal use AND re-exported for the many callers
+   that import these from this module. */
+import { monthKey, prevMonthKey, monthEndsAt } from './season-time.js';
+export { monthKey, prevMonthKey, monthEndsAt };
 
 export function ledgerKey(userId, month) {
   return `${LEDGER_PREFIX}${userId}_${month}`;

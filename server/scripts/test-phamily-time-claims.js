@@ -63,12 +63,10 @@ function makeEnv() {
   };
 }
 
-/* Same UTC month key phamily-time.js computes internally. Needed to seed
-   pt_<userId>_<month> directly, since the handler owns that key and does
-   not export a way in. */
-function monthKey(d = new Date()) {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
+/* The same season month key phamily-time.js computes internally (SEASON_TZ, not
+   UTC). Needed to seed pt_<userId>_<month> directly, since the handler owns that
+   key and does not export a way in. */
+import { monthKey } from '../../functions/api/season-time.js';
 const MK = monthKey();
 
 function seedUser(env, userId, { level = 0, claimedRewards = [], claimedMilestones = [] } = {}) {

@@ -49,24 +49,14 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
-function monthKey(date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-function prevMonthKey(mk) {
-  const [y, m] = mk.split('-').map(Number);
-  const pm = m === 1 ? 12 : m - 1;
-  const py = m === 1 ? y - 1 : y;
-  return `${py}-${String(pm).padStart(2, '0')}`;
-}
-
-function daysLeftInMonth(now) {
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return Math.ceil((end - now) / 86400000);
-}
+/* Month + day boundaries follow the shared season calendar (SEASON_TZ), so a
+   viewer's watch minutes land in the same month (and same local day) as their
+   giveaway entries. */
+import { monthKey, prevMonthOf, daysLeftInMonth, daysInMonth as seasonDaysInMonth, dayOfMonth } from './season-time.js';
+const prevMonthKey = prevMonthOf;
 
 function isInGracePeriod(now) {
-  return now.getUTCDate() <= GRACE_DAYS;
+  return dayOfMonth(now) <= GRACE_DAYS;
 }
 
 function getBoostRate(session) {
@@ -195,7 +185,7 @@ export async function onRequestGet(context) {
 
   if (action === 'chart') {
     const data = await getUserData(env, session.user_id, mk);
-    const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+    const daysInMonth = seasonDaysInMonth(now);
     const chartData = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dayStr = String(d);
@@ -292,7 +282,7 @@ async function handleHeartbeat(env, session, mk, now) {
     data.hours = Math.min(data.hours + boosted, MAX_LEVEL);
     data.level = Math.min(Math.floor(data.hours), MAX_LEVEL);
 
-    const dayStr = String(now.getUTCDate());
+    const dayStr = String(dayOfMonth(now));
     data.attendance[dayStr] = (data.attendance[dayStr] || 0) + elapsed;
 
     creditedSeconds = Math.round(gap / 1000);
