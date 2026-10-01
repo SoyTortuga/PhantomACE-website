@@ -109,6 +109,10 @@ async function main(){
   }
   for(const id of ids){
     const k=`sc_save_${id}`; const st=await kv.get(k,'json'); if(!st)continue;
+    /* Read-only peek at what the corrupt save actually holds, so we can judge
+       whether any real number survives or it's all overflowed. */
+    console.log(`\n${k} fields:`);
+    for(const f of ['lifetimeSkulls','totalSkulls','skulls','prestige','highestPrestige','ascensions','epitaphs']) console.log(`   ${f} = ${st[f]}`);
     const changed = reset ? resetState(st) : sanitizeState(st).changed;
     if(changed){ edits++; console.log(`${k}: ${reset?'run wiped (legacy kept), seasonEpoch -> '+st.seasonEpoch:'numeric fields clamped'}`); if(confirm){ await kv.put(k,st); console.log(`  ${k} rewritten`);} }
   }
