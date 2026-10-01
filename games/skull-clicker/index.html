@@ -2872,7 +2872,8 @@
 
     function formatNum(n) {
       if (n < 0) return '-' + formatNum(-n);
-      if (!Number.isFinite(n)) return 'Infinity';
+      if (!Number.isFinite(n)) return 'MAX';
+      if (n >= VALUE_CAP) return 'MAX';   /* at the ceiling: read as MAX, not a bare "1.00 da" that looks like a glitch */
       if (n < 1000) return Math.floor(n).toLocaleString();
       const tier = Math.floor(Math.log10(n) / 3);
       const scaled = n / Math.pow(10, tier * 3);
