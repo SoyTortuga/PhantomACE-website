@@ -121,6 +121,25 @@ async function main(){
     await pool.end(); return;
   }
 
+  /* ── Drop anonymous guests from the boards ───────────────────────────────
+     Guests (id starts 'guest_') are per-browser and unverifiable; they clutter
+     the public boards and can't be awarded. Remove them from both. The server
+     also stops writing new guest rows and hides any on read. */
+  if(arg('drop-guests')===true){
+    let dropped=0;
+    for(const key of ['sc_leaderboard','sc_season']){
+      const raw=await kv.get(key,'json'); if(!raw)continue;
+      const entries=Array.isArray(raw)?raw:(Array.isArray(raw.entries)?raw.entries:null); if(!entries)continue;
+      const kept=entries.filter(e=>!String(e&&e.id).startsWith('guest_'));
+      const n=entries.length-kept.length;
+      if(n>0){ dropped+=n; console.log(`${key}: dropping ${n} guest${n===1?'':'s'} (keeping ${kept.length})`);
+        if(confirm){ if(Array.isArray(raw)) await kv.put(key,kept); else { raw.entries=kept; await kv.put(key,raw); } console.log(`  ${key} rewritten`); } }
+      else console.log(`${key}: no guests`);
+    }
+    console.log(''); console.log(confirm?`Done. ${dropped} guest row(s) removed.`:`DRY RUN — ${dropped} guest row(s) would be removed. Re-run with --confirm.`);
+    await pool.end(); return;
+  }
+
   let edits=0, topScore=0;
   for(const key of ['sc_leaderboard','sc_season']){
     const raw=await kv.get(key,'json'); if(!raw)continue;

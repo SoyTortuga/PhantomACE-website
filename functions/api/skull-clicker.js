@@ -16,6 +16,11 @@ function getPlayer(request, body) {
   return null;
 }
 
+/* Anonymous guests (no Twitch login) have a per-browser id and can't be verified
+   or awarded, so they do not appear on the public boards. */
+const isGuest = (id) => String(id).startsWith('guest_');
+const notGuest = (e) => e && !isGuest(e.id);
+
 const LB_KEY = 'sc_leaderboard';
 const SAVE_MAX_BYTES = 20000;   /* a real save is a few hundred bytes */
 const EVENT_KEY = 'sc_event';
@@ -211,10 +216,10 @@ export async function onRequestGet(context) {
      lifetime board, unchanged in shape for any existing caller. */
   if (url.searchParams.get('board') === 'season') {
     const s = await rolloverSeason(env);
-    return json({ month: s.month, entries: s.entries.slice(0, 15).map(sanitizeEntry) });
+    return json({ month: s.month, entries: s.entries.filter(notGuest).slice(0, 15).map(sanitizeEntry) });
   }
   const lb = await env.MARKETPLACE.get(LB_KEY, 'json') || [];
-  return json(lb.slice(0, 15).map(sanitizeEntry));
+  return json(lb.filter(notGuest).slice(0, 15).map(sanitizeEntry));
 }
 
 /**
@@ -290,6 +295,12 @@ export async function onRequestPost(context) {
 
   const player = getPlayer(request, body);
   if (!player) return json({ error: 'Not authenticated' }, 401);
+
+  /* Guests play and keep a local save, but never appear on the public all-time or
+     season boards — a per-browser identity can't be verified or awarded (and is
+     already barred from prizes). Accept the submit so the client doesn't error;
+     rank nothing. */
+  if (isGuest(player.id)) return json({ success: true, updated: false, guest: true });
 
   /* Big-number score: travels as a string + scoreLog (log10). Rank/compare by
      scoreLog, store the string. A JSON'd Infinity arrives as null → log 0 → rejected;
