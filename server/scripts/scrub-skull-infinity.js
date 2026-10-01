@@ -2,7 +2,9 @@
 /* Heal Skull Clicker values that overflowed to Infinity / past the ceiling.
    node server/scripts/scrub-skull-infinity.js --service phantomace-web
    node server/scripts/scrub-skull-infinity.js --service phantomace-web --confirm
-   Optional: --name mvgfamous (match by display name)  --user-id 123456 (scrub that save too)
+   Heals by VALUE (>= ceiling / non-finite) only — a player who already reset and
+   re-climbed a legit score is never touched.
+   Optional: --name <display> (ALSO drop/scrub this exact name)  --user-id 123456 (also that save)
 
    Two modes:
      (default)  CLAMP — pin non-finite / over-cap numbers to the finite ceiling.
@@ -61,7 +63,10 @@ function resetState(s){ if(!s||typeof s!=='object')return false;
 const arg=(n)=>{const h=process.argv.find(a=>a.startsWith(`--${n}=`)); if(h)return h.slice(n.length+3); const i=process.argv.indexOf(`--${n}`); if(i!==-1&&process.argv[i+1]&&!process.argv[i+1].startsWith('--'))return process.argv[i+1]; return process.argv.includes(`--${n}`)||false;};
 
 async function main(){
-  const service=arg('service'), confirm=arg('confirm')===true, reset=arg('reset')===true, name=(arg('name')||'mvgfamous').toString().toLowerCase(), userId=arg('user-id');
+  const service=arg('service'), confirm=arg('confirm')===true, reset=arg('reset')===true, userId=arg('user-id');
+  /* Opt-in only. By default we heal purely by VALUE (>= ceiling / non-finite) so a
+     player who already reset and re-climbed a legit score is never dropped by name. */
+  const nameArg=arg('name'); const name=(typeof nameArg==='string'?nameArg:'').toLowerCase();
   const url=resolveDatabaseUrl({service, fallback:arg('database-url')});
   if(!url){console.error('No DATABASE_URL. Use --service phantomace-web.');process.exit(2);}
   const pool=createPool(url); const info=await waitForDatabase(); console.log('Database:',info.db);
