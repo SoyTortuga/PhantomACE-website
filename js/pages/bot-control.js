@@ -429,6 +429,7 @@ async function loadGiveawayState() {
     /* The monthly-ledger draw is a separate event with its own winner record;
        show it if one has been drawn this month. */
     if (data.monthlyWinner) showMonthlyWinner(data.monthlyWinner);
+    renderMonthlyPrev(data.monthlyPrev);
   } catch {
     /* leave panel as-is */
   }
@@ -447,6 +448,7 @@ function showMonthlyWinner(w) {
   if (nameEl) nameEl.textContent = w.username || '';
   if (metaEl) {
     const bits = [];
+    if (w.month) bits.push(w.month);
     if (w.entries != null) bits.push(w.entries + (w.entries === 1 ? ' entry' : ' entries'));
     if (w.totalEntries != null) bits.push('pool ' + w.totalEntries);
     if (w.sent) bits.push('code sent');
@@ -456,8 +458,32 @@ function showMonthlyWinner(w) {
   if (panel) panel.hidden = false;
 }
 
-async function drawMonthlyWinnerAction() {
-  const btn = document.getElementById('monthlyDrawBtn');
+/* The previous UTC month, when it had entrants, so the broadcaster can still
+   draw the just-ended month after the ledger rolled over at UTC midnight. */
+let monthlyPrevMonth = null;
+function renderMonthlyPrev(p) {
+  const btn = document.getElementById('monthlyDrawPrevBtn');
+  const note = document.getElementById('monthlyPrevNote');
+  const has = p && p.totalPeople > 0 && p.totalEntries > 0;
+  monthlyPrevMonth = has ? p.month : null;
+  if (btn) {
+    btn.hidden = !has;
+    if (has) btn.textContent = 'Draw Last Month (' + p.month + ')';
+  }
+  if (note) {
+    note.hidden = !has;
+    if (has) note.textContent = 'Last month (' + p.month + '): ' + p.totalEntries +
+      (p.totalEntries === 1 ? ' entry' : ' entries') + ' across ' + p.totalPeople +
+      (p.totalPeople === 1 ? ' person' : ' people') + ' — still drawable.';
+  }
+}
+
+/* `month` omitted → current month (primary button); set → the previous-month
+   grace draw (secondary button). */
+async function drawMonthlyWinnerAction(month) {
+  const prev = typeof month === 'string' && month;
+  const btn = document.getElementById(prev ? 'monthlyDrawPrevBtn' : 'monthlyDrawBtn');
+  const label = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Drawing...'; }
   document.getElementById('monthlyWinnerPanel').hidden = true;
   try {
@@ -465,7 +491,7 @@ async function drawMonthlyWinnerAction() {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'draw-monthly' }),
+      body: JSON.stringify({ action: 'draw-monthly', month: prev || undefined }),
     });
     const data = await res.json();
     if (data.success) {
@@ -474,10 +500,11 @@ async function drawMonthlyWinnerAction() {
         entries: data.winner.entries,
         totalEntries: data.totalEntries,
         totalPeople: data.totalPeople,
+        month: data.month,
         sent: false,
       });
       showBotStatus(
-        'Monthly winner drawn: ' + data.winner.username + ' (' + data.winner.entries +
+        'Monthly winner drawn for ' + data.month + ': ' + data.winner.username + ' (' + data.winner.entries +
         ' entries, from ' + data.totalEntries + ' across ' + data.totalPeople +
         (data.totalPeople === 1 ? ' person' : ' people') + '). The reel is spinning on the overlay.',
         false
@@ -488,7 +515,7 @@ async function drawMonthlyWinnerAction() {
   } catch {
     showBotStatus('Network error drawing the monthly winner.', true);
   }
-  if (btn) { btn.disabled = false; btn.textContent = 'Draw Monthly Winner'; }
+  if (btn) { btn.disabled = false; btn.textContent = label; }
 }
 
 async function sendMonthlyCode() {
@@ -659,8 +686,12 @@ function initGiveawayPanel() {
   if (resetBtn) resetBtn.addEventListener('click', resetGiveaway);
 
   const monthlyDrawBtn = document.getElementById('monthlyDrawBtn');
+  const monthlyDrawPrevBtn = document.getElementById('monthlyDrawPrevBtn');
   const monthlySendBtn = document.getElementById('monthlySendCodeBtn');
   if (monthlyDrawBtn) monthlyDrawBtn.addEventListener('click', drawMonthlyWinnerAction);
+  if (monthlyDrawPrevBtn) monthlyDrawPrevBtn.addEventListener('click', function () {
+    if (monthlyPrevMonth) drawMonthlyWinnerAction(monthlyPrevMonth);
+  });
   if (monthlySendBtn) monthlySendBtn.addEventListener('click', sendMonthlyCode);
 
   /* WATCH THE ENTRIES ARRIVE.

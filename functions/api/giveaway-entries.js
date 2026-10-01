@@ -58,6 +58,13 @@ export function monthKey(d = new Date()) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+/* The UTC month immediately before `d`'s month, 'YYYY-MM'. Used for the "draw
+   last month" grace window, so a broadcaster west of UTC can still draw the
+   just-ended month after the ledger rolls over at UTC midnight. */
+export function prevMonthKey(d = new Date()) {
+  return monthKey(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)));
+}
+
 /** Millisecond timestamp of the instant the current month's giveaway closes. */
 export function monthEndsAt(d = new Date()) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0);

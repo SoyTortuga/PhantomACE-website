@@ -196,8 +196,12 @@ export async function onRequestGet(context) {
      separate: its own winner record, and a live pool preview (current month's
      non-guest entry totals) so the panel can say what a draw would pull from
      WITHOUT drawing anyone — the totals are a read, the draw is a POST. */
-  const { monthlyLedgerTotals } = await import('../giveaway-entries.js');
+  const { monthlyLedgerTotals, prevMonthKey } = await import('../giveaway-entries.js');
   const monthly = await monthlyLedgerTotals(env);
+  /* Previous UTC month's pool, so the panel can offer "draw last month" during
+     the grace window after the ledger rolls over — only worth showing when that
+     month actually had entrants. */
+  const monthlyPrev = await monthlyLedgerTotals(env, prevMonthKey());
   const monthlyWinner = await env.MARKETPLACE.get(MONTHLY_WINNER_KEY, 'json') || null;
 
   return json({
@@ -210,6 +214,7 @@ export async function onRequestGet(context) {
     winner,
     rewardConfigured: !!rewardId,
     monthly,
+    monthlyPrev,
     monthlyWinner,
     /* Whether each reveal can be replayed onto the overlay (a winner with a
        stored reel payload exists), plus who, for the Overlay Dashboard's
@@ -486,10 +491,20 @@ export async function onRequestPost(context) {
      there is no pending-winner guard here, so a moderator can re-roll freely,
      and the Big Prize draw cannot be blocked by (or block) this one. */
   if (body.action === 'draw-monthly') {
-    const { drawMonthlyWinner, buildWeightedReelPool } = await import('../giveaway-entries.js');
-    const draw = await drawMonthlyWinner(env);
+    const { drawMonthlyWinner, buildWeightedReelPool, monthKey, prevMonthKey } = await import('../giveaway-entries.js');
+    /* Draw the current UTC month by default. A `month` may be passed to draw the
+       just-ended month during the grace window (the ledger rolls on the UTC
+       calendar, so a broadcaster west of UTC crosses over while still "this
+       month" locally). Restricted to current or previous month — older months
+       aren't drawable from the UI to avoid re-rolling settled history by mistake. */
+    const cur = monthKey(), prev = prevMonthKey();
+    const month = body.month ? String(body.month) : cur;
+    if (month !== cur && month !== prev) {
+      return json({ error: `Only the current (${cur}) or previous (${prev}) month can be drawn here.` }, 400);
+    }
+    const draw = await drawMonthlyWinner(env, { month });
     if (!draw.winner) {
-      return json({ error: 'Nobody has entered this month yet.' }, 400);
+      return json({ error: `Nobody has entered for ${month} yet.` }, 400);
     }
 
     /* The prize is drawn at the grand (mythic) tier — this is the big monthly
@@ -504,7 +519,7 @@ export async function onRequestPost(context) {
       winnerIndex: reel.winnerIndex,
       rarity: 'mythic',
       who: draw.winner.username,
-      label: 'Monthly Giveaway',
+      label: month === prev ? `Monthly Giveaway · ${month}` : 'Monthly Giveaway',
       note: `Drawn from ${draw.totalEntries} entries across ${draw.totalPeople} ${draw.totalPeople === 1 ? 'person' : 'people'}`,
     };
 
