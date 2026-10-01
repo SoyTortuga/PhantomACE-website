@@ -86,6 +86,41 @@ async function main(){
     if(entries) for(const e of entries) console.log(`   ${e.name}  id=${e.id}  score=${e.score}  scoreLog=${e.scoreLog}  (>=cap: ${over(e.score)})`);
   }
   console.log('');
+
+  /* ── Targeted restore ──────────────────────────────────────────────────
+     Put one player back on the all-time board at an explicit score (e.g. after a
+     --reset deleted them). Writes the board entry (string score + scoreLog, the
+     break_infinity format) AND their save's lifetimeSkulls so it is backed and
+     survives a re-login. Uses prestige/ascensions from the save when present.
+       --restore-id <id> --restore-name "PHAMmom" --restore-score 1.2e24  [--confirm] */
+  const restoreId=arg('restore-id'), restoreName=arg('restore-name'), restoreScore=arg('restore-score');
+  if(typeof restoreId==='string' && restoreScore!==false){
+    const val=Number(restoreScore);
+    if(!Number.isFinite(val)||val<=0){ console.error('--restore-score must be a positive number (e.g. 1.2e24).'); await pool.end(); process.exit(2); }
+    const log=val>0?Math.log10(val):0;
+    const save=await kv.get(`sc_save_${restoreId}`,'json');
+    const asc=save?Math.floor(Number(save.ascensions)||0):0;
+    const pres=save?Math.floor(Number(save.prestige)||0):0;
+    const lb=await kv.get('sc_leaderboard','json')||[];
+    let e=lb.find(x=>String(x.id)===String(restoreId));
+    if(e){ e.score=String(val); e.scoreLog=log; if(typeof restoreName==='string')e.name=restoreName; e.prestige=pres; e.ascensions=asc; e.updatedAt=Date.now(); console.log(`Updating existing board entry for id ${restoreId}`); }
+    else { e={ id:String(restoreId), name:(typeof restoreName==='string'?restoreName:'player'), score:String(val), scoreLog:log, prestige:pres, ascensions:asc, updatedAt:Date.now() }; lb.push(e); console.log(`Inserting new board entry for id ${restoreId}`); }
+    const sortKey=r=>Number.isFinite(Number(r.scoreLog))?Number(r.scoreLog):(Number(r.score)>0?Math.log10(Number(r.score)):0);
+    lb.sort((a,b)=>sortKey(b)-sortKey(a));
+    const rank=lb.findIndex(x=>String(x.id)===String(restoreId))+1;
+    console.log(`\nRestore: ${e.name} (id ${restoreId}) -> score ${e.score} (scoreLog ${log.toFixed(3)}), prestige ${pres}, ascensions ${asc}. New rank: #${rank} of ${lb.length}.`);
+    if(save){ console.log(`Save sc_save_${restoreId}: lifetimeSkulls ${save.lifetimeSkulls} -> ${val} (seasonEpoch kept: ${save.seasonEpoch})`); }
+    else { console.log(`No sc_save_${restoreId} — board entry only (it will persist; a future login with a lower save won't lower it).`); }
+    if(confirm){
+      await kv.put('sc_leaderboard',lb);
+      if(save){ save.lifetimeSkulls=val; await kv.put(`sc_save_${restoreId}`,save); }
+      console.log('\nWritten.');
+    } else {
+      console.log('\nDRY RUN — re-run with --confirm to apply.');
+    }
+    await pool.end(); return;
+  }
+
   let edits=0, topScore=0;
   for(const key of ['sc_leaderboard','sc_season']){
     const raw=await kv.get(key,'json'); if(!raw)continue;
