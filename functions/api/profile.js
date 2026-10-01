@@ -54,8 +54,13 @@ async function resolveUserId(env, url) {
 /** Where someone sits on one board, or null if they are not on it. */
 function placingIn(rows, userId, board) {
   if (!Array.isArray(rows)) return null;
+  /* Skull Clicker scores can exceed a JS double (stored as a string + scoreLog
+     since the break_infinity migration), so a raw a.score - b.score is NaN for
+     them. Rank by scoreLog when present, falling back to the numeric score for
+     legacy rows / other boards. */
+  const key = (r) => (r && Number.isFinite(Number(r.scoreLog)) ? Number(r.scoreLog) : Number(r && r.score));
   const sorted = [...rows].sort((a, b) =>
-    board.asc ? (a.score - b.score) : (b.score - a.score));
+    board.asc ? (key(a) - key(b)) : (key(b) - key(a)));
   const i = sorted.findIndex(r => String(r.id ?? r.userId) === String(userId));
   if (i === -1) return null;
   return {
