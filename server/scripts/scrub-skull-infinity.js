@@ -6,7 +6,11 @@
    re-climbed a legit score is never touched.
    Optional: --name <display> (ALSO drop/scrub this exact name)  --user-id 123456 (also that save)
 
-   Two modes:
+   Modes:
+     --to-top   SET the corrupt entries (and their saves) to the current REAL top
+                score on the board, clamp everything else finite, and bump seasonEpoch
+                so the cached corrupt local save can't re-clobber. Keeps the players at
+                the top legitimately instead of wiping or showing MAX. (Recommended.)
      (default)  CLAMP — pin non-finite / over-cap numbers to the finite ceiling.
                 Safe + idempotent, but corrupted lifetime totals all land on the SAME
                 cap (1e300), so they tie at the top of the all-time board forever
@@ -63,7 +67,7 @@ function resetState(s){ if(!s||typeof s!=='object')return false;
 const arg=(n)=>{const h=process.argv.find(a=>a.startsWith(`--${n}=`)); if(h)return h.slice(n.length+3); const i=process.argv.indexOf(`--${n}`); if(i!==-1&&process.argv[i+1]&&!process.argv[i+1].startsWith('--'))return process.argv[i+1]; return process.argv.includes(`--${n}`)||false;};
 
 async function main(){
-  const service=arg('service'), confirm=arg('confirm')===true, reset=arg('reset')===true, userId=arg('user-id');
+  const service=arg('service'), confirm=arg('confirm')===true, reset=arg('reset')===true, toTop=arg('to-top')===true, userId=arg('user-id');
   /* Opt-in only. By default we heal purely by VALUE (>= ceiling / non-finite) so a
      player who already reset and re-climbed a legit score is never dropped by name. */
   const nameArg=arg('name'); const name=(typeof nameArg==='string'?nameArg:'').toLowerCase();
@@ -82,12 +86,30 @@ async function main(){
     if(entries) for(const e of entries.slice(0,5)) console.log(`   ${e.name}  score=${e.score}  (>=cap: ${over(e.score)})`);
   }
   console.log('');
-  let edits=0;
+  let edits=0, topScore=0;
   for(const key of ['sc_leaderboard','sc_season']){
     const raw=await kv.get(key,'json'); if(!raw)continue;
     const entries=Array.isArray(raw)?raw:(Array.isArray(raw.entries)?raw.entries:null); if(!entries)continue;
     const corrupt=(e)=>over(e.score)||over(e.prestige)||over(e.ascensions)||(e.name||'').toLowerCase()===name;
     for(const e of entries) if(corrupt(e)&&e.id)ids.add(String(e.id));
+
+    /* Highest legit (finite, sub-ceiling) score on this board. */
+    const legit=entries.filter(e=>!corrupt(e)).map(e=>Number(e.score)).filter(Number.isFinite);
+    const topLegit=legit.length?Math.max(...legit):0;
+    if(key==='sc_leaderboard') topScore=topLegit;
+
+    if(toTop){
+      let changed=false;
+      for(const e of entries){ if(!corrupt(e))continue;
+        console.log(`${key}: ${e.name} score ${e.score} -> ${topLegit} (real top)`);
+        e.score=Math.floor(topLegit);
+        if(over(e.prestige)) e.prestige=Math.min(9999,Math.floor(finite(e.prestige)));
+        if(over(e.ascensions)) e.ascensions=Math.min(99999,Math.floor(finite(e.ascensions)));
+        changed=true;
+      }
+      if(changed){ edits++; if(confirm){ if(Array.isArray(raw)){entries.sort((a,b)=>b.score-a.score); await kv.put(key,entries);} else {await kv.put(key,raw);} console.log(`  ${key} rewritten`);} }
+      continue;
+    }
 
     if(reset){
       const kept=entries.filter(e=>!corrupt(e));
@@ -113,8 +135,20 @@ async function main(){
        whether any real number survives or it's all overflowed. */
     console.log(`\n${k} fields:`);
     for(const f of ['lifetimeSkulls','totalSkulls','skulls','prestige','highestPrestige','ascensions','epitaphs']) console.log(`   ${f} = ${st[f]}`);
-    const changed = reset ? resetState(st) : sanitizeState(st).changed;
-    if(changed){ edits++; console.log(`${k}: ${reset?'run wiped (legacy kept), seasonEpoch -> '+st.seasonEpoch:'numeric fields clamped'}`); if(confirm){ await kv.put(k,st); console.log(`  ${k} rewritten`);} }
+    let changed, note;
+    if(toTop){
+      /* Pin the overflowed all-time total down to the real top, clamp everything
+         else finite, and bump seasonEpoch so the cached corrupt local save can't
+         re-clobber it on next load. The run keeps playing from there. */
+      sanitizeState(st);
+      st.lifetimeSkulls=Math.floor(topScore);
+      if(!(finite(st.totalSkulls)<=topScore)) st.totalSkulls=Math.floor(topScore);
+      if(!(finite(st.skulls)<=topScore)) st.skulls=Math.floor(topScore);
+      st.seasonEpoch=nextMonthEpoch();
+      changed=true; note=`lifetimeSkulls -> ${st.lifetimeSkulls} (real top), seasonEpoch -> ${st.seasonEpoch}`;
+    } else if(reset){ changed=resetState(st); note=`run wiped (legacy kept), seasonEpoch -> ${st.seasonEpoch}`; }
+    else { changed=sanitizeState(st).changed; note='numeric fields clamped'; }
+    if(changed){ edits++; console.log(`${k}: ${note}`); if(confirm){ await kv.put(k,st); console.log(`  ${k} rewritten`);} }
   }
   console.log(''); console.log(confirm?`Done. ${edits} record(s) rewritten.`:`DRY RUN — ${edits} record(s) would change. Re-run with --confirm.`);
   await pool.end();
