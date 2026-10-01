@@ -29,6 +29,10 @@ import { resolveDatabaseUrl } from '../lib/service-env.js';
 const CAP = 1e300;
 const finite = (v) => { const n = Number(v); if (Number.isFinite(n)) return n < 0 ? 0 : (n > CAP ? CAP : n); return n === Infinity ? CAP : 0; };
 const bad = (v) => typeof v === 'number' && (!Number.isFinite(v) || v > CAP);
+/* At OR over the ceiling. A prior clamp run pins corrupt values to exactly CAP,
+   which `bad` (strictly > CAP) no longer sees — so --reset must flag >= CAP to
+   catch already-clamped entries, not only still-overflowing ones. */
+const over = (v) => typeof v === 'number' && (!Number.isFinite(v) || v >= CAP);
 const NUM = ['skulls','totalSkulls','lifetimeSkulls','prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','seasonBaseline','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
 function sanitizeState(s){ if(!s||typeof s!=='object')return {s,changed:false}; let c=false;
   for(const k of NUM) if(typeof s[k]==='number'&&s[k]!==finite(s[k])){s[k]=finite(s[k]);c=true;}
@@ -68,7 +72,7 @@ async function main(){
   for(const key of ['sc_leaderboard','sc_season']){
     const raw=await kv.get(key,'json'); if(!raw)continue;
     const entries=Array.isArray(raw)?raw:(Array.isArray(raw.entries)?raw.entries:null); if(!entries)continue;
-    const corrupt=(e)=>bad(e.score)||bad(e.prestige)||bad(e.ascensions)||(e.name||'').toLowerCase()===name;
+    const corrupt=(e)=>over(e.score)||over(e.prestige)||over(e.ascensions)||(e.name||'').toLowerCase()===name;
     for(const e of entries) if(corrupt(e)&&e.id)ids.add(String(e.id));
 
     if(reset){
