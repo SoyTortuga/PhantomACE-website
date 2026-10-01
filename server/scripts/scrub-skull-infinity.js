@@ -68,6 +68,15 @@ async function main(){
   console.log('Mode:', reset?'RESET (drop corrupt entries + wipe run, keep legacy)':'CLAMP (pin to ceiling)');
   const kv=createKVStore(pool);
   const ids=new Set(); if(userId)ids.add(String(userId));
+
+  /* Ground truth: show what is actually stored on each board right now. */
+  for(const key of ['sc_leaderboard','sc_season']){
+    const raw=await kv.get(key,'json');
+    const entries=Array.isArray(raw)?raw:(raw&&Array.isArray(raw.entries)?raw.entries:null);
+    console.log(`\n${key}: ${entries?entries.length+' entries':'(empty/missing)'}`);
+    if(entries) for(const e of entries.slice(0,5)) console.log(`   ${e.name}  score=${e.score}  (>=cap: ${over(e.score)})`);
+  }
+  console.log('');
   let edits=0;
   for(const key of ['sc_leaderboard','sc_season']){
     const raw=await kv.get(key,'json'); if(!raw)continue;
