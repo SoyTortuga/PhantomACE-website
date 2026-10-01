@@ -169,6 +169,12 @@ export const SINGLETONS = {
   /* Per-alert on/off map (bot/trigger.js alert-toggle + isAlertEnabled in
      overlay/events.js). 'none' — a lost value falls back to every alert on. */
   alert_toggles:         { table: 'singletons', expiry: 'none' },
+  /* Customizable overlay wheel: its saved segments, and its last spin result for
+     replay. 'none' — persist until the next save/spin. */
+  wheel_config:          { table: 'singletons', expiry: 'none' },
+  wheel_last_winner:     { table: 'singletons', expiry: 'none' },
+  /* The activity feed: one capped newest-first array. 'none' — overwritten in place. */
+  activity_feed:         { table: 'singletons', expiry: 'none' },
 
   /* Short-lived heartbeat registry of open overlay instances, used to elect a
      single "audio leader" so the check-in chime plays once no matter how many
