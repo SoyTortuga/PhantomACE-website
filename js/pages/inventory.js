@@ -20,6 +20,17 @@ const SLOT_BY_TYPE = Object.fromEntries(PROFILE_SLOTS.map(s => [s.type, s]));
 const RARITY_ORDER = { exclusive: 0, mythic: 1, legendary: 2, epic: 3, rare: 4, uncommon: 5, common: 6 };
 const SHOWCASE_MAX = 5;
 
+/* The cosmetic kinds a duplicate of can be gifted — matches
+   functions/api/gift.js GIFTABLE_TYPES. Consumables (eggs, wildcards) and the
+   room-slot capacity unlock are deliberately absent. */
+const GIFTABLE_TYPES = new Set([
+  'badge', 'title', 'banner', 'name-effect',
+  'cardback', 'emote-pack',
+  'skull-skin', 'click-effect', 'cosmetic',
+  'dice',
+  'room-piece', 'room-set',
+]);
+
 /* Months follow the shared season calendar (functions/api/season-time.js
    SEASON_TZ), so "this season" here is the same month Phamily Time and the
    giveaway are counting. */
@@ -65,6 +76,8 @@ async function loadInventory() {
     return;
   }
 
+  raiseGiftNotices();
+
   try {
     const res = await fetch('/api/inventory?game=profile');
     if (!res.ok) throw new Error();
@@ -108,6 +121,7 @@ function bindContainer(container) {
     else if (a === 'equip') toggleProfileEquip(el.dataset.slot, el.dataset.id, el.dataset.equipped === '1');
     else if (a === 'showcase') toggleShowcaseBadge(el.dataset.id);
     else if (a === 'save-showcase') saveShowcase();
+    else if (a === 'gift') openGiftDialog(el.dataset.id, el.dataset.type);
   });
 
   /* toggle does not bubble; capture it so a collapsed group stays collapsed
@@ -250,6 +264,7 @@ function renderCollection(container) {
   html += renderToolbar();
   html += renderActiveTabGrid();
   html += renderShowcaseSection();
+  html += renderGiftSection();
   html += renderFooterTip();
 
   clearNameFx(container);
@@ -527,6 +542,235 @@ function renderShowcaseSection() {
   html += `<button class="btn-primary showcase-save-btn" id="showcaseSaveBtn" data-action="save-showcase">Save Showcase</button>`;
   html += '</div>';
   return html;
+}
+
+/* ── Gifting a duplicate ─────────────────────────
+   You can only ever gift a cosmetic you hold two or more of; the copy you
+   keep is never at risk. functions/api/gift.js enforces the same rule
+   server-side — this section only surfaces what is eligible. */
+
+function giftableDuplicates() {
+  const counts = new Map();   // id|type -> { item, count }
+  for (const it of profileItems) {
+    if (!it || it.consumable || !GIFTABLE_TYPES.has(it.type)) continue;
+    const key = it.id + '|' + it.type;
+    const cur = counts.get(key);
+    if (cur) cur.count++;
+    else counts.set(key, { item: it, count: 1 });
+  }
+  return [...counts.values()]
+    .filter(g => g.count >= 2)
+    .sort((a, b) => (RARITY_ORDER[a.item.rarity] ?? 9) - (RARITY_ORDER[b.item.rarity] ?? 9)
+      || String(a.item.name || '').localeCompare(String(b.item.name || '')));
+}
+
+function renderGiftSection() {
+  const dupes = giftableDuplicates();
+  if (dupes.length === 0) return '';
+
+  let html = '<div class="collection-category gift-section">';
+  html += `<div class="section-header">Gift a Duplicate <span class="collection-count">${dupes.length} eligible</span></div>`;
+  html += `<p class="gift-desc">Hold two or more of the same cosmetic? Pass a spare to another member of the Phamily — the copy you keep stays yours. Pick a duplicate, choose who gets it, done.</p>`;
+  html += '<div class="collection-grid gift-grid">';
+  for (const g of dupes) {
+    const slot = slotOf(g.item) || BADGE_SLOT;
+    const rarity = escAttr(g.item.rarity || 'common');
+    html += `
+      <div class="collection-item gift-item rarity-${rarity} type-${escAttr(g.item.type)}">
+        <div class="gift-count-pill">${g.count} owned</div>
+        ${itemFace(g.item, slot)}
+        <span class="item-rarity-tag">${escName(g.item.rarity || 'common')}</span>
+        <div class="item-name">${escName(g.item.name)}</div>
+        <button class="pill-btn item-equip-btn" data-action="gift" data-id="${escAttr(g.item.id)}" data-type="${escAttr(g.item.type)}">Gift a spare</button>
+      </div>`;
+  }
+  html += '</div></div>';
+  return html;
+}
+
+/* The dialog lives on <body>, not inside the collection container, so a
+   re-render of the grid never tears it out from under an open gift. */
+let giftDialog = null;
+let giftState = null;   // { id, type, name, recipient: {login, displayName} | null }
+let giftSearchSeq = 0;
+let giftSearchTimer = null;
+
+function ensureGiftDialog() {
+  if (giftDialog) return giftDialog;
+  const d = document.createElement('dialog');
+  d.className = 'gift-dialog';
+  document.body.appendChild(d);
+  giftDialog = d;
+
+  d.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-g]');
+    if (el) {
+      const a = el.dataset.g;
+      if (a === 'close') closeGiftDialog();
+      else if (a === 'pick') pickGiftRecipient(el.dataset.login, el.dataset.name);
+      else if (a === 'clear-recipient') { giftState.recipient = null; renderGiftDialog(); }
+      else if (a === 'confirm') submitGift();
+      return;
+    }
+    /* Click on the backdrop (the dialog element itself) closes it. */
+    if (e.target === d) closeGiftDialog();
+  });
+
+  d.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'giftRecipientInput') runGiftSearch(e.target.value);
+  });
+  d.addEventListener('cancel', () => { giftState = null; });
+  return d;
+}
+
+function openGiftDialog(id, type) {
+  const g = giftableDuplicates().find(x => x.item.id === id && x.item.type === type);
+  if (!g) return;
+  giftState = { id, type, name: g.item.name, rarity: g.item.rarity || 'common', recipient: null, status: '', busy: false, done: null };
+  ensureGiftDialog();
+  renderGiftDialog();
+  if (!giftDialog.open) giftDialog.showModal();
+  const input = document.getElementById('giftRecipientInput');
+  if (input) input.focus();
+}
+
+function closeGiftDialog() {
+  giftSearchSeq++;
+  if (giftDialog && giftDialog.open) giftDialog.close();
+  giftState = null;
+}
+
+function renderGiftDialog() {
+  if (!giftDialog || !giftState) return;
+  const s = giftState;
+
+  if (s.done) {
+    giftDialog.innerHTML = `
+      <div class="gift-dialog-inner">
+        <div class="gift-dialog-head"><h2 class="gift-dialog-title">Gift sent</h2></div>
+        <p class="gift-dialog-done">You gifted <strong class="rarity-${escAttr(s.done.rarity)}">${escName(s.done.name)}</strong> to <strong>${escName(s.done.to)}</strong>. They'll see it in their inventory.</p>
+        <div class="gift-dialog-actions"><button class="btn-primary" data-g="close">Done</button></div>
+      </div>`;
+    return;
+  }
+
+  let picks = '';
+  if (s.recipient) {
+    picks = `
+      <div class="gift-recipient-chosen">
+        <span>Gifting to <strong>${escName(s.recipient.displayName)}</strong></span>
+        <button class="gift-recipient-change" data-g="clear-recipient">Change</button>
+      </div>`;
+  } else {
+    picks = `
+      <label class="gift-field-label" for="giftRecipientInput">Send to</label>
+      <input id="giftRecipientInput" class="gift-recipient-input" type="text" autocomplete="off" spellcheck="false" placeholder="Twitch name…" maxlength="30">
+      <ul id="giftResults" class="gift-results" hidden></ul>`;
+  }
+
+  giftDialog.innerHTML = `
+    <div class="gift-dialog-inner">
+      <div class="gift-dialog-head">
+        <h2 class="gift-dialog-title">Gift a duplicate</h2>
+        <button class="gift-dialog-x" data-g="close" aria-label="Close">✕</button>
+      </div>
+      <p class="gift-dialog-item">Giving away one <strong class="rarity-${escAttr(s.rarity)}">${escName(s.name)}</strong>. Your other copy stays with you.</p>
+      ${picks}
+      ${s.status ? `<p class="gift-dialog-status">${escName(s.status)}</p>` : ''}
+      <div class="gift-dialog-actions">
+        <button class="pill-btn" data-g="close">Cancel</button>
+        <button class="btn-primary" data-g="confirm" ${s.recipient && !s.busy ? '' : 'disabled'}>${s.busy ? 'Sending…' : 'Send gift'}</button>
+      </div>
+    </div>`;
+}
+
+function runGiftSearch(term) {
+  const t = String(term || '').trim();
+  clearTimeout(giftSearchTimer);
+  const list = document.getElementById('giftResults');
+  if (t.length < 2) { giftSearchSeq++; if (list) { list.hidden = true; list.innerHTML = ''; } return; }
+  giftSearchTimer = setTimeout(() => {
+    const mine = ++giftSearchSeq;
+    fetch('/api/profile?q=' + encodeURIComponent(t), { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { results: [] }))
+      .then(d => {
+        if (mine !== giftSearchSeq) return;
+        const el = document.getElementById('giftResults');
+        if (!el) return;
+        const rows = (d.results || []).filter(r => r.login);
+        if (!rows.length) {
+          el.innerHTML = '<li class="gift-result-none">Nobody by that name</li>';
+          el.hidden = false;
+          return;
+        }
+        el.innerHTML = rows.map(r =>
+          `<li><button type="button" class="gift-result" data-g="pick" data-login="${escAttr(r.login)}" data-name="${escAttr(r.displayName || r.login)}">`
+          + (r.avatar ? `<img src="${escAttr(r.avatar)}" alt="">` : '<span class="gift-result-blank"></span>')
+          + `<span>${escName(r.displayName || r.login)}</span></button></li>`
+        ).join('');
+        el.hidden = false;
+      })
+      .catch(() => {});
+  }, 220);
+}
+
+function pickGiftRecipient(login, name) {
+  if (!giftState) return;
+  giftState.recipient = { login, displayName: name || login };
+  giftState.status = '';
+  renderGiftDialog();
+}
+
+async function submitGift() {
+  if (!giftState || giftState.busy || !giftState.recipient) return;
+  giftState.busy = true;
+  giftState.status = '';
+  renderGiftDialog();
+
+  try {
+    const res = await fetch('/api/gift', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'gift', itemId: giftState.id, type: giftState.type, toLogin: giftState.recipient.login }),
+    });
+    let data = null;
+    try { data = await res.json(); } catch { data = null; }
+    if (!res.ok || !data || !data.success) {
+      throw new Error((data && data.error) || ('Server returned ' + res.status));
+    }
+    /* Drop one local copy so the grid updates without a reload; if that was
+       the second-to-last, the duplicate leaves the Gift section entirely. */
+    const idx = profileItems.findIndex(i => i && i.id === giftState.id && i.type === giftState.type && !i.consumable);
+    if (idx !== -1) profileItems.splice(idx, 1);
+    giftState.done = { name: data.item.name, rarity: data.item.rarity || 'common', to: (data.to && data.to.displayName) || giftState.recipient.displayName };
+    renderGiftDialog();
+    rerender();
+  } catch (err) {
+    giftState.busy = false;
+    giftState.status = (err && err.message) || 'Could not send that gift — try again.';
+    renderGiftDialog();
+  }
+}
+
+/* Raise the "someone gifted you X" bell on page load. The server hands the
+   notices over once (read-and-clear); addNotification keys each one so a
+   second tab reading nothing, or a re-render, never double-announces. */
+function raiseGiftNotices() {
+  if (typeof window.addNotification !== 'function') return;
+  fetch('/api/gift', { cache: 'no-store' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      if (!d || !Array.isArray(d.gifts)) return;
+      for (const g of d.gifts) {
+        if (!g || !g.item) continue;
+        window.addNotification({
+          type: 'system',
+          key: 'gift:' + g.id,
+          message: `${g.fromName || 'Someone'} gifted you ${g.item.name}!`,
+        });
+      }
+    })
+    .catch(() => {});
 }
 
 function renderFooterTip() {

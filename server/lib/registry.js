@@ -381,6 +381,9 @@ export const FAMILIES = [
   /* mm_game_{userId} — memory-match.js: the one in-progress server-dealt game
      per player (deck + flip log), sliding 1h TTL; a new start replaces it. */
   { prefix: 'mm_game_',        table: 'singletons',       expiry: 'real' },
+  /* Cosmetic gift bell: a disposable per-recipient queue (gift_inbox_<userId>),
+     read-and-cleared on the next inventory load; TTL is the backstop. */
+  { prefix: 'gift_inbox_',     table: 'singletons',       expiry: 'real' },
   /* Weekly Phamily Quests: one progress/claim/notice row per user per ISO week
      (quest_<userId>_<weekKey>), read by exact key, so the generic singletons
      table is the right home; the handler sets a week-scoped TTL. */

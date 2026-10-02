@@ -496,6 +496,217 @@
   .inv-toolbar { gap: 10px; }
 }
 
+/* ── Gift a duplicate ── */
+.gift-section {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.gift-desc {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  color: var(--text-sec);
+  margin: 0 0 16px;
+  max-width: 62ch;
+  line-height: 1.5;
+}
+
+.gift-grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.gift-count-pill {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: var(--font-system);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-sec);
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+/* ── Gift dialog ── */
+.gift-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: 440px;
+  padding: 0;
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  background: var(--gray-lo);
+  color: var(--text-pri);
+}
+
+.gift-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.gift-dialog-inner {
+  padding: 22px 24px 24px;
+}
+
+.gift-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gift-dialog-title {
+  font-family: var(--font-gothic);
+  font-size: 24px;
+  letter-spacing: 0.04em;
+  color: var(--text-pri);
+  margin: 0;
+}
+
+.gift-dialog-x {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.gift-dialog-x:hover { color: var(--red); }
+
+.gift-dialog-item,
+.gift-dialog-done {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--text-sec);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.gift-field-label {
+  display: block;
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.gift-recipient-input {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  padding: 9px 12px;
+  background: var(--black);
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-pri);
+}
+
+.gift-recipient-input:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.gift-results {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.gift-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text-pri);
+  font-family: var(--font-ui);
+  font-size: 16px;
+}
+
+.gift-results li:last-child .gift-result { border-bottom: none; }
+.gift-result:hover { background: var(--gray-mid); }
+
+.gift-result img,
+.gift-result-blank {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--gray-mid);
+  flex-shrink: 0;
+}
+
+.gift-result-none {
+  padding: 10px 12px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.gift-recipient-chosen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--text-sec);
+  background: var(--black);
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.gift-recipient-change {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.gift-dialog-status {
+  color: var(--red);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  margin: 12px 0 0;
+}
+
+.gift-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.gift-dialog .rarity-exclusive { color: var(--exclusive); }
+.gift-dialog .rarity-mythic { color: var(--rarity-mythic); }
+.gift-dialog .rarity-legendary { color: var(--rarity-legendary); }
+.gift-dialog .rarity-epic { color: var(--rarity-epic); }
+.gift-dialog .rarity-rare { color: var(--rarity-rare); }
+.gift-dialog .rarity-uncommon { color: var(--rarity-uncommon); }
+.gift-dialog .rarity-common { color: var(--rarity-common); }
+
 /* ── Import badges bar ── */
 .import-badges-bar {
   text-align: center;
