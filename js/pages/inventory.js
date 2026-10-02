@@ -103,6 +103,7 @@ function renderCollection(container) {
   }
   html += '</div></div>';
 
+  html += renderEquipError();
   html += renderTabs();
   html += renderActiveTabGrid();
   html += renderShowcaseSection();
@@ -268,25 +269,51 @@ async function saveShowcase() {
   }
 }
 
+let equipError = '';
+let equipBusy = false;
+
 async function toggleProfileEquip(slot, itemId, isEquipped) {
+  if (equipBusy) return;
+  equipBusy = true;
   const newId = isEquipped ? 'none' : itemId;
-
-  if (isEquipped) {
-    delete profileEquips[slot];
-  } else {
-    profileEquips[slot] = itemId;
-  }
-
+  const previous = profileEquips[slot];
   const container = document.getElementById('inventoryCollection');
+
+  if (isEquipped) delete profileEquips[slot];
+  else profileEquips[slot] = itemId;
+  equipError = '';
   renderCollection(container);
 
   try {
-    await fetch('/api/inventory', {
+    const res = await fetch('/api/inventory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'equip', game: 'profile', slot, itemId: newId }),
     });
-  } catch {}
+    let data = null;
+    try { data = await res.json(); } catch { data = null; }
+    if (!res.ok || !data || !data.success) {
+      throw new Error((data && data.error) || ('Server returned ' + res.status));
+    }
+    if (data.equips && typeof data.equips === 'object') {
+      const keepShowcase = profileEquips.badgeShowcase;
+      profileEquips = { ...data.equips };
+      if (keepShowcase && !profileEquips.badgeShowcase) profileEquips.badgeShowcase = keepShowcase;
+    }
+  } catch (err) {
+    if (previous === undefined) delete profileEquips[slot];
+    else profileEquips[slot] = previous;
+    const verb = isEquipped ? 'unequip' : 'equip';
+    equipError = `Couldn't ${verb} that — ${(err && err.message) || 'try again'}.`;
+  } finally {
+    equipBusy = false;
+    renderCollection(container);
+  }
+}
+
+function renderEquipError() {
+  if (!equipError) return '';
+  return `<p class="inv-equip-error" role="alert" style="color: var(--red); margin: 8px 0;">${escName(equipError)}</p>`;
 }
 
 function escName(s) {

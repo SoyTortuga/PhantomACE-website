@@ -41,7 +41,17 @@ export function nameEffectVariant(item) {
   else if (item.rarity === 'mythic') tier = 'mythic';
   else tier = 'rare';
   const theme = meta.theme || item.theme || '';
-  return theme ? `${theme}-${tier}` : tier;
+  return KNOWN_THEMES.indexOf(theme) !== -1 ? `${theme}-${tier}` : tier;
+}
+
+/* Themes that have CSS and banner art. Keep identical to KNOWN_THEMES in
+   js/cosmetic-variants.js (test-cosmetics.js asserts it). An unknown or
+   malformed theme falls back to the plain tier rather than producing a class
+   or image path that does not exist. */
+export const KNOWN_THEMES = Object.freeze(['halloween']);
+
+export function knownTheme(theme) {
+  return KNOWN_THEMES.indexOf(theme) !== -1 ? theme : null;
 }
 
 /* Name effects and banners map the same way — one core, two names so the

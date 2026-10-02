@@ -19,6 +19,8 @@
    nothing rather than to whoever holds it now.
    ══════════════════════════════════════════════ */
 
+import { knownTheme } from './cosmetics.js';
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -164,6 +166,10 @@ export async function onRequestGet(context) {
        lets a future explicit id win, and it is a short opaque string, not the
        rest of meta. */
     effect: (i.meta && i.meta.effect) || null,
+    /* The seasonal theme (halloween banners / glows), whitelisted against
+       the same KNOWN_THEMES the variant mapping uses — an unknown theme is
+       dropped here so nothing unvalidated reaches the page. */
+    theme: knownTheme(i.meta && i.meta.theme),
   });
 
   const byId = (id) => items.find(i => i.id === id) || null;

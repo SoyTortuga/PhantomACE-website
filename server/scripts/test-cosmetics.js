@@ -21,6 +21,8 @@ import {
   resolveEquippedCosmetics,
   nameEffectVariant as serverVariant,
   bannerPath,
+  KNOWN_THEMES,
+  knownTheme,
 } from '../../functions/api/cosmetics.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -58,8 +60,49 @@ const MATRIX = [
   { rarity: 'common', name: 'Name Effect', meta: { theme: 'halloween' } },
   { rarity: 'mythic', name: 'x', meta: { theme: 'other' } },
 ];
+const UNKNOWN_THEMES = [
+  'other', 'christmas', 'Halloween', 'halloween ', 'hallo ween', 'spooky season',
+  '"><img src=x onerror=alert(1)>', '../evil', '__proto__', 'constructor', 'toString',
+  42, true, { toString: () => 'halloween' }, ['halloween'],
+];
+for (const theme of UNKNOWN_THEMES) {
+  MATRIX.push({ rarity: 'mythic', name: 'Name Effect', meta: { theme } });
+  MATRIX.push({ rarity: 'rare', name: 'Exclusive Banner', theme });
+}
 for (let i = 0; i < MATRIX.length; i++) {
   check('client==server for case ' + i, serverVariant(MATRIX[i]), clientVariant(MATRIX[i]));
+}
+
+/* ── KNOWN_THEMES whitelist ─────────────────────────────────────────── */
+const clientThemes = (0, eval)(cvSrc.slice(s, e).trim() + '\nKNOWN_THEMES;');
+check('KNOWN_THEMES identical client/server', [...clientThemes], [...KNOWN_THEMES]);
+check('KNOWN_THEMES is just halloween today', [...KNOWN_THEMES], ['halloween']);
+
+for (const theme of UNKNOWN_THEMES) {
+  const label = JSON.stringify(String(theme));
+  check(`unknown theme ${label} → plain mythic (server)`,
+    serverVariant({ rarity: 'mythic', name: 'Name Effect', meta: { theme } }), 'mythic');
+  check(`unknown theme ${label} → plain mythic (client)`,
+    clientVariant({ rarity: 'mythic', name: 'Name Effect', meta: { theme } }), 'mythic');
+  check(`unknown flattened theme ${label} → plain exclusive (server)`,
+    serverVariant({ rarity: 'rare', name: 'Exclusive Banner', theme }), 'exclusive');
+  check(`unknown flattened theme ${label} → plain exclusive (client)`,
+    clientVariant({ rarity: 'rare', name: 'Exclusive Banner', theme }), 'exclusive');
+  check(`knownTheme(${label}) → null`, knownTheme(theme), null);
+}
+check('known theme still themed (server)',
+  serverVariant({ rarity: 'rare', name: 'Name Effect', meta: { theme: 'halloween' } }), 'halloween-rare');
+check('known theme still themed (client)',
+  clientVariant({ rarity: 'rare', name: 'Name Effect', meta: { theme: 'halloween' } }), 'halloween-rare');
+check('knownTheme(halloween)', knownTheme('halloween'), 'halloween');
+check('knownTheme(undefined)', knownTheme(undefined), null);
+
+/* Every variant either side can produce must be a valid single class token —
+   a space here is what threw in classList.add and killed forum controls. */
+for (const item of MATRIX) {
+  const v = clientVariant(item);
+  if (v !== null && !/^[a-z0-9-]+$/.test(v)) failures.push(`variant ${JSON.stringify(v)} is not a safe class token`);
+  else passed++;
 }
 
 /* ── bannerPath ─────────────────────────────────────────────────────── */
@@ -84,11 +127,15 @@ const store = {
       { id: 'hne', type: 'name-effect', rarity: 'mythic', name: 'Name Effect', meta: { theme: 'halloween' } },
       { id: 'hbn', type: 'banner', rarity: 'rare', name: 'Exclusive Banner', meta: { theme: 'halloween' } },
     ], equips: { profile: { 'name-effect': 'hne', banner: 'hbn' } } },
+  inv_500: { items: [            // a month with no CSS/art, and a malformed theme
+      { id: 'xne', type: 'name-effect', rarity: 'mythic', name: 'Name Effect', meta: { theme: 'christmas' } },
+      { id: 'xbn', type: 'banner', rarity: 'rare', name: 'Profile Banner', meta: { theme: 'spooky season' } },
+    ], equips: { profile: { 'name-effect': 'xne', banner: 'xbn' } } },
 };
 let reads = 0;
 const env = { MARKETPLACE: { async get(key) { reads++; return store[key] || null; } } };
 
-const res = await resolveEquippedCosmetics(env, ['100', '200', '300', '400', '999', 'guest_abc', '100']);
+const res = await resolveEquippedCosmetics(env, ['100', '200', '300', '400', '500', '999', 'guest_abc', '100']);
 
 check('user 100 name effect', res['100'].nameEffect, 'mythic');    // mythic rarity, plain name
 check('user 100 banner', res['100'].banner, 'exclusive');          // "Exclusive Banner"
@@ -97,12 +144,14 @@ check('user 200 banner (none equipped)', res['200'].banner, null);
 check('user 300 nothing equipped', res['300'], { nameEffect: null, banner: null });
 check('user 400 halloween name effect', res['400'].nameEffect, 'halloween-mythic');
 check('user 400 halloween banner', res['400'].banner, 'halloween-exclusive');
+check('user 500 unknown theme → plain mythic', res['500'].nameEffect, 'mythic');
+check('user 500 malformed theme → plain rare', res['500'].banner, 'rare');
 check('user 999 no inventory', res['999'], { nameEffect: null, banner: null });
 check('guest excluded → nulls', res['guest_abc'], { nameEffect: null, banner: null });
 
-/* Batched + guest-free: 100 (twice, deduped), 200, 300, 400, 999 = 5 unique
-   real ids = 5 reads. The guest is never read. */
-check('batched: one read per unique real id, guests skipped', reads, 5);
+/* Batched + guest-free: 100 (twice, deduped), 200, 300, 400, 500, 999 = 6
+   unique real ids = 6 reads. The guest is never read. */
+check('batched: one read per unique real id, guests skipped', reads, 6);
 
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

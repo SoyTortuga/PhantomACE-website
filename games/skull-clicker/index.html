@@ -4934,8 +4934,8 @@
         const data = await res.json();
         ownedCosmetics = data.items || [];
         if (data.equips) {
-          if (data.equips['skull-theme']) equippedCosmetics['skull-theme'] = data.equips['skull-theme'];
-          if (data.equips['click-effect']) equippedCosmetics['click-effect'] = data.equips['click-effect'];
+          equippedCosmetics['skull-theme'] = normalizeEquipped('skull-theme', data.equips['skull-theme']);
+          equippedCosmetics['click-effect'] = normalizeEquipped('click-effect', data.equips['click-effect']);
         }
       } catch {}
 
@@ -4971,17 +4971,51 @@
       return badgeSkulls.find(b => b.id === id) || null;
     }
 
+    /* Owned items for one slot, by type. Ids are only unique per type —
+       'void' is both a skull skin and a click effect — so every lookup is
+       made within the slot's own list. */
+    function ownedForSlot(slot) {
+      const legacyName = (i, words) =>
+        i.type === 'cosmetic' && i.name && words.some(w => i.name.toLowerCase().includes(w));
+      if (slot === 'skull-theme') {
+        return ownedCosmetics.filter(i =>
+          i.type === 'skull-skin' || legacyName(i, ['skin', 'skull', 'theme']));
+      }
+      if (slot === 'click-effect') {
+        return ownedCosmetics.filter(i =>
+          i.type === 'click-effect' || legacyName(i, ['effect', 'click', 'wisp']));
+      }
+      return [];
+    }
+
+    /* The server stores the owned item's real id; older saves held the
+       theme key ('blood'). Either resolves to the owned item's id, or
+       'default' when it names nothing they own. */
+    function normalizeEquipped(slot, stored) {
+      if (!stored || stored === 'default') return 'default';
+      const owned = ownedForSlot(slot);
+      const byId = owned.find(i => i.id === stored);
+      if (byId) return byId.id;
+      const byKey = owned.find(i => getCosmeticThemeId(i) === stored);
+      return byKey ? byKey.id : 'default';
+    }
+
+    function equippedThemeKey(slot) {
+      const id = equippedCosmetics[slot];
+      if (!id || id === 'default') return 'default';
+      const item = ownedForSlot(slot).find(i => i.id === id);
+      return item ? getCosmeticThemeId(item) : 'default';
+    }
+
     function applyCosmetics() {
       const btn = document.getElementById('skullBtn');
       btn.className = 'skull-btn';
-      const themeId = equippedCosmetics['skull-theme'] || 'default';
-      const theme = SKULL_THEMES[themeId];
+      const theme = SKULL_THEMES[equippedThemeKey('skull-theme')];
       if (theme && theme.cssClass) btn.classList.add(theme.cssClass);
 
       const area = document.querySelector('.skull-area');
       area.className = 'skull-area';
-      const effectId = equippedCosmetics['click-effect'] || 'default';
-      const effect = CLICK_EFFECTS[effectId];
+      const effect = CLICK_EFFECTS[equippedThemeKey('click-effect')];
       if (effect && effect.cssClass) area.classList.add(effect.cssClass);
 
       const img = btn.querySelector('img');
@@ -4999,6 +5033,7 @@
     }
 
     async function equipCosmetic(slot, itemId) {
+      const previous = equippedCosmetics[slot];
       equippedCosmetics[slot] = itemId;
       applyCosmetics();
       render();
@@ -5006,13 +5041,23 @@
          against 'profile'. Sending them as 'skull-clicker' would fail the
          ownership check, which only matches an item within its own game. */
       const ownerGame = slot === 'skull-image' ? 'profile' : 'skull-clicker';
+      let error = '';
       try {
-        await fetch('/api/inventory', {
+        const res = await fetch('/api/inventory', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'equip', game: ownerGame, slot, itemId: itemId === 'default' ? 'none' : itemId }),
         });
-      } catch {}
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) error = (data && data.error) || ('Server returned ' + res.status);
+      } catch {
+        error = 'Network error';
+      }
+      if (!error) return;
+      equippedCosmetics[slot] = previous;
+      applyCosmetics();
+      render();
+      showBuffToast("Couldn't equip: " + error, 'frenzy');
     }
 
     function getCosmeticThemeId(item) {
@@ -5036,19 +5081,18 @@
          was the only thing that distinguished a skull skin from a click
          effect. Rewards now carry the real type; the name test stays as a
          fallback so anything granted under the old scheme still appears. */
-      const legacyName = (i, words) =>
-        i.type === 'cosmetic' && i.name && words.some(w => i.name.toLowerCase().includes(w));
-      const themes = ownedCosmetics.filter(i =>
-        i.type === 'skull-skin' || legacyName(i, ['skin', 'skull', 'theme']));
-      const effects = ownedCosmetics.filter(i =>
-        i.type === 'click-effect' || legacyName(i, ['effect', 'click', 'wisp']));
+      const themes = ownedForSlot('skull-theme');
+      const effects = ownedForSlot('click-effect');
 
+      /* Rows equip by the owned item's real id — the server resolves an
+         equip against the inventory, and the theme key ('blood') is only
+         what the game draws with. */
       let html = '<div class="section-label">Skull Themes</div>';
       html += cosmeticOptionRow('skull-theme', 'default', SKULL_THEMES['default'], 'common');
       for (const item of themes) {
         const tid = getCosmeticThemeId(item);
         const def = SKULL_THEMES[tid] || { name: item.name, desc: item.name };
-        html += cosmeticOptionRow('skull-theme', tid, def, item.rarity || 'common');
+        html += cosmeticOptionRow('skull-theme', item.id, def, item.rarity || 'common');
       }
 
       html += '<div class="section-label">Click Effects</div>';
@@ -5056,7 +5100,7 @@
       for (const item of effects) {
         const eid = getCosmeticThemeId(item);
         const def = CLICK_EFFECTS[eid] || { name: item.name, desc: item.name };
-        html += cosmeticOptionRow('click-effect', eid, def, item.rarity || 'common');
+        html += cosmeticOptionRow('click-effect', item.id, def, item.rarity || 'common');
       }
 
       if (badgeSkulls.length) {

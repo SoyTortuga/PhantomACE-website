@@ -2263,7 +2263,10 @@ async function chooseDiceSet(id) {
       headers: { 'Content-Type': 'application/json' },
       /* Equipped server-side so it follows the account rather than the
          browser -- the same slot the profile cosmetics use. */
-      body: JSON.stringify({ action: 'equip', game: 'mana-clash', slot: 'dice', itemId: id }),
+      /* Classic is the built-in default, not an owned item: choosing it clears
+         the slot ('none'), and loadDiceSets falls back to Classic on an empty
+         slot. Sending 'classic' itself always 404'd. */
+      body: JSON.stringify({ action: 'equip', game: 'mana-clash', slot: 'dice', itemId: id === 'classic' ? 'none' : id }),
     });
   } catch {}
 }

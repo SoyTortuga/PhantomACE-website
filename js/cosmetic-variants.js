@@ -49,8 +49,14 @@
     else if (item.rarity === 'mythic') tier = 'mythic';
     else tier = 'rare';
     var theme = meta.theme || item.theme || '';
-    return theme ? theme + '-' + tier : tier;
+    return KNOWN_THEMES.indexOf(theme) !== -1 ? theme + '-' + tier : tier;
   }
+  /* Themes that have CSS (name-fx-<theme>-<tier>) and banner art
+     (banner-<theme>-<tier>.png). Anything else — a month nobody drew, a typo,
+     a value with a space that would throw in classList.add — falls back to
+     the plain tier. Mirrored exactly in functions/api/cosmetics.js; add a
+     theme to BOTH only once its CSS and art have shipped. */
+  var KNOWN_THEMES = ['halloween'];
   /* end variant mapping */
 
   function bannerPath(variant) {

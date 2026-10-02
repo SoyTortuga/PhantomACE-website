@@ -172,25 +172,101 @@ export async function onRequestPost(context) {
   return json({ error: 'Unknown action' }, 400);
 }
 
+/* Every equip slot, per game, and the item type(s) it accepts. Slot names
+   are what each caller sends (inventory.js PROFILE_SLOTS, Skull Clicker,
+   Memory Match, Mana Clash); types are what the granters write (phamily-time
+   REWARD_ITEM_MAP, import-badges, raid/check-in badges). Skull Clicker's
+   'cosmetic' is the pre-fix type its old rewards were granted under. A
+   game/slot absent here cannot be equipped at all. */
+export const EQUIP_SLOTS = Object.freeze({
+  profile: {
+    badge: ['badge'],
+    title: ['title'],
+    banner: ['banner'],
+    'name-effect': ['name-effect'],
+    'skull-image': ['badge'],
+  },
+  'memory-match': {
+    'card-back': ['cardback'],
+    'emote-set': ['emote-pack'],
+  },
+  'skull-clicker': {
+    'skull-theme': ['skull-skin', 'cosmetic'],
+    'click-effect': ['click-effect', 'cosmetic'],
+  },
+  'mana-clash': {
+    dice: ['dice'],
+  },
+});
+
+const LEGACY_SLUG_GAMES = ['memory-match', 'skull-clicker'];
+
+function slotTypes(game, slot) {
+  const g = Object.prototype.hasOwnProperty.call(EQUIP_SLOTS, game) ? EQUIP_SLOTS[game] : null;
+  return g && Object.prototype.hasOwnProperty.call(g, slot) ? g[slot] : null;
+}
+
+function nameSlug(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/* The owned item an equip refers to. The real inventory id wins. Older game
+   builds sent their own short key instead ('cobweb', 'reapermoon') — the
+   word the game derives from the item's name — so as a fallback a bare
+   lowercase word is matched against the words of an owned item's name
+   (or the run of them, for 'reapermoon' ← "Reaper Moon Skull"). Only items
+   of this game AND an accepted type are ever candidates. */
+export function resolveEquipItem(items, game, types, itemId) {
+  const candidates = (Array.isArray(items) ? items : [])
+    .filter(i => i && i.game === game && types.includes(i.type));
+  const exact = candidates.find(i => i.id === itemId);
+  if (exact) return exact;
+  if (!LEGACY_SLUG_GAMES.includes(game)) return null;
+
+  const key = String(itemId);
+  if (!/^[a-z0-9]{2,40}$/.test(key)) return null;
+  return candidates.find(i => {
+    const slug = nameSlug(i.name);
+    return slug.split('-').includes(key) || slug.replace(/-/g, '').startsWith(key);
+  }) || null;
+}
+
 async function handleEquip(env, session, body) {
   if (!body.game || !body.slot || !body.itemId) {
     return json({ error: 'Missing game, slot, or itemId' }, 400);
   }
-
-  const inv = await getInventory(env, session.user_id);
-  const item = inv.items.find(i => i.id === body.itemId && i.game === body.game);
-  if (!item) return json({ error: 'Item not found' }, 404);
-
-  if (!inv.equips[body.game]) inv.equips[body.game] = {};
-
-  if (body.itemId === 'none') {
-    delete inv.equips[body.game][body.slot];
-  } else {
-    inv.equips[body.game][body.slot] = body.itemId;
+  if (typeof body.game !== 'string' || typeof body.slot !== 'string' || typeof body.itemId !== 'string') {
+    return json({ error: 'Invalid game, slot, or itemId' }, 400);
   }
 
+  const types = slotTypes(body.game, body.slot);
+  if (!types) return json({ error: 'Unknown equip slot' }, 400);
+
+  const inv = await getInventory(env, session.user_id);
+  if (!Array.isArray(inv.items)) inv.items = [];
+  if (!inv.equips || typeof inv.equips !== 'object') inv.equips = {};
+
+  if (body.itemId === 'none') {
+    if (inv.equips[body.game]) delete inv.equips[body.game][body.slot];
+    await saveInventory(env, session.user_id, inv);
+    return json({ success: true, equips: inv.equips[body.game] || {} });
+  }
+
+  /* Ids are only unique per type ('void' is both a skull skin and a click
+     effect), so an id held under the wrong type is refused only when no item
+     of an accepted type answers to it. */
+  const item = resolveEquipItem(inv.items, body.game, types, body.itemId);
+  if (!item) {
+    const wrongType = inv.items.find(i => i && i.id === body.itemId && i.game === body.game);
+    if (wrongType) return json({ error: `That item can't be equipped as ${body.slot}` }, 400);
+    return json({ error: 'Item not found' }, 404);
+  }
+
+  if (!inv.equips[body.game]) inv.equips[body.game] = {};
+  inv.equips[body.game][body.slot] = item.id;
+
   await saveInventory(env, session.user_id, inv);
-  return json({ success: true, equips: inv.equips[body.game] });
+  return json({ success: true, itemId: item.id, equips: inv.equips[body.game] });
 }
 
 const SHOWCASE_MAX = 5;

@@ -20,6 +20,8 @@
    ══════════════════════════════════════════════ */
 
 import { sanitizeFavorite } from '../../functions/api/dino-park.js';
+import { onRequestGet as profileGet } from '../../functions/api/profile.js';
+import { bannerVariant, nameEffectVariant } from '../../functions/api/cosmetics.js';
 
 let passed = 0;
 const failures = [];
@@ -217,6 +219,42 @@ const good = (over = {}) => sanitizeFavorite({
     full({ species: '<b>Rex</b>' }).species, '<b>Rex</b>');
   check('missing prose becomes empty, never undefined',
     sanitizeFavorite({ specId: 'rex', src: ASSET }).species, '');
+}
+
+/* ── Equipped cosmetics carry a WHITELISTED theme ────────────────────
+   publicItem used to drop meta.theme, so a Halloween banner/glow rendered
+   plain on profiles while every other surface showed it themed. It now
+   passes the theme through — but only a known one. */
+{
+  const store = {
+    profile_77: { login: 'spooky', displayName: 'Spooky' },
+    inv_77: {
+      items: [
+        { id: 'hb', game: 'profile', type: 'banner', name: 'Profile Banner', rarity: 'mythic', meta: { theme: 'halloween' } },
+        { id: 'hn', game: 'profile', type: 'name-effect', name: 'Name Effect', rarity: 'rare', meta: { theme: 'spooky season' } },
+        { id: 'bd', game: 'profile', type: 'badge', name: 'Badge', rarity: 'rare', meta: { theme: '"><script>' } },
+        { id: 'tt', game: 'profile', type: 'title', name: 'Title', rarity: 'common' },
+      ],
+      equips: { profile: { banner: 'hb', 'name-effect': 'hn', badge: 'bd', title: 'tt', badgeShowcase: ['bd'] } },
+    },
+  };
+  const env = { MARKETPLACE: {
+    async get(key) { return key in store ? JSON.parse(JSON.stringify(store[key])) : null; },
+    async listValues() { return []; },
+  } };
+  const res = await profileGet({ env, request: new Request('http://localhost/api/profile?id=77') });
+  check('profile responds', res.status, 200);
+  const body = await res.json();
+  check('known theme carried on the equipped banner', body.equipped.banner.theme, 'halloween');
+  check('unknown theme dropped on the name effect', body.equipped['name-effect'].theme, null);
+  check('malformed theme dropped on the badge', body.equipped.badge.theme, null);
+  check('and in the showcase', body.showcase[0].theme, null);
+  check('no theme → null', body.equipped.title.theme, null);
+  check('meta itself never leaks', 'meta' in body.equipped.banner, false);
+  check('themed banner resolves to its themed variant',
+    bannerVariant(body.equipped.banner), 'halloween-mythic');
+  check('unthemed name effect resolves to the plain tier',
+    nameEffectVariant(body.equipped['name-effect']), 'rare');
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
