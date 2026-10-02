@@ -112,6 +112,9 @@ const NON_ROUTE_MODULES = new Set([
   /* The one calendar every monthly cycle (giveaway ledger, leaderboard awards,
      Phamily Time, Skull Clicker season) rolls on. Library, no handler. */
   'api/season-time.js',
+  /* Derives a month's collectible cosmetic set from the reward tables for the
+     Seasonal Grimoire. Library, no handler. */
+  'api/season-manifest.js',
 ]);
 
 /** Cloudflare's catch-all route, handled as a prefix match. */
