@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <a href="/community.html" data-page="community">Community</a>
               <div class="nav-submenu">
                 <a href="/community.html">Forums</a>
+                <a href="/room-crawl.html">Room Crawl</a>
                 <a href="/phamily-time.html">Phamily Time</a>
                 <a href="/community-leaderboards.html">Leaderboards</a>
               </div>

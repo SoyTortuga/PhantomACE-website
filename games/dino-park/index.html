@@ -6252,6 +6252,21 @@ async function visitRandomPark() {
   }
 }
 
+/* Deep-link from Room Crawl: ?visit=<numericId> opens that specific park in
+   the same looking-only overlay. Reuses the exact consent + projection path
+   of a random visit, so a closed park is refused the same way. */
+async function visitParkById(id) {
+  if (!/^[0-9]{1,20}$/.test(String(id))) return;
+  try {
+    const res = await fetch('/api/dino-park?visit=' + encodeURIComponent(id), { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'That park is not open'); return; }
+    showVisitedPark(data);
+  } catch (e) {
+    showToast('Could not reach that park right now');
+  }
+}
+
 function showVisitedPark(data) {
   const p = data.park || {};
   const dinos = Array.isArray(p.park) ? p.park : [];
@@ -7206,6 +7221,14 @@ checkTwitchLive();
 /* Earnings settle into the cloud save, so they are claimed once that save
    has been merged in — not raced against it. */
 syncCloudSave().then(() => { if (getPlayerSession()) claimEarnings(); });
+
+/* Room Crawl deep-link: ?visit=<id> opens straight into that keeper's park.
+   Left until after the first paint so the park behind the overlay is drawn. */
+try {
+  const _visitId = new URLSearchParams(location.search).get('visit');
+  if (_visitId && /^[0-9]{1,20}$/.test(_visitId)) setTimeout(() => visitParkById(_visitId), 400);
+} catch (e) { /* no params, nothing to open */ }
+
 setInterval(checkTwitchLive, 60000);
 setInterval(() => { gameTick(); save(); }, 2000);
 

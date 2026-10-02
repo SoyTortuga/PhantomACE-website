@@ -602,8 +602,12 @@ export function sanitizeFavorite(fav) {
    park document, and a row nobody else can write is a consent record.
    ══════════════════════════════════════════════════════════════════════ */
 
-const VISIT_KEY_PREFIX = 'parkpub_';
-const visitKey = (userId) => `${VISIT_KEY_PREFIX}${userId}`;
+/* Exported so Room Crawl (functions/api/rooms-browse.js) reads the SAME
+   consent rows this game writes — a park is "public" for the gallery exactly
+   when it has opted into visiting here. One opt-in, one meaning, no second
+   flag to drift. */
+export const VISIT_KEY_PREFIX = 'parkpub_';
+export const visitKey = (userId) => `${VISIT_KEY_PREFIX}${userId}`;
 
 /* One row per consenting player. Kept deliberately tiny: enough to draw a
    list entry without opening anybody's save. */
@@ -688,7 +692,7 @@ function projectYardItem(it) {
  * is for looking at someone's dinosaurs, and every extra field would be
  * another thing to get right for no added reason to visit.
  */
-function projectPark(state) {
+export function projectPark(state) {
   const s = (state && typeof state === 'object') ? state : {};
   const park = Array.isArray(s.park) ? s.park : [];
   const yard = Array.isArray(s.yardItems) ? s.yardItems : [];
@@ -741,6 +745,11 @@ export async function onRequestPost(context) {
     if (body.visitable) {
       await env.MARKETPLACE.put(visitKey(session.user_id), JSON.stringify({
         name: String(session.display_name || 'A keeper').slice(0, VISIT_NAME_MAX),
+        /* The owner's Twitch avatar, taken from the SESSION, so the Room Crawl
+           gallery can draw a card without a per-keeper profile lookup. Capped;
+           the gallery still runs it through its own safeSrc. Older consent rows
+           predate this field and simply render without an avatar. */
+        avatar: typeof session.profile_image === 'string' ? session.profile_image.slice(0, 300) : '',
         since: Date.now(),
       }));
     } else {

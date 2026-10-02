@@ -4,10 +4,9 @@
   <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="PhantomACE Community Forums - Discuss streams, games, and community topics.">
+  <meta name="description" content="Room Crawl - browse other keepers' Dino Park rooms, leave a guestbook stamp, and see the Room of the Week.">
   <link rel="icon" href="/assets/images/favicon.ico">
-  <title>Forums | PhantomACE</title>
-
+  <title>Room Crawl | PhantomACE</title>
 
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/reset.css">
@@ -15,24 +14,23 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/roles.css">
-  <link rel="stylesheet" href="/css/pages/about.css">
   <link rel="stylesheet" href="/css/pages/community.css">
+  <link rel="stylesheet" href="/css/pages/room-crawl.css">
 </head>
 <body data-page="community">
 
   <div id="site-header"></div>
 
   <section class="page-hero">
-    <h1 class="page-hero-title">Community</h1>
-    <p class="page-hero-subtitle">Where the chaos lives</p>
+    <h1 class="page-hero-title">Room Crawl</h1>
+    <p class="page-hero-subtitle">Wander the Phamily's dinosaur parks</p>
   </section>
 
-  <!-- Sub-navigation -->
   <nav class="community-subnav">
     <div class="page-container">
       <div class="subnav-links">
-        <a href="/community.html" class="subnav-link active">Forums</a>
-        <a href="/room-crawl.html" class="subnav-link">Room Crawl</a>
+        <a href="/community.html" class="subnav-link">Forums</a>
+        <a href="/room-crawl.html" class="subnav-link active">Room Crawl</a>
         <a href="/phamily-time.html" class="subnav-link">Phamily Time</a>
         <a href="/community-leaderboards.html" class="subnav-link">Leaderboards</a>
       </div>
@@ -40,12 +38,21 @@
     </div>
   </nav>
 
-  <!-- Forum. Boards and topics are drawn from /api/forum/*; a topic itself
-       opens at /thread/<id> (thread.html). -->
-  <section class="page-container forum-page">
-    <div id="forumBreadcrumb" class="forum-breadcrumb"></div>
-    <div id="forumView"><div class="forum-empty card"><p>Loading the boards…</p></div></div>
+  <section class="page-container rc-page">
+    <div id="rcFeatured"></div>
+    <div id="rcSelfPanel"></div>
+
+    <div class="rc-gallery-head">
+      <h2 class="rc-section-title">Open Parks</h2>
+      <span id="rcCount" class="rc-count"></span>
+    </div>
+    <div id="rcGallery" class="rc-gallery">
+      <div class="rc-empty card"><p>Rounding up the parks…</p></div>
+    </div>
   </section>
+
+  <!-- Single-room view, built and toggled by the page script. -->
+  <div id="rcRoomView" class="rc-roomview" hidden></div>
 
   <div id="site-footer"></div>
 
@@ -56,6 +63,6 @@
   <script src="/js/nav.js" defer></script>
   <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>
-  <script src="/js/pages/community-forums.js" defer></script>
+  <script src="/js/pages/room-crawl.js" defer></script>
 </body>
 </html>
