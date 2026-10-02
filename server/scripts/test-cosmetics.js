@@ -52,6 +52,11 @@ const MATRIX = [
   { rarity: 'rare', name: 'x', meta: { effect: 'mythic' } },
   { rarity: 'mythic', name: 'x', effect: 'rare' },
   { name: '' },
+  { rarity: 'rare', name: 'Name Effect', meta: { theme: 'halloween' } },
+  { rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'halloween' } },
+  { rarity: 'rare', name: 'x', theme: 'halloween', effect: 'mythic' },
+  { rarity: 'common', name: 'Name Effect', meta: { theme: 'halloween' } },
+  { rarity: 'mythic', name: 'x', meta: { theme: 'other' } },
 ];
 for (let i = 0; i < MATRIX.length; i++) {
   check('client==server for case ' + i, serverVariant(MATRIX[i]), clientVariant(MATRIX[i]));
@@ -60,6 +65,8 @@ for (let i = 0; i < MATRIX.length; i++) {
 /* ── bannerPath ─────────────────────────────────────────────────────── */
 check('bannerPath rare', bannerPath('rare'), '/assets/banners/banner-rare.png');
 check('bannerPath null', bannerPath(null), null);
+check('bannerPath halloween-mythic', bannerPath('halloween-mythic'), '/assets/banners/banner-halloween-mythic.png');
+check('bannerPath halloween-exclusive', bannerPath('halloween-exclusive'), '/assets/banners/banner-halloween-exclusive.png');
 
 /* ── resolveEquippedCosmetics — mock KV ─────────────────────────────── */
 const store = {
@@ -73,23 +80,29 @@ const store = {
   inv_300: { items: [
       { id: 'bnX', type: 'banner', rarity: 'rare', name: 'Profile Banner' },
     ], equips: { profile: {} } },   // owns a banner but equips nothing
+  inv_400: { items: [            // October themed grants (meta.theme='halloween')
+      { id: 'hne', type: 'name-effect', rarity: 'mythic', name: 'Name Effect', meta: { theme: 'halloween' } },
+      { id: 'hbn', type: 'banner', rarity: 'rare', name: 'Exclusive Banner', meta: { theme: 'halloween' } },
+    ], equips: { profile: { 'name-effect': 'hne', banner: 'hbn' } } },
 };
 let reads = 0;
 const env = { MARKETPLACE: { async get(key) { reads++; return store[key] || null; } } };
 
-const res = await resolveEquippedCosmetics(env, ['100', '200', '300', '999', 'guest_abc', '100']);
+const res = await resolveEquippedCosmetics(env, ['100', '200', '300', '400', '999', 'guest_abc', '100']);
 
 check('user 100 name effect', res['100'].nameEffect, 'mythic');    // mythic rarity, plain name
 check('user 100 banner', res['100'].banner, 'exclusive');          // "Exclusive Banner"
 check('user 200 name effect', res['200'].nameEffect, 'rare');
 check('user 200 banner (none equipped)', res['200'].banner, null);
 check('user 300 nothing equipped', res['300'], { nameEffect: null, banner: null });
+check('user 400 halloween name effect', res['400'].nameEffect, 'halloween-mythic');
+check('user 400 halloween banner', res['400'].banner, 'halloween-exclusive');
 check('user 999 no inventory', res['999'], { nameEffect: null, banner: null });
 check('guest excluded → nulls', res['guest_abc'], { nameEffect: null, banner: null });
 
-/* Batched + guest-free: 100 (twice, deduped), 200, 300, 999 = 4 unique real
-   ids = 4 reads. The guest is never read. */
-check('batched: one read per unique real id, guests skipped', reads, 4);
+/* Batched + guest-free: 100 (twice, deduped), 200, 300, 400, 999 = 5 unique
+   real ids = 5 reads. The guest is never read. */
+check('batched: one read per unique real id, guests skipped', reads, 5);
 
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

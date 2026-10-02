@@ -66,6 +66,22 @@ check('no rarity, no name → rare',
 check('null item → null (no effect to apply)',
   nameEffectVariant(null), null);
 
+/* ── Halloween themed variants (meta.theme='halloween') ──────────────── */
+check('halloween rare → halloween-rare',
+  nameEffectVariant({ rarity: 'rare', name: 'Name Effect', meta: { theme: 'halloween' } }), 'halloween-rare');
+check('halloween mythic → halloween-mythic',
+  nameEffectVariant({ rarity: 'mythic', name: 'Name Effect', meta: { theme: 'halloween' } }), 'halloween-mythic');
+check('halloween "Exclusive Name Effect" → halloween-exclusive',
+  nameEffectVariant({ rarity: 'mythic', name: 'Exclusive Name Effect', meta: { theme: 'halloween' } }), 'halloween-exclusive');
+check('halloween exclusive via meta.effect → halloween-exclusive',
+  nameEffectVariant({ rarity: 'rare', name: 'Whatever', meta: { theme: 'halloween', effect: 'exclusive' } }), 'halloween-exclusive');
+check('halloween theme flattened onto item.theme (public payload) → halloween-mythic',
+  nameEffectVariant({ rarity: 'mythic', name: 'Name Effect', theme: 'halloween' }), 'halloween-mythic');
+check('halloween floor: unknown rarity, plain name → halloween-rare',
+  nameEffectVariant({ rarity: 'common', name: 'Name Effect', meta: { theme: 'halloween' } }), 'halloween-rare');
+check('no theme → plain tier unchanged (mythic)',
+  nameEffectVariant({ rarity: 'mythic', name: 'Name Effect' }), 'mythic');
+
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);
   for (const f of failures) console.error('  ✗ ' + f);

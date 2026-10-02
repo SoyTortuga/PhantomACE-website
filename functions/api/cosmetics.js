@@ -25,17 +25,23 @@
      never once per rendered name.
    ══════════════════════════════════════════════ */
 
-/* Keep this identical to variantOf() in js/cosmetic-variants.js. */
+/* Keep this identical to variantOf() in js/cosmetic-variants.js: resolve the
+   rarity TIER first, then prefix an optional meta.theme so themed items become
+   "<theme>-<tier>" (e.g. halloween-rare) and un-themed items stay the plain
+   tier. server/scripts/test-cosmetics.js asserts the two copies never drift. */
 export function nameEffectVariant(item) {
   if (!item) return null;
   const meta = item.meta || {};
   const effect = meta.effect || item.effect || '';
   const name = String(item.name || '');
-  if (effect === 'exclusive' || /exclusive/i.test(name)) return 'exclusive';
-  if (effect === 'mythic') return 'mythic';
-  if (effect === 'rare') return 'rare';
-  if (item.rarity === 'mythic') return 'mythic';
-  return 'rare';
+  let tier;
+  if (effect === 'exclusive' || /exclusive/i.test(name)) tier = 'exclusive';
+  else if (effect === 'mythic') tier = 'mythic';
+  else if (effect === 'rare') tier = 'rare';
+  else if (item.rarity === 'mythic') tier = 'mythic';
+  else tier = 'rare';
+  const theme = meta.theme || item.theme || '';
+  return theme ? `${theme}-${tier}` : tier;
 }
 
 /* Name effects and banners map the same way — one core, two names so the

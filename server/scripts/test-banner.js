@@ -57,11 +57,23 @@ check('explicit effect=rare beats mythic rarity', bannerVariant({ rarity: 'mythi
 check('unknown rarity, plain name → rare (floor)', bannerVariant({ rarity: 'common', name: 'Profile Banner' }), 'rare');
 check('null item → null (no banner)', bannerVariant(null), null);
 
+/* ── Halloween themed variants (meta.theme='halloween') ──────────────── */
+check('halloween rare → halloween-rare', bannerVariant({ rarity: 'rare', name: 'Profile Banner', meta: { theme: 'halloween' } }), 'halloween-rare');
+check('halloween mythic → halloween-mythic', bannerVariant({ rarity: 'mythic', name: 'Profile Banner', meta: { theme: 'halloween' } }), 'halloween-mythic');
+check('halloween "Exclusive Banner" → halloween-exclusive', bannerVariant({ rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'halloween' } }), 'halloween-exclusive');
+check('halloween theme flattened (public payload) → halloween-rare', bannerVariant({ rarity: 'rare', name: 'Profile Banner', theme: 'halloween' }), 'halloween-rare');
+check('no theme → plain tier unchanged (mythic)', bannerVariant({ rarity: 'mythic', name: 'Profile Banner' }), 'mythic');
+
 /* ── variant → path (the fixed 1200x280 contract) ───────────────────── */
 check('rare path', pathFor(bannerVariant({ rarity: 'rare', name: 'Profile Banner' })), '/assets/banners/banner-rare.png');
 check('mythic path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Profile Banner' })), '/assets/banners/banner-mythic.png');
 check('exclusive path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Exclusive Banner' })), '/assets/banners/banner-exclusive.png');
 check('null → no path', pathFor(bannerVariant(null)), null);
+
+/* ── themed variant → themed path (art lands at these exact names) ────── */
+check('halloween rare path', pathFor(bannerVariant({ rarity: 'rare', name: 'Profile Banner', meta: { theme: 'halloween' } })), '/assets/banners/banner-halloween-rare.png');
+check('halloween mythic path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Profile Banner', meta: { theme: 'halloween' } })), '/assets/banners/banner-halloween-mythic.png');
+check('halloween exclusive path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'halloween' } })), '/assets/banners/banner-halloween-exclusive.png');
 
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

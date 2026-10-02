@@ -850,6 +850,79 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
   }
 }
 
+/* ── Halloween themed name effects (October) ───────────────────────────
+   Theme-aware variants: variantOf() returns "halloween-<tier>" for items that
+   carry meta.theme='halloween'. Same gothic palette as the plain tiers —
+   red/white glow, with the gold --exclusive token used ONLY to signal the
+   exclusive tier — but a haunted, guttering FLICKER instead of the smooth
+   breathe/shimmer, so they read as clearly distinct. Glow is text-shadow only
+   (no box-shadow); the loops run only with .name-fx-animate (the shared applier
+   gates that by in-view + the count cap); reduced-motion drops them. Every
+   colour is a token, so each reads in both the dark and gothic-light themes. */
+.name-fx-halloween-rare,
+.name-fx-halloween-mythic,
+.name-fx-halloween-exclusive {
+  will-change: text-shadow, filter;
+}
+
+/* halloween rare — red glow with a cold white rim (static, like plain rare). */
+.name-fx-halloween-rare {
+  color: var(--white);
+  text-shadow: 0 0 3px var(--white), 0 0 8px var(--red), 0 0 15px var(--red-dim);
+}
+
+/* halloween mythic — white-cored red glow that flickers like a guttering
+   candle (hard step cuts), vs. plain mythic's smooth breathe. */
+.name-fx-halloween-mythic {
+  color: var(--white);
+  text-shadow: 0 0 4px var(--white), 0 0 10px var(--red), 0 0 20px var(--red-dim);
+}
+.name-fx-halloween-mythic.name-fx-animate {
+  animation: nameFxHalloweenFlicker 2.4s steps(1, end) infinite;
+}
+
+@keyframes nameFxHalloweenFlicker {
+  0%   { text-shadow: 0 0 4px var(--white), 0 0 10px var(--red), 0 0 20px var(--red-dim); filter: brightness(1); }
+  12%  { filter: brightness(1.4); }
+  16%  { text-shadow: 0 0 2px var(--red); filter: brightness(0.7); }
+  22%  { filter: brightness(1.25); }
+  48%  { text-shadow: 0 0 6px var(--white), 0 0 14px var(--red), 0 0 26px var(--red-dim); }
+  52%  { filter: brightness(0.82); }
+  70%  { filter: brightness(1.15); }
+  74%  { text-shadow: 0 0 3px var(--red); filter: brightness(0.9); }
+  100% { text-shadow: 0 0 4px var(--white), 0 0 10px var(--red), 0 0 20px var(--red-dim); filter: brightness(1); }
+}
+
+/* halloween exclusive — the gold --exclusive tier signal haunted by a red
+   flicker (a jack-o-lantern guttering), distinct from plain exclusive's smooth
+   gold shimmer. */
+.name-fx-halloween-exclusive {
+  color: var(--exclusive);
+  text-shadow: 0 0 5px var(--exclusive), 0 0 12px var(--red);
+}
+.name-fx-halloween-exclusive.name-fx-animate {
+  animation: nameFxHalloweenHaunt 3s steps(1, end) infinite;
+}
+
+@keyframes nameFxHalloweenHaunt {
+  0%   { text-shadow: 0 0 5px var(--exclusive), 0 0 12px var(--red); filter: brightness(1); }
+  18%  { text-shadow: 0 0 8px var(--exclusive), 0 0 16px var(--red), 0 0 4px var(--white); filter: brightness(1.45); }
+  24%  { text-shadow: 0 0 3px var(--red); filter: brightness(0.72); }
+  40%  { filter: brightness(1.2); }
+  60%  { text-shadow: 0 0 9px var(--exclusive), 0 0 18px var(--red); filter: brightness(1.1); }
+  66%  { text-shadow: 0 0 4px var(--exclusive); filter: brightness(0.8); }
+  100% { text-shadow: 0 0 5px var(--exclusive), 0 0 12px var(--red); filter: brightness(1); }
+}
+
+/* Reduced motion — keep the static glow, drop the flicker loops. */
+@media (prefers-reduced-motion: reduce) {
+  .name-fx-halloween-mythic.name-fx-animate,
+  .name-fx-halloween-exclusive.name-fx-animate {
+    animation: none;
+    filter: none;
+  }
+}
+
 /* ── Leaderboard row banner backdrop ──────────────────────────────────
    A user's equipped banner shows as a FAINT image behind their leaderboard
    row, under a dark red/black gothic vignette so the row text stays legible in
@@ -895,4 +968,5 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
 .lb-row.has-banner .lb-col-score {
   color: #fff;
 }
-.lb-row.has-banner .lb-name-text.name-fx-exclusive { color: var(--exclusive); }
+.lb-row.has-banner .lb-name-text.name-fx-exclusive,
+.lb-row.has-banner .lb-name-text.name-fx-halloween-exclusive { color: var(--exclusive); }

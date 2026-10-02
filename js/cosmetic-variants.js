@@ -29,20 +29,27 @@
   'use strict';
 
   /* variant mapping — extracted & tested by test-cosmetics / test-name-effects
-     / test-banner. Name effects and banners map identically: an explicit
-     effect id wins, then a name containing "exclusive", then mythic rarity,
-     else the rare floor. `effect` is read from meta.effect (raw inventory
-     items) or a flattened `effect` (the public profile payload). null → null. */
+     / test-banner. Name effects and banners map identically: first the rarity
+     TIER — an explicit effect id wins, then a name containing "exclusive",
+     then mythic rarity, else the rare floor — then an optional THEME prefix.
+     When meta.theme is set (e.g. 'halloween') the variant becomes
+     "<theme>-<tier>" (halloween-rare/-mythic/-exclusive); otherwise it stays
+     the plain tier (rare/mythic/exclusive) so existing items are unchanged.
+     `effect`/`theme` are read from meta (raw inventory items) or flattened onto
+     the item (the public profile payload). null → null. */
   function variantOf(item) {
     if (!item) return null;
     var meta = item.meta || {};
     var effect = meta.effect || item.effect || '';
     var name = String(item.name || '');
-    if (effect === 'exclusive' || /exclusive/i.test(name)) return 'exclusive';
-    if (effect === 'mythic') return 'mythic';
-    if (effect === 'rare') return 'rare';
-    if (item.rarity === 'mythic') return 'mythic';
-    return 'rare';
+    var tier;
+    if (effect === 'exclusive' || /exclusive/i.test(name)) tier = 'exclusive';
+    else if (effect === 'mythic') tier = 'mythic';
+    else if (effect === 'rare') tier = 'rare';
+    else if (item.rarity === 'mythic') tier = 'mythic';
+    else tier = 'rare';
+    var theme = meta.theme || item.theme || '';
+    return theme ? theme + '-' + tier : tier;
   }
   /* end variant mapping */
 
@@ -58,6 +65,13 @@
      leaves, so a long board never animates dozens of names simultaneously. */
   var FX_ANIMATED = { mythic: true, exclusive: true };
   var FX_CAP = 14;
+
+  /* A variant is "<theme>-<tier>" or just "<tier>"; the animated flag keys on
+     the tier (last segment), so themed variants animate exactly like their
+     plain tier does. */
+  function tierOf(variant) {
+    return variant ? variant.slice(variant.lastIndexOf('-') + 1) : '';
+  }
   var animating = new Set();     // managed elements currently animating (counted)
   var pending = new Set();       // in-view managed elements waiting for a slot
   var observer = null;
@@ -76,7 +90,11 @@
   }
 
   function isAnimatedEl(el) {
-    return el.classList.contains('name-fx-mythic') || el.classList.contains('name-fx-exclusive');
+    for (var i = 0; i < el.classList.length; i++) {
+      var c = el.classList[i];
+      if (c.indexOf('name-fx-') === 0 && FX_ANIMATED[tierOf(c)]) return true;
+    }
+    return false;
   }
 
   function startAnimate(el) {
@@ -115,10 +133,15 @@
     /* Clear any prior state first — leaderboard/chat rows are reused. */
     stopAnimate(el);
     if (observer) observer.unobserve(el);
-    el.classList.remove('name-fx-rare', 'name-fx-mythic', 'name-fx-exclusive', 'name-fx-animate');
+    /* Drop every prior name-fx-* class (plain or themed) — rows are reused. */
+    var stale = [];
+    for (var k = 0; k < el.classList.length; k++) {
+      if (el.classList[k].indexOf('name-fx-') === 0) stale.push(el.classList[k]);
+    }
+    for (var m = 0; m < stale.length; m++) el.classList.remove(stale[m]);
     if (!variant) return;
     el.classList.add('name-fx-' + variant);
-    if (!FX_ANIMATED[variant]) return;           // rare: static glow only
+    if (!FX_ANIMATED[tierOf(variant)]) return;   // rare: static glow only
     if (opts.managed) {
       var ob = ensureObserver();
       if (ob) ob.observe(el);                     // observer toggles the class
