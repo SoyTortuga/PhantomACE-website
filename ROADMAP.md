@@ -32,8 +32,11 @@ the broadcaster grants `channel:read:ads`.
 - **Community epic — DONE & deployed.** C0 season manifest, C1 Seasonal Grimoire,
   C2 Phamily Quests, C3 Room Crawl, C4 forum social + member directory + cosmetic
   gifting. (Migrations 009_forum_social, 010_profile_social applied on the rig.)
-- **In progress: Rewards (B)**, starting with #6 (season registry).
-- Remaining: Overlay (A), Stream interactivity (D).
+- **Rewards epic (B) — DONE & deployed.** #6 season registry (pass page fetches
+  tables, mirror + drift guard gone), #7 auto-credit giveaway entries on level-up
+  + per-run 3/5/10 streak bonuses, #8 next-month preview + past-seasons view +
+  Past Winners block + owned-duplicate→entries. No migrations.
+- Remaining: Overlay / leave Streamlabs (A), Stream interactivity (D).
 
 ---
 
