@@ -336,6 +336,10 @@ async function handleHeartbeat(env, session, mk, now) {
       reason = 'credited';
     }
     d.lastHeartbeat = Math.max(d.lastHeartbeat || 0, timestamp);
+    /* The community Watch Time board prints this. Refreshed every beat (same
+       write, same lock) so a Twitch rename shows up on the next heartbeat. */
+    const name = typeof session.display_name === 'string' ? session.display_name.trim().slice(0, 50) : '';
+    if (name) d.displayName = name;
     return d;
   });
 

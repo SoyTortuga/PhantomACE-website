@@ -473,6 +473,38 @@ check('the test clock is in October', MK, '2026-10');
   setNow('2026-10-03T19:00:00Z');
 }
 
+/* ══ WATCH TIME BOARD NAMES ════════════════════════════════════════════
+   community-leaderboard.js printed v.username off pt_ rows, which nothing
+   ever wrote — so the whole Watch Time board read "Anonymous". The heartbeat
+   now records displayName in the row it already writes; rows from before
+   that borrow the name from the same user's ledger / check-in row. */
+{
+  const { onRequestGet: boardGet } = await import('../../functions/api/community-leaderboard.js');
+  const env = makeEnv();
+  env.MARKETPLACE.listValues = async ({ prefix }) => [...env._store.entries()]
+    .filter(([k]) => k.startsWith(prefix)).map(([name, raw]) => ({ name, value: JSON.parse(raw) }));
+  env._store.set('twitch_live_cache', JSON.stringify({ live: true, checkedAt: Date.now() }));
+
+  const uid = USERS.sub.user_id;
+  seedUser(env, uid, { level: 12, lastHeartbeat: Date.now() - 60000 });
+  const hb = await post(env, 'sub', { action: 'heartbeat' });
+  check('heartbeat still answers 200', hb.status, 200);
+  check('the heartbeat records the display name on the row', userData(env, uid).displayName, 'Subby');
+  ok('and still credits time in the same write', userData(env, uid).hours > 12);
+
+  /* An old row with no name, whose owner has a giveaway ledger row. */
+  seedUser(env, '777', { level: 30 });
+  env._store.set(ledgerKey('777', MK), JSON.stringify({ userId: '777', username: 'LedgerName', month: MK, entries: 3, history: [] }));
+  /* And one with nothing anywhere. */
+  seedUser(env, '888', { level: 5 });
+
+  const res = await boardGet({ env, request: new Request('https://t.local/api/community-leaderboard') });
+  const boards = await res.json();
+  check('the watch time board shows real names, falling back to other rows',
+    boards.hours.map(r => r.name), ['LedgerName', 'Subby', 'Anonymous']);
+  ok('and still publishes no user ids', !JSON.stringify(boards.hours).includes('777'));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

@@ -23,8 +23,28 @@ async function getInventory(env, userId) {
   return data || { userId, items: [], equips: {} };
 }
 
-async function saveInventory(env, userId, inv) {
-  await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
+function asInventory(cur, userId) {
+  const inv = cur && typeof cur === 'object' ? cur : { userId, items: [], equips: {} };
+  if (!Array.isArray(inv.items)) inv.items = [];
+  if (!inv.equips || typeof inv.equips !== 'object') inv.equips = {};
+  return inv;
+}
+
+/* EVERY inv_ WRITE IN THIS FILE IS A mutate(). Equip, use and set-showcase
+   used to read the row, change it and put it back with nothing held in
+   between, so an equip in one tab landing during a claim-all in another
+   wrote back the item list it had read before the grant — and the granted
+   item vanished. `fn` runs under the row's lock against the row as it is
+   now; it returns { write: false, ... } to decline (no write) and anything
+   else is the response payload for a successful write. */
+async function mutateInventory(env, userId, fn) {
+  let result;
+  await env.MARKETPLACE.mutate(inventoryKey(userId), (cur) => {
+    const inv = asInventory(cur, userId);
+    result = fn(inv);
+    return result && result.write === false ? undefined : inv;
+  });
+  return result;
 }
 
 /* Every rarity an inv_ item is actually written with: the cosmetic ladder
@@ -242,31 +262,31 @@ async function handleEquip(env, session, body) {
   const types = slotTypes(body.game, body.slot);
   if (!types) return json({ error: 'Unknown equip slot' }, 400);
 
-  const inv = await getInventory(env, session.user_id);
-  if (!Array.isArray(inv.items)) inv.items = [];
-  if (!inv.equips || typeof inv.equips !== 'object') inv.equips = {};
+  const r = await mutateInventory(env, session.user_id, (inv) => {
+    if (body.itemId === 'none') {
+      const g = inv.equips[body.game];
+      if (!g || !Object.prototype.hasOwnProperty.call(g, body.slot)) {
+        return { write: false, status: 200, body: { success: true, equips: g || {} } };
+      }
+      delete g[body.slot];
+      return { status: 200, body: { success: true, equips: g } };
+    }
 
-  if (body.itemId === 'none') {
-    if (inv.equips[body.game]) delete inv.equips[body.game][body.slot];
-    await saveInventory(env, session.user_id, inv);
-    return json({ success: true, equips: inv.equips[body.game] || {} });
-  }
+    /* Ids are only unique per type ('void' is both a skull skin and a click
+       effect), so an id held under the wrong type is refused only when no
+       item of an accepted type answers to it. */
+    const item = resolveEquipItem(inv.items, body.game, types, body.itemId);
+    if (!item) {
+      const wrongType = inv.items.find(i => i && i.id === body.itemId && i.game === body.game);
+      if (wrongType) return { write: false, status: 400, body: { error: `That item can't be equipped as ${body.slot}` } };
+      return { write: false, status: 404, body: { error: 'Item not found' } };
+    }
 
-  /* Ids are only unique per type ('void' is both a skull skin and a click
-     effect), so an id held under the wrong type is refused only when no item
-     of an accepted type answers to it. */
-  const item = resolveEquipItem(inv.items, body.game, types, body.itemId);
-  if (!item) {
-    const wrongType = inv.items.find(i => i && i.id === body.itemId && i.game === body.game);
-    if (wrongType) return json({ error: `That item can't be equipped as ${body.slot}` }, 400);
-    return json({ error: 'Item not found' }, 404);
-  }
-
-  if (!inv.equips[body.game]) inv.equips[body.game] = {};
-  inv.equips[body.game][body.slot] = item.id;
-
-  await saveInventory(env, session.user_id, inv);
-  return json({ success: true, itemId: item.id, equips: inv.equips[body.game] });
+    if (!inv.equips[body.game]) inv.equips[body.game] = {};
+    inv.equips[body.game][body.slot] = item.id;
+    return { status: 200, body: { success: true, itemId: item.id, equips: inv.equips[body.game] } };
+  });
+  return json(r.body, r.status);
 }
 
 const SHOWCASE_MAX = 5;
@@ -278,34 +298,41 @@ async function handleSetShowcase(env, session, body) {
     return json({ error: `Choose at most ${SHOWCASE_MAX} badges` }, 400);
   }
 
-  const inv = await getInventory(env, session.user_id);
-
-  const valid = badgeIds.filter(id => inv.items.some(i => i.id === id && i.type === 'badge'));
-  if (valid.length !== badgeIds.length) {
-    return json({ error: 'One or more badges are not in your inventory' }, 400);
+  if (!badgeIds.every(id => typeof id === 'string')) {
+    return json({ error: 'badgeIds must be strings' }, 400);
   }
 
-  if (!inv.equips.profile) inv.equips.profile = {};
-  inv.equips.profile.badgeShowcase = valid;
-
-  await saveInventory(env, session.user_id, inv);
-  return json({ success: true, badgeShowcase: valid });
+  /* Ownership is checked inside the lock, against the row being written. */
+  const r = await mutateInventory(env, session.user_id, (inv) => {
+    const unique = [...new Set(badgeIds)];
+    const valid = unique.filter(id => inv.items.some(i => i && i.id === id && i.type === 'badge'));
+    if (valid.length !== unique.length) {
+      return { write: false, status: 400, body: { error: 'One or more badges are not in your inventory' } };
+    }
+    if (!inv.equips.profile || typeof inv.equips.profile !== 'object') inv.equips.profile = {};
+    inv.equips.profile.badgeShowcase = valid;
+    return { status: 200, body: { success: true, badgeShowcase: valid } };
+  });
+  return json(r.body, r.status);
 }
 
 async function handleUse(env, session, body) {
-  if (!body.itemId) return json({ error: 'Missing itemId' }, 400);
+  if (!body.itemId || typeof body.itemId !== 'string') return json({ error: 'Missing itemId' }, 400);
 
-  const inv = await getInventory(env, session.user_id);
-  const idx = inv.items.findIndex(i => i.id === body.itemId && i.consumable);
-  if (idx === -1) return json({ error: 'Consumable not found' }, 404);
+  /* Quantity is read and decremented under the lock, so two tabs spending
+     the last one cannot both succeed off the same read. */
+  const r = await mutateInventory(env, session.user_id, (inv) => {
+    const idx = inv.items.findIndex(i => i && i.id === body.itemId && i.consumable && (i.quantity || 1) > 0);
+    if (idx === -1) return { write: false, status: 404, body: { error: 'Consumable not found' } };
 
-  const item = inv.items[idx];
-  if (item.quantity <= 1) {
-    inv.items.splice(idx, 1);
-  } else {
-    item.quantity--;
-  }
-
-  await saveInventory(env, session.user_id, inv);
-  return json({ success: true, item: publicItem(item), remaining: item.quantity || 0 });
+    const item = inv.items[idx];
+    if ((item.quantity || 1) <= 1) {
+      inv.items.splice(idx, 1);
+      item.quantity = 0;
+    } else {
+      item.quantity--;
+    }
+    return { status: 200, body: { success: true, item: publicItem(item), remaining: item.quantity || 0 } };
+  });
+  return json(r.body, r.status);
 }

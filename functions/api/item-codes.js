@@ -76,13 +76,34 @@ function inventoryKey(userId) {
   return `inv_${userId}`;
 }
 
-async function getInventory(env, userId) {
-  const data = await env.MARKETPLACE.get(inventoryKey(userId), 'json');
-  return data || { userId, items: [], equips: {} };
-}
-
-async function saveInventory(env, userId, inv) {
-  await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
+/* Put one item into a user's inventory under the inv_ row's lock. This used
+   to be get → push → put: a claim-all or an equip landing between the read
+   and the write lost one side's change, and two codes for the same item id
+   redeemed together both saw "not owned" and both pushed it. The ownership
+   and stacking decisions are made INSIDE the mutator, against the row as it
+   is now. Identity is game + type + id, matching the equip resolver.
+   `separate` always adds a new row — for eggs, whose meta (the exact tier)
+   differs per code and must not merge into another egg's stack.
+   Returns 'added' | 'stacked' | 'owned'. */
+async function grantInventoryItem(env, userId, entry, { separate = false } = {}) {
+  let outcome = 'owned';
+  await env.MARKETPLACE.mutate(inventoryKey(userId), (cur) => {
+    const inv = cur && typeof cur === 'object' ? cur : { userId, items: [], equips: {} };
+    if (!Array.isArray(inv.items)) inv.items = [];
+    if (!inv.equips || typeof inv.equips !== 'object') inv.equips = {};
+    const same = separate ? null
+      : inv.items.find(i => i && i.id === entry.id && i.game === entry.game && i.type === entry.type);
+    if (same && !entry.consumable) { outcome = 'owned'; return undefined; }
+    if (same && entry.consumable && same.consumable) {
+      same.quantity = (Number(same.quantity) || 1) + (Number(entry.quantity) || 1);
+      outcome = 'stacked';
+      return inv;
+    }
+    inv.items.push(entry);
+    outcome = 'added';
+    return inv;
+  });
+  return outcome;
 }
 
 async function getQueue(env) {
@@ -318,7 +339,8 @@ async function handleRedeem(env, session, body) {
     return json({ error: 'Invalid code' }, 404);
   }
 
-  if (record.redeemedBy.includes(userId)) {
+  /* Early out only; claimRedemption re-checks under the code row's lock. */
+  if ((record.redeemedBy || []).includes(userId)) {
     return json({ error: 'Already redeemed' }, 409);
   }
 
@@ -346,10 +368,9 @@ async function handleRedeem(env, session, body) {
     return json({ success: true, item: record.item, raidKill: true, grantedTiers });
   }
 
-  const inv = await getInventory(env, userId);
-  const existing = inv.items.find(i => i.id === record.item.id && !i.consumable);
-  if (!existing) {
-    inv.items.push({
+  /* The item comes only from the stored code record, never the request. */
+  try {
+    await grantInventoryItem(env, userId, {
       id: record.item.id,
       game: record.item.game,
       type: record.item.type,
@@ -364,7 +385,12 @@ async function handleRedeem(env, session, body) {
          art keep the shape they have always had. */
       ...(record.item.image ? { meta: { image: record.item.image } } : {}),
     });
-    await saveInventory(env, userId, inv);
+  } catch (err) {
+    /* The claim is already recorded; without this the code would read
+       "Already redeemed" while nothing landed. */
+    await releaseRedemption(env, code, userId);
+    console.error('[item-codes] grant failed:', err && err.message);
+    return json({ error: 'Something went wrong granting your item. Try again.' }, 500);
   }
 
   return json({ success: true, item: record.item });
@@ -432,24 +458,27 @@ async function redeemDinoEgg(env, record, code, userId) {
      weights unless meta.guaranteed is set, so without it a mythic egg would
      silently degrade into a mostly-common roll. */
   if (result && !result.success && result.error === 'Incubator full') {
-    const inv = await getInventory(env, userId);
-    inv.items.push({
-      id: record.item.id,
-      game: 'dino-park',
-      type: 'egg',
-      name: record.item.name || `${capitalize(dinoTier)} Dino Park Egg`,
-      rarity: siteRarity,
-      consumable: true,
-      quantity: 1,
-      grantedAt: Date.now(),
-      source: 'item-code',
-      meta: {
-        guaranteed: true,
-        rarity: dinoTier,
-        guaranteedMutation: !!record.item.guaranteedMutation,
-      },
-    });
-    await saveInventory(env, userId, inv);
+    try {
+      await grantInventoryItem(env, userId, {
+        id: record.item.id,
+        game: 'dino-park',
+        type: 'egg',
+        name: record.item.name || `${capitalize(dinoTier)} Dino Park Egg`,
+        rarity: siteRarity,
+        consumable: true,
+        quantity: 1,
+        grantedAt: Date.now(),
+        source: 'item-code',
+        meta: {
+          guaranteed: true,
+          rarity: dinoTier,
+          guaranteedMutation: !!record.item.guaranteedMutation,
+        },
+      }, { separate: true });
+    } catch {
+      await releaseRedemption(env, code, userId);
+      return json({ error: 'Something went wrong granting your egg. Try again.' }, 500);
+    }
 
     return json({
       success: true,

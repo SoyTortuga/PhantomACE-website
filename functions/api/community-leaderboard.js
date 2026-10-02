@@ -66,13 +66,25 @@ export async function onRequestGet(context) {
     v => displayName(v.username)
   );
 
+  /* Phamily Time rows written before the heartbeat recorded displayName
+     carry no name at all. The same person's giveaway ledger or check-in
+     history usually does, keyed by the same user id — borrowed here, inside
+     this function, so no id ever reaches the response. */
+  const knownNames = new Map();
+  for (const r of [...checkinRows, ...entryRows]) {
+    const v = r.value;
+    if (v && v.userId && typeof v.username === 'string' && v.username.trim()) {
+      knownNames.set(String(v.userId), v.username);
+    }
+  }
+
   /* pt_ covers BOTH pt_{id}_{month} and pt_alltime_{id}; the all-time rows
      have no `month`, so filtering on the current month excludes them without
      needing to know the key shape here. */
   const hours = topBy(
     phamilyRows.map(r => r.value).filter(v => v && v.month === month),
     v => Math.round((Number(v.hours) || 0) * 10) / 10,
-    v => displayName(v.username, v.displayName)
+    v => displayName(v.displayName, knownNames.get(String(v.userId)))
   );
 
   const streaks = topBy(

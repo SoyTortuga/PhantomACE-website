@@ -19,7 +19,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { onRequestGet, onRequestPost, EQUIP_SLOTS } from '../../functions/api/inventory.js';
+import { onRequestGet, onRequestPost, EQUIP_SLOTS, consumeConsumable, refundConsumable } from '../../functions/api/inventory.js';
+import { onRequestPost as redeemPost, createItemCode, activateItemCode } from '../../functions/api/item-codes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -31,13 +32,40 @@ function check(label, actual, expected) {
   failures.push(`${label}\n      expected ${x}\n      got      ${a}`);
 }
 
+/* mutate() mirrors server/lib/kv.js: one caller per key at a time, the
+   mutator sees the row as it is now, undefined = no write. put() exists only
+   so a regression back to get-then-put is still observable in `puts`. */
 function makeEnv(store) {
   let writes = 0;
+  let puts = 0;
+  const locks = new Map();
+  const tick = () => new Promise(r => setTimeout(r, 0));
   return {
     get writes() { return writes; },
+    get puts() { return puts; },
     MARKETPLACE: {
-      async get(key) { return key in store ? JSON.parse(JSON.stringify(store[key])) : null; },
-      async put(key, val) { writes++; store[key] = JSON.parse(val); },
+      async get(key) { await tick(); return key in store ? JSON.parse(JSON.stringify(store[key])) : null; },
+      async put(key, val) { await tick(); writes++; if (key.startsWith('inv_')) puts++; store[key] = JSON.parse(val); },
+      async mutate(key, fn) {
+        const prev = locks.get(key) || Promise.resolve();
+        let release;
+        const mine = new Promise(r => { release = r; });
+        locks.set(key, prev.then(() => mine));
+        await prev;
+        try {
+          await tick();
+          const cur = key in store ? JSON.parse(JSON.stringify(store[key])) : null;
+          const next = await fn(cur);
+          await tick();
+          if (next === undefined) return cur;
+          writes++;
+          store[key] = JSON.parse(JSON.stringify(next));
+          return next;
+        } finally { release(); }
+      },
+      async listValues({ prefix }) {
+        return Object.keys(store).filter(k => k.startsWith(prefix)).map(name => ({ name, value: store[name] }));
+      },
     },
   };
 }
@@ -260,6 +288,129 @@ const MM = extractMM();
   }) });
   check('signed out → 401', anon.status, 401);
   check('no writes from refused requests', env.writes, 0);
+}
+
+/* ── Races: every inv_ write goes through the row lock ──────────────── */
+async function post(env, uid, body, path = '/api/inventory', handler = onRequestPost) {
+  const res = await handler({ env, request: new Request('http://localhost' + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie(uid) },
+    body: JSON.stringify(body),
+  }) });
+  return { status: res.status, body: await res.json() };
+}
+
+/* What a Phamily Time claim-all grant does: add an item under mutate. */
+function serverGrant(env, uid, item) {
+  return env.MARKETPLACE.mutate(`inv_${uid}`, async (cur) => {
+    await new Promise(r => setTimeout(r, 0));
+    cur.items.push(item);
+    return cur;
+  });
+}
+
+{
+  const store = freshStore();
+  const env = makeEnv(store);
+  const granted = { id: 'ms_10_badge_2026-10', game: 'profile', type: 'badge', name: 'Fresh Badge', rarity: 'rare' };
+  const [eq, sc, us] = await Promise.all([
+    equip(env, '1', 'profile', 'title', 'title-1'),
+    post(env, '1', { action: 'set-showcase', badgeIds: ['badge-1'] }),
+    serverGrant(env, '1', granted),
+    equip(env, '1', 'profile', 'name-effect', 'fx-1'),
+  ]);
+  check('race: equip during a grant → 200', eq.status, 200);
+  check('race: set-showcase during a grant → 200', sc.status, 200);
+  check('race: granted item survives the concurrent equips', store.inv_1.items.some(i => i.id === granted.id), true);
+  check('race: both equips survive', [store.inv_1.equips.profile.title, store.inv_1.equips.profile['name-effect']], ['title-1', 'fx-1']);
+  check('race: no unlocked put() of inv_', env.puts, 0);
+  void us;
+}
+
+{
+  /* set-showcase checks ownership against the locked row: a badge granted
+     a moment earlier counts, and a duplicate id is folded rather than 400'd. */
+  const store = freshStore();
+  const env = makeEnv(store);
+  const fresh = { id: 'new-badge', game: 'profile', type: 'badge', name: 'New', rarity: 'common' };
+  await serverGrant(env, '1', fresh);
+  const r = await post(env, '1', { action: 'set-showcase', badgeIds: ['badge-1', 'new-badge', 'badge-1'] });
+  check('showcase with a just-granted badge → 200', r.status, 200);
+  check('showcase deduped', store.inv_1.equips.profile.badgeShowcase, ['badge-1', 'new-badge']);
+  const bad = await post(env, '1', { action: 'set-showcase', badgeIds: ['banner-1'] });
+  check('showcase with a non-badge → 400', bad.status, 400);
+  check('refused showcase left the old one', store.inv_1.equips.profile.badgeShowcase, ['badge-1', 'new-badge']);
+  const tooMany = await post(env, '1', { action: 'set-showcase', badgeIds: ['a', 'b', 'c', 'd', 'e', 'f'] });
+  check('showcase over 5 → 400', tooMany.status, 400);
+}
+
+{
+  /* use: two tabs spending the last consumable — exactly one succeeds. */
+  const store = freshStore();
+  store.inv_1.items.push({ id: 'egg-1', game: 'dino-park', type: 'egg', name: 'Egg', consumable: true, quantity: 1 });
+  store.inv_1.items.push({ id: 'egg-2', game: 'dino-park', type: 'egg', name: 'Egg', consumable: true, quantity: 3 });
+  const env = makeEnv(store);
+  const [a, b] = await Promise.all([
+    post(env, '1', { action: 'use', itemId: 'egg-1' }),
+    post(env, '1', { action: 'use', itemId: 'egg-1' }),
+  ]);
+  check('use race: one success, one 404', [a.status, b.status].sort(), [200, 404]);
+  check('use race: the item is gone', store.inv_1.items.some(i => i.id === 'egg-1'), false);
+  const s = await post(env, '1', { action: 'use', itemId: 'egg-2' });
+  check('use of a stack decrements', [s.status, s.body.remaining], [200, 2]);
+  const last = await post(env, '1', { action: 'use', itemId: 'egg-1' });
+  check('use of nothing left → 404', last.status, 404);
+}
+
+{
+  /* consumeConsumable / refundConsumable semantics unchanged. */
+  const store = freshStore();
+  store.inv_1.items.push({ id: 'wild', game: 'commander-bingo', type: 'wildcard', name: 'Wildcard', consumable: true, quantity: 2 });
+  const env = makeEnv(store);
+  const r1 = await consumeConsumable(env, '1', { game: 'commander-bingo', type: 'wildcard' });
+  check('consumeConsumable spends one', r1, { ok: true, remaining: 1 });
+  const [r2, r3] = await Promise.all([
+    consumeConsumable(env, '1', { game: 'commander-bingo', type: 'wildcard' }),
+    consumeConsumable(env, '1', { game: 'commander-bingo', type: 'wildcard' }),
+  ]);
+  check('consumeConsumable race: exactly one gets the last', [r2.ok, r3.ok].sort(), [false, true]);
+  await refundConsumable(env, '1', { game: 'commander-bingo', type: 'wildcard', name: 'Wildcard' });
+  const back = store.inv_1.items.find(i => i.type === 'wildcard');
+  check('refundConsumable restores one', [!!back, back && back.quantity], [true, 1]);
+}
+
+{
+  /* item-codes redeem: grant under the lock, no double-grant, no lost equip. */
+  const store = freshStore();
+  const env = makeEnv(store);
+  const item = { id: 'code-banner', game: 'profile', type: 'banner', name: 'Code Banner', rarity: 'rare' };
+  const c1 = await createItemCode(env, item);
+  const c2 = await createItemCode(env, item);
+  await activateItemCode(env, c1.code, 300);
+  await activateItemCode(env, c2.code, 300);
+  const [r1, r2, eq] = await Promise.all([
+    post(env, '1', { action: 'redeem', code: c1.code }, '/api/item-codes', redeemPost),
+    post(env, '1', { action: 'redeem', code: c2.code }, '/api/item-codes', redeemPost),
+    equip(env, '1', 'profile', 'title', 'title-1'),
+  ]);
+  check('redeem race: both codes succeed', [r1.status, r2.status], [200, 200]);
+  check('redeem race: the item is granted once', store.inv_1.items.filter(i => i.id === 'code-banner').length, 1);
+  check('redeem race: concurrent equip survives', store.inv_1.equips.profile.title, 'title-1');
+  const again = await post(env, '1', { action: 'redeem', code: c1.code }, '/api/item-codes', redeemPost);
+  check('same code twice → 409', again.status, 409);
+
+  const pot = { id: 'potion', game: 'skull-clicker', type: 'boost', name: 'Potion', rarity: 'common', consumable: true, quantity: 2 };
+  const p1 = await createItemCode(env, pot);
+  const p2 = await createItemCode(env, pot);
+  await activateItemCode(env, p1.code, 300);
+  await activateItemCode(env, p2.code, 300);
+  await Promise.all([
+    post(env, '1', { action: 'redeem', code: p1.code }, '/api/item-codes', redeemPost),
+    post(env, '1', { action: 'redeem', code: p2.code }, '/api/item-codes', redeemPost),
+  ]);
+  const stack = store.inv_1.items.filter(i => i.id === 'potion');
+  check('consumable codes stack into one row', [stack.length, stack[0] && stack[0].quantity], [1, 4]);
+  check('item-codes made no unlocked put() of inv_', env.puts, 0);
 }
 
 if (failures.length) {

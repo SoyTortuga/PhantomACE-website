@@ -64,9 +64,46 @@
 
 .equipped-item.rarity-exclusive { color: var(--exclusive); }
 .equipped-item.rarity-mythic { color: var(--rarity-mythic); }
+.equipped-item.rarity-legendary { color: var(--rarity-legendary); }
+.equipped-item.rarity-epic { color: var(--rarity-epic); }
 .equipped-item.rarity-rare { color: var(--rarity-rare); }
 .equipped-item.rarity-uncommon { color: var(--rarity-uncommon); }
 .equipped-item.rarity-common { color: var(--rarity-common); }
+
+.equipped-banner-thumb {
+  aspect-ratio: 4 / 1;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--black);
+}
+
+.equipped-banner-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.equipped-banner-thumb.no-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.equipped-slot .item-month-chip {
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.inv-equip-error {
+  color: var(--red);
+  margin: 8px 0;
+  font-family: var(--font-ui);
+  font-size: 16px;
+}
 
 /* ── Category tabs ── */
 .inv-tabs {
@@ -90,6 +127,37 @@
   color: inherit;
   opacity: 0.75;
   margin-left: 2px;
+}
+
+/* ── Filter / sort toolbar ── */
+.inv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: -8px 0 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inv-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inv-toolbar-label {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+
+.inv-filter {
+  font-size: 12px;
+  padding: 5px 12px;
 }
 
 /* ── Category grid ── */
@@ -119,15 +187,36 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
   transition: border-color 0.2s;
+}
+
+/* Rarity tints the card's full border (never a side rail): every rarity an
+   inv_ item can carry (functions/api/inventory.js RARITIES) maps to its
+   token, mixed into the neutral line so the grid stays quiet until hover. */
+.collection-item.rarity-common    { --item-rarity: var(--rarity-common); }
+.collection-item.rarity-uncommon  { --item-rarity: var(--rarity-uncommon); }
+.collection-item.rarity-rare      { --item-rarity: var(--rarity-rare); }
+.collection-item.rarity-epic      { --item-rarity: var(--rarity-epic); }
+.collection-item.rarity-legendary { --item-rarity: var(--rarity-legendary); }
+.collection-item.rarity-mythic    { --item-rarity: var(--rarity-mythic); }
+.collection-item.rarity-exclusive { --item-rarity: var(--exclusive); }
+
+.collection-item[class*="rarity-"] {
+  border-color: color-mix(in srgb, var(--item-rarity) 30%, var(--border));
 }
 
 .collection-item:hover {
   border-color: var(--border-mid);
 }
 
-.collection-item.equipped {
-  border-color: var(--red-dim);
+.collection-item[class*="rarity-"]:hover {
+  border-color: color-mix(in srgb, var(--item-rarity) 70%, var(--border));
+}
+
+.collection-item.equipped,
+.collection-item.equipped[class*="rarity-"] {
+  border-color: var(--red);
   background: var(--red-glow);
 }
 
@@ -178,15 +267,78 @@
 
 .rarity-exclusive .item-rarity-tag { color: var(--exclusive); }
 .rarity-mythic .item-rarity-tag { color: var(--rarity-mythic); }
+.rarity-legendary .item-rarity-tag { color: var(--rarity-legendary); }
+.rarity-epic .item-rarity-tag { color: var(--rarity-epic); }
 .rarity-rare .item-rarity-tag { color: var(--rarity-rare); }
 .rarity-uncommon .item-rarity-tag { color: var(--rarity-uncommon); }
 .rarity-common .item-rarity-tag { color: var(--rarity-common); }
+
+.item-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.item-type-tag {
+  font-family: var(--font-system);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Which month a cosmetic came from. Items repeat names month to month;
+   this chip is how October's banner reads differently from September's. */
+.item-month-chip {
+  align-self: flex-start;
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-sec);
+  border: 1px solid var(--border-mid);
+  border-radius: 999px;
+  padding: 2px 8px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Banner preview: the art the profile header draws, cropped to the
+   header's proportions. */
+.item-banner-thumb {
+  aspect-ratio: 4 / 1;
+  margin: 18px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--black);
+}
+
+.item-banner-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-banner-thumb.no-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.collection-item.type-name-effect .item-name {
+  margin-top: 18px;
+  font-size: 24px;
+}
 
 .item-name {
   font-family: var(--font-ui);
   font-size: 20px;
   color: var(--text-pri);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .item-desc {
@@ -234,9 +386,114 @@
 }
 
 .showcase-save-btn {
-  margin-top: 12px;
+  margin-top: 16px;
   font-size: 18px;
   padding: 8px 20px;
+}
+
+/* The five chosen badges, in order, above the picker. */
+.showcase-picked {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.showcase-slot {
+  min-height: 92px;
+  border: 1px dashed var(--border-mid);
+  border-radius: 4px;
+  background: var(--gray-lo);
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.showcase-slot.empty {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.showcase-slot.filled {
+  border-style: solid;
+  cursor: pointer;
+  color: var(--text-pri);
+  font: inherit;
+  transition: border-color 0.2s;
+}
+
+.showcase-slot.rarity-common    { border-color: var(--rarity-common); }
+.showcase-slot.rarity-uncommon  { border-color: var(--rarity-uncommon); }
+.showcase-slot.rarity-rare      { border-color: var(--rarity-rare); }
+.showcase-slot.rarity-epic      { border-color: var(--rarity-epic); }
+.showcase-slot.rarity-legendary { border-color: var(--rarity-legendary); }
+.showcase-slot.rarity-mythic    { border-color: var(--rarity-mythic); }
+.showcase-slot.rarity-exclusive { border-color: var(--exclusive); }
+.showcase-slot.filled:hover     { border-color: var(--red); }
+
+.showcase-slot .item-icon-swatch {
+  margin: 0;
+  font-size: 24px;
+}
+
+.showcase-slot .item-icon-swatch.has-art,
+.showcase-slot .item-icon-swatch.has-art img {
+  width: 36px;
+  height: 36px;
+}
+
+.showcase-slot-name {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.showcase-slot-remove {
+  font-family: var(--font-system);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.showcase-slot.filled:hover .showcase-slot-remove { color: var(--red); }
+
+.showcase-group {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.showcase-group-title {
+  cursor: pointer;
+  font-family: var(--font-gothic);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: var(--text-sec);
+  padding: 4px 0;
+}
+
+.showcase-group-title:hover { color: var(--text-pri); }
+
+.showcase-group[open] .showcase-group-title { margin-bottom: 12px; }
+
+.showcase-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.showcase-grid .collection-item { padding: 12px; }
+.showcase-grid .item-name { font-size: 17px; }
+
+@media (max-width: 560px) {
+  .showcase-picked { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inv-toolbar { gap: 10px; }
 }
 
 /* ── Import badges bar ── */
