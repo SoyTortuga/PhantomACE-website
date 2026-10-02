@@ -1679,6 +1679,20 @@
        new season has begun: the run + prestige layer reset while the legacy
        persists (see applySeasonReset). Never derived from the local clock. */
     let seasonEpoch = null;
+    /* The server's CURRENT epoch, as last reported by ?epoch=1 or the event
+       poll (the server's season calendar, America/Los_Angeles). Drives the
+       leaderboard baseline roll too. null until the server has answered. */
+    let serverEpoch = null;
+    /* Set once the boot-time save merge + season check have settled; only then
+       may the event poll trigger a mid-session monthly reset. */
+    let seasonReady = false;
+    /* "Reset All Progress" in flight: every save path is suppressed so the
+       live state cannot be written back over the wipe (beforeunload included). */
+    let resetting = false;
+    /* Stamp of this save's last "Reset All Progress" (server time, ms). A save
+       with a newer stamp outranks any save without it, so a stale tab or
+       second device can never restore the progress that was reset. */
+    let resetAt = 0;
 
     /* Timed buff/debuff framework — a list of active effects, each
        { id, name, kind:'buff'|'debuff', cpsMult, clickMult, endsAt, icon, chipClass }.
@@ -2739,6 +2753,13 @@
         const res = await fetch('/api/skull-clicker?event=1', { cache: 'no-store' });
         if (!res.ok) return;
         const d = await res.json();
+        /* The month can turn while a tab stays open for days: the epoch rides
+           along with every event poll, so a long-open tab takes the monthly
+           reset as soon as the server's season does. */
+        if (d && typeof d.epoch === 'string') {
+          serverEpoch = d.epoch;
+          if (seasonReady && epochNum(seasonEpoch) < epochNum(d.epoch)) checkSeasonReset(d.epoch);
+        }
         const ev = d && d.event;
         const now = Date.now();
         if (ev && ev.until > now) {
@@ -2866,7 +2887,7 @@
           showBuffToast('☠️ ' + (s.defeatedBy || 'The chat') + ' felled ' + s.name + '! Frenzy!', 'reap');
           screenShake();
           setTimeout(fetchRaidReward, 1500);   /* your code is minted on the killing blow */
-        } else if (s.status === 'expired' && prev === 'active') {
+        } else if (s.status === 'escaped' && prev === 'active') {
           showBuffToast(s.name + ' escaped into the dark…', 'frenzy');
         } else if (s.status === 'active' && prev !== 'active') {
           showBuffToast('⚔️ ' + s.name + ' rises — click to strike!', 'rush');
@@ -2875,9 +2896,15 @@
       }
     }
 
+    /* RAID_FLUSH_MS and RAID_FLUSH_MAX set the most this client can ever send
+       (100 per 3s ≈ 33/s); the server's per-striker rate limit in
+       functions/api/skull-raid.js is derived from them — change both together. */
+    const RAID_FLUSH_MS = 3000;
+    const RAID_FLUSH_MAX = 100;
+    const RAID_QUEUE_MAX = 300;
     async function flushRaidDamage() {
       if (!raidActive() || raidQueue <= 0) return;
-      const dmg = Math.min(100, raidQueue);
+      const dmg = Math.min(RAID_FLUSH_MAX, raidQueue);
       raidQueue -= dmg;
       const p = getPlayerId();
       const body = { action: 'hit', damage: dmg };
@@ -2888,7 +2915,7 @@
           headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         if (res.ok) applyRaid(await res.json());
-      } catch (e) { raidQueue += dmg; /* put it back to retry next flush */ }
+      } catch (e) { raidQueue = Math.min(RAID_QUEUE_MAX, raidQueue + dmg); /* put it back to retry next flush */ }
     }
 
     function renderRaidBanner() {
@@ -3681,15 +3708,17 @@
         const res = await fetch('/api/skull-clicker?epoch=1', { cache: 'no-store' });
         if (!res.ok) return null;
         const d = await res.json();
-        return (d && typeof d.epoch === 'string') ? d.epoch : null;
+        if (d && typeof d.epoch === 'string') { serverEpoch = d.epoch; return d.epoch; }
+        return null;
       } catch (e) { return null; }
     }
 
-    /* Run once at load, AFTER the local+server saves have settled on a state.
+    /* Run at load, AFTER the local+server saves have settled on a state, and
+       again whenever the event poll reports a newer epoch (`known`).
        Migration-safe: a missing stamp adopts the current epoch with no wipe. */
-    async function checkSeasonReset() {
-      const ep = await fetchServerEpoch();
-      if (!ep) return;                               /* cannot verify → never wipe */
+    async function checkSeasonReset(known) {
+      const ep = known || await fetchServerEpoch();
+      if (!ep || resetting) return;                  /* cannot verify → never wipe */
       if (seasonEpoch == null || seasonEpoch === '') {
         seasonEpoch = ep;                            /* migration safety: adopt, do NOT wipe */
         save();
@@ -4602,6 +4631,9 @@
          automation is ON, so any older save (v7–v11) loads with its automations
          running exactly as before — no behavior change, never throws. */
       if (!Array.isArray(d.autoOff)) d.autoOff = [];
+      /* The "Reset All Progress" stamp. Absent on every save that predates it
+         (= never reset), so nothing existing changes rank. */
+      if (!Number.isFinite(Number(d.resetAt)) || Number(d.resetAt) < 0) d.resetAt = 0;
       if (d.startTime === undefined) d.startTime = Date.now();
       if (d.prestige === undefined) d.prestige = 0;
       /* Pre-prestige saves had no lifetime field; their run total IS their
@@ -4631,6 +4663,7 @@
     }
 
     function save() {
+      if (resetting) return;
       const data = {
         /* The four big-number currencies serialize as strings (Decimal.toString),
            parsed back by migrateSave/toDec on load. */
@@ -4654,6 +4687,7 @@
         perks: [...perks],
         perkLevels,
         achievements: [...achievements],
+        resetAt,
         savedAt: Date.now(),
         version: SAVE_VERSION
       };
@@ -4680,7 +4714,7 @@
       if (!session || !session.user_id) return;
       try {
         const res = await fetch('/api/skull-clicker', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
           credentials: 'same-origin', body: JSON.stringify({ action: 'save-state', state: data }),
         });
         if (!res.ok) return;
@@ -4758,6 +4792,7 @@
       perks = new Set(d.perks || []);
       perkLevels = (d.perkLevels && typeof d.perkLevels === 'object') ? d.perkLevels : {};
       achievements = new Set(d.achievements || []);
+      resetAt = Number(d.resetAt) || 0;
 
       if (d.savedAt) {
         const away = (Date.now() - d.savedAt) / 1000;
@@ -4806,7 +4841,12 @@
        lifetime, higher tier) must beat the old save so the sync never
        undoes it, and normal progress (more lifetime) still adopts forward. */
     function serverOutranks(server) {
-      /* SEASON EPOCH FIRST — kept identical to the server's outranks(). A save that
+      /* RESET STAMP FIRST — kept identical to the server's outranks(). A save
+         carrying a newer "Reset All Progress" stamp always wins, so a tab or
+         device that missed the reset cannot restore what was wiped. */
+      const sr = Number(server.resetAt) || 0, lr = Number(resetAt) || 0;
+      if (sr !== lr) return sr > lr;
+      /* SEASON EPOCH NEXT — kept identical to the server's outranks(). A save that
          has taken a newer monthly seasonal reset ALWAYS wins, so the wipe (which
          lowers prestige/run) is never reverted by a stale higher-prestige save; a
          missing stamp counts as oldest. Within the same epoch the original
@@ -4856,9 +4896,43 @@
       } catch(e) {}
     }
 
-    function hardReset() {
-      if (!confirm('This will permanently erase all progress. Are you sure?')) return;
-      localStorage.removeItem('sc_save');
+    /* "Reset All Progress" means ALL of it — the run, prestige, the Reaping,
+       Grave Blooms, every unlock, relic and feat. Two things used to undo it:
+       the beforeunload save wrote the live state straight back into
+       localStorage on the reload, and a logged-in player's server save was
+       adopted again on boot. So: suppress every save first, wipe the server
+       copy (which stamps a newer resetAt so no stale tab or other device can
+       restore it), and only then clear this device and reload. If the server
+       wipe fails nothing is erased — a half reset would just come back. */
+    async function hardReset() {
+      if (resetting) return;
+      const session = typeof readPhamSession === 'function' ? readPhamSession() : null;
+      const loggedIn = !!(session && session.user_id);
+      const msg = loggedIn
+        ? 'This will permanently erase all progress — on this device AND the save on your Twitch account. Your best score stays on the all-time leaderboard. Are you sure?'
+        : 'This will permanently erase all progress. Are you sure?';
+      if (!confirm(msg)) return;
+      resetting = true;
+      let fresh = null;
+      if (loggedIn) {
+        try {
+          const res = await fetch('/api/skull-clicker', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin', body: JSON.stringify({ action: 'reset-save', confirm: true }),
+          });
+          const out = res.ok ? await res.json() : null;
+          if (out && out.state && out.state.resetAt) fresh = out.state;
+        } catch (e) {}
+        if (!fresh) {
+          resetting = false;
+          alert('Could not reach the server to reset your account save, so nothing was erased. Try again in a moment.');
+          return;
+        }
+      }
+      try {
+        if (fresh) localStorage.setItem('sc_save', JSON.stringify(fresh));
+        else localStorage.removeItem('sc_save');
+      } catch (e) {}
       location.reload();
     }
 
@@ -4890,16 +4964,19 @@
       return { guestId: gid, guestName: gname };
     }
 
-    /* Current UTC month, matching the server's monthKeyUTC. */
+    /* The season month the server's board is on — its epoch (the shared
+       America/Los_Angeles season calendar), never this machine's UTC clock,
+       which turns the month hours early and would roll the baseline while the
+       server board is still on the old month. null until the server answers. */
     function currentMonthKey() {
-      const d = new Date();
-      return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+      return serverEpoch || null;
     }
     /* Roll the client baseline when the month turns, then report skulls
-       gathered this season. */
+       gathered this season. With no server epoch yet, the baseline is left
+       alone rather than guessed. */
     function seasonScore() {
       const cur = currentMonthKey();
-      if (seasonMonth !== cur) { seasonMonth = cur; seasonBaseline = lifetimeSkulls; }
+      if (cur && seasonMonth !== cur) { seasonMonth = cur; seasonBaseline = lifetimeSkulls; }
       return Decimal.max(0, lifetimeSkulls.sub(seasonBaseline).floor());
     }
 
@@ -4914,18 +4991,16 @@
       const lifeLog = lifeFloor.gt(0) ? lifeFloor.log10() : 0;
       const seasonStr = seasonS.toString();
       const seasonLog = seasonS.gt(0) ? seasonS.log10() : 0;
+      /* One write: /api/skull-clicker updates sc_leaderboard (the same board
+         /api/leaderboards serves) AND the season board. keepalive lets the
+         final submit from the unload save outlive the page. */
       try {
         await fetch('/api/skull-clicker', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'submit-score', score: lifeStr, scoreLog: lifeLog, seasonScore: seasonStr, seasonScoreLog: seasonLog, prestige, ascensions, ...player })
-        });
-        fetch('/api/leaderboards', {
-          method: 'POST',
+          method: 'POST', keepalive: true,
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ game: 'skull-clicker', score: lifeStr, scoreLog: lifeLog }),
-        }).catch(function () {});
+          body: JSON.stringify({ action: 'submit-score', score: lifeStr, scoreLog: lifeLog, seasonScore: seasonStr, seasonScoreLog: seasonLog, prestige, ascensions, ...player })
+        });
       } catch(e) {}
     }
 
@@ -5207,7 +5282,11 @@
     /* Settle local vs server save FIRST, then evaluate the season epoch against the
        adopted state — so the reset acts on the final save and its stamped wipe is
        what gets pushed back up (the server merge then accepts the newer epoch). */
-    (async () => { try { await syncFromServer(); } catch (e) {} await checkSeasonReset(); })();
+    (async () => {
+      try { await syncFromServer(); } catch (e) {}
+      try { await checkSeasonReset(); } catch (e) {}
+      seasonReady = true;
+    })();
     loadCosmetics();
     lastTick = Date.now();
     checkAchievements();
@@ -5222,7 +5301,7 @@
     setInterval(pollSkullEvent, 30000);
     pollRaid();
     setInterval(pollRaid, 4000);
-    setInterval(flushRaidDamage, 3000);
+    setInterval(flushRaidDamage, RAID_FLUSH_MS);
     fetchRaidReward();
     setInterval(fetchRaidReward, 30000);
   </script>

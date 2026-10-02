@@ -72,7 +72,7 @@ function cleanScore(score) {
    are big-number strings now, so finite() must never touch them (it would parse
    "1.2e500" to Infinity and overwrite the string with the cap). They pass through
    untouched; the client parses them back into Decimals on load. */
-const SC_STATE_NUM_FIELDS = ['prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt'];
+const SC_STATE_NUM_FIELDS = ['prestige','totalClicks','clickBonus','cpsClickPct','boneShards','cursedPopped','ascensions','epitaphs','highestPrestige','graveBlooms','petLevel','essence','spellsCast','spellsBackfired','gardenTier','gardenPlanted','gardenHarvests','wisps','startTime','bloomStart','seasonEndsAt','apocStart','apocPacifiedUntil','savedAt','resetAt'];
 function sanitizeState(state) {
   if (!state || typeof state !== 'object') return state;
   for (const k of SC_STATE_NUM_FIELDS) if (typeof state[k] === 'number') state[k] = finite(state[k]);
@@ -177,8 +177,14 @@ function epochOf(state) {
   return (y && mo) ? y * 12 + (mo - 1) : 0;
 }
 
+/* The "Reset All Progress" stamp (ms); 0 for any save never reset. */
+function resetOf(state) { return num(state && state.resetAt); }
+
 /** True when `a` should win the merge over `b`.
- *  SEASON EPOCH FIRST: a save that has taken a newer monthly seasonal reset ALWAYS
+ *  RESET STAMP FIRST: a save carrying a newer "Reset All Progress" stamp ALWAYS
+ *  wins — a reset lowers everything, so without this a stale tab or another
+ *  device would outrank the wipe and restore what the player chose to erase.
+ *  SEASON EPOCH NEXT: a save that has taken a newer monthly seasonal reset ALWAYS
  *  wins, bypassing the ascension/prestige/lifetime comparison — otherwise a wipe
  *  (which lowers prestige/run) would look "worse" and the stale higher-prestige
  *  save would silently revert it on the next sync. Within the SAME epoch the
@@ -186,6 +192,8 @@ function epochOf(state) {
  *  so a stale or cleared device still cannot clobber a better save. Kept identical
  *  to the client's serverOutranks(). */
 function outranks(a, b) {
+  const ra = resetOf(a), rb = resetOf(b);
+  if (ra !== rb) return ra > rb;
   const ea = epochOf(a), eb = epochOf(b);
   if (ea !== eb) return ea > eb;
   const aa = ascensionOf(a), ab = ascensionOf(b);
@@ -256,6 +264,33 @@ async function saveState(env, session, body) {
   return json({ success: true, adopted: winner !== state, state: winner });
 }
 
+/**
+ * "Reset All Progress" for the session's OWN save. The game's copy reads
+ * "permanently erase all progress", so nothing is kept — not even the legacy
+ * layers the monthly season reset preserves. The save becomes a fresh-start
+ * record stamped with a strictly newer resetAt (and the current season epoch,
+ * so the fresh save never takes a spurious monthly wipe), which outranks
+ * every pre-reset save in the merge: a stale tab or second device pushing old
+ * progress is handed this instead. Leaderboard entries are records, not
+ * progress, and are left alone. `confirm: true` is required so a stray call
+ * cannot wipe a save; the client asks the player first.
+ */
+async function resetSave(env, session, body) {
+  if (!body || body.confirm !== true) return json({ error: 'Confirmation required' }, 400);
+  const now = Date.now();
+  let fresh = null;
+  await env.MARKETPLACE.mutate(saveKey(session.user_id), (current) => {
+    fresh = {
+      resetAt: Math.max(now, resetOf(current) + 1),
+      seasonEpoch: monthKeyUTC(new Date()),
+      startTime: now,
+      savedAt: now,
+    };
+    return fresh;
+  });
+  return json({ success: true, state: fresh });
+}
+
 async function loadState(env, session) {
   const state = await env.MARKETPLACE.get(saveKey(session.user_id), 'json');
   /* Heal on read: an already-corrupted save (e.g. mvgfamous's) returns finite values,
@@ -270,9 +305,10 @@ export async function onRequestPost(context) {
 
   /* The save/load pair is login-only, so it checks the session directly
      rather than through getPlayer (which also admits guests). */
-  if (body.action === 'save-state' || body.action === 'load-state') {
+  if (body.action === 'save-state' || body.action === 'load-state' || body.action === 'reset-save') {
     const session = getSession(request);
     if (!session || !session.user_id) return json({ error: 'Log in to sync your progress.' }, 401);
+    if (body.action === 'reset-save') return resetSave(env, session, body);
     return body.action === 'save-state'
       ? saveState(env, session, body)
       : loadState(env, session);

@@ -117,6 +117,7 @@ function boss(over = {}) {
 {
   const e = envWith({ sc_raid: boss({ hp: 40, contributors: {
     u_7: { name: 'U7', dmg: 500 }, u_9: { name: 'U9', dmg: 10 }, guest_z: { name: 'Gz', dmg: 300 },
+    u_3: { name: 'U3', dmg: 1 },
   } }) });
   const s = await (await POST(e, { action: 'hit', damage: 100 }, cookie('9'))).json();
   check('the boss falls', s.status, 'defeated');
@@ -137,6 +138,8 @@ function boss(over = {}) {
   check('restricted to that raider', uncommon.restrictedTo, ['9']);
   ok('the codes are activated with an expiry', rare.active === true && rare.expiresAt > Date.now());
   ok('no code was minted for the guest striker', !codes.some(c => (c.restrictedTo || []).includes('z')));
+  ok('nor for an account that landed a single token strike', !codes.some(c => (c.restrictedTo || []).includes('3')));
+  ok('which has no pending reward either', !e.MARKETPLACE.read('sc_raid_reward_3'));
 
   /* The in-game claim: each account has a pending reward pointer it can fetch. */
   const topReward = e.MARKETPLACE.read('sc_raid_reward_7');
@@ -160,19 +163,174 @@ function boss(over = {}) {
 /* ══ Expiry and manual end ═════════════════════════════════════════════ */
 {
   const e = envWith({ sc_raid: boss({ endsAt: Date.now() - 1 }) });
-  check('a boss past its timer reads expired', (await (await GET(e)).json()).status, 'expired');
+  check('a boss past its timer reads escaped', (await (await GET(e)).json()).status, 'escaped');
+  /* THE BUG: the first poll to see it expired DELETED it, so only that one
+     poller ever saw the escape and every other client missed the toast. */
+  check('and keeps reading escaped for every later poller', (await (await GET(e)).json()).status, 'escaped');
+  check('the third poller too', (await (await GET(e)).json()).status, 'escaped');
+  check('it is marked escaped in storage, not deleted', (e.MARKETPLACE.read('sc_raid') || {}).status, 'escaped');
+  check('stamped at its deadline', e.MARKETPLACE.read('sc_raid').escapedAt, e.MARKETPLACE.read('sc_raid').endsAt);
+  const late = await (await POST(e, { action: 'hit', damage: 50 }, cookie('7'))).json();
+  check('a strike on an escaped boss lands nothing', late.landed, 0);
+}
+{
+  const e = envWith({ sc_raid: boss({ endsAt: Date.now() - 20000 }) });
+  check('an escape past its display window reads as gone', (await (await GET(e)).json()).status, 'none');
+  const legacy = envWith({ sc_raid: boss({ status: 'expired', endsAt: Date.now() - 1000 }) });
+  check('a legacy stored "expired" record reads as escaped', (await (await GET(legacy)).json()).status, 'escaped');
 }
 {
   const e = envWith({ sc_raid: boss() });
   check('a stranger cannot end it', (await POST(e, { action: 'end' }, cookie('9'))).status, 403);
   await POST(e, { action: 'end' }, cookie(BC));
-  check('the broadcaster removes it outright', e.MARKETPLACE.read('sc_raid'), null);
+  check('the broadcaster ends it at once', (await (await GET(e)).json()).status, 'none');
+  check('by an ended marker written under the lock', e.MARKETPLACE.read('sc_raid').status, 'ended');
+  check('a strike after the end lands nothing', (await (await POST(e, { action: 'hit', damage: 50 }, cookie('7'))).json()).landed, 0);
+  check('and does not resurrect it', e.MARKETPLACE.read('sc_raid').status, 'ended');
+  ok('a fresh redemption may spawn over an ended boss', !!(await spawnRaidFromRedemption(e, { viewers: 10 })));
 }
 {
   /* End clears a stuck defeated boss too, not just an active one. */
   const e = envWith({ sc_raid: boss({ status: 'defeated', hp: 0, defeatedAt: Date.now() }) });
   await POST(e, { action: 'end' }, cookie(BC));
-  check('and clears a lingering defeated boss', e.MARKETPLACE.read('sc_raid'), null);
+  check('and clears a lingering defeated boss', (await (await GET(e)).json()).status, 'none');
+}
+
+/* ══ The read path never clobbers a strike or a fresh boss ═════════════
+   The public GET does a lock-free read; when timed work is due it must
+   re-read and apply it INSIDE mutate(). These envs hand the GET a stale
+   snapshot and then let another writer change the record before the GET
+   writes — exactly the interleaving that used to lose data. */
+function racingEnv(seed, interleave) {
+  const e = envWith(seed);
+  const kv = e.MARKETPLACE;
+  const realGet = kv.get.bind(kv);
+  let fired = false;
+  kv.get = async (k, t) => {
+    const v = await realGet(k, t);
+    if (k === 'sc_raid' && !fired) { fired = true; interleave(kv); }
+    return v;
+  };
+  return e;
+}
+{
+  /* A tick is due; between the poll's read and its write, a strike lands. */
+  const e = racingEnv({ sc_raid: boss({ hp: 500, nextTickAt: Date.now() - 1 }) }, (kv) => {
+    const r = kv.read('sc_raid');
+    r.hp = 400; r.contributors = { u_7: { name: 'U7', dmg: 100 } };
+    kv.store.set('sc_raid', JSON.stringify(r));
+  });
+  const s = await (await GET(e)).json();
+  check('the due heal is applied on top of the concurrent strike', s.hp, 430);
+  check('which is still credited', (e.MARKETPLACE.read('sc_raid').contributors.u_7 || {}).dmg, 100);
+}
+{
+  /* A stale poll saw a long-escaped boss; meanwhile a new boss was summoned. */
+  const e = racingEnv({ sc_raid: boss({ id: 'old', endsAt: Date.now() - 60000 }) }, (kv) => {
+    kv.store.set('sc_raid', JSON.stringify(boss({ id: 'fresh' })));
+  });
+  const s = await (await GET(e)).json();
+  check('a stale read never kills a freshly summoned boss', e.MARKETPLACE.read('sc_raid').id, 'fresh');
+  check('and the poll reports the live boss', s.status, 'active');
+}
+{
+  /* No timed work due: the GET must not write at all. */
+  const e = envWith({ sc_raid: boss() });
+  let writes = 0;
+  const realMutate = e.MARKETPLACE.mutate.bind(e.MARKETPLACE);
+  e.MARKETPLACE.mutate = async (k, fn) => { writes++; return realMutate(k, fn); };
+  e.MARKETPLACE.put = async () => { writes++; };
+  e.MARKETPLACE.delete = async () => { writes++; };
+  await GET(e);
+  check('an idle poll takes no lock and writes nothing', writes, 0);
+}
+
+/* ══ Damage over time: a script cannot solo the boss ════════════════════
+   The real client flushes at most 100 strikes every 3s. Bucket stamps are
+   rewound to simulate elapsed time without sleeping. */
+function rewind(e, id, ms) {
+  const r = e.MARKETPLACE.read('sc_raid');
+  r.contributors[id].t -= ms;
+  e.MARKETPLACE.store.set('sc_raid', JSON.stringify(r));
+}
+{
+  const e = envWith({ sc_raid: boss({ maxHp: 1e6, hp: 1e6 }) });
+  let landed = 0;
+  for (let i = 0; i < 20; i++) landed += (await (await POST(e, { action: 'hit', damage: 100 }, cookie('7'))).json()).landed;
+  ok('20 max-size strikes in an instant are held to the burst allowance', landed >= 300 && landed <= 310);
+  check('the boss only took what landed', e.MARKETPLACE.read('sc_raid').hp, 1e6 - landed);
+  check('and the striker is credited only that', e.MARKETPLACE.read('sc_raid').contributors.u_7.dmg, landed);
+  const t = await (await POST(e, { action: 'hit', damage: 100 }, cookie('7'))).json();
+  ok('a throttled strike says so', t.throttled === true && t.landed < 100);
+}
+{
+  /* A flawless real client — 100 strikes every 3 seconds, forever — is
+     never clipped, even starting from an empty bucket. */
+  const e = envWith({ sc_raid: boss({ maxHp: 1e6, hp: 1e6, contributors: { u_7: { name: 'U7', dmg: 0, k: 0, t: Date.now() } } }) });
+  let clipped = 0;
+  for (let i = 0; i < 40; i++) {
+    rewind(e, 'u_7', 3000);
+    const s = await (await POST(e, { action: 'hit', damage: 100 }, cookie('7'))).json();
+    if (s.landed !== 100) clipped++;
+  }
+  check('the real client ceiling (100 per 3s flush) is never throttled', clipped, 0);
+}
+{
+  /* A script posting 100 every second gets the sustained rate, not 100/s. */
+  const e = envWith({ sc_raid: boss({ maxHp: 1e6, hp: 1e6, contributors: { u_7: { name: 'U7', dmg: 0, k: 0, t: Date.now() } } }) });
+  let landed = 0;
+  for (let i = 0; i < 60; i++) {
+    rewind(e, 'u_7', 1000);
+    landed += (await (await POST(e, { action: 'hit', damage: 100 }, cookie('7'))).json()).landed;
+  }
+  ok('a 100/s script is held to ~40/s over a minute', landed >= 60 * 40 && landed <= 60 * 40 + 60);
+}
+{
+  /* Rotating guest ids from one address cannot multiply the rate. */
+  const e = envWith({ sc_raid: boss({ maxHp: 1e6, hp: 1e6 }) });
+  const ip = { 'CF-Connecting-IP': '203.0.113.9' };
+  let landed = 0;
+  for (let i = 0; i < 30; i++) {
+    landed += (await (await POST(e, { action: 'hit', damage: 100, guestId: 'g_rot' + i, guestName: 'x' }, ip)).json()).landed;
+  }
+  ok('rotating guest ids share one per-IP allowance', landed >= 600 && landed <= 620);
+  const other = await (await POST(e, { action: 'hit', damage: 100, guestId: 'g_other1' }, { 'CF-Connecting-IP': '198.51.100.4' })).json();
+  check('a guest at another address is unaffected', other.landed, 100);
+  ok('the raw address is never stored', !JSON.stringify(e.MARKETPLACE.read('sc_raid')).includes('203.0.113.9'));
+}
+
+/* ══ Names and the contributor map ════════════════════════════════════ */
+{
+  const e = envWith({ sc_raid: boss() });
+  const s = await (await POST(e, { action: 'hit', damage: 10, guestId: 'g_ab12cd34',
+    guestName: '<img src=x>\u202Eevil\u0000 ' + 'X'.repeat(80) })).json();
+  check('a guest name is derived from its id, never the request', s.top[0].name, 'Skull#AB12');
+  check('a malformed guest id is refused', (await POST(e, { action: 'hit', damage: 10, guestId: '../../x y', guestName: 'G' })).status, 401);
+  check('a guest with no id is refused', (await POST(e, { action: 'hit', damage: 10, guestName: 'G' })).status, 401);
+
+  const long = { Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: '42', display_name: 'Ab\u200B\u202Ec' + 'd'.repeat(60) })) };
+  const s2 = await (await POST(e, { action: 'hit', damage: 20 }, long)).json();
+  const n = s2.top.find(t => t.name.startsWith('Ab')).name;
+  ok('an account name loses zero-width/bidi characters', !/[\u200B\u202E]/.test(n) && n.startsWith('Abc'));
+  ok('and is length-capped', [...n].length <= 25);
+  const pub = JSON.stringify(s2);
+  ok('the public state never exposes rate buckets', !/"k":|"guestIps"/.test(pub));
+
+  const seeded = envWith({ sc_raid: boss({ contributors: { guest_old: { name: '\u202Eabc\u0007', dmg: 5 } } }) });
+  check('names already stored are cleaned on the way out', (await (await GET(seeded)).json()).top[0].name, 'abc');
+}
+{
+  const contributors = {};
+  for (let i = 0; i < 500; i++) contributors['guest_g' + i] = { name: 'Skull#' + i, dmg: 10 + i };
+  const e = envWith({ sc_raid: boss({ maxHp: 1e6, hp: 1e6, contributors }) });
+  const g = await (await POST(e, { action: 'hit', damage: 50, guestId: 'g_newcomer' })).json();
+  check('a full contributor map refuses a new guest', g.landed, 0);
+  check('which leaves the map at its ceiling', Object.keys(e.MARKETPLACE.read('sc_raid').contributors).length, 500);
+  const a = await (await POST(e, { action: 'hit', damage: 50 }, cookie('7'))).json();
+  check('an account still gets in', a.landed, 50);
+  const after = e.MARKETPLACE.read('sc_raid').contributors;
+  check('by evicting one guest, so the map never grows', Object.keys(after).length, 500);
+  ok('the weakest guest is the one evicted', !after.guest_g0 && !!after.guest_g1 && !!after.u_7);
 }
 
 /* ══ A defeated boss shows briefly, then clears itself ═════════════════ */
@@ -210,8 +368,9 @@ function boss(over = {}) {
   const reg2 = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
   ok('the per-account reward key is registered', /prefix: 'sc_raid_reward_'/.test(reg2));
 
-  const bc = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
-  ok('bot control can summon the boss', /function initOvRaid/.test(bc) && /action: 'start'/.test(bc));
+  const bc = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  ok('the overlay dashboard can summon the boss', /function initOvRaid/.test(bc) && /action: 'start'/.test(bc));
+  ok('the game toasts an escape on the server\'s escaped status', /s\.status === 'escaped'/.test(game));
 
   const samples = fs.readFileSync(path.join(REPO, 'js/pages/overlay-samples.js'), 'utf8');
   ok('layout mode knows the raid panel', /id: 'ovRaid'/.test(samples) && /function raidBoss/.test(samples));

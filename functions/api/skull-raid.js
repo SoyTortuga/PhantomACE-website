@@ -18,8 +18,16 @@
                  cursed-skull frenzy.
 
    Mechanics resolve LAZILY inside the poll/strike handlers — the same lazy
-   advance the room games use — so there is no timer process to run. Damage
-   is CLICKS, capped per request: a community pile-on, not a score to solo.
+   advance the room games use — so there is no timer process to run. Every
+   write goes through mutate() (the per-key lock), including the read path's
+   timed-action advance, so a poll can never overwrite a strike. Damage is
+   CLICKS, capped per request AND per striker over time: a community
+   pile-on, not a score to solo.
+
+   The record is never deleted from a read. A boss that runs out its clock
+   is marked 'escaped' (shown for ESCAPE_LINGER_MS so every client sees the
+   toast), a kill lingers as 'defeated', and both then read as 'none' until
+   the next summon overwrites the record.
    ══════════════════════════════════════════════ */
 
 const RAID_KEY = 'sc_raid';
@@ -30,6 +38,45 @@ const MAX_HP = 5_000_000;
 const DEFAULT_MINUTES = 15;
 const FRENZY_MS = 10 * 60 * 1000;    /* the reward on a kill */
 const DEFEAT_LINGER_MS = 15000;      /* a defeated boss shows this long, then clears */
+const ESCAPE_LINGER_MS = 15000;      /* an escaped boss reads 'escaped' this long after its deadline */
+
+/* ── Damage over TIME, per striker ──────────────────────────────────────
+   HIT_CAP bounds one request, not a stream of them. Derived from the real
+   client (games/skull-clicker/index.html):
+     • one strike per skull click — sustained human mashing is ~10-15/s,
+       bursts touch ~20/s — plus the Reaping auto-clicker (a 200ms
+       setInterval = 5/s);
+     • strikes are queued and flushed every 3s, at most 100 per POST, so
+       even a flawless client tops out at 100/3s ≈ 33/s.
+   RAID_RATE_PER_SEC sits ~20% above that ceiling so no real player is ever
+   clipped; RAID_BURST (three full flushes) absorbs a retried flush or a
+   throttled background tab catching up. Each striker carries a token
+   bucket inside the raid record, updated under mutate()'s lock; strikes
+   past it are dropped, not errored. Guest ids are minted client-side, so a
+   guest strike also draws from a per-IP bucket — rotating guest ids cannot
+   multiply the rate. */
+const RAID_RATE_PER_SEC = 40;
+const RAID_BURST = 300;
+const GUEST_IP_RATE_PER_SEC = 80;    /* a household of guests behind one address */
+const GUEST_IP_BURST = 600;
+const RAID_MAX_CONTRIBUTORS = 500;   /* contributor map ceiling (accounts may evict the weakest guest) */
+const RAID_MAX_IP_BUCKETS = 300;
+
+/* A defeat code needs a real share of the fight, not one stray click:
+   1% of the boss's max HP, at least 50 and at most 500 strikes (~1 minute of
+   honest mashing on the biggest redemption bosses), and never more than 10%
+   of a tiny manual test boss. */
+const RAID_MIN_REWARD_SHARE = 0.01;
+const RAID_MIN_REWARD_FLOOR = 50;
+const RAID_MIN_REWARD_CEIL = 500;
+function minRewardDamage(maxHp) {
+  const hp = Math.max(1, Number(maxHp) || DEFAULT_HP);
+  return Math.min(
+    Math.max(RAID_MIN_REWARD_FLOOR, Math.ceil(hp * RAID_MIN_REWARD_SHARE)),
+    RAID_MIN_REWARD_CEIL,
+    Math.ceil(hp * 0.1),
+  );
+}
 
 /* ── The channel-point boss: sized to who's actually watching ────────────
    Summoned by redeeming "Summon Raid Boss" (10,000 points) — see
@@ -76,11 +123,95 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
+/* Names reach the stream overlay, so strip anything that is not plain
+   visible text (control, zero-width, bidi-override and other format
+   characters), collapse whitespace and cap the length. */
+const NAME_MAX = 25;
+function cleanName(raw, fallback) {
+  const s = String(raw == null ? '' : raw)
+    .replace(/[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Zl}\p{Zp}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return Array.from(s).slice(0, NAME_MAX).join('') || fallback;
+}
+
+/* A guest's display name is NEVER taken from the request: the client's own
+   default is 'Skull#' + four characters of its guest id, so the server
+   derives exactly that, and a guest can put nothing of its own choosing on
+   the overlay. */
+const GUEST_ID_RE = /^[A-Za-z0-9_-]{3,40}$/;
+function guestNameFor(guestId) {
+  const tag = guestId.replace(/^g_/, '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
+  return 'Skull#' + (tag || 'ANON');
+}
+
 function getPlayer(request, body) {
   const session = getSession(request);
-  if (session && session.user_id) return { id: 'u_' + session.user_id, name: session.display_name || 'Reaper' };
-  if (body && body.guestId && body.guestName) return { id: 'guest_' + body.guestId, name: String(body.guestName).slice(0, 20) };
+  if (session && session.user_id) {
+    return { id: 'u_' + String(session.user_id).slice(0, 40), name: cleanName(session.display_name, 'Reaper'), guest: false };
+  }
+  const gid = body && typeof body.guestId === 'string' ? body.guestId : '';
+  if (GUEST_ID_RE.test(gid)) return { id: 'guest_' + gid, name: guestNameFor(gid), guest: true };
   return null;
+}
+
+/* The caller's address as a short opaque key (never stored raw). Null when
+   no proxy header is present, in which case only the per-guest bucket
+   applies. */
+async function clientIpKey(request) {
+  const ip = request.headers.get('CF-Connecting-IP')
+    || (request.headers.get('X-Forwarded-For') || '').split(',')[0].trim();
+  if (!ip) return null;
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('sc_raid:' + ip));
+    return Array.from(new Uint8Array(buf).slice(0, 8), b => b.toString(16).padStart(2, '0')).join('');
+  } catch { return null; }
+}
+
+/* Token bucket: refill for the time since its last touch, capped at burst.
+   A bucket with no stamp (new striker, or a record from before this
+   existed) starts full. Mutates in place. */
+function refill(bucket, now, rate, burst) {
+  const known = Number.isFinite(bucket.k) && Number.isFinite(bucket.t);
+  const k = known ? bucket.k + (Math.max(0, now - bucket.t) / 1000) * rate : burst;
+  bucket.k = Math.min(burst, Math.max(0, k));
+  bucket.t = now;
+}
+
+/* Room for a new contributor. Under the ceiling, always. At it, an account
+   may evict the lowest-damage guest (guests are never rewarded); a guest,
+   or an account with no guest to displace, is refused. */
+function admitContributor(contributors, player) {
+  const ids = Object.keys(contributors);
+  if (ids.length < RAID_MAX_CONTRIBUTORS) return true;
+  if (player.guest) return false;
+  let worst = null;
+  for (const id of ids) {
+    if (id.startsWith('guest_') && (worst === null || (contributors[id].dmg || 0) < (contributors[worst].dmg || 0))) worst = id;
+  }
+  if (worst === null) return false;
+  delete contributors[worst];
+  return true;
+}
+
+/* The shared per-IP bucket for guest strikes. An idle bucket that has fully
+   refilled is identical to a missing one, so those are pruned when the
+   table is full; if it is still full the guest strike is refused. */
+const IP_FULL_MS = (GUEST_IP_BURST / GUEST_IP_RATE_PER_SEC) * 1000;
+function ipBucket(raid, ipKey, now) {
+  raid.guestIps = (raid.guestIps && typeof raid.guestIps === 'object') ? raid.guestIps : {};
+  let b = raid.guestIps[ipKey];
+  if (!b) {
+    if (Object.keys(raid.guestIps).length >= RAID_MAX_IP_BUCKETS) {
+      for (const k of Object.keys(raid.guestIps)) {
+        if (now - (raid.guestIps[k].t || 0) >= IP_FULL_MS) delete raid.guestIps[k];
+      }
+      if (Object.keys(raid.guestIps).length >= RAID_MAX_IP_BUCKETS) return null;
+    }
+    b = raid.guestIps[ipKey] = {};
+  }
+  refill(b, now, GUEST_IP_RATE_PER_SEC, GUEST_IP_BURST);
+  return b;
 }
 
 /* Advance the boss's timed mechanics up to now — heal, or every third act a
@@ -102,6 +233,32 @@ function resolveMechanics(raid) {
   }
 }
 
+/* An active boss past its deadline escapes. Stamped at the deadline itself,
+   not "now", so the display window is the same for every reader however
+   late the first one arrives. Returns whether it flipped. */
+function expireIfDue(raid, now) {
+  if (!raid || raid.status !== 'active' || !raid.endsAt || now <= raid.endsAt) return false;
+  raid.status = 'escaped';
+  raid.escapedAt = raid.endsAt;
+  return true;
+}
+
+/* Whether a read has timed work to persist (an escape, or a due mechanic). */
+function raidDue(raid, now) {
+  if (!raid || raid.status !== 'active') return false;
+  return (raid.endsAt && now > raid.endsAt) || (raid.nextTickAt && now >= raid.nextTickAt);
+}
+
+/* Apply every timed change up to now, in place. Returns whether anything
+   changed, so the caller writes only when it must. */
+function advanceRaid(raid, now) {
+  if (!raid || raid.status !== 'active') return false;
+  if (expireIfDue(raid, now)) return true;
+  const before = JSON.stringify([raid.attackCount, raid.skillCount, raid.hp, raid.shieldUntil, raid.nextTickAt]);
+  resolveMechanics(raid);
+  return JSON.stringify([raid.attackCount, raid.skillCount, raid.hp, raid.shieldUntil, raid.nextTickAt]) !== before;
+}
+
 /* Summon minions the first time HP crosses each threshold. */
 function maybeSummon(raid) {
   raid.summonedThresholds = raid.summonedThresholds || [];
@@ -115,15 +272,17 @@ function maybeSummon(raid) {
   }
 }
 
-/* On a kill, code everyone who struck: an uncommon for every account that
-   landed a hit, upgraded to a rare for the single top damager. Each code is
-   RESTRICTED to its recipient, so a whispered code cannot be redeemed by
-   whoever else sees it. Guests are skipped — a guest id has no account to
-   redeem into. Best-effort per person so one failure never denies the rest. */
+/* On a kill, code everyone who pulled their weight: an uncommon for every
+   account that dealt at least minRewardDamage(), upgraded to a rare for the
+   single top damager. Each code is RESTRICTED to its recipient, so a
+   whispered code cannot be redeemed by whoever else sees it. Guests are
+   skipped — a guest id has no account to redeem into. Best-effort per person
+   so one failure never denies the rest. */
 async function awardRaidRewards(env, raid) {
+  const minDmg = minRewardDamage(raid.maxHp);
   const entries = Object.keys(raid.contributors || {})
-    .map(id => ({ id, name: raid.contributors[id].name, dmg: raid.contributors[id].dmg }))
-    .filter(e => e.id.startsWith('u_') && e.dmg > 0)
+    .map(id => ({ id, name: raid.contributors[id].name, dmg: Number(raid.contributors[id].dmg) || 0 }))
+    .filter(e => e.id.startsWith('u_') && e.dmg >= minDmg)
     .sort((a, b) => b.dmg - a.dmg)
     .slice(0, RAID_REWARD_CAP);
   if (!entries.length) return;
@@ -218,18 +377,23 @@ export async function spawnRaidFromRedemption(env, { viewers } = {}) {
 }
 
 /* Fold the live boss into the small public shape the game and overlay read —
-   never the raw contributor map. Resolves the timer so every reader agrees
-   without a job: an active boss past its deadline reads as expired. */
+   never the raw contributor map or the rate buckets. Resolves the timer so
+   every reader agrees without a job: an active boss past its deadline reads
+   as escaped (the legacy stored 'expired' too), for ESCAPE_LINGER_MS after
+   the deadline, then as gone. */
 function publicState(raid) {
   if (!raid || !raid.status) return { status: 'none' };
-  let status = raid.status;
-  if (status === 'active' && raid.endsAt && Date.now() > raid.endsAt) status = 'expired';
+  const now = Date.now();
+  let status = raid.status === 'expired' ? 'escaped' : raid.status;
+  if (status === 'active' && raid.endsAt && now > raid.endsAt) status = 'escaped';
+  if (status === 'escaped' && now - (raid.escapedAt || raid.endsAt || 0) > ESCAPE_LINGER_MS) status = 'none';
   /* A defeated boss shows just long enough for the death + banner, then reads
      as gone so the overlay panel clears itself rather than lingering. */
-  if (status === 'defeated' && raid.defeatedAt && Date.now() - raid.defeatedAt > DEFEAT_LINGER_MS) status = 'none';
+  if (status === 'defeated' && raid.defeatedAt && now - raid.defeatedAt > DEFEAT_LINGER_MS) status = 'none';
+  if (status !== 'active' && status !== 'escaped' && status !== 'defeated') return { status: 'none' };
   const contributors = raid.contributors || {};
   const top = Object.keys(contributors)
-    .map(id => ({ name: contributors[id].name, dmg: contributors[id].dmg }))
+    .map(id => ({ name: cleanName(contributors[id].name, 'Reaper'), dmg: Number(contributors[id].dmg) || 0 }))
     .sort((a, b) => b.dmg - a.dmg).slice(0, 5);
   const m = raid.minions || { hp: 0, maxHp: 0 };
   return {
@@ -266,28 +430,18 @@ export async function onRequestGet(context) {
   }
 
   /* Resolve mechanics on read too, so an idle overlay still sees the boss
-     heal/guard/summon on schedule. Persist only if something changed. */
+     heal/guard/summon/escape on schedule. The plain read is lock-free; only
+     when timed work is due does it take the lock, re-read inside mutate()
+     and apply it there — so it can never overwrite a strike that landed in
+     between, and it never deletes anything. */
   let raid = await env.MARKETPLACE.get(RAID_KEY, 'json');
-  if (raid && raid.status === 'active') {
-    const before = JSON.stringify([raid.attackCount, raid.skillCount, raid.hp, raid.shieldUntil, raid.nextTickAt]);
-    resolveMechanics(raid);
-    if (JSON.stringify([raid.attackCount, raid.skillCount, raid.hp, raid.shieldUntil, raid.nextTickAt]) !== before) {
-      await env.MARKETPLACE.put(RAID_KEY, JSON.stringify(raid));
-    }
+  if (raidDue(raid, Date.now())) {
+    await env.MARKETPLACE.mutate(RAID_KEY, (current) => {
+      raid = current;
+      return advanceRaid(current, Date.now()) ? current : undefined;
+    });
   }
-
-  const view = publicState(raid);
-
-  /* The stored record has run its course (expired, or a defeated boss past
-     its linger window) but nothing ever deletes it outright short of the
-     moderator's `end` action or the next redemption's spawn check. Clear it
-     here so the overlay/game don't keep re-deriving 'none' from a dead
-     record on every single poll forever. */
-  if (raid && (view.status === 'none' || view.status === 'expired')) {
-    await env.MARKETPLACE.delete(RAID_KEY);
-  }
-
-  return json(view);
+  return json(publicState(raid));
 }
 
 export async function onRequestPost(context) {
@@ -313,18 +467,22 @@ export async function onRequestPost(context) {
     const hp = Math.min(MAX_HP, Math.max(100, Math.floor(Number(body.hp) || DEFAULT_HP)));
     const minutes = Math.min(120, Math.max(1, Math.floor(Number(body.minutes) || DEFAULT_MINUTES)));
     const raid = buildRaid({ hp, minutes, name: body.name, source: 'manual' });
-    await env.MARKETPLACE.put(RAID_KEY, JSON.stringify(raid));
+    /* Under the lock, so a strike mid-commit on the old boss cannot write
+       its record back over the new one. */
+    await env.MARKETPLACE.mutate(RAID_KEY, () => raid);
     return json({ success: true, raid: publicState(raid) });
   }
 
-  /* ── Remove the boss — broadcaster/moderators only. Clears it outright
-     whatever its state (active, defeated-but-lingering, or a stuck record),
-     so there is always a reliable way to get it off the overlay now. ── */
+  /* ── Remove the boss — broadcaster/moderators only. Replaces the record
+     with an 'ended' marker whatever its state (active, defeated-but-
+     lingering, or a stuck record), so it reads as 'none' at once. Written
+     under the lock rather than deleted, so a strike already holding the
+     lock cannot resurrect the boss by writing it back afterwards. ── */
   if (body.action === 'end') {
     const session = getSession(request);
     const { isModerator } = await import('./admin/moderators.js');
     if (!(await isModerator(env, session))) return json({ error: 'Moderators only.' }, 403);
-    await env.MARKETPLACE.delete(RAID_KEY);
+    await env.MARKETPLACE.mutate(RAID_KEY, () => ({ status: 'ended', endedAt: Date.now() }));
     return json({ success: true });
   }
 
@@ -337,17 +495,43 @@ export async function onRequestPost(context) {
       const raid = await env.MARKETPLACE.get(RAID_KEY, 'json');
       return json(publicState(raid));
     }
+    const ipKey = player.guest ? await clientIpKey(request) : null;
 
     let justDefeated = false;
     let after = null;
+    let landed = 0;
     await env.MARKETPLACE.mutate(RAID_KEY, (raid) => {
-      if (!raid || raid.status !== 'active') { after = raid; return undefined; }
-      if (raid.endsAt && Date.now() > raid.endsAt) { raid.status = 'expired'; after = raid; return raid; }
+      after = raid;
+      if (!raid || raid.status !== 'active') return undefined;
+      const now = Date.now();
+      if (expireIfDue(raid, now)) return raid;
 
       resolveMechanics(raid);
 
+      /* Rate limit: the strike lands only as far as this striker's bucket
+         (and, for a guest, its address's bucket) allows. A refused or
+         fully-throttled strike still persists the mechanics/bucket state. */
+      raid.contributors = (raid.contributors && typeof raid.contributors === 'object') ? raid.contributors : {};
+      const known = Object.prototype.hasOwnProperty.call(raid.contributors, player.id);
+      if (!known && !admitContributor(raid.contributors, player)) return raid;
+      const c = known ? raid.contributors[player.id] : { name: player.name, dmg: 0 };
+      refill(c, now, RAID_RATE_PER_SEC, RAID_BURST);
+      let allowed = Math.min(damage, Math.floor(c.k));
+      let ipB = null;
+      if (ipKey) {
+        ipB = ipBucket(raid, ipKey, now);
+        allowed = ipB ? Math.min(allowed, Math.floor(ipB.k)) : 0;
+      }
+      if (allowed <= 0) {
+        if (known) raid.contributors[player.id] = c;
+        return raid;
+      }
+      c.k -= allowed;
+      if (ipB) ipB.k -= allowed;
+      landed = allowed;
+
       /* The scythe-guard halves the strike. */
-      let eff = damage * ((raid.shieldUntil || 0) > Date.now() ? SHIELD_REDUCE : 1);
+      let eff = allowed * ((raid.shieldUntil || 0) > now ? SHIELD_REDUCE : 1);
 
       /* Minions soak half of it until they are cleared. */
       raid.minions = raid.minions || { hp: 0, maxHp: 0 };
@@ -361,14 +545,13 @@ export async function onRequestPost(context) {
       raid.hp = Math.max(0, raid.hp - eff);
       maybeSummon(raid);
 
-      raid.contributors = raid.contributors || {};
-      const c = raid.contributors[player.id] || { name: player.name, dmg: 0 };
-      c.dmg += damage; c.name = player.name;
+      c.dmg = (Number(c.dmg) || 0) + allowed;
+      c.name = player.name;
       raid.contributors[player.id] = c;
 
       if (raid.hp <= 0) {
         raid.status = 'defeated';
-        raid.defeatedAt = Date.now();
+        raid.defeatedAt = now;
         /* Credit the top contributor, not whoever landed the last hit — a
            co-op boss should reward the effort, not the reflex. */
         const topC = Object.values(raid.contributors).sort((a, b) => b.dmg - a.dmg)[0];
@@ -393,7 +576,7 @@ export async function onRequestPost(context) {
       }
     }
 
-    return json(publicState(after));
+    return json({ ...publicState(after), landed, throttled: landed < damage });
   }
 
   return json({ error: 'Invalid action' }, 400);

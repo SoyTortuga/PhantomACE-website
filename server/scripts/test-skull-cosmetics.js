@@ -230,6 +230,13 @@ const env = {
   MARKETPLACE: {
     async get(k) { return k in store ? JSON.parse(JSON.stringify(store[k])) : null; },
     async put(k, v) { store[k] = JSON.parse(v); },
+    async mutate(k, fn) {
+      const cur = k in store ? JSON.parse(JSON.stringify(store[k])) : null;
+      const out = await fn(cur);
+      if (out === undefined) return cur;
+      store[k] = JSON.parse(JSON.stringify(out));
+      return out;
+    },
   },
 };
 const cookie = 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: '1', display_name: 'T' }));

@@ -71,8 +71,9 @@ ok('the world is rebuilt on buy, load, prestige and boot',
    (html.match(/renderWorld\(\);/g) || []).length >= 4);
 /* Never in the 10/s tick loop — that would rebuild hundreds of sprites ten
    times a second. Scoped to the tick body so the check cannot leak past it. */
-const tickBody = html.slice(html.indexOf('function tick'), html.indexOf('setInterval(tick'));
-ok('the world is not rebuilt in the tick loop', tickBody.length > 0 && !/renderWorld/.test(tickBody));
+const tickStart = html.indexOf('function tick()');
+const tickBody = tickStart >= 0 ? html.slice(tickStart, html.indexOf('setInterval(tick,', tickStart)) : '';
+ok('the world is not rebuilt in the tick loop', tickStart >= 0 && tickBody.length > 0 && !/renderWorld/.test(tickBody));
 
 console.log('');
 if (failures.length) {
