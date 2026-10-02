@@ -302,6 +302,16 @@ check('the test clock is in October', MK, '2026-10');
   check('a September dice grace claim grants Phyrexian, not Graveslate',
     inventory(env, uid).items.filter(i => i.type === 'dice').map(i => i.id), ['phyrexian']);
 
+  const room = await post(env, 'sub', { action: 'claim-prev', type: 'reward', rewardKey: '4_follower_room-piece_common' });
+  check('a September room-piece grace claim succeeds', room.status, 200);
+  check('and grants September\'s first-tenth piece, not October\'s',
+    inventory(env, uid).items.filter(i => i.type === 'room-piece').map(i => [i.id, i.meta.piece]),
+    [['room-piece-snacks-r1c1', 'snacks-r1c1']]);
+  await post(env, 'sub', { action: 'claim-reward', rewardKey: '4_follower_room-piece_common' });
+  check('and the October claim of the same key is a new piece, not a dedupe',
+    inventory(env, uid).items.filter(i => i.type === 'room-piece').map(i => i.id),
+    ['room-piece-snacks-r1c1', 'room-piece-snacks-r1c8']);
+
   await post(env, 'sub', { action: 'claim-prev', type: 'reward', rewardKey: '10_follower_cardback_common' });
   const cb = inventory(env, uid).items.filter(i => i.type === 'cardback');
   check('a September card back grace claim grants Basic, not Cobweb', cb.map(i => i.name), ['Basic Card Back']);
@@ -323,9 +333,9 @@ check('the test clock is in October', MK, '2026-10');
 
   const sep = userData(env, uid, '2026-09');
   check('the claims landed on September\'s row',
-    sep.claimedRewards.slice().sort(), ['10_follower_cardback_common', '48_phamily_dice_rare', '85_follower_skull-skin_rare']);
+    sep.claimedRewards.slice().sort(), ['10_follower_cardback_common', '48_phamily_dice_rare', '4_follower_room-piece_common', '85_follower_skull-skin_rare']);
   check('and September\'s milestones', sep.claimedMilestones, [60, 45]);
-  check('October\'s row is untouched', userData(env, uid).claimedRewards, []);
+  check('October\'s row has only its own claim', userData(env, uid).claimedRewards, ['4_follower_room-piece_common']);
 
   /* The same key, claimed for October, is October's. */
   await post(env, 'sub', { action: 'claim-reward', rewardKey: '85_follower_skull-skin_rare' });

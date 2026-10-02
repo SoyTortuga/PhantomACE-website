@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as R from '../../functions/api/phamily-rewards.js';
+import { piece, basicCategories } from '../../functions/api/room-catalog.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -59,7 +60,7 @@ const setNow = (iso) => { FAKE_NOW = iso === null ? null : RealDate.parse(iso); 
    months on both sides of them — the month is passed in, never read from
    today's date, so a theme cannot pass this guard just because it is not
    live yet. */
-const BASE_MONTHS = ['2026-09', '2026-11', '2027-03'];
+const BASE_MONTHS = ['2026-08', '2026-09', '2026-11', '2027-03'];
 const clientSide = (() => {
   const src = fs.readFileSync(path.join(REPO, 'js/pages/phamily-time.js'), 'utf8');
 
@@ -75,6 +76,9 @@ const clientSide = (() => {
     grab(/const FOLLOWER_THEMES = \{[\s\S]*?\n {2}\};/, 'FOLLOWER_THEMES'),
     grab(/const PHAMILY_THEMES = \{[\s\S]*?\n {2}\};/, 'PHAMILY_THEMES'),
     grab(/const MILESTONE_THEMES = \{[\s\S]*?\n {2}\};/, 'MILESTONE_THEMES'),
+    grab(/const FOLLOWER_ROOM_DRIPS = \{[\s\S]*?\n {2}\};/, 'FOLLOWER_ROOM_DRIPS'),
+    grab(/const PHAMILY_ROOM_DRIPS = \{[\s\S]*?\n {2}\};/, 'PHAMILY_ROOM_DRIPS'),
+    grab(/ {2}function roomDripFor\(drips, mk\) \{[\s\S]*?\n {2}\}/, 'roomDripFor'),
     grab(/ {2}function defineFollowerRewards\(mk\) \{[\s\S]*?\n {2}\}/, 'defineFollowerRewards(mk)'),
     grab(/ {2}function definePhamilyRewards\(mk\) \{[\s\S]*?\n {2}\}/, 'definePhamilyRewards(mk)'),
     grab(/ {2}function defineMilestones\(mk\) \{[\s\S]*?\n {2}\}/, 'defineMilestones(mk)'),
@@ -85,6 +89,7 @@ const clientSide = (() => {
     '\nreturn {' +
     '  build: (mk) => ({ follower: defineFollowerRewards(mk), phamily: definePhamilyRewards(mk), milestones: defineMilestones(mk) }),' +
     '  months: [...new Set([...Object.keys(FOLLOWER_THEMES), ...Object.keys(PHAMILY_THEMES), ...Object.keys(MILESTONE_THEMES)])],' +
+    '  dripMonths: [...new Set([...Object.keys(FOLLOWER_ROOM_DRIPS), ...Object.keys(PHAMILY_ROOM_DRIPS)])],' +
     '};'
   )();
 })();
@@ -109,8 +114,11 @@ const clientSide = (() => {
   check('the page and the server theme the same months',
     clientSide.months.slice().sort(), R.THEMED_MONTHS);
   ok('at least one themed month is covered', R.THEMED_MONTHS.length > 0);
+  check('the page and the server drip rooms for the same months',
+    clientSide.dripMonths.slice().sort(), R.ROOM_DRIP_MONTHS);
 
-  const months = [...new Set([...R.THEMED_MONTHS, ...clientSide.months, ...BASE_MONTHS])].sort();
+  const months = [...new Set([...R.THEMED_MONTHS, ...clientSide.months,
+    ...R.ROOM_DRIP_MONTHS, ...clientSide.dripMonths, ...BASE_MONTHS])].sort();
   for (const mk of months) {
     const page = clientSide.build(mk);
     const server = R.rewardTablesFor(mk);
@@ -133,6 +141,44 @@ const clientSide = (() => {
     for (const track of ['follower', 'phamily']) {
       check(`${mk} ${track} keys match a base month`,
         themed[track].map(r => R.rewardKeyFor(r, track)), base[track].map(r => R.rewardKeyFor(r, track)));
+    }
+  }
+}
+
+/* ── MY ROOM DRIPS BY MONTH ──────────────────────────────────────────
+   The drip used to be one list edited in place on the 1st, so September's
+   table silently became October's and a grace claim of a September piece
+   paid October's. Each month now has its own list. */
+{
+  const pieces = (mk, track) => R.rewardTablesFor(mk)[track]
+    .filter(r => r.type === 'room-piece').map(r => [R.rewardKeyFor(r, track), r.cosmeticId]);
+
+  for (const track of ['follower', 'phamily']) {
+    const sep = pieces('2026-09', track), oct = pieces('2026-10', track);
+    check(`${track}: September and October drip at the same keys`, sep.map(p => p[0]), oct.map(p => p[0]));
+    check(`${track}: and every September piece differs from October's`,
+      sep.filter((p, i) => p[1] === oct[i][1]).map(p => p[0]), []);
+    ok(`${track}: September drips the first tenth`, sep.every(p => /-r1c[1-7]$/.test(p[1])));
+    check(`${track}: no September piece reappears in October`,
+      sep.map(p => p[1]).filter(id => oct.some(o => o[1] === id)), []);
+    check(`${track}: a month with no drip of its own keeps the latest before it`,
+      pieces('2026-11', track), oct);
+    check(`${track}: a month before the first drip uses the first`, pieces('2026-08', track), sep);
+  }
+  check('a September room-piece key resolves to September\'s piece',
+    R.findReward('4_follower_room-piece_common', '2026-09').cosmeticId, 'snacks-r1c1');
+  check('and in October to October\'s', R.findReward('4_follower_room-piece_common', '2026-10').cosmeticId, 'snacks-r1c8');
+
+  /* Every month's pieces must be real catalog pieces of a set nobody has
+     by default, and no track may drip the same piece twice in one month.
+     test-room-validator checks the CURRENT table; this covers them all. */
+  const basicSet = basicCategories();
+  for (const mk of [...new Set([...R.ROOM_DRIP_MONTHS, ...BASE_MONTHS])]) {
+    for (const track of ['follower', 'phamily']) {
+      const ids = pieces(mk, track).map(p => p[1]);
+      check(`${mk} ${track}: every drip piece exists in the room catalog`, ids.filter(id => !piece(id)), []);
+      check(`${mk} ${track}: none is from a basic set`, ids.filter(id => piece(id) && basicSet.has(piece(id).category)), []);
+      check(`${mk} ${track}: no piece dripped twice`, ids.length - new Set(ids).size, 0);
     }
   }
 }

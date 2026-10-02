@@ -99,6 +99,73 @@ const MILESTONE_THEMES = {
   },
 };
 
+/* ── MY ROOM DRIP, BY MONTH ────────────────────────────────────────────
+   Each month drips the next tenth of every set, rounded down, interleaved
+   so the sets arrive mixed. Levels (and so reward KEYS) never change —
+   only the piece ids advance. This used to be ONE hardcoded list that was
+   edited in place on the 1st, so September's table "became" October's:
+   a grace claim of a September piece paid October's, and the viewer's
+   own October claim of that key then deduped to nothing.
+   A month with no entry uses the latest entry at or before it. NOTE: no
+   third tenth has been authored, so November onward keeps October's
+   pieces until a '2026-11' entry is added here (and in the mirror).
+   Duplicated in js/pages/phamily-time.js; the drift guard compares every
+   month. See docs/ROOM-PLAN.md. */
+const FOLLOWER_ROOM_DRIPS = {
+  '2026-09': [
+    [4,'snacks-r1c1'], [9,'posters-r1c1'], [14,'consoles-r1c1'],
+    [21,'keyboards-r1c1'], [26,'led-strips-r1c1'], [32,'monitors-r1c1'],
+    [37,'smart-r1c1'], [43,'pc-towers-r1c1'], [48,'snacks-r1c2'],
+    [54,'posters-r1c2'], [59,'consoles-r1c2'], [64,'keyboards-r1c2'],
+    [69,'led-strips-r1c2'], [76,'monitors-r1c2'], [81,'smart-r1c2'],
+    [87,'snacks-r1c3'], [92,'posters-r1c3'], [98,'consoles-r1c3'],
+    [103,'led-strips-r1c3'], [109,'snacks-r1c4'], [114,'led-strips-r1c4'],
+    [119,'snacks-r1c5'], [124,'led-strips-r1c5'], [131,'snacks-r1c6'],
+    [136,'led-strips-r1c6'], [142,'snacks-r1c7'],
+  ],
+  '2026-10': [
+    [4,'snacks-r1c8'], [9,'posters-r1c4'], [14,'consoles-r1c4'],
+    [21,'keyboards-r1c3'], [26,'led-strips-r1c7'], [32,'monitors-r1c3'],
+    [37,'smart-r1c3'], [43,'pc-towers-r1c2'], [48,'snacks-r1c9'],
+    [54,'posters-r1c5'], [59,'consoles-r1c5'], [64,'keyboards-r1c4'],
+    [69,'led-strips-r1c8'], [76,'monitors-r1c4'], [81,'smart-r1c4'],
+    [87,'snacks-r1c10'], [92,'posters-r1c6'], [98,'consoles-r1c6'],
+    [103,'led-strips-r1c9'], [109,'snacks-r1c11'], [114,'led-strips-r2c1'],
+    [119,'snacks-r1c12'], [124,'led-strips-r2c2'], [131,'snacks-r1c13'],
+    [136,'led-strips-r2c3'], [142,'snacks-r2c1'],
+  ],
+};
+const PHAMILY_ROOM_DRIPS = {
+  '2026-09': [
+    [3,'snacks-r1c1'], [7,'posters-r1c1'], [13,'consoles-r1c1'],
+    [17,'keyboards-r1c1'], [21,'led-strips-r1c1'], [27,'monitors-r1c1'],
+    [32,'smart-r1c1'], [37,'pc-towers-r1c1'], [41,'snacks-r1c2'],
+    [46,'posters-r1c2'], [51,'consoles-r1c2'], [54,'keyboards-r1c2'],
+    [59,'led-strips-r1c2'], [64,'monitors-r1c2'], [69,'smart-r1c2'],
+    [74,'snacks-r1c3'], [79,'posters-r1c3'], [84,'consoles-r1c3'],
+    [89,'led-strips-r1c3'], [93,'snacks-r1c4'], [98,'led-strips-r1c4'],
+    [103,'snacks-r1c5'], [108,'led-strips-r1c5'], [112,'snacks-r1c6'],
+    [117,'led-strips-r1c6'], [122,'snacks-r1c7'],
+  ],
+  '2026-10': [
+    [3,'snacks-r1c8'], [7,'posters-r1c4'], [13,'consoles-r1c4'],
+    [17,'keyboards-r1c3'], [21,'led-strips-r1c7'], [27,'monitors-r1c3'],
+    [32,'smart-r1c3'], [37,'pc-towers-r1c2'], [41,'snacks-r1c9'],
+    [46,'posters-r1c5'], [51,'consoles-r1c5'], [54,'keyboards-r1c4'],
+    [59,'led-strips-r1c8'], [64,'monitors-r1c4'], [69,'smart-r1c4'],
+    [74,'snacks-r1c10'], [79,'posters-r1c6'], [84,'consoles-r1c6'],
+    [89,'led-strips-r1c9'], [93,'snacks-r1c11'], [98,'led-strips-r2c1'],
+    [103,'snacks-r1c12'], [108,'led-strips-r2c2'], [112,'snacks-r1c13'],
+    [117,'led-strips-r2c3'], [122,'snacks-r2c1'],
+  ],
+};
+function roomDripFor(drips, mk) {
+  const months = Object.keys(drips).sort();
+  let pick = months[0];
+  for (const m of months) if (m <= String(mk)) pick = m;
+  return drips[pick];
+}
+
 function defineFollowerRewards(mk) {
   const r = [];
   const giveawayLevels = [
@@ -127,27 +194,13 @@ function defineFollowerRewards(mk) {
   r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
     cosmeticId:'bone',
     name:'Bone Dice', desc:'Cosmetic bone-themed dice for Mana Clash' });
-  /* MY ROOM — this month's drip: one tenth of each set (advances each month), rounded
-     down, interleaved so the sets arrive mixed rather than seven snacks
-     in a row. Next month is the next tenth, and the rule carries itself.
-     Duplicated in js/pages/phamily-time.js; test-phamily-rewards.js
-     compares the two entry by entry. See docs/ROOM-PLAN.md.
-     A piece is granted as a `room-piece` item naming one piece id; a
-     whole set is a `room-set`. The room validator accepts either. */
+  /* MY ROOM — one tenth of each set per month, from the month-keyed drip
+     maps above (see roomDripFor). A piece is granted as a `room-piece`
+     item naming one piece id; the room validator accepts either grain. */
   const ROOM_SETS = { snacks:'Snacks', posters:'Posters', consoles:'Consoles',
     keyboards:'Keyboards', 'led-strips':'LED Strips', monitors:'Monitors',
     smart:'Smart Devices', 'pc-towers':'PC Towers' };
-  const ROOM_DRIP = [
-    [4,'snacks-r1c8'], [9,'posters-r1c4'], [14,'consoles-r1c4'],
-    [21,'keyboards-r1c3'], [26,'led-strips-r1c7'], [32,'monitors-r1c3'],
-    [37,'smart-r1c3'], [43,'pc-towers-r1c2'], [48,'snacks-r1c9'],
-    [54,'posters-r1c5'], [59,'consoles-r1c5'], [64,'keyboards-r1c4'],
-    [69,'led-strips-r1c8'], [76,'monitors-r1c4'], [81,'smart-r1c4'],
-    [87,'snacks-r1c10'], [92,'posters-r1c6'], [98,'consoles-r1c6'],
-    [103,'led-strips-r1c9'], [109,'snacks-r1c11'], [114,'led-strips-r2c1'],
-    [119,'snacks-r1c12'], [124,'led-strips-r2c2'], [131,'snacks-r1c13'],
-    [136,'led-strips-r2c3'], [142,'snacks-r2c1'],
-  ];
+  const ROOM_DRIP = roomDripFor(FOLLOWER_ROOM_DRIPS, mk);
   for (const [lvl, pieceId] of ROOM_DRIP) {
     const label = ROOM_SETS[pieceId.replace(/-r\d+c\d+$/, '')];
     r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
@@ -218,27 +271,13 @@ function definePhamilyRewards(mk) {
   r.push({ level:130, rarity:'mythic', type:'dice', icon:REWARD_ICONS.dice,
     cosmeticId:'fracture',
     name:'Reality Fracture Dice', desc:'Mythic animated dice for Mana Clash' });
-  /* MY ROOM — this month's drip: one tenth of each set (advances each month), rounded
-     down, interleaved so the sets arrive mixed rather than seven snacks
-     in a row. Next month is the next tenth, and the rule carries itself.
-     Duplicated in js/pages/phamily-time.js; test-phamily-rewards.js
-     compares the two entry by entry. See docs/ROOM-PLAN.md.
-     A piece is granted as a `room-piece` item naming one piece id; a
-     whole set is a `room-set`. The room validator accepts either. */
+  /* MY ROOM — one tenth of each set per month, from the month-keyed drip
+     maps above (see roomDripFor). A piece is granted as a `room-piece`
+     item naming one piece id; the room validator accepts either grain. */
   const ROOM_SETS = { snacks:'Snacks', posters:'Posters', consoles:'Consoles',
     keyboards:'Keyboards', 'led-strips':'LED Strips', monitors:'Monitors',
     smart:'Smart Devices', 'pc-towers':'PC Towers' };
-  const ROOM_DRIP = [
-    [3,'snacks-r1c8'], [7,'posters-r1c4'], [13,'consoles-r1c4'],
-    [17,'keyboards-r1c3'], [21,'led-strips-r1c7'], [27,'monitors-r1c3'],
-    [32,'smart-r1c3'], [37,'pc-towers-r1c2'], [41,'snacks-r1c9'],
-    [46,'posters-r1c5'], [51,'consoles-r1c5'], [54,'keyboards-r1c4'],
-    [59,'led-strips-r1c8'], [64,'monitors-r1c4'], [69,'smart-r1c4'],
-    [74,'snacks-r1c10'], [79,'posters-r1c6'], [84,'consoles-r1c6'],
-    [89,'led-strips-r1c9'], [93,'snacks-r1c11'], [98,'led-strips-r2c1'],
-    [103,'snacks-r1c12'], [108,'led-strips-r2c2'], [112,'snacks-r1c13'],
-    [117,'led-strips-r2c3'], [122,'snacks-r2c1'],
-  ];
+  const ROOM_DRIP = roomDripFor(PHAMILY_ROOM_DRIPS, mk);
   for (const [lvl, pieceId] of ROOM_DRIP) {
     const label = ROOM_SETS[pieceId.replace(/-r\d+c\d+$/, '')];
     r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
@@ -358,6 +397,11 @@ export function themeKeyFor(mk = monthKey()) {
 export const THEMED_MONTHS = [...new Set([
   ...Object.keys(SEASON_THEMES), ...Object.keys(FOLLOWER_THEMES),
   ...Object.keys(PHAMILY_THEMES), ...Object.keys(MILESTONE_THEMES),
+])].sort();
+
+/** Every month the room drip maps name — the drift guard covers these too. */
+export const ROOM_DRIP_MONTHS = [...new Set([
+  ...Object.keys(FOLLOWER_ROOM_DRIPS), ...Object.keys(PHAMILY_ROOM_DRIPS),
 ])].sort();
 
 /* The key the client sends and the server stores, built the same way on both

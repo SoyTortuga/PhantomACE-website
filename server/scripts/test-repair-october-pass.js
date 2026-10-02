@@ -118,11 +118,56 @@ check('October starts at midnight Pacific', new Date(OCT_START).toISOString(), '
   check('(b) a NEW-id Cobweb proves nothing about September', grants(p), []);
 }
 
-/* ── room pieces are never themed ─────────────────────────────────────── */
+/* ── room pieces: the drip advanced in place on Oct 1 ─────────────────
+   follower level 4 dripped snacks-r1c1 in September and snacks-r1c8 in
+   October; phamily level 3 drips the SAME pieces in the same months. */
+const piece = (id, grantedAt, source) => it('room-piece', `room-piece-${id}`, 'Room: Snacks', grantedAt, source, { meta: { piece: id } });
 {
-  const p = planUser({ sep: row(['4_follower_room-piece_common']), oct: row([]), items: [] });
-  check('a September room piece is never repaired by this script', [grants(p), p.unattributed], [[], []]);
-  check('and is counted as identical', p.roomGraceOk, 1);
+  const p = planUser({
+    sep: row(['4_follower_room-piece_common']),
+    oct: row([]),
+    items: [piece('snacks-r1c8', OCT_TIME)],
+  });
+  check('(b) a September room piece that paid October\'s is confirmed', grants(p), ['b:room-piece:room-piece-snacks-r1c1']);
+  check('and the granted piece names the September piece', p.grants[0].item.meta, { piece: 'snacks-r1c1' });
+  check('and October\'s piece is reported as kept', p.misgranted.map(m => m.item.id), ['room-piece-snacks-r1c8']);
+}
+{
+  const p = planUser({
+    sep: row(['4_follower_room-piece_common']),
+    oct: row(['4_follower_room-piece_common']),
+    items: [piece('snacks-r1c8', OCT_TIME)],
+  });
+  check('(b) October claimed the same key: not confirmed', grants(p), []);
+  check('but unattributed', p.unattributed.map(u => u.item.id), ['room-piece-snacks-r1c1']);
+  check('and granted only when asked',
+    [applyPlan({ items: [], equips: {} }, p), applyPlan({ items: [], equips: {} }, p, { includeUnattributed: true }).items.map(i => i.id)],
+    [undefined, ['room-piece-snacks-r1c1']]);
+}
+{
+  const p = planUser({
+    sep: row(['4_follower_room-piece_common']),
+    oct: row(['3_phamily_room-piece_common']),
+    items: [piece('snacks-r1c8', OCT_TIME)],
+  });
+  check('(b) an October claim on the OTHER track that pays the same piece also explains it',
+    [grants(p), p.unattributed.map(u => u.item.id)], [[], ['room-piece-snacks-r1c1']]);
+}
+{
+  const p = planUser({
+    sep: row(['4_follower_room-piece_common']),
+    oct: row([]),
+    items: [piece('snacks-r1c1', SEPT_TIME), piece('snacks-r1c8', OCT_TIME)],
+  });
+  check('(b) nothing when September\'s piece is owned', [grants(p), p.unattributed], [[], []]);
+}
+{
+  const p = planUser({ sep: row(['4_follower_room-piece_common']), oct: row([]), items: [piece('snacks-r1c8', SEPT_TIME)] });
+  check('(b) refuses an October piece granted before October', [grants(p), p.unattributed], [[], []]);
+}
+{
+  const p = planUser({ sep: row([]), oct: row(['4_follower_room-piece_common']), items: [piece('snacks-r1c1', OCT_TIME)] });
+  check('(a) an October claim that paid September\'s piece is owed October\'s', grants(p), ['a:room-piece:room-piece-snacks-r1c8']);
 }
 
 /* ── (c) milestones ───────────────────────────────────────────────────── */

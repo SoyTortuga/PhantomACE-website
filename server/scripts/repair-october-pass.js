@@ -27,12 +27,15 @@
        September item differs from its October one and is NOT in the
        inventory:
 
-         skull-skin / click-effect / dice — the inventory holds the October
-           item (type + October cosmeticId), granted on/after 2026-10-01 PT
-           by phamily-time, AND the October row has NOT claimed that key.
-           Nothing but a grace claim of the September key could have put it
-           there, so this is CONFIRMED.
-           If October's row HAS claimed the key, that October claim explains
+         skull-skin / click-effect / dice / room-piece — the inventory holds
+           the October item (type + October id), granted on/after 2026-10-01
+           PT by phamily-time, AND the October row has claimed NO key that
+           pays that same item. (Room pieces are shared across the two
+           tracks — follower level 4 and phamily level 3 drip the same piece
+           — so the check is "any October claim yielding this item", not
+           just the same key.) Nothing but a grace claim of the September key
+           could have put it there, so this is CONFIRMED.
+           If October's row HAS such a claim, that October claim explains
            the October item on its own, and nothing records WHEN the
            September claim was made (claimedRewards carries no timestamp).
            The September item is still owed by the claim record, but the
@@ -48,9 +51,11 @@
            September's item absent, proves the September claim was made in
            October: CONFIRMED regardless of October's row.
 
-         room-piece — never themed: September's and October's pieces are
-           the same item, so a grace claim paid the right thing. Nothing to
-           repair; the plan says so rather than staying silent.
+         Room pieces went wrong for a second reason as well: the My Room
+         drip was one hardcoded list, advanced in place to October's tenth
+         on Oct 1 (da5bd0b), so a September room-piece key paid October's
+         piece and the viewer's own October claim of it later deduped to
+         nothing. The drip is now month-keyed; the rule above applies.
 
        Anything else (September's item missing with no October evidence) is
        not this bug and is left alone.
@@ -134,7 +139,15 @@ export function planUser({ sep, oct, items }) {
   const sepMs = (sep && Array.isArray(sep.claimedMilestones)) ? sep.claimedMilestones.map(Number) : [];
   const octMs = new Set((oct && Array.isArray(oct.claimedMilestones)) ? oct.claimedMilestones.map(Number) : []);
 
-  const plan = { grants: [], unattributed: [], renames: [], misgranted: [], misthemed: [], roomGraceOk: 0 };
+  const plan = { grants: [], unattributed: [], renames: [], misgranted: [], misthemed: [] };
+
+  /* Every item an October claim of this user would have paid, by identity:
+     the explanation check for (b). */
+  const octPays = new Set();
+  for (const key of octClaims) {
+    const item = itemFor(OCTT.byKey.get(key));
+    if (item) octPays.add(`${item.type}\u0000${item.id}`);
+  }
 
   /* (a) October claims missing October's item. */
   for (const key of octClaims) {
@@ -153,7 +166,7 @@ export function planUser({ sep, oct, items }) {
     const sItem = itemFor(S);
     const oItem = itemFor(O);
     if (!sItem || !oItem) continue;
-    if (sameItem(sItem, oItem)) { if (S.type === 'room-piece') plan.roomGraceOk++; continue; }
+    if (sameItem(sItem, oItem)) continue;
     if (owns(items, sItem)) continue;
 
     const evidence = items.filter(i => i && i.type === oItem.type && grantedSinceOct(i)
@@ -162,13 +175,13 @@ export function planUser({ sep, oct, items }) {
     if (nameKeyed(oItem)) {
       confirmed = items.some(i => i && i.type === oItem.type && i.id === key && i.name === oItem.name);
     } else {
-      confirmed = evidence.length > 0 && !octClaims.has(key);
+      confirmed = evidence.length > 0 && !octPays.has(`${oItem.type}\u0000${oItem.id}`);
     }
     if (confirmed) {
       plan.grants.push({ part: 'b', key, item: sItem });
       if (!octClaims.has(key)) plan.misgranted.push({ key, item: oItem });
     } else if (evidence.length > 0) {
-      plan.unattributed.push({ part: 'b', key, item: sItem, why: 'October claimed the same key, so the October item does not prove a grace claim' });
+      plan.unattributed.push({ part: 'b', key, item: sItem, why: 'an October claim pays the same item, so it does not prove a grace claim' });
     }
   }
 
@@ -270,7 +283,7 @@ async function main() {
   line(`Users with a September or October pass row: ${users.size}`);
 
   const plans = [];
-  const tally = { a: 0, b: 0, c: 0, unattributed: 0, renames: 0, misgranted: 0, misthemed: 0, roomGraceOk: 0 };
+  const tally = { a: 0, b: 0, c: 0, unattributed: 0, renames: 0, misgranted: 0, misthemed: 0, roomB: 0, roomUnattributed: 0 };
   const byType = new Map();
   for (const [userId, u] of users) {
     let inv;
@@ -281,12 +294,17 @@ async function main() {
       tally[g.part]++;
       const k = `${g.part} ${g.item.type}`;
       byType.set(k, (byType.get(k) || 0) + 1);
+      if (g.part === 'b' && g.item.type === 'room-piece') tally.roomB++;
+    }
+    for (const g of plan.unattributed) {
+      const k = `unattributed ${g.item.type}`;
+      byType.set(k, (byType.get(k) || 0) + 1);
+      if (g.item.type === 'room-piece') tally.roomUnattributed++;
     }
     tally.unattributed += plan.unattributed.length;
     tally.renames += plan.renames.length;
     tally.misgranted += plan.misgranted.length;
     tally.misthemed += plan.misthemed.length;
-    tally.roomGraceOk += plan.roomGraceOk;
     const acts = plan.grants.length + plan.renames.length + plan.unattributed.length + plan.misthemed.length;
     if (!acts) continue;
     plans.push({ userId, plan });
@@ -309,7 +327,8 @@ async function main() {
   line(`UNATTRIBUTED (owed by the claim record, misgrant not provable):     ${tally.unattributed}${includeUnattributed ? '  [will grant]' : '  [skipped; --include-unattributed]'}`);
   line(`October items paid by misgranted grace claims (kept):               ${tally.misgranted}`);
   line(`2026-09 banners/name effects carrying an October theme (reported):  ${tally.misthemed}`);
-  line(`September room-piece grace claims (identical item, nothing to fix): ${tally.roomGraceOk}`);
+  line(`September room-piece grace claims paid October's piece, confirmed: ${tally.roomB}`);
+  line(`September room-piece grace claims, unattributed:                   ${tally.roomUnattributed}`);
   line('');
 
   if (!plans.length) { line('Nothing to do.'); await pool.end(); return; }
