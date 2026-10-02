@@ -1393,3 +1393,162 @@
   setInterval(render, 5000);
   render();
 })();
+
+/* ══════════════════════════════════════════════
+   WEEKLY QUESTS
+
+   Reads /api/quests (server-verified progress, claimed state, and any
+   completion notices the bell has not yet announced), renders the cards, and
+   claims on demand. Progress and payout are entirely the server's call; this
+   only draws what it is told and relays a claim.
+
+   Completed quests are announced through the shared notification bell
+   (js/notifications.js). Each announcement is KEYED quest:<week>:<id> so it
+   shows once however many times it is surfaced — the in-page claim and the
+   next page load both try to add it, and the key dedupes the second away. The
+   server notices are then acked so they are not re-sent.
+   ══════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  const section = document.getElementById('ptQuestsSection');
+  const list = document.getElementById('ptQuestsList');
+  if (!section || !list) return;
+
+  let weekKey = '';
+
+  function rewardLabel(reward) {
+    if (!reward) return '';
+    if (reward.type === 'entries') return `+${reward.amount} ${reward.amount === 1 ? 'entry' : 'entries'}`;
+    if (reward.type === 'minutes') return `+${reward.amount} pass min`;
+    return '';
+  }
+
+  function announce(q) {
+    if (typeof window.addNotification !== 'function') return;
+    window.addNotification({
+      type: 'system',
+      key: 'quest:' + weekKey + ':' + q.id,
+      message: `Quest complete: ${q.title} — ${rewardLabel(q.reward)}`,
+    });
+  }
+
+  function makeCard(q) {
+    const card = document.createElement('div');
+    card.className = 'pt-quest-card' + (q.claimed ? ' is-claimed' : q.completed ? ' is-complete' : '');
+
+    const head = document.createElement('div');
+    head.className = 'pt-quest-head';
+    const title = document.createElement('div');
+    title.className = 'pt-quest-title';
+    title.textContent = q.title;
+    const reward = document.createElement('div');
+    reward.className = 'pt-quest-reward';
+    reward.textContent = rewardLabel(q.reward);
+    head.appendChild(title);
+    head.appendChild(reward);
+
+    const desc = document.createElement('p');
+    desc.className = 'pt-quest-desc';
+    desc.textContent = q.desc;
+
+    const progWrap = document.createElement('div');
+    progWrap.className = 'pt-quest-progress';
+    const bar = document.createElement('div');
+    bar.className = 'pt-quest-bar';
+    const fill = document.createElement('div');
+    fill.className = 'pt-quest-bar-fill';
+    fill.style.width = Math.round((Math.min(q.progress, q.goal) / q.goal) * 100) + '%';
+    bar.appendChild(fill);
+
+    const meta = document.createElement('div');
+    meta.className = 'pt-quest-meta';
+    const count = document.createElement('span');
+    count.className = 'pt-quest-count';
+    count.textContent = Math.min(q.progress, q.goal) + ' / ' + q.goal;
+    meta.appendChild(count);
+
+    if (q.claimed) {
+      const st = document.createElement('span');
+      st.className = 'pt-quest-state';
+      st.textContent = 'Claimed';
+      meta.appendChild(st);
+    } else if (q.completed) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-primary pt-quest-claim';
+      btn.textContent = 'Claim';
+      btn.addEventListener('click', () => claim(q, btn));
+      meta.appendChild(btn);
+    } else {
+      const st = document.createElement('span');
+      st.className = 'pt-quest-state';
+      st.textContent = 'In progress';
+      meta.appendChild(st);
+    }
+
+    progWrap.appendChild(bar);
+    progWrap.appendChild(meta);
+    card.appendChild(head);
+    card.appendChild(desc);
+    card.appendChild(progWrap);
+    return card;
+  }
+
+  function render(quests) {
+    list.innerHTML = '';
+    for (const q of quests) list.appendChild(makeCard(q));
+    section.hidden = quests.length === 0;
+  }
+
+  async function claim(q, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Claiming…';
+    try {
+      const res = await fetch('/api/quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'claim', questId: q.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not claim.');
+      announce(q);
+      await load();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Claim';
+      window.alert(err.message);
+    }
+  }
+
+  async function load() {
+    let data;
+    try {
+      const res = await fetch('/api/quests', { cache: 'no-store', credentials: 'same-origin' });
+      if (!res.ok) return;
+      data = await res.json();
+    } catch { return; }
+    if (!data || !data.loggedIn || !Array.isArray(data.quests)) return;
+
+    weekKey = data.weekKey || '';
+    render(data.quests);
+
+    /* Announce anything the server recorded as completed but not yet shown,
+       then ack so it is announced once. The keyed add dedupes against an
+       in-page claim that already surfaced it. */
+    if (Array.isArray(data.notices) && data.notices.length) {
+      for (const n of data.notices) {
+        announce({ id: n.questId, title: n.title, reward: n.reward });
+      }
+      fetch('/api/quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'ack-notices' }),
+      }).catch(() => {});
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+})();

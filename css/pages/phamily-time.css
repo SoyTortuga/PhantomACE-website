@@ -960,3 +960,133 @@
   padding: 0;
   vertical-align: middle;
 }
+
+/* ── Weekly Quests ───────────────────────────────────────────────────────
+   Earn-track challenges that refresh each week. Depth is borders only (no
+   box-shadow), state is signalled by border/colour and a full-width progress
+   fill — never a side-border rail. */
+.pt-quests-intro {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 4px 0 14px;
+  max-width: 60ch;
+}
+
+.pt-quests-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 680px) {
+  .pt-quests-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.pt-quest-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.pt-quest-card.is-complete {
+  border-color: var(--red);
+}
+
+.pt-quest-card.is-claimed {
+  border-color: var(--border-mid);
+  opacity: 0.7;
+}
+
+.pt-quest-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pt-quest-title {
+  font-family: var(--font-gothic);
+  letter-spacing: normal;
+  font-size: 17px;
+  color: var(--text-pri);
+  line-height: 1.1;
+}
+
+.pt-quest-reward {
+  font-family: var(--font-system);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--red);
+  font-weight: 800;
+}
+
+.pt-quest-desc {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.pt-quest-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: auto;
+}
+
+.pt-quest-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 5px;
+  background: var(--black);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.pt-quest-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, #cc0000, #ff0000, #ff2222);
+  border-radius: 5px 0 0 5px;
+  transition: width 0.3s ease;
+}
+
+.pt-quest-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pt-quest-count {
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.pt-quest-claim {
+  align-self: flex-start;
+}
+
+.pt-quest-state {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.pt-quest-state.is-done {
+  color: var(--red);
+  font-weight: 800;
+}

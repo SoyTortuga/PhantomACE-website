@@ -105,3 +105,19 @@ export function daysInMonth(d = new Date()) {
 export function dayOfMonth(d = new Date()) {
   return zonedYMD(d).day;
 }
+
+/** 'YYYY-Www' ISO week key for the SEASON_TZ date of `d` (weeks start Monday).
+   Used by weekly features (Phamily Quests) so a week rolls on the stream's
+   calendar, not UTC. The year is the ISO week-year, so the last days of
+   December can read as week 01 of the next year, by design. */
+export function weekKey(d = new Date()) {
+  const { y, m, day } = zonedYMD(d);
+  const date = new Date(Date.UTC(y, m - 1, day));
+  const dow = (date.getUTCDay() + 6) % 7;            // Mon=0 … Sun=6
+  date.setUTCDate(date.getUTCDate() - dow + 3);      // the Thursday of this week
+  const firstThu = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const fDow = (firstThu.getUTCDay() + 6) % 7;
+  firstThu.setUTCDate(firstThu.getUTCDate() - fDow + 3);
+  const week = 1 + Math.round((date - firstThu) / (7 * 86400000));
+  return `${date.getUTCFullYear()}-W${pad(week)}`;
+}

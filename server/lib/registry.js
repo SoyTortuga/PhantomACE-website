@@ -156,6 +156,7 @@ export const SINGLETONS = {
      asked for, in the middle of a stream. */
   overlay_reload:        { table: 'singletons', expiry: 'none' },
   overlay_control:       { table: 'singletons', expiry: 'none' },
+  room_of_week:          { table: 'singletons', expiry: 'none' },
 
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
@@ -380,6 +381,19 @@ export const FAMILIES = [
   /* mm_game_{userId} — memory-match.js: the one in-progress server-dealt game
      per player (deck + flip log), sliding 1h TTL; a new start replaces it. */
   { prefix: 'mm_game_',        table: 'singletons',       expiry: 'real' },
+  /* Weekly Phamily Quests: one progress/claim/notice row per user per ISO week
+     (quest_<userId>_<weekKey>), read by exact key, so the generic singletons
+     table is the right home; the handler sets a week-scoped TTL. */
+  { prefix: 'quest_',          table: 'singletons',       expiry: 'real' },
+  /* Room Crawl visit set per user per week (roomvisits_<userId>_<weekKey>),
+     feeds the "visit rooms" quest. Shared by quests.js and rooms-browse.js. */
+  { prefix: 'roomvisits_',     table: 'singletons',       expiry: 'real' },
+  /* Room Crawl guestbook, one row per room owner (roomguestbook_<ownerId>);
+     bounded to 50 stamps and kept as social history, so no TTL. */
+  { prefix: 'roomguestbook_',  table: 'singletons',       expiry: 'none' },
+  /* Haunted-room contest entries per month (room_haunted_<monthKey>); TTL
+     outlives the contest month. */
+  { prefix: 'room_haunted_',   table: 'singletons',       expiry: 'real' },
 
   /* giveaway_monthly_winner_{YYYY-MM} — that month's ledger-draw winner, its
      reel, whether the prize code went out, and any re-rolls (bot/giveaway.js).
