@@ -1,3 +1,5 @@
+import { takeOverlay } from './overlay.js';
+
 const GAME_TTL = 14400;
 
 function json(data, status = 200) {
@@ -45,15 +47,22 @@ export async function onRequestPost(context) {
 
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
 
-  /* Point the overlay at this room so OBS never needs a code in its URL.
-     Best-effort: a game is perfectly playable without the overlay, so a
-     failure here must not fail the create. Cleared in end.js, and only if
-     it still points at this room. */
-  try {
-    await env.MARKETPLACE.put('bingo_current', JSON.stringify({ code, at: Date.now() }));
-  } catch (err) {
-    console.error('[bingo/create] could not set bingo_current:', err.message);
+  /* Only STAFF creating a room takes the overlay. Anyone with a login may
+     host a card for their pod, but bingo_current is what puts a room — and
+     its call/win alerts — on the live stream, so a viewer's room must not
+     claim it just by existing. A moderator can still put any running room
+     on stream from the Overlay Dashboard. Best-effort: a game is playable
+     without the overlay, so a failure here must not fail the create. */
+  const { isModerator } = await import('../admin/moderators.js');
+  let onOverlay = false;
+  if (await isModerator(env, session)) {
+    try {
+      await takeOverlay(env, code);
+      onOverlay = true;
+    } catch (err) {
+      console.error('[bingo/create] could not set bingo_current:', err.message);
+    }
   }
 
-  return json({ success: true, code });
+  return json({ success: true, code, onOverlay });
 }

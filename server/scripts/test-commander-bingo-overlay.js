@@ -80,6 +80,7 @@ const GET = (e, qs, h) => state({ env: e, request: new Request('https://x/api/bi
 /* The host is also the broadcaster, so award's moderator gate passes without
    a moderator list to seed. */
 const envWith = (seed) => ({ MARKETPLACE: fakeKV(seed), TWITCH_BROADCASTER_ID: HOST });
+const liveCode = (e) => (e.MARKETPLACE.read('bingo_current') || {}).code || null;
 const events = (e) => { const r = e.MARKETPLACE.read('overlay_events'); return (r && r.events) || []; };
 const ofType = (e, t) => events(e).filter(ev => ev.type === t);
 
@@ -230,7 +231,8 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   const e = envWith();
   await POST(create, e, { code: 'aaa' }, cookie(HOST));
   await POST(end, e, { code: 'aaa' }, cookie(HOST));
-  check('ending the current game clears the pointer', e.MARKETPLACE.read('bingo_current'), null);
+  check('ending the current game clears the pointer', liveCode(e), null);
+  check('but remembers the room it ended on, for the prize alerts', e.MARKETPLACE.read('bingo_current').ended, 'AAA');
 }
 {
   const e = envWith();
@@ -244,8 +246,8 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
 /* ══ ?list=1 — the dashboard room picker ═══════════════════════════════ */
 {
   const e = envWith();
-  await POST(create, e, { code: 'aaa' }, cookie(HOST));   /* bingo_current -> AAA */
-  await POST(create, e, { code: 'bbb' }, cookie('111'));  /* newest claims it -> BBB */
+  await POST(create, e, { code: 'aaa' }, cookie('111'));  /* a viewer's room: no pointer */
+  await POST(create, e, { code: 'bbb' }, cookie(HOST));   /* staff room claims it -> BBB */
 
   const anon = await GET(e, 'list=1');
   check('listing without a session is 401', anon.status, 401);
@@ -258,7 +260,8 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   check('the newest room is marked current', asMod.rooms.find(r => r.code === 'BBB').isCurrent, true);
   check('the other is not current', asMod.rooms.find(r => r.code === 'AAA').isCurrent, false);
   check('and the current room sorts first', asMod.rooms[0].code, 'BBB');
-  check('each row carries the host name', asMod.rooms.find(r => r.code === 'BBB').hostName, 'U111');
+  check('each row carries the host name', asMod.rooms.find(r => r.code === 'AAA').hostName, 'U111');
+  check('and whether its host has it switched on', asMod.rooms.find(r => r.code === 'BBB').showOnOverlay, true);
 
   /* A non-moderator host may still list — they host a room. */
   const asHost = await GET(e, 'list=1', cookie('111'));
@@ -276,8 +279,11 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
 /* ══ makeCurrent repoints the overlay; clear takes it down ═════════════ */
 {
   const e = envWith();
-  await POST(create, e, { code: 'aaa' }, cookie(HOST));
-  await POST(create, e, { code: 'bbb' }, cookie('111'));  /* bingo_current -> BBB */
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));   /* bingo_current -> AAA */
+  await POST(create, e, { code: 'bbb' }, cookie('111'));  /* a viewer's room — pointer stays AAA */
+  check('a viewer room does not take the pointer', liveCode(e), 'AAA');
+  await POST(overlay, e, { code: 'bbb', makeCurrent: true }, cookie(HOST));
+  check('the broadcaster can put it on stream', liveCode(e), 'BBB');
 
   /* Point it back at AAA. */
   const res = await (await POST(overlay, e, { code: 'aaa', makeCurrent: true }, cookie(HOST))).json();
@@ -301,17 +307,205 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   await POST(create, e, { code: 'aaa' }, cookie(HOST));
   const cleared = await (await POST(overlay, e, { clear: true }, cookie(HOST))).json();
   check('clear succeeds', cleared.cleared, true);
-  check('and removes bingo_current', e.MARKETPLACE.read('bingo_current'), null);
+  check('and points bingo_current at nothing', liveCode(e), null);
 
   /* makeCurrent with no code is treated as a clear. */
   await POST(create, e, { code: 'ccc' }, cookie(HOST));  /* pointer -> CCC */
   await POST(overlay, e, { makeCurrent: true, code: '' }, cookie(HOST));
-  check('makeCurrent with no room clears too', e.MARKETPLACE.read('bingo_current'), null);
+  check('makeCurrent with no room clears too', liveCode(e), null);
 
   /* A stranger cannot clear. */
   await POST(create, e, { code: 'ddd' }, cookie(HOST));
   const byStranger = await POST(overlay, e, { clear: true }, cookie('999'));
   check('a stranger cannot clear', byStranger.status, 403);
+}
+
+/* ══ N9 — a viewer's room never takes the overlay ══════════════════════ */
+const seatWinner = async (e, code) => {
+  const g = e.MARKETPLACE.read('bingo_' + code);
+  g.players = [{ id: 'u_777', name: 'Winner777' }];
+  await e.MARKETPLACE.put('bingo_' + code, JSON.stringify(g));
+};
+{
+  const MOD = '444';
+  const e = envWith({ site_moderators: { entries: [{ userId: MOD, name: 'Mod', addedBy: 'test' }] } });
+
+  const viewer = await (await POST(create, e, { code: 'vvv' }, cookie('999'))).json();
+  check('a non-staff login can still host a room', viewer.success, true);
+  check('but it does not take bingo_current', e.MARKETPLACE.read('bingo_current'), null);
+  check('and the host is told it is not on stream', viewer.onOverlay, false);
+
+  const asHostOfV = await (await GET(e, 'code=VVV', cookie('999'))).json();
+  check('state tells that host the room is not on the overlay', asHostOfV.onOverlay, false);
+  ok('and players are not told at all', (await (await GET(e, 'code=VVV')).json()).onOverlay === undefined);
+
+  const mod = await (await POST(create, e, { code: 'mmm' }, cookie(MOD))).json();
+  check('a site moderator creating a room takes the overlay', liveCode(e), 'MMM');
+  check('and is told so', mod.onOverlay, true);
+
+  const again = await (await POST(create, e, { code: 'www' }, cookie('999'))).json();
+  check('a later viewer room does not steal it back', liveCode(e), 'MMM');
+  check('(created fine)', again.success, true);
+
+  /* The viewer's own calls never reach the stream, even switched "on". */
+  await POST(overlay, e, { code: 'vvv', show: true }, cookie('999'));
+  await POST(call, e, { code: 'vvv', eventId: 4, action: 'call' }, cookie('999'));
+  check('a viewer room call pushes no alert', ofType(e, 'bingo-call').length, 0);
+
+  /* And a viewer cannot point the overlay at their own room. */
+  const self = await POST(overlay, e, { code: 'vvv', makeCurrent: true }, cookie('999'));
+  check('a non-staff host cannot makeCurrent their own room', self.status, 403);
+  check('so the pointer is untouched', liveCode(e), 'MMM');
+}
+
+/* ══ N9 — the call label is the server's, never the body's ═════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await POST(call, e, { code: 'aaa', eventId: 12, action: 'call', text: 'FOLLOW MY CHANNEL <b>now</b>' }, cookie(HOST));
+  const alerts = ofType(e, 'bingo-call');
+  check('a call pushes one alert', alerts.length, 1);
+  check('labelled from the canonical square list, ignoring body.text', alerts[0].label, 'Sol Ring on turn 1');
+
+  await POST(call, e, { code: 'aaa', eventId: 1, action: 'call' }, cookie(HOST));
+  check('a call with no text at all still gets the square label', ofType(e, 'bingo-call')[1].label, 'Board wipe played');
+
+  for (const bad of [0, 69, -1, 1.5, '12', null]) {
+    const r = await POST(call, e, { code: 'aaa', eventId: bad, action: 'call', text: 'x' }, cookie(HOST));
+    check('an unknown eventId is refused: ' + JSON.stringify(bad), r.status, 400);
+  }
+  check('and refused ids push nothing', ofType(e, 'bingo-call').length, 2);
+  check('nor are they recorded', e.MARKETPLACE.read('bingo_AAA').calledEvents, [12, 1]);
+}
+
+/* ══ N9 — toggling a square alerts once per square per game ════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  for (let i = 0; i < 4; i++) {
+    await POST(call, e, { code: 'aaa', eventId: 20, action: 'call' }, cookie(HOST));
+    await POST(call, e, { code: 'aaa', eventId: 20, action: 'uncall' }, cookie(HOST));
+  }
+  await POST(call, e, { code: 'aaa', eventId: 20, action: 'call' }, cookie(HOST));
+  check('call/undo x5 pushes exactly one alert', ofType(e, 'bingo-call').length, 1);
+  check('the square ends up called', e.MARKETPLACE.read('bingo_AAA').calledEvents, [20]);
+  check('and the room remembers it alerted', e.MARKETPLACE.read('bingo_AAA').alertedEvents, [20]);
+
+  await POST(call, e, { code: 'aaa', eventId: 21, action: 'call' }, cookie(HOST));
+  check('a different square still alerts', ofType(e, 'bingo-call').length, 2);
+}
+
+/* ══ N10 — "None (hide)" silences the room ═════════════════════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await seatWinner(e, 'AAA');
+  await POST(overlay, e, { clear: true }, cookie(HOST));
+  check('clear turns the cleared room\'s flag off', e.MARKETPLACE.read('bingo_AAA').showOnOverlay, false);
+
+  await POST(call, e, { code: 'aaa', eventId: 3, action: 'call' }, cookie(HOST));
+  check('a hidden room posts no call alert', ofType(e, 'bingo-call').length, 0);
+
+  /* Even with its host flipping its own switch back on: it is not current. */
+  await POST(overlay, e, { code: 'aaa', show: true }, cookie(HOST));
+  await POST(call, e, { code: 'aaa', eventId: 4, action: 'call' }, cookie(HOST));
+  check('nor after its host switches it back on', ofType(e, 'bingo-call').length, 0);
+
+  await POST(award, e, { code: 'aaa', playerId: 'u_777', rarity: 'rare' }, cookie(HOST));
+  check('and posts no win alert', ofType(e, 'bingo-win').length, 0);
+}
+
+/* ══ N10 — switching rooms stops the old room's alerts ═════════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await POST(create, e, { code: 'bbb' }, cookie(HOST));   /* staff create takes over */
+  check('a staff create switches the previous room off', e.MARKETPLACE.read('bingo_AAA').showOnOverlay, false);
+
+  await POST(call, e, { code: 'aaa', eventId: 5, action: 'call' }, cookie(HOST));
+  check('the replaced room posts no alert', ofType(e, 'bingo-call').length, 0);
+  await POST(call, e, { code: 'bbb', eventId: 5, action: 'call' }, cookie(HOST));
+  check('the current room does', ofType(e, 'bingo-call').length, 1);
+
+  await POST(overlay, e, { code: 'aaa', makeCurrent: true }, cookie(HOST));
+  check('makeCurrent switches the previous room off', e.MARKETPLACE.read('bingo_BBB').showOnOverlay, false);
+  check('and the picked room on', e.MARKETPLACE.read('bingo_AAA').showOnOverlay, true);
+
+  await POST(call, e, { code: 'bbb', eventId: 6, action: 'call' }, cookie(HOST));
+  check('the old room is silent after the switch', ofType(e, 'bingo-call').length, 1);
+  await POST(call, e, { code: 'aaa', eventId: 6, action: 'call' }, cookie(HOST));
+  check('the new room alerts', ofType(e, 'bingo-call').length, 2);
+
+  await seatWinner(e, 'BBB');
+  await POST(award, e, { code: 'bbb', playerId: 'u_777', rarity: 'rare' }, cookie(HOST));
+  check('the old room posts no win alert either', ofType(e, 'bingo-win').length, 0);
+}
+
+/* ══ N10 — prizes after the end still alert, until the overlay moves ══ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await seatWinner(e, 'AAA');
+  await POST(end, e, { code: 'aaa' }, cookie(HOST));
+  await POST(award, e, { code: 'aaa', playerId: 'u_777', rarity: 'mythic' }, cookie(HOST));
+  check('a prize awarded on the results screen still alerts', ofType(e, 'bingo-win').length, 1);
+}
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await seatWinner(e, 'AAA');
+  await POST(end, e, { code: 'aaa' }, cookie(HOST));
+  await POST(overlay, e, { clear: true }, cookie(HOST));
+  await POST(award, e, { code: 'aaa', playerId: 'u_777', rarity: 'mythic' }, cookie(HOST));
+  check('but not once the overlay was cleared after the end', ofType(e, 'bingo-win').length, 0);
+}
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await seatWinner(e, 'AAA');
+  await POST(end, e, { code: 'aaa' }, cookie(HOST));
+  await POST(create, e, { code: 'bbb' }, cookie(HOST));
+  await POST(award, e, { code: 'aaa', playerId: 'u_777', rarity: 'mythic' }, cookie(HOST));
+  check('nor once a newer room took the overlay', ofType(e, 'bingo-win').length, 0);
+}
+
+/* ══ N10 — makeCurrent refuses ended and missing rooms ═════════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await POST(create, e, { code: 'bbb' }, cookie(HOST));   /* pointer -> BBB */
+  await POST(end, e, { code: 'aaa' }, cookie(HOST));
+
+  const ended = await POST(overlay, e, { code: 'aaa', makeCurrent: true }, cookie(HOST));
+  check('makeCurrent on an ended room is refused', ended.status, 409);
+  check('the pointer is untouched', liveCode(e), 'BBB');
+  check('and the ended room stays off', e.MARKETPLACE.read('bingo_AAA').showOnOverlay, false);
+
+  const missing = await POST(overlay, e, { code: 'zzz', makeCurrent: true }, cookie(HOST));
+  check('makeCurrent on a missing room is 404', missing.status, 404);
+  check('the pointer is still untouched', liveCode(e), 'BBB');
+}
+
+/* ══ N10 — a pointer at a missing room lists as none, and is cleaned ═══ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await e.MARKETPLACE.put('bingo_current', JSON.stringify({ code: 'GONE', at: Date.now() }));
+  const d = await (await GET(e, 'list=1', cookie(HOST))).json();
+  check('the live room is listed', d.rooms.length, 1);
+  check('nothing is marked current', d.rooms.filter(r => r.isCurrent).length, 0);
+  check('and the stale pointer is dropped', liveCode(e), null);
+  check('so ?current=1 says no game', (await GET(e, 'current=1')).status, 404);
+}
+
+/* ══ The server's square list matches the client's ═════════════════════ */
+{
+  const { BINGO_SQUARES, TOTAL_EVENTS } = await import('../../functions/api/bingo/squares.js');
+  const src = fs.readFileSync(path.join(REPO, 'games/commander-bingo/events.js'), 'utf8');
+  const client = new Function(src + '; return BINGO_EVENTS;')();
+  check('the server square list matches events.js exactly',
+    BINGO_SQUARES.map(s => [s.id, s.text]), client.map(c => [c.id, c.text]));
+  check('and its total is the square count', TOTAL_EVENTS, client.length);
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
@@ -353,7 +547,7 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   const css = fs.readFileSync(path.join(REPO, 'css/pages/overlay.css'), 'utf8');
   ok('the panel has styles', /\.ov-bingo\s*\{/.test(css));
 
-  ok('the host sends the square text with a call', /text:\s*\(BINGO_EVENTS\.find/.test(host));
+  ok('the host no longer sends square text with a call (the server names it)', !/text:\s*\(BINGO_EVENTS\.find/.test(host));
 
   const odHtml = fs.readFileSync(path.join(REPO, 'overlay-dashboard.html'), 'utf8');
   ok('the overlay dashboard has the bingo room picker', /id="ovBingoSection"/.test(odHtml) && /id="ovBingoRoomPick"/.test(odHtml));
@@ -362,6 +556,13 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   ok('the dashboard wires the bingo room picker', /function initOvBingo/.test(odJs) && /initOvBingo\(\)/.test(odJs));
   ok('and it lists rooms then repoints the overlay', /bingo\/state\?list=1/.test(odJs) && /makeCurrent/.test(odJs));
   ok('with a none option that clears the pointer', /clear:\s*true/.test(odJs) && /none \(hide\)/.test(odJs));
+  const renderOvBingoSrc = (odJs.match(/function renderOvBingo\([\s\S]*?\n\}/) || [''])[0];
+  ok('the picker preselects the room actually on the overlay',
+     /pick\.value = ovBingoLive;/.test(renderOvBingoSrc) && !/const keep\b/.test(renderOvBingoSrc));
+  ok('a failed repoint reverts the picker to the live room', /if \(!okay && pick\) pick\.value = ovBingoLive/.test(odJs));
+  ok('the refresh tick leaves a focused picker alone', /!force && document\.activeElement === pick/.test(odJs));
+
+  ok('the host overlay switch knows when the room is not on stream', /overlayLive/.test(host) && /created\.onOverlay/.test(host));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

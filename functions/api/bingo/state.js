@@ -1,4 +1,5 @@
-const TOTAL_EVENTS = 68;
+import { TOTAL_EVENTS } from './squares.js';
+import { readPointer, pointerCode, dropStalePointer } from './overlay.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -44,13 +45,14 @@ async function listRooms(env, request) {
   const session = getSession(request);
   if (!session || !session.user_id) return json({ error: 'Log in first.' }, 401);
 
-  const current = await env.MARKETPLACE.get('bingo_current', 'json');
-  const currentCode = current && current.code ? String(current.code).toUpperCase().trim() : null;
+  const currentCode = pointerCode(await readPointer(env));
 
   const rows = await env.MARKETPLACE.listValues({ prefix: 'bingo_' });
   const rooms = [];
   let hostsAny = false;
+  let pointerRoomExists = false;
   for (const { value: g } of rows) {
+    if (g && g.code && String(g.code).toUpperCase().trim() === currentCode) pointerRoomExists = true;
     if (!g || !g.code || g.status !== 'active') continue;
     if (String(g.host) === String(session.user_id)) hostsAny = true;
     rooms.push({
@@ -58,6 +60,7 @@ async function listRooms(env, request) {
       hostName: g.hostName || ('Host ' + (g.host || g.code)),
       playerCount: Array.isArray(g.players) ? g.players.length : 0,
       createdAt: g.createdAt || 0,
+      showOnOverlay: g.showOnOverlay !== false,
       isCurrent: currentCode != null && String(g.code).toUpperCase().trim() === currentCode,
     });
   }
@@ -65,6 +68,15 @@ async function listRooms(env, request) {
   const { isModerator } = await import('../admin/moderators.js');
   if (!(await isModerator(env, session)) && !hostsAny) {
     return json({ error: 'You need broadcaster or moderator access for this.' }, 403);
+  }
+
+  /* A pointer naming a room that expired (or was never written) is "none":
+     no row is marked current, and the stale pointer is dropped so the
+     overlay stops resolving a game that is not there. */
+  if (currentCode && !pointerRoomExists) {
+    try { await dropStalePointer(env, currentCode); } catch (err) {
+      console.error('[bingo/state] could not drop stale bingo_current:', err.message);
+    }
   }
 
   /* The room on the overlay first, then newest — the order a moderator
@@ -122,6 +134,11 @@ export async function onRequestGet(context) {
        true) so the host page can tell "not the host" apart from "an older
        server that never sent this at all", and treat them differently. */
     out.isHost = String(session.user_id) === String(game.host);
+
+    /* Only the host is told whether the room is the one on stream — it is
+       what the host page's overlay switch shows. Kept off every player's
+       2-second poll, which has no use for it. */
+    if (out.isHost) out.onOverlay = pointerCode(await readPointer(env)) === code;
 
     const me = game.players.find(p => p.id === 'u_' + session.user_id);
     if (me) {

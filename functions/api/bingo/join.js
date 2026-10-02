@@ -1,5 +1,6 @@
+import { TOTAL_EVENTS } from './squares.js';
+
 const GAME_TTL = 14400;
-const TOTAL_EVENTS = 68;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -51,34 +52,40 @@ export async function onRequestPost(context) {
 
   const playerId = 'u_' + session.user_id;
 
-  const key = `bingo_${code}`;
-  const raw = await env.MARKETPLACE.get(key);
-  if (!raw) return json({ error: 'Game not found' }, 404);
+  /* mutate(), not get-then-put: a stream opening is exactly when many
+     viewers join in the same second, and a lost update means a player who
+     thinks they joined never appears in the room. */
+  let failure = null;
+  let result = null;
 
-  const game = JSON.parse(raw);
-  if (game.status === 'ended') return json({ error: 'Game has ended' }, 400);
+  await env.MARKETPLACE.mutate(`bingo_${code}`, (game) => {
+    if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
+    if (game.status === 'ended') { failure = json({ error: 'Game has ended' }, 400); return undefined; }
+    if (!Array.isArray(game.players)) game.players = [];
 
-  const existing = game.players.find(p => p.id === playerId);
-  if (existing) {
-    if (existing.name !== name) existing.name = name;
-    /* Pre-powers players hold only cardIds; hand back everything they own
-       so a refresh restores extra cards and wildcard stamps, not just the
-       original card — losing those on reload was half of the extra-card
-       bug as shipped. */
-    if (!Array.isArray(existing.cards) || !existing.cards.length) existing.cards = [existing.cardIds];
-    if (!Array.isArray(existing.wildcards)) existing.wildcards = [];
-    existing.cardIds = existing.cards[0];
-    await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
-    return json({ cardIds: existing.cardIds, cards: existing.cards, wildcards: existing.wildcards, calledEvents: game.calledEvents });
-  }
+    const existing = game.players.find(p => p.id === playerId);
+    if (existing) {
+      if (existing.name !== name) existing.name = name;
+      /* Pre-powers players hold only cardIds; hand back everything they own
+         so a refresh restores extra cards and wildcard stamps, not just the
+         original card. */
+      if (!Array.isArray(existing.cards) || !existing.cards.length) existing.cards = [existing.cardIds];
+      if (!Array.isArray(existing.wildcards)) existing.wildcards = [];
+      existing.cardIds = existing.cards[0];
+      result = { cardIds: existing.cardIds, cards: existing.cards, wildcards: existing.wildcards, calledEvents: game.calledEvents };
+      return game;
+    }
 
-  const cardIds = generateCard();
+    const cardIds = generateCard();
 
-  /* cards[0] === cardIds, mirrored: the host page and older rooms read
-     cardIds, powers.js reads cards. One truth, two spellings, kept equal
-     by everything that writes a player. */
-  game.players.push({ id: playerId, name, cardIds, cards: [cardIds], wildcards: [] });
-  await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+    /* cards[0] === cardIds, mirrored: the host page and older rooms read
+       cardIds, powers.js reads cards. One truth, two spellings, kept equal
+       by everything that writes a player. */
+    game.players.push({ id: playerId, name, cardIds, cards: [cardIds], wildcards: [] });
+    result = { cardIds, cards: [cardIds], wildcards: [], calledEvents: game.calledEvents };
+    return game;
+  }, { expirationTtl: GAME_TTL });
 
-  return json({ cardIds, cards: [cardIds], wildcards: [], calledEvents: game.calledEvents });
+  if (failure) return failure;
+  return json(result);
 }

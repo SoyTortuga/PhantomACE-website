@@ -1,3 +1,5 @@
+import { releaseOnEnd } from './overlay.js';
+
 const GAME_TTL = 14400;
 
 function json(data, status = 200) {
@@ -22,32 +24,36 @@ export async function onRequestPost(context) {
   const code = (body.code || '').toUpperCase().trim();
   if (!code) return json({ error: 'Missing code' }, 400);
 
-  const key = `bingo_${code}`;
-  const raw = await env.MARKETPLACE.get(key);
-  if (!raw) return json({ error: 'Game not found' }, 404);
+  let failure = null;
+  let players = [];
 
-  const game = JSON.parse(raw);
+  await env.MARKETPLACE.mutate(`bingo_${code}`, (game) => {
+    if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
 
-  /* Unauthenticated before this, so any player could end the host's game
-     mid-stream. */
-  if (!session || String(session.user_id) !== String(game.host)) {
-    return json({ error: 'Only the host can end the game.' }, 403);
-  }
+    /* Unauthenticated before this, so any player could end the host's game
+       mid-stream. */
+    if (!session || String(session.user_id) !== String(game.host)) {
+      failure = json({ error: 'Only the host can end the game.' }, 403);
+      return undefined;
+    }
 
-  game.status = 'ended';
-  game.endedAt = Date.now();
+    game.status = 'ended';
+    game.endedAt = Date.now();
+    players = game.players || [];
+    return game;
+  }, { expirationTtl: GAME_TTL });
 
-  await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+  if (failure) return failure;
 
   /* Take the overlay pointer down with the game, but ONLY if it still names
-     this room — a newer game may have opened and claimed it, and clearing it
-     blind would blank that live game's overlay. */
+     this room — a newer game may have claimed it, and clearing it blind
+     would blank that live game's overlay. The pointer remembers the room it
+     ended on, so the prizes awarded from the results screen still alert. */
   try {
-    const current = await env.MARKETPLACE.get('bingo_current', 'json');
-    if (current && current.code === code) await env.MARKETPLACE.delete('bingo_current');
+    await releaseOnEnd(env, code);
   } catch (err) {
     console.error('[bingo/end] could not clear bingo_current:', err.message);
   }
 
-  return json({ success: true, players: game.players });
+  return json({ success: true, players });
 }

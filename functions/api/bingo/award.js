@@ -21,6 +21,8 @@
    clicking twice, or two moderators awarding at once, must not pay twice.
    ══════════════════════════════════════════════ */
 
+import { readPointer, alertsAllowed } from './overlay.js';
+
 const GAME_TTL = 14400;
 const RARITIES = ['common', 'uncommon', 'rare', 'mythic'];
 
@@ -66,11 +68,12 @@ export async function onRequestPost(context) {
 
   let failure = null;
   let awarded = null;
-  let showOnOverlay = true;
+  let showOnOverlay = false;
+  const pointer = await readPointer(env);
 
   await env.MARKETPLACE.mutate(`bingo_${code}`, (game) => {
     if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
-    showOnOverlay = game.showOnOverlay !== false;
+    showOnOverlay = alertsAllowed(pointer, code, game);
 
     if (String(session.user_id) !== String(game.host)) {
       /* A moderator, but not the host of THIS game. */
@@ -125,8 +128,9 @@ export async function onRequestPost(context) {
   }
 
   /* Put the win on the overlay — the Commander Bingo equivalent of MTGBBB's
-     bingo alert. Suppressed when the host has this game off the overlay, the
-     same as the call alert. Best-effort, after the prize is safely recorded,
+     bingo alert. Only for the room the overlay follows (or followed when it
+     ended — prizes are awarded from the results screen, after the end), and
+     never once the host or a moderator took it off. Best-effort, after the prize is safely recorded,
      so a failed alert never affects whether the entries were credited. */
   if (showOnOverlay) try {
     const { pushOverlayEvent } = await import('../overlay/events.js');

@@ -1,4 +1,5 @@
 const GAME_TTL = 14400;
+const POINTER = 'bingo_current';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -13,18 +14,116 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
+const norm = (c) => (c ? String(c).toUpperCase().trim() : null);
+
+/* ══════════════════════════════════════════════
+   THE OVERLAY POINTER — shared by every bingo route.
+
+   bingo_current is the ONE room the stream overlay follows:
+     { code, at }              a live room is on the overlay
+     { code: null, at }        nothing is (cleared from the dashboard)
+     { code: null, ended, at } nothing is, but `ended` was on it when its
+                               host ended the game — prizes are awarded
+                               from the results screen AFTER the end, and
+                               those win alerts still belong on stream.
+   An absent row means nothing is on the overlay either.
+
+   ALERTS FOLLOW THE POINTER, not the room's own flag. showOnOverlay alone
+   was what call/award checked, so a room cleared from the dashboard — or
+   replaced by another — kept its flag on and kept posting alerts.
+   ══════════════════════════════════════════════ */
+
+export async function readPointer(env) {
+  try { return (await env.MARKETPLACE.get(POINTER, 'json')) || null; } catch { return null; }
+}
+
+/** The room code the overlay currently shows, or null. */
+export function pointerCode(pointer) {
+  return pointer ? norm(pointer.code) : null;
+}
+
 /**
- * SHOW ON OVERLAY — the host's switch for putting this game on the stream.
+ * May room `code` push an alert to the stream right now? Only the room the
+ * pointer names (or, once ended, the room it named when it ended), and only
+ * while its host has not switched it off.
+ */
+export function alertsAllowed(pointer, code, game) {
+  if (!pointer || !game || game.showOnOverlay === false) return false;
+  const c = norm(code);
+  if (pointerCode(pointer) === c) return game.status !== 'ended';
+  if (norm(pointer.ended) === c) return game.status === 'ended';
+  return false;
+}
+
+/* Flip a room's own show flag. No TTL passed, so a room being switched OFF
+   keeps its original expiry instead of being kept alive by this write. */
+async function setRoomShown(env, code, show) {
+  if (!code) return;
+  try {
+    await env.MARKETPLACE.mutate(`bingo_${code}`, (g) => {
+      if (!g || g.showOnOverlay === show) return undefined;
+      g.showOnOverlay = show;
+      return g;
+    });
+  } catch (err) {
+    console.error('[bingo/overlay] could not update room ' + code + ':', err.message);
+  }
+}
+
+async function releaseRooms(env, prev, keep) {
+  const olds = new Set([pointerCode(prev), norm(prev && prev.ended)]);
+  for (const old of olds) {
+    if (old && old !== keep) await setRoomShown(env, old, false);
+  }
+}
+
+/** Point the overlay at `code`, switching off whichever room had it. */
+export async function takeOverlay(env, code) {
+  const c = norm(code);
+  let prev = null;
+  await env.MARKETPLACE.mutate(POINTER, (cur) => { prev = cur; return { code: c, at: Date.now() }; });
+  await releaseRooms(env, prev, c);
+}
+
+/** Point the overlay at nothing, switching off whichever room had it. */
+export async function clearOverlay(env) {
+  let prev = null;
+  await env.MARKETPLACE.mutate(POINTER, (cur) => {
+    prev = cur;
+    return cur ? { code: null, at: Date.now() } : undefined;
+  });
+  await releaseRooms(env, prev, null);
+}
+
+/** Take the pointer off `code` when its game ends — only if it still names it. */
+export async function releaseOnEnd(env, code) {
+  const c = norm(code);
+  await env.MARKETPLACE.mutate(POINTER, (cur) => {
+    if (!cur || pointerCode(cur) !== c) return undefined;
+    return { code: null, ended: c, at: Date.now() };
+  });
+}
+
+/** Drop a pointer that names a room which no longer exists — only if it still does. */
+export async function dropStalePointer(env, code) {
+  const c = norm(code);
+  await env.MARKETPLACE.mutate(POINTER, (cur) => {
+    if (!cur || pointerCode(cur) !== c) return undefined;
+    return { code: null, at: Date.now() };
+  });
+}
+
+/**
+ * SHOW ON OVERLAY — the switches for putting a game on the stream.
  *
- * The overlay panel finds the live room on its own, so without this switch a
- * game would appear on stream the instant it is created. This lets the host
- * decide: off, and the panel stays hidden AND the call/win alerts are
- * suppressed — nothing bingo reaches the overlay. On, and it all does.
- *
- * THE HOST OR A MODERATOR. The host runs it from their panel; the
- * broadcaster and moderators run it from Bot Control, because the overlay is
- * theirs to produce and the bingo host may be a different person. Knowing the
- * room code is not enough — players are told it — so it rests on identity.
+ *   { code, show }          the host's own on/off for their room. Host or
+ *                           staff. It can only take a room OFF the stream
+ *                           in practice: a room the pointer does not name
+ *                           posts nothing whatever its flag says.
+ *   { code, makeCurrent }   point the overlay at this room. Staff only —
+ *                           letting a host do it would let any logged-in
+ *                           viewer put their room (and its alerts) on stream.
+ *   { clear: true }         point the overlay at nothing. Staff only.
  */
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -34,59 +133,65 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
-  const code = String(body.code || '').toUpperCase().trim();
+  const code = norm(body.code) || '';
   const makeCurrent = body.makeCurrent === true;
-  /* Clearing the pointer shows NOTHING on the overlay. Asked for explicitly
-     (clear:true) or implied by "make current" with no room picked. */
   const clear = body.clear === true || (makeCurrent && !code);
 
+  const { isModerator } = await import('../admin/moderators.js');
+
   if (clear) {
-    /* No game to appeal to for host rights, so this is a stream-production
-       action: broadcaster or moderator only. */
-    const { isModerator } = await import('../admin/moderators.js');
     if (!(await isModerator(env, session))) {
       return json({ error: 'Only the broadcaster or a moderator can clear the overlay.' }, 403);
     }
-    try { await env.MARKETPLACE.delete('bingo_current'); } catch (err) {
+    try { await clearOverlay(env); } catch (err) {
       console.error('[bingo/overlay] could not clear bingo_current:', err.message);
+      return json({ error: 'Could not clear the overlay.' }, 500);
     }
     return json({ success: true, cleared: true, showOnOverlay: false });
   }
 
   if (!code) return json({ error: 'Missing code' }, 400);
-
   const key = `bingo_${code}`;
-  const raw = await env.MARKETPLACE.get(key);
-  if (!raw) return json({ error: 'Game not found' }, 404);
 
-  const game = JSON.parse(raw);
-
-  const isHost = String(session.user_id) === String(game.host);
-  if (!isHost) {
-    const { isModerator } = await import('../admin/moderators.js');
-    if (!(await isModerator(env, session))) {
-      return json({ error: 'Only the host, broadcaster, or a moderator can change the overlay.' }, 403);
-    }
-  }
-
-  /* POINT THE OVERLAY AT THIS ROOM. Sets bingo_current so the overlay (which
-     resolves the live room from that singleton) follows this game, and turns
-     this game's show flag on so the chosen room actually displays. */
   if (makeCurrent) {
-    game.showOnOverlay = true;
-    await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
-    try {
-      await env.MARKETPLACE.put('bingo_current', JSON.stringify({ code, at: Date.now() }));
-    } catch (err) {
+    if (!(await isModerator(env, session))) {
+      return json({ error: 'Only the broadcaster or a moderator can put a game on the overlay.' }, 403);
+    }
+    let failure = null;
+    await env.MARKETPLACE.mutate(key, (game) => {
+      if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
+      if (game.status !== 'active') {
+        failure = json({ error: 'That game has ended — pick a running one.' }, 409);
+        return undefined;
+      }
+      game.showOnOverlay = true;
+      return game;
+    }, { expirationTtl: GAME_TTL });
+    if (failure) return failure;
+
+    try { await takeOverlay(env, code); } catch (err) {
       console.error('[bingo/overlay] could not set bingo_current:', err.message);
+      return json({ error: 'Could not point the overlay at that game.' }, 500);
     }
     return json({ success: true, makeCurrent: true, code, showOnOverlay: true });
   }
 
-  /* The original show/hide switch, unchanged. */
   const show = !!body.show;
-  game.showOnOverlay = show;
-  await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+  let failure = null;
+  let isHost = false;
+  const staff = await isModerator(env, session);
+  await env.MARKETPLACE.mutate(key, (game) => {
+    if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
+    isHost = String(session.user_id) === String(game.host);
+    if (!isHost && !staff) {
+      failure = json({ error: 'Only the host, broadcaster, or a moderator can change the overlay.' }, 403);
+      return undefined;
+    }
+    game.showOnOverlay = show;
+    return game;
+  }, { expirationTtl: GAME_TTL });
+  if (failure) return failure;
 
-  return json({ success: true, showOnOverlay: show });
+  const pointer = await readPointer(env);
+  return json({ success: true, showOnOverlay: show, isCurrent: pointerCode(pointer) === code });
 }

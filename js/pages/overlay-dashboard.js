@@ -331,16 +331,33 @@ function ovBingoSay(text, showing) {
   state.className = 'giveaway-status' + (showing ? ' open' : '');
 }
 
-function renderOvBingo(rooms) {
+/* The room the overlay actually shows, as of the last list. A failed
+   repoint snaps the picker back to this rather than leaving a room selected
+   that is not on stream. */
+let ovBingoLive = '';
+
+function renderOvBingo(rooms, force) {
   const pick = document.getElementById('ovBingoRoomPick');
   if (!pick) return;
   const list = Array.isArray(rooms) ? rooms : [];
   const current = list.find(function (r) { return r.isCurrent; });
+  ovBingoLive = current ? current.code : '';
 
-  /* The selection survives a refresh tick. A moderator mid-choice who found
-     the dropdown reset to the current room would be one click from putting
-     the wrong game on stream. */
-  const keep = pick.value || (current ? current.code : '');
+  if (!list.length) {
+    ovBingoSay('No active games — a host has to create one first', false);
+  } else if (current && current.showOnOverlay === false) {
+    ovBingoSay((current.hostName || current.code) + ' (' + current.code + ') is picked, but its host switched the overlay off', false);
+  } else if (current) {
+    const n = current.playerCount + (current.playerCount === 1 ? ' player' : ' players');
+    ovBingoSay('Showing ' + (current.hostName || current.code) + ' · ' + n + ' (' + current.code + ')', true);
+  } else {
+    ovBingoSay(list.length + (list.length === 1 ? ' game' : ' games') + ' running — none on the overlay', false);
+  }
+
+  /* Rebuilding the options closes an open dropdown, so the background tick
+     leaves a focused picker alone — a moderator mid-choice keeps their menu.
+     Explicit loads (after a change, or Refresh) always rebuild. */
+  if (!force && document.activeElement === pick) return;
 
   let html = '<option value="">— none (hide) —</option>';
   html += list.map(function (r) {
@@ -350,17 +367,8 @@ function renderOvBingo(rooms) {
   }).join('');
   pick.innerHTML = html;
 
-  if (keep && list.some(function (r) { return r.code === keep; })) pick.value = keep;
-  else pick.value = '';
-
-  if (!list.length) {
-    ovBingoSay('No active games — a host has to create one first', false);
-  } else if (current) {
-    const n = current.playerCount + (current.playerCount === 1 ? ' player' : ' players');
-    ovBingoSay('Showing ' + (current.hostName || current.code) + ' · ' + n + ' (' + current.code + ')', true);
-  } else {
-    ovBingoSay(list.length + (list.length === 1 ? ' game' : ' games') + ' running — none on the overlay', false);
-  }
+  /* Always the room really on the overlay — never a stale earlier pick. */
+  pick.value = ovBingoLive;
 }
 
 function ovBingoSayErr(text) {
@@ -369,7 +377,7 @@ function ovBingoSayErr(text) {
   ovBingoSay(text, false);
 }
 
-async function loadOvBingo() {
+async function loadOvBingo(force) {
   let res;
   try {
     res = await fetch('/api/bingo/state?list=1', { credentials: 'same-origin', cache: 'no-store' });
@@ -387,11 +395,13 @@ async function loadOvBingo() {
 
   let d;
   try { d = await res.json(); } catch { ovBingoSayErr('Could not read the room list'); return; }
-  renderOvBingo(d.rooms);
+  renderOvBingo(d.rooms, force === true);
 }
 
 async function setOvBingo(code) {
+  const pick = document.getElementById('ovBingoRoomPick');
   const body = code ? { code: code, makeCurrent: true } : { clear: true };
+  let okay = false;
   try {
     const res = await fetch('/api/bingo/overlay', {
       method: 'POST',
@@ -401,8 +411,9 @@ async function setOvBingo(code) {
     });
     const d = await res.json().catch(function () { return {}; });
     if (res.ok && d.success) {
+      okay = true;
       showBotStatus(code ? 'Commander Bingo ' + code + ' is on the overlay.' : 'Commander Bingo hidden from the overlay.', false);
-    } else if (res.status === 404) {
+    } else if (res.status === 404 && !d.error) {
       showBotStatus('The bingo overlay route returned 404. The server needs restarting after the last pull.', true);
     } else {
       showBotStatus(d.error || 'Could not change the overlay.', true);
@@ -410,7 +421,9 @@ async function setOvBingo(code) {
   } catch {
     showBotStatus('Network error changing the overlay.', true);
   }
-  await loadOvBingo();
+  /* A refused pick must not stay selected as though it were live. */
+  if (!okay && pick) pick.value = ovBingoLive;
+  await loadOvBingo(true);
 }
 
 function initOvBingo() {
@@ -419,9 +432,9 @@ function initOvBingo() {
   if (!pick) return;
 
   pick.addEventListener('change', function () { setOvBingo(pick.value); });
-  if (refresh) refresh.addEventListener('click', function () { loadOvBingo(); });
+  if (refresh) refresh.addEventListener('click', function () { loadOvBingo(true); });
 
-  loadOvBingo();
+  loadOvBingo(true);
   /* Slow tick so rooms created after this page opened show up without a
      manual refresh. The dashboard is not the OBS overlay, so an idle poll
      here carries none of the marathon-safety cost. */

@@ -561,6 +561,7 @@
     <button class="create-btn" onclick="createGame()">Create Game</button>
     <p class="create-note">
       Creates a game session with a 4-letter code. Share the code with your audience so they can join and get their bingo cards.
+      Anyone logged in with Twitch can host; only games the broadcaster or a moderator put on stream show on the overlay.
     </p>
     <p class="create-note" id="authMsg" hidden style="color:var(--red,#ff0000)"></p>
     <a class="create-btn" id="loginBtn" hidden target="_top" href="/api/auth/twitch"
@@ -655,6 +656,10 @@
     let currentCat = 'all';
     let useApi = false;
     let showOnOverlay = true;
+    /* Whether this room is the one the stream overlay follows. Only staff
+       can make it so (by creating it, or from the Overlay Dashboard); for any
+       other room the switch has nothing to switch. */
+    let overlayLive = true;
 
     /* The room this browser is hosting, remembered so a refresh or a dropped
        connection can walk straight back into the live game instead of the
@@ -668,6 +673,15 @@
     function renderOverlayToggle() {
       const btn = document.getElementById('overlayToggleBtn');
       const txt = document.getElementById('overlayToggleText');
+      if (useApi && !overlayLive) {
+        btn.classList.remove('on');
+        btn.disabled = true;
+        btn.title = 'Only the broadcaster or a moderator can put a game on the stream overlay.';
+        txt.textContent = 'Overlay: Not on stream';
+        return;
+      }
+      btn.disabled = false;
+      btn.title = '';
       btn.classList.toggle('on', showOnOverlay);
       txt.textContent = 'Overlay: ' + (showOnOverlay ? 'On' : 'Off');
     }
@@ -688,6 +702,7 @@
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error || 'Could not change the overlay.');
           showOnOverlay = !!data.showOnOverlay;
+          if (typeof data.isCurrent === 'boolean') overlayLive = data.isCurrent;
         } catch (err) {
           window.alert(err.message);
         } finally {
@@ -717,6 +732,7 @@
       calledEvents = new Set();
       gameCode = generateCode();
       showOnOverlay = true;
+      overlayLive = true;
 
       let res = null;
       try {
@@ -733,8 +749,9 @@
          that dropped an unauthorized user into a host panel that looked real
          but no player could ever join. Stop and tell them instead. */
       if (res && (res.status === 401 || res.status === 403)) {
+        const refusal = await res.json().catch(() => ({}));
         const msg = document.getElementById('authMsg');
-        msg.textContent = 'Only the broadcaster and moderators can host Commander Bingo.';
+        msg.textContent = refusal.error || 'Log in with Twitch to host Commander Bingo.';
         msg.hidden = false;
         const loginBtn = document.getElementById('loginBtn');
         loginBtn.href = '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname);
@@ -744,6 +761,8 @@
 
       if (res && res.ok) {
         useApi = true;
+        const created = await res.json().catch(() => ({}));
+        overlayLive = created.onOverlay === true;
       } else {
         /* Network error or server 5xx only — the intended offline fallback. */
         useApi = false;
@@ -800,7 +819,8 @@
             restoreHost(code, true, {
               called: Array.isArray(g.calledEvents) ? g.calledEvents : [],
               players: g.playerCount || 0,
-              showOnOverlay: g.showOnOverlay !== false
+              showOnOverlay: g.showOnOverlay !== false,
+              onOverlay: g.onOverlay !== false
             });
             return;
           }
@@ -841,6 +861,7 @@
       useApi = api;
       calledEvents = new Set(s.called);
       showOnOverlay = s.showOnOverlay;
+      overlayLive = s.onOverlay !== false;
       document.getElementById('codeDisplay').textContent = gameCode;
       document.getElementById('playerCount').textContent = s.players;
       updateCalledCount();
@@ -903,10 +924,7 @@
             body: JSON.stringify({
               code: gameCode,
               eventId: id,
-              action: wasCalled ? 'uncall' : 'call',
-              /* The square's text, so the overlay can name the call. Cosmetic
-                 and host-only; ignored on an uncall. */
-              text: (BINGO_EVENTS.find(e => e.id === id) || {}).text || ''
+              action: wasCalled ? 'uncall' : 'call'
             })
           });
         } catch { /* silent */ }

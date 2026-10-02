@@ -1,10 +1,11 @@
+import { TOTAL_EVENTS, squareText } from './squares.js';
+import { readPointer, alertsAllowed } from './overlay.js';
+
 const GAME_TTL = 14400;
-const TOTAL_EVENTS = 68;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
-
 
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
@@ -24,56 +25,63 @@ export async function onRequestPost(context) {
   const eventId = body.eventId;
   const action = body.action;
   if (!code || eventId == null) return json({ error: 'Missing code or eventId' }, 400);
-  if (!Number.isInteger(eventId) || eventId < 1 || eventId > TOTAL_EVENTS) {
+  if (!Number.isInteger(eventId) || squareText(eventId) == null) {
     return json({ error: 'Invalid eventId' }, 400);
   }
 
-  const key = `bingo_${code}`;
-  const raw = await env.MARKETPLACE.get(key);
-  if (!raw) return json({ error: 'Game not found' }, 404);
+  /* Read before the room lock, not inside it: it is a different row, and
+     the decision only needs to be as fresh as this request. */
+  const pointer = await readPointer(env);
 
-  const game = JSON.parse(raw);
+  let failure = null;
+  let alert = null;
+  let calledEvents = [];
 
-  /* ONLY THE HOST. There was no check at all, so anybody who knew a room
-     code — and players are told it, that is how they join — could call
-     events into somebody else's game or un-call them. Harmless while bingo
-     was for fun; not harmless now that a called event is what decides who
-     gets a prize. */
-  if (!session || String(session.user_id) !== String(game.host)) {
-    return json({ error: 'Only the host can call events.' }, 403);
-  }
+  await env.MARKETPLACE.mutate(`bingo_${code}`, (game) => {
+    if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
 
-  if (game.status === 'ended') return json({ error: 'Game has ended' }, 400);
-
-  let newlyCalled = false;
-  if (action === 'uncall') {
-    game.calledEvents = game.calledEvents.filter(id => id !== eventId);
-  } else {
-    if (!game.calledEvents.includes(eventId)) {
-      game.calledEvents.push(eventId);
-      newlyCalled = true;
+    /* ONLY THE HOST. Anybody who knew a room code — and players are told
+       it, that is how they join — could otherwise call events into somebody
+       else's game, and a called event is what decides who gets a prize. */
+    if (!session || String(session.user_id) !== String(game.host)) {
+      failure = json({ error: 'Only the host can call events.' }, 403);
+      return undefined;
     }
-  }
+    if (game.status === 'ended') { failure = json({ error: 'Game has ended' }, 400); return undefined; }
 
-  await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+    if (!Array.isArray(game.calledEvents)) game.calledEvents = [];
+    if (action === 'uncall') {
+      game.calledEvents = game.calledEvents.filter(id => id !== eventId);
+    } else if (!game.calledEvents.includes(eventId)) {
+      game.calledEvents.push(eventId);
 
-  /* Overlay alert on a GENUINELY new call only — never on an uncall, and
-     never on re-calling a square already up, or the stream would flash the
-     same alert twice. Suppressed entirely when the host has the game off the
-     overlay: the switch means "no bingo on stream", alerts included. The
-     label is the host's own event text (the host page already has it); it is
-     cosmetic and host-only, so it is trusted here and escaped where the
-     overlay renders it. Best-effort: an overlay hiccup must not fail the
-     call itself. */
-  if (newlyCalled && game.showOnOverlay !== false) {
-    const label = String(body.text || '').slice(0, 120).trim();
+      /* ONE ALERT PER SQUARE PER GAME, on the off->on edge only. A host
+         toggling a square call/undo/call must not flash it on stream each
+         time, so the squares that have alerted are remembered in the room. */
+      const alerted = Array.isArray(game.alertedEvents) ? game.alertedEvents : [];
+      if (!alerted.includes(eventId) && alertsAllowed(pointer, code, game)) {
+        alerted.push(eventId);
+        game.alertedEvents = alerted;
+        alert = { called: game.calledEvents.length };
+      }
+    }
+    calledEvents = game.calledEvents;
+    return game;
+  }, { expirationTtl: GAME_TTL });
+
+  if (failure) return failure;
+
+  /* The label is the server's own text for the square — never the request
+     body, which let any host put arbitrary text on stream. Best-effort: an
+     overlay hiccup must not fail the call itself. */
+  if (alert) {
     try {
       const { pushOverlayEvent } = await import('../overlay/events.js');
       await pushOverlayEvent(env, {
         type: 'bingo-call',
         eventId,
-        label,
-        called: game.calledEvents.length,
+        label: squareText(eventId),
+        called: alert.called,
         total: TOTAL_EVENTS,
       });
     } catch (err) {
@@ -81,5 +89,5 @@ export async function onRequestPost(context) {
     }
   }
 
-  return json({ success: true, calledEvents: game.calledEvents });
+  return json({ success: true, calledEvents });
 }
