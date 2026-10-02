@@ -27,6 +27,21 @@ async function saveInventory(env, userId, inv) {
   await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
 }
 
+/* Every rarity an inv_ item is actually written with: the cosmetic ladder
+   (common → mythic, exclusive above it) plus Dino Park's epic/legendary,
+   which dino-hatch.js stores on overflow eggs. Rarity reaches other people's
+   screens as a class name, so anything outside this set is reported as
+   'common' rather than passed through. */
+export const RARITIES = Object.freeze(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'exclusive']);
+
+export function normalizeRarity(r) {
+  return RARITIES.includes(r) ? r : 'common';
+}
+
+function publicItem(item) {
+  return item && typeof item === 'object' ? { ...item, rarity: normalizeRarity(item.rarity) } : item;
+}
+
 /**
  * Spend one consumable of a given game+type, under the inventory's lock.
  *
@@ -104,7 +119,7 @@ export async function onRequestGet(context) {
         .map(i => ({
           id: i.id,
           name: i.name,
-          rarity: i.rarity || 'common',
+          rarity: normalizeRarity(i.rarity),
           image: (i.meta && (i.meta.image || i.meta.imageUrl2x || i.meta.imageUrl1x)) || null,
         }));
     }
@@ -120,15 +135,19 @@ export async function onRequestGet(context) {
   const inv = await getInventory(env, session.user_id);
 
   if (game) {
-    const filtered = inv.items.filter(i => i.game === game);
+    const filtered = inv.items.filter(i => i.game === game).map(publicItem);
     const equips = inv.equips[game] || {};
     return json({ items: filtered, equips });
   }
 
-  return json(inv);
+  return json({ ...inv, items: (inv.items || []).map(publicItem) });
 }
 
-/* ── POST — grant, equip, use items ───────────── */
+/* ── POST — equip, use items ──────────────────────
+   There is deliberately no client-facing grant. Items are minted only by
+   server code (phamily-time, item-codes, channel-points, raid-badges, …);
+   a 'grant' action that took the item from the request body let any
+   signed-in user hand themselves anything. */
 
 export async function onRequestPost(context) {
   const { env, request } = context;
@@ -137,10 +156,6 @@ export async function onRequestPost(context) {
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
-
-  if (body.action === 'grant') {
-    return await handleGrant(env, session, body);
-  }
 
   if (body.action === 'equip') {
     return await handleEquip(env, session, body);
@@ -154,39 +169,7 @@ export async function onRequestPost(context) {
     return await handleSetShowcase(env, session, body);
   }
 
-  return json({ error: 'Invalid action' }, 400);
-}
-
-async function handleGrant(env, session, body) {
-  if (!body.item || !body.item.game || !body.item.type || !body.item.id) {
-    return json({ error: 'Invalid item' }, 400);
-  }
-
-  const inv = await getInventory(env, session.user_id);
-
-  const existing = inv.items.find(i => i.id === body.item.id && !i.consumable);
-  if (existing) return json({ success: true, duplicate: true });
-
-  inv.items.push({
-    id: body.item.id,
-    game: body.item.game,
-    type: body.item.type,
-    name: body.item.name || body.item.id,
-    rarity: body.item.rarity || 'common',
-    consumable: body.item.consumable || false,
-    quantity: body.item.quantity || 1,
-    grantedAt: Date.now(),
-    source: body.source || 'phamily-time',
-    /* Carried through, because meta is where a badge's ARTWORK lives —
-       `image` for a site badge, Twitch's own URLs for an imported one.
-       Dropping it here meant a granted badge could never show its art no
-       matter what the grant supplied, and the tile would silently fall back
-       to the slot emoji. */
-    meta: (body.item.meta && typeof body.item.meta === 'object') ? body.item.meta : undefined,
-  });
-
-  await saveInventory(env, session.user_id, inv);
-  return json({ success: true });
+  return json({ error: 'Unknown action' }, 400);
 }
 
 async function handleEquip(env, session, body) {
@@ -248,5 +231,5 @@ async function handleUse(env, session, body) {
   }
 
   await saveInventory(env, session.user_id, inv);
-  return json({ success: true, item, remaining: item.quantity || 0 });
+  return json({ success: true, item: publicItem(item), remaining: item.quantity || 0 });
 }

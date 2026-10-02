@@ -6,8 +6,19 @@
 
   function esc(s) {
     var d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* Rarity and cosmetic variants come from other players' stored items and
+     end up in class names and image paths, so both are checked against a
+     fixed shape rather than trusted. */
+  var RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
+  function safeRarity(r) {
+    return RARITIES.indexOf(r) !== -1 ? r : 'common';
+  }
+  function safeVariant(v) {
+    return (typeof v === 'string' && /^[a-z0-9-]{1,40}$/.test(v)) ? v : null;
   }
 
   /* Short-scale big-number formatter for Skull Clicker, matching the in-game
@@ -110,8 +121,8 @@
         /* Name effect on the name text — managed, so only in-view names animate
            and the board never runs more than the cap at once. Banner behind the
            whole row. */
-        if (CV) CV.applyNameFx(nameEl.querySelector('.lb-name-text'), entry.nameEffect || null, { managed: true });
-        applyRowBanner(row, entry.banner || null);
+        if (CV) CV.applyNameFx(nameEl.querySelector('.lb-name-text'), safeVariant(entry.nameEffect), { managed: true });
+        applyRowBanner(row, safeVariant(entry.banner));
       } else {
         nameEl.dataset.userId = '';
         var txt = nameEl.querySelector('.lb-name-text');
@@ -147,8 +158,9 @@
           var badges = showcases[el.dataset.userId];
           if (!badges || badges.length === 0) return;
           var badgeHtml = badges.map(function (b) {
-            var icon = RARITY_ICON[b.rarity] || RARITY_ICON.common;
-            return '<span class="lb-badge lb-badge-' + b.rarity + '" title="' + esc(b.name) + '">' + icon + '</span>';
+            var rarity = safeRarity(b && b.rarity);
+            var icon = RARITY_ICON[rarity] || RARITY_ICON.common;
+            return '<span class="lb-badge lb-badge-' + rarity + '" title="' + esc(b && b.name) + '">' + icon + '</span>';
           }).join('');
           el.insertAdjacentHTML('beforeend', '<span class="lb-badge-row">' + badgeHtml + '</span>');
         });

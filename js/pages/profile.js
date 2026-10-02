@@ -20,10 +20,27 @@
   var body = document.getElementById('profBody');
   if (!state || !body) return;
 
+  /* Quotes too: half of what goes through here lands inside an attribute
+     (title, src, data-role, class), and innerHTML alone leaves " intact. */
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
-    return d.innerHTML;
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  var RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'exclusive'];
+  function safeRarity(r) {
+    return RARITIES.indexOf(r) !== -1 ? r : 'common';
+  }
+  function safeVariant(v) {
+    return (typeof v === 'string' && /^[a-z0-9-]{1,40}$/.test(v)) ? v : null;
+  }
+  /* Image sources from stored data: site-relative paths, https, or the inline
+     png/webp portraits Dino Park's favourite-dino sanitizer already allows. */
+  function safeSrc(u) {
+    if (typeof u !== 'string') return '';
+    return (/^\/(?!\/)/.test(u) || /^https:\/\//i.test(u) ||
+      /^data:image\/(png|webp);base64,[a-z0-9+/=]+$/i.test(u)) ? u : '';
   }
 
   /* Whose profile. Falls back to the signed-in viewer so /profile with no
@@ -57,15 +74,17 @@
   }
 
   function rarityTag(r) {
-    return '<span class="prof-rarity r-' + esc(r || 'common') + '">' + esc(r || 'common') + '</span>';
+    var safe = safeRarity(r);
+    return '<span class="prof-rarity r-' + safe + '">' + safe + '</span>';
   }
 
   /* A badge, with its artwork where it has any. Twitch badges are 72px at
      most and render here at 48, so they are drawn pixelated rather than
      smoothed — the same treatment Dino Park's sprites get. */
   function badgeTile(b) {
-    var art = b.image
-      ? '<img src="' + esc(b.image) + '" alt="" class="prof-badge-art" data-glyph="' +
+    var img = safeSrc(b.image);
+    var art = img
+      ? '<img src="' + esc(img) + '" alt="" class="prof-badge-art" data-glyph="' +
         (b.founder ? '★' : '◆') + '">'
       : '<span class="prof-badge-fallback">' + (b.founder ? '★' : '◆') + '</span>';
     return '<div class="prof-badge" title="' + esc(b.name) + '">' +
@@ -106,14 +125,14 @@
        shared mapping resolves the same as a raw inventory item. The name effect
        itself is applied post-render (see below) via the shared applier. */
     var CV = window.CosmeticVariants;
-    var nameFx = (CV && equipped['name-effect']) ? CV.nameEffectVariant(equipped['name-effect']) : null;
+    var nameFx = (CV && equipped['name-effect']) ? safeVariant(CV.nameEffectVariant(equipped['name-effect'])) : null;
 
     /* The equipped banner is a tiered image behind the whole identity card,
        under a dark red/black scrim that keeps the name legible in either
        theme. variant is a fixed word, so the src is not user-controlled. If no
        banner is equipped the strip is simply absent; if the file is missing
        the onerror handler below strips it back to the plain card. */
-    var bannerVar = (CV && equipped.banner) ? CV.bannerVariant(equipped.banner) : null;
+    var bannerVar = (CV && equipped.banner) ? safeVariant(CV.bannerVariant(equipped.banner)) : null;
     var headCls = 'prof-head' + (bannerVar ? ' has-banner' : '');
     var bannerHtml = bannerVar
       ? '<img class="prof-banner-img" alt="" src="/assets/banners/banner-' + bannerVar + '.png">' +
@@ -123,7 +142,7 @@
     var head =
       '<header class="' + headCls + '">' +
         bannerHtml +
-        (p.avatar ? '<img class="prof-avatar" src="' + esc(p.avatar) + '" alt="">' : '<div class="prof-avatar"></div>') +
+        (safeSrc(p.avatar) ? '<img class="prof-avatar" src="' + esc(safeSrc(p.avatar)) + '" alt="">' : '<div class="prof-avatar"></div>') +
         '<div class="prof-ident">' +
           '<h1 class="prof-name">' + esc(p.displayName) + '</h1>' +
           (title ? '<p class="prof-title">' + esc(title) + '</p>' : '') +
@@ -133,7 +152,7 @@
              VIEWER is a moderator — so styling this label with one made it
              stretch for moderators and vanish for everybody else. */
           '<span class="prof-role" data-role="' + esc(p.role) + '">' +
-            esc(p.role.replace(/_/g, ' ')) + '</span>' +
+            esc(String(p.role || '').replace(/_/g, ' ')) + '</span>' +
         '</div>' +
       '</header>';
 
@@ -151,12 +170,12 @@
       var d = p.favoriteDino;
       /* Both filters were whitelisted server-side to the characters CSS
          filter functions are built from — see sanitizeFavorite. */
-      var art = d.portrait || d.src;
+      var art = safeSrc(d.portrait || d.src);
       var artFilter = d.portrait ? d.portraitFilter : d.filter;
       var style = artFilter ? ' style="filter:' + esc(artFilter) + '"' : '';
 
       var badges = '';
-      if (d.rarity) badges += '<span class="prof-dino-badge r-' + esc(d.rarity) + '">' + esc(d.rarity) + '</span>';
+      if (d.rarity) badges += '<span class="prof-dino-badge r-' + safeRarity(d.rarity) + '">' + safeRarity(d.rarity) + '</span>';
       if (d.diet) badges += '<span class="prof-dino-badge">' + esc(d.diet) + '</span>';
       if (d.build) badges += '<span class="prof-dino-badge">' + esc(d.build) + '</span>';
       if (d.mutationLabel) {
