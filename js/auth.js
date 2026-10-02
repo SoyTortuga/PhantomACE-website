@@ -205,8 +205,13 @@ function loadProfileCosmetics() {
 
       if (data.equips.badge && badgeEl) {
         var badge = data.items.find(function (i) { return i.id === data.equips.badge; });
-        if (badge && badge.meta && badge.meta.imageUrl) {
-          badgeEl.src = badge.meta.imageUrl;
+        /* Badge meta carries image/imageUrl2x/imageUrl1x (see inventory.js and
+           forum/authors.js) — there is no `imageUrl`, so the old check never
+           passed and the header badge never showed. Same accessor order as
+           everywhere else that renders a badge. */
+        var badgeImg = badge && badge.meta && (badge.meta.image || badge.meta.imageUrl2x || badge.meta.imageUrl1x);
+        if (badgeImg) {
+          badgeEl.src = badgeImg;
           badgeEl.alt = badge.name;
           badgeEl.title = badge.name;
           badgeEl.hidden = false;

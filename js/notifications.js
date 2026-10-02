@@ -51,11 +51,23 @@ function describeServerNotif(n) {
     case 'moderation': text = 'A moderator removed your post' + (n.reason ? `: ${n.reason}` : ''); break;
     default:           text = 'Something happened on the forum';
   }
-  if (n.postDeleted && n.kind !== 'moderation') text += ' (since removed)';
-  else if (n.threadId && n.postId) href = `/thread/${n.threadId}#post-${n.postId}`;
-  else if (n.kind === 'comment') {
+  if (n.postDeleted && n.kind !== 'moderation') {
+    text += ' (since removed)';
+  } else if (n.threadId && n.postId) {
+    href = `/thread/${n.threadId}#post-${n.postId}`;
+  } else if (n.profileId) {
+    /* A comment or a mention on a profile wall points at that wall, anchored
+       to the comment itself. A 'comment' is always on your own wall, so your
+       login is right even before the owner identity resolves; a 'mention' can
+       be on anyone's wall, so prefer the resolved owner and fall back to
+       yourself only when the wall is yours. Before this, a mention on a
+       profile got no link at all. */
     const me = (typeof getSession === 'function' ? getSession() : null) || {};
-    if (me.login) href = `/user/${encodeURIComponent(me.login)}`;
+    const owner = serverAuthors[n.profileId] || {};
+    const ownerLogin = owner.login
+      || (n.kind === 'comment' ? me.login : '')
+      || (me.user_id != null && String(n.profileId) === String(me.user_id) ? me.login : '');
+    if (ownerLogin) href = `/user/${encodeURIComponent(ownerLogin)}` + (n.postId ? `#post-${n.postId}` : '');
   }
   return { text, href };
 }
@@ -82,14 +94,19 @@ function markAllRead() {
   try {
     localStorage.setItem(PA_NOTIF_READ_KEY, String(Date.now()));
   } catch {}
-  /* The server's unread are read once the panel has shown them. The
-     highlight stays for this opening — the count is what clears. */
-  if (serverUnread > 0) {
-    serverUnread = 0;
+  /* Mark read only the forum notifications THIS page loaded, named by id.
+     Posting no ids tells the server to mark EVERYTHING unread read — including
+     anything that arrived after this page loaded, which the reader never saw
+     and which would then be cleared unseen. The highlight stays for this
+     opening; the count is what clears. */
+  const unreadIds = serverNotifs.filter(n => n && !n.read && n.id).map(n => n.id);
+  if (unreadIds.length) {
+    serverNotifs.forEach(n => { if (n) n.read = true; });
+    serverUnread = Math.max(0, serverUnread - unreadIds.length);
     fetch('/api/forum/notifications', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'read' }), cache: 'no-store',
-    }).then(() => { serverNotifs.forEach(n => { n.read = true; }); }).catch(() => {});
+      body: JSON.stringify({ action: 'read', ids: unreadIds }), cache: 'no-store',
+    }).catch(() => {});
   }
   updateBadge();
 }
@@ -242,12 +259,13 @@ function toggleNotifPanel() {
 
 function clearAllNotifications() {
   saveNotifications([]);
-  /* Clear the forum list from the panel too — before this it only emptied the
-     local live/offline list, so "Clear" left every reply and mention sitting
-     there. markAllRead() below tells the server they're read so they don't
-     come back on the next load. */
-  serverNotifs = [];
+  /* Mark the loaded forum notifications read BEFORE dropping them from the
+     panel: markAllRead() now reads their ids off serverNotifs to tell the
+     server exactly which were seen, so it must run while the list is still
+     populated. Emptying first would send no ids, and every reply and mention
+     would come back on the next load. */
   markAllRead();
+  serverNotifs = [];
   renderNotifPanel();
 }
 
