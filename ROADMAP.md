@@ -28,6 +28,13 @@ A light **season manifest** (slice of Rewards #6) → **Community** (C1–C4) �
 **Stream interactivity** (#10 → #9 → #11 → #12). `#4` (ad holds) stays parked until
 the broadcaster grants `channel:read:ads`.
 
+## Status
+- **Community epic — DONE & deployed.** C0 season manifest, C1 Seasonal Grimoire,
+  C2 Phamily Quests, C3 Room Crawl, C4 forum social + member directory + cosmetic
+  gifting. (Migrations 009_forum_social, 010_profile_social applied on the rig.)
+- **In progress: Rewards (B)**, starting with #6 (season registry).
+- Remaining: Overlay (A), Stream interactivity (D).
+
 ---
 
 ## Epic C — Community engagement (FIRST)
