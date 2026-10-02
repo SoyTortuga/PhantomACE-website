@@ -1,0 +1,225 @@
+/* ══════════════════════════════════════════════
+   MEMBER DIRECTORY
+
+   The site's gothic vocabulary: black grounds, red accents, depth from
+   borders only. No box-shadow, no side-border accent rails, no
+   backdrop-filter. Rarity colours come from the tokens and only ever signal
+   rarity.
+   ══════════════════════════════════════════════ */
+
+.mem-wrap { padding-block: 24px 72px; }
+
+/* ── Controls ─────────────────────────────────────────────────── */
+.mem-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.mem-search {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-family: var(--font-ui, serif);
+  font-size: 16px;
+  color: var(--text-pri);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+.mem-search::placeholder { color: var(--text-dim); }
+.mem-search:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+/* A segmented control, held together by a 1px gap over the shared
+   border-mid ground — no side-border divider (the AI accent-rail tell). */
+.mem-sort {
+  display: flex;
+  gap: 1px;
+  background: var(--border-mid);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mem-sort-btn {
+  font-family: var(--font-ui, serif);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: var(--gray-lo);
+  border: none;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.mem-sort-btn:hover { color: var(--text-pri); }
+.mem-sort-btn.active { color: #fff; background: var(--red); }
+
+.mem-count {
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 16px;
+}
+
+/* ── Grid ─────────────────────────────────────────────────────── */
+.mem-state {
+  color: var(--text-dim);
+  font-size: 19px;
+  padding: 40px 0;
+  text-align: center;
+  grid-column: 1 / -1;
+}
+
+.mem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.mem-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+.mem-card:hover { border-color: var(--red); }
+
+.mem-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mem-avatar {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--border-mid);
+  object-fit: cover;
+  background: var(--gray-mid);
+}
+.mem-avatar-blank { display: inline-block; }
+
+.mem-badge {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: var(--text-dim);
+}
+.mem-badge-art {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+.mem-badge-glyph { font-size: 18px; line-height: 1; }
+.mem-badge-uncommon  { color: var(--rarity-uncommon); }
+.mem-badge-rare      { color: var(--rarity-rare); }
+.mem-badge-epic      { color: var(--rarity-epic); }
+.mem-badge-legendary { color: var(--rarity-legendary); }
+.mem-badge-mythic    { color: var(--rarity-mythic); }
+.mem-badge-exclusive { color: var(--exclusive); }
+
+.mem-name {
+  font-family: var(--font-gothic, serif);
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 2px 0 0;
+  color: var(--text-pri);
+  overflow-wrap: anywhere;
+}
+
+.mem-title {
+  margin: 0;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+.mem-title.r-uncommon  { color: var(--rarity-uncommon); }
+.mem-title.r-rare      { color: var(--rarity-rare); }
+.mem-title.r-mythic    { color: var(--rarity-mythic); }
+.mem-title.r-exclusive { color: var(--exclusive); }
+
+.mem-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.mem-role {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  padding: 1px 7px;
+}
+.mem-role[data-role="moderator"]   { color: var(--role-moderator);   border-color: var(--role-moderator); }
+.mem-role[data-role="broadcaster"] { color: var(--role-broadcaster); border-color: var(--role-broadcaster); }
+.mem-role[data-role^="sub_"]       { color: var(--role-subscriber);  border-color: var(--role-subscriber); }
+.mem-role[data-role="follower"]    { color: var(--role-follower);    border-color: var(--role-follower); }
+
+.mem-joined {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* ── Pager ────────────────────────────────────────────────────── */
+.mem-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.mem-page-btn {
+  font-family: var(--font-ui, serif);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-sec);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 9px 20px;
+  cursor: pointer;
+}
+.mem-page-btn:hover:not(:disabled) { border-color: var(--red); color: var(--text-pri); }
+.mem-page-btn:disabled { opacity: 0.4; cursor: default; }
+
+.mem-page-at {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .mem-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .mem-avatar { width: 48px; height: 48px; }
+}

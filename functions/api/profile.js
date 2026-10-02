@@ -29,6 +29,59 @@ function json(data, status = 200) {
   });
 }
 
+function getSession(request) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(/(?:^|;\s*)pham_session=([^;]+)/);
+  if (!match) return null;
+  try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
+}
+
+/* ── The social fields a person writes about themselves ────────────────────
+   Bio and links are the first profile data the OWNER authors, so they are
+   bounded here and escaped at render like every other piece of someone-else's
+   text on the page. The sanitisers are exported because the directory re-runs
+   the link check on read (defence in depth) and the test suite drives them
+   directly. */
+export const BIO_MAX = 300;
+export const LINK_LABEL_MAX = 40;
+export const LINK_URL_MAX = 200;
+export const LINKS_MAX = 5;
+
+export function sanitizeBio(raw) {
+  if (raw == null) return '';
+  /* Normalise newlines, drop NULs (jsonb refuses them), trim, then cap. The
+     text is stored as written and escaped at render — nothing reconstructs
+     markup from it. */
+  const s = String(raw).replace(/\r\n?/g, '\n').replace(/\u0000/g, '').trim();
+  return s.slice(0, BIO_MAX);
+}
+
+/** One link, or null if it is not a usable http(s) link. */
+export function sanitizeLink(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const label = String(raw.label == null ? '' : raw.label)
+    .replace(/\u0000/g, '').replace(/[\r\n]+/g, ' ').trim().slice(0, LINK_LABEL_MAX);
+  const urlRaw = String(raw.url == null ? '' : raw.url).trim();
+  if (!urlRaw || urlRaw.length > LINK_URL_MAX) return null;
+  let u;
+  try { u = new URL(urlRaw); } catch { return null; }
+  /* http/https only: javascript:, data:, mailto: and the rest are refused so a
+     link rendered on a public page cannot be an injection or a surprise. */
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  return { label: label || u.hostname, url: u.href };
+}
+
+export function sanitizeLinks(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw) {
+    const link = sanitizeLink(item);
+    if (link) out.push(link);
+    if (out.length >= LINKS_MAX) break;      // a cap, not a truncation of garbage
+  }
+  return out;
+}
+
 /** The boards a profile reports a placing on, and what each one counts. */
 const BOARDS = [
   { key: 'sc_leaderboard',     game: 'skull-clicker',    label: 'Skull Clicker', unit: 'High Score' },
@@ -285,6 +338,11 @@ export async function onRequestGet(context) {
     avatar: profile.avatar || '',
     role: profile.role || 'viewer',
     firstSeen: profile.firstSeen || null,
+    /* Self-written, read-only to viewers. Bio is escaped at render; links are
+       re-sanitised here so a stored shape that ever drifted cannot put a
+       non-http(s) href on the page. */
+    bio: typeof profile.bio === 'string' ? profile.bio : '',
+    links: sanitizeLinks(profile.links),
     showcase,
     equipped,
     collection,
@@ -293,4 +351,39 @@ export async function onRequestGet(context) {
     standings,
     favoriteDino,
   });
+}
+
+/* ── POST /api/profile — set your OWN bio and links ─────────────────────────
+   Login-gated and own-profile-only by construction: the record written is
+   keyed by the SESSION's user id, never a target from the request, so there
+   is no id to tamper with. Merged under the row's lock so it cannot clobber
+   the login / display name / avatar that auth writes on every sign-in. */
+export async function onRequestPost(context) {
+  const { env, request } = context;
+
+  const session = getSession(request);
+  if (!session || !session.user_id) return json({ error: 'Not logged in' }, 401);
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+
+  if (body.action !== 'set-social') return json({ error: 'Unknown action' }, 400);
+
+  const bio = sanitizeBio(body.bio);
+  const links = sanitizeLinks(body.links);
+
+  const userId = String(session.user_id);
+  let saved = null;
+  await env.MARKETPLACE.mutate(`profile_${userId}`, (cur) => {
+    /* A profile exists the moment someone has signed in. If somehow there is
+       none, decline the write rather than mint an identity with no login. */
+    if (!cur || typeof cur !== 'object') return undefined;
+    cur.bio = bio;
+    cur.links = links;
+    saved = { bio, links };
+    return cur;
+  });
+
+  if (!saved) return json({ error: 'No profile to update yet' }, 404);
+  return json({ success: true, bio: saved.bio, links: saved.links });
 }

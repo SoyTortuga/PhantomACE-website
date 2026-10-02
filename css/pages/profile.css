@@ -394,6 +394,162 @@
   .prof-unit { display: none; }
 }
 
+/* ── About: bio + links ───────────────────────────────────────────
+   Self-written text in the page's gothic palette. Borders only — no
+   box-shadow, no side-border accents, no backdrop-filter. */
+.prof-bio {
+  margin: 0 0 14px;
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--text-sec);
+  overflow-wrap: anywhere;
+}
+
+.prof-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prof-link {
+  display: inline-block;
+  font-size: 16px;
+  color: var(--text-pri);
+  text-decoration: none;
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 7px 14px;
+  overflow-wrap: anywhere;
+}
+.prof-link:hover { border-color: var(--red); color: var(--red); }
+
+.prof-about-empty {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.prof-about-edit,
+.prof-link-add,
+.prof-about-save,
+.prof-about-cancel {
+  font-family: var(--font-ui, serif);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--text-sec);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.prof-about-edit { margin-top: 12px; }
+.prof-about-edit:hover,
+.prof-link-add:hover:not(:disabled),
+.prof-about-cancel:hover { border-color: var(--red); color: var(--text-pri); }
+
+.prof-about-save {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+.prof-about-save:disabled { opacity: 0.55; cursor: default; }
+.prof-link-add:disabled { opacity: 0.45; cursor: default; }
+
+/* ── About: the owner's edit form ─────────────────────────────── */
+.prof-about-form {
+  margin-top: 14px;
+  padding: 18px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.prof-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.prof-field-label {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.prof-field-hint {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-dim);
+}
+
+.prof-bio-input,
+.prof-link-label,
+.prof-link-url {
+  width: 100%;
+  font-family: var(--font-ui, serif);
+  font-size: 16px;
+  color: var(--text-pri);
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 9px 12px;
+}
+.prof-bio-input { resize: vertical; min-height: 64px; }
+.prof-bio-input:focus,
+.prof-link-label:focus,
+.prof-link-url:focus { outline: none; border-color: var(--red); }
+
+.prof-field .prof-field-hint { display: block; text-align: right; margin-top: 4px; }
+
+.prof-links-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.prof-link-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.prof-link-row .prof-link-label { flex: 1 1 140px; }
+.prof-link-row .prof-link-url { flex: 2 1 200px; }
+
+.prof-link-remove {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.prof-link-remove:hover { border-color: var(--red); color: var(--red); }
+
+.prof-about-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.prof-about-error {
+  margin: 10px 0 0;
+  font-size: 15px;
+  color: var(--red);
+}
+
 /* Comment wall (drawn by profile-comments.js with community.css classes). */
 .prof-comments-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 18px; color: var(--text-sec); margin-bottom: 12px; cursor: pointer; }
 .prof-comments-switch input { accent-color: var(--red); }

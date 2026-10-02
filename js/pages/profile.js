@@ -43,6 +43,19 @@
       /^data:image\/(png|webp);base64,[a-z0-9+/=]+$/i.test(u)) ? u : '';
   }
 
+  /* A link href is validated server-side; this is the matching client guard so
+     a malformed stored value can never put a non-http(s) href on the page. */
+  function safeHttpUrl(u) {
+    if (typeof u !== 'string') return '';
+    try {
+      var url = new URL(u);
+      return (url.protocol === 'http:' || url.protocol === 'https:') ? u : '';
+    } catch (e) { return ''; }
+  }
+
+  var BIO_MAX = 300;
+  var LINKS_MAX = 5;
+
   /* Whose profile. Falls back to the signed-in viewer so /profile with no
      query is "mine" rather than an error. */
   function wanted() {
@@ -115,9 +128,167 @@
       '<h2 class="prof-section-title">' + esc(title) + '</h2>' + inner + '</section>';
   }
 
+  /* ── About: the owner's bio and links ─────────────────────────────────
+     Everything here is the profile owner's own text, escaped like the rest of
+     the page. The links were validated to http(s) server-side and are checked
+     again here. */
+  function linksList(links) {
+    var safe = (links || []).map(function (l) {
+      return { label: (l && l.label) || '', url: safeHttpUrl(l && l.url) };
+    }).filter(function (l) { return l.url; });
+    if (!safe.length) return '';
+    return '<ul class="prof-links">' + safe.map(function (l) {
+      return '<li><a class="prof-link" href="' + esc(l.url) + '" ' +
+        'target="_blank" rel="noopener noreferrer nofollow ugc">' +
+        esc(l.label || l.url) + '</a></li>';
+    }).join('') + '</ul>';
+  }
+
+  function aboutDisplay(p) {
+    var bio = (typeof p.bio === 'string' ? p.bio : '').trim();
+    var bioHtml = bio ? '<p class="prof-bio">' + esc(bio).replace(/\n/g, '<br>') + '</p>' : '';
+    return bioHtml + linksList(p.links);
+  }
+
+  var ABOUT_EMPTY = '<p class="prof-about-empty">Say who you are — a short bio and ' +
+    'a few links. Everyone who opens your profile sees them.</p>';
+
+  function linkInputRow(l) {
+    l = l || {};
+    return '<div class="prof-link-row">' +
+      '<input type="text" class="prof-link-label" maxlength="40" placeholder="Label (e.g. Twitch)" value="' + esc(l.label || '') + '">' +
+      '<input type="url" class="prof-link-url" maxlength="200" placeholder="https://…" value="' + esc(safeHttpUrl(l.url) || '') + '">' +
+      '<button type="button" class="prof-link-remove" aria-label="Remove link">×</button>' +
+    '</div>';
+  }
+
+  function aboutForm(p) {
+    var bio = (typeof p.bio === 'string' ? p.bio : '');
+    var links = Array.isArray(p.links) ? p.links : [];
+    var count = Math.min(Math.max(links.length, 1), LINKS_MAX);
+    var rows = '';
+    for (var i = 0; i < count; i++) rows += linkInputRow(links[i]);
+    return '<form class="prof-about-form" id="profAboutForm" hidden>' +
+      '<label class="prof-field">' +
+        '<span class="prof-field-label">Bio</span>' +
+        '<textarea class="prof-bio-input" id="profBioInput" maxlength="' + BIO_MAX + '" rows="3" ' +
+          'placeholder="A line or two about you.">' + esc(bio) + '</textarea>' +
+        '<span class="prof-field-hint"><span id="profBioCount">' + bio.length + '</span>/' + BIO_MAX + '</span>' +
+      '</label>' +
+      '<span class="prof-field-label">Links <span class="prof-field-hint">up to ' + LINKS_MAX + '</span></span>' +
+      '<div class="prof-links-edit" id="profLinksEdit">' + rows + '</div>' +
+      '<button type="button" class="prof-link-add" id="profLinkAdd">Add link</button>' +
+      '<p class="prof-about-error" id="profAboutError" hidden></p>' +
+      '<div class="prof-about-actions">' +
+        '<button type="submit" class="prof-about-save">Save</button>' +
+        '<button type="button" class="prof-about-cancel" id="profAboutCancel">Cancel</button>' +
+      '</div>' +
+    '</form>';
+  }
+
+  function aboutSection(p, isOwner) {
+    var display = aboutDisplay(p);
+    if (!display && !isOwner) return '';
+    return '<section class="prof-section prof-about">' +
+      '<h2 class="prof-section-title">About</h2>' +
+      '<div class="prof-about-view" id="profAboutView">' + (display || ABOUT_EMPTY) + '</div>' +
+      (isOwner
+        ? '<button type="button" class="prof-about-edit" id="profAboutEdit">' +
+            (display ? 'Edit bio &amp; links' : 'Add a bio &amp; links') + '</button>' +
+          aboutForm(p)
+        : '') +
+    '</section>';
+  }
+
+  function wireAbout(p) {
+    var section = body.querySelector('.prof-about');
+    if (!section) return;
+    var form = section.querySelector('#profAboutForm');
+    if (!form) return;                                  // viewer, not owner
+    var view = section.querySelector('#profAboutView');
+    var editBtn = section.querySelector('#profAboutEdit');
+    var linksEdit = section.querySelector('#profLinksEdit');
+    var addBtn = section.querySelector('#profLinkAdd');
+    var errEl = section.querySelector('#profAboutError');
+    var bioInput = section.querySelector('#profBioInput');
+    var bioCount = section.querySelector('#profBioCount');
+
+    function open() { form.hidden = false; view.hidden = true; if (editBtn) editBtn.hidden = true; }
+    function close() { form.hidden = true; view.hidden = false; if (editBtn) editBtn.hidden = false; }
+
+    if (editBtn) editBtn.addEventListener('click', open);
+    var cancel = section.querySelector('#profAboutCancel');
+    if (cancel) cancel.addEventListener('click', close);
+
+    if (bioInput && bioCount) {
+      bioInput.addEventListener('input', function () { bioCount.textContent = String(bioInput.value.length); });
+    }
+
+    function syncAdd() {
+      if (addBtn) addBtn.disabled = linksEdit.querySelectorAll('.prof-link-row').length >= LINKS_MAX;
+    }
+    if (addBtn) addBtn.addEventListener('click', function () {
+      if (linksEdit.querySelectorAll('.prof-link-row').length >= LINKS_MAX) return;
+      linksEdit.insertAdjacentHTML('beforeend', linkInputRow(null));
+      syncAdd();
+    });
+    linksEdit.addEventListener('click', function (e) {
+      var rm = e.target.closest('.prof-link-remove');
+      if (!rm) return;
+      var row = rm.closest('.prof-link-row');
+      if (row) row.remove();
+      syncAdd();
+    });
+    syncAdd();
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bio = bioInput ? bioInput.value : '';
+      var links = [];
+      var rows = linksEdit.querySelectorAll('.prof-link-row');
+      for (var i = 0; i < rows.length; i++) {
+        var urlv = rows[i].querySelector('.prof-link-url').value.trim();
+        if (!urlv) continue;
+        links.push({ label: rows[i].querySelector('.prof-link-label').value.trim(), url: urlv });
+      }
+      var saveBtn = form.querySelector('.prof-about-save');
+      if (saveBtn) saveBtn.disabled = true;
+      if (errEl) errEl.hidden = true;
+
+      fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'set-social', bio: bio, links: links }),
+      }).then(function (r) {
+        return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+      }).then(function (res) {
+        if (!res.ok) throw new Error((res.d && res.d.error) || 'Could not save.');
+        p.bio = res.d.bio;
+        p.links = res.d.links;
+        var display = aboutDisplay(p);
+        view.innerHTML = display || ABOUT_EMPTY;
+        if (editBtn) editBtn.innerHTML = display ? 'Edit bio &amp; links' : 'Add a bio &amp; links';
+        close();
+      }).catch(function (err) {
+        if (errEl) { errEl.textContent = err.message; errEl.hidden = false; }
+      }).finally(function () {
+        if (saveBtn) saveBtn.disabled = false;
+      });
+    });
+  }
+
   function render(p) {
     var equipped = p.equipped || {};
     var title = equipped.title ? equipped.title.name : '';
+
+    /* Is the viewer looking at their own profile? Only then is the About
+       section editable. Compared on the stable user id, never the login. */
+    var isOwner = false;
+    try {
+      var sess = (typeof getSession === 'function') ? getSession() : null;
+      isOwner = !!(sess && sess.user_id && String(sess.user_id) === String(p.userId));
+    } catch (e) { isOwner = false; }
 
     /* Variant mapping is shared — js/cosmetic-variants.js, loaded before this
        script — so nav / profile / leaderboards / chat agree. The profile API's
@@ -245,6 +416,7 @@
     body.innerHTML =
       head +
       stats +
+      aboutSection(p, isOwner) +
       section('Showcase', showcase) +
       section('Favourite dino', dino) +
       section('Standings', standings) +
@@ -295,6 +467,9 @@
       bannerImg.addEventListener('error', dropBanner);
       if (bannerImg.complete && bannerImg.naturalWidth === 0) dropBanner();
     }
+
+    /* Owner-only: wire the bio/links editor. A no-op for a viewer. */
+    wireAbout(p);
 
     body.hidden = false;
     state.hidden = true;

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The PhantomACE Phamily - everyone who's signed in, the titles and badges they wear, and when they joined the crypt.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Members | PhantomACE</title>
+
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/members.css">
+</head>
+<body data-page="members">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">The Phamily</h1>
+    <p class="page-hero-subtitle">Everyone who has wandered in and signed their name. The titles and badges here are worn, not just owned.</p>
+  </section>
+
+  <section class="page-container mem-wrap">
+    <div class="mem-controls">
+      <input type="search" id="memSearch" class="mem-search" placeholder="Find someone by name…"
+        autocomplete="off" spellcheck="false" maxlength="30" aria-label="Search members by name">
+      <div class="mem-sort" role="group" aria-label="Sort members">
+        <button type="button" class="mem-sort-btn active" data-sort="joined">Newest</button>
+        <button type="button" class="mem-sort-btn" data-sort="name">A–Z</button>
+      </div>
+    </div>
+
+    <p class="mem-count" id="memCount" aria-live="polite"></p>
+
+    <div class="mem-grid" id="memGrid">
+      <p class="mem-state">Summoning the Phamily…</p>
+    </div>
+
+    <nav class="mem-pager" id="memPager" hidden aria-label="Member pages">
+      <button type="button" class="mem-page-btn" id="memPrev">Prev</button>
+      <span class="mem-page-at" id="memPageAt"></span>
+      <button type="button" class="mem-page-btn" id="memNext">Next</button>
+    </nav>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/members.js" defer></script>
+</body>
+</html>
