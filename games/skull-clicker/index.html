@@ -869,10 +869,20 @@
       0%, 100% { border-color: #aa44ff; }
       50% { border-color: #ff99ff; }
     }
+    .skull-btn.theme-bonewhite { border-color: #e6e6e6; border-width: 3px; background: radial-gradient(circle at 40% 35%, #3a3a3a, #141414, #000); }
+    .skull-btn.theme-graveash { border-color: #6a6a6a; border-width: 3px; background: radial-gradient(circle at 40% 35%, #262626, #101010, #000); }
+    .skull-btn.theme-reapermoon { border-color: #990000; border-width: 3px;
+      background: radial-gradient(circle at 50% 42%, #000 32%, #550000 58%, #a00000 72%, #1a0000 88%, #000);
+      animation: reapermoon-pulse 2.4s ease-in-out infinite; }
+    @keyframes reapermoon-pulse {
+      0%, 100% { border-color: #880000; }
+      50% { border-color: #ff3333; }
+    }
     .click-effect-blood .click-pop { color: #ff3333 !important; }
     .click-effect-void .click-pop { color: #aa66ff !important; }
     .click-effect-chaos .click-pop { color: #ffaa00 !important; }
     .click-effect-eternal .click-pop { color: #ff00ff !important; text-shadow: 0 0 6px rgba(255,0,255,0.5); }
+    .click-effect-wraith .click-pop { color: #f2f2f2 !important; text-shadow: 0 0 7px rgba(255,255,255,0.55) !important; }
   </style>
 </head>
 <body>
@@ -4899,6 +4909,9 @@
       'void': { name: 'Void Skull', desc: 'A skull from beyond the cosmic veil', cssClass: 'theme-void' },
       'chaos': { name: 'Chaos Skull', desc: 'Burning with chaotic energy', cssClass: 'theme-chaos' },
       'eternal': { name: 'Eternal Darkness', desc: 'A mythic skull pulsing with dark power', cssClass: 'theme-eternal' },
+      'bonewhite': { name: 'Bonewhite Skull', desc: 'Bleached bone, pale against the dark', cssClass: 'theme-bonewhite' },
+      'graveash': { name: 'Graveash Skull', desc: 'Cold grey ash from a snuffed pyre', cssClass: 'theme-graveash' },
+      'reapermoon': { name: 'Reaper Moon Skull', desc: 'A red harvest moon pulsing behind the bone', cssClass: 'theme-reapermoon' },
     };
 
     const CLICK_EFFECTS = {
@@ -4907,6 +4920,7 @@
       'void': { name: 'Void Click', desc: 'Purple ethereal numbers', cssClass: 'click-effect-void' },
       'chaos': { name: 'Chaos Strike', desc: 'Fiery orange numbers', cssClass: 'click-effect-chaos' },
       'eternal': { name: 'Eternal Darkness', desc: 'Mythic glowing magenta numbers', cssClass: 'click-effect-eternal' },
+      'wraith': { name: 'Wraith Wisp', desc: 'Pale ghostlight numbers that glow white', cssClass: 'click-effect-wraith' },
     };
 
     let ownedCosmetics = [];
@@ -5007,6 +5021,10 @@
       if (n.includes('void')) return 'void';
       if (n.includes('chaos')) return 'chaos';
       if (n.includes('eternal') || n.includes('darkness')) return 'eternal';
+      if (n.includes('bonewhite')) return 'bonewhite';
+      if (n.includes('graveash')) return 'graveash';
+      if (n.includes('reaper') || n.includes('reapermoon')) return 'reapermoon';
+      if (n.includes('wraith')) return 'wraith';
       return item.id;
     }
 
@@ -5023,7 +5041,7 @@
       const themes = ownedCosmetics.filter(i =>
         i.type === 'skull-skin' || legacyName(i, ['skin', 'skull', 'theme']));
       const effects = ownedCosmetics.filter(i =>
-        i.type === 'click-effect' || legacyName(i, ['effect', 'click']));
+        i.type === 'click-effect' || legacyName(i, ['effect', 'click', 'wisp']));
 
       let html = '<div class="section-label">Skull Themes</div>';
       html += cosmeticOptionRow('skull-theme', 'default', SKULL_THEMES['default'], 'common');

@@ -418,6 +418,50 @@
       .die.set-fracture { animation: none; }
     }
 
+    /* ════ OCTOBER HALLOWEEN FINISHES ════
+       Six gothic finishes, all inside the black/grey/red/white palette --
+       no new face PNGs, just body colours, borders, filters and two guarded
+       animations. Ash and Wraith are the pale ones, Slate and Pitch the dark
+       ones, Blood and Ember the red ones. */
+    .die.set-ash { border-color: #8f8f8f; }
+    .die.set-ash img { filter: grayscale(1) brightness(1.15) contrast(0.85); }
+
+    .die.set-slate { border-color: #55554e; }
+    .die.set-slate img { filter: grayscale(1) brightness(0.95) contrast(1.1); }
+
+    /* Void-black body, so the glyph is lifted to a readable grey rather than
+       tinted -- the red/black palette has no amber to borrow. */
+    .die.set-pitch { border-color: #2a2a2a; }
+    .die.set-pitch img { filter: grayscale(0.9) brightness(1.2) contrast(1.15); }
+
+    /* The red in Blood and Ember is the body and the border, never the glyph:
+       a sepia tint would pull the glyph toward gold, which is off-palette. The
+       glyph stays neutral and is brightened so it reads on the dark body. */
+    .die.set-blood { border-color: #5a0e12; }
+    .die.set-blood img { filter: grayscale(1) brightness(1.45) contrast(0.95); }
+
+    /* The two that move -- a coal that breathes at the border and a spectre
+       whose glyph pulses. Both drift slowly (these sit on screen for whole
+       rounds, so nothing twitches) and both stop dead for reduced motion. */
+    .die.set-ember { border-color: #3a0000; animation: ember 3.6s ease-in-out infinite; }
+    .die.set-ember img { filter: grayscale(0.9) brightness(1.35) contrast(1.05); }
+    @keyframes ember {
+      0%, 100% { border-color: #3a0000; }
+      50%      { border-color: #c41422; }
+    }
+
+    .die.set-wraith { border-color: #cfcfcf; }
+    .die.set-wraith img { filter: grayscale(1) brightness(1.3) contrast(0.7);
+                          animation: wraith 3.8s ease-in-out infinite; }
+    @keyframes wraith {
+      0%, 100% { filter: grayscale(1) brightness(1.2) contrast(0.7); }
+      50%      { filter: grayscale(1) brightness(1.55) contrast(0.6); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .die.set-ember { animation: none; }
+      .die.set-wraith img { animation: none; }
+    }
+
     .dice-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
                    margin-bottom: 8px; }
     .dice-picker-label { font-size: 14px;
@@ -860,6 +904,45 @@ const DICE_SETS = {
     name: 'Reality Fracture',
     faces: FACE_IMG,
     cls: 'set-fracture',
+  },
+  /* ── October Halloween finishes ─────────────────────────────────────
+     Additive gothic sets, CSS finishes over the same glyphs. Keys are the
+     contract and are unique; names can change, keys cannot. */
+  ash: {
+    name: 'Ashen',
+    faces: FACE_IMG,
+    cls: 'set-ash',
+    colours: { C:'#cccccc', W:'#e4e4e4', U:'#bcbcbc', B:'#b0b0b0', R:'#d4d4d4', G:'#c4c4c4' },
+  },
+  slate: {
+    name: 'Graveslate',
+    faces: FACE_IMG,
+    cls: 'set-slate',
+    colours: { C:'#434343', W:'#4e4e4e', U:'#3c3c3c', B:'#343434', R:'#474747', G:'#404040' },
+  },
+  pitch: {
+    name: 'Pitch Black',
+    faces: FACE_IMG,
+    cls: 'set-pitch',
+    colours: { C:'#141414', W:'#1c1c1c', U:'#121212', B:'#0c0c0c', R:'#1a1414', G:'#121412' },
+  },
+  blood: {
+    name: 'Bloodletter',
+    faces: FACE_IMG,
+    cls: 'set-blood',
+    colours: { C:'#3a1414', W:'#5a1a1a', U:'#2e1010', B:'#200c0c', R:'#6e1414', G:'#3a1414' },
+  },
+  ember: {
+    name: 'Ember',
+    faces: FACE_IMG,
+    cls: 'set-ember',
+    colours: { C:'#1a1414', W:'#241818', U:'#161010', B:'#120c0c', R:'#2a1414', G:'#1a1414' },
+  },
+  wraith: {
+    name: 'Wraithsilk',
+    faces: FACE_IMG,
+    cls: 'set-wraith',
+    colours: { C:'#e6e6e6', W:'#f6f6f6', U:'#dcdcdc', B:'#d2d2d2', R:'#ececec', G:'#e0e0e0' },
   },
 };
 

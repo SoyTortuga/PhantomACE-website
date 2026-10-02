@@ -166,6 +166,14 @@
     .card-front.cb-rare::after { content: '🃏'; color: #4466ee; opacity: 0.6; }
     .card-front.cb-legendary { background: linear-gradient(135deg, #1a0a1a, #111); border-color: #8833cc; }
     .card-front.cb-legendary::after { content: '✨'; color: #aa44ff; opacity: 0.6; }
+    .card-front.cb-cobweb { background: linear-gradient(135deg, #1c1c1c, #0a0a0a); border-color: #666; }
+    .card-front.cb-cobweb::after { content: '🕸️'; color: #ddd; opacity: 0.55; }
+    .card-front.cb-crypt { background: linear-gradient(135deg, #160606, #0a0a0a); border-color: #660000; }
+    .card-front.cb-crypt::after { content: '🪦'; color: var(--red); opacity: 0.6; }
+    .card-front.cb-bat { background: radial-gradient(circle, #330000, #0a0a0a); border-color: #990000; }
+    .card-front.cb-bat::after { content: '🦇'; color: var(--red); opacity: 0.65; }
+    .card-front.cb-ghost { background: linear-gradient(135deg, #2b2b2b, #111); border-color: #ccc; }
+    .card-front.cb-ghost::after { content: '👻'; color: #fff; opacity: 0.55; }
   </style>
 </head>
 <body>
@@ -256,10 +264,38 @@
       { name: 'phamPepeHands', src: emoteUrl('303615508') },
     ];
 
+    const SPOOKY_EMOTES = [
+      { name: 'phamMonkaS', src: emoteUrl('303615499') },
+      { name: 'phamFroze', src: emoteUrl('emotesv2_1d3742cd0c33464f9fdc9d5e2495a4cb') },
+      { name: 'phamPepeHands', src: emoteUrl('303615508') },
+      { name: 'phamFeelsBad', src: emoteUrl('303615479') },
+      { name: 'phamToxic', src: emoteUrl('300609000') },
+      { name: 'phamUsure', src: emoteUrl('472088') },
+      { name: 'phamRee', src: emoteUrl('303615532') },
+      { name: 'phamHUH', src: emoteUrl('emotesv2_6700d9409cfc499ab30d1235e680b25b') },
+      { name: 'phamClown', src: emoteUrl('303615503') },
+      { name: 'phamYEP', src: emoteUrl('303615534') },
+    ];
+
+    const HAUNTED_EMOTES = [
+      { name: 'phamL', src: emoteUrl('415421') },
+      { name: 'phamPepelaugh', src: emoteUrl('emotesv2_92f127f639ff4ff2a3b8ed07faa86d49') },
+      { name: 'phamMonkaS', src: emoteUrl('303615499') },
+      { name: 'phamFroze', src: emoteUrl('emotesv2_1d3742cd0c33464f9fdc9d5e2495a4cb') },
+      { name: 'phamClown', src: emoteUrl('303615503') },
+      { name: 'phamToxic', src: emoteUrl('300609000') },
+      { name: 'phamUsure', src: emoteUrl('472088') },
+      { name: 'phamNice', src: emoteUrl('303615522') },
+      { name: 'phamPepeHands', src: emoteUrl('303615508') },
+      { name: 'phamHUH', src: emoteUrl('emotesv2_6700d9409cfc499ab30d1235e680b25b') },
+    ];
+
     const EMOTE_SETS = {
       default: { name: 'PhantomACE Emotes', images: DEFAULT_IMAGES, alts: DEFAULT_NAMES },
       bonus: { name: 'Emote Pack', images: BONUS_EMOTES.map(e => e.src), alts: BONUS_EMOTES.map(e => e.name) },
       premium: { name: 'Premium Emote Pack', images: PREMIUM_EMOTES.map(e => e.src), alts: PREMIUM_EMOTES.map(e => e.name) },
+      spooky: { name: 'Spooky Emote Pack', images: SPOOKY_EMOTES.map(e => e.src), alts: SPOOKY_EMOTES.map(e => e.name) },
+      haunted: { name: 'Haunted Emote Pack', images: HAUNTED_EMOTES.map(e => e.src), alts: HAUNTED_EMOTES.map(e => e.name) },
     };
 
     const CARD_BACKS = {
@@ -268,6 +304,10 @@
       phamily: { name: 'Phamily Card Back', cssClass: 'cb-phamily' },
       rare: { name: 'Rare Card Back', cssClass: 'cb-rare' },
       legendary: { name: 'Legendary Card Back', cssClass: 'cb-legendary' },
+      cobweb: { name: 'Cobweb Card Back', cssClass: 'cb-cobweb' },
+      crypt: { name: 'Crypt Card Back', cssClass: 'cb-crypt' },
+      bat: { name: 'Bat Card Back', cssClass: 'cb-bat' },
+      ghost: { name: 'Ghost Card Back', cssClass: 'cb-ghost' },
     };
 
     let activeCardBack = 'default';
@@ -345,6 +385,12 @@
       if (n.includes('phamily')) return 'phamily';
       if (n.includes('rare')) return 'rare';
       if (n.includes('premium')) return 'premium';
+      if (n.includes('cobweb')) return 'cobweb';
+      if (n.includes('crypt')) return 'crypt';
+      if (n.includes('bat')) return 'bat';
+      if (n.includes('ghost')) return 'ghost';
+      if (n.includes('spooky')) return 'spooky';
+      if (n.includes('haunt')) return 'haunted';
       // Unrecognized reward name — fall back to the lowest tier for this slot
       // rather than silently duplicating the default set.
       return prefix === 'cb' ? 'basic' : 'bonus';
