@@ -316,11 +316,13 @@ function initOvMc() {
 }
 
 /* ── Commander Bingo on the overlay ─────────────────────────────────
-   Unlike Mana Clash, there is no room to pick: the overlay finds the live
-   Commander Bingo game itself via bingo_current. So this card reports that
-   one game and offers the same show/hide switch the host has. */
-
-let ovBingoCode = null;
+   A room picker. Several Commander Bingo games can run at once (the newest
+   simply claimed the overlay on creation); this dropdown lets the broadcaster
+   or a moderator choose WHICH one the stream shows. The overlay resolves its
+   room from bingo_current, so choosing a room POSTs { code, makeCurrent } to
+   repoint it (and turn that room's show flag on); "— none (hide) —" clears the
+   pointer so the overlay shows nothing. Populated from ?list=1, re-fetched on
+   a slow tick so newly created rooms appear. */
 
 function ovBingoSay(text, showing) {
   const state = document.getElementById('ovBingoState');
@@ -329,64 +331,77 @@ function ovBingoSay(text, showing) {
   state.className = 'giveaway-status' + (showing ? ' open' : '');
 }
 
-function ovBingoButtons(enabled) {
-  ['ovBingoShowBtn', 'ovBingoOffBtn'].forEach(function (id) {
-    const b = document.getElementById(id);
-    if (b) b.disabled = !enabled;
-  });
+function renderOvBingo(rooms) {
+  const pick = document.getElementById('ovBingoRoomPick');
+  if (!pick) return;
+  const list = Array.isArray(rooms) ? rooms : [];
+  const current = list.find(function (r) { return r.isCurrent; });
+
+  /* The selection survives a refresh tick. A moderator mid-choice who found
+     the dropdown reset to the current room would be one click from putting
+     the wrong game on stream. */
+  const keep = pick.value || (current ? current.code : '');
+
+  let html = '<option value="">— none (hide) —</option>';
+  html += list.map(function (r) {
+    const n = r.playerCount + (r.playerCount === 1 ? ' player' : ' players');
+    const label = (r.hostName || r.code) + ' — ' + n + ' (' + r.code + ')';
+    return '<option value="' + escapeBotHtml(r.code) + '">' + escapeBotHtml(label) + '</option>';
+  }).join('');
+  pick.innerHTML = html;
+
+  if (keep && list.some(function (r) { return r.code === keep; })) pick.value = keep;
+  else pick.value = '';
+
+  if (!list.length) {
+    ovBingoSay('No active games — a host has to create one first', false);
+  } else if (current) {
+    const n = current.playerCount + (current.playerCount === 1 ? ' player' : ' players');
+    ovBingoSay('Showing ' + (current.hostName || current.code) + ' · ' + n + ' (' + current.code + ')', true);
+  } else {
+    ovBingoSay(list.length + (list.length === 1 ? ' game' : ' games') + ' running — none on the overlay', false);
+  }
+}
+
+function ovBingoSayErr(text) {
+  const pick = document.getElementById('ovBingoRoomPick');
+  if (pick) pick.innerHTML = '<option value="">' + escapeBotHtml(text) + '</option>';
+  ovBingoSay(text, false);
 }
 
 async function loadOvBingo() {
   let res;
   try {
-    res = await fetch('/api/bingo/state?current=1', { credentials: 'same-origin', cache: 'no-store' });
+    res = await fetch('/api/bingo/state?list=1', { credentials: 'same-origin', cache: 'no-store' });
   } catch {
-    ovBingoSay('Could not reach the server', false);
+    ovBingoSayErr('Could not reach the server');
     return;
   }
-
   if (res.status === 404) {
-    ovBingoCode = null;
-    ovBingoSay('No game running', false);
-    ovBingoButtons(false);
+    ovBingoSayErr('Bingo list route missing — restart the server');
+    showBotStatus('The bingo list route returned 404. The server needs restarting after the last pull.', true);
     return;
   }
-  if (!res.ok) {
-    ovBingoSay('Could not load the game (HTTP ' + res.status + ')', false);
-    return;
-  }
+  if (res.status === 403) { ovBingoSayErr('You need moderator access'); return; }
+  if (!res.ok) { ovBingoSayErr('Could not load rooms (HTTP ' + res.status + ')'); return; }
 
-  let g;
-  try { g = await res.json(); } catch { ovBingoSay('Could not read the game', false); return; }
-
-  if (!g || !g.code || g.status !== 'active') {
-    ovBingoCode = null;
-    ovBingoSay('No game running', false);
-    ovBingoButtons(false);
-    return;
-  }
-
-  ovBingoCode = g.code;
-  ovBingoButtons(true);
-  const where = g.code + ' · ' + (g.calledCount || 0) + '/' + (g.total || 68) +
-                ' · ' + (g.playerCount || 0) + (g.playerCount === 1 ? ' player' : ' players');
-  if (g.showOnOverlay === false) ovBingoSay('Hidden — ' + where, false);
-  else ovBingoSay('Showing ' + where, true);
+  let d;
+  try { d = await res.json(); } catch { ovBingoSayErr('Could not read the room list'); return; }
+  renderOvBingo(d.rooms);
 }
 
-async function setOvBingo(show, btn) {
-  if (!ovBingoCode) { showBotStatus('There is no game to show.', true); return; }
-  if (btn) btn.disabled = true;
+async function setOvBingo(code) {
+  const body = code ? { code: code, makeCurrent: true } : { clear: true };
   try {
     const res = await fetch('/api/bingo/overlay', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: ovBingoCode, show: show }),
+      body: JSON.stringify(body),
     });
     const d = await res.json().catch(function () { return {}; });
     if (res.ok && d.success) {
-      showBotStatus(d.showOnOverlay ? 'Commander Bingo is on the overlay.' : 'Commander Bingo hidden from the overlay.', false);
+      showBotStatus(code ? 'Commander Bingo ' + code + ' is on the overlay.' : 'Commander Bingo hidden from the overlay.', false);
     } else if (res.status === 404) {
       showBotStatus('The bingo overlay route returned 404. The server needs restarting after the last pull.', true);
     } else {
@@ -399,16 +414,18 @@ async function setOvBingo(show, btn) {
 }
 
 function initOvBingo() {
-  const show = document.getElementById('ovBingoShowBtn');
-  const off = document.getElementById('ovBingoOffBtn');
+  const pick = document.getElementById('ovBingoRoomPick');
   const refresh = document.getElementById('ovBingoRefreshBtn');
-  if (!show) return;
+  if (!pick) return;
 
-  show.addEventListener('click', function () { setOvBingo(true, show); });
-  off.addEventListener('click', function () { setOvBingo(false, off); });
-  refresh.addEventListener('click', function () { loadOvBingo(); });
+  pick.addEventListener('change', function () { setOvBingo(pick.value); });
+  if (refresh) refresh.addEventListener('click', function () { loadOvBingo(); });
 
   loadOvBingo();
+  /* Slow tick so rooms created after this page opened show up without a
+     manual refresh. The dashboard is not the OBS overlay, so an idle poll
+     here carries none of the marathon-safety cost. */
+  setInterval(loadOvBingo, 15000);
 }
 
 /* ── Skull Clicker raid boss ─────────────────────────────────────────── */

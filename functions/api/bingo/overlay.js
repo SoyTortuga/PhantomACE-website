@@ -35,8 +35,25 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
   const code = String(body.code || '').toUpperCase().trim();
+  const makeCurrent = body.makeCurrent === true;
+  /* Clearing the pointer shows NOTHING on the overlay. Asked for explicitly
+     (clear:true) or implied by "make current" with no room picked. */
+  const clear = body.clear === true || (makeCurrent && !code);
+
+  if (clear) {
+    /* No game to appeal to for host rights, so this is a stream-production
+       action: broadcaster or moderator only. */
+    const { isModerator } = await import('../admin/moderators.js');
+    if (!(await isModerator(env, session))) {
+      return json({ error: 'Only the broadcaster or a moderator can clear the overlay.' }, 403);
+    }
+    try { await env.MARKETPLACE.delete('bingo_current'); } catch (err) {
+      console.error('[bingo/overlay] could not clear bingo_current:', err.message);
+    }
+    return json({ success: true, cleared: true, showOnOverlay: false });
+  }
+
   if (!code) return json({ error: 'Missing code' }, 400);
-  const show = !!body.show;
 
   const key = `bingo_${code}`;
   const raw = await env.MARKETPLACE.get(key);
@@ -52,6 +69,22 @@ export async function onRequestPost(context) {
     }
   }
 
+  /* POINT THE OVERLAY AT THIS ROOM. Sets bingo_current so the overlay (which
+     resolves the live room from that singleton) follows this game, and turns
+     this game's show flag on so the chosen room actually displays. */
+  if (makeCurrent) {
+    game.showOnOverlay = true;
+    await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
+    try {
+      await env.MARKETPLACE.put('bingo_current', JSON.stringify({ code, at: Date.now() }));
+    } catch (err) {
+      console.error('[bingo/overlay] could not set bingo_current:', err.message);
+    }
+    return json({ success: true, makeCurrent: true, code, showOnOverlay: true });
+  }
+
+  /* The original show/hide switch, unchanged. */
+  const show = !!body.show;
   game.showOnOverlay = show;
   await env.MARKETPLACE.put(key, JSON.stringify(game), { expirationTtl: GAME_TTL });
 

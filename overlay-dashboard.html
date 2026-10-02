@@ -69,12 +69,13 @@
 
           <div class="card bot-section" id="ovBingoSection">
             <h3>Commander Bingo on the Overlay</h3>
-            <p class="bot-section-desc">Shows the live Commander Bingo game on the overlay.</p>
+            <p class="bot-section-desc">Pick which Commander Bingo room the stream overlay shows. Newly created rooms appear here on the next refresh.</p>
             <div class="ovmc-row">
               <span class="giveaway-status" id="ovBingoState">No game running</span>
-              <button class="btn-primary" id="ovBingoShowBtn">Show</button>
-              <button class="btn-secondary" id="ovBingoOffBtn">Hide</button>
-              <button class="btn-secondary" id="ovBingoRefreshBtn">Refresh</button>
+              <label class="bot-rotation-interval" style="flex:1 1 260px">Commander Bingo room on overlay
+                <select id="ovBingoRoomPick" class="giveaway-rarity-select"><option value="">Loading&hellip;</option></select>
+              </label>
+              <button class="btn-secondary" id="ovBingoRefreshBtn">Refresh list</button>
             </div>
           </div>
 

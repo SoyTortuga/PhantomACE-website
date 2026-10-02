@@ -50,6 +50,17 @@ function fakeKV(seed = {}) {
     async get(k, t) { const v = store.get(k); return v === undefined ? null : (t === 'json' ? JSON.parse(v) : v); },
     async put(k, v) { store.set(k, String(v)); },
     async delete(k) { store.delete(k); },
+    async listValues({ prefix } = {}) {
+      const out = [];
+      for (const [k, v] of store) {
+        if (prefix && !k.startsWith(prefix)) continue;
+        /* bingo_current is a singleton in a different table — the real DAL's
+           prefix listing never returns it. */
+        if (k === 'bingo_current') continue;
+        out.push({ name: k, value: JSON.parse(v) });
+      }
+      return out;
+    },
     async mutate(k, fn) {
       const cur = store.has(k) ? JSON.parse(store.get(k)) : null;
       const out = await fn(cur);
@@ -230,6 +241,79 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
   check('ending an old game does not steal the newer pointer', e.MARKETPLACE.read('bingo_current').code, 'BBB');
 }
 
+/* ══ ?list=1 — the dashboard room picker ═══════════════════════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));   /* bingo_current -> AAA */
+  await POST(create, e, { code: 'bbb' }, cookie('111'));  /* newest claims it -> BBB */
+
+  const anon = await GET(e, 'list=1');
+  check('listing without a session is 401', anon.status, 401);
+
+  const stranger = await GET(e, 'list=1', cookie('999'));
+  check('a stranger who hosts no room cannot list', stranger.status, 403);
+
+  const asMod = await (await GET(e, 'list=1', cookie(HOST))).json(); /* HOST is broadcaster */
+  check('the broadcaster gets both active rooms', asMod.rooms.length, 2);
+  check('the newest room is marked current', asMod.rooms.find(r => r.code === 'BBB').isCurrent, true);
+  check('the other is not current', asMod.rooms.find(r => r.code === 'AAA').isCurrent, false);
+  check('and the current room sorts first', asMod.rooms[0].code, 'BBB');
+  check('each row carries the host name', asMod.rooms.find(r => r.code === 'BBB').hostName, 'U111');
+
+  /* A non-moderator host may still list — they host a room. */
+  const asHost = await GET(e, 'list=1', cookie('111'));
+  check('a room host (non-mod) may list', asHost.status, 200);
+}
+{
+  /* Ended games are left out. */
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await POST(end, e, { code: 'aaa' }, cookie(HOST));
+  const d = await (await GET(e, 'list=1', cookie(HOST))).json();
+  check('an ended game is not listed', d.rooms.length, 0);
+}
+
+/* ══ makeCurrent repoints the overlay; clear takes it down ═════════════ */
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  await POST(create, e, { code: 'bbb' }, cookie('111'));  /* bingo_current -> BBB */
+
+  /* Point it back at AAA. */
+  const res = await (await POST(overlay, e, { code: 'aaa', makeCurrent: true }, cookie(HOST))).json();
+  check('makeCurrent reports the room', res.code, 'AAA');
+  check('and turns that room on', res.showOnOverlay, true);
+  check('bingo_current now names AAA', e.MARKETPLACE.read('bingo_current').code, 'AAA');
+  check('and AAA shows on the overlay', e.MARKETPLACE.read('bingo_AAA').showOnOverlay, true);
+  check('state?current=1 follows the repoint', (await (await GET(e, 'current=1')).json()).code, 'AAA');
+
+  /* The broadcaster may repoint a game they did not host. */
+  const byBroadcaster = await POST(overlay, e, { code: 'bbb', makeCurrent: true }, cookie(HOST));
+  check('the broadcaster can repoint to another host\'s game', byBroadcaster.status, 200);
+  check('and the pointer followed', e.MARKETPLACE.read('bingo_current').code, 'BBB');
+
+  /* A stranger cannot repoint. */
+  const byStranger = await POST(overlay, e, { code: 'aaa', makeCurrent: true }, cookie('999'));
+  check('a stranger cannot repoint', byStranger.status, 403);
+}
+{
+  const e = envWith();
+  await POST(create, e, { code: 'aaa' }, cookie(HOST));
+  const cleared = await (await POST(overlay, e, { clear: true }, cookie(HOST))).json();
+  check('clear succeeds', cleared.cleared, true);
+  check('and removes bingo_current', e.MARKETPLACE.read('bingo_current'), null);
+
+  /* makeCurrent with no code is treated as a clear. */
+  await POST(create, e, { code: 'ccc' }, cookie(HOST));  /* pointer -> CCC */
+  await POST(overlay, e, { makeCurrent: true, code: '' }, cookie(HOST));
+  check('makeCurrent with no room clears too', e.MARKETPLACE.read('bingo_current'), null);
+
+  /* A stranger cannot clear. */
+  await POST(create, e, { code: 'ddd' }, cookie(HOST));
+  const byStranger = await POST(overlay, e, { clear: true }, cookie('999'));
+  check('a stranger cannot clear', byStranger.status, 403);
+}
+
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
 {
   const overlay = fs.readFileSync(path.join(REPO, 'js/pages/overlay.js'), 'utf8');
@@ -271,12 +355,13 @@ const ofType = (e, t) => events(e).filter(ev => ev.type === t);
 
   ok('the host sends the square text with a call', /text:\s*\(BINGO_EVENTS\.find/.test(host));
 
-  const bcHtml = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
-  ok('bot control has the bingo overlay section', /id="ovBingoSection"/.test(bcHtml) && /id="ovBingoShowBtn"/.test(bcHtml));
+  const odHtml = fs.readFileSync(path.join(REPO, 'overlay-dashboard.html'), 'utf8');
+  ok('the overlay dashboard has the bingo room picker', /id="ovBingoSection"/.test(odHtml) && /id="ovBingoRoomPick"/.test(odHtml));
 
-  const bcJs = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
-  ok('bot control wires the bingo overlay switch', /function initOvBingo/.test(bcJs) && /initOvBingo\(\)/.test(bcJs));
-  ok('and it reads the live room then posts the switch', /bingo\/state\?current=1/.test(bcJs) && /\/api\/bingo\/overlay/.test(bcJs));
+  const odJs = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  ok('the dashboard wires the bingo room picker', /function initOvBingo/.test(odJs) && /initOvBingo\(\)/.test(odJs));
+  ok('and it lists rooms then repoints the overlay', /bingo\/state\?list=1/.test(odJs) && /makeCurrent/.test(odJs));
+  ok('with a none option that clears the pointer', /clear:\s*true/.test(odJs) && /none \(hide\)/.test(odJs));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

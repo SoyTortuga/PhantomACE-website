@@ -32,9 +32,54 @@ function overlaySummary(game) {
   };
 }
 
+/* `?list=1` — every ACTIVE room, for the Overlay Dashboard's room picker.
+   Staff-gated (broadcaster/moderators), with one extra door: a bingo host
+   may list too, so their own host page could use the same enumeration. The
+   codes themselves are not secret (players are told them), so the list is
+   not sensitive; the gate keeps it off the public poll, not out of reach.
+
+   listValues({ prefix: 'bingo_' }) returns ONLY room docs — bingo_current
+   is a singleton in a different table (see server/lib/registry.js). */
+async function listRooms(env, request) {
+  const session = getSession(request);
+  if (!session || !session.user_id) return json({ error: 'Log in first.' }, 401);
+
+  const current = await env.MARKETPLACE.get('bingo_current', 'json');
+  const currentCode = current && current.code ? String(current.code).toUpperCase().trim() : null;
+
+  const rows = await env.MARKETPLACE.listValues({ prefix: 'bingo_' });
+  const rooms = [];
+  let hostsAny = false;
+  for (const { value: g } of rows) {
+    if (!g || !g.code || g.status !== 'active') continue;
+    if (String(g.host) === String(session.user_id)) hostsAny = true;
+    rooms.push({
+      code: g.code,
+      hostName: g.hostName || ('Host ' + (g.host || g.code)),
+      playerCount: Array.isArray(g.players) ? g.players.length : 0,
+      createdAt: g.createdAt || 0,
+      isCurrent: currentCode != null && String(g.code).toUpperCase().trim() === currentCode,
+    });
+  }
+
+  const { isModerator } = await import('../admin/moderators.js');
+  if (!(await isModerator(env, session)) && !hostsAny) {
+    return json({ error: 'You need broadcaster or moderator access for this.' }, 403);
+  }
+
+  /* The room on the overlay first, then newest — the order a moderator
+     picking a room to show would want them in. */
+  rooms.sort((a, b) =>
+    (a.isCurrent === b.isCurrent ? 0 : a.isCurrent ? -1 : 1) || (b.createdAt - a.createdAt));
+
+  return json({ rooms });
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
+
+  if (url.searchParams.get('list')) return listRooms(env, request);
 
   let code = (url.searchParams.get('code') || '').toUpperCase().trim();
 
