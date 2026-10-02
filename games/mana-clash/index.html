@@ -462,6 +462,86 @@
       .die.set-wraith img { animation: none; }
     }
 
+    /* ════ NOVEMBER DEAD HARVEST FINISHES ════
+       Late-autumn sets in black / grey / dried-blood red / bone only. The
+       harvest reads through texture and value -- stalks, chaff, feather
+       barbs, sackcloth, a sickle, a hollow moon -- never through orange or
+       brown. The body colour is set inline per face, so each texture rides
+       on a ::before laid under the glyph; the glyph and the number are lifted
+       above it. Hard-stop patterns only, no soft fades. */
+    .die.set-withered, .die.set-chaff, .die.set-crowfeather,
+    .die.set-scythe, .die.set-scarecrow, .die.set-hollow { overflow: hidden; }
+    .die.set-withered::before, .die.set-chaff::before, .die.set-crowfeather::before,
+    .die.set-scythe::before, .die.set-scarecrow::before, .die.set-hollow::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+    }
+    .die.set-withered img, .die.set-chaff img, .die.set-crowfeather img,
+    .die.set-scythe img, .die.set-scarecrow img, .die.set-hollow img { position: relative; }
+    .die.set-crowfeather .pip-num, .die.set-scarecrow .pip-num,
+    .die.set-hollow .pip-num { color: #e4e0d4; }
+
+    .die.set-withered { border: 3px double #7a7a76; }
+    .die.set-withered::before {
+      background: repeating-linear-gradient(100deg,
+        transparent 0 4px, rgba(0,0,0,0.10) 4px 5px,
+        transparent 5px 9px, rgba(255,255,255,0.45) 9px 10px);
+    }
+    .die.set-withered img { filter: grayscale(1) brightness(0.45) contrast(1.35); }
+
+    .die.set-chaff { border: 2px dashed #cfcbbf; }
+    .die.set-chaff::before {
+      background:
+        radial-gradient(circle, rgba(232,228,216,0.6) 0 1px, transparent 1.5px) 0 0 / 7px 7px,
+        radial-gradient(circle, rgba(0,0,0,0.38) 0 1px, transparent 1.5px) 3px 4px / 9px 9px;
+    }
+    .die.set-chaff img { filter: grayscale(1) brightness(1.7) contrast(0.9); }
+
+    .die.set-crowfeather { border: 3px ridge #4c4c4c; }
+    .die.set-crowfeather::before {
+      background:
+        linear-gradient(45deg, transparent 48.5%, rgba(255,255,255,0.16) 48.5% 51.5%, transparent 51.5%),
+        repeating-linear-gradient(135deg, transparent 0 3px, rgba(255,255,255,0.06) 3px 4px);
+    }
+    .die.set-crowfeather img { filter: grayscale(1) brightness(1.55) contrast(1.1); }
+
+    .die.set-scythe { border: 2px solid #6e0f14; }
+    .die.set-scythe::before {
+      inset: 12%; border-radius: 50%;
+      border: 3px solid transparent; border-top-color: rgba(110,15,20,0.6);
+      transform: rotate(-38deg);
+    }
+    .die.set-scythe img { filter: grayscale(1) brightness(0.5) contrast(1.4); }
+
+    .die.set-scarecrow { border: 2px dotted #b0141c; }
+    .die.set-scarecrow::before {
+      background:
+        repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.24) 2px 3px),
+        repeating-linear-gradient(90deg, transparent 0 2px, rgba(255,255,255,0.09) 2px 3px);
+    }
+    .die.set-scarecrow img { filter: grayscale(1) brightness(1.5) contrast(1); }
+
+    /* The one that moves: the moon waxes and wanes behind the glyph, slowly,
+       and stops dead for reduced motion. */
+    .die.set-hollow { border: 2px solid #5e5e5e; }
+    .die.set-hollow::before {
+      inset: auto; top: 2%; left: 2%; width: 82%; height: 82%;
+      border-radius: 50%; border: 3px solid #d8d4c8;
+      animation: hollow-moon 5.2s ease-in-out infinite;
+    }
+    .die.set-hollow img { filter: grayscale(1) brightness(1.65) contrast(1.05); }
+    @keyframes hollow-moon {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(0.88); }
+    }
+
+    .die.mini.set-withered, .die.mini.set-chaff, .die.mini.set-crowfeather,
+    .die.mini.set-scythe, .die.mini.set-scarecrow, .die.mini.set-hollow { border-width: 1px; border-style: solid; }
+    .die.mini.set-scythe::before, .die.mini.set-hollow::before { border-width: 1px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .die.set-hollow::before { animation: none; }
+    }
+
     .dice-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
                    margin-bottom: 8px; }
     .dice-picker-label { font-size: 14px;
@@ -943,6 +1023,44 @@ const DICE_SETS = {
     faces: FACE_IMG,
     cls: 'set-wraith',
     colours: { C:'#e6e6e6', W:'#f6f6f6', U:'#dcdcdc', B:'#d2d2d2', R:'#ececec', G:'#e0e0e0' },
+  },
+  /* ── November Dead Harvest finishes ─────────────────────────────────
+     Same contract as October: unique keys, CSS finishes over FACE_IMG. */
+  withered: {
+    name: 'Withered Wheat',
+    faces: FACE_IMG,
+    cls: 'set-withered',
+    colours: { C:'#d9d6cc', W:'#e7e4da', U:'#d1cec4', B:'#c4c1b7', R:'#ddd7cd', G:'#cdcbc1' },
+  },
+  chaff: {
+    name: 'Chaff & Husk',
+    faces: FACE_IMG,
+    cls: 'set-chaff',
+    colours: { C:'#8c8c8a', W:'#9a9a98', U:'#848482', B:'#787876', R:'#929090', G:'#888886' },
+  },
+  crowfeather: {
+    name: 'Crowfeather',
+    faces: FACE_IMG,
+    cls: 'set-crowfeather',
+    colours: { C:'#121213', W:'#1a1a1b', U:'#0f0f11', B:'#08080a', R:'#161313', G:'#111211' },
+  },
+  scythe: {
+    name: 'Bone Sickle',
+    faces: FACE_IMG,
+    cls: 'set-scythe',
+    colours: { C:'#ece9e0', W:'#f5f3ec', U:'#e5e2d9', B:'#dbd8cf', R:'#efe7e2', G:'#e1dfd6' },
+  },
+  scarecrow: {
+    name: 'Scarecrow',
+    faces: FACE_IMG,
+    cls: 'set-scarecrow',
+    colours: { C:'#5a5a58', W:'#646462', U:'#545452', B:'#484846', R:'#5e5858', G:'#565654' },
+  },
+  hollow: {
+    name: 'Hollow Moon',
+    faces: FACE_IMG,
+    cls: 'set-hollow',
+    colours: { C:'#232323', W:'#2b2b2b', U:'#202020', B:'#191919', R:'#272020', G:'#212221' },
   },
 };
 
