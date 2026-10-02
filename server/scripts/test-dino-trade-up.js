@@ -197,8 +197,12 @@ const tradeUpRarity = eval(`(${fnSource('tradeUpRarity')})`);
      !/k\.endsWith\('_' \+ idx\)/.test(page));
   ok('moving to the vault goes through removeDinos',
      /removeDinos\(\[\{ source: 'park', idx \}\]\)/.test(page));
-  ok('and so does listing on the marketplace',
-     /removeDinos\(\[\{ source, idx \}\]\)/.test(page));
+  /* A listing is escrowed server-side; the client removes the dino when it
+     applies the 'out' op, and that removal must remap cooldowns too. */
+  ok('and so does the marketplace escrow',
+     /op\.t === 'out'[\s\S]{0,500}removeDinos\(\[\{ source, idx \}\]\)/.test(page));
+  ok('a traded-up granted dino is remembered as consumed',
+     /markGrantsConsumed\(removeDinos\(tradeUpPicks\)/.test(page));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

@@ -3781,6 +3781,7 @@ function load() {
     const parsed = JSON.parse(raw);
     if (isStaleSave(parsed)) { discardLocalSave(); return; }
     state = { ...state, ...parsed };
+    ensureDinoUids();
     applyOfflineDecay();
   } catch(e) {}
 }
@@ -3816,18 +3817,109 @@ function scheduleServerSave() {
    deliberate and harmless: renderIncubator pads up to the slot count and
    renders whatever is there, and a brief overflow is a far better outcome
    than silently dropping a reward. */
+/* CONSUMED GRANTS. A granted egg that is hatched, or a granted dino that is
+   traded up or listed, is gone locally but still sitting in the server copy
+   until the next save lands — and saves are throttled. If another grant
+   lands in that window the save 409s, and matching on "grantId not present
+   locally" would hand the spent egg straight back. So spent grantIds are
+   remembered here and never adopted again. Bounded: a grant only lingers
+   server-side until one save gets through. */
+const CONSUMED_GRANTS_MAX = 300;
+const APPLIED_OPS_MAX = 200;
+
+function markGrantsConsumed(ids) {
+  if (!Array.isArray(state.consumedGrants)) state.consumedGrants = [];
+  for (const id of ids) {
+    if (id && !state.consumedGrants.includes(id)) state.consumedGrants.push(id);
+  }
+  if (state.consumedGrants.length > CONSUMED_GRANTS_MAX) {
+    state.consumedGrants = state.consumedGrants.slice(-CONSUMED_GRANTS_MAX);
+  }
+}
+
+/* DINO UIDS. The marketplace escrows a dino by uid, so every dino needs one
+   that is the SAME on every device. New dinos get a random one; a dino from
+   before uids existed is backfilled from its position and traits, which is
+   deterministic — two devices loading the same save derive the same uids,
+   so an escrow made on one is found on the other. */
+function newDinoUid() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+}
+
+function backfillUid(source, i, d) {
+  const key = [source, i, d.speciesId, d.mutation || '', d.careCount || 0, d.nickname || ''].join('|');
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let k = 0; k < key.length; k++) {
+    const c = key.charCodeAt(k);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x5bd1e995) >>> 0;
+  }
+  return 'b' + h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+
+function ensureDinoUids() {
+  const seen = new Set();
+  ['park', 'vault'].forEach(source => (Array.isArray(state[source]) ? state[source] : []).forEach((d, i) => {
+    if (!d) return;
+    if (!d.uid || seen.has(d.uid)) {
+      d.uid = d.uid ? d.uid + '-' + source[0] + i : backfillUid(source, i, d);
+    }
+    seen.add(d.uid);
+  }));
+}
+
+/* Apply what the server changed: granted eggs and dinos, plus marketplace
+   settlements (coins debited or credited, dinos taken into escrow). Every
+   path is keyed — grantId for arrivals, op id for settlements — so running
+   this twice on the same server state changes nothing the second time. */
 function adoptServerGrants(serverState) {
-  if (!serverState || typeof serverState !== 'object') return { eggs: 0, dinos: 0 };
+  const added = { eggs: 0, dinos: 0, marketDinos: 0, coins: 0, out: 0 };
+  if (!serverState || typeof serverState !== 'object') return added;
   if (!Array.isArray(state.eggs)) state.eggs = [];
   if (!Array.isArray(state.park)) state.park = [];
   if (!Array.isArray(state.vault)) state.vault = [];
   if (!Array.isArray(state.discovered)) state.discovered = [];
+  if (!Array.isArray(state.discoveredMutations)) state.discoveredMutations = [];
+  if (!Array.isArray(state.appliedOps)) state.appliedOps = [];
+  if (!state.cooldowns || typeof state.cooldowns !== 'object') state.cooldowns = {};
+  ensureDinoUids();
+
+  /* Marketplace settlements first. An 'out' op is a dino the server took
+     into escrow; removing it here is what stops a stale copy of this park
+     putting it back. A 'coins' op is a purchase debit or a sale credit,
+     applied as a delta so progress made since is kept. */
+  const applied = new Set(state.appliedOps);
+  for (const op of (Array.isArray(serverState.marketOps) ? serverState.marketOps : [])) {
+    if (!op || !op.id || applied.has(op.id)) continue;
+    if (op.t === 'coins') {
+      const d = Math.floor(Number(op.d) || 0);
+      state.coins = (state.coins || 0) + d;
+      added.coins += d;
+    } else if (op.t === 'out') {
+      if (op.grantId) markGrantsConsumed([op.grantId]);
+      const pi = state.park.findIndex(x => x && x.uid === op.uid);
+      const vi = pi === -1 ? state.vault.findIndex(x => x && x.uid === op.uid) : -1;
+      if (pi !== -1 || vi !== -1) {
+        const source = pi !== -1 ? 'park' : 'vault';
+        const idx = pi !== -1 ? pi : vi;
+        markGrantsConsumed(removeDinos([{ source, idx }]).map(x => x && x.grantId));
+        added.out++;
+      }
+    }
+    applied.add(op.id);
+    state.appliedOps.push(op.id);
+  }
+  if (state.appliedOps.length > APPLIED_OPS_MAX) state.appliedOps = state.appliedOps.slice(-APPLIED_OPS_MAX);
+  const consumed = new Set(Array.isArray(state.consumedGrants) ? state.consumedGrants : []);
 
   /* Eggs the server dropped into the incubator (redeemed egg codes), matched
-     by grantId so this is safe to run repeatedly. */
+     by grantId so this is safe to run repeatedly — and never one this park
+     already hatched. */
   const knownEggs = new Set(state.eggs.map(e => e && e.grantId).filter(Boolean));
-  const missingEggs = (serverState.eggs || []).filter(e => e && e.grantId && !knownEggs.has(e.grantId));
+  const missingEggs = (serverState.eggs || []).filter(e => e && e.grantId && !knownEggs.has(e.grantId) && !consumed.has(e.grantId));
   for (const e of missingEggs) state.eggs.push(e);
+  added.eggs = missingEggs.length;
 
   /* Fully HATCHED dinos the server granted straight into the park/vault — the
      overlay hatch minigame. Matched by grantId across BOTH local arrays so a
@@ -3839,17 +3931,47 @@ function adoptServerGrants(serverState) {
     [...state.park, ...state.vault].map(d => d && d.grantId).filter(Boolean)
   );
   const serverDinos = [...(serverState.park || []), ...(serverState.vault || [])];
-  let dinos = 0;
   for (const d of serverDinos) {
-    if (!d || !d.grantId || knownDinos.has(d.grantId)) continue;
+    if (!d || !d.grantId || knownDinos.has(d.grantId) || consumed.has(d.grantId)) continue;
+    if (!d.uid) d.uid = newDinoUid();
     if (!addNewDino(d)) state.vault.push(d);      // both full — overflow beats dropping it
     if (!state.discovered.includes(d.speciesId)) state.discovered.push(d.speciesId);
+    if (d.mutation) {
+      const mk = d.speciesId + '_' + d.mutation;
+      if (!state.discoveredMutations.includes(mk)) state.discoveredMutations.push(mk);
+    }
     knownDinos.add(d.grantId);
-    dinos++;
+    if (String(d.grantSource || '').indexOf('market') === 0) added.marketDinos++;
+    else added.dinos++;
   }
 
   state.grantSeq = Number(serverState.grantSeq || 0);
-  return { eggs: missingEggs.length, dinos };
+  return added;
+}
+
+function persistLocalSave() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function refreshAfterAdopt(added) {
+  updateTopBar();
+  renderEggsTab();
+  const active = document.querySelector('.tab-content.active');
+  if (active && active.id === 'tab-park' && typeof renderParkWorld === 'function') renderParkWorld();
+  if (active && active.id === 'tab-collection' && typeof renderCollection === 'function') renderCollection();
+}
+
+function announceAdopted(added) {
+  if (added.dinos > 0) {
+    showToast(added.dinos === 1 ? 'A hatched dino arrived in your park! 🦕' : `${added.dinos} hatched dinos arrived! 🦕`);
+  }
+  if (added.marketDinos > 0) {
+    showToast(added.marketDinos === 1 ? 'A dino came back from the marketplace.' : `${added.marketDinos} dinos came back from the marketplace.`);
+  }
+  if (added.coins > 0) showToast(`Marketplace: +${added.coins} coins from your sales!`);
+  if (added.eggs > 0) {
+    showToast(added.eggs === 1 ? 'A new egg arrived in your incubator! 🥚' : `${added.eggs} new eggs arrived! 🥚`);
+  }
 }
 
 async function doServerSave(isRetry) {
@@ -3861,27 +3983,21 @@ async function doServerSave(isRetry) {
       body: JSON.stringify({ state }),
     });
 
-    /* 409 means a reward landed after this state was captured. Merge it in
-       and save again — once only, so a persistent disagreement cannot turn
-       into a request loop. */
+    /* 409 means a reward or a marketplace settlement landed after this
+       state was captured. Merge it in and save again — once only, so a
+       persistent disagreement cannot turn into a request loop. */
     if (res.status === 409 && !isRetry) {
       let payload = null;
       try { payload = await res.json(); } catch(e) {}
       const added = adoptServerGrants(payload && payload.state);
-      try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
-      if (added.eggs > 0 || added.dinos > 0) {
-        updateTopBar();
-        renderEggsTab();
-        const active = document.querySelector('.tab-content.active');
-        if (added.dinos > 0 && active && active.id === 'tab-park' && typeof renderParkWorld === 'function') renderParkWorld();
-        if (added.dinos > 0) {
-          showToast(added.dinos === 1 ? 'A hatched dino arrived in your park! 🦕' : `${added.dinos} hatched dinos arrived! 🦕`);
-        }
-        if (added.eggs > 0) {
-          showToast(added.eggs === 1 ? 'A new egg arrived in your incubator! 🥚' : `${added.eggs} new eggs arrived! 🥚`);
-        }
+      persistLocalSave();
+      if (added.eggs || added.dinos || added.marketDinos || added.coins || added.out) {
+        refreshAfterAdopt(added);
+        announceAdopted(added);
       }
       await doServerSave(true);
+    } else if (res.status === 413) {
+      console.warn('Dino Park: cloud save refused as too large.');
     }
   } catch(e) {}
 }
@@ -3962,6 +4078,7 @@ async function syncCloudSave() {
 
     if (data && data.hasSave && data.state) {
       state = { ...state, ...data.state };
+      ensureDinoUids();
       applySubTierFromSession(session);
       applyOfflineDecay();
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
@@ -4555,6 +4672,7 @@ function initDinoPosition(dino) {
 // New dino goes active if there's room, otherwise straight to the vault.
 // Returns 'park' | 'vault' | null (both full) so callers can message accordingly.
 function addNewDino(newDino) {
+  if (!newDino.uid) newDino.uid = newDinoUid();
   if (state.park.length < MAX_ACTIVE_PARK) {
     state.park.push(newDino);
     initDinoPosition(newDino);
@@ -5085,23 +5203,17 @@ async function confirmListDino(idx, source) {
   const price = parseInt(priceInput.value);
   if (!price || price < 1) { showToast('Enter a valid price.'); return; }
   const dino = arr[idx];
+  if (!dino) { closeSellDialog(); return; }
   const spec = getRosterById(dino.speciesId);
   try {
-    const res = await fetch('/api/marketplace', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'list', dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation, careCount: dino.careCount, xp: getDinoXp(dino) }, price }),
-    });
-    const data = await res.json();
-    if (!res.ok) { showToast(data.error || 'Failed to list.'); return; }
-    const session = getPlayerSession();
-    marketPendingAdds.set(data.id, {
-      id: data.id,
-      seller: { userId: session.user_id, displayName: session.display_name, profileImage: session.profile_image },
-      dino: { speciesId: dino.speciesId, nickname: dino.nickname, mutation: dino.mutation || null, careCount: dino.careCount || 0, xp: getDinoXp(dino) },
-      price, listedAt: Date.now(),
-    });
-    removeDinos([{ source, idx }]);
+    ensureDinoUids();
+    /* The server escrows the dino out of the park save itself and answers
+       with that save; adopting it is what removes the dino here. Nothing
+       is removed locally on faith. */
+    const { res, data } = await marketPost({ action: 'list', uid: dino.uid, price });
+    if (!res.ok) { showToast(marketError(data, 'Failed to list.')); return; }
+    if (data.listing) marketPendingAdds.set(data.id, data.listing);
+    adoptServerGrants(data.state);
     save();
     closeSellDialog();
     renderParkWorld();
@@ -5479,21 +5591,61 @@ function applySubTierFromSession(session) {
 function initAuth() {
   const session = getPlayerSession();
   applySubTierFromSession(session);
-  if (session) claimEarnings();
 }
 
+/* Sale proceeds and expired listings are settled into the cloud save by the
+   server; this only adopts that save and says what happened. The coins
+   arrive as marketOps, never as a number the client adds to itself. */
 async function claimEarnings() {
   try {
     const res = await fetch('/api/marketplace?action=earnings');
     if (!res.ok) return;
     const data = await res.json();
-    if (data.coins > 0) {
-      state.coins += data.coins;
-      save();
-      updateTopBar();
-      showToast(`Marketplace earnings: +${data.coins} coins from ${data.sales.length} sale(s)!`);
+    if (!data || !data.state) return;
+    const added = adoptServerGrants(data.state);
+    save();
+    refreshAfterAdopt(added);
+    const sales = Array.isArray(data.sales) ? data.sales : [];
+    if (sales.length) {
+      showToast(`Marketplace: sold ${sales.length} dino${sales.length === 1 ? '' : 's'} for ${data.earned || 0} coins!`);
+    } else if (added.coins > 0) {
+      showToast(`Marketplace earnings: +${added.coins} coins!`);
+    }
+    if (data.returned > 0) {
+      showToast(data.returned === 1 ? 'An expired listing came back to your park.' : `${data.returned} expired listings came back to your park.`);
     }
   } catch {}
+}
+
+/* List and buy send the whole park state: the server settles against it as
+   the save it writes, so a dino hatched or coins earned since the last
+   throttled sync count. A 409 means a grant or settlement landed first —
+   merge it and try once more, the same as doServerSave. */
+async function marketPost(payload) {
+  let res = null, data = {};
+  for (let attempt = 0; attempt < 2; attempt++) {
+    state.saveEpoch = SAVE_EPOCH;
+    res = await fetch('/api/marketplace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, state }),
+    });
+    data = {};
+    try { data = await res.json(); } catch(e) {}
+    if (res.status === 409 && data && data.state && attempt === 0) {
+      const added = adoptServerGrants(data.state);
+      persistLocalSave();
+      refreshAfterAdopt(added);
+      continue;
+    }
+    break;
+  }
+  return { res, data };
+}
+
+function marketError(data, fallback) {
+  if (data && data.error === 'stale') return 'Your park just changed. Try again.';
+  return (data && data.error) || fallback;
 }
 
 /* ======================== MARKETPLACE TAB ======================== */
@@ -5622,32 +5774,21 @@ async function buyDino(listingId) {
   if (!confirm(`Buy ${listing.dino.nickname || spec.name} for ${listing.price} coins?`)) return;
 
   try {
-    const res = await fetch('/api/marketplace', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'buy', listingId }),
-    });
-    const data = await res.json();
-    if (!res.ok) { showToast(data.error || 'Purchase failed.'); return; }
-
-    marketPendingRemoves.add(listingId);
-    state.coins -= data.price;
-    const newDino = {
-      speciesId: data.dino.speciesId,
-      nickname: data.dino.nickname || '',
-      mutation: data.dino.mutation || null,
-      careCount: data.dino.careCount || 0,
-      xp: data.dino.xp || 0,
-      hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
-    };
-    const dest = addNewDino(newDino);
-    if (!state.discovered.includes(data.dino.speciesId)) state.discovered.push(data.dino.speciesId);
-    if (data.dino.mutation) {
-      const mk = data.dino.speciesId + '_' + data.dino.mutation;
-      if (!state.discoveredMutations.includes(mk)) state.discoveredMutations.push(mk);
+    const { res, data } = await marketPost({ action: 'buy', listingId });
+    if (!res.ok) {
+      if (res.status === 404) marketPendingRemoves.add(listingId);
+      showToast(marketError(data, 'Purchase failed.'));
+      if (res.status === 404) renderMarketplace();
+      return;
     }
+
+    /* The server debited the coins and delivered the dino into the save;
+       adopting it applies both here, exactly once. */
+    marketPendingRemoves.add(listingId);
+    adoptServerGrants(data.state);
     save();
     updateTopBar();
+    const dest = state.vault.some(d => d && d.grantId === data.grantId) ? 'vault' : 'park';
     showToast(`Adopted ${spec.name}!${dest === 'vault' ? ' (park full — sent to your Dino Vault)' : ''}`);
     renderMarketplace();
   } catch (e) {
@@ -5667,20 +5808,14 @@ async function cancelListing(listingId) {
     if (!res.ok) { showToast(data.error || 'Cancel failed.'); return; }
     marketPendingRemoves.add(listingId);
     marketPendingAdds.delete(listingId);
-    const newDino = {
-      speciesId: data.dino.speciesId,
-      nickname: data.dino.nickname || '',
-      mutation: data.dino.mutation || null,
-      careCount: data.dino.careCount || 0,
-      xp: data.dino.xp || 0,
-      hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
-    };
-    const dest = addNewDino(newDino);
+    /* The server granted the escrowed dino back into the save. If its
+       state did not come back, the next sync's 409 delivers it instead. */
+    adoptServerGrants(data.state);
     save();
     updateTopBar();
-    showToast(dest === 'vault' ? 'Listing cancelled. Park was full — dino sent to your Dino Vault.'
-      : dest === 'park' ? 'Listing cancelled. Dino returned to park.'
-      : 'Listing cancelled, but park and vault are both full — contact support.');
+    refreshAfterAdopt({});
+    showToast(data.placed === 'vault' ? 'Listing cancelled. Park was full — dino sent to your Dino Vault.'
+      : 'Listing cancelled. Dino returned to park.');
     renderMarketplace();
   } catch (e) {
     showToast('Network error. Try again.');
@@ -6009,6 +6144,7 @@ function hatchEgg(idx) {
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
   if (mut) { const mk=spec.id+'_'+mut; if(!state.discoveredMutations)state.discoveredMutations=[]; if(!state.discoveredMutations.includes(mk))state.discoveredMutations.push(mk); }
   state.eggs.splice(idx, 1);
+  if (egg.grantId) markGrantsConsumed([egg.grantId]);
   save(); updateTopBar(); renderEggsTab();
 
   document.getElementById('hatchEmoji').innerHTML = spriteImg(spec.id, 96, 'sprite-img', newDino.mutation);
@@ -6335,7 +6471,7 @@ function performTradeUp() {
   const mutation = tradeUpTrack === 'mutated' ? rollMutationTradeUp(spec.id)
                  : (to === from ? rollMutationGuaranteed(spec.id) : null);
 
-  removeDinos(tradeUpPicks);
+  markGrantsConsumed(removeDinos(tradeUpPicks).map(d => d && d.grantId));
   tradeUpPicks = [];
 
   const newDino = { speciesId: spec.id, nickname: '', hunger: 80, thirst: 80, happiness: 80,
@@ -7067,7 +7203,9 @@ loadInventoryEggs();
 updateTopBar();
 initParkView();
 checkTwitchLive();
-syncCloudSave();
+/* Earnings settle into the cloud save, so they are claimed once that save
+   has been merged in — not raced against it. */
+syncCloudSave().then(() => { if (getPlayerSession()) claimEarnings(); });
 setInterval(checkTwitchLive, 60000);
 setInterval(() => { gameTick(); save(); }, 2000);
 

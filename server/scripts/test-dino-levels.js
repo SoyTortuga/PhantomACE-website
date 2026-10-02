@@ -232,14 +232,21 @@ const dino = (over = {}) => ({ speciesId: 'rex', careCount: 0, xp: 0, ...over })
   /* The listing object IS the dino once it is sold: marketplace.js
      whitelists fields, so anything missing there is gone. A levelled dino
      arriving as level 1 reads as data loss, not a missing field. */
+  /* The listed dino is now read out of the seller's SERVER save (escrow),
+     so xp is whitelisted by listingDinoFrom in dino-park.js rather than
+     taken from the request. */
   const mkt = fs.readFileSync(path.join(REPO, 'functions/api/marketplace.js'), 'utf8');
-  ok('the server keeps xp on a listing', /dino: \{[^}]*\bxp:/.test(mkt));
-  ok('and sanitises it to a non-negative integer',
-     /xp: Math\.max\(0, Math\.floor\(Number\(body\.dino\.xp\) \|\| 0\)\)/.test(mkt));
+  const api = fs.readFileSync(path.join(REPO, 'functions/api/dino-park.js'), 'utf8');
+  ok('the listing is built from the escrowed dino', /dino: listingDinoFrom\(dino\)/.test(mkt));
+  ok('the server keeps xp on a listing, sanitised to a non-negative integer',
+     /xp: Math\.max\(0, Math\.floor\(Number\(d\.xp\) \|\| 0\)\)/.test(api));
+  ok('and delivery spreads the whitelisted dino, xp included',
+     /const d = listingDinoFrom\(listed\);[\s\S]{0,80}\.\.\.d,/.test(api));
 
-  ok('the client sends xp when listing', /action: 'list'[\s\S]{0,200}xp: getDinoXp\(dino\)/.test(src));
-  check('and restores it on both buy paths',
-        (src.match(/xp: data\.dino\.xp \|\| 0,/g) || []).length, 2);
+  ok('the client lists by uid, not by a dino object', /marketPost\(\{ action: 'list', uid: dino\.uid, price \}\)/.test(src));
+  ok('and both arrival paths adopt the server save instead of rebuilding the dino',
+     /action: 'buy', listingId[\s\S]{0,600}adoptServerGrants\(data\.state\)/.test(src) &&
+     /action: 'cancel', listingId[\s\S]{0,900}adoptServerGrants\(data\.state\)/.test(src));
 }
 
 /* ── Wiring: every source is actually connected ──────────────────────── */

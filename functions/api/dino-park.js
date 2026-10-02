@@ -45,7 +45,7 @@ const SAVE_EPOCH = 2;
    hatch times are rebalanced.
    ══════════════════════════════════════════════ */
 
-import { ROSTER_BY_RARITY, rollSpeciesId, speciesMeta, rollHatchRarity, rollDinoMutation } from './dino-species.js';
+import { SPECIES, DINO_MUTATIONS, ROSTER_BY_RARITY, rollSpeciesId, speciesMeta, rollHatchRarity, rollDinoMutation } from './dino-species.js';
 
 const HATCH_TIMES = { common: 1800, uncommon: 3600, rare: 7200, epic: 14400, legendary: 28800 };
 
@@ -233,6 +233,7 @@ export async function grantDino(env, userId, opts = {}) {
       speciesId, nickname: '', hunger: 80, thirst: 80, happiness: 80,
       hygiene: 80, stamina: 80, careCount: 0, mutation: mutation || null, xp: 0,
       grantId, grantedAt: Date.now(), grantSource: opts.source || 'hatch',
+      uid: crypto.randomUUID(),
     };
 
     if (state.park.length < MAX_ACTIVE_PARK) { state.park.push(dino); placed = 'park'; }
@@ -252,6 +253,186 @@ export async function grantDino(env, userId, opts = {}) {
     return { success: true, granted: false, placed: 'full', ...reveal };
   }
   return { success: false, error: 'Grant failed', ...reveal };
+}
+
+/* ══ MARKETPLACE SETTLEMENT ═════════════════════════════════════════════
+   The marketplace used to trust the browser for everything that mattered:
+   `list` took a dino the server had never seen, and `buy` never touched the
+   buyer's coins (they only ever lived in the client save) while the seller
+   was credited for real. So a purchase was free, and selling to an alt
+   minted coins.
+
+   Every market action now settles against the player's PARK SAVE — the
+   same server-side document grantEgg/grantDino write — and rides the same
+   grantSeq protocol: each settlement bumps grantSeq, so any save taken
+   before it is refused with a 409 and the client merges the change in
+   (adoptServerGrants) instead of overwriting it. That is what stops a stale
+   tab resurrecting an escrowed dino or restoring spent coins.
+
+   Changes that a client must APPLY rather than merely notice travel as
+   `marketOps` on the state: {id, t:'coins', d} for a debit or credit, and
+   {id, t:'out', uid} for a dino taken into escrow. marketOps is
+   server-owned — a client save never overwrites it (see onRequestPost) —
+   and the client records the ids it has applied in `appliedOps`, so an op
+   applies exactly once per state fork. Dinos ARRIVING (a purchase, a
+   cancelled or expired listing) need no op: they carry a grantId and come
+   in through the existing grant path.
+
+   These helpers are pure: they edit a state object and leave the storage
+   to the caller, which is what lets marketplace.js write the save and the
+   listing in one transaction. */
+
+/* Generous against measured saves: a full 200-dino vault plus every other
+   capped array is ~145KB, ~190KB with an inline favourite sprite. A body
+   past this is not a park, and the save is re-served to the owner and
+   projected to visitors, so it is refused rather than stored. */
+export const SAVE_MAX_BYTES = 256 * 1024;
+const MARKET_OPS_MAX = 50;
+const APPLIED_OPS_MAX = 200;
+
+/* Hand-synced from COLOR_SWAPS in games/dino-park/index.html. The client
+   offers each species the three swaps furthest from its base colour; this
+   accepts any of the twelve, because reproducing that choice needs every
+   species' base hex. Per-species specials and rares are exact. */
+const COLOR_SWAP_IDS = ['azure', 'crimson', 'jade', 'amethyst', 'amber', 'arctic',
+  'obsidian', 'rose', 'copper', 'teal', 'ivory', 'slate'];
+
+export function isKnownSpecies(id) {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(SPECIES, id);
+}
+
+export function isKnownMutation(speciesId, m) {
+  if (m === null || m === undefined || m === '') return true;
+  if (typeof m !== 'string') return false;
+  return DINO_MUTATIONS.includes(m) || COLOR_SWAP_IDS.includes(m) ||
+    m === 'sp_' + speciesId || m === 'rare_' + speciesId;
+}
+
+export function usableState(record) {
+  return (record && record.state && record.state.saveEpoch === SAVE_EPOCH) ? record.state : null;
+}
+
+/**
+ * The state a settlement works on.
+ *
+ * With an incoming client state (the normal path), that state IS the save
+ * being written — exactly as a plain POST would store it — so the dino the
+ * player just hatched is listable and the coins they just earned are
+ * spendable, without a separate sync racing the request. It is refused if
+ * it predates a grant, the same rule as onRequestPost. Without one, the
+ * stored save is used as-is.
+ *
+ * Returns {stale, state} | {error, status} | {state, nextSeq}.
+ */
+export function prepareMarketState(record, incoming) {
+  const stored = usableState(record);
+  const storedSeq = Number((stored && stored.grantSeq) || 0);
+  let state;
+
+  if (incoming && typeof incoming === 'object') {
+    if (incoming.saveEpoch !== SAVE_EPOCH) return { error: 'Reload the game and try again.', status: 409 };
+    const incomingSeq = Number(incoming.grantSeq || 0);
+    if (storedSeq > incomingSeq) return { stale: true, state: stored };
+    state = JSON.parse(JSON.stringify(incoming));
+    state.marketOps = (stored && Array.isArray(stored.marketOps)) ? stored.marketOps : [];
+    if ('favorite' in state) state.favorite = sanitizeFavorite(state.favorite);
+    normalizeMarketState(state);
+    return { state, nextSeq: Math.max(storedSeq, incomingSeq) + 1 };
+  }
+
+  state = stored ? JSON.parse(JSON.stringify(stored)) : defaultState();
+  normalizeMarketState(state);
+  return { state, nextSeq: storedSeq + 1 };
+}
+
+function normalizeMarketState(state) {
+  for (const k of ['park', 'vault', 'eggs', 'discovered', 'discoveredMutations', 'marketOps', 'appliedOps']) {
+    if (!Array.isArray(state[k])) state[k] = [];
+  }
+  state.coins = Math.floor(Number(state.coins) || 0);
+  state.saveEpoch = SAVE_EPOCH;
+}
+
+/** Stamp a settlement onto the state and wrap it as a save record. */
+export function sealMarketState(userId, state, nextSeq) {
+  state.grantSeq = nextSeq;
+  return { userId, state, savedAt: Date.now() };
+}
+
+function pushMarketOp(state, op) {
+  state.marketOps = [...state.marketOps, op].slice(-MARKET_OPS_MAX);
+  /* The server applied it to THIS state, so this state has it — a client
+     that loads the record wholesale must not apply it a second time. */
+  state.appliedOps = [...state.appliedOps, op.id].slice(-APPLIED_OPS_MAX);
+}
+
+export function findDinoByUid(state, uid) {
+  if (!uid || typeof uid !== 'string') return null;
+  for (const source of ['park', 'vault']) {
+    const idx = state[source].findIndex(d => d && d.uid === uid);
+    if (idx !== -1) return { source, idx, dino: state[source][idx] };
+  }
+  return null;
+}
+
+/** Remove a dino into escrow. Returns the dino, or null if it is not there. */
+export function escrowDino(state, uid) {
+  const found = findDinoByUid(state, uid);
+  if (!found) return null;
+  state[found.source].splice(found.idx, 1);
+  /* Park cooldowns are keyed by index; the client's removeDinos remaps
+     them when it applies this op, and the server copy is replaced by the
+     client's next save. Nothing to do here. */
+  pushMarketOp(state, {
+    id: crypto.randomUUID(), t: 'out', uid,
+    grantId: found.dino.grantId || null, at: Date.now(),
+  });
+  return found.dino;
+}
+
+/** Debit or credit coins. Callers check affordability first. */
+export function applyCoins(state, delta, note) {
+  state.coins = Math.floor(Number(state.coins) || 0) + delta;
+  pushMarketOp(state, { id: crypto.randomUUID(), t: 'coins', d: delta, note: note || '', at: Date.now() });
+}
+
+/** The public, whitelisted shape of a listed dino — this object IS the dino once sold. */
+export function listingDinoFrom(d) {
+  return {
+    speciesId: d.speciesId,
+    nickname: String(d.nickname == null ? '' : d.nickname).trim().slice(0, 24),
+    mutation: d.mutation || null,
+    careCount: Math.max(0, Math.floor(Number(d.careCount) || 0)),
+    xp: Math.max(0, Math.floor(Number(d.xp) || 0)),
+  };
+}
+
+export function hasRoomForDino(state) {
+  return state.park.length < MAX_ACTIVE_PARK || state.vault.length < MAX_VAULT_SIZE;
+}
+
+/**
+ * Hand a dino to a player's save as a grant (purchase, cancel, expiry).
+ * A fresh uid and grantId every time: the uid must never match an escrow
+ * op still sitting in some stale fork, and the grantId is what the client
+ * adopts by. Overflows into the vault rather than refusing — a returned
+ * dino has nowhere else to go, and the client makes the same call.
+ */
+export function deliverDino(state, listed, source) {
+  const d = listingDinoFrom(listed);
+  const dino = {
+    ...d, hunger: 80, thirst: 80, happiness: 80, hygiene: 80, stamina: 80,
+    grantId: crypto.randomUUID(), grantedAt: Date.now(), grantSource: source,
+    uid: crypto.randomUUID(),
+  };
+  const placed = state.park.length < MAX_ACTIVE_PARK ? 'park' : 'vault';
+  state[placed].push(dino);
+  if (!state.discovered.includes(d.speciesId)) state.discovered.push(d.speciesId);
+  if (d.mutation) {
+    const mk = d.speciesId + '_' + d.mutation;
+    if (!state.discoveredMutations.includes(mk)) state.discoveredMutations.push(mk);
+  }
+  return { placed, grantId: dino.grantId };
 }
 
 /* ── GET — fetch the player's cloud save ──────── */
@@ -540,8 +721,15 @@ export async function onRequestPost(context) {
   const session = getSession(request);
   if (!session || !session.user_id) return json({ error: 'Not logged in' }, 401);
 
+  const declared = Number(request.headers.get('Content-Length') || 0);
+  if (declared > SAVE_MAX_BYTES) return json({ error: 'Save too large' }, 413);
+  let raw;
+  try { raw = await request.text(); } catch { return json({ error: 'Invalid request' }, 400); }
+  if (new TextEncoder().encode(raw).length > SAVE_MAX_BYTES) return json({ error: 'Save too large' }, 413);
+
   let body;
-  try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+  try { body = JSON.parse(raw); } catch { return json({ error: 'Invalid request' }, 400); }
+  if (!body || typeof body !== 'object') return json({ error: 'Invalid request' }, 400);
 
   /* ── Opt in or out of being visited ──
      Its own action rather than a field on the save, because consent must
@@ -578,29 +766,48 @@ export async function onRequestPost(context) {
      for free. If the stored value is ahead, this save predates a grant —
      reject it and hand back the current state so the client can merge the
      egg in and retry. Rejecting costs at most the few seconds of progress
-     in that one request; accepting costs the reward. */
-  const existing = await env.MARKETPLACE.get(saveKey(session.user_id), 'json');
-  const storedSeq = Number((existing && existing.state && existing.state.grantSeq) || 0);
-  const incomingSeq = Number(body.state.grantSeq || 0);
+     in that one request; accepting costs the reward.
 
-  if (storedSeq > incomingSeq) {
+     The check and the write are ONE locked step. As a separate get and put,
+     a grant landing between them was overwritten by a save that had passed
+     the check against the pre-grant record — the exact loss this exists to
+     prevent, through a narrower window. */
+  const incomingSeq = Number(body.state.grantSeq || 0);
+  let conflict = null;
+  let record = null;
+
+  await env.MARKETPLACE.mutate(saveKey(session.user_id), (existing) => {
+    const storedSeq = Number((existing && existing.state && existing.state.grantSeq) || 0);
+    if (storedSeq > incomingSeq) {
+      conflict = { grantSeq: storedSeq, state: existing.state };
+      return undefined;
+    }
+
+    /* Sanitised rather than trusted, because this one field leaves the
+       player's own park and appears on a page other people read. */
+    if ('favorite' in body.state) {
+      body.state.favorite = sanitizeFavorite(body.state.favorite);
+    }
+
+    /* Server-owned: the marketplace's op log. A client save never gets to
+       rewrite it, or one tab saving would erase the escrow record another
+       tab still needs to apply. */
+    const ops = existing && existing.state && Array.isArray(existing.state.marketOps)
+      ? existing.state.marketOps : [];
+    body.state.marketOps = ops;
+
+    record = { userId: session.user_id, state: body.state, savedAt: Date.now() };
+    return record;
+  });
+
+  if (conflict) {
     return json({
       error: 'stale',
       reason: 'A reward was granted since this save was taken.',
-      grantSeq: storedSeq,
-      state: existing.state,
+      grantSeq: conflict.grantSeq,
+      state: conflict.state,
     }, 409);
   }
 
-  /* Sanitised rather than trusted, because this one field leaves the
-     player's own park and appears on a page other people read. Everything
-     else in this document is private and stays opaque. */
-  if ('favorite' in body.state) {
-    body.state.favorite = sanitizeFavorite(body.state.favorite);
-  }
-
-  const record = { userId: session.user_id, state: body.state, savedAt: Date.now() };
-  await env.MARKETPLACE.put(saveKey(session.user_id), JSON.stringify(record));
-
-  return json({ success: true, savedAt: record.savedAt });
+  return json({ success: true, savedAt: record ? record.savedAt : Date.now() });
 }

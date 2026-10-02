@@ -367,7 +367,9 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
 
   /* Capped on the server too: escaping is the render-side half, and the
      listing is stored and re-served for as long as it is up. */
-  ok('the marketplace caps a listed nickname', /nickname: String\(body\.dino\.nickname[\s\S]{0,80}\.slice\(0, 24\)/.test(MKT));
+  ok('the marketplace caps a listed nickname',
+     /dino: listingDinoFrom\(dino\)/.test(MKT) &&
+     /nickname: String\(d\.nickname == null \? '' : d\.nickname\)\.trim\(\)\.slice\(0, 24\)/.test(API));
   ok('and the projection caps it as well', /nickname: String\(d\.nickname \|\| ''\)\.trim\(\)\.slice\(0, 24\)/.test(API));
 }
 
