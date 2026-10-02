@@ -98,6 +98,14 @@
         <div class="entry-claim-msg" id="entryClaimMsg"></div>
       </div>
 
+      <!-- Free alternate method of entry: one per account per month, no code,
+           sub, purchase or watch time. Shown only to logged-in viewers. -->
+      <div class="entry-free" id="entryFree" style="display:none;">
+        <p class="entry-claim-hint">No code, subscription or watch time needed — claim one free entry each month.</p>
+        <button class="btn-primary" id="entryFreeBtn" onclick="claimFreeEntry()">Claim Your Free Monthly Entry</button>
+        <div class="entry-claim-msg" id="entryFreeMsg"></div>
+      </div>
+
       <div class="entry-login" id="entryLogin" style="display:none;">
         <p>Log in with Twitch to claim codes and track your entries.</p>
         <button class="btn-primary" onclick="loginWithTwitch()">Log In with Twitch</button>
@@ -145,11 +153,16 @@
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
+        <div class="step-title">Free Entry</div>
+        <div class="step-desc">Want in with no strings attached? Log in and hit "Claim Your Free Monthly Entry" above for one free entry every month — no code, subscription, purchase or watch time. It counts exactly the same as any earned entry.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
         <div class="step-title">Subscriber Track</div>
         <div class="step-desc">Subscribers also unlock the Phamily track of the pass, which awards additional entries. Subscribing is never required to enter or win.</div>
       </div>
       <div class="step-card">
-        <div class="step-num">4</div>
+        <div class="step-num">5</div>
         <div class="step-title">Winner Drawn</div>
         <div class="step-desc">At the end of each month, a winner is drawn live on stream. Must be present or respond within 48 hours.</div>
       </div>
@@ -161,7 +174,7 @@
     <div class="divider"></div>
     <div class="section-header">Rules</div>
     <ul class="rules-list">
-      <li><strong>No purchase or subscription is necessary to enter or win.</strong> Every way of earning entries listed above is free except the subscriber track. Subscribers can earn additional entries through that track; free entries count the same as any other in the draw.</li>
+      <li><strong>No purchase or subscription is necessary to enter or win.</strong> Every way of earning entries listed above is free except the subscriber track. As a free alternate method of entry, any logged-in viewer may claim one free entry per month on this page ("Claim Your Free Monthly Entry"), with no code, purchase, subscription or watch time required. Subscribers can earn additional entries through the subscriber track; free entries count the same as any other in the draw.</li>
       <li>Open to legal residents of the United States who are 18 or older at the time of entry. Void where prohibited or restricted by law.</li>
       <li>One Twitch account per person. Entries earned through multiple accounts, scripts or automation are void, and the account may be disqualified.</li>
       <li>Each code can be claimed once per account. Entries accumulate across the calendar month (Pacific time) and do not carry over.</li>
@@ -294,6 +307,15 @@
           login.style.display = d.loggedIn ? 'none' : '';
         }
 
+        const free = document.getElementById('entryFree');
+        const freeBtn = document.getElementById('entryFreeBtn');
+        if (free && freeBtn) {
+          free.style.display = d.loggedIn ? '' : 'none';
+          const claimed = !!(d.you && d.you.amoeClaimed);
+          freeBtn.disabled = claimed;
+          freeBtn.textContent = claimed ? 'Free Entry Claimed This Month' : 'Claim Your Free Monthly Entry';
+        }
+
         const hist = document.getElementById('entryHistory');
         if (hist) {
           const items = (d.you && d.you.history) || [];
@@ -308,7 +330,9 @@
                   ? src.slice(5).replace(/^./, c => c.toUpperCase()) + ' drop'
                   : src.startsWith('phamily:')
                     ? 'Phamily Time'
-                    : 'Channel points';
+                    : src === 'amoe'
+                      ? 'Free entry'
+                      : 'Channel points';
                 const when = new Date(h.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
                 return `<div class="entry-history-row"><span>${label}</span><span class="entry-history-n">+${Number(h.entries || 0)}</span><span class="entry-history-when">${when}</span></div>`;
               }).join('')
@@ -411,6 +435,45 @@
         document.getElementById('entryClaimBtn'),
         input
       );
+    }
+
+    /* The free alternate method of entry — one per account per month. The
+       one-per-month rule is enforced server-side; the button is just disabled
+       once claimed so the page reflects it without a reload. */
+    async function claimFreeEntry() {
+      const btn = document.getElementById('entryFreeBtn');
+      const msg = document.getElementById('entryFreeMsg');
+      if (!msg) return;
+
+      if (btn) btn.disabled = true;
+      msg.className = 'entry-claim-msg';
+      msg.textContent = 'Claiming…';
+
+      try {
+        const res = await fetch('/api/giveaway-amoe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const d = await res.json();
+
+        if (res.ok && d.success) {
+          msg.className = 'entry-claim-msg ok';
+          msg.textContent = `Free entry added! You now have ${d.total} this month.`;
+        } else if (res.status === 409) {
+          msg.className = 'entry-claim-msg';
+          msg.textContent = d.error || 'You already claimed your free entry this month.';
+        } else {
+          msg.className = 'entry-claim-msg err';
+          msg.textContent = d.error || 'Could not claim your free entry.';
+          if (btn) btn.disabled = false;
+          return;
+        }
+        loadEntryTracker();
+      } catch (e) {
+        msg.className = 'entry-claim-msg err';
+        msg.textContent = 'Network error — try again.';
+        if (btn) btn.disabled = false;
+      }
     }
 
     // Enter submits, since people paste a code and hit return.

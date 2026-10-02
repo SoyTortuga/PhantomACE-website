@@ -9,8 +9,12 @@
      - Redeeming a code dropped in chat, at /redeem. Claimable once per
        account by ANYONE, for five minutes from the drop.
      - Redeeming the "Enter Giveaway" channel points reward (1 entry).
+     - The FREE alternate method of entry (AMOE): one entry per account per
+       month, claimed on the giveaway page with no purchase, sub or watch
+       time. Required so the sweepstakes has a no-strings path to enter; see
+       claimFreeEntry below.
 
-   Both land in the same monthly ledger so the draw has one source of truth.
+   All land in the same monthly ledger so the draw has one source of truth.
 
    REQUIRES the self-hosted server — mutate() and listValues() do not exist
    on a Cloudflare KV binding.
@@ -99,6 +103,52 @@ export async function addEntries(env, userId, username, count, source) {
   });
 
   return total;
+}
+
+/** The free alternate method of entry grants exactly this many entries. */
+export const AMOE_ENTRIES = 1;
+
+/**
+ * Claim the FREE alternate method of entry for the current month.
+ *
+ * Sweepstakes need a way in that costs nothing — no purchase, sub, or watch
+ * time — and that path must be worth the same as any single earned entry, so
+ * this grants one entry, the same unit a maze clear or a channel-points
+ * redemption gives.
+ *
+ * One per account per month. The guarantee is a durable `amoeClaimed` flag on
+ * the ledger row, checked and set inside the SAME mutate() that adds the entry,
+ * so two taps in the same instant can't both pass. The flag is preferred over
+ * reading `history` for the marker because history is trimmed to the last 50
+ * entries and a busy month would lose it.
+ *
+ * @returns {Promise<{ok: true, total: number} | {ok: false, reason: 'already'}>}
+ */
+export async function claimFreeEntry(env, userId, username) {
+  if (!userId) return { ok: false, reason: 'already' };
+
+  const month = monthKey();
+  let granted = false;
+  let total = 0;
+
+  await env.MARKETPLACE.mutate(ledgerKey(userId, month), (current) => {
+    const rec = current && current.month === month
+      ? current
+      : { userId: String(userId), username: username || '', month, entries: 0, history: [] };
+
+    if (rec.amoeClaimed) { total = Number(rec.entries || 0); return undefined; }
+
+    rec.amoeClaimed = true;
+    rec.entries = Number(rec.entries || 0) + AMOE_ENTRIES;
+    rec.username = username || rec.username || '';
+    rec.history = [...(rec.history || []), { source: 'amoe', entries: AMOE_ENTRIES, at: Date.now() }].slice(-50);
+
+    granted = true;
+    total = rec.entries;
+    return rec;
+  });
+
+  return granted ? { ok: true, total } : { ok: false, reason: 'already', total };
 }
 
 /**
@@ -323,7 +373,7 @@ export async function getGiveawaySummary(env, session) {
     totalEntries += n;
     participants += 1;
     if (session && String(value.userId) === String(session.user_id)) {
-      you = { entries: n, history: (value.history || []).slice(-10).reverse() };
+      you = { entries: n, history: (value.history || []).slice(-10).reverse(), amoeClaimed: !!value.amoeClaimed };
     }
   }
 
@@ -333,7 +383,7 @@ export async function getGiveawaySummary(env, session) {
     totalEntries,
     participants,
     loggedIn: !!session,
-    you: session ? (you || { entries: 0, history: [] }) : null,
+    you: session ? (you || { entries: 0, history: [], amoeClaimed: false }) : null,
     prize: session ? await getPrize(env, session.user_id) : null,
   };
 }
