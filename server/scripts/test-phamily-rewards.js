@@ -6,12 +6,12 @@
 
    Two jobs.
 
-   FIRST, the drift guard. functions/api/phamily-rewards.js is a port of the
-   three definition functions in js/pages/phamily-time.js, and a port that
-   quietly falls behind its original is worse than no port at all — the page
-   would draw one track while the server granted another. This file evaluates
-   the client's own copies straight out of that file and asserts the two
-   agree, reward for reward.
+   FIRST, the server table itself. functions/api/phamily-rewards.js is now the
+   ONE source of truth for the reward tables: the page fetches them from the
+   server (via /api/phamily-time?action=tables) rather than keeping a copy, so
+   there is no second definition to drift against. This file asserts the
+   server's own tables — their shape, their themes, their room drip, and that
+   every cosmetic a reward names exists in the game that reads it.
 
    SECOND, the refusals. The server used to take rewardType, rewardRarity
    and rewardName from the request body and hand them to grantReward, which
@@ -51,84 +51,23 @@ globalThis.Date = class extends RealDate {
 };
 const setNow = (iso) => { FAKE_NOW = iso === null ? null : RealDate.parse(iso); };
 
-/* ── The drift guard ─────────────────────────────────────────────────────
-   The client's definitions are lifted out of the page and run here. They
-   close over REWARD_ICONS, MILESTONE_INTERVAL and the three theme maps and
-   nothing else, so they evaluate cleanly outside a browser.
-
-   Compared for EVERY month either side names a theme for, plus unthemed
-   months on both sides of them — the month is passed in, never read from
-   today's date, so a theme cannot pass this guard just because it is not
-   live yet. */
+/* ── The months the server-side assertions sweep ─────────────────────────
+   A spread of unthemed months on either side of the themed ones — the month
+   is always passed in, never read from today's date, so a reward table is
+   tested for a month whether or not it is live yet. */
 const BASE_MONTHS = ['2026-08', '2026-09', '2026-12', '2027-03'];
-const clientSide = (() => {
-  const src = fs.readFileSync(path.join(REPO, 'js/pages/phamily-time.js'), 'utf8');
 
-  const grab = (re, what) => {
-    const m = src.match(re);
-    if (!m) throw new Error(`could not find ${what} in js/pages/phamily-time.js`);
-    return m[0];
-  };
-
-  const pieces = [
-    grab(/const REWARD_ICONS = \{[\s\S]*?\n {2}\};/, 'REWARD_ICONS'),
-    grab(/const MILESTONE_INTERVAL = [^;]+;/, 'MILESTONE_INTERVAL'),
-    grab(/const FOLLOWER_THEMES = \{[\s\S]*?\n {2}\};/, 'FOLLOWER_THEMES'),
-    grab(/const PHAMILY_THEMES = \{[\s\S]*?\n {2}\};/, 'PHAMILY_THEMES'),
-    grab(/const MILESTONE_THEMES = \{[\s\S]*?\n {2}\};/, 'MILESTONE_THEMES'),
-    grab(/const FOLLOWER_ROOM_DRIPS = \{[\s\S]*?\n {2}\};/, 'FOLLOWER_ROOM_DRIPS'),
-    grab(/const PHAMILY_ROOM_DRIPS = \{[\s\S]*?\n {2}\};/, 'PHAMILY_ROOM_DRIPS'),
-    grab(/ {2}function roomDripFor\(drips, mk\) \{[\s\S]*?\n {2}\}/, 'roomDripFor'),
-    grab(/ {2}function defineFollowerRewards\(mk\) \{[\s\S]*?\n {2}\}/, 'defineFollowerRewards(mk)'),
-    grab(/ {2}function definePhamilyRewards\(mk\) \{[\s\S]*?\n {2}\}/, 'definePhamilyRewards(mk)'),
-    grab(/ {2}function defineMilestones\(mk\) \{[\s\S]*?\n {2}\}/, 'defineMilestones(mk)'),
-  ];
-
-  return new Function(
-    pieces.join('\n') +
-    '\nreturn {' +
-    '  build: (mk) => ({ follower: defineFollowerRewards(mk), phamily: definePhamilyRewards(mk), milestones: defineMilestones(mk) }),' +
-    '  months: [...new Set([...Object.keys(FOLLOWER_THEMES), ...Object.keys(PHAMILY_THEMES), ...Object.keys(MILESTONE_THEMES)])],' +
-    '  dripMonths: [...new Set([...Object.keys(FOLLOWER_ROOM_DRIPS), ...Object.keys(PHAMILY_ROOM_DRIPS)])],' +
-    '};'
-  )();
-})();
-
+/* ── The server table is the one source of truth ─────────────────────────
+   The page used to carry a verbatim mirror of these tables and this suite
+   lifted the page's define* functions out and compared them reward-for-reward.
+   The mirror is gone — the page fetches the finished tables from the server
+   now — so there is nothing to compare against and no drift to guard. What the
+   tables ARE is asserted here and in the sections that follow. */
 {
-  /* Compared entry by entry, not array against array. Diffing two
-     twenty-five element lists as one blob prints both in full and leaves you
-     to spot the changed word — which is the opposite of what a drift guard
-     is for. */
-  const compare = (what, page, server) => {
-    check(`${what}: same number of entries`, page.length, server.length);
-    const n = Math.min(page.length, server.length);
-    const differing = [];
-    for (let i = 0; i < n; i++) {
-      if (JSON.stringify(page[i]) !== JSON.stringify(server[i])) {
-        differing.push({ index: i, page: page[i], server: server[i] });
-      }
-    }
-    check(`${what}: every entry matches the page`, differing, []);
-  };
-
-  check('the page and the server theme the same months',
-    clientSide.months.slice().sort(), R.THEMED_MONTHS);
   ok('at least one themed month is covered', R.THEMED_MONTHS.length > 0);
-  check('the page and the server drip rooms for the same months',
-    clientSide.dripMonths.slice().sort(), R.ROOM_DRIP_MONTHS);
 
-  const months = [...new Set([...R.THEMED_MONTHS, ...clientSide.months,
-    ...R.ROOM_DRIP_MONTHS, ...clientSide.dripMonths, ...BASE_MONTHS])].sort();
-  for (const mk of months) {
-    const page = clientSide.build(mk);
-    const server = R.rewardTablesFor(mk);
-    compare(`${mk} follower track`, page.follower, server.follower);
-    compare(`${mk} phamily track`, page.phamily, server.phamily);
-    compare(`${mk} milestones`, page.milestones, server.milestones);
-  }
-
-  /* A themed month must actually differ from a base month, or the guard
-     above is comparing two copies of the same unthemed table. */
+  /* A themed month must actually differ from a base month, or the themes are
+     doing nothing at all. */
   for (const mk of R.THEMED_MONTHS) {
     const themed = R.rewardTablesFor(mk);
     const base = R.rewardTablesFor('2026-09');

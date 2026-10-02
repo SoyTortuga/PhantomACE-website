@@ -52,8 +52,11 @@ async function grantItem(env, userId, item) {
    giveaway code pool at all — rewards add entries to the monthly ledger
    directly — so the pool now has exactly one consumer, the chat drops. */
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+function json(data, status = 200, extraHeaders) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) },
+  });
 }
 
 function getSession(request) {
@@ -174,13 +177,31 @@ async function mutateAllTimeStats(env, userId, fn) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
-  const session = getSession(request);
-  if (!session) return json({ error: 'Not logged in' }, 401);
-
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
   const now = new Date();
   const mk = monthKey(now);
+
+  /* THE ONE SEASON REGISTRY. The page used to carry a verbatim copy of the
+     whole reward table; now it fetches it from here, so there is a single
+     source of truth and nothing to keep in step. Built from the canonical
+     rewardTablesFor(mk) in phamily-rewards.js — never recomputed. The current
+     month drives the pass ladder, the previous one the grace view, exactly as
+     the page's own mirror used to. byKey is a Map (and would serialise to {}),
+     so only the arrays the page renders from are sent. Identical for every
+     viewer and served before the login gate, so the logged-out demo view gets
+     it too; cached briefly since it only changes at the month boundary. */
+  if (action === 'tables') {
+    const { rewardTablesFor } = await import('./phamily-rewards.js');
+    const shape = (t) => ({ month: t.month, follower: t.follower, phamily: t.phamily, milestones: t.milestones });
+    return json({
+      current: shape(rewardTablesFor(mk)),
+      prev: shape(rewardTablesFor(prevMonthKey(mk))),
+    }, 200, { 'Cache-Control': 'public, max-age=300' });
+  }
+
+  const session = getSession(request);
+  if (!session) return json({ error: 'Not logged in' }, 401);
 
   if (action === 'status') {
     const data = await getUserData(env, session.user_id, mk);

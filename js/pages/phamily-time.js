@@ -6,7 +6,6 @@
   'use strict';
 
   const MAX_LEVEL = 150;
-  const MILESTONE_INTERVAL = 15;
   const GRACE_DAYS = 7;
 
   /* ── Reward Definitions ──────────────────────── */
@@ -62,397 +61,17 @@
     return REWARD_ART[reward.type] || null;
   }
 
-  const REWARD_ICONS = {
-    giveaway: '🎫',
-    egg: '🥚',
-    cardback: '🃏',
-    emote: '😈',
-    bingo: '🎰',
-    wildcard: '⭐',
-    dice: '🎲',
-    cosmetic: '💀',
-    badge: '🛡️',
-    title: '👑',
-    banner: '🏳️',
-    nameeffect: '✨',
-    room: '🛋️',
-  };
-
-  /* ── SEASONAL THEMES ─────────────────────────────────────────────────
-     A month-keyed cosmetic skin over the base table. A reward override
-     touches cosmeticId / name / desc ONLY — never level, type, rarity or
-     icon — so every reward KEY is identical to a base month and claim-state
-     is unchanged. Slots are keyed `${level}_${type}_${rarity}`. Milestone
-     themes replace the ten titles, stamp meta.theme on every banner /
-     name-effect bonus and re-skin the bonus dice by level. Mirrors
-     functions/api/phamily-rewards.js verbatim; test-phamily-rewards.js
-     builds both sides for every month named here and compares them. */
-  const FOLLOWER_THEMES = {
-    '2026-10': {
-      '10_cardback_common': { name:'Cobweb Card Back', desc:'A cobweb-laced card back for Memory Match' },
-      '22_emote_uncommon':  { name:'Spooky Emote Pack', desc:'A spooky emote set for Memory Match' },
-      '55_cardback_rare':   { name:'Bat Card Back', desc:'A bat-swarm card back for Memory Match' },
-      '85_skull-skin_rare': { cosmeticId:'bonewhite', name:'Bonewhite Skull', desc:'The Bonewhite Skull theme for Skull Clicker' },
-      '95_dice_rare':       { cosmeticId:'ash', name:'Ashen Dice', desc:'Ashen-grey dice for Mana Clash' },
-    },
-    '2026-11': {
-      '10_cardback_common': { name:'Withered Wheat Card Back', desc:'A withered-wheat card back for Memory Match' },
-      '22_emote_uncommon':  { name:'Barrow Emote Pack', desc:'A barrow-dug emote set for Memory Match' },
-      '55_cardback_rare':   { name:'Carrion Crow Card Back', desc:'A carrion-crow card back for Memory Match' },
-      '85_skull-skin_rare': { cosmeticId:'hollowmoon', name:'Hollow Moon Skull', desc:'The Hollow Moon Skull theme for Skull Clicker' },
-      '95_dice_rare':       { cosmeticId:'withered', name:'Withered Wheat Dice', desc:'Withered-wheat dice for Mana Clash' },
-    },
-  };
-  const PHAMILY_THEMES = {
-    '2026-10': {
-      '10_cardback_uncommon': { name:'Crypt Card Back', desc:'A crypt-carved card back for Memory Match' },
-      '22_emote_uncommon':    { name:'Haunted Emote Pack', desc:'A haunted emote set for Memory Match' },
-      '48_dice_rare':         { cosmeticId:'slate', name:'Graveslate Dice', desc:'Graveslate dice for Mana Clash' },
-      '55_cardback_rare':     { name:'Ghost Card Back', desc:'A ghostly card back for Memory Match' },
-      '65_skull-skin_rare':   { cosmeticId:'graveash', name:'Graveash Skull', desc:'The Graveash Skull theme for Skull Clicker' },
-      '85_click-effect_rare': { cosmeticId:'wraith', name:'Wraith Wisp', desc:'The Wraith Wisp click effect for Skull Clicker' },
-      '95_dice_rare':         { cosmeticId:'pitch', name:'Pitch Black Dice', desc:'Pitch-black dice for Mana Clash' },
-      '115_skull-skin_mythic':{ cosmeticId:'reapermoon', name:'Reaper Moon Skull', desc:'The Reaper Moon Skull theme for Skull Clicker' },
-      '130_dice_mythic':      { cosmeticId:'ember', name:'Ember Dice', desc:'Ember-lit dice for Mana Clash' },
-    },
-    '2026-11': {
-      '10_cardback_uncommon': { name:'Bone Sickle Card Back', desc:'A bone-sickle card back for Memory Match' },
-      '22_emote_uncommon':    { name:'Harvest Emote Pack', desc:'A harvest emote set for Memory Match' },
-      '48_dice_rare':         { cosmeticId:'chaff', name:'Chaff & Husk Dice', desc:'Chaff-and-husk dice for Mana Clash' },
-      '55_cardback_rare':     { name:'Hollow Moon Card Back', desc:'A hollow-moon card back for Memory Match' },
-      '65_skull-skin_rare':   { cosmeticId:'chaff', name:'Chaff Field Skull', desc:'The Chaff Field Skull theme for Skull Clicker' },
-      '85_click-effect_rare': { cosmeticId:'bonesickle', name:'Bone Sickle Slash', desc:'The Bone Sickle Slash click effect for Skull Clicker' },
-      '95_dice_rare':         { cosmeticId:'crowfeather', name:'Crowfeather Dice', desc:'Crowfeather dice for Mana Clash' },
-      '115_skull-skin_mythic':{ cosmeticId:'crowfeather', name:'Crowfeather Skull', desc:'The Crowfeather Skull theme for Skull Clicker' },
-      '130_dice_mythic':      { cosmeticId:'hollow', name:'Hollow Moon Dice', desc:'Hollow-moon dice for Mana Clash' },
-    },
-  };
-  const MILESTONE_THEMES = {
-    '2026-10': {
-      theme: 'halloween',
-      titles: ['Trick-or-Treater','Candle Bearer','Grave Tender','Pumpkin Knight','Hex Weaver','Nightstalker','Crypt Keeper','Soul Reaper','Dread Warden','Harbinger of Hallows'],
-      dice: { 60: { cosmeticId:'blood', name:'Bloodletter Dice' }, 135: { cosmeticId:'wraith', name:'Wraithsilk Dice' } },
-    },
-    '2026-11': {
-      theme: 'harvest',
-      titles: ['Gleaner','Crow Caller','Field Warden','Scarecrow Knight','Harvest Witch','Bone Thresher','Barrow Keeper','Sickle Saint','Hollow Lord','Lord of the Last Harvest'],
-      dice: { 60: { cosmeticId:'scythe', name:'Bone Sickle Dice' }, 135: { cosmeticId:'scarecrow', name:'Scarecrow Dice' } },
-    },
-  };
-
-  /* ── MY ROOM DRIP, BY MONTH ────────────────────────────────────────────
-     Each month drips the next tenth of every set, rounded down, interleaved
-     so the sets arrive mixed. Levels (and so reward KEYS) never change —
-     only the piece ids advance. This used to be ONE hardcoded list that was
-     edited in place on the 1st, so September's table "became" October's:
-     a grace claim of a September piece paid October's, and the viewer's
-     own October claim of that key then deduped to nothing.
-     Each tenth is the next run of that set's pieces in catalog order.
-     A month with no entry uses the latest entry at or before it. NOTE: no
-     fourth tenth has been authored, so December onward keeps November's
-     pieces until a '2026-12' entry is added here (and in the mirror).
-     Duplicated in functions/api/phamily-rewards.js; the drift guard compares every
-     month. See docs/ROOM-PLAN.md. */
-  const FOLLOWER_ROOM_DRIPS = {
-    '2026-09': [
-      [4,'snacks-r1c1'], [9,'posters-r1c1'], [14,'consoles-r1c1'],
-      [21,'keyboards-r1c1'], [26,'led-strips-r1c1'], [32,'monitors-r1c1'],
-      [37,'smart-r1c1'], [43,'pc-towers-r1c1'], [48,'snacks-r1c2'],
-      [54,'posters-r1c2'], [59,'consoles-r1c2'], [64,'keyboards-r1c2'],
-      [69,'led-strips-r1c2'], [76,'monitors-r1c2'], [81,'smart-r1c2'],
-      [87,'snacks-r1c3'], [92,'posters-r1c3'], [98,'consoles-r1c3'],
-      [103,'led-strips-r1c3'], [109,'snacks-r1c4'], [114,'led-strips-r1c4'],
-      [119,'snacks-r1c5'], [124,'led-strips-r1c5'], [131,'snacks-r1c6'],
-      [136,'led-strips-r1c6'], [142,'snacks-r1c7'],
-    ],
-    '2026-10': [
-      [4,'snacks-r1c8'], [9,'posters-r1c4'], [14,'consoles-r1c4'],
-      [21,'keyboards-r1c3'], [26,'led-strips-r1c7'], [32,'monitors-r1c3'],
-      [37,'smart-r1c3'], [43,'pc-towers-r1c2'], [48,'snacks-r1c9'],
-      [54,'posters-r1c5'], [59,'consoles-r1c5'], [64,'keyboards-r1c4'],
-      [69,'led-strips-r1c8'], [76,'monitors-r1c4'], [81,'smart-r1c4'],
-      [87,'snacks-r1c10'], [92,'posters-r1c6'], [98,'consoles-r1c6'],
-      [103,'led-strips-r1c9'], [109,'snacks-r1c11'], [114,'led-strips-r2c1'],
-      [119,'snacks-r1c12'], [124,'led-strips-r2c2'], [131,'snacks-r1c13'],
-      [136,'led-strips-r2c3'], [142,'snacks-r2c1'],
-    ],
-    '2026-11': [
-      [4,'snacks-r2c2'], [9,'posters-r1c7'], [14,'consoles-r1c7'],
-      [21,'keyboards-r1c5'], [26,'led-strips-r2c4'], [32,'monitors-r1c5'],
-      [37,'smart-r1c5'], [43,'pc-towers-r1c3'], [48,'snacks-r2c3'],
-      [54,'posters-r1c8'], [59,'consoles-r2c1'], [64,'keyboards-r1c6'],
-      [69,'led-strips-r2c5'], [76,'monitors-r1c6'], [81,'smart-r1c6'],
-      [87,'snacks-r2c4'], [92,'posters-r2c1'], [98,'consoles-r2c2'],
-      [103,'led-strips-r2c6'], [109,'snacks-r2c5'], [114,'led-strips-r2c7'],
-      [119,'snacks-r2c6'], [124,'led-strips-r2c8'], [131,'snacks-r2c7'],
-      [136,'led-strips-r2c9'], [142,'snacks-r2c8'],
-    ],
-  };
-  const PHAMILY_ROOM_DRIPS = {
-    '2026-09': [
-      [3,'snacks-r1c1'], [7,'posters-r1c1'], [13,'consoles-r1c1'],
-      [17,'keyboards-r1c1'], [21,'led-strips-r1c1'], [27,'monitors-r1c1'],
-      [32,'smart-r1c1'], [37,'pc-towers-r1c1'], [41,'snacks-r1c2'],
-      [46,'posters-r1c2'], [51,'consoles-r1c2'], [54,'keyboards-r1c2'],
-      [59,'led-strips-r1c2'], [64,'monitors-r1c2'], [69,'smart-r1c2'],
-      [74,'snacks-r1c3'], [79,'posters-r1c3'], [84,'consoles-r1c3'],
-      [89,'led-strips-r1c3'], [93,'snacks-r1c4'], [98,'led-strips-r1c4'],
-      [103,'snacks-r1c5'], [108,'led-strips-r1c5'], [112,'snacks-r1c6'],
-      [117,'led-strips-r1c6'], [122,'snacks-r1c7'],
-    ],
-    '2026-10': [
-      [3,'snacks-r1c8'], [7,'posters-r1c4'], [13,'consoles-r1c4'],
-      [17,'keyboards-r1c3'], [21,'led-strips-r1c7'], [27,'monitors-r1c3'],
-      [32,'smart-r1c3'], [37,'pc-towers-r1c2'], [41,'snacks-r1c9'],
-      [46,'posters-r1c5'], [51,'consoles-r1c5'], [54,'keyboards-r1c4'],
-      [59,'led-strips-r1c8'], [64,'monitors-r1c4'], [69,'smart-r1c4'],
-      [74,'snacks-r1c10'], [79,'posters-r1c6'], [84,'consoles-r1c6'],
-      [89,'led-strips-r1c9'], [93,'snacks-r1c11'], [98,'led-strips-r2c1'],
-      [103,'snacks-r1c12'], [108,'led-strips-r2c2'], [112,'snacks-r1c13'],
-      [117,'led-strips-r2c3'], [122,'snacks-r2c1'],
-    ],
-    '2026-11': [
-      [3,'snacks-r2c2'], [7,'posters-r1c7'], [13,'consoles-r1c7'],
-      [17,'keyboards-r1c5'], [21,'led-strips-r2c4'], [27,'monitors-r1c5'],
-      [32,'smart-r1c5'], [37,'pc-towers-r1c3'], [41,'snacks-r2c3'],
-      [46,'posters-r1c8'], [51,'consoles-r2c1'], [54,'keyboards-r1c6'],
-      [59,'led-strips-r2c5'], [64,'monitors-r1c6'], [69,'smart-r1c6'],
-      [74,'snacks-r2c4'], [79,'posters-r2c1'], [84,'consoles-r2c2'],
-      [89,'led-strips-r2c6'], [93,'snacks-r2c5'], [98,'led-strips-r2c7'],
-      [103,'snacks-r2c6'], [108,'led-strips-r2c8'], [112,'snacks-r2c7'],
-      [117,'led-strips-r2c9'], [122,'snacks-r2c8'],
-    ],
-  };
-  function roomDripFor(drips, mk) {
-    const months = Object.keys(drips).sort();
-    let pick = months[0];
-    for (const m of months) if (m <= String(mk)) pick = m;
-    return drips[pick];
-  }
-
-  function defineFollowerRewards(mk) {
-    const r = [];
-    const giveawayLevels = [
-      [2,'common'],[5,'common'],[8,'common'],[12,'common'],[16,'common'],
-      [20,'uncommon'],[25,'uncommon'],[30,'uncommon'],[35,'uncommon'],
-      [40,'rare'],[50,'rare'],[60,'rare'],[70,'rare'],
-      [80,'rare'],[90,'rare'],[100,'rare'],
-      [110,'mythic'],[125,'mythic'],[140,'mythic'],
-    ];
-    const entries = { common:2, uncommon:5, rare:15, mythic:50 };
-    for (const [lvl, rarity] of giveawayLevels) {
-      r.push({ level:lvl, rarity, type:'giveaway', icon:REWARD_ICONS.giveaway,
-        name:`Giveaway Entries`, desc:`+${entries[rarity]} entries into the monthly giveaway, added automatically` });
-    }
-    r.push({ level:10, rarity:'common', type:'cardback', icon:REWARD_ICONS.cardback,
-      name:'Basic Card Back', desc:'A simple card back for Memory Match' });
-    r.push({ level:22, rarity:'uncommon', type:'emote', icon:REWARD_ICONS.emote,
-      name:'Emote Pack', desc:'Bonus emote set for Memory Match' });
-    r.push({ level:55, rarity:'rare', type:'cardback', icon:REWARD_ICONS.cardback,
-      name:'Rare Card Back', desc:'An exclusive card back for Memory Match' });
-    r.push({ level:65, rarity:'rare', type:'bingo', icon:REWARD_ICONS.bingo,
-      name:'Bonus Bingo Card', desc:'An extra bingo card for Commander Bingo' });
-    r.push({ level:85, rarity:'rare', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
-      cosmeticId:'blood',
-      name:'Skull Skin', desc:'The Blood Skull theme for Skull Clicker' });
-  r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
-    cosmeticId:'bone',
-    name:'Bone Dice', desc:'Cosmetic bone-themed dice for Mana Clash' });
-    /* MY ROOM — one tenth of each set per month, from the month-keyed drip
-       maps above (see roomDripFor). A piece is granted as a `room-piece`
-       item naming one piece id; the room validator accepts either grain. */
-    const ROOM_SETS = { snacks:'Snacks', posters:'Posters', consoles:'Consoles',
-      keyboards:'Keyboards', 'led-strips':'LED Strips', monitors:'Monitors',
-      smart:'Smart Devices', 'pc-towers':'PC Towers' };
-    const ROOM_DRIP = roomDripFor(FOLLOWER_ROOM_DRIPS, mk);
-    for (const [lvl, pieceId] of ROOM_DRIP) {
-      const label = ROOM_SETS[pieceId.replace(/-r\d+c\d+$/, '')];
-      r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
-        type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
-        name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
-    }
-    const theme = FOLLOWER_THEMES[mk];
-    if (theme) {
-      for (const rw of r) {
-        const o = theme[`${rw.level}_${rw.type}_${rw.rarity}`];
-        if (!o) continue;
-        if (o.cosmeticId !== undefined) rw.cosmeticId = o.cosmeticId;
-        if (o.name) rw.name = o.name;
-        if (o.desc) rw.desc = o.desc;
-        if (o.meta) rw.meta = { ...(rw.meta || {}), ...o.meta };
-      }
-    }
-    return r.sort((a,b) => a.level - b.level);
-  }
-
-  function definePhamilyRewards(mk) {
-    const r = [];
-    const giveawayLevels = [
-      [2,'uncommon'],[5,'uncommon'],[8,'uncommon'],[12,'uncommon'],[16,'uncommon'],
-      [20,'rare'],[25,'rare'],[30,'rare'],[35,'rare'],
-      [40,'rare'],[50,'rare'],[60,'rare'],[70,'mythic'],
-      [80,'mythic'],[90,'mythic'],[100,'mythic'],
-      [110,'mythic'],[125,'mythic'],[140,'mythic'],
-    ];
-    const entries = { common:2, uncommon:5, rare:15, mythic:50 };
-    for (const [lvl, rarity] of giveawayLevels) {
-      r.push({ level:lvl, rarity, type:'giveaway', icon:REWARD_ICONS.giveaway,
-        name:`Giveaway Entries`, desc:`+${entries[rarity]} entries into the monthly giveaway, added automatically` });
-    }
-    r.push({ level:6, rarity:'common', type:'egg', icon:REWARD_ICONS.egg,
-      name:'Common Egg', desc:'A Dino Park egg — hatch a random common dinosaur' });
-    r.push({ level:18, rarity:'uncommon', type:'egg', icon:REWARD_ICONS.egg,
-      name:'Uncommon Egg', desc:'A Dino Park egg — hatch a random uncommon dinosaur' });
-    r.push({ level:10, rarity:'uncommon', type:'cardback', icon:REWARD_ICONS.cardback,
-      name:'Phamily Card Back', desc:'An exclusive card back for Memory Match' });
-    r.push({ level:22, rarity:'uncommon', type:'emote', icon:REWARD_ICONS.emote,
-      name:'Premium Emote Pack', desc:'Exclusive emote set for Memory Match' });
-    r.push({ level:28, rarity:'uncommon', type:'bingo', icon:REWARD_ICONS.bingo,
-      name:'Bonus Bingo Card', desc:'An extra bingo card for Commander Bingo' });
-    r.push({ level:36, rarity:'rare', type:'egg', icon:REWARD_ICONS.egg,
-      name:'Guaranteed Rare Egg', desc:'A Dino Park egg — guaranteed rare dinosaur' });
-    r.push({ level:42, rarity:'rare', type:'wildcard', icon:REWARD_ICONS.wildcard,
-      name:'Wildcard Stamp', desc:'A wildcard stamp for Commander Bingo' });
-  r.push({ level:48, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
-    cosmeticId:'phyrexian',
-    name:'Phyrexian Dice', desc:'Phyrexian mana symbols for Mana Clash' });
-    r.push({ level:55, rarity:'rare', type:'cardback', icon:REWARD_ICONS.cardback,
-      name:'Legendary Card Back', desc:'A rare card back for Memory Match' });
-    r.push({ level:65, rarity:'rare', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
-      cosmeticId:'void',
-      name:'Dark Altar Skin', desc:'The Void Skull theme for Skull Clicker' });
-    r.push({ level:85, rarity:'rare', type:'click-effect', icon:REWARD_ICONS.cosmetic,
-      cosmeticId:'void',
-      name:'Void Click Effect', desc:'The Void Click effect for Skull Clicker' });
-  r.push({ level:95, rarity:'rare', type:'dice', icon:REWARD_ICONS.dice,
-    cosmeticId:'phantom',
-    name:'Phantom Dice Pack', desc:'Cosmetic phantom-themed dice for Mana Clash' });
-    r.push({ level:105, rarity:'mythic', type:'egg', icon:REWARD_ICONS.egg,
-      name:'Guaranteed Mutant Egg', desc:'A Dino Park egg — guaranteed mutant dinosaur' });
-    r.push({ level:115, rarity:'mythic', type:'skull-skin', icon:REWARD_ICONS.cosmetic,
-      cosmeticId:'eternal',
-      name:'Eternal Darkness Skin', desc:'The Eternal Darkness theme for Skull Clicker' });
-  r.push({ level:130, rarity:'mythic', type:'dice', icon:REWARD_ICONS.dice,
-    cosmeticId:'fracture',
-    name:'Reality Fracture Dice', desc:'Mythic animated dice for Mana Clash' });
-    /* MY ROOM — one tenth of each set per month, from the month-keyed drip
-       maps above (see roomDripFor). A piece is granted as a `room-piece`
-       item naming one piece id; the room validator accepts either grain. */
-    const ROOM_SETS = { snacks:'Snacks', posters:'Posters', consoles:'Consoles',
-      keyboards:'Keyboards', 'led-strips':'LED Strips', monitors:'Monitors',
-      smart:'Smart Devices', 'pc-towers':'PC Towers' };
-    const ROOM_DRIP = roomDripFor(PHAMILY_ROOM_DRIPS, mk);
-    for (const [lvl, pieceId] of ROOM_DRIP) {
-      const label = ROOM_SETS[pieceId.replace(/-r\d+c\d+$/, '')];
-      r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
-        type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
-        name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
-    }
-    const theme = PHAMILY_THEMES[mk];
-    if (theme) {
-      for (const rw of r) {
-        const o = theme[`${rw.level}_${rw.type}_${rw.rarity}`];
-        if (!o) continue;
-        if (o.cosmeticId !== undefined) rw.cosmeticId = o.cosmeticId;
-        if (o.name) rw.name = o.name;
-        if (o.desc) rw.desc = o.desc;
-        if (o.meta) rw.meta = { ...(rw.meta || {}), ...o.meta };
-      }
-    }
-    return r.sort((a,b) => a.level - b.level);
-  }
-
-  function defineMilestones(mk) {
-    const ms = [];
-    const followerBundles = [
-      ['Initiate','Badge + Title'],
-      ['Acolyte','Badge + Title'],
-      ['Watcher','Badge + Title'],
-      ['Guardian','Badge + Title'],
-      ['Sentinel','Badge + Title'],
-      ['Phantom','Badge + Title'],
-      ['Wraith','Badge + Title'],
-      ['Revenant','Badge + Title'],
-      ['Specter','Badge + Title'],
-      ['Eternal','Badge + Title'],
-    ];
-    const phamilyBundles = [
-      ['Initiate','Badge + Title + Common Egg', [
-        { type:'egg', rarity:'common', name:'Common Egg' },
-      ]],
-      ['Acolyte','Badge + Title + Card Back + Common Egg', [
-        { type:'cardback', rarity:'uncommon', name:'Card Back' },
-        { type:'egg', rarity:'common', name:'Common Egg' },
-      ]],
-      ['Watcher','Badge + Title + Profile Banner', [
-        { type:'banner', rarity:'rare', name:'Profile Banner' },
-      ]],
-      ['Guardian','Badge + Title + Uncommon Egg + Dice Pack', [
-        { type:'egg', rarity:'uncommon', name:'Uncommon Egg' },
-        { type:'dice', rarity:'rare', name:'Crimson Dice', cosmeticId:'crimson' },
-      ]],
-      ['Sentinel','Badge + Title + Name Effect + Rare Giveaway Entries + a second Room', [
-        { type:'nameeffect', rarity:'rare', name:'Name Effect' },
-        { type:'giveaway', rarity:'rare', name:'Rare Giveaway Entries' },
-        { type:'room-slot', rarity:'rare', name:'Second Room', cosmeticId:'2' },
-      ]],
-      ['Phantom','Badge + Title + Profile Banner + Rare Egg + the Studio Lights room set', [
-        { type:'banner', rarity:'rare', name:'Profile Banner' },
-        { type:'egg', rarity:'rare', name:'Rare Egg' },
-        { type:'room-set', rarity:'rare', name:'Studio Lights Set', cosmeticId:'studio-lights' },
-      ]],
-      ['Wraith','Badge + Title + Name Effect + Bingo Wildcard Bundle', [
-        { type:'nameeffect', rarity:'mythic', name:'Name Effect' },
-        { type:'wildcard', rarity:'rare', name:'Bingo Wildcard Bundle' },
-      ]],
-      ['Revenant','Badge + Title + Profile Banner + Mutant Egg', [
-        { type:'banner', rarity:'mythic', name:'Profile Banner' },
-        { type:'egg', rarity:'mythic', name:'Guaranteed Mutant Egg' },
-      ]],
-      ['Specter','Badge + Title + Mythic Giveaway Entries + Dice Pack', [
-        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
-        { type:'dice', rarity:'mythic', name:'Obsidian Dice', cosmeticId:'obsidian' },
-      ]],
-      ['Eternal','Badge + Title + Exclusive Banner + Exclusive Name Effect + Mythic Giveaway Entries + a third Room', [
-        { type:'banner', rarity:'mythic', name:'Exclusive Banner' },
-        { type:'nameeffect', rarity:'mythic', name:'Exclusive Name Effect' },
-        { type:'giveaway', rarity:'mythic', name:'Mythic Giveaway Entries' },
-        { type:'room-slot', rarity:'mythic', name:'Third Room', cosmeticId:'3' },
-      ]],
-    ];
-    for (let i = 0; i < 10; i++) {
-      ms.push({
-        level: (i + 1) * MILESTONE_INTERVAL,
-        title: followerBundles[i][0],
-        followerDesc: followerBundles[i][1],
-        phamilyDesc: phamilyBundles[i][1],
-        bonusItems: phamilyBundles[i][2],
-      });
-    }
-    const mt = MILESTONE_THEMES[mk];
-    if (mt) {
-      for (let i = 0; i < ms.length; i++) {
-        ms[i].title = mt.titles[i];
-        for (const b of (ms[i].bonusItems || [])) {
-          if (b.type === 'banner' || b.type === 'nameeffect') {
-            b.meta = { ...(b.meta || {}), theme:mt.theme };
-          } else if (b.type === 'dice' && mt.dice[ms[i].level]) {
-            b.cosmeticId = mt.dice[ms[i].level].cosmeticId;
-            b.name = mt.dice[ms[i].level].name;
-          }
-        }
-      }
-    }
-    return ms;
-  }
-
-  /* ── ONE MONTH'S TABLES ─────────────────────────────────────────────
-     The tables are a function of the month, as on the server. The track
-     draws the month the server says it is (status.month); the grace banner
-     draws LAST month's, so a September reward claimed in October's grace
-     week is shown — and paid — as September's. Until the server answers,
-     the Pacific month is computed locally (NOT raw getMonth/UTC, or the two
-     drift at the boundary). */
+  /* ── ONE SEASON REGISTRY, FETCHED ────────────────────────────────────
+     The reward tables are the server's, not a copy kept here. The page used
+     to carry a verbatim mirror of the whole table (and a drift guard to keep
+     the two honest); now it fetches the finished tables from the server at
+     init — /api/phamily-time?action=tables, which returns the CURRENT month
+     for the pass ladder and the PREVIOUS month for the grace view, each built
+     from the canonical rewardTablesFor(mk). The track draws the month the
+     server says it is (status.month); the grace banner draws LAST month's, so
+     a September reward claimed in October's grace week is shown — and paid —
+     as September's. The Pacific month is still computed locally for the demo
+     fallback (NOT raw getMonth/UTC, or the two drift at the boundary). */
   function localMonthKey() {
     return new Intl.DateTimeFormat('en-CA',
       { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit' }).format(new Date());
@@ -470,25 +89,33 @@
     return { y, m, day };
   }
 
+  /* Reward tables keyed by month, filled by loadTables() before the first
+     render. Each value is { follower, phamily, milestones } — the same arrays
+     the old in-page builder returned, so everything downstream is unchanged. */
   const TABLES = new Map();
-  function rewardTablesFor(mk) {
-    const month = String(mk);
-    let t = TABLES.get(month);
-    if (!t) {
-      t = { follower: defineFollowerRewards(month), phamily: definePhamilyRewards(month), milestones: defineMilestones(month) };
-      TABLES.set(month, t);
+  async function loadTables() {
+    const res = await fetch('/api/phamily-time?action=tables', { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('tables unavailable');
+    const data = await res.json();
+    for (const t of [data && data.current, data && data.prev]) {
+      if (t && t.month) {
+        TABLES.set(String(t.month), {
+          follower: t.follower || [], phamily: t.phamily || [], milestones: t.milestones || [],
+        });
+      }
     }
-    return t;
+  }
+  function rewardTablesFor(mk) {
+    return TABLES.get(String(mk)) || { follower: [], phamily: [], milestones: [] };
   }
 
-  let followerRewards, phamilyRewards, milestones;
+  let followerRewards = [], phamilyRewards = [], milestones = [];
   function useMonth(mk) {
     const t = rewardTablesFor(mk);
     followerRewards = t.follower;
     phamilyRewards = t.phamily;
     milestones = t.milestones;
   }
-  useMonth(localMonthKey());
 
   /* ── State ───────────────────────────────────── */
 
@@ -1265,6 +892,9 @@
   /* ── Demo Data (fallback) ───────────────────── */
 
   function loadDemoData() {
+    /* The logged-out preview still draws the current month's track from the
+       fetched tables; applyAPIData does this for the logged-in path. */
+    useMonth(localMonthKey());
     const level = 23;
     userLevel = level;
     const hours = 23.4;
@@ -1312,6 +942,10 @@
   /* ── Init ────────────────────────────────────── */
 
   document.addEventListener('DOMContentLoaded', async () => {
+    /* The reward tables are the server's now — fetch them before any render
+       that reads them (the track, the grace banner, the demo preview). */
+    try { await loadTables(); } catch { /* render degrades to an empty track */ }
+
     try {
       const data = await loadFromAPI();
       if (data && !data.error) {
