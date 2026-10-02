@@ -20,7 +20,12 @@ import fs from 'node:fs';
 import send from 'send';
 import 'dotenv/config';
 
-import { toWebRequest, writeWebResponse, isHostAllowed } from './adapter.js';
+import {
+  toWebRequest, writeWebResponse, isHostAllowed,
+  bodyLimitFor, declaredBodyTooLarge,
+  clientIp, rateClassFor, createRateLimiter,
+  shouldLogRequest, createWarnLimiter,
+} from './adapter.js';
 import { gateSessionCookie } from '../functions/api/auth/session-crypto.js';
 import { createStatic } from './static.js';
 import { buildRoutes, matchRoute } from './router.js';
@@ -84,12 +89,48 @@ const REAP_INTERVAL_MS = 60_000;
 
    Query strings are NOT logged verbatim: the OAuth callback carries ?code=,
    a single-use authorization code, and logs get pasted into chat and issue
-   trackers. Only the parameter NAMES are recorded. */
-function logRequest(req, url, status, startedAt) {
+   trackers. Only the parameter NAMES are recorded.
+
+   WHAT IS LOGGED is decided by shouldLogRequest() in adapter.js: errors,
+   state-changing requests, auth hops and slow requests. Successful static
+   files and read-only polls are not — the overlay alone polls once a
+   second, and logging that buried everything else.
+
+   WHEN: on the response's 'close' event, with the status that was actually
+   sent. It used to log a hardcoded 200 for static files before `send` had
+   even opened the file, so a 404/304/416 from send was recorded as 200. */
+function logRequest(req, url, status, startedAt, note = '') {
   const ms = Date.now() - startedAt;
+  if (!shouldLogRequest({ method: req.method, pathname: url.pathname, status, ms })) return;
   const params = [...url.searchParams.keys()];
   const q = params.length ? ` ?${params.join(',')}` : '';
-  console.log(`[req] ${String(status)} ${(req.method || 'GET').padEnd(4)} ${url.pathname}${q} ${ms}ms`);
+  console.log(`[req] ${String(status)} ${(req.method || 'GET').padEnd(4)} ${url.pathname}${q} ${ms}ms${note}`);
+}
+
+/* Repeating warnings (bad Host headers from scanners, an expired cookie on
+   a 1-second overlay poll, a client hammering the limiter) collapse to one
+   line per key per minute with a suppressed count. */
+const warnOnce = createWarnLimiter();
+
+/* Per-IP token buckets for /api/*. Limits and exemptions are in adapter.js. */
+const limiter = createRateLimiter();
+
+/* 30s per SQL statement — see the TIMEOUTS note in lib/db.js for why this
+   cannot cut short a legitimately long kv.mutate(). */
+const STATEMENT_TIMEOUT_MS = Number(process.env.PG_STATEMENT_TIMEOUT_MS) || 30_000;
+
+const CLEAR_SESSION_COOKIE = (secure) =>
+  `pham_session=; Path=/; Max-Age=0; SameSite=Lax${secure ? '; Secure' : ''}`;
+
+function sendTooLarge(res, limit) {
+  res.writeHead(413, {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    /* The rest of the oversized body is never read; closing the
+       connection stops the client sending it. */
+    Connection: 'close',
+  });
+  res.end(JSON.stringify({ error: `Request body too large (limit ${limit} bytes).` }));
 }
 
 function isPublicOrigin(origin) {
@@ -140,7 +181,7 @@ async function main() {
     console.error('FATAL: DATABASE_URL is not set. See server/.env.example.');
     process.exit(1);
   }
-  const pool = createPool(process.env.DATABASE_URL);
+  const pool = createPool(process.env.DATABASE_URL, { statementTimeoutMs: STATEMENT_TIMEOUT_MS });
   const info = await waitForDatabase();
   console.log(`[boot] postgres ready: ${info.db}`);
 
@@ -160,6 +201,8 @@ async function main() {
   console.log(`[boot] media store: ${mediaStore.root}`);
 
   const env = { ...process.env, MARKETPLACE: store, MEDIA_STORE: mediaStore };
+
+  setInterval(() => { limiter.sweep(); }, 60_000).unref();
 
   setInterval(() => {
     store.reap()
@@ -277,7 +320,7 @@ async function main() {
     const started = Date.now();
     try {
       if (!isHostAllowed(req, ALLOWED_HOSTS)) {
-        console.warn(`[req] 421 rejected Host: ${req.headers.host}`);
+        warnOnce('host', `[req] 421 rejected Host: ${String(req.headers.host).slice(0, 100)}`);
         res.writeHead(421, { 'Content-Type': 'text/plain' });
         res.end('Misdirected Request');
         return;
@@ -285,6 +328,38 @@ async function main() {
 
       const url = new URL(PUBLIC_ORIGIN + (req.url || '/'));
       const method = (req.method || 'GET').toUpperCase();
+
+      /* One log line per request, written once the response has really
+         gone out (see logRequest). `res.quietLog` opts a response out —
+         used for 429s, which are summarised by warnOnce instead so a flood
+         cannot flood the log too. */
+      res.once('close', () => {
+        if (res.quietLog) return;
+        logRequest(req, url, res.statusCode, started, res.writableFinished ? '' : ' (client went away)');
+      });
+
+      /* ── RATE LIMIT ────────────────────────────────────────────────
+         Before the session gate, so a flood costs a map lookup rather than
+         an HMAC per request. EventSub deliveries, /api/health and requests
+         from processes on the rig itself are exempt — see adapter.js. */
+      const rateClass = rateClassFor(url.pathname, method);
+      if (rateClass) {
+        const who = clientIp(req);
+        if (!who.local) {
+          const verdict = limiter.take(rateClass, who.ip);
+          if (!verdict.allowed) {
+            res.quietLog = true;
+            warnOnce(`429:${rateClass}`, `[rate] 429 ${rateClass} limit hit by ${who.ip} on ${url.pathname}`);
+            res.writeHead(429, {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+              'Retry-After': String(verdict.retryAfterSec),
+            });
+            res.end(JSON.stringify({ error: 'Too many requests. Slow down and try again shortly.' }));
+            return;
+          }
+        }
+      }
 
       /* ── THE SESSION GATE ────────────────────────────────────────────
          Every request passes through here, so this is the one place a
@@ -296,10 +371,14 @@ async function main() {
          Verifying inside those 23 copies instead would mean 23 chances to
          miss one, and one miss is a total bypass. This cannot be missed.
 
-         An invalid or forged cookie is STRIPPED rather than rejected with
-         an error: the request simply proceeds as logged out, which is what
-         a tampered cookie deserves and keeps public pages working for
-         someone with stale cookie state.
+         An invalid, forged or EXPIRED cookie is STRIPPED rather than
+         rejected with an error: the request simply proceeds as logged out,
+         which keeps public pages working for someone with stale cookie
+         state. The browser is also told to drop it — the frontend renders
+         the signed-in UI from the readable cookie, so leaving an expired one
+         in place would show "signed in" to someone the server treats as a
+         guest. A handler that issues a new session (the login callback)
+         overrides this, because writeHead's headers win over setHeader's.
 
          The WHOLE header is replaced, never filtered. The handlers match
          /pham_session=/ unanchored, so any cookie left behind — including
@@ -309,7 +388,11 @@ async function main() {
       const gated = await gateSessionCookie(req.headers.cookie, process.env.SESSION_SECRET);
       if (gated.cookie) req.headers.cookie = gated.cookie;
       else delete req.headers.cookie;
-      if (gated.rejected) console.warn(`[auth] rejected an unverifiable session cookie on ${url.pathname}`);
+      if (gated.rejected) {
+        res.setHeader('Set-Cookie', CLEAR_SESSION_COOKIE(url.protocol === 'https:'));
+        warnOnce(`session:${gated.reason}`,
+          `[auth] rejected ${gated.reason === 'expired' ? 'an expired' : 'an unverifiable'} session cookie on ${url.pathname}`);
+      }
 
       /* Not a file under functions/ — this server is a single point of
          failure in a way Cloudflare Pages never was, so it needs something
@@ -323,7 +406,6 @@ async function main() {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         });
-        logRequest(req, url, dbOk ? 200 : 503, started);
         res.end(JSON.stringify({
           ok: dbOk,
           database: dbOk ? 'up' : 'unreachable',
@@ -345,18 +427,28 @@ async function main() {
       if (isApi) {
         const match = matchRoute(table, url.pathname, method);
         if (match === 'method-not-allowed') {
-          logRequest(req, url, 405, started);
           res.writeHead(405, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
           res.end(JSON.stringify({ error: 'Method not allowed' }));
           return;
         }
         if (!match) {
-          logRequest(req, url, 404, started);
           res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
           res.end(JSON.stringify({ error: 'Not found' }));
           return;
         }
-        const request = toWebRequest(req, PUBLIC_ORIGIN);
+
+        /* ── BODY CAP ──────────────────────────────────────────────────
+           A declared oversize body is refused unread. An undeclared
+           (chunked) one is cut off by the adapter's counting stream, which
+           sets req.bodyTooLarge; whatever the handler made of its failed
+           read is then replaced with the 413 it really is. */
+        const bodyLimit = bodyLimitFor(url.pathname);
+        if (declaredBodyTooLarge(req, bodyLimit)) {
+          warnOnce('413', `[req] 413 declared body over ${bodyLimit} bytes on ${url.pathname}`);
+          sendTooLarge(res, bodyLimit);
+          return;
+        }
+        const request = toWebRequest(req, PUBLIC_ORIGIN, { maxBodyBytes: bodyLimit });
         const webRes = await match.handler({
           env,
           request,
@@ -366,12 +458,17 @@ async function main() {
           // can't take down the request.
           waitUntil: (p) => { Promise.resolve(p).catch(e => console.error('[waitUntil]', e)); },
         });
+        if (req.bodyTooLarge) {
+          try { await webRes?.body?.cancel(); } catch { /* nothing to release */ }
+          warnOnce('413', `[req] 413 streamed body over ${bodyLimit} bytes on ${url.pathname}`);
+          sendTooLarge(res, bodyLimit);
+          return;
+        }
         if (!webRes || typeof webRes.status !== 'number') {
           throw new Error(`handler for ${url.pathname} did not return a Response`);
         }
         const withNoStore = new Response(method === 'HEAD' ? null : webRes.body, webRes);
         withNoStore.headers.set('Cache-Control', 'no-store');
-        logRequest(req, url, withNoStore.status, started);
         await writeWebResponse(res, withNoStore);
         return;
       }
@@ -380,14 +477,12 @@ async function main() {
       const decision = statik.resolve(url.pathname, url.search);
 
       if (decision.kind === 'redirect') {
-        logRequest(req, url, decision.status, started);
         res.writeHead(decision.status, { Location: decision.location, ...SECURITY_HEADERS });
         res.end();
         return;
       }
 
       if (decision.kind === 'notfound') {
-        logRequest(req, url, 404, started);
         const notFoundPage = path.join(ROOT, '404.html');
         const headers = { ...SECURITY_HEADERS, 'Content-Type': 'text/html; charset=utf-8' };
         if (fs.existsSync(notFoundPage)) {
@@ -405,14 +500,20 @@ async function main() {
         extra['Content-Security-Policy'] = "frame-ancestors 'self'";
       }
       for (const [k, v] of Object.entries(extra)) res.setHeader(k, v);
-      logRequest(req, url, 200, started);
-      // `send` handles HEAD, conditional GETs and Range on its own.
+      // `send` handles HEAD, conditional GETs and Range on its own, and
+      // sets the final status itself — logged on 'close', not here.
       send(req, decision.relPath, { root: ROOT, dotfiles: 'deny', index: false }).pipe(res);
     } catch (err) {
-      console.error('[request]', req.method, req.url, err);
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      if (req.bodyTooLarge && !res.headersSent) {
+        sendTooLarge(res, bodyLimitFor(String(req.url || '').split('?')[0]));
+        return;
       }
+      console.error('[request]', req.method, req.url, err);
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ error: 'Internal error' }));
     }
   });

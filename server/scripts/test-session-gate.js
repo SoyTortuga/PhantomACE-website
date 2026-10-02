@@ -52,13 +52,17 @@ const handlerRead = (header) => {          // exactly what the ~60 handlers do
 
 /* ── Real sessions still work ─────────────────────────────────────────── */
 {
+  /* signSession stamps iat/exp (see test-hardening.js for the lifetime
+     rules); compare the identity fields and check the stamp separately. */
+  const identity = (s) => { if (!s) return s; const { iat, exp, ...rest } = s; return rest; };
   const real = await signSession({ user_id: '999', display_name: 'Viewer' }, SECRET);
   const g = await gateSessionCookie(`pham_session=${real}`, SECRET);
-  check('a valid signed session passes', handlerRead(g.cookie), { user_id: '999', display_name: 'Viewer' });
+  check('a valid signed session passes', identity(handlerRead(g.cookie)), { user_id: '999', display_name: 'Viewer' });
+  ok('carrying its signed expiry', Number.isFinite(handlerRead(g.cookie)?.exp));
   check('not reported as rejected', g.rejected, false);
 
   const mixed = await gateSessionCookie(`xpham_session=${forged}; pham_session=${real}; zzz=1`, SECRET);
-  check('valid session + look-alike: only the verified session survives', handlerRead(mixed.cookie), { user_id: '999', display_name: 'Viewer' });
+  check('valid session + look-alike: only the verified session survives', identity(handlerRead(mixed.cookie)), { user_id: '999', display_name: 'Viewer' });
   ok('and nothing else rides along in the header', mixed.cookie && !/xpham_session|zzz=/.test(mixed.cookie));
 
   const wrong = await signSession({ user_id: BROADCASTER }, 'a-different-secret');

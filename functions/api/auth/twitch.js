@@ -1,7 +1,32 @@
+import {
+  SESSION_MAX_AGE_SEC, safeReturnPath, randomNonce, oauthStateCookie,
+  clearOauthStateCookie, oauthStateMatches, encodeStatePart, decodeStatePart,
+} from './session-crypto.js';
+
 const TWITCH_CHANNEL = 'phantomace';
 const SCOPES = 'user:read:follows user:read:subscriptions';
 const COOKIE_NAME = 'pham_session';
-const COOKIE_MAX_AGE = 86400;
+const COOKIE_MAX_AGE = SESSION_MAX_AGE_SEC;
+const STATE_PATH = '/api/auth/twitch';
+
+/* state = "<nonce>.<base64url(return path)>". The nonce proves the callback
+   belongs to a login THIS browser started (it must match the HttpOnly
+   pham_oauth_state cookie); the return path rides along so it survives the
+   round trip, and is re-validated by safeReturnPath on the way out. */
+function parseState(state) {
+  const s = String(state || '');
+  const dot = s.indexOf('.');
+  if (dot <= 0) return { nonce: null, returnTo: '/' };
+  return { nonce: s.slice(0, dot), returnTo: safeReturnPath(decodeStatePart(s.slice(dot + 1))) };
+}
+
+function redirectWithError(url, returnTo, errorCode, extraCookies = []) {
+  const target = new URL(safeReturnPath(returnTo), url.origin);
+  target.searchParams.set('login_error', errorCode);
+  const headers = new Headers({ Location: target.toString() });
+  for (const c of extraCookies) headers.append('Set-Cookie', c);
+  return new Response(null, { status: 302, headers });
+}
 
 export async function onRequestGet(context) {
   const { env, request } = context;
@@ -17,6 +42,8 @@ export async function onRequestGet(context) {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
   const state = url.searchParams.get('state');
+  const isSecure = url.protocol === 'https:';
+  const clearState = clearOauthStateCookie(STATE_PATH, isSecure);
 
   if (error) {
     /* Twitch rejected the authorisation. This used to redirect to returnTo
@@ -31,26 +58,38 @@ export async function onRequestGet(context) {
     const description = url.searchParams.get('error_description') || '';
     console.error(`[auth] Twitch OAuth error: ${error}${description ? ' — ' + description : ''} (redirect_uri sent: ${redirectUri})`);
 
-    const returnTo = state ? decodeURIComponent(state) : '/';
-    const sep = returnTo.includes('?') ? '&' : '?';
-    return Response.redirect(
-      `${url.origin}${returnTo}${sep}login_error=${encodeURIComponent(error)}`,
-      302
-    );
+    return redirectWithError(url, parseState(state).returnTo, error, [clearState]);
   }
 
   if (!code) {
-    const returnTo = url.searchParams.get('return_to') || '/';
+    const returnTo = safeReturnPath(url.searchParams.get('return_to') || '/');
+    const nonce = randomNonce();
     const authUrl = new URL('https://id.twitch.tv/oauth2/authorize');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', SCOPES);
-    authUrl.searchParams.set('state', encodeURIComponent(returnTo));
-    return Response.redirect(authUrl.toString(), 302);
+    authUrl.searchParams.set('state', `${nonce}.${encodeStatePart(returnTo)}`);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: authUrl.toString(),
+        'Set-Cookie': oauthStateCookie(nonce, STATE_PATH, isSecure),
+      },
+    });
   }
 
-  const returnPath = state ? decodeURIComponent(state) : '/';
+  const { nonce, returnTo: returnPath } = parseState(state);
+
+  /* Refuse a callback this browser did not start. Without this check an
+     attacker could send a victim to the callback carrying the ATTACKER's
+     code and log them into the attacker's account (login CSRF). A login
+     started before this check shipped also lands here — it just bounces with
+     login_error=state and the next click works. */
+  if (!oauthStateMatches(request.headers.get('Cookie'), nonce)) {
+    console.warn('[auth] login callback refused: state did not match this browser\'s nonce');
+    return redirectWithError(url, returnPath, 'state', [clearState]);
+  }
 
   try {
     const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
@@ -241,10 +280,14 @@ export async function onRequestGet(context) {
     }
 
     /* Signed, so it cannot be edited in a browser. See session-crypto.js —
-       the payload stays readable for the frontend; only forgery is closed. */
+       the payload stays readable for the frontend; only forgery is closed.
+       iat/exp are stamped explicitly so the signed lifetime is exactly the
+       cookie's Max-Age; verifySession refuses it after exp. */
     const { signSession } = await import('./session-crypto.js');
-    const cookieValue = await signSession(session, env.SESSION_SECRET);
-    const isSecure = url.protocol === 'https:';
+    const iat = Math.floor(Date.now() / 1000);
+    session.iat = iat;
+    session.exp = iat + COOKIE_MAX_AGE;
+    const cookieValue = await signSession(session, env.SESSION_SECRET, { maxAgeSec: COOKIE_MAX_AGE });
     const flags = [
       `Path=/`,
       `Max-Age=${COOKIE_MAX_AGE}`,
@@ -252,14 +295,12 @@ export async function onRequestGet(context) {
     ];
     if (isSecure) flags.push('Secure');
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        'Location': returnPath,
-        'Set-Cookie': `${COOKIE_NAME}=${cookieValue}; ${flags.join('; ')}`,
-      },
-    });
+    const out = new Headers({ Location: new URL(returnPath, url.origin).toString() });
+    out.append('Set-Cookie', `${COOKIE_NAME}=${cookieValue}; ${flags.join('; ')}`);
+    out.append('Set-Cookie', clearState);
+    return new Response(null, { status: 302, headers: out });
   } catch (err) {
-    return Response.redirect(`${url.origin}${returnPath}`, 302);
+    console.error('[auth] login failed:', err && err.message);
+    return redirectWithError(url, returnPath, 'login_failed', [clearState]);
   }
 }

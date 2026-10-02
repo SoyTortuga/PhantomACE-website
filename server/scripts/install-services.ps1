@@ -35,7 +35,9 @@ param(
     [string] $Database     = 'phantomace-tv',
     [string] $PublicOrigin = 'https://phantomace.tv',
     [int]    $Port         = 8790,
-    [string] $ServiceName  = 'phantomace-web'
+    [string] $ServiceName  = 'phantomace-web',
+    # Rotated log files older than this are deleted by a daily scheduled task.
+    [int]    $LogRetentionDays = 14
 )
 
 $ErrorActionPreference = 'Stop'
@@ -175,7 +177,15 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
 # and cost real time tracing which lines belonged to which process.
 & $nssm set $ServiceName AppStdout          (Join-Path $logDir "$ServiceName.out.log")
 & $nssm set $ServiceName AppStderr          (Join-Path $logDir "$ServiceName.err.log")
+#
+# ROTATION WHILE RUNNING. AppRotateFiles alone only rotates when the service
+# STARTS, and this service runs for weeks between restarts — so the log grew
+# without bound. AppRotateOnline=1 makes NSSM rotate the live file once it
+# passes AppRotateBytes (10 MB). Rotated files are renamed with a timestamp,
+# e.g. phantomace-web.out-20261002T040000.123.log, and NSSM never deletes
+# them; the prune task registered below does.
 & $nssm set $ServiceName AppRotateFiles     1
+& $nssm set $ServiceName AppRotateOnline    1
 & $nssm set $ServiceName AppRotateBytes     10485760
 
 # Environment. NSSM wants a single NUL-free multi-line blob; secrets stay in
@@ -266,6 +276,27 @@ if ($failures.Count) {
 Write-Host "[setup] verified: $storedApp index.js (in $storedDir)"
 if ($siblings.Count) { Write-Host '[setup] verified: no sibling service was modified' }
 
+# ── prune rotated logs ────────────────────────────────────────────────────
+# NSSM rotates but never deletes. A daily task removes THIS service's rotated
+# files (never the live <name>.out.log / <name>.err.log, which have no
+# "-<timestamp>" suffix) once they are older than $LogRetentionDays. The
+# filter is anchored on "<name>." so phantomace-web never touches
+# phantomace-web-dev's files. Re-running this script replaces the task.
+#  The name is matched by regex as well as the -Filter wildcard, because
+#  Windows wildcards also match 8.3 short names and can catch the live file.
+$pruneTask = "$ServiceName-log-prune"
+$nameRx    = '^' + [regex]::Escape($ServiceName) + '\.(out|err)-\d{8}T'
+$pruneCmd  = "Get-ChildItem -LiteralPath '$logDir' -File -Filter '$ServiceName.*-*.log' | " +
+             "Where-Object { `$_.Name -match '$nameRx' -and `$_.LastWriteTime -lt (Get-Date).AddDays(-$LogRetentionDays) } | " +
+             "Remove-Item -Force"
+$action    = New-ScheduledTaskAction -Execute 'powershell.exe' `
+               -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"$pruneCmd`""
+$trigger   = New-ScheduledTaskTrigger -Daily -At '04:15'
+$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -TaskName $pruneTask -Action $action -Trigger $trigger -Principal $principal `
+    -Description "Deletes rotated $ServiceName logs older than $LogRetentionDays days." -Force | Out-Null
+Write-Host "[setup] log prune task: $pruneTask (daily 04:15, keeps $LogRetentionDays days)"
+
 Write-Host ''
 Write-Host "[setup] installed '$ServiceName'"
 Write-Host "        port      : $Port"
@@ -275,12 +306,12 @@ Write-Host "        depends on: $($pg.Name)"
 Write-Host ''
 Write-Host '[setup] NOT started automatically. Start it deliberately when ready:'
 Write-Host "          Start-Service $ServiceName"
-Write-Host "          Get-Content '$logDir\server.out.log' -Tail 20"
+Write-Host "          Get-Content '$logDir\$ServiceName.out.log' -Tail 20"
 Write-Host ''
 Write-Host '[setup] If it crash-loops, Status reads "Paused" rather than "Stopped"'
 Write-Host '        and NSSM keeps restarting it with escalating backoff. Quiet it'
 Write-Host "        with:  Stop-Service $ServiceName"
-Write-Host '        The reason is always in server.out.log, not in Get-Service.'
+Write-Host "        The reason is always in $ServiceName.out.log, not in Get-Service."
 Write-Host ''
 Write-Host '[setup] Reboot survival is the point of this script. Verify it by actually'
 Write-Host '        rebooting and confirming the site answers without anyone logging in.'

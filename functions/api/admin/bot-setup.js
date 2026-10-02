@@ -11,6 +11,13 @@
    ══════════════════════════════════════════════ */
 
 import { getBroadcasterToken } from '../bot/send-chat.js';
+import {
+  randomNonce, oauthStateCookie, clearOauthStateCookie, oauthStateMatches,
+} from '../auth/session-crypto.js';
+
+/* The OAuth state cookie is scoped to this route, so it never collides with
+   the login flow's (scoped to /api/auth/twitch). */
+const STATE_PATH = '/api/admin/bot-setup';
 
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
@@ -19,8 +26,44 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
-function html(body, status = 200) {
-  return new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+function html(body, status = 200, setCookie = null) {
+  const headers = new Headers({ 'Content-Type': 'text/html; charset=utf-8' });
+  if (setCookie) headers.append('Set-Cookie', setCookie);
+  return new Response(body, { status, headers });
+}
+
+/** Which Twitch account a fresh user token belongs to, or null. */
+async function tokenOwner(env, accessToken) {
+  try {
+    const res = await fetch('https://api.twitch.tv/helix/users', {
+      headers: { 'Authorization': 'Bearer ' + accessToken, 'Client-Id': env.TWITCH_CLIENT_ID },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.data && data.data[0]) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Best-effort: a token we refused to store should not stay alive at Twitch. */
+async function revokeToken(env, accessToken) {
+  try {
+    await fetch('https://id.twitch.tv/oauth2/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: env.TWITCH_CLIENT_ID, token: accessToken }),
+    });
+  } catch { /* it expires on its own */ }
+}
+
+function refusedPage(title, message, clearCookie) {
+  return html(`<!DOCTYPE html>
+<html><head><title>${escapeHtml(title)}</title>
+<style>body { font-family: system-ui; background: #111; color: #eee; max-width: 600px; margin: 80px auto; padding: 20px; } h1 { color: #ff0000; } a { color: #ff4400; }</style>
+</head><body><h1>${escapeHtml(title)}</h1><p>${message}</p>
+<p>Nothing was stored.</p>
+<p><a href="/api/admin/bot-setup">← Back to setup</a></p></body></html>`, 403, clearCookie);
 }
 
 function json(data, status = 200) {
@@ -79,18 +122,32 @@ export async function onRequestGet(context) {
   }
 
   if (code) {
-    const state = url.searchParams.get('state');
-    if (state === 'broadcaster') {
+    /* state is "<purpose>.<nonce>" and the nonce must match the HttpOnly
+       cookie this page set when it rendered the Authorize links. It used to
+       be a fixed string ('broadcaster', or nothing for the bot), so anyone
+       could send a signed-in moderator to this callback with a code for an
+       account of THEIR choosing and have it stored as the bot token. */
+    const clearCookie = clearOauthStateCookie(STATE_PATH, url.protocol === 'https:');
+    const state = String(url.searchParams.get('state') || '');
+    const dot = state.indexOf('.');
+    const purpose = dot > 0 ? state.slice(0, dot) : '';
+    const nonce = dot > 0 ? state.slice(dot + 1) : '';
+    if (!['bot', 'broadcaster'].includes(purpose) || !oauthStateMatches(request.headers.get('Cookie'), nonce)) {
+      return refusedPage('Authorization Expired',
+        'This authorization did not start from this browser\'s setup page, or the link is more than ten minutes old. Open the setup page again and click Authorize from there.',
+        clearCookie);
+    }
+    if (purpose === 'broadcaster') {
       /* Refused here as well as in the page, because the page only hides the
          link. This callback stores a token granting permissions on the
          broadcaster's channel; it must not be reachable by anyone who simply
          navigated to the Twitch consent URL themselves. */
       if (!broadcaster) {
-        return html('<h1>Broadcaster Only</h1><p>Channel points and hype train permissions can only be granted by the broadcaster\'s own account.</p>', 403);
+        return html('<h1>Broadcaster Only</h1><p>Channel points and hype train permissions can only be granted by the broadcaster\'s own account.</p>', 403, clearCookie);
       }
-      return await handleBroadcasterOAuthCallback(env, url, code);
+      return await handleBroadcasterOAuthCallback(env, url, code, clearCookie);
     }
-    return await handleOAuthCallback(env, url, code);
+    return await handleOAuthCallback(env, url, code, clearCookie);
   }
 
   return showSetupPage(env, url, broadcaster);
@@ -275,10 +332,15 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
     : '❌ Not created yet';
 
   const callbackUrl = `${url.origin}/api/admin/bot-setup`;
+  /* One nonce per page render, bound to this browser by an HttpOnly cookie
+     and carried in both Authorize links' state. See the callback branch. */
+  const stateNonce = randomNonce();
+  const stateCookie = oauthStateCookie(stateNonce, STATE_PATH, url.protocol === 'https:');
   const scopes = 'user:write:chat user:bot user:read:chat user:manage:whispers';
   const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
-    `&response_type=code&scope=${encodeURIComponent(scopes)}`;
+    `&response_type=code&scope=${encodeURIComponent(scopes)}` +
+    `&state=${encodeURIComponent('bot.' + stateNonce)}`;
 
   /* channel:read:hype_train is REQUIRED to create any channel.hype_train.*
      EventSub subscription — Twitch checks the broadcaster's granted scopes
@@ -321,7 +383,8 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   const broadcasterScopes = REQUIRED_BROADCASTER_SCOPES.join(' ');
   const broadcasterAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${env.TWITCH_CLIENT_ID}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
-    `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}&state=broadcaster`;
+    `&response_type=code&scope=${encodeURIComponent(broadcasterScopes)}` +
+    `&state=${encodeURIComponent('broadcaster.' + stateNonce)}`;
 
   return html(`<!DOCTYPE html>
 <html><head><title>PhantomACE Bot Setup</title>
@@ -713,10 +776,10 @@ async function createGiveawayReward() {
   }
 }
 </script>
-</body></html>`);
+</body></html>`, 200, stateCookie);
 }
 
-async function handleOAuthCallback(env, url, code) {
+async function handleOAuthCallback(env, url, code, clearCookie = null) {
   try {
     const callbackUrl = `${url.origin}/api/admin/bot-setup`;
 
@@ -743,28 +806,39 @@ async function handleOAuthCallback(env, url, code) {
     }
     const ttl = Number.isFinite(tokens.expires_in) && tokens.expires_in >= 60 ? tokens.expires_in : 3600;
 
+    /* WHO AUTHORIZED, BEFORE ANYTHING IS STORED. Tokens used to be written
+       first and the account looked up afterwards, so whatever account's code
+       arrived became the bot — the broadcaster's included, which has
+       happened on this channel. Now:
+         - TWITCH_BOT_USER_ID set   → only that account is accepted;
+         - not set                  → the broadcaster's own account is still
+                                      refused (the known mistake); any other
+                                      account is accepted, since re-linking a
+                                      new bot is a supported operation.
+       An account Twitch will not name is refused outright. */
+    const user = await tokenOwner(env, tokens.access_token);
+    const expectedBot = env.TWITCH_BOT_USER_ID ? String(env.TWITCH_BOT_USER_ID) : null;
+    let refusal = null;
+    if (!user) {
+      refusal = 'Twitch would not say which account this authorization belongs to, so it was not stored.';
+    } else if (expectedBot && String(user.id) !== expectedBot) {
+      refusal = `You authorized as <b>${escapeHtml(user.display_name)}</b> (ID ${escapeHtml(user.id)}), but the configured bot account is ID ${escapeHtml(expectedBot)} (TWITCH_BOT_USER_ID). Sign into twitch.tv as the bot account and try again.`;
+    } else if (!expectedBot && env.TWITCH_BROADCASTER_ID && String(user.id) === String(env.TWITCH_BROADCASTER_ID)) {
+      refusal = `You authorized as the broadcaster (<b>${escapeHtml(user.display_name)}</b>). That would make every drop and announcement post as the broadcaster. Sign into twitch.tv as the bot account and try again.`;
+    }
+    if (refusal) {
+      console.warn(`[bot-setup] refused bot authorization for ${user ? user.id : 'unknown account'}`);
+      await revokeToken(env, tokens.access_token);
+      return refusedPage('Wrong Twitch Account', refusal, clearCookie);
+    }
+
     await env.MARKETPLACE.put('twitch_bot_refresh_token', tokens.refresh_token);
     await env.MARKETPLACE.put('twitch_bot_token', JSON.stringify({
       access_token: tokens.access_token,
       expiresAt: Date.now() + (ttl * 1000),
     }), { expirationTtl: ttl });
-
-    const userRes = await fetch('https://api.twitch.tv/helix/users', {
-      headers: {
-        'Authorization': 'Bearer ' + tokens.access_token,
-        'Client-Id': env.TWITCH_CLIENT_ID,
-      },
-    });
-
-    let botInfo = '';
-    if (userRes.ok) {
-      const userData = await userRes.json();
-      const user = userData.data && userData.data[0];
-      if (user) {
-        await env.MARKETPLACE.put('twitch_bot_user_id', user.id);
-        botInfo = `Bot account: <b>${escapeHtml(user.display_name)}</b> (ID: ${escapeHtml(user.id)})`;
-      }
-    }
+    await env.MARKETPLACE.put('twitch_bot_user_id', user.id);
+    const botInfo = `Bot account: <b>${escapeHtml(user.display_name)}</b> (ID: ${escapeHtml(user.id)})`;
 
     return html(`<!DOCTYPE html>
 <html><head><title>Bot Authorized</title>
@@ -779,9 +853,9 @@ async function handleOAuthCallback(env, url, code) {
 <p>The bot can now send messages in your Twitch chat.</p>
 <p>Tokens are stored securely in KV — no env vars needed for this part.</p>
 <p><a href="/api/admin/bot-setup">← Back to setup</a></p>
-</body></html>`);
+</body></html>`, 200, clearCookie);
   } catch (e) {
-    return html(`<h1>Unexpected Error</h1><p>Something went wrong finishing bot authorization.</p><pre>${escapeHtml(e.message || String(e))}</pre><p><a href="/api/admin/bot-setup">← Back to setup</a></p>`, 500);
+    return html(`<h1>Unexpected Error</h1><p>Something went wrong finishing bot authorization.</p><pre>${escapeHtml(e.message || String(e))}</pre><p><a href="/api/admin/bot-setup">← Back to setup</a></p>`, 500, clearCookie);
   }
 }
 
@@ -836,7 +910,7 @@ export async function onRequestPost(context) {
   return json({ error: 'Invalid action' }, 400);
 }
 
-async function handleBroadcasterOAuthCallback(env, url, code) {
+async function handleBroadcasterOAuthCallback(env, url, code, clearCookie = null) {
   try {
     const callbackUrl = `${url.origin}/api/admin/bot-setup`;
 
@@ -863,6 +937,21 @@ async function handleBroadcasterOAuthCallback(env, url, code) {
     }
     const ttl = Number.isFinite(tokens.expires_in) && tokens.expires_in >= 60 ? tokens.expires_in : 3600;
 
+    /* The SITE session is the broadcaster's (checked by the caller), but the
+       Twitch account that just consented may not be — whoever is signed into
+       twitch.tv in this browser is who Twitch asks. A token for any other
+       account would silently break every channel-points and EventSub call. */
+    const owner = await tokenOwner(env, tokens.access_token);
+    if (!owner || !env.TWITCH_BROADCASTER_ID || String(owner.id) !== String(env.TWITCH_BROADCASTER_ID)) {
+      console.warn(`[bot-setup] refused broadcaster authorization for ${owner ? owner.id : 'unknown account'}`);
+      await revokeToken(env, tokens.access_token);
+      return refusedPage('Wrong Twitch Account',
+        owner
+          ? `You authorized as <b>${escapeHtml(owner.display_name)}</b>, which is not the broadcaster account. Sign into twitch.tv as the broadcaster and try again.`
+          : 'Twitch would not say which account this authorization belongs to, so it was not stored.',
+        clearCookie);
+    }
+
     await env.MARKETPLACE.put('twitch_broadcaster_refresh_token', tokens.refresh_token);
     await env.MARKETPLACE.put('twitch_broadcaster_token', JSON.stringify({
       access_token: tokens.access_token,
@@ -880,9 +969,9 @@ async function handleBroadcasterOAuthCallback(env, url, code) {
 <h1>Channel Points Authorized!</h1>
 <p>The site can now manage the "Enter Giveaway" reward on your channel.</p>
 <p><a href="/api/admin/bot-setup">← Back to setup</a></p>
-</body></html>`);
+</body></html>`, 200, clearCookie);
   } catch (e) {
-    return html(`<h1>Unexpected Error</h1><p>Something went wrong finishing channel points authorization.</p><pre>${escapeHtml(e.message || String(e))}</pre><p><a href="/api/admin/bot-setup">← Back to setup</a></p>`, 500);
+    return html(`<h1>Unexpected Error</h1><p>Something went wrong finishing channel points authorization.</p><pre>${escapeHtml(e.message || String(e))}</pre><p><a href="/api/admin/bot-setup">← Back to setup</a></p>`, 500, clearCookie);
   }
 }
 
