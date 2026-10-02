@@ -50,6 +50,8 @@ function fakeKV(seed = {}) {
     async get(k, t) { const v = store.get(k); return v === undefined ? null : (t === 'json' ? JSON.parse(v) : v); },
     async put(k, v) { store.set(k, String(v)); },
     async delete(k) { store.delete(k); },
+    /* end.js settles last month before writing lb_bingo. */
+    async claimMonthlyAward() { return false; },
     async listValues({ prefix } = {}) {
       const out = [];
       for (const [k, v] of store) {

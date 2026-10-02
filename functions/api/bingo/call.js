@@ -17,6 +17,11 @@ function getSession(request) {
 export async function onRequestPost(context) {
   const { env, request } = context;
   const session = getSession(request);
+  /* 401, not the 403 below: the host page tells "log in again" apart from
+     "this is not your game", and a lapsed session mid-stream is the former. */
+  if (!session || !session.user_id) {
+    return json({ error: 'Your login has expired. Log in again to keep calling squares.' }, 401);
+  }
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
@@ -38,12 +43,12 @@ export async function onRequestPost(context) {
   let calledEvents = [];
 
   await env.MARKETPLACE.mutate(`bingo_${code}`, (game) => {
-    if (!game) { failure = json({ error: 'Game not found' }, 404); return undefined; }
+    if (!game) { failure = json({ error: 'Game not found — the room may have expired.' }, 404); return undefined; }
 
     /* ONLY THE HOST. Anybody who knew a room code — and players are told
        it, that is how they join — could otherwise call events into somebody
        else's game, and a called event is what decides who gets a prize. */
-    if (!session || String(session.user_id) !== String(game.host)) {
+    if (String(session.user_id) !== String(game.host)) {
       failure = json({ error: 'Only the host can call events.' }, 403);
       return undefined;
     }

@@ -42,7 +42,9 @@ function cleanScore(score) {
 const BOARDS = {
   'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc', bignum: true },
   'memory-match':     { key: 'lb_memory_match', label: 'Best Moves',  sort: 'asc' },
-  'commander-bingo':  { key: 'lb_bingo',        label: 'Bingos',      sort: 'desc' },
+  /* Written by bingo/end.js from the room's own cards and calls, and only for
+     staff-hosted rooms -- the client used to POST its own count. */
+  'commander-bingo':  { key: 'lb_bingo',        label: 'Bingos',      sort: 'desc', serverOnly: true },
   /* Both Mana Clash boards are written by the game server from the
      finished room, never by a player's browser — see recordResult() in
      mana-clash.js. serverOnly refuses the POST below, because a board

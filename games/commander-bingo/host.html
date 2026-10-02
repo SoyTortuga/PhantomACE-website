@@ -81,6 +81,96 @@
     }
 
     .create-btn:hover { background: #cc0000; }
+    .create-btn:disabled { opacity: 0.6; cursor: wait; }
+
+    .create-error { color: var(--red); max-width: 340px; }
+    .create-error[hidden] { display: none; }
+
+    .login-link { display: inline-block; text-decoration: none; margin-top: 10px; }
+    .login-link[hidden] { display: none; }
+
+    /* ── HOST ERRORS ─────────────────────── */
+    .host-error {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      background: rgba(255, 0, 0, 0.08);
+      border: 1px solid var(--red);
+      border-radius: 4px;
+    }
+    .host-error[hidden] { display: none; }
+
+    .host-error-text { flex: 1; min-width: 200px; font-size: 15px; color: var(--text-pri); line-height: 1.4; }
+
+    .host-error-btn {
+      padding: 5px 12px;
+      background: var(--red);
+      border: none;
+      border-radius: 3px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .host-error-btn[hidden] { display: none; }
+
+    .host-error-close {
+      background: transparent;
+      border: 1px solid var(--border-mid);
+      border-radius: 3px;
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 17px;
+      line-height: 1;
+      padding: 3px 8px;
+      cursor: pointer;
+    }
+
+    /* ── ROSTER ──────────────────────────── */
+    .roster {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      background: var(--gray-lo);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .roster[hidden] { display: none; }
+
+    .roster-label {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      padding-top: 3px;
+      white-space: nowrap;
+    }
+
+    .roster-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 96px; overflow-y: auto; }
+
+    .roster-chip {
+      padding: 2px 8px;
+      border: 1px solid var(--border-mid);
+      border-radius: 3px;
+      font-size: 14px;
+      color: var(--text-sec);
+      white-space: nowrap;
+    }
+    .roster-chip.has-bingo { border-color: var(--red); color: var(--text-pri); }
+    .roster-chip b { color: var(--red); margin-left: 4px; }
+    .roster-empty { font-size: 14px; color: var(--text-dim); padding-top: 3px; }
+
+    .event-call-btn:disabled { opacity: 0.5; cursor: wait; }
+    .end-game-btn:disabled { opacity: 0.5; cursor: wait; }
 
     .create-note {
       margin-top: 16px;
@@ -558,14 +648,13 @@
     <h1 class="host-title">Commander Bingo</h1>
     <p class="host-subtitle">Host Control Panel</p>
     <div class="dev-banner">🚧 Still in Development</div>
-    <button class="create-btn" onclick="createGame()">Create Game</button>
+    <button class="create-btn" id="createBtn" onclick="createGame()">Create Game</button>
     <p class="create-note">
       Creates a game session with a 4-letter code. Share the code with your audience so they can join and get their bingo cards.
       Anyone logged in with Twitch can host; only games the broadcaster or a moderator put on stream show on the overlay.
     </p>
-    <p class="create-note" id="authMsg" hidden style="color:var(--red,#ff0000)"></p>
-    <a class="create-btn" id="loginBtn" hidden target="_top" href="/api/auth/twitch"
-       style="display:inline-block;text-decoration:none;margin-top:10px">Log In with Twitch</a>
+    <p class="create-note create-error" id="authMsg" hidden></p>
+    <a class="create-btn login-link" id="loginBtn" hidden target="_top" href="/api/auth/twitch">Log In with Twitch</a>
   </div>
 
   <!-- ════ HOST PANEL ════ -->
@@ -588,6 +677,18 @@
       </div>
     </div>
 
+    <div class="host-error" id="hostError" role="alert" hidden>
+      <span class="host-error-text" id="hostErrorText"></span>
+      <a class="host-error-btn" id="hostErrorLogin" hidden target="_top" href="/api/auth/twitch">Log In Again</a>
+      <button class="host-error-btn" id="hostErrorBack" hidden onclick="backToCreate()">Back to Start</button>
+      <button class="host-error-close" onclick="clearHostError()" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <div class="roster" id="roster" hidden>
+      <div class="roster-label">In the room</div>
+      <div class="roster-list" id="rosterList"></div>
+    </div>
+
     <div class="host-body">
       <div class="cat-sidebar">
         <button class="cat-tab active" data-cat="all" onclick="setCat('all')">All</button>
@@ -605,7 +706,7 @@
       <div class="called-summary">
         <span id="calledCountFooter">0</span> events called
       </div>
-      <button class="end-game-btn" onclick="endGame()">End Game</button>
+      <button class="end-game-btn" id="endGameBtn" onclick="endGame()">End Game</button>
     </div>
   </div>
 
@@ -663,7 +764,9 @@
 
     /* The room this browser is hosting, remembered so a refresh or a dropped
        connection can walk straight back into the live game instead of the
-       create screen. Cleared only when the host ends the game or leaves. */
+       create screen. Kept through the end of the game, so the award screen
+       survives a refresh; cleared when the host leaves the results, when a
+       new game replaces it, or when the server no longer has the room. */
     const HOST_CODE_KEY = 'bingo_host_code';
 
     const TOTAL = BINGO_EVENTS.length;
@@ -727,81 +830,156 @@
       return code;
     }
 
+    /* ── Errors ──────────────────────────── */
+    function loginUrl() {
+      return '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname + location.search);
+    }
+
+    /* `kind` lets a later poll clear only the error it can vouch is over
+       (a lapsed session that came back), never one the host has not seen. */
+    let hostErrorKind = null;
+    function showHostError(msg, opts) {
+      const o = opts || {};
+      hostErrorKind = o.kind || null;
+      document.getElementById('hostErrorText').textContent = msg;
+      const login = document.getElementById('hostErrorLogin');
+      login.hidden = !o.login;
+      if (o.login) login.href = loginUrl();
+      document.getElementById('hostErrorBack').hidden = !o.back;
+      document.getElementById('hostError').hidden = false;
+    }
+
+    function clearHostError(kind) {
+      if (kind && hostErrorKind !== kind) return;
+      hostErrorKind = null;
+      document.getElementById('hostError').hidden = true;
+    }
+
+    function showCreateError(msg, offerLogin) {
+      const m = document.getElementById('authMsg');
+      m.textContent = msg;
+      m.hidden = false;
+      const btn = document.getElementById('loginBtn');
+      btn.hidden = !offerLogin;
+      if (offerLogin) btn.href = loginUrl();
+    }
+
+    function clearCreateError() {
+      document.getElementById('authMsg').hidden = true;
+      document.getElementById('loginBtn').hidden = true;
+    }
+
     /* ── Create game ─────────────────────── */
+    let creating = false;
+
+    /* Only a request that never reached the server (fetch threw) falls back
+       to a local room. A server that ANSWERED — 409 code collision, 5xx,
+       anything — is reachable, and a local room there is one no player can
+       join: the host would run a whole game to an empty audience. A
+       collision gets one retry with a fresh code; everything else is shown
+       and the host stays on the create screen. */
     async function createGame() {
-      calledEvents = new Set();
-      gameCode = generateCode();
-      showOnOverlay = true;
-      overlayLive = true;
+      if (creating) return;
+      creating = true;
+      const btn = document.getElementById('createBtn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      clearCreateError();
 
-      let res = null;
       try {
-        res = await fetch('/api/bingo/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: gameCode })
-        });
-      } catch {
-        res = null; /* genuine network error — offline fallback below */
+        let code = generateCode();
+        let res = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            res = await fetch('/api/bingo/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ code })
+            });
+          } catch {
+            res = null;
+            break;
+          }
+          if (res.status !== 409) break;
+          code = generateCode();
+        }
+
+        if (res && !res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const auth = res.status === 401 || res.status === 403;
+          let msg = err.error;
+          if (auth) msg = msg || 'Log in with Twitch to host Commander Bingo.';
+          else if (res.status === 409) msg = 'Could not find a free game code. Try again.';
+          else msg = (msg || 'The server could not create the game') + ' (error ' + res.status + '). Try again.';
+          showCreateError(msg, auth);
+          showScreen('createScreen');
+          return;
+        }
+
+        stopRoomPoll();
+        stopPlayerPoll();
+        gameCode = code;
+        calledEvents = new Set();
+        pendingCalls.clear();
+        showOnOverlay = true;
+        overlayLive = true;
+
+        if (res) {
+          useApi = true;
+          const created = await res.json().catch(() => ({}));
+          overlayLive = created.onOverlay === true;
+        } else {
+          useApi = false;
+          localStorage.setItem('bingo_game_' + gameCode, JSON.stringify({
+            code: gameCode,
+            status: 'active',
+            calledEvents: [],
+            players: [],
+            showOnOverlay: true,
+            createdAt: Date.now()
+          }));
+        }
+
+        /* Remember the room so a reload comes straight back to it. This also
+           replaces an ended room kept for its award screen. */
+        try { localStorage.setItem(HOST_CODE_KEY, gameCode); } catch {}
+
+        clearHostError();
+        document.getElementById('codeDisplay').textContent = gameCode;
+        document.getElementById('playerCount').textContent = '0';
+        renderRoster(useApi ? [] : null);
+        updateCalledCount();
+        renderOverlayToggle();
+        renderEvents();
+        showScreen('hostScreen');
+
+        if (useApi) {
+          startRoomPoll();
+        } else {
+          showHostError('The server could not be reached, so this is a LOCAL room — only this browser can see it. Players cannot join it.', { back: true });
+          startPlayerPoll();
+        }
+      } finally {
+        creating = false;
+        btn.disabled = false;
+        btn.textContent = 'Create Game';
       }
-
-      /* An auth refusal must NOT silently degrade to a local "offline" room:
-         that dropped an unauthorized user into a host panel that looked real
-         but no player could ever join. Stop and tell them instead. */
-      if (res && (res.status === 401 || res.status === 403)) {
-        const refusal = await res.json().catch(() => ({}));
-        const msg = document.getElementById('authMsg');
-        msg.textContent = refusal.error || 'Log in with Twitch to host Commander Bingo.';
-        msg.hidden = false;
-        const loginBtn = document.getElementById('loginBtn');
-        loginBtn.href = '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname);
-        loginBtn.hidden = false;
-        return;
-      }
-
-      if (res && res.ok) {
-        useApi = true;
-        const created = await res.json().catch(() => ({}));
-        overlayLive = created.onOverlay === true;
-      } else {
-        /* Network error or server 5xx only — the intended offline fallback. */
-        useApi = false;
-        localStorage.setItem('bingo_game_' + gameCode, JSON.stringify({
-          code: gameCode,
-          status: 'active',
-          calledEvents: [],
-          players: [],
-          showOnOverlay: true,
-          createdAt: Date.now()
-        }));
-      }
-
-      /* Remember the room so a reload comes straight back to it. */
-      try { localStorage.setItem(HOST_CODE_KEY, gameCode); } catch {}
-
-      document.getElementById('codeDisplay').textContent = gameCode;
-      updateCalledCount();
-      renderOverlayToggle();
-      renderEvents();
-      showScreen('hostScreen');
-
-      if (!useApi) startPlayerPoll();
     }
 
     /* ── Reconnect ───────────────────────────
        On load, if this browser was hosting a game, walk back into it rather
        than the create screen — the game outlived the page, the host just lost
        it. The stored code is only ever set by THIS browser creating that
-       game, so it is a trustworthy "I host this"; every actual call/award is
-       still checked against the session on the server, so restoring the panel
-       optimistically is safe.
+       game; every call/award is still checked against the session on the
+       server, so restoring optimistically is safe.
 
-       The server is asked first. It refuses the restore only when it can
-       positively say this account is NOT the host (isHost === false). A game
-       it reports active is restored; a game it has ended, or one it does not
-       have at all, sends us to the localStorage copy (the offline/no-API
-       fallback the host page has always had), and only if that is gone too
-       is the pointer dropped. */
+       An ENDED room the server still holds is restored to its award screen,
+       with the prizes already paid marked as paid — ending is not the end of
+       the host's job, and a refresh between "End Game" and the last award
+       used to lose the screen for good. The code is dropped only when the
+       server says this account is not the host, when the room is gone, or
+       when the host leaves the results (Back / New Game). */
     async function resumeGame() {
       let code;
       try { code = localStorage.getItem(HOST_CODE_KEY); } catch {}
@@ -813,26 +991,31 @@
         });
         if (res.ok) {
           const g = await res.json().catch(function () { return null; });
-          /* The server positively says this account is not the host. */
           if (g && g.isHost === false) { clearHostCode(); return; }
           if (g && g.status === 'active') {
             restoreHost(code, true, {
               called: Array.isArray(g.calledEvents) ? g.calledEvents : [],
               players: g.playerCount || 0,
+              roster: Array.isArray(g.roster) ? g.roster : null,
               showOnOverlay: g.showOnOverlay !== false,
               onOverlay: g.onOverlay !== false
             });
+            startRoomPoll();
             return;
           }
-          /* The server has it, but it has ended. */
-          if (g && g.status && g.status !== 'active') { clearHostCode(); return; }
+          if (g && g.status === 'ended') {
+            if (g.isHost === true && Array.isArray(g.roster)) {
+              restoreResults(code, g);
+            } else {
+              /* No session — the results are the host's to see. Keep the
+                 code so logging back in lands on the award screen. */
+              showCreateError('Game ' + code + ' has ended. Log in again to see its results and award prizes.', true);
+            }
+            return;
+          }
         }
-        /* 404, or any non-OK: the server does not have this game (or is an
-           API-less deploy). Fall back to a localStorage game if there is one. */
         if (!resumeFromLocal(code)) { if (res.status === 404) clearHostCode(); }
       } catch {
-        /* Offline: try the local copy; otherwise keep the pointer and stay put
-           so a later reload can retry. */
         resumeFromLocal(code);
       }
     }
@@ -849,9 +1032,10 @@
       restoreHost(code, false, {
         called: Array.isArray(game.calledEvents) ? game.calledEvents : [],
         players: Array.isArray(game.players) ? game.players.length : 0,
+        roster: null,
         showOnOverlay: game.showOnOverlay !== false
       });
-      if (!useApi) startPlayerPoll();
+      startPlayerPoll();
       return true;
     }
 
@@ -860,29 +1044,147 @@
       gameCode = code;
       useApi = api;
       calledEvents = new Set(s.called);
+      pendingCalls.clear();
       showOnOverlay = s.showOnOverlay;
       overlayLive = s.onOverlay !== false;
       document.getElementById('codeDisplay').textContent = gameCode;
       document.getElementById('playerCount').textContent = s.players;
+      renderRoster(s.roster);
       updateCalledCount();
       renderOverlayToggle();
       renderEvents();
       showScreen('hostScreen');
     }
 
+    /* The award screen of an ended room, rebuilt from the server's own
+       standings and the prizes it has already recorded. */
+    function restoreResults(code, g) {
+      gameCode = code;
+      useApi = true;
+      calledEvents = new Set(Array.isArray(g.calledEvents) ? g.calledEvents : []);
+      pendingCalls.clear();
+      stopRoomPoll();
+      stopPlayerPoll();
+      showResults(g.roster, g.prizes || []);
+    }
+
     function clearHostCode() {
       try { localStorage.removeItem(HOST_CODE_KEY); } catch {}
     }
 
+    /* ── Live room poll (API mode) ───────────
+       The room's own state, every few seconds: the live player count and
+       roster, and the server's called list — so a call the server never
+       recorded cannot sit on the host's screen looking called. state.js
+       already computes the roster for the host; this is one cheap GET. */
+    const ROOM_POLL_MS = 5000;
+    let roomPollTimer = null;
+    let roomPollBusy = false;
+    let callSeq = 0;
+    const pendingCalls = new Set();
+
+    function startRoomPoll() {
+      stopRoomPoll();
+      roomPollTimer = setInterval(pollRoom, ROOM_POLL_MS);
+      pollRoom();
+    }
+
+    function stopRoomPoll() {
+      if (roomPollTimer) clearInterval(roomPollTimer);
+      roomPollTimer = null;
+    }
+
+    async function pollRoom() {
+      if (!useApi || !gameCode || roomPollBusy || document.hidden) return;
+      roomPollBusy = true;
+      const code = gameCode;
+      const seq = callSeq;
+      try {
+        const res = await fetch('/api/bingo/state?code=' + encodeURIComponent(code), {
+          cache: 'no-store', credentials: 'same-origin'
+        });
+        if (code !== gameCode || !roomPollTimer) return;
+        if (res.status === 404) {
+          stopRoomPoll();
+          showHostError('This room no longer exists on the server — it expired or was removed, so players cannot join it and calls are not recorded. Start a new game.', { back: true, kind: 'gone' });
+          return;
+        }
+        if (!res.ok) return;
+        const g = await res.json();
+        if (code !== gameCode || !roomPollTimer) return;
+
+        if (g.isHost === false) {
+          showHostError('You are logged in as a different account from the one hosting this game, so your calls are refused. Log in as the host.', { login: true, kind: 'session' });
+        } else if (g.isHost !== true) {
+          showHostError('Your login has expired — calls will NOT be recorded until you log in again. This panel comes back after login.', { login: true, kind: 'session' });
+        } else {
+          clearHostError('session');
+        }
+
+        document.getElementById('playerCount').textContent = g.playerCount || 0;
+        if (Array.isArray(g.roster)) renderRoster(g.roster);
+
+        if (seq === callSeq && pendingCalls.size === 0 && Array.isArray(g.calledEvents)) {
+          syncCalled(g.calledEvents);
+        }
+
+        if (g.status === 'ended') {
+          stopRoomPoll();
+          if (g.isHost === true && Array.isArray(g.roster)) {
+            clearHostError();
+            showResults(g.roster, g.prizes || []);
+          } else {
+            showHostError('This game has been ended. Log in as the host to see the results.', { login: true });
+          }
+        }
+      } catch {
+        /* A dropped poll is not news; the next one retries. */
+      } finally {
+        roomPollBusy = false;
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && roomPollTimer) pollRoom();
+    });
+
+    /* Adopt the server's called list when it differs from the screen. */
+    function syncCalled(list) {
+      const next = new Set(list);
+      if (next.size === calledEvents.size && [...next].every(id => calledEvents.has(id))) return;
+      calledEvents = next;
+      renderEvents();
+      updateCalledCount();
+    }
+
+    function renderRoster(roster) {
+      const box = document.getElementById('roster');
+      if (!Array.isArray(roster)) { box.hidden = true; return; }
+      box.hidden = false;
+      const list = document.getElementById('rosterList');
+      if (!roster.length) {
+        list.innerHTML = '<span class="roster-empty">Nobody has joined yet — share the code.</span>';
+        return;
+      }
+      list.innerHTML = roster.map(r =>
+        '<span class="roster-chip' + (r.bingos > 0 ? ' has-bingo' : '') + '">' + escHtml(r.name || 'Player') +
+        (r.bingos > 0 ? '<b>' + r.bingos + '</b>' : '') + '</span>').join('');
+    }
+
     let playerPollTimer = null;
     function startPlayerPoll() {
-      if (playerPollTimer) clearInterval(playerPollTimer);
+      stopPlayerPoll();
       playerPollTimer = setInterval(() => {
         const raw = localStorage.getItem('bingo_game_' + gameCode);
         if (!raw) return;
         const game = JSON.parse(raw);
         document.getElementById('playerCount').textContent = game.players.length;
       }, 2000);
+    }
+
+    function stopPlayerPoll() {
+      if (playerPollTimer) clearInterval(playerPollTimer);
+      playerPollTimer = null;
     }
 
     /* ── Render event list ───────────────── */
@@ -906,52 +1208,89 @@
       filterEvents();
     }
 
-    /* ── Call / uncall event ──────────────── */
-    async function toggleEvent(id) {
-      const wasCalled = calledEvents.has(id);
-
-      if (wasCalled) {
-        calledEvents.delete(id);
-      } else {
-        calledEvents.add(id);
+    /* ── Call / uncall event ──────────────────
+       Optimistic on screen, but only until the server answers. A refused or
+       unreachable call is put back the way it was and the host is told why:
+       a square left looking called that the server never recorded is a
+       square no player's card ever marks. */
+    function setCalledUi(id, on) {
+      if (on) calledEvents.add(id); else calledEvents.delete(id);
+      const item = document.querySelector('.event-card[data-id="' + id + '"]');
+      if (item) {
+        const btn = item.querySelector('.event-call-btn');
+        item.classList.toggle('called', on);
+        btn.className = 'event-call-btn ' + (on ? 'btn-undo' : 'btn-call');
+        btn.textContent = on ? 'Undo' : 'Call';
       }
+      updateCalledCount();
+    }
 
-      if (useApi) {
-        try {
-          await fetch('/api/bingo/call', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code: gameCode,
-              eventId: id,
-              action: wasCalled ? 'uncall' : 'call'
-            })
-          });
-        } catch { /* silent */ }
-      } else {
+    function setCallPending(id, pending) {
+      const item = document.querySelector('.event-card[data-id="' + id + '"]');
+      const btn = item && item.querySelector('.event-call-btn');
+      if (btn) btn.disabled = pending;
+    }
+
+    async function toggleEvent(id) {
+      if (pendingCalls.has(id)) return;
+      const wasCalled = calledEvents.has(id);
+      setCalledUi(id, !wasCalled);
+
+      if (!useApi) {
         const raw = localStorage.getItem('bingo_game_' + gameCode);
         if (raw) {
           const game = JSON.parse(raw);
           game.calledEvents = [...calledEvents];
           localStorage.setItem('bingo_game_' + gameCode, JSON.stringify(game));
         }
+        return;
       }
 
-      const item = document.querySelector('.event-card[data-id="' + id + '"]');
-      if (item) {
-        const btn = item.querySelector('.event-call-btn');
-        if (wasCalled) {
-          item.classList.remove('called');
-          btn.className = 'event-call-btn btn-call';
-          btn.textContent = 'Call';
-        } else {
-          item.classList.add('called');
-          btn.className = 'event-call-btn btn-undo';
-          btn.textContent = 'Undo';
-        }
+      const code = gameCode;
+      const evt = BINGO_EVENTS.find(e => e.id === id);
+      const label = '"' + (evt ? evt.text : 'that square') + '"';
+      const verb = wasCalled ? 'un-called' : 'called';
+      pendingCalls.add(id);
+      callSeq++;
+      setCallPending(id, true);
+
+      let res = null;
+      let data = {};
+      try {
+        res = await fetch('/api/bingo/call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ code, eventId: id, action: wasCalled ? 'uncall' : 'call' })
+        });
+        data = await res.json().catch(() => ({}));
+      } catch {
+        res = null;
       }
 
-      updateCalledCount();
+      pendingCalls.delete(id);
+      callSeq++;
+      if (code !== gameCode) return;
+      setCallPending(id, false);
+
+      if (res && res.ok) {
+        if (pendingCalls.size === 0 && Array.isArray(data.calledEvents)) syncCalled(data.calledEvents);
+        return;
+      }
+
+      setCalledUi(id, wasCalled);
+      if (!res) {
+        showHostError('Could not reach the server, so ' + label + ' was NOT ' + verb + '. Check your connection and try again.');
+      } else if (res.status === 401) {
+        showHostError('Your login has expired, so ' + label + ' was NOT ' + verb + '. Log in again — this panel comes back after login — then call it again.', { login: true, kind: 'session' });
+      } else if (res.status === 403) {
+        showHostError((data.error || 'The server refused that call.') + ' ' + label + ' was NOT ' + verb + '. Are you logged in as the host?', { login: true, kind: 'session' });
+      } else if (res.status === 404) {
+        stopRoomPoll();
+        showHostError('This room no longer exists on the server — it expired or was removed — so ' + label + ' was NOT ' + verb + '. Start a new game.', { back: true, kind: 'gone' });
+      } else {
+        showHostError((data.error || 'The server refused that call (error ' + res.status + ').') + ' ' + label + ' was NOT ' + verb + '.');
+      }
     }
 
     /* ── Filter events ───────────────────── */
@@ -1008,34 +1347,25 @@
       setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
     }
 
-    /* ── End game ────────────────────────── */
+    /* ── End game ────────────────────────────
+       The saved host code survives a successful end: the award screen is
+       still the host's job, and a refresh must bring it back. A FAILED end
+       changes nothing — the room is still live on the server, so the panel,
+       the poll and the saved code all stay, and the host is told. */
+    let ending = false;
+
     async function endGame() {
+      if (ending) return;
       if (calledEvents.size === 0) {
         if (!confirm('No events have been called. End the game anyway?')) return;
       } else {
         if (!confirm('End the game and calculate results?')) return;
       }
 
-      if (playerPollTimer) clearInterval(playerPollTimer);
-      clearHostCode();
-
-      let players = [];
-
-      if (useApi) {
-        try {
-          const res = await fetch('/api/bingo/end', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: gameCode })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            players = data.players || [];
-          }
-        } catch { /* fall through to local */ }
-      }
-
-      if (!useApi || players.length === 0) {
+      if (!useApi) {
+        stopPlayerPoll();
+        clearHostCode();
+        let players = [];
         const raw = localStorage.getItem('bingo_game_' + gameCode);
         if (raw) {
           const game = JSON.parse(raw);
@@ -1043,18 +1373,70 @@
           localStorage.setItem('bingo_game_' + gameCode, JSON.stringify(game));
           players = game.players || [];
         }
+        clearHostError();
+        showResults(resultsFromPlayers(players), []);
+        return;
       }
 
+      ending = true;
+      const btn = document.getElementById('endGameBtn');
+      btn.disabled = true;
+      btn.textContent = 'Ending...';
+      const code = gameCode;
+      try {
+        let res = null;
+        let data = {};
+        try {
+          res = await fetch('/api/bingo/end', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ code })
+          });
+          data = await res.json().catch(() => ({}));
+        } catch {
+          res = null;
+        }
+        if (code !== gameCode) return;
+
+        if (!res) {
+          showHostError('Could not reach the server — the game has NOT ended and is still live. Try again.');
+          return;
+        }
+        if (res.status === 404) {
+          stopRoomPoll();
+          showHostError('This room no longer exists on the server — it expired — so there are no results to show. Start a new game.', { back: true, kind: 'gone' });
+          return;
+        }
+        if (!res.ok) {
+          const auth = res.status === 401 || res.status === 403;
+          showHostError((data.error || 'The server could not end the game (error ' + res.status + ').') +
+            ' The game has NOT ended and is still live.', { login: auth, kind: auth ? 'session' : null });
+          return;
+        }
+
+        stopRoomPoll();
+        clearHostError();
+        const results = Array.isArray(data.standings) ? data.standings : resultsFromPlayers(data.players || []);
+        showResults(results, data.prizes || []);
+      } finally {
+        ending = false;
+        btn.disabled = false;
+        btn.textContent = 'End Game';
+      }
+    }
+
+    /* Local-mode results, and the fallback for a server that predates
+       end.js returning its own standings. A player may hold several cards,
+       and wildcard stamps count as marks; the player is worth their BEST
+       card, the same rule the player page and end.js use. */
+    function resultsFromPlayers(players) {
       const results = players.map(p => {
-        /* A player may hold several cards now, and wildcard stamps count
-           as marks — the host's verification must see exactly what the
-           player's page scores, or every close call becomes a dispute.
-           The player is worth their BEST card; the badge column says how
-           they got there so "3 bingos (2 cards, 1 stamp)" reads honestly. */
         const cards = (Array.isArray(p.cards) && p.cards.length) ? p.cards : [p.cardIds];
         const wilds = Array.isArray(p.wildcards) ? p.wildcards : [];
         let best = { bingos: -1, marked: 0 };
         cards.forEach((ids, ci) => {
+          if (!Array.isArray(ids)) return;
           const wildIds = new Set(wilds.filter(w => w.cardIndex === ci).map(w => w.eventId));
           const cardEvents = ids.map(id => id === 0 ? 'free' : id);
           const m = cardEvents.filter(id => id === 'free' || calledEvents.has(id) || wildIds.has(id));
@@ -1063,14 +1445,11 @@
             best = { bingos, marked: m.length };
           }
         });
-        /* The id comes through so a prize can be awarded to a player rather
-           than to a display name, which two people can share. */
-        return { id: p.id, name: p.name, bingos: best.bingos, marked: best.marked,
+        return { id: p.id, name: p.name, bingos: Math.max(0, best.bingos), marked: best.marked,
                  cardCount: cards.length, wildcardsUsed: wilds.length };
       });
-
       results.sort((a, b) => b.bingos - a.bingos || b.marked - a.marked);
-      showResults(results);
+      return results;
     }
 
     function countBingos(cardEvents, wildIds) {
@@ -1092,9 +1471,11 @@
       return count;
     }
 
-    function showResults(results) {
+    function showResults(results, prizes) {
+      const paid = new Map((prizes || []).map(p => [p.playerId, p]));
       document.getElementById('resultsSub').textContent =
-        calledEvents.size + ' events called · ' + results.length + ' players';
+        calledEvents.size + ' events called · ' + results.length + ' players' +
+        (paid.size ? ' · ' + paid.size + ' paid' : '');
 
       const body = document.getElementById('lbBody');
 
@@ -1106,7 +1487,7 @@
           '<div class="lb-rank">' + (i + 1) + '</div>' +
           '<div class="lb-name">' + escHtml(r.name) +
             ((r.cardCount > 1 || r.wildcardsUsed > 0)
-              ? ' <span style="font-size:9px;color:#ffffff88">(' +
+              ? ' <span style="font-size:13px;color:var(--text-dim)">(' +
                 (r.cardCount > 1 ? r.cardCount + ' cards' : '') +
                 (r.cardCount > 1 && r.wildcardsUsed > 0 ? ' · ' : '') +
                 (r.wildcardsUsed > 0 ? r.wildcardsUsed + ' stamp' + (r.wildcardsUsed > 1 ? 's' : '') : '') +
@@ -1114,7 +1495,7 @@
               : '') + '</div>' +
           '<div class="lb-bingos">' + r.bingos + '</div>' +
           '<div class="lb-marked">' + r.marked + '/25</div>' +
-          awardControl(r) +
+          awardControl(r, paid.get(r.id)) +
           '</div>'
         ).join('');
         wireAwards();
@@ -1123,7 +1504,14 @@
       showScreen('resultsScreen');
     }
 
-    function awardControl(r) {
+    function paidLabel(prize) {
+      const tier = RARITIES.find(t => t.id === prize.rarity);
+      return '<span class="lb-award-done">' + escHtml(tier ? tier.label : prize.rarity) +
+             ' · +' + escHtml(prize.entries) + '</span>';
+    }
+
+    function awardControl(r, prize) {
+      if (prize) return '<div class="lb-award">' + paidLabel(prize) + '</div>';
       /* Only players with an account can be credited. A guest record from
          before login was required has nothing to pay into. */
       if (!r.id || !String(r.id).startsWith('u_')) {
@@ -1186,9 +1574,14 @@
     }
 
     /* ── Navigation ──────────────────────── */
+    /* Leaving the results (or a dead room) is the host saying they are done
+       with it — the only point a kept code is dropped. */
     function backToCreate() {
-      if (playerPollTimer) clearInterval(playerPollTimer);
+      stopRoomPoll();
+      stopPlayerPoll();
       clearHostCode();
+      clearHostError();
+      clearCreateError();
       showScreen('createScreen');
     }
 

@@ -1076,16 +1076,10 @@
         markedSet.size + ' squares marked' +
         (liveCards && liveCards.length > 1 ? ' · best of ' + liveCards.length + ' cards' : '');
 
+      /* No leaderboard POST from here: lb_bingo pays prizes, so the server
+         writes it from the room's own record when the host ends the game
+         (functions/api/bingo/end.js). */
       showScreen('resultsScreen');
-
-      if (patterns.length > 0) {
-        fetch('/api/leaderboards', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ game: 'commander-bingo', score: patterns.length }),
-        }).catch(function () {});
-      }
     }
 
     /* ── Navigation ──────────────────────── */

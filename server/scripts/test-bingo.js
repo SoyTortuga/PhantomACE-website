@@ -125,7 +125,8 @@ const game = (env, code) => JSON.parse(env._store.get('bingo_' + code));
 
   check('a player cannot call events', (await post(call, env, 'player', { code: 'CDEF', eventId: 5 })).status, 403);
   check('nor can a stranger', (await post(call, env, 'viewer', { code: 'CDEF', eventId: 5 })).status, 403);
-  check('nor anonymous', (await post(call, env, null, { code: 'CDEF', eventId: 5 })).status, 403);
+  /* 401 rather than 403: the host page offers a re-login on a lapsed session. */
+  check('nor anonymous', (await post(call, env, null, { code: 'CDEF', eventId: 5 })).status, 401);
   check('the host can', (await post(call, env, 'mod', { code: 'CDEF', eventId: 5 })).status, 200);
   check('and it is recorded', game(env, 'CDEF').calledEvents, [5]);
 

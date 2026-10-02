@@ -1,5 +1,6 @@
 import { TOTAL_EVENTS } from './squares.js';
 import { readPointer, pointerCode, dropStalePointer } from './overlay.js';
+import { standings, paidPrizes } from './end.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -140,7 +141,17 @@ export async function onRequestGet(context) {
        2-second poll, which has no use for it. */
     if (out.isHost) out.onOverlay = pointerCode(await readPointer(env)) === code;
 
-    const me = game.players.find(p => p.id === 'u_' + session.user_id);
+    /* The host's live roster and, once ended, the results and who has been
+       paid — so a refreshed host page restores the panel with a real player
+       list, and a refresh after ending restores the award screen instead of
+       losing it. Counts only, computed here from the room; no cards. */
+    if (out.isHost) {
+      out.roster = standings(game);
+      out.prizes = paidPrizes(game);
+      if (game.endedAt) out.endedAt = game.endedAt;
+    }
+
+    const me = (game.players || []).find(p => p.id === 'u_' + session.user_id);
     if (me) {
       const cards = (Array.isArray(me.cards) && me.cards.length) ? me.cards : [me.cardIds];
       out.you = { cards, wildcards: Array.isArray(me.wildcards) ? me.wildcards : [] };
