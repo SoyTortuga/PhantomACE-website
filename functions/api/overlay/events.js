@@ -168,6 +168,22 @@ async function reloadToken(env) {
   return (rec && rec.token) ? String(rec.token) : '';
 }
 
+/* ── PANIC CONTROLS — Clear / Skip ──────────────────────────────────────────
+   The dashboard's panic buttons ride this same feed. Clear wipes every alert
+   and the off-queue panels (check-in, hatch, prediction) off the overlay NOW;
+   Skip dismisses the alert currently on screen. Carried like the reload token:
+   the overlay records its FIRST sighting without acting (so a command issued
+   before a source opened is never replayed onto it) and applies each later
+   change exactly once. Only the latest command is held — panic semantics, where
+   the most recent press is the one that matters. */
+const CONTROL_KEY = 'overlay_control';
+const CONTROL_ACTIONS = ['clear', 'skip'];
+
+async function overlayControl(env) {
+  const rec = await env.MARKETPLACE.get(CONTROL_KEY, 'json');
+  return (rec && rec.token) ? { cmd: String(rec.cmd || ''), token: String(rec.token) } : null;
+}
+
 /* AUDIO LEADER — one overlay plays sound, however many are open.
    Each overlay source is its own page with its own audio element, so a
    check-in chime plays once PER open source and OBS mixes them all onto the
@@ -221,20 +237,29 @@ export async function onRequestPost(context) {
 
   let body;
   try { body = await request.json(); } catch { body = {}; }
-  if (body.action !== 'reload') {
+  const action = body && body.action;
+  if (action !== 'reload' && CONTROL_ACTIONS.indexOf(action) === -1) {
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
   }
 
-  /* The clock, not a counter. Two moderators pressing the button a second
-     apart should produce two different tokens without either having read
-     the other's. */
-  const token = String(Date.now());
-  await env.MARKETPLACE.put(RELOAD_KEY, JSON.stringify({
-    token, at: Date.now(), by: (session && session.display_name) || '',
-  }));
+  /* The clock, not a counter. Two moderators pressing a button a second apart
+     should produce two different tokens without either having read the other's.
+     A random suffix keeps two presses inside the same millisecond distinct. */
+  const token = String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8);
+
+  if (action === 'reload') {
+    await env.MARKETPLACE.put(RELOAD_KEY, JSON.stringify({
+      token, at: Date.now(), by: (session && session.display_name) || '',
+    }));
+  } else {
+    /* Clear / Skip — the latest command, applied once by every open overlay. */
+    await env.MARKETPLACE.put(CONTROL_KEY, JSON.stringify({
+      cmd: action, token, at: Date.now(), by: (session && session.display_name) || '',
+    }));
+  }
 
   return new Response(JSON.stringify({ success: true, token }), {
     status: 200,
@@ -291,6 +316,9 @@ export async function onRequestGet(context) {
        once reloads every open overlay exactly once, and a page opened
        afterwards does not reload on its first poll. */
     reloadToken: await reloadToken(env),
+    /* The latest panic command (Clear/Skip), or null. The overlay records its
+       first sighting and applies each later change once — see overlay.js. */
+    control: await overlayControl(env),
     alertVolume: alertVolume,
     audioLeader: audioLeader,
     hatchSound: hatchSound,

@@ -82,6 +82,105 @@ async function reloadOverlay(btn) {
   if (btn) { btn.disabled = false; btn.textContent = original; }
 }
 
+/* ── Panic controls (Clear / Skip) ──────────────────────────────────────────
+   Both ride the same /api/overlay/events control feed the Reload button uses.
+   Clear wipes the alert queue + the off-queue panels off every open overlay;
+   Skip dismisses the alert currently on screen. The overlay applies each once
+   (see overlay.js). */
+async function overlayControl(action, btn) {
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const res = await fetch('/api/overlay/events', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus(action === 'clear'
+        ? 'Overlay cleared — alerts and the check-in, hatch and prediction panels are off.'
+        : 'Skipped the alert on screen.', false);
+    } else {
+      showBotStatus(d.error || 'Could not send that command.', true);
+    }
+  } catch {
+    showBotStatus('Network error — the command may not have been sent.', true);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = original; }
+}
+
+function initPanic() {
+  const clear = document.getElementById('odClearBtn');
+  const skip = document.getElementById('odSkipBtn');
+  const reload = document.getElementById('odPanicReloadBtn');
+  if (clear) clear.addEventListener('click', function () { overlayControl('clear', clear); });
+  if (skip) skip.addEventListener('click', function () { overlayControl('skip', skip); });
+  if (reload) reload.addEventListener('click', function () { reloadOverlay(reload); });
+}
+
+/* ── Live alert log ─────────────────────────────────────────────────────────
+   Polls the broadcaster/mod-gated /api/activity feed and lists recent events.
+   Runs ONLY while the tab is visible — no point hammering the rig while nobody
+   is looking — and resumes on return. */
+var OD_LOG_POLL_MS = 5000;
+var odLogTimer = null;
+var OD_LOG_CHIP = {
+  sub: 'Sub', giftsub: 'Gift', raid: 'Raid', hype: 'Hype', redemption: 'Redeem', bot: 'Bot',
+};
+
+function odRelTime(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return new Date(ts).toLocaleString();
+}
+
+function renderAlertLog(events) {
+  const box = document.getElementById('odAlertLog');
+  if (!box) return;
+  if (!events || !events.length) {
+    box.innerHTML = '<li class="od-log-empty">Nothing yet — events show here as they happen.</li>';
+    return;
+  }
+  box.innerHTML = events.slice(0, 20).map(function (e) {
+    const chip = OD_LOG_CHIP[e.category] || (e.category || 'event');
+    return '<li class="od-log-item">' +
+      '<span class="od-log-chip">' + escapeBotHtml(chip) + '</span>' +
+      '<span class="od-log-summary">' + escapeBotHtml(e.summary || e.type || 'event') + '</span>' +
+      '<span class="od-log-time" title="' + escapeBotHtml(new Date(e.at).toLocaleString()) + '">' + escapeBotHtml(odRelTime(e.at)) + '</span>' +
+      '</li>';
+  }).join('');
+}
+
+function fetchAlertLog() {
+  fetch('/api/activity', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (res) { return res.ok ? res.json() : null; })
+    .then(function (data) { if (data) renderAlertLog(data.events || []); })
+    .catch(function () { /* transient — keep the last render, try next poll */ });
+}
+
+function startAlertLog() {
+  if (odLogTimer) clearInterval(odLogTimer);
+  odLogTimer = setInterval(fetchAlertLog, OD_LOG_POLL_MS);
+}
+function stopAlertLog() {
+  if (odLogTimer) { clearInterval(odLogTimer); odLogTimer = null; }
+}
+
+function initAlertLog() {
+  const box = document.getElementById('odAlertLog');
+  if (!box) return;
+  fetchAlertLog();
+  startAlertLog();
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) stopAlertLog();
+    else { fetchAlertLog(); startAlertLog(); }
+  });
+}
+
 /* ── Pham Check-In reminder + hatch sounds + alert volume ─────────────────
    Show Now fires the nudge once (with sound); the timer repeats it silently
    while live. The timer's on/off and interval live server-side (KV, read by
@@ -1019,12 +1118,21 @@ async function saveWheel(btn) {
 async function spinWheel(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Spinning…'; }
   try {
-    /* Save the current edits first, so a spin always reflects what is on screen. */
-    await fetch('/api/wheel', {
+    /* Save the current edits first, so a spin always reflects what is on screen.
+       If that save is REFUSED (empty labels, too few segments, staff gate), do
+       NOT spin — a spin on a rejected config would land on stale/invalid data on
+       stream while the panel showed an error. */
+    const saveRes = await fetch('/api/wheel', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save', segments: collectWheelSegments() }),
     });
+    const saveData = await saveRes.json().catch(function () { return {}; });
+    if (!(saveRes.ok && saveData.success)) {
+      showBotStatus(saveData.error || 'Could not save the wheel, so it was not spun.', true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Spin the Wheel'; }
+      return;
+    }
     const res = await fetch('/api/wheel', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -1075,6 +1183,8 @@ function showOdDenied(message, offerLogin) {
 }
 
 function initOverlayDashboard(data) {
+  initPanic();
+  initAlertLog();
   initOvMc();
   initOvBingo();
   initOvRaid();

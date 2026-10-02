@@ -160,6 +160,11 @@
      in the control panel. */
   var reloadToken;
 
+  /* The latest panic command token this page has acted on. `undefined` until
+     the first answer arrives; once set, any change means a moderator pressed
+     Clear or Skip in the dashboard. */
+  var controlToken;
+
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -554,6 +559,12 @@
      own sound and they layered — "it plays once for every press". Restarting
      one element plays at most one check-in sound at a time. */
   var checkinAudio = null;
+  /* A burst of check-ins at stream start (many viewers redeeming at once, plus
+     Twitch's webhook redeliveries) would replay the chime every few seconds.
+     Rate-limit the SOUND — the visual nudge still rises each time — so the one
+     reused element plays at most once per window. */
+  var CHECKIN_CHIME_COOLDOWN_MS = 20000;
+  var lastCheckinChimeAt = 0;
   /* Overlay alert volume, 0..1, driven by the control panel through the poll
      response. Matches the server default (35) until the first poll lands, so a
      redemption in the first second isn't briefly loud. */
@@ -660,12 +671,18 @@
     checkinTimers.push(step);
 
     if (ev && ev.sound && !audioMuted && isAudioLeader) {
-      try {
-        if (!checkinAudio) checkinAudio = new Audio(CHECKIN_AUDIO);
-        checkinAudio.volume = alertVolume;
-        checkinAudio.currentTime = 0;      // restart the one element rather than layering a new one
-        checkinAudio.play().catch(function () { /* autoplay-with-sound blocked outside OBS — silent */ });
-      } catch (e) { /* no audio element — the nudge still shows */ }
+      /* Cooldown so a wave of check-ins does not machine-gun the chime; the
+         nudge above still shows for each one. */
+      var nowChime = Date.now();
+      if (nowChime - lastCheckinChimeAt >= CHECKIN_CHIME_COOLDOWN_MS) {
+        lastCheckinChimeAt = nowChime;
+        try {
+          if (!checkinAudio) checkinAudio = new Audio(CHECKIN_AUDIO);
+          checkinAudio.volume = alertVolume;
+          checkinAudio.currentTime = 0;      // restart the one element rather than layering a new one
+          checkinAudio.play().catch(function () { /* autoplay-with-sound blocked outside OBS — silent */ });
+        } catch (e) { /* no audio element — the nudge still shows */ }
+      }
     }
 
     checkinTimers.push(setTimeout(function () {
@@ -1414,22 +1431,37 @@
        out of the way. One class, and a new panel costs nothing here. */
     document.body.classList.add('ov-alerting');
 
-    setTimeout(function () {
+    card._showTimer = setTimeout(function () {
+      card._showTimer = null;
       card.classList.add('is-leaving');
-      setTimeout(function () {
-        /* Stop any per-card animation loop BEFORE detaching, so nothing keeps
-           ticking against a node that is no longer on screen. */
-        if (card._cleanup) { try { card._cleanup(); } catch (e) {} card._cleanup = null; }
-        if (card.parentNode) card.parentNode.removeChild(card);
-        showing = false;
-        /* Cleared in the same place `showing` is, so the two can never
-           disagree about whether anything is on screen. */
-        document.body.classList.remove('ov-alerting');
-        setTimeout(pump, GAP_MS);
+      card._leaveTimer = setTimeout(function () {
+        card._leaveTimer = null;
+        detachCard(card);
+        finishShowing();
       }, 340);
     }, d.ms || SHOW_MS);
 
     return true;
+  }
+
+  /* Detach one alert card and stop EVERYTHING it started — its own per-card
+     animation loop (_cleanup) and the show/leave timers this file owns — before
+     it leaves the DOM, so nothing ticks against an off-screen node on a
+     marathon. Shared by the normal end-of-life, Skip and Clear. */
+  function detachCard(card) {
+    if (!card) return;
+    if (card._showTimer) { clearTimeout(card._showTimer); card._showTimer = null; }
+    if (card._leaveTimer) { clearTimeout(card._leaveTimer); card._leaveTimer = null; }
+    if (card._cleanup) { try { card._cleanup(); } catch (e) {} card._cleanup = null; }
+    if (card.parentNode) card.parentNode.removeChild(card);
+  }
+
+  /* Back to "nothing on the stage", in one place so `showing` and the body flag
+     can never disagree about whether anything is up. */
+  function finishShowing() {
+    showing = false;
+    document.body.classList.remove('ov-alerting');
+    setTimeout(pump, GAP_MS);
   }
 
   function pump() {
@@ -1441,6 +1473,33 @@
       showing = false;
       pump();
     }
+  }
+
+  /* ── PANIC CONTROLS ────────────────────────────────────────────────────────
+     Driven by the dashboard's Clear/Skip through the event feed (see poll()).
+
+     SKIP dismisses the alert on screen and lets the next queued one play.
+     CLEAR wipes everything a moderator can see go wrong: the queued and
+     on-screen alerts, and the three off-queue panels (check-in, hatch,
+     prediction). The standing GAME panels are left alone — their own pollers
+     reflect live game state, so hiding them here would only flip back on the
+     next poll. Every path returns the overlay to its idle state (0 stage
+     children, panels at display:none, all timers cleared). */
+  function skipCurrent() {
+    while (stage.firstElementChild) detachCard(stage.firstElementChild);
+    finishShowing();
+  }
+
+  function clearAll() {
+    queue.length = 0;
+    while (stage.firstElementChild) detachCard(stage.firstElementChild);
+    showing = false;
+    document.body.classList.remove('ov-alerting');
+    clearPrediction();
+    clearHatch();
+    clearCheckinTimers();
+    var ci = document.getElementById('ovCheckin');
+    if (ci) { ci.classList.remove('is-in'); ci.hidden = true; }
   }
 
 /* ONE INDICATOR, SEVERAL REPORTERS. The alert stream is not the only thing
@@ -1555,6 +1614,20 @@
           u.searchParams.set('r', token || String(Date.now()));
           location.replace(u.toString());
           return;
+        }
+
+        /* PANIC COMMAND. A moderator's Clear/Skip from the dashboard, carried on
+           this same feed. Like the reload token, the FIRST sighting is only
+           recorded — a command issued before this source opened is never
+           replayed onto it — and each later change is applied exactly once. */
+        var ctl = data.control || null;
+        var ctlToken = ctl && ctl.token ? String(ctl.token) : '';
+        if (controlToken === undefined) {
+          controlToken = ctlToken;
+        } else if (ctlToken && ctlToken !== controlToken) {
+          controlToken = ctlToken;
+          if (ctl.cmd === 'clear') clearAll();
+          else if (ctl.cmd === 'skip') skipCurrent();
         }
 
         /* No stored position — a genuinely first run. Take the current

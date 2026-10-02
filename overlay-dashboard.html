@@ -49,6 +49,16 @@
         <h2 class="bot-group-title">Overlay Panels</h2>
         <div class="bot-grid">
 
+          <div class="card bot-section bot-grid-full" id="odPanicSection">
+            <h3>Panic Controls</h3>
+            <p class="bot-section-desc">Clear wipes every alert and the check-in, hatch and prediction panels off the overlay right now — the standing game panels stay, as they follow their own game. Skip dismisses the alert on screen and lets the next one play. Reload refreshes every open OBS overlay.</p>
+            <div class="ovmc-row">
+              <button class="btn-primary" id="odClearBtn">Clear Overlay</button>
+              <button class="btn-secondary" id="odSkipBtn">Skip Current Alert</button>
+              <button class="btn-secondary" id="odPanicReloadBtn">Reload OBS Overlay</button>
+            </div>
+          </div>
+
           <div class="card bot-section" id="ovMcSection">
             <h3>Mana Clash on the Overlay</h3>
             <p class="bot-section-desc">Shows a live Mana Clash game on the stream overlay.</p>
@@ -218,6 +228,12 @@
         <h2 class="bot-group-title">Alerts &amp; Tools</h2>
         <div class="bot-grid">
 
+          <div class="card bot-section bot-grid-full" id="odAlertLogSection">
+            <h3>Live Alert Log</h3>
+            <p class="bot-section-desc">The most recent events as they hit the overlay — subs, raids, drops, redemptions and bot actions. Refreshes while this tab is open and pauses when it is hidden.</p>
+            <ul class="od-alert-log" id="odAlertLog"><li class="od-log-empty">Loading&hellip;</li></ul>
+          </div>
+
           <div class="card bot-section" id="odTestAlertsSection">
             <h3>Test Alerts</h3>
             <p class="bot-section-desc">Fire a sample of any alert onto the overlay to preview and position it. Each uses obvious fake data and clears itself exactly like the real alert.</p>
@@ -285,6 +301,7 @@
   <script src="/js/cosmetic-variants.js" defer></script>
   <script src="/js/auth.js" defer></script>
   <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
   <script src="/js/nav.js" defer></script>
   <script src="/js/notifications.js" defer></script>
   <script src="/js/twitch.js" defer></script>

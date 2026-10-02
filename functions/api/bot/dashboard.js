@@ -194,6 +194,14 @@ export async function onRequestGet(context) {
     redemptions: subTypes.includes('channel.channel_points_custom_reward_redemption.add'),
     hypeTrain: hasHypeTrainSub,
     chat: subTypes.includes('channel.chat.message'),
+    /* The scope-gated features — each needs an extra OAuth scope the broadcaster
+       must grant, so their status is the one most worth seeing: a missing scope
+       is why the feature is silently inert. */
+    follow: subTypes.includes('channel.follow'),
+    cheer: subTypes.includes('channel.cheer'),
+    predictions: subTypes.some(t => t.startsWith('channel.prediction')),
+    adBreak: subTypes.includes('channel.ad_break.begin'),
+    bits: subTypes.includes('channel.bits.use'),
     total: subTypes.length,
     /* Per-row: a snapshot "registered" can still be dead at Twitch. */
     revokedRows: {
@@ -203,6 +211,11 @@ export async function onRequestGet(context) {
       redemptions: isRevoked(t => t === 'channel.channel_points_custom_reward_redemption.add'),
       hypeTrain: isRevoked(t => t.startsWith('channel.hype_train')),
       chat: isRevoked(t => t === 'channel.chat.message'),
+      follow: isRevoked(t => t === 'channel.follow'),
+      cheer: isRevoked(t => t === 'channel.cheer'),
+      predictions: isRevoked(t => t.startsWith('channel.prediction')),
+      adBreak: isRevoked(t => t === 'channel.ad_break.begin'),
+      bits: isRevoked(t => t === 'channel.bits.use'),
     },
     revoked,
   };

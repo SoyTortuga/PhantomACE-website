@@ -60,6 +60,11 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
      layered a sound per rapid press. */
   ok('the check-in sound is a single reused element, restarted', /if \(!checkinAudio\) checkinAudio = new Audio/.test(ov) && /checkinAudio\.currentTime = 0/.test(ov));
   ok('and it obeys the alert volume', /checkinAudio\.volume = alertVolume/.test(ov) && /data\.alertVolume/.test(ov));
+  /* A burst of check-ins at stream start used to machine-gun the chime every
+     few seconds. The SOUND is rate-limited (the nudge still shows each time) by
+     a cooldown on the single reused element. */
+  ok('the chime is rate-limited by a cooldown', /CHECKIN_CHIME_COOLDOWN_MS/.test(ov) && /lastCheckinChimeAt/.test(ov) &&
+     /nowChime - lastCheckinChimeAt >= CHECKIN_CHIME_COOLDOWN_MS/.test(ov));
 
   /* The panel markup lives in overlay.html — just the reaper and the words,
      no subtext line. */

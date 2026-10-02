@@ -166,6 +166,13 @@ function renderSubs(subs) {
     ['Channel-point redemptions', subs.redemptions, revokedRows.redemptions],
     ['Hype train', subs.hypeTrain, revokedRows.hypeTrain],
     ['Chat commands', subs.chat, revokedRows.chat],
+    /* Scope-gated features — inert until the broadcaster grants the extra OAuth
+       scope each needs, so surfacing their status answers "why isn't X firing". */
+    ['Follows', subs.follow, revokedRows.follow],
+    ['Cheers', subs.cheer, revokedRows.cheer],
+    ['Predictions', subs.predictions, revokedRows.predictions],
+    ['Ad breaks', subs.adBreak, revokedRows.adBreak],
+    ['Bits / Power-ups', subs.bits, revokedRows.bits],
   ];
   grid.innerHTML = rows.map(function (r) {
     /* Registered is a snapshot taken when the subscriptions were created;
