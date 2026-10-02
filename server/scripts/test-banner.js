@@ -75,6 +75,30 @@ check('halloween rare path', pathFor(bannerVariant({ rarity: 'rare', name: 'Prof
 check('halloween mythic path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Profile Banner', meta: { theme: 'halloween' } })), '/assets/banners/banner-halloween-mythic.png');
 check('halloween exclusive path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'halloween' } })), '/assets/banners/banner-halloween-exclusive.png');
 
+/* ── Dead Harvest themed variants (meta.theme='harvest') ─────────────── */
+check('harvest rare → harvest-rare', bannerVariant({ rarity: 'rare', name: 'Profile Banner', meta: { theme: 'harvest' } }), 'harvest-rare');
+check('harvest mythic → harvest-mythic', bannerVariant({ rarity: 'mythic', name: 'Profile Banner', meta: { theme: 'harvest' } }), 'harvest-mythic');
+check('harvest "Exclusive Banner" → harvest-exclusive', bannerVariant({ rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'harvest' } }), 'harvest-exclusive');
+check('harvest theme flattened (public payload) → harvest-mythic', bannerVariant({ rarity: 'mythic', name: 'Profile Banner', theme: 'harvest' }), 'harvest-mythic');
+check('harvest rare path', pathFor(bannerVariant({ rarity: 'rare', name: 'Profile Banner', meta: { theme: 'harvest' } })), '/assets/banners/banner-harvest-rare.png');
+check('harvest mythic path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Profile Banner', meta: { theme: 'harvest' } })), '/assets/banners/banner-harvest-mythic.png');
+check('harvest exclusive path', pathFor(bannerVariant({ rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'harvest' } })), '/assets/banners/banner-harvest-exclusive.png');
+
+/* ── The shipped client bannerPath is the generic template (no theme
+   hardcoded), and still-unknown themes fall back to the plain art. ─── */
+const bs = src.indexOf('function bannerPath');
+const be = src.indexOf('}', src.indexOf('return', bs)) + 1;
+// eslint-disable-next-line no-eval
+const clientBannerPath = (0, eval)('(' + src.slice(bs, be) + ')');
+for (const v of [null, 'rare', 'halloween-exclusive', 'harvest-rare', 'harvest-mythic', 'harvest-exclusive']) {
+  check(`client bannerPath(${v}) matches the contract`, clientBannerPath(v), pathFor(v));
+}
+check('client bannerPath has no hardcoded theme', /halloween|harvest/.test(src.slice(bs, be)), false);
+for (const theme of ['christmas', 'Harvest', 'harvest ', 'dead harvest']) {
+  check(`unknown theme ${JSON.stringify(theme)} → plain mythic path`,
+    pathFor(bannerVariant({ rarity: 'mythic', name: 'Profile Banner', meta: { theme } })), '/assets/banners/banner-mythic.png');
+}
+
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);
   for (const f of failures) console.error('  ✗ ' + f);

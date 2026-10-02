@@ -82,6 +82,53 @@ check('halloween floor: unknown rarity, plain name → halloween-rare',
 check('no theme → plain tier unchanged (mythic)',
   nameEffectVariant({ rarity: 'mythic', name: 'Name Effect' }), 'mythic');
 
+/* ── Dead Harvest themed variants (meta.theme='harvest') ─────────────── */
+check('harvest rare → harvest-rare',
+  nameEffectVariant({ rarity: 'rare', name: 'Name Effect', meta: { theme: 'harvest' } }), 'harvest-rare');
+check('harvest mythic → harvest-mythic',
+  nameEffectVariant({ rarity: 'mythic', name: 'Name Effect', meta: { theme: 'harvest' } }), 'harvest-mythic');
+check('harvest "Exclusive Name Effect" → harvest-exclusive',
+  nameEffectVariant({ rarity: 'mythic', name: 'Exclusive Name Effect', meta: { theme: 'harvest' } }), 'harvest-exclusive');
+check('harvest exclusive via meta.effect → harvest-exclusive',
+  nameEffectVariant({ rarity: 'rare', name: 'Whatever', meta: { theme: 'harvest', effect: 'exclusive' } }), 'harvest-exclusive');
+check('harvest theme flattened onto item.theme (public payload) → harvest-mythic',
+  nameEffectVariant({ rarity: 'mythic', name: 'Name Effect', theme: 'harvest' }), 'harvest-mythic');
+check('harvest floor: unknown rarity, plain name → harvest-rare',
+  nameEffectVariant({ rarity: 'common', name: 'Name Effect', meta: { theme: 'harvest' } }), 'harvest-rare');
+
+/* ── Still-unknown themes fall back to the plain tier ───────────────── */
+for (const theme of ['christmas', 'Harvest', 'harvest ', 'dead harvest', 'november']) {
+  check(`unknown theme ${JSON.stringify(theme)} → plain mythic`,
+    nameEffectVariant({ rarity: 'mythic', name: 'Name Effect', meta: { theme } }), 'mythic');
+}
+
+/* ── Every themed variant the mapping can emit has CSS in components.css,
+   animated tiers gated behind .name-fx-animate and dropped under
+   prefers-reduced-motion. ─────────────────────────────────────────── */
+const css = readFileSync(join(here, '../../css/components.css'), 'utf8').replace(/\r\n/g, '\n');
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+const rmBlocks = css.split('@media (prefers-reduced-motion: reduce)').slice(1).map(b => b.slice(0, b.indexOf('\n}')));
+for (const theme of ['halloween', 'harvest']) {
+  for (const tier of ['rare', 'mythic', 'exclusive']) {
+    const cls = `.name-fx-${theme}-${tier}`;
+    check(`${cls} has a rule`, new RegExp(esc(cls) + '\\s*\\{').test(css), true);
+  }
+  for (const tier of ['mythic', 'exclusive']) {
+    const anim = `.name-fx-${theme}-${tier}.name-fx-animate`;
+    check(`${anim} animates`, new RegExp(esc(anim) + '\\s*\\{\\s*animation:').test(css), true);
+    check(`${anim} dropped under reduced motion`, rmBlocks.some(b => b.includes(anim)), true);
+  }
+}
+const harvestStart = css.lastIndexOf('/*', css.indexOf('Dead Harvest themed name effects'));
+const harvestCss = css.slice(harvestStart, css.lastIndexOf('/*', css.indexOf('Leaderboard row banner backdrop')))
+  .replace(/\/\*[\s\S]*?\*\//g, '');
+check('harvest CSS block found', harvestCss.length > 0, true);
+check('harvest CSS has no box-shadow', /box-shadow/.test(harvestCss), false);
+check('harvest CSS uses no hardcoded hex', /#[0-9a-fA-F]{3,8}\b/.test(harvestCss), false);
+check('harvest loops are smooth drifts, not stepped flicker', /steps\(/.test(harvestCss), false);
+check('harvest exclusive keeps gold on a banner leaderboard row',
+  css.includes('.lb-row.has-banner .lb-name-text.name-fx-harvest-exclusive'), true);
+
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);
   for (const f of failures) console.error('  ✗ ' + f);

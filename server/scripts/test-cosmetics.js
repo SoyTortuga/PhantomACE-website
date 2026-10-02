@@ -59,11 +59,18 @@ const MATRIX = [
   { rarity: 'rare', name: 'x', theme: 'halloween', effect: 'mythic' },
   { rarity: 'common', name: 'Name Effect', meta: { theme: 'halloween' } },
   { rarity: 'mythic', name: 'x', meta: { theme: 'other' } },
+  { rarity: 'rare', name: 'Name Effect', meta: { theme: 'harvest' } },
+  { rarity: 'mythic', name: 'Name Effect', meta: { theme: 'harvest' } },
+  { rarity: 'mythic', name: 'Exclusive Banner', meta: { theme: 'harvest' } },
+  { rarity: 'rare', name: 'x', theme: 'harvest', effect: 'exclusive' },
+  { rarity: 'common', name: 'Profile Banner', theme: 'harvest' },
 ];
 const UNKNOWN_THEMES = [
   'other', 'christmas', 'Halloween', 'halloween ', 'hallo ween', 'spooky season',
   '"><img src=x onerror=alert(1)>', '../evil', '__proto__', 'constructor', 'toString',
   42, true, { toString: () => 'halloween' }, ['halloween'],
+  'Harvest', 'harvest ', 'dead harvest', 'dead-harvest', 'november', 'HARVEST',
+  { toString: () => 'harvest' }, ['harvest'],
 ];
 for (const theme of UNKNOWN_THEMES) {
   MATRIX.push({ rarity: 'mythic', name: 'Name Effect', meta: { theme } });
@@ -76,7 +83,7 @@ for (let i = 0; i < MATRIX.length; i++) {
 /* ── KNOWN_THEMES whitelist ─────────────────────────────────────────── */
 const clientThemes = (0, eval)(cvSrc.slice(s, e).trim() + '\nKNOWN_THEMES;');
 check('KNOWN_THEMES identical client/server', [...clientThemes], [...KNOWN_THEMES]);
-check('KNOWN_THEMES is just halloween today', [...KNOWN_THEMES], ['halloween']);
+check('KNOWN_THEMES is halloween + harvest', [...KNOWN_THEMES], ['halloween', 'harvest']);
 
 for (const theme of UNKNOWN_THEMES) {
   const label = JSON.stringify(String(theme));
@@ -95,6 +102,17 @@ check('known theme still themed (server)',
 check('known theme still themed (client)',
   clientVariant({ rarity: 'rare', name: 'Name Effect', meta: { theme: 'halloween' } }), 'halloween-rare');
 check('knownTheme(halloween)', knownTheme('halloween'), 'halloween');
+for (const [item, want] of [
+  [{ rarity: 'rare', name: 'Name Effect', meta: { theme: 'harvest' } }, 'harvest-rare'],
+  [{ rarity: 'mythic', name: 'Name Effect', meta: { theme: 'harvest' } }, 'harvest-mythic'],
+  [{ rarity: 'mythic', name: 'Exclusive Name Effect', meta: { theme: 'harvest' } }, 'harvest-exclusive'],
+  [{ rarity: 'rare', name: 'Exclusive Banner', theme: 'harvest' }, 'harvest-exclusive'],
+  [{ rarity: 'common', name: 'Profile Banner', meta: { theme: 'harvest' } }, 'harvest-rare'],
+]) {
+  check(`harvest ${JSON.stringify(item)} (server)`, serverVariant(item), want);
+  check(`harvest ${JSON.stringify(item)} (client)`, clientVariant(item), want);
+}
+check('knownTheme(harvest)', knownTheme('harvest'), 'harvest');
 check('knownTheme(undefined)', knownTheme(undefined), null);
 
 /* Every variant either side can produce must be a valid single class token —
@@ -110,6 +128,17 @@ check('bannerPath rare', bannerPath('rare'), '/assets/banners/banner-rare.png');
 check('bannerPath null', bannerPath(null), null);
 check('bannerPath halloween-mythic', bannerPath('halloween-mythic'), '/assets/banners/banner-halloween-mythic.png');
 check('bannerPath halloween-exclusive', bannerPath('halloween-exclusive'), '/assets/banners/banner-halloween-exclusive.png');
+for (const tier of ['rare', 'mythic', 'exclusive']) {
+  check(`bannerPath harvest-${tier}`, bannerPath(`harvest-${tier}`), `/assets/banners/banner-harvest-${tier}.png`);
+}
+/* The client's bannerPath is the same generic template — no theme hardcoded. */
+const cbs = cvSrc.indexOf('function bannerPath');
+const cbe = cvSrc.indexOf('}', cvSrc.indexOf('return', cbs)) + 1;
+// eslint-disable-next-line no-eval
+const clientBannerPath = (0, eval)('(' + cvSrc.slice(cbs, cbe) + ')');
+for (const v of [null, 'rare', 'halloween-mythic', 'harvest-rare', 'harvest-mythic', 'harvest-exclusive']) {
+  check(`client bannerPath(${v}) == server`, clientBannerPath(v), bannerPath(v));
+}
 
 /* ── resolveEquippedCosmetics — mock KV ─────────────────────────────── */
 const store = {
@@ -131,11 +160,15 @@ const store = {
       { id: 'xne', type: 'name-effect', rarity: 'mythic', name: 'Name Effect', meta: { theme: 'christmas' } },
       { id: 'xbn', type: 'banner', rarity: 'rare', name: 'Profile Banner', meta: { theme: 'spooky season' } },
     ], equips: { profile: { 'name-effect': 'xne', banner: 'xbn' } } },
+  inv_600: { items: [            // November themed grants (meta.theme='harvest')
+      { id: 'vne', type: 'name-effect', rarity: 'rare', name: 'Name Effect', meta: { theme: 'harvest' } },
+      { id: 'vbn', type: 'banner', rarity: 'mythic', name: 'Profile Banner', meta: { theme: 'harvest' } },
+    ], equips: { profile: { 'name-effect': 'vne', banner: 'vbn' } } },
 };
 let reads = 0;
 const env = { MARKETPLACE: { async get(key) { reads++; return store[key] || null; } } };
 
-const res = await resolveEquippedCosmetics(env, ['100', '200', '300', '400', '500', '999', 'guest_abc', '100']);
+const res = await resolveEquippedCosmetics(env, ['100', '200', '300', '400', '500', '600', '999', 'guest_abc', '100']);
 
 check('user 100 name effect', res['100'].nameEffect, 'mythic');    // mythic rarity, plain name
 check('user 100 banner', res['100'].banner, 'exclusive');          // "Exclusive Banner"
@@ -146,12 +179,14 @@ check('user 400 halloween name effect', res['400'].nameEffect, 'halloween-mythic
 check('user 400 halloween banner', res['400'].banner, 'halloween-exclusive');
 check('user 500 unknown theme → plain mythic', res['500'].nameEffect, 'mythic');
 check('user 500 malformed theme → plain rare', res['500'].banner, 'rare');
+check('user 600 harvest name effect', res['600'].nameEffect, 'harvest-rare');
+check('user 600 harvest banner', res['600'].banner, 'harvest-mythic');
 check('user 999 no inventory', res['999'], { nameEffect: null, banner: null });
 check('guest excluded → nulls', res['guest_abc'], { nameEffect: null, banner: null });
 
-/* Batched + guest-free: 100 (twice, deduped), 200, 300, 400, 500, 999 = 6
-   unique real ids = 6 reads. The guest is never read. */
-check('batched: one read per unique real id, guests skipped', reads, 6);
+/* Batched + guest-free: 100 (twice, deduped), 200, 300, 400, 500, 600, 999
+   = 7 unique real ids = 7 reads. The guest is never read. */
+check('batched: one read per unique real id, guests skipped', reads, 7);
 
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

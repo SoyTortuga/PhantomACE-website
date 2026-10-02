@@ -174,6 +174,19 @@
     .card-front.cb-bat::after { content: '🦇'; color: var(--red); opacity: 0.65; }
     .card-front.cb-ghost { background: linear-gradient(135deg, #2b2b2b, #111); border-color: #ccc; }
     .card-front.cb-ghost::after { content: '👻'; color: #fff; opacity: 0.55; }
+    .card-front.cb-wheat {
+      background:
+        repeating-linear-gradient(100deg, rgba(214, 210, 196, 0.06) 0 2px, transparent 2px 9px),
+        linear-gradient(180deg, #1d1d1b, #080808);
+      border: 1px solid #8a8780;
+    }
+    .card-front.cb-wheat::after { content: '🌾'; filter: grayscale(1) brightness(1.3); opacity: 0.6; }
+    .card-front.cb-crow { background: linear-gradient(160deg, #000 0%, #121212 55%, #3a0000 100%); border: 1px solid #4a4a4a; }
+    .card-front.cb-crow::after { content: '🐦‍⬛'; filter: grayscale(1); opacity: 0.75; }
+    .card-front.cb-sickle { background: linear-gradient(135deg, #e4e0d4, #9c988d); border: 2px solid #7a0000; }
+    .card-front.cb-sickle::after { content: '🦴'; filter: grayscale(1) brightness(0.3); opacity: 0.7; }
+    .card-front.cb-moon { background: linear-gradient(180deg, #1c1c1c 0%, #0a0a0a 64%, #2a0000 64%, #050505 100%); border: 1px solid #d6d2c4; }
+    .card-front.cb-moon::after { content: '🌕'; filter: grayscale(1) brightness(1.15); opacity: 0.6; }
   </style>
 </head>
 <body>
@@ -291,12 +304,40 @@
       { name: 'phamHUH', src: emoteUrl('emotesv2_6700d9409cfc499ab30d1235e680b25b') },
     ];
 
+    const BARROW_EMOTES = [
+      { name: 'phamFeelsBad', src: emoteUrl('303615479') },
+      { name: 'phamPepeHands', src: emoteUrl('303615508') },
+      { name: 'phamChair', src: emoteUrl('emotesv2_e4a4f5d9bc764548ba26a61d54140bfe') },
+      { name: 'phamEcho', src: emoteUrl('emotesv2_325e83dde662429c82020e6d2af7f08f') },
+      { name: 'phamTime', src: emoteUrl('emotesv2_66462619face41b1abec201b92022a0b') },
+      { name: 'phamFroze', src: emoteUrl('emotesv2_1d3742cd0c33464f9fdc9d5e2495a4cb') },
+      { name: 'phamL', src: emoteUrl('415421') },
+      { name: 'phamHeal', src: emoteUrl('emotesv2_1f60e4c71d9e4af19fa7b3812f40d71f') },
+      { name: 'phamMonkaS', src: emoteUrl('303615499') },
+      { name: 'phamDrink', src: emoteUrl('emotesv2_8c96393fd63f46a6bb0f15d5ba9051d0') },
+    ];
+
+    const HARVEST_EMOTES = [
+      { name: 'phamCoin', src: emoteUrl('153656') },
+      { name: 'phamCoinroll', src: emoteUrl('emotesv2_26bf7acbf75644e69473adf3952110b7') },
+      { name: 'phamGear', src: emoteUrl('emotesv2_9fad6fab6f35430390613ab56d7a008f') },
+      { name: 'phamDrum', src: emoteUrl('emotesv2_454abcf6e3104137b1eeeac026d5f62d') },
+      { name: 'phamBass', src: emoteUrl('emotesv2_11714d9a022d4fd7b4cb872b0d5bba1d') },
+      { name: 'phamJam', src: emoteUrl('emotesv2_62be33ae947d41eeb96785317e0ff198') },
+      { name: 'phamHYPERS', src: emoteUrl('1142146') },
+      { name: 'phamGG', src: emoteUrl('121668') },
+      { name: 'phamLit', src: emoteUrl('120782') },
+      { name: 'phamPoggers', src: emoteUrl('emotesv2_92dfe6ff82464cdda9d0261e1ca4e7ed') },
+    ];
+
     const EMOTE_SETS = {
       default: { name: 'PhantomACE Emotes', images: DEFAULT_IMAGES, alts: DEFAULT_NAMES },
       bonus: { name: 'Emote Pack', images: BONUS_EMOTES.map(e => e.src), alts: BONUS_EMOTES.map(e => e.name) },
       premium: { name: 'Premium Emote Pack', images: PREMIUM_EMOTES.map(e => e.src), alts: PREMIUM_EMOTES.map(e => e.name) },
       spooky: { name: 'Spooky Emote Pack', images: SPOOKY_EMOTES.map(e => e.src), alts: SPOOKY_EMOTES.map(e => e.name) },
       haunted: { name: 'Haunted Emote Pack', images: HAUNTED_EMOTES.map(e => e.src), alts: HAUNTED_EMOTES.map(e => e.name) },
+      barrow: { name: 'Barrow Emote Pack', images: BARROW_EMOTES.map(e => e.src), alts: BARROW_EMOTES.map(e => e.name) },
+      harvest: { name: 'Harvest Emote Pack', images: HARVEST_EMOTES.map(e => e.src), alts: HARVEST_EMOTES.map(e => e.name) },
     };
 
     const CARD_BACKS = {
@@ -309,6 +350,10 @@
       crypt: { name: 'Crypt Card Back', cssClass: 'cb-crypt' },
       bat: { name: 'Bat Card Back', cssClass: 'cb-bat' },
       ghost: { name: 'Ghost Card Back', cssClass: 'cb-ghost' },
+      wheat: { name: 'Withered Wheat Card Back', cssClass: 'cb-wheat' },
+      crow: { name: 'Carrion Crow Card Back', cssClass: 'cb-crow' },
+      sickle: { name: 'Bone Sickle Card Back', cssClass: 'cb-sickle' },
+      moon: { name: 'Hollow Moon Card Back', cssClass: 'cb-moon' },
     };
 
     let activeCardBack = 'default';
@@ -409,6 +454,12 @@
       if (n.includes('ghost')) return 'ghost';
       if (n.includes('spooky')) return 'spooky';
       if (n.includes('haunt')) return 'haunted';
+      if (n.includes('wheat')) return 'wheat';
+      if (n.includes('crow')) return 'crow';
+      if (n.includes('sickle')) return 'sickle';
+      if (n.includes('moon')) return 'moon';
+      if (n.includes('barrow')) return 'barrow';
+      if (n.includes('harvest')) return 'harvest';
       // Unrecognized reward name — fall back to the lowest tier for this slot
       // rather than silently duplicating the default set.
       return prefix === 'cb' ? 'basic' : 'bonus';

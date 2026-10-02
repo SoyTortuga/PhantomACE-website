@@ -32,8 +32,8 @@
      / test-banner. Name effects and banners map identically: first the rarity
      TIER — an explicit effect id wins, then a name containing "exclusive",
      then mythic rarity, else the rare floor — then an optional THEME prefix.
-     When meta.theme is set (e.g. 'halloween') the variant becomes
-     "<theme>-<tier>" (halloween-rare/-mythic/-exclusive); otherwise it stays
+     When meta.theme is a known theme (e.g. 'halloween', 'harvest') the
+     variant becomes "<theme>-<tier>" (harvest-rare/-mythic/-exclusive); otherwise it stays
      the plain tier (rare/mythic/exclusive) so existing items are unchanged.
      `effect`/`theme` are read from meta (raw inventory items) or flattened onto
      the item (the public profile payload). null → null. */
@@ -56,7 +56,7 @@
      a value with a space that would throw in classList.add — falls back to
      the plain tier. Mirrored exactly in functions/api/cosmetics.js; add a
      theme to BOTH only once its CSS and art have shipped. */
-  var KNOWN_THEMES = ['halloween'];
+  var KNOWN_THEMES = ['halloween', 'harvest'];
   /* end variant mapping */
 
   function bannerPath(variant) {

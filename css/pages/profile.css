@@ -71,7 +71,9 @@
 }
 
 .prof-head.has-banner .prof-name { color: #fff; }
-.prof-head.has-banner .prof-name.name-fx-exclusive { color: var(--exclusive); }
+.prof-head.has-banner .prof-name.name-fx-exclusive,
+.prof-head.has-banner .prof-name.name-fx-halloween-exclusive,
+.prof-head.has-banner .prof-name.name-fx-harvest-exclusive { color: var(--exclusive); }
 .prof-head.has-banner .prof-title,
 .prof-head.has-banner .prof-tenure,
 .prof-head.has-banner .prof-role,

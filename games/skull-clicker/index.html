@@ -878,6 +878,44 @@
       0%, 100% { border-color: #880000; }
       50% { border-color: #ff3333; }
     }
+    @media (prefers-reduced-motion: reduce) { .skull-btn.theme-reapermoon { animation: none; } }
+    .skull-btn.theme-hollowmoon { border: 4px double #b5b5b5;
+      background:
+        radial-gradient(circle at 70% 25%, #0b0b0b 0 15%, transparent 15.5%),
+        radial-gradient(circle at 62% 31%, #ededed 0 13%, #a9a9a9 17%, transparent 17.5%),
+        radial-gradient(circle at 62% 31%, rgba(255,255,255,0.12) 0 22%, transparent 34%),
+        radial-gradient(circle at 50% 55%, #1a1a1a, #0b0b0b 62%, #000); }
+    .skull-btn.theme-chaff { border: 3px dashed #8c8c8c;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(0,0,0,0) 34%, rgba(0,0,0,0.85) 78%),
+        linear-gradient(to bottom, transparent 46%, rgba(130,0,0,0.6) 50%, transparent 55%),
+        linear-gradient(to bottom, #060606 0 47%, rgba(6,6,6,0) 64%),
+        repeating-linear-gradient(98deg, #3c3c3c 0 1px, #0e0e0e 1px 6px, #2a2a2a 6px 8px, #0e0e0e 8px 12px),
+        #0e0e0e; }
+    .skull-btn.theme-crowfeather { border-color: #262626; border-width: 3px;
+      background:
+        radial-gradient(circle at 33% 30%, #ff1a1a 0 2.5%, rgba(255,0,0,0.35) 4%, transparent 6.5%),
+        radial-gradient(circle at 50% 42%, rgba(255,255,255,0.07), transparent 68%),
+        repeating-conic-gradient(from 210deg at 50% 118%, #040404 0deg 6deg, #1f1f1f 8.5deg, #040404 11deg);
+      animation: crowfeather-beat 3.2s ease-in-out infinite; }
+    @keyframes crowfeather-beat {
+      0%, 100% { border-color: #1c1c1c; }
+      45% { border-color: #5e5e5e; }
+      55% { border-color: #8a0000; }
+    }
+    @media (prefers-reduced-motion: reduce) { .skull-btn.theme-crowfeather { animation: none; } }
+    .click-effect-bonesickle .click-pop { color: #ececec !important; font-style: italic;
+      text-shadow: 1px 1px 0 #8b0000, 0 0 6px rgba(255,0,0,0.45) !important;
+      animation: sickle-reap 0.5s ease-out forwards; }
+    @keyframes sickle-reap {
+      0% { opacity: 1; transform: translate(-18px, 6px) rotate(-28deg) scale(0.9); }
+      45% { opacity: 1; transform: translate(4px, -22px) rotate(-4deg) scale(1.15); }
+      100% { opacity: 0; transform: translate(22px, -40px) rotate(14deg) scale(1); }
+    }
+    @keyframes sickle-fade { from { opacity: 1; } to { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .click-effect-bonesickle .click-pop { animation: sickle-fade 0.5s linear forwards; }
+    }
     .click-effect-blood .click-pop { color: #ff3333 !important; }
     .click-effect-void .click-pop { color: #aa66ff !important; }
     .click-effect-chaos .click-pop { color: #ffaa00 !important; }
@@ -4912,6 +4950,9 @@
       'bonewhite': { name: 'Bonewhite Skull', desc: 'Bleached bone, pale against the dark', cssClass: 'theme-bonewhite' },
       'graveash': { name: 'Graveash Skull', desc: 'Cold grey ash from a snuffed pyre', cssClass: 'theme-graveash' },
       'reapermoon': { name: 'Reaper Moon Skull', desc: 'A red harvest moon pulsing behind the bone', cssClass: 'theme-reapermoon' },
+      'hollowmoon': { name: 'Hollow Moon Skull', desc: 'A pale gutted moon hanging over the emptied fields', cssClass: 'theme-hollowmoon' },
+      'chaff': { name: 'Chaff Field Skull', desc: 'Withered stubble under a last red line of dusk', cssClass: 'theme-chaff' },
+      'crowfeather': { name: 'Crowfeather Skull', desc: 'Black pinions and one red eye watching the furrows', cssClass: 'theme-crowfeather' },
     };
 
     const CLICK_EFFECTS = {
@@ -4921,6 +4962,7 @@
       'chaos': { name: 'Chaos Strike', desc: 'Fiery orange numbers', cssClass: 'click-effect-chaos' },
       'eternal': { name: 'Eternal Darkness', desc: 'Mythic glowing magenta numbers', cssClass: 'click-effect-eternal' },
       'wraith': { name: 'Wraith Wisp', desc: 'Pale ghostlight numbers that glow white', cssClass: 'click-effect-wraith' },
+      'bonesickle': { name: 'Bone Sickle Slash', desc: 'Bone-white numbers reaped along a blood-edged arc', cssClass: 'click-effect-bonesickle' },
     };
 
     let ownedCosmetics = [];
@@ -5070,6 +5112,10 @@
       if (n.includes('graveash')) return 'graveash';
       if (n.includes('reaper') || n.includes('reapermoon')) return 'reapermoon';
       if (n.includes('wraith')) return 'wraith';
+      if (n.includes('hollow')) return 'hollowmoon';
+      if (n.includes('chaff')) return 'chaff';
+      if (n.includes('crowfeather')) return 'crowfeather';
+      if (n.includes('sickle')) return 'bonesickle';
       return item.id;
     }
 

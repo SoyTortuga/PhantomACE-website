@@ -48,7 +48,7 @@ export function nameEffectVariant(item) {
    js/cosmetic-variants.js (test-cosmetics.js asserts it). An unknown or
    malformed theme falls back to the plain tier rather than producing a class
    or image path that does not exist. */
-export const KNOWN_THEMES = Object.freeze(['halloween']);
+export const KNOWN_THEMES = Object.freeze(['halloween', 'harvest']);
 
 export function knownTheme(theme) {
   return KNOWN_THEMES.indexOf(theme) !== -1 ? theme : null;

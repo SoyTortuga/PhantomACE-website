@@ -923,6 +923,79 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
   }
 }
 
+/* ── Dead Harvest themed name effects (November) ───────────────────────
+   variantOf() returns "harvest-<tier>" for items carrying
+   meta.theme='harvest'. Withered wheat, chaff on the wind, a hollow moon over
+   empty fields — told in the gothic palette only: bone-white letters under a
+   pale moon haze, a dim red ember trail blown off to one side like chaff, and
+   the gold --exclusive token ONLY as the exclusive tier signal. Where plain
+   tiers breathe in place and halloween gutters in hard steps, harvest DRIFTS:
+   the glow is directional (offset, never centred) and the loops are slow,
+   smooth gusts that stretch the trail and let it settle. text-shadow only (no
+   box-shadow); loops run only with .name-fx-animate; reduced-motion drops them. */
+.name-fx-harvest-rare,
+.name-fx-harvest-mythic,
+.name-fx-harvest-exclusive {
+  will-change: text-shadow, filter;
+}
+
+/* harvest rare — static: bone letters with a hollow-moon rim and a chaff
+   smear leaning off with the wind. */
+.name-fx-harvest-rare {
+  color: var(--white);
+  text-shadow: 0 0 2px var(--white), 3px 1px 5px var(--red-dim), 7px 1px 10px var(--red-dim);
+}
+
+/* harvest mythic — the chaff trail gusts out across the field and settles
+   back, under a moon haze that swells as the wind rises. */
+.name-fx-harvest-mythic {
+  color: var(--white);
+  text-shadow: 0 0 4px var(--white), 3px 1px 6px var(--red), 8px 1px 13px var(--red-dim);
+}
+.name-fx-harvest-mythic.name-fx-animate {
+  animation: nameFxHarvestDrift 7s ease-in-out infinite;
+}
+
+@keyframes nameFxHarvestDrift {
+  0%, 100% { text-shadow: 0 0 4px var(--white), 2px 1px 5px var(--red), 5px 1px 11px var(--red-dim); }
+  45%      { text-shadow: 0 0 7px var(--white), 6px 0 7px var(--red), 14px -1px 18px var(--red-dim); }
+  70%      { text-shadow: 0 0 5px var(--white), 4px 1px 6px var(--red), 9px 1px 14px var(--red-dim); }
+}
+
+/* harvest exclusive — the gold tier signal under a pale dusk: a cold bone
+   shimmer lifts across the gold while an ember trail drifts off behind it. */
+.name-fx-harvest-exclusive {
+  color: var(--exclusive);
+  text-shadow: 0 0 5px var(--exclusive), 0 0 2px var(--white), 5px 1px 11px var(--red-dim);
+}
+.name-fx-harvest-exclusive.name-fx-animate {
+  animation: nameFxHarvestDusk 8s ease-in-out infinite;
+}
+
+@keyframes nameFxHarvestDusk {
+  0%, 100% {
+    text-shadow: 0 0 5px var(--exclusive), 0 0 2px var(--white), 4px 1px 10px var(--red-dim);
+    filter: brightness(1);
+  }
+  40% {
+    text-shadow: 0 0 7px var(--exclusive), 0 0 5px var(--white), 11px 0 16px var(--red-dim);
+    filter: brightness(1.12);
+  }
+  65% {
+    text-shadow: 0 0 6px var(--exclusive), 0 0 3px var(--white), 7px 1px 13px var(--red-dim);
+    filter: brightness(1.05);
+  }
+}
+
+/* Reduced motion — keep the static glow, drop the drift loops. */
+@media (prefers-reduced-motion: reduce) {
+  .name-fx-harvest-mythic.name-fx-animate,
+  .name-fx-harvest-exclusive.name-fx-animate {
+    animation: none;
+    filter: none;
+  }
+}
+
 /* ── Leaderboard row banner backdrop ──────────────────────────────────
    A user's equipped banner shows as a FAINT image behind their leaderboard
    row, under a dark red/black gothic vignette so the row text stays legible in
@@ -969,4 +1042,5 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
   color: #fff;
 }
 .lb-row.has-banner .lb-name-text.name-fx-exclusive,
-.lb-row.has-banner .lb-name-text.name-fx-halloween-exclusive { color: var(--exclusive); }
+.lb-row.has-banner .lb-name-text.name-fx-halloween-exclusive,
+.lb-row.has-banner .lb-name-text.name-fx-harvest-exclusive { color: var(--exclusive); }
