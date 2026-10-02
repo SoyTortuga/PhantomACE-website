@@ -23,6 +23,14 @@
    drift apart silently.
    ══════════════════════════════════════════════ */
 
+/* The season month ('YYYY-MM' in the broadcaster's timezone) drives the
+   monthly cosmetic THEME below. Shared with the giveaway ledger, the watch
+   handler and the seasonal reset, so a themed reward lands in the same month
+   as the watch time that earned it. The client mirror in
+   js/pages/phamily-time.js computes the SAME Pacific month with its own small
+   monthKey(); test-phamily-rewards.js compares the two tables entry by entry. */
+import { monthKey } from './season-time.js';
+
 const REWARD_ICONS = {
     giveaway: '🎫',
     egg: '🥚',
@@ -37,7 +45,6 @@ const REWARD_ICONS = {
     banner: '🏳️',
     nameeffect: '✨',
     room: '🛋️',
-  room: '🛋️',
 };
 
 const MILESTONE_INTERVAL = 15;
@@ -96,6 +103,34 @@ function defineFollowerRewards() {
     r.push({ level:lvl, rarity: lvl < 50 ? 'common' : lvl < 100 ? 'uncommon' : 'rare',
       type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
       name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
+  }
+  /* ── SEASONAL THEME ─────────────────────────────────────────────────
+     A month-keyed cosmetic skin over the September table. It overrides a
+     reward's cosmeticId / name / desc ONLY — never its level, type, rarity or
+     icon — so every reward KEY is identical to a base month and claim-state
+     is unchanged. Base months get no override and build byte-for-byte as
+     before. Slots are keyed `${level}_${type}_${rarity}`. Duplicated in
+     js/pages/phamily-time.js (which computes the SAME Pacific month with its
+     own monthKey); test-phamily-rewards.js compares the two entry by entry. */
+  const THEMES = {
+    '2026-10': {
+      '10_cardback_common': { name:'Cobweb Card Back', desc:'A cobweb-laced card back for Memory Match' },
+      '22_emote_uncommon':  { name:'Spooky Emote Pack', desc:'A spooky emote set for Memory Match' },
+      '55_cardback_rare':   { name:'Bat Card Back', desc:'A bat-swarm card back for Memory Match' },
+      '85_skull-skin_rare': { cosmeticId:'bonewhite', name:'Bonewhite Skull', desc:'The Bonewhite Skull theme for Skull Clicker' },
+      '95_dice_rare':       { cosmeticId:'ash', name:'Ashen Dice', desc:'Ashen-grey dice for Mana Clash' },
+    },
+  };
+  const theme = THEMES[monthKey()];
+  if (theme) {
+    for (const rw of r) {
+      const o = theme[`${rw.level}_${rw.type}_${rw.rarity}`];
+      if (!o) continue;
+      if (o.cosmeticId !== undefined) rw.cosmeticId = o.cosmeticId;
+      if (o.name) rw.name = o.name;
+      if (o.desc) rw.desc = o.desc;
+      if (o.meta) rw.meta = { ...(rw.meta || {}), ...o.meta };
+    }
   }
   return r.sort((a,b) => a.level - b.level);
 }
@@ -177,6 +212,31 @@ function definePhamilyRewards() {
       type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
       name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
   }
+  /* ── SEASONAL THEME ── see defineFollowerRewards for the full note. ──── */
+  const THEMES = {
+    '2026-10': {
+      '10_cardback_uncommon': { name:'Crypt Card Back', desc:'A crypt-carved card back for Memory Match' },
+      '22_emote_uncommon':    { name:'Haunted Emote Pack', desc:'A haunted emote set for Memory Match' },
+      '48_dice_rare':         { cosmeticId:'slate', name:'Graveslate Dice', desc:'Graveslate dice for Mana Clash' },
+      '55_cardback_rare':     { name:'Ghost Card Back', desc:'A ghostly card back for Memory Match' },
+      '65_skull-skin_rare':   { cosmeticId:'graveash', name:'Graveash Skull', desc:'The Graveash Skull theme for Skull Clicker' },
+      '85_click-effect_rare': { cosmeticId:'wraith', name:'Wraith Wisp', desc:'The Wraith Wisp click effect for Skull Clicker' },
+      '95_dice_rare':         { cosmeticId:'pitch', name:'Pitch Black Dice', desc:'Pitch-black dice for Mana Clash' },
+      '115_skull-skin_mythic':{ cosmeticId:'reapermoon', name:'Reaper Moon Skull', desc:'The Reaper Moon Skull theme for Skull Clicker' },
+      '130_dice_mythic':      { cosmeticId:'ember', name:'Ember Dice', desc:'Ember-lit dice for Mana Clash' },
+    },
+  };
+  const theme = THEMES[monthKey()];
+  if (theme) {
+    for (const rw of r) {
+      const o = theme[`${rw.level}_${rw.type}_${rw.rarity}`];
+      if (!o) continue;
+      if (o.cosmeticId !== undefined) rw.cosmeticId = o.cosmeticId;
+      if (o.name) rw.name = o.name;
+      if (o.desc) rw.desc = o.desc;
+      if (o.meta) rw.meta = { ...(rw.meta || {}), ...o.meta };
+    }
+  }
   return r.sort((a,b) => a.level - b.level);
 }
 
@@ -247,6 +307,32 @@ function defineMilestones() {
       bonusItems: phamilyBundles[i][2],
     });
   }
+  /* ── SEASONAL THEME ─────────────────────────────────────────────────
+     Overrides the ten milestone titles, and within the phamily bonus bundles
+     stamps meta.theme on every banner / name-effect (so the cosmetics
+     resolver yields halloween-<tier>) and re-skins the dice. Rarity, type and
+     level are untouched, so claim-state is unchanged. Duplicated in
+     js/pages/phamily-time.js; compared entry by entry by the drift guard. */
+  const THEME_MS = {
+    '2026-10': {
+      titles: ['Trick-or-Treater','Candle Bearer','Grave Tender','Pumpkin Knight','Hex Weaver','Nightstalker','Crypt Keeper','Soul Reaper','Dread Warden','Harbinger of Hallows'],
+      dice: { 60: { cosmeticId:'blood', name:'Bloodletter Dice' }, 135: { cosmeticId:'wraith', name:'Wraithsilk Dice' } },
+    },
+  };
+  const mt = THEME_MS[monthKey()];
+  if (mt) {
+    for (let i = 0; i < ms.length; i++) {
+      ms[i].title = mt.titles[i];
+      for (const b of (ms[i].bonusItems || [])) {
+        if (b.type === 'banner' || b.type === 'nameeffect') {
+          b.meta = { ...(b.meta || {}), theme:'halloween' };
+        } else if (b.type === 'dice' && mt.dice[ms[i].level]) {
+          b.cosmeticId = mt.dice[ms[i].level].cosmeticId;
+          b.name = mt.dice[ms[i].level].name;
+        }
+      }
+    }
+  }
   return ms;
 }
 
@@ -254,6 +340,16 @@ export const FOLLOWER_REWARDS = defineFollowerRewards();
 export const PHAMILY_REWARDS = definePhamilyRewards();
 export const MILESTONES = defineMilestones();
 export { MILESTONE_INTERVAL };
+
+/* The seasonal cosmetic theme active for a season month ('YYYY-MM'), or null.
+   The reward and milestone tables above re-skin themselves by this same month
+   key; this names the theme in ONE place so the grant path (e.g. the themed
+   milestone-badge art) can branch on it without re-deriving a table. A new
+   theme month must be added both here and to the inline tables above. */
+const SEASON_THEMES = { '2026-10': 'halloween' };
+export function themeKeyFor(mk = monthKey()) {
+  return SEASON_THEMES[String(mk)] || null;
+}
 
 /* The key the client sends and the server stores, built the same way on both
    sides: level_track_type_rarity. It is the identity of a reward, so the

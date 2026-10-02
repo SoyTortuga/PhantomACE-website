@@ -29,7 +29,7 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 import { createPool, waitForDatabase } from '../lib/db.js';
 import { createKVStore } from '../lib/kv.js';
 import { resolveDatabaseUrl } from '../lib/service-env.js';
-import { MILESTONES } from '../../functions/api/phamily-rewards.js';
+import { MILESTONES, themeKeyFor } from '../../functions/api/phamily-rewards.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -47,12 +47,20 @@ const line = (s = '') => console.log(s);
 /* `ms_{level}_badge_{YYYY-MM}` — the month is part of the id because the
    track resets monthly, so one person can hold several of the same rank. */
 const BADGE_ID = /^ms_(\d+)_badge_/;
+const BADGE_MONTH = /_(\d{4}-\d{2})$/;   // the earned month is baked into the id suffix
 
 const RANK = new Map(MILESTONES.map(m => [m.level, m.title]));
 
-function artFor(level) {
-  return `/assets/badges/milestones/ms-${level}.png`;
+/* Artwork follows the THEME of the month the badge was earned (that month is in
+   the badge id), so a Halloween badge backfilled later still gets its Halloween
+   art. Base months use the plain per-level file. */
+function artFor(level, month) {
+  const theme = month ? themeKeyFor(month) : null;
+  return theme
+    ? `/assets/badges/milestones/ms-${theme}-${level}.png`
+    : `/assets/badges/milestones/ms-${level}.png`;
 }
+const monthOf = (id) => (BADGE_MONTH.exec(String(id || '')) || [])[1] || null;
 
 async function main() {
   const service = arg('service');
@@ -92,6 +100,7 @@ async function main() {
      the dry run reports the same numbers the real run will act on. */
   const plan = [];
   const perLevel = new Map();
+  const artPaths = new Set();        // every (themed) file the apply pass will point at
 
   for (const row of rows) {
     const inv = row.value;
@@ -110,7 +119,18 @@ async function main() {
     for (const i of needs) {
       const level = Number(BADGE_ID.exec(i.id)[1]);
       perLevel.set(level, (perLevel.get(level) || 0) + 1);
+      artPaths.add(artFor(level, monthOf(i.id)));     // theme follows the earned month
     }
+  }
+
+  /* Refuse before writing if any themed file is missing — the early check only
+     covered the base art; a Halloween badge needs ms-halloween-<level>.png. */
+  const missingThemed = [...artPaths].filter(p => !fs.existsSync(path.join(REPO, p.replace(/^\//, ''))));
+  if (missingThemed.length) {
+    console.error('[backfill] Themed artwork missing: ' + missingThemed.join(', '));
+    console.error('[backfill] Refusing to point items at files that are not there.');
+    await pool.end();
+    process.exit(1);
   }
 
   const total = plan.reduce((n, p) => n + p.count, 0);
@@ -154,7 +174,7 @@ async function main() {
         if (i.meta && i.meta.image) continue;
         /* Merged, not replaced — an item may carry meta this script knows
            nothing about. */
-        i.meta = { ...(i.meta || {}), image: artFor(level), milestoneLevel: level, rank: RANK.get(level) };
+        i.meta = { ...(i.meta || {}), image: artFor(level, monthOf(i.id)), milestoneLevel: level, rank: RANK.get(level) };
         n++;
       }
       if (!n) return undefined;

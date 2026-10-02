@@ -370,8 +370,14 @@ const REWARD_ITEM_MAP = {
     ({ id: `room-slot-${cosmeticId}`, game:'profile', type:'room-slot', consumable:false }),
   badge: () => ({ game:'profile', type:'badge', consumable:false }),
   title: () => ({ game:'profile', type:'title', consumable:false }),
-  banner: () => ({ game:'profile', type:'banner', consumable:false }),
-  nameeffect: () => ({ game:'profile', type:'name-effect', consumable:false }),
+  /* A seasonal milestone stamps meta.theme on its banner / name-effect bonus
+     (e.g. 'halloween'); the cosmetics resolver reads it to pick the themed
+     variant (halloween-<tier>). Threaded through grantReward from the table,
+     never the request. Absent theme → a plain item, exactly as before. */
+  banner: (rarity, name, cosmeticId, theme) =>
+    ({ game:'profile', type:'banner', consumable:false, ...(theme ? { meta:{ theme } } : {}) }),
+  nameeffect: (rarity, name, cosmeticId, theme) =>
+    ({ game:'profile', type:'name-effect', consumable:false, ...(theme ? { meta:{ theme } } : {}) }),
 };
 
 /**
@@ -395,7 +401,7 @@ const REWARD_ITEM_MAP = {
  * their own level, so there is nobody to prove anything to and no reason for
  * the code to exist.
  */
-async function grantReward(env, session, { id, type, rarity, name, cosmeticId }) {
+async function grantReward(env, session, { id, type, rarity, name, cosmeticId, theme }) {
   if (!type) return;
 
   if (type === 'giveaway') {
@@ -407,7 +413,7 @@ async function grantReward(env, session, { id, type, rarity, name, cosmeticId })
 
   const mapper = REWARD_ITEM_MAP[type];
   if (!mapper) return;
-  await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name, cosmeticId) });
+  await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name, cosmeticId, theme) });
 }
 
 /**
@@ -543,7 +549,7 @@ async function handleClaimMilestone(env, session, mk, body) {
   const milestoneLevel = Math.floor(Number(body.milestoneLevel));
   if (!milestoneLevel) return json({ error: 'Missing milestone level' }, 400);
 
-  const { findMilestone } = await import('./phamily-rewards.js');
+  const { findMilestone, themeKeyFor } = await import('./phamily-rewards.js');
   const milestone = findMilestone(milestoneLevel);
   if (!milestone) return json({ error: 'No such milestone' }, 400);
 
@@ -574,12 +580,23 @@ async function handleClaimMilestone(env, session, mk, body) {
      Pointed at a file rather than gated on one existing: a missing image
      falls back to the rarity glyph at render, so the art can land later
      without this needing to know whether it has. */
+  /* Seasonal badge art. When the month this claim lands in carries a cosmetic
+     theme (e.g. '2026-10' -> 'halloween', the same month selection the reward
+     tables skin by), point at the themed PNG; base months keep the plain path
+     exactly as before. Gated on mk, not "now", so a Halloween badge claimed in
+     the following month's grace period still gets its themed art. The
+     missing-art glyph fallback at render stays intact, so this is safe even
+     before every themed PNG has landed. */
+  const badgeTheme = themeKeyFor(mk);
+  const badgeImage = badgeTheme
+    ? `/assets/badges/milestones/ms-${badgeTheme}-${milestoneLevel}.png`
+    : `/assets/badges/milestones/ms-${milestoneLevel}.png`;
   await grantItem(env, session.user_id, {
     id: `ms_${milestoneLevel}_badge_${mk}`,
     game: 'profile', type: 'badge', consumable: false,
     name: milestoneTitle + ' Badge', rarity: milestoneLevel >= 120 ? 'mythic' : milestoneLevel >= 60 ? 'rare' : 'uncommon',
     meta: {
-      image: `/assets/badges/milestones/ms-${milestoneLevel}.png`,
+      image: badgeImage,
       milestoneLevel,
       rank: milestoneTitle,
     },
@@ -603,6 +620,10 @@ async function handleClaimMilestone(env, session, mk, body) {
            is granted with `undefined` in its id and its meta, so it
            lands in the inventory as an item nothing can match. */
         cosmeticId: bonus.cosmeticId,
+        /* A seasonal milestone carries meta.theme on its banner / name-effect
+           bonus; thread it through so the granted item resolves to the themed
+           variant (halloween-<tier>) rather than the plain tier. */
+        theme: bonus.meta && bonus.meta.theme,
       });
     }
   }
