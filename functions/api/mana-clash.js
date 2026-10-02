@@ -889,6 +889,18 @@ function startRound(room, now) {
  * round that everyone plays, so being last to act is not a disadvantage —
  * which is the point of simultaneous rounds.
  */
+/* A versus game ends here and nowhere else, so the head-count the boards
+   depend on is taken at the one moment it means something. Players who
+   left, were kicked or were AFK-removed are already gone from `players`;
+   what is counted is who was still at the table when it ended. */
+function finishVersus(room, winner, now) {
+  room.status = 'finished';
+  room.winner = winner;
+  room.finishedAt = now;
+  room.intermissionEndsAt = null;
+  room.contendersAtFinish = Object.keys(room.players).length;
+}
+
 function endRound(room, now) {
   /* Co-op has its own resolution — team damage vs one enemy, not a race. */
   if (room.mode === 'coop') return endRoundCoop(room, now);
@@ -897,12 +909,9 @@ function endRound(room, now) {
      in the room beats looping the round forever with nobody in it. */
   const remaining = Object.keys(room.players);
   if (playersInRound(room).length === 0) {
-    room.status = 'finished';
-    room.winner = remaining.length
+    finishVersus(room, remaining.length
       ? remaining.reduce((a, b) => (room.players[b].total > room.players[a].total ? b : a))
-      : null;
-    room.finishedAt = now;
-    room.intermissionEndsAt = null;
+      : null, now);
     return;
   }
 
@@ -924,10 +933,7 @@ function endRound(room, now) {
       return;
     }
 
-    room.status = 'finished';
-    room.winner = tied[0];
-    room.finishedAt = now;
-    room.intermissionEndsAt = null;
+    finishVersus(room, tied[0], now);
     return;
   }
 
@@ -1031,18 +1037,40 @@ function advance(room, now) {
    browser. The server already knows who won; asking the client to report it
    would make "most wins" a number anyone can curl.
 
-   Only ranked games count: goal exactly 10,000, and not a practice room. */
+   Only ranked games count: goal exactly 10,000, not a practice room, and not
+   a password room. A password room is a table its host chose the guests for,
+   which is the easiest place to sit an alt across from yourself; the boards
+   carry monthly prizes, so private games stay friendly games.
+
+   And a ranked room only produces a ranked RESULT if it still had an
+   opponent when it ended. An opponent who joins and leaves (or idles out,
+   or is kicked) otherwise left the host rolling alone to the goal, and a
+   game against nobody was a free win on the prize board. */
 
 const WINS_BOARD = 'lb_mana_clash_wins';
 const SCORE_BOARD = 'lb_mana_clash';
 const MAX_ENTRIES = 50;
+const MIN_RANKED_CONTENDERS = 2;
 
 function isRanked(room) {
-  return room.goal === RANKED_GOAL && !room.practice;
+  return room.goal === RANKED_GOAL && !room.practice && !room.password && (room.mode || 'versus') === 'versus';
+}
+
+/**
+ * Why this room's result does not (or will not) reach the boards, or null
+ * when it does. 'solo' only ever applies to a finished game.
+ */
+function unrankedReason(room) {
+  if ((room.mode || 'versus') !== 'versus') return 'coop';
+  if (room.practice) return 'practice';
+  if (room.goal !== RANKED_GOAL) return 'goal';
+  if (room.password) return 'password';
+  if (room.status === 'finished' && !(room.contendersAtFinish >= MIN_RANKED_CONTENDERS)) return 'solo';
+  return null;
 }
 
 async function recordResult(env, room) {
-  if (!isRanked(room)) return;
+  if (unrankedReason(room)) return;
 
   /* Settle last month's prizes before writing, so a game finished after
      midnight on the 1st counts for the new month instead of landing on the
@@ -1232,7 +1260,11 @@ export function viewFor(room, userId, now, opts = {}) {
          everyone's screen, not only the presser's. */
       ultUsed: room.coop.ultUsed || 0,
     } : null,
-    ranked: isRanked(room),
+    /* Whether this game counts: the room's settings, and once it is over,
+       whether an opponent was still there at the end. `unrankedReason` says
+       which, so the results screen can tell players why it did not count. */
+    ranked: !unrankedReason(room),
+    unrankedReason: unrankedReason(room),
     round: room.round,
     isFinalRound: !!room.isFinalRound,
     nextIsFinal: !!room.nextIsFinal,
@@ -1411,6 +1443,7 @@ export async function onRequestGet(context) {
         maxPlayers: MAX_PLAYERS,
         hasPassword: !!room.password,
         goal: room.goal,
+        ranked: isRanked(room),
         mode: room.mode || 'versus',
         wave: room.mode === 'coop' && room.coop ? room.coop.wave : null,
         status: room.status,
@@ -1621,6 +1654,7 @@ export async function onRequestPost(context) {
       r.round = 0;
       r.winner = null;
       r.finishedAt = null;
+      r.contendersAtFinish = null;
       r.intermissionEndsAt = null;
       r.isFinalRound = false;
       r.nextIsFinal = false;

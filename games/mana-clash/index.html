@@ -729,7 +729,7 @@
         <button class="btn btn-dim" id="practiceBtn">Solo Practice</button>
         <button class="btn btn-coop" id="coopBtn">Co-op Gauntlet</button>
         <div class="coop-note" id="coopNote">Team up (or go solo) against a gauntlet of enemies, bosses, and a final boss — bank points to damage them and survive on shared Team HP. The <b>colour</b> of the dice you bank matters: a banked trio triggers an effect — ⚪ pierce · ⚪ White heal · 🔵 +round · ⚫ poison · 🔴 burn minions · 🟢 damage buff. The Target above is ignored in co-op.</div>
-        <span class="muted">Only 10,000-point games reach the leaderboards. Practice never does.</span>
+        <span class="muted">Only open 10,000-point games reach the leaderboards, and only if an opponent is still at the table when it ends. Practice and password rooms never do.</span>
       </div>
 
       <div class="card-box splash-form">
@@ -1593,9 +1593,21 @@ function myId() {
   return state.you ? state.you.id : (session ? String(session.user_id) : null);
 }
 
+/* Said on the results screen whenever a game did not reach the boards. The
+   solo case most of all: a host who rolled on alone after everyone left
+   deserves to know why the win did not show up. */
+function unrankedNote(s) {
+  if (s.ranked) return '';
+  if (s.unrankedReason === 'solo') return ' — but nobody else was left at the table by the end, so it does not count for the boards';
+  if (s.unrankedReason === 'password') return ' — a password room is a private game, so nothing reached the boards';
+  return ' — not a ranked game, so nothing reached the boards';
+}
+
 function renderLobby() {
   $('lobbyCode').textContent = state.code;
-  $('lobbyGoal').textContent = state.mode === 'coop' ? 'Co-op Gauntlet' : state.goal.toLocaleString();
+  $('lobbyGoal').textContent = state.mode === 'coop'
+    ? 'Co-op Gauntlet'
+    : state.goal.toLocaleString() + (state.ranked ? ' (ranked)' : ' (unranked)');
   $('lobbyIdle').textContent = (state.idleMs / 1000) + 's';
   $('lobbyCount').textContent = state.playerCount;
 
@@ -1944,9 +1956,8 @@ function renderResults() {
   const winner = state.players.find(p => p.id === state.winner);
   $('resultsTitle').textContent = winner && winner.id === meId ? 'YOU WIN' : 'GAME OVER';
   $('resultsSub').textContent = winner
-    ? winner.name + ' takes it with ' + winner.total.toLocaleString() +
-      (state.ranked ? '' : ' — not a ranked game, so nothing reached the boards')
-    : 'No winner.';
+    ? winner.name + ' takes it with ' + winner.total.toLocaleString() + unrankedNote(state)
+    : 'No winner.' + unrankedNote(state);
   standingsTable($('resultsTable'), state.players, meId);
 
   /* Only the host is offered it; everyone else is simply moved when it
@@ -2193,8 +2204,89 @@ function stopPolling() {
   pollTimer = tickTimer = null;
 }
 
+/* ── Remembering the room across a refresh ─────────────────────────────
+   The room code lives in sessionStorage (this tab only, gone when the tab
+   closes) and in the URL as ?room=CODE, so a reload lands back in the game
+   instead of on the splash while the idle clock quietly times the player
+   out of it. `left` marks that the lobby beacon below removed us on the way
+   out, which is the one case a reload should rejoin rather than resume. */
+const ROOM_KEY = 'mc_room';
+
+function readRemembered() {
+  try { return JSON.parse(sessionStorage.getItem(ROOM_KEY) || 'null'); } catch { return null; }
+}
+
+function rememberRoom(code, left) {
+  try { sessionStorage.setItem(ROOM_KEY, JSON.stringify({ code, left: !!left })); } catch {}
+}
+
+/* The last password that got us into a room, in memory only — what lets a
+   page restored from the back/forward cache rejoin a password lobby. */
+let joinedPassword = '';
+
+function setRoomParam(code) {
+  try {
+    const url = new URL(window.location.href);
+    if (code) url.searchParams.set('room', code); else url.searchParams.delete('room');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+  } catch {}
+}
+
+function forgetRoom() {
+  try { sessionStorage.removeItem(ROOM_KEY); } catch {}
+  setRoomParam(null);
+}
+
+function enterRoom(code) {
+  roomCode = code;
+  rememberRoom(code, false);
+  setRoomParam(code);
+  startPolling();
+}
+
+async function resumeRoom() {
+  let code = null;
+  try { code = new URLSearchParams(window.location.search).get('room'); } catch {}
+  code = code ? String(code).trim().toUpperCase() : null;
+  const saved = readRemembered();
+  /* ?room= on a reload of our own room is ours, not a link someone shared —
+     enterRoom puts it there. Only a code this tab was not already in is a
+     deep link to join. */
+  const fromLink = !!code && !(saved && saved.code === code);
+  if (!code && saved) code = String(saved.code || '').toUpperCase();
+  if (!code) return;
+  if (!/^[A-Z0-9]{4}$/.test(code)) { forgetRoom(); return; }
+
+  let s;
+  try {
+    const res = await fetch(API + '?action=get-state&code=' + encodeURIComponent(code));
+    if (res.status === 404) { forgetRoom(); say('splashFeedback', 'Room ' + code + ' is gone.'); return; }
+    if (!res.ok) return;
+    s = await res.json();
+  } catch { return; }
+
+  const me = session ? String(session.user_id) : null;
+  if (s.you || (me && s.host === me)) { enterRoom(code); return; }
+
+  forgetRoom();
+  $('joinCode').value = code;
+  const wasBeaconed = saved && saved.code === code && saved.left;
+  if (!fromLink && !wasBeaconed) {
+    say('splashFeedback', 'You are no longer in room ' + code + '. Join again if you want back in.');
+    return;
+  }
+  if (s.status === 'finished') { say('splashFeedback', 'That game is over.'); return; }
+  if (s.hasPassword) {
+    say('splashFeedback', 'Room ' + code + ' needs a password — enter it and press Join.');
+    $('joinPassword').focus();
+    return;
+  }
+  joinRoom();
+}
+
 function leaveToSplash(msg) {
   stopPolling();
+  forgetRoom();
   roomCode = null;
   state = null;
   held.clear();
@@ -2307,7 +2399,7 @@ async function loadRooms() {
          surprise. */
       const detail = playing
         ? 'Round ' + r.round + ' &middot; top ' + (r.topScore || 0).toLocaleString()
-        : r.goal.toLocaleString();
+        : r.goal.toLocaleString() + (r.ranked ? ' ranked' : '');
 
       row.innerHTML = '<span class="room-code">' + esc(r.code) + '</span>' +
         (playing ? '<span class="room-live">In progress</span>' : '') +
@@ -2349,8 +2441,8 @@ async function createRoom(opts) {
       mode: opts.coop ? 'coop' : 'versus',
       hostOnly: !!opts.hostOnly,
     });
-    roomCode = data.code;
-    startPolling();
+    joinedPassword = opts.practice ? '' : $('createPassword').value.trim();
+    enterRoom(data.code);
   } catch (err) {
     say('splashFeedback', err.message);
   }
@@ -2362,8 +2454,8 @@ async function joinRoom() {
   say('splashFeedback', '');
   try {
     await api({ action: 'join-room', code, password: $('joinPassword').value });
-    roomCode = code;
-    startPolling();
+    joinedPassword = $('joinPassword').value;
+    enterRoom(code);
   } catch (err) {
     say('splashFeedback', err.message);
   }
@@ -2440,12 +2532,26 @@ $('againBtn').addEventListener('click', async () => {
    the page starts navigating away. */
 window.addEventListener('pagehide', () => {
   if (!roomCode || !state || state.status !== 'lobby') return;
+  /* If this is a reload rather than a close, the next load sees `left` and
+     rejoins the lobby it was just removed from. Only a seated player: a
+     hosting-only host must never come back as a player. */
+  if (state.you) rememberRoom(roomCode, true);
   try {
     navigator.sendBeacon(API, new Blob(
       [JSON.stringify({ action: 'leave-room', code: roomCode })],
       { type: 'application/json' }
     ));
   } catch (e) { /* best effort — a missed beacon is what already happened before this existed */ }
+});
+
+/* Restored from the back/forward cache: the beacon above already removed
+   us, but the page never reloaded, so resumeRoom never ran. Rejoin here. */
+window.addEventListener('pageshow', (e) => {
+  if (!e.persisted || !roomCode || !state || state.status !== 'lobby' || !state.you) return;
+  const code = roomCode;
+  api({ action: 'join-room', code, password: joinedPassword })
+    .then(() => { rememberRoom(code, false); poll(); })
+    .catch((err) => leaveToSplash(err.message));
 });
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
@@ -2468,6 +2574,7 @@ if (!session) {
 } else {
   $('splashBody').hidden = false;
   loadRooms();
+  resumeRoom();
   /* Once, at boot. The answer cannot change while the tab is open -- a
      reward claimed on another page needs a reload either way -- and a
      cosmetic is not worth a second poll. */

@@ -1047,8 +1047,11 @@ async function playToFinish(env, code, hands) {
   const done = await finishGame(env, code, '101', { 101: 10200, 202: 7400 });
   check('the game finishes', done.status, 'finished');
   check('with the higher score winning', done.winner, '101');
-  check('and it reached the wins board',
-        ((await env.MARKETPLACE.get('lb_mana_clash_wins', 'json') || []).find(e => e.id === '101') || {}).score, 1);
+  /* A password room is private -- the host picked the table -- so even at
+     the ranked goal it stays off the prize boards. */
+  check('a password room is not ranked', done.ranked, false);
+  check('and says so', done.unrankedReason, 'password');
+  check('so it did not reach the wins board', await env.MARKETPLACE.get('lb_mana_clash_wins', 'json'), null);
   let room;
 
   const notHost = await post(env, 'b', { action: 'rematch', code });
@@ -1317,6 +1320,163 @@ async function playToFinish(env, code, hands) {
   const game = fs.readFileSync(gamePath, 'utf8');
   ok('the standings strip offers a kick for a player who missed a round',
      /missedRounds >= 1/.test(game) && /action: 'kick'/.test(game));
+}
+
+/* ══ Ranked needs an opponent at the end ════════════════════════════════
+   The farm: open a 10k room, let an opponent join, have them leave (or idle
+   out twice, or kick them), then roll alone to the goal. The game finished
+   with the host as winner and the prize board counted it. A result is only
+   ranked when at least two players were still at the table when it ended. */
+
+async function rollBank(env, who, code, hand) {
+  loadDice(hand);
+  await post(env, who, { action: 'roll', code });
+  return post(env, who, { action: 'bank', code });
+}
+
+async function rankedPair() {
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 10000 });
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'b', { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+  return { env, code };
+}
+
+async function boards(env) {
+  return {
+    wins: await env.MARKETPLACE.get('lb_mana_clash_wins', 'json'),
+    high: await env.MARKETPLACE.get('lb_mana_clash', 'json'),
+  };
+}
+
+{
+  /* Solo finish after the opponent goes AFK twice and is auto-removed. */
+  const { env, code } = await rankedPair();
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('solo-finish: the room starts ranked', r.data.ranked, true);
+
+  await rollBank(env, 'a', code, '111111');
+  expireTurn(env, code, '202');
+  await get(env, 'a', `action=get-state&code=${code}`);
+  endIntermission(env, code);
+  await get(env, 'a', `action=get-state&code=${code}`);
+
+  await rollBank(env, 'a', code, '111111');
+  expireTurn(env, code, '202');
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('solo-finish: the opponent was auto-removed', !r.data.players.find(p => p.id === '202'));
+  ok('solo-finish: the host crossed the goal', r.data.players[0].total >= 10000);
+
+  endIntermission(env, code);
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('solo-finish: the game still finishes normally', r.data.status, 'finished');
+  check('solo-finish: with the host as winner', r.data.winner, '101');
+  check('solo-finish: but it is not ranked', r.data.ranked, false);
+  check('solo-finish: and the page is told why', r.data.unrankedReason, 'solo');
+  const b = await boards(env);
+  check('solo-finish: no win reached the board', b.wins, null);
+  check('solo-finish: no score reached the board', b.high, null);
+}
+
+{
+  /* Leave mid-game, then the host rolls on alone past the goal. */
+  const { env, code } = await rankedPair();
+  await playToFinish(env, code, [['a', '111111'], ['b', '666666']]);
+  endIntermission(env, code);
+  await get(env, 'a', `action=get-state&code=${code}`);
+
+  await post(env, 'b', { action: 'leave-room', code });
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('leave-mid-game: the game carries on for the host', r.data.status, 'playing');
+
+  await rollBank(env, 'a', code, '111111');
+  endIntermission(env, code);
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('leave-mid-game: it finishes', r.data.status, 'finished');
+  check('leave-mid-game: the host wins', r.data.winner, '101');
+  check('leave-mid-game: unranked', r.data.ranked, false);
+  check('leave-mid-game: because they finished alone', r.data.unrankedReason, 'solo');
+  check('leave-mid-game: nothing on the wins board', (await boards(env)).wins, null);
+}
+
+{
+  /* Leave DURING the final round, while the host rests on the goal. */
+  const { env, code } = await rankedPair();
+  await playToFinish(env, code, [['a', '111111'], ['b', '666666']]);
+  endIntermission(env, code);
+  await get(env, 'a', `action=get-state&code=${code}`);
+  await playToFinish(env, code, [['a', '111111'], ['b', '666666']]);
+  endIntermission(env, code);
+  let r = await get(env, 'a', `action=get-state&code=${code}`);
+  ok('leave-final: the final round is running', r.data.isFinalRound && r.data.status === 'playing');
+
+  const left = await post(env, 'b', { action: 'leave-room', code });
+  check('leave-final: the chaser can leave', left.status, 200);
+  r = await get(env, 'a', `action=get-state&code=${code}`);
+  check('leave-final: the game ends on the spot', r.data.status, 'finished');
+  check('leave-final: the host wins', r.data.winner, '101');
+  check('leave-final: but unranked', r.data.unrankedReason, 'solo');
+  check('leave-final: nothing on the wins board', (await boards(env)).wins, null);
+}
+
+{
+  /* Kicking the only opponent is the same farm by another route. */
+  const { env, code } = await rankedPair();
+  await post(env, 'a', { action: 'kick', code, userId: '202' });
+  const done = await finishGame(env, code, '101', { 101: 12000 });
+  check('kick-then-finish: finishes', done.status, 'finished');
+  check('kick-then-finish: unranked', done.unrankedReason, 'solo');
+  check('kick-then-finish: nothing on the wins board', (await boards(env)).wins, null);
+}
+
+{
+  /* Control: one of three leaves, two are still playing at the end -- a
+     real game, and it counts. */
+  const env = makeEnv();
+  const code = await newRoom(env, { goal: 10000 });
+  await post(env, 'b', { action: 'join-room', code });
+  await post(env, 'c', { action: 'join-room', code });
+  for (const who of ['b', 'c']) await post(env, who, { action: 'ready', code, ready: true });
+  await post(env, 'a', { action: 'start-game', code });
+  await post(env, 'c', { action: 'leave-room', code });
+  const done = await finishGame(env, code, '101', { 101: 10500, 202: 6000 });
+  check('two-left: finishes', done.status, 'finished');
+  check('two-left: ranked', done.ranked, true);
+  check('two-left: no unranked reason', done.unrankedReason, null);
+  const b = await boards(env);
+  check('two-left: the win counted', ((b.wins || []).find(e => e.id === '101') || {}).score, 1);
+
+  /* A rematch clears the head-count with the rest of the result. */
+  await post(env, 'a', { action: 'rematch', code });
+  check('rematch clears contendersAtFinish',
+    JSON.parse(env._store.get('mc_room_' + code)).contendersAtFinish, null);
+}
+
+{
+  /* Password rooms are unranked from the lobby on, and the list says so. */
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, password: 'shh' });
+  const open = await newRoom(env, { goal: 10000 });
+  const lobby = await get(env, 'a', `action=get-state&code=${made.data.code}`);
+  check('password lobby: unranked', lobby.data.ranked, false);
+  check('password lobby: reason', lobby.data.unrankedReason, 'password');
+  const list = (await get(env, 'b', 'action=list-rooms')).data;
+  check('list: the password room is marked unranked', (list.find(x => x.code === made.data.code) || {}).ranked, false);
+  check('list: the open 10k room is marked ranked', (list.find(x => x.code === open) || {}).ranked, true);
+}
+
+{
+  /* The page tells players why, and survives a refresh. */
+  const gamePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../games/mana-clash/index.html');
+  const game = fs.readFileSync(gamePath, 'utf8');
+  ok('page: explains a solo finish on the results screen', /unrankedReason === 'solo'/.test(game));
+  ok('page: explains a password room', /unrankedReason === 'password'/.test(game));
+  ok('page: remembers the room in sessionStorage', /sessionStorage\.setItem\(ROOM_KEY/.test(game));
+  ok('page: reads ?room= deep links', /searchParams\)?\.?get\('room'\)|URLSearchParams\(window\.location\.search\)\.get\('room'\)/.test(game));
+  ok('page: resumes on boot', /resumeRoom\(\);/.test(game));
+  ok('page: the lobby beacon marks the reload for a rejoin', /if \(state\.you\) rememberRoom\(roomCode, true\)/.test(game));
+  ok('page: leaving forgets the room', /function leaveToSplash[\s\S]{0,80}forgetRoom\(\)/.test(game));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
