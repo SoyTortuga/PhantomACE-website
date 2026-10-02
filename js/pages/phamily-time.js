@@ -93,17 +93,21 @@
      render. Each value is { follower, phamily, milestones } — the same arrays
      the old in-page builder returned, so everything downstream is unchanged. */
   const TABLES = new Map();
+  /* The month after the live one, from the tables endpoint's `next`. Drives the
+     locked "Next month" preview tab. */
+  let previewMonthKey = null;
   async function loadTables() {
     const res = await fetch('/api/phamily-time?action=tables', { credentials: 'same-origin' });
     if (!res.ok) throw new Error('tables unavailable');
     const data = await res.json();
-    for (const t of [data && data.current, data && data.prev]) {
+    for (const t of [data && data.current, data && data.prev, data && data.next]) {
       if (t && t.month) {
         TABLES.set(String(t.month), {
           follower: t.follower || [], phamily: t.phamily || [], milestones: t.milestones || [],
         });
       }
     }
+    if (data && data.next && data.next.month) previewMonthKey = String(data.next.month);
   }
   function rewardTablesFor(mk) {
     return TABLES.get(String(mk)) || { follower: [], phamily: [], milestones: [] };
@@ -128,6 +132,11 @@
   let heartbeatTimer = null;
   let activePopoverIsPrev = false;
   let prevMonthInfo = null;
+  /* The live month the pass actually tracks (status.month, or the local month
+     for the demo view), and whether the thermometer is showing the read-only
+     next-month preview instead. */
+  let liveMonthKey = null;
+  let viewingPreview = false;
 
   /* THE TRACK HAS ONE NAME: 'follower' or 'phamily'.
      'top' and 'bottom' describe where a lane is drawn and must never reach
@@ -146,6 +155,9 @@
   }
 
   function getRewardState(reward, track) {
+    /* The next-month preview is read-only: every node reads 'preview' so the
+       track draws the ladder with no claim affordance and no earned state. */
+    if (viewingPreview) return 'preview';
     const key = rewardKey(reward, track);
     if (claimedRewards.includes(key)) return 'claimed';
     /* The phamily track is the subscriber bonus on top of the follower
@@ -163,6 +175,7 @@
   }
 
   function getMilestoneState(ms) {
+    if (viewingPreview) return 'preview';
     if (claimedMilestones.includes(ms.level)) return 'claimed';
     if (ms.level <= userLevel) return 'ready';
     return 'locked';
@@ -311,7 +324,8 @@
            emoji instead of in a corner. */
         const badgeEl = document.createElement('div');
         badgeEl.className = 'pt-reward-badge';
-        badgeEl.textContent = (state === 'claimed' || state === 'credited') ? '✓' : state === 'locked' ? '🔒' : '!';
+        badgeEl.textContent = (state === 'claimed' || state === 'credited') ? '✓'
+          : (state === 'locked' || state === 'preview') ? '🔒' : '!';
         iconEl.appendChild(badgeEl);
 
         const lvlEl = document.createElement('div');
@@ -370,8 +384,14 @@
        of it they do not need to see. */
     const youEl = document.getElementById('ptYouMarker');
     if (youEl) {
-      youEl.style.left = (xFor(Math.min(currentLevel, MAX_LEVEL)) - 24) + 'px';
-      youEl.hidden = false;
+      /* No "YOU" marker in the next-month preview — there is no progress on a
+         month that has not started. */
+      if (viewingPreview) {
+        youEl.hidden = true;
+      } else {
+        youEl.style.left = (xFor(Math.min(currentLevel, MAX_LEVEL)) - 24) + 'px';
+        youEl.hidden = false;
+      }
     }
 
     const wrap = document.getElementById('ptThermometerWrap');
@@ -419,6 +439,10 @@
          automatically as soon as the level is reached. */
       claimBtn.hidden = true;
       statusEl.textContent = 'Added automatically — no claim needed';
+    } else if (state === 'preview') {
+      /* Read-only next-month preview: nothing to claim, just a look ahead. */
+      claimBtn.hidden = true;
+      statusEl.textContent = 'Preview — unlocks at level ' + reward.level + ' next month';
     } else {
       claimBtn.hidden = true;
       statusEl.textContent = (track === 'phamily' && !userIsSub)
@@ -461,6 +485,9 @@
     } else if (state === 'claimed') {
       claimBtn.hidden = true;
       statusEl.textContent = 'Claimed';
+    } else if (state === 'preview') {
+      claimBtn.hidden = true;
+      statusEl.textContent = 'Preview — unlocks at level ' + ms.level + ' next month';
     } else {
       claimBtn.hidden = true;
       statusEl.textContent = 'Reach level ' + ms.level + ' to unlock';
@@ -548,6 +575,8 @@
   function updateClaimAllBtn() {
     const btn = document.getElementById('ptClaimAllBtn');
     if (!btn) return;
+    /* Nothing is claimable in the read-only preview. */
+    if (viewingPreview) { btn.hidden = true; return; }
     /* Follower track counts for everyone; phamily is the subscriber bonus
        on top of it, so it only adds to the count for subs. Giveaway rewards
        are excluded — they are auto-credited, not claimable. */
@@ -590,11 +619,162 @@
     }
   }
 
+  /* The dashboard's "Rewards Available" is always the LIVE month's count, read
+     straight from its table rather than the module arrays — so it stays correct
+     while the thermometer is swapped to the next-month preview. Giveaway rewards
+     are excluded (auto-credited, never a manual claim). */
   function updateRewardsCount() {
-    const ready = followerRewards.filter(r => getRewardState(r, 'follower') === 'ready').length
-      + phamilyRewards.filter(r => getRewardState(r, 'phamily') === 'ready').length
-      + milestones.filter(m => getMilestoneState(m) === 'ready').length;
+    const t = rewardTablesFor(liveMonthKey || localMonthKey());
+    const ready = t.follower.filter(r =>
+        r.type !== 'giveaway' && r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'follower'))).length
+      + (userIsSub ? t.phamily.filter(r =>
+          r.type !== 'giveaway' && r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'phamily'))).length : 0)
+      + t.milestones.filter(m => m.level <= userLevel && !claimedMilestones.includes(m.level)).length;
     document.getElementById('ptRewards').textContent = ready;
+  }
+
+  /* ── Next-month preview tab ────────────────────────────────────────────
+     A locked look-ahead at next month's ladder. The tables endpoint already
+     ships `next`; this just swaps the thermometer over to it, read-only — every
+     node reads 'preview' (see getRewardState), so there is no claim affordance.
+     Built once, above the thermometer, and only when a next-month table with
+     rewards actually arrived. */
+  function monthLabelOf(mk) {
+    const [y, mo] = String(mk || '').split('-').map(Number);
+    if (!y || !mo) return '';
+    return new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  function ensurePreviewToggle() {
+    const wrap = document.getElementById('ptThermometerWrap');
+    if (!wrap || document.getElementById('ptViewTabs')) return;
+    const next = previewMonthKey && rewardTablesFor(previewMonthKey);
+    if (!next || !(next.follower.length || next.phamily.length)) return;
+
+    const tabs = document.createElement('div');
+    tabs.className = 'pt-view-tabs';
+    tabs.id = 'ptViewTabs';
+
+    const thisBtn = document.createElement('button');
+    thisBtn.type = 'button';
+    thisBtn.className = 'pt-view-tab is-active';
+    thisBtn.id = 'ptViewThis';
+    thisBtn.textContent = 'This month';
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'pt-view-tab';
+    nextBtn.id = 'ptViewNext';
+    nextBtn.textContent = 'Next month';
+    const lbl = monthLabelOf(previewMonthKey);
+    nextBtn.title = lbl ? 'Preview ' + lbl : 'Preview next month';
+
+    const note = document.createElement('div');
+    note.className = 'pt-preview-note';
+    note.id = 'ptPreviewNote';
+    note.hidden = true;
+    note.textContent = 'Preview of ' + (lbl || 'next month') + ' — a look ahead. Nothing here is claimable yet.';
+
+    thisBtn.addEventListener('click', () => showPreview(false));
+    nextBtn.addEventListener('click', () => showPreview(true));
+
+    tabs.appendChild(thisBtn);
+    tabs.appendChild(nextBtn);
+    wrap.insertAdjacentElement('beforebegin', tabs);
+    tabs.insertAdjacentElement('afterend', note);
+  }
+
+  function showPreview(on) {
+    if (on === viewingPreview) return;
+    viewingPreview = on;
+
+    const thisBtn = document.getElementById('ptViewThis');
+    const nextBtn = document.getElementById('ptViewNext');
+    const note = document.getElementById('ptPreviewNote');
+    if (thisBtn) thisBtn.classList.toggle('is-active', !on);
+    if (nextBtn) nextBtn.classList.toggle('is-active', on);
+    if (note) note.hidden = !on;
+
+    if (on) {
+      useMonth(previewMonthKey);
+      buildThermometer(0);
+    } else {
+      useMonth(liveMonthKey || localMonthKey());
+      buildThermometer(userLevel);
+    }
+    updateClaimAllBtn();
+  }
+
+  /* ── Past seasons — a compact earned summary per prior month ────────────
+     Reuses the Seasonal Grimoire's own set math (server action=past-seasons →
+     collectionForMonth), so there is no second copy of the month data here. It
+     shows how much of each month the viewer collected and links to the full
+     Grimoire on their profile. Logged-in only; silent if there is nothing. */
+  async function loadPastSeasons() {
+    let data;
+    try {
+      const res = await fetch('/api/phamily-time?action=past-seasons', { credentials: 'same-origin' });
+      if (!res.ok) return;
+      data = await res.json();
+    } catch { return; }
+    if (!data || !Array.isArray(data.seasons) || data.seasons.length === 0) return;
+    renderPastSeasons(data.seasons);
+  }
+
+  function renderPastSeasons(seasons) {
+    const stats = document.getElementById('ptPersonalStats');
+    if (!stats) return;
+
+    let section = document.getElementById('ptPastSeasons');
+    if (!section) {
+      section = document.createElement('section');
+      section.className = 'page-container';
+      section.id = 'ptPastSeasons';
+      stats.insertAdjacentElement('beforebegin', section);
+    }
+    section.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.textContent = 'Past Seasons';
+    section.appendChild(header);
+
+    const intro = document.createElement('p');
+    intro.className = 'pt-past-intro';
+    intro.textContent = 'What you collected in months gone by. Open your Grimoire for the full owned-and-missing log.';
+    section.appendChild(intro);
+
+    const grid = document.createElement('div');
+    grid.className = 'pt-past-grid';
+
+    for (const s of seasons) {
+      const card = document.createElement('div');
+      card.className = 'card pt-past-card' + (s.complete ? ' is-complete' : '');
+
+      const month = document.createElement('div');
+      month.className = 'pt-past-month';
+      month.textContent = monthLabelOf(s.month) || s.month;
+
+      const count = document.createElement('div');
+      count.className = 'pt-past-count';
+      count.textContent = s.owned + ' / ' + s.total;
+
+      const sub = document.createElement('div');
+      sub.className = 'pt-past-sub';
+      sub.textContent = s.complete ? 'Set complete' : 'collected';
+
+      card.appendChild(month);
+      card.appendChild(count);
+      card.appendChild(sub);
+      grid.appendChild(card);
+    }
+    section.appendChild(grid);
+
+    const link = document.createElement('a');
+    link.className = 'pt-past-link';
+    link.href = '/profile.html';
+    link.textContent = 'View your full Grimoire →';
+    section.appendChild(link);
   }
 
   function positionPopover(e) {
@@ -831,7 +1011,7 @@
 
   function applyAPIData(data) {
     isLoggedIn = true;
-    if (data.month) useMonth(data.month);
+    liveMonthKey = data.month || localMonthKey();
     userLevel = data.level;
     userSubTier = data.subTier;
     userIsSub = data.subTier > 0;
@@ -840,9 +1020,16 @@
 
     updateDashboard(data.level, data.hours, 0, data.daysLeft);
     updateBoostDisplay(data.subTier);
-    buildThermometer(data.level);
+    /* Leave the thermometer alone while the next-month preview is open — a
+       background refresh must not yank the viewer back to this month. The
+       dashboard stats above still update. */
+    if (!viewingPreview) {
+      if (data.month) useMonth(data.month);
+      buildThermometer(data.level);
+    }
     updateRewardsCount();
     updateClaimAllBtn();
+    ensurePreviewToggle();
     renderGraceBanner(data.prevMonth);
 
     if (data.allTime) {
@@ -909,7 +1096,8 @@
   function loadDemoData() {
     /* The logged-out preview still draws the current month's track from the
        fetched tables; applyAPIData does this for the logged-in path. */
-    useMonth(localMonthKey());
+    liveMonthKey = localMonthKey();
+    useMonth(liveMonthKey);
     const level = 23;
     userLevel = level;
     const hours = 23.4;
@@ -919,6 +1107,7 @@
     updateBoostDisplay(0);
     buildThermometer(level);
     updateRewardsCount();
+    ensurePreviewToggle();
 
     const today = new Date().getDate();
     const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
@@ -969,6 +1158,7 @@
         if (chartData) renderWatchChart(chartData);
         document.getElementById('ptLoginPrompt').hidden = true;
         document.getElementById('ptPersonalStats').hidden = false;
+        loadPastSeasons();
         startHeartbeat();
         return;
       }

@@ -277,13 +277,15 @@
     }
 
     /* Maps a ledger entry's server-written source string to a display label.
-       The sources are drop:<tier>, phamily:<reward>, amoe, bingo:<rarity>,
-       maze:level<n>, chat-scramble, checkin:<label> and mtgbbb:<rarity>. The
+       The sources are drop:<tier>, phamily:<reward>, phamily-dupe:<cosmetic>,
+       amoe, bingo:<rarity>, maze:level<n>, chat-scramble, checkin:<label> and
+       mtgbbb:<rarity>. The
        channel-points "Enter Giveaway" reward runs a separate live drawing and
        never writes to this monthly ledger, so there is no channel-points
        source here — anything unrecognised shows as a plain "Entry". */
     function entrySourceLabel(src) {
       if (src.startsWith('drop:')) return src.slice(5).replace(/^./, c => c.toUpperCase()) + ' drop';
+      if (src.startsWith('phamily-dupe:')) return 'Duplicate → entries';
       if (src.startsWith('phamily:')) return 'Phamily Time';
       if (src.startsWith('bingo:')) return 'Commander Bingo';
       if (src.startsWith('maze:')) return 'Chat maze';

@@ -159,7 +159,52 @@ function copyDropCode(btn, code) {
   }).catch(function () {});
 }
 
+/* ══════════════════════════════════════════
+   PAST WINNERS
+   Recent monthly-ledger draws, newest first. Public, read-only — the server
+   sends only sent (delivered) winners with no code or id. Replaces the
+   "Coming Soon" placeholder once there is real history.
+   ══════════════════════════════════════════ */
+
+function monthLabel(ym) {
+  var p = String(ym || '').split('-').map(Number);
+  var names = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+    'August', 'September', 'October', 'November', 'December'];
+  if (!p[0] || !p[1] || !names[p[1] - 1]) return String(ym || '');
+  return names[p[1] - 1] + ' ' + p[0];
+}
+
+function loadPastWinners() {
+  fetch('/api/hype-train?action=winners')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) { renderPastWinners(data && data.winners ? data.winners : []); })
+    .catch(function () { /* leave the placeholder in place */ });
+}
+
+function renderPastWinners(winners) {
+  var grid = document.getElementById('winnersGrid');
+  if (!grid) return;
+  if (!winners.length) return;   /* keep the "Coming Soon" card until there is history */
+
+  var html = '';
+  for (var i = 0; i < winners.length; i++) {
+    var w = winners[i];
+    var rarity = esc(w.rarity || 'mythic');
+    var prize = rarity.charAt(0).toUpperCase() + rarity.slice(1) + ' monthly giveaway';
+    html += '<div class="winner-card">' +
+      '<div class="winner-icon">&#127942;</div>' +
+      '<div class="winner-info">' +
+        '<div class="winner-month">' + esc(monthLabel(w.month)) + '</div>' +
+        '<div class="winner-name">' + esc(w.username) + '</div>' +
+        '<div class="winner-prize rarity-' + rarity + '">' + prize + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+  grid.innerHTML = html;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   loadHypeTrainDrops();
   setInterval(loadHypeTrainDrops, 15000);
+  loadPastWinners();
 });

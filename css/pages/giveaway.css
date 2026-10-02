@@ -377,6 +377,12 @@
   color: var(--text-sec);
 }
 
+/* The prize tier, coloured by rarity. Text colour only — no fills, no rails. */
+.winner-prize.rarity-mythic   { color: var(--rarity-mythic); }
+.winner-prize.rarity-rare     { color: var(--rarity-rare); }
+.winner-prize.rarity-uncommon { color: var(--rarity-uncommon); }
+.winner-prize.rarity-common   { color: var(--rarity-common); }
+
 /* ── HYPE TRAIN CODE DROPS ── */
 
 .hype-drops-header {

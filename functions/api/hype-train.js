@@ -329,6 +329,35 @@ export async function onRequestGet(context) {
     return json({ drops: await getLiveDrops(env) });
   }
 
+  /* ── PAST WINNERS — recent monthly-ledger draws, for the giveaway page ────
+     Public and read-only. Monthly winners are stored per month under
+     giveaway_monthly_winner_<YYYY-MM> (bot/giveaway.js / draw-monthly-giveaway.js);
+     this lists them newest first. Only winners whose prize CODE has gone out
+     (`sent`) are shown — an un-sent record is still provisional and re-rollable,
+     so it is not public history. Nothing identifying leaks: no code, no userId —
+     just the display name, month and the prize tier. The name is NOT escaped
+     here (JSON, not HTML); the page escapes it on render. */
+  if (action === 'winners') {
+    const PREFIX = 'giveaway_monthly_winner_';
+    let rows = [];
+    try { rows = await env.MARKETPLACE.listValues({ prefix: PREFIX }); }
+    catch { rows = []; }
+
+    const winners = rows
+      .map(r => r && r.value)
+      .filter(w => w && w.sent && w.username && w.month)
+      .sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : 0))
+      .slice(0, 12)
+      .map(w => ({
+        month: String(w.month),
+        username: String(w.username),
+        rarity: String(w.rarity || 'mythic'),
+        entries: Math.floor(Number(w.entries) || 0),
+      }));
+
+    return json({ winners }, 200);
+  }
+
   return json({ error: 'Invalid action' }, 400);
 }
 

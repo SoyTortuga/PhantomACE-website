@@ -36,16 +36,23 @@ async function grantItem(env, userId, item) {
   const byName = NAME_KEYED_ITEM_TYPES.includes(item.type);
   const same = (i) => i && ((i.id === item.id && i.type === item.type)
     || (byName && i.type === item.type && !!item.name && i.name === item.name));
+  /* Tells the caller whether anything actually landed. A non-consumable the
+     viewer already holds is a no-op here ('duplicate'); grantReward turns that
+     into a small giveaway-entry credit so a returning player on a base month
+     still gets value instead of nothing. Consumables always count as granted
+     (they stack). */
+  let result = 'granted';
   await env.MARKETPLACE.mutate(inventoryKey(userId), (cur) => {
     const inv = cur && typeof cur === 'object' ? cur : { userId, items: [], equips: {} };
     if (!Array.isArray(inv.items)) inv.items = [];
     if (!inv.equips || typeof inv.equips !== 'object') inv.equips = {};
-    if (!item.consumable && inv.items.find(same)) return undefined;
+    if (!item.consumable && inv.items.find(same)) { result = 'duplicate'; return undefined; }
     const existing = item.consumable && inv.items.find(same);
     if (existing) { existing.quantity = (existing.quantity || 1) + (item.quantity || 1); }
     else { inv.items.push({ ...item, grantedAt: Date.now(), source: 'phamily-time' }); }
     return inv;
   });
+  return result;
 }
 
 /* pullGiveawayCode used to live here. Phamily Time no longer draws from the
@@ -69,9 +76,10 @@ function getSession(request) {
 /* Month + day boundaries follow the shared season calendar (SEASON_TZ), so a
    viewer's watch minutes land in the same month (and same local day) as their
    giveaway entries. */
-import { monthKey, prevMonthOf, daysLeftInMonth, daysInMonth as seasonDaysInMonth, dayOfMonth } from './season-time.js';
+import { monthKey, prevMonthOf, nextMonthOf, daysLeftInMonth, daysInMonth as seasonDaysInMonth, dayOfMonth } from './season-time.js';
 import { NAME_KEYED_ITEM_TYPES, nameKeyedItemId } from './phamily-rewards.js';
 const prevMonthKey = prevMonthOf;
+const nextMonthKey = nextMonthOf;
 
 function isInGracePeriod(now) {
   return dayOfMonth(now) <= GRACE_DAYS;
@@ -207,6 +215,10 @@ export async function onRequestGet(context) {
     return json({
       current: shape(rewardTablesFor(mk)),
       prev: shape(rewardTablesFor(prevMonthKey(mk))),
+      /* The NEXT month's ladder, for the locked "Next month" preview tab. Built
+         from the same canonical rewardTablesFor so a themed month previews with
+         its real skin; the page renders it read-only with no claim affordance. */
+      next: shape(rewardTablesFor(nextMonthKey(mk))),
     }, 200, { 'Cache-Control': 'public, max-age=300' });
   }
 
@@ -265,6 +277,45 @@ export async function onRequestGet(context) {
       chartData.push({ label: dayStr, hours: Math.round(hours * 10) / 10 });
     }
     return json(chartData);
+  }
+
+  /* ── PAST SEASONS — the viewer's earned summary per prior month ──────────
+     A compact "how much of each past month did I collect" view for the pass
+     page. It reuses the Seasonal Grimoire's own set definition
+     (collectionForMonth in season-manifest.js) rather than re-deriving which
+     cosmetics a month paid — the full owned/missing log lives on the profile
+     Grimoire, which the page links to. Scope follows the viewer's standing: a
+     subscriber's set is both tracks + milestones, everyone else's is the
+     follower track + milestones. Months come from the all-time activeMonths
+     ratchet, so only months the viewer actually watched in are listed, newest
+     first and bounded. */
+  if (action === 'past-seasons') {
+    const { collectionForMonth } = await import('./season-manifest.js');
+    const allTime = await getAllTimeStats(env, session.user_id);
+    const inv = await env.MARKETPLACE.get(inventoryKey(session.user_id), 'json');
+    const items = inv && Array.isArray(inv.items) ? inv.items : [];
+    const scope = getSubTier(session) > 0 ? 'all' : 'follower';
+
+    const months = (Array.isArray(allTime.activeMonths) ? allTime.activeMonths : [])
+      .map(String)
+      .filter(m => m < mk)
+      .sort()
+      .reverse()
+      .slice(0, 12);
+
+    const seasons = [];
+    for (const month of months) {
+      const col = collectionForMonth(items, month, scope);
+      if (col.total <= 0) continue;
+      seasons.push({
+        month,
+        total: col.total,
+        owned: col.owned.length,
+        complete: col.complete,
+      });
+    }
+
+    return json({ current: mk, scope, seasons });
   }
 
   return json({ error: 'Invalid action' }, 400);
@@ -555,7 +606,25 @@ async function grantReward(env, session, { id, type, rarity, name, cosmeticId, t
 
   const mapper = REWARD_ITEM_MAP[type];
   if (!mapper) return;
-  await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name, cosmeticId, theme) });
+  const res = await grantItem(env, session.user_id, { id, name, rarity, ...mapper(rarity, name, cosmeticId, theme) });
+
+  /* DUPLICATE COSMETIC → GIVEAWAY ENTRIES. If the viewer already owned this
+     exact cosmetic, grantItem granted nothing (it dedupes), which left a
+     returning player on a base, unthemed month with nothing to show for a
+     claim. Convert that no-op into a modest rarity-based entry credit instead,
+     the same conversion the giveaway-type rewards use, so the month still pays.
+
+     Idempotent by construction: this only runs from an actual claim, and both
+     the reward claim (claimedRewards) and the milestone claim (claimedMilestones)
+     are ratcheted under a lock BEFORE grantReward is reached — so a second claim
+     of the same key is refused before it ever gets here. It never touches the
+     giveaway-type rewards (#7 auto-credits those; they return above and are not
+     cosmetics), so it cannot double-credit them. */
+  if (res === 'duplicate') {
+    const entries = GIVEAWAY_ENTRIES_BY_RARITY[rarity] || GIVEAWAY_ENTRIES_BY_RARITY.common;
+    const { addEntries } = await import('./giveaway-entries.js');
+    await addEntries(env, session.user_id, session.display_name, entries, `phamily-dupe:${name || type}`);
+  }
 }
 
 /**

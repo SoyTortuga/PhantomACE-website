@@ -68,6 +68,18 @@ export function prevMonthKey(d = new Date()) {
   return prevMonthOf(monthKey(d));
 }
 
+/** Add one to a 'YYYY-MM' string (TZ-independent string math). Mirrors
+    prevMonthOf, for the Phamily Time "next month" preview. */
+export function nextMonthOf(mk) {
+  const [y, m] = String(mk).split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
+}
+
+/** The month after `d`'s SEASON_TZ month, 'YYYY-MM'. */
+export function nextMonthKey(d = new Date()) {
+  return nextMonthOf(monthKey(d));
+}
+
 /** The UTC-ms instant the SEASON_TZ month containing `d` ends (= next month's
     1st at 00:00 local). Used for "days left" / countdowns. */
 export function monthEndsAt(d = new Date()) {

@@ -1104,3 +1104,112 @@
   color: var(--red);
   font-weight: 800;
 }
+
+/* ── Next-month preview tab ────────────────────────────────────────────── */
+.pt-view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pt-view-tab {
+  font-family: var(--font-system);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-sec);
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.pt-view-tab:hover {
+  color: var(--white);
+  border-color: var(--border);
+}
+
+.pt-view-tab.is-active {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.pt-preview-note {
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+/* Preview nodes: the rarity border stays so the look-ahead reads at a glance,
+   dimmed to say "not yet". Mirrors the locked treatment for milestones. */
+.pt-reward-node[data-state="preview"] .pt-reward-icon { opacity: 0.55; }
+.pt-reward-node[data-state="preview"] .pt-reward-badge { opacity: 0.7; }
+.pt-reward-node[data-state="preview"] .pt-reward-stem { background: var(--border-mid); }
+.pt-milestone-node[data-state="preview"] .pt-milestone-icon { opacity: 0.35; }
+
+/* ── Past seasons ──────────────────────────────────────────────────────── */
+.pt-past-intro {
+  font-family: var(--font-system);
+  font-size: 13px;
+  color: var(--text-sec);
+  margin: 0 0 16px;
+}
+
+.pt-past-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.pt-past-card {
+  text-align: center;
+  padding: 16px 12px;
+}
+
+.pt-past-card.is-complete {
+  border-color: var(--exclusive);
+}
+
+.pt-past-month {
+  font-family: var(--font-system);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.pt-past-count {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--white);
+  line-height: 1;
+}
+
+.pt-past-card.is-complete .pt-past-count {
+  color: var(--exclusive);
+}
+
+.pt-past-sub {
+  font-family: var(--font-system);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.pt-past-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-family: var(--font-system);
+  font-size: 13px;
+  color: var(--red);
+  text-decoration: none;
+}
+
+.pt-past-link:hover {
+  text-decoration: underline;
+}
