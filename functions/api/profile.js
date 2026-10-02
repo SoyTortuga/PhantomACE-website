@@ -37,6 +37,8 @@ const BOARDS = [
   { key: 'lb_shell_shock',     game: 'pham-shock',       label: 'PhamShock',     unit: 'Wins' },
   { key: 'lb_bingo',           game: 'commander-bingo',  label: 'Commander Bingo', unit: 'Bingos' },
   { key: 'lb_memory_match',    game: 'memory-match',     label: 'Memory Match',  unit: 'Best Moves', asc: true },
+  { key: 'lb_memory_match_15', game: 'memory-match-15',  label: 'Memory Match',  unit: 'Best Moves (15 pairs)', asc: true },
+  { key: 'lb_memory_match_10', game: 'memory-match-10',  label: 'Memory Match',  unit: 'Best Moves (10 pairs)', asc: true },
 ];
 
 async function resolveUserId(env, url) {

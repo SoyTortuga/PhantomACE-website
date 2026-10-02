@@ -40,8 +40,14 @@ function cleanScore(score) {
 }
 
 const BOARDS = {
-  'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc', bignum: true },
-  'memory-match':     { key: 'lb_memory_match', label: 'Best Moves',  sort: 'asc' },
+  /* Written only by skull-clicker.js (save push); the browser POST is gone. */
+  'skull-clicker':    { key: 'sc_leaderboard',  label: 'High Score',  sort: 'desc', bignum: true, serverOnly: true },
+  /* Written by memory-match.js from a server-dealt, server-revealed game
+     (recordResult), one board per deck size so a 10-pair pack doesn't compete
+     with the full 20-pair deck. The browser used to POST its own move count. */
+  'memory-match':     { key: 'lb_memory_match',    label: 'Best Moves', sort: 'asc', serverOnly: true },
+  'memory-match-15':  { key: 'lb_memory_match_15', label: 'Best Moves', sort: 'asc', serverOnly: true },
+  'memory-match-10':  { key: 'lb_memory_match_10', label: 'Best Moves', sort: 'asc', serverOnly: true },
   /* Written by bingo/end.js from the room's own cards and calls, and only for
      staff-hosted rooms -- the client used to POST its own count. */
   'commander-bingo':  { key: 'lb_bingo',        label: 'Bingos',      sort: 'desc', serverOnly: true },
@@ -55,7 +61,9 @@ const BOARDS = {
   /* Written by pham-shock.js when resolve() settles a real multi-player
      match (recordWin), never by a browser -- one curl used to add a win. */
   'pham-shock':      { key: 'lb_shell_shock',  label: 'Wins',        sort: 'desc', mode: 'increment', serverOnly: true },
-  'phamily-time':     { key: 'lb_phamily_time', label: 'Hours',       sort: 'desc' },
+  /* Nothing writes this board (Watch Time is read from pt_ rows by
+     community-leaderboard.js); serverOnly so it can't be filled by curl. */
+  'phamily-time':     { key: 'lb_phamily_time', label: 'Hours',       sort: 'desc', serverOnly: true },
   /* Written by end.js from the room's own computed scores, same shape as
      Mana Clash's SCORE_BOARD — points come from mtgbbb-scoring, never from
      a client, so a client POST here has nothing legitimate to submit. */
@@ -80,6 +88,8 @@ const MONTHLY_GAME_LABELS = {
      the ALL-TIME board and must never be wiped. Its monthly race and prize
      live on the season board (sc_season), handled in skull-clicker.js. */
   'memory-match':    'Memory Match',
+  'memory-match-15': 'Memory Match (15 pairs)',
+  'memory-match-10': 'Memory Match (10 pairs)',
   'commander-bingo': 'Commander Bingo',
   'mana-clash':      'Mana Clash High Score',
   'mana-clash-wins': 'Mana Clash Wins',

@@ -32,6 +32,10 @@ export const SINGLETONS = {
   /* The co-op raid boss — one shared boss the whole site clicks down. */
   sc_raid:               { table: 'singletons', expiry: 'none' },
   lb_memory_match:       { table: 'singletons', expiry: 'none' },
+  /* Per-deck-size Memory Match boards (memory-match.js recordResult): the
+     20-pair deck stays lb_memory_match; packs play 15- and 10-pair decks. */
+  lb_memory_match_15:    { table: 'singletons', expiry: 'none' },
+  lb_memory_match_10:    { table: 'singletons', expiry: 'none' },
   lb_bingo:              { table: 'singletons', expiry: 'none' },
   lb_mana_clash:         { table: 'singletons', expiry: 'none' },
   lb_mana_clash_wins:    { table: 'singletons', expiry: 'none' },
@@ -44,6 +48,7 @@ export const SINGLETONS = {
   item_code_queue:       { table: 'singletons', expiry: 'none' },
   bridge_pending_actions:{ table: 'singletons', expiry: 'none' },
   eventsub_subscriptions:{ table: 'singletons', expiry: 'none' },
+  eventsub_revoked:      { table: 'singletons', expiry: 'none' },
   giveaway_reward_id:    { table: 'singletons', expiry: 'none' },
   /* The rarity entry rewards' ids, resolved from Twitch by title and
      cached. Unregistered at first, which 500'd the panel the moment a
@@ -371,6 +376,9 @@ export const FAMILIES = [
      stops a redelivery re-firing alerts, code drops and dino hatches. */
   { prefix: 'follow_seen_',    table: 'singletons',       expiry: 'real' },
   { prefix: 'eventsub_msg_',   table: 'singletons',       expiry: 'real' },
+  /* mm_game_{userId} — memory-match.js: the one in-progress server-dealt game
+     per player (deck + flip log), sliding 1h TTL; a new start replaces it. */
+  { prefix: 'mm_game_',        table: 'singletons',       expiry: 'real' },
 
   /* giveaway_monthly_winner_{YYYY-MM} — that month's ledger-draw winner, its
      reel, whether the prize code went out, and any re-rolls (bot/giveaway.js).

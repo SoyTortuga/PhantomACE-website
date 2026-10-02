@@ -1,7 +1,9 @@
 (function () {
   /* mana-clash-wins shares the Mana Clash TAB with mana-clash — two boards,
-     one tab — so it has no tab button of its own. */
-  var BOARDS = ['skull-clicker', 'memory-match', 'commander-bingo',
+     one tab — so it has no tab button of its own. The 15- and 10-pair Memory
+     Match boards likewise live inside the Memory Match tab. */
+  var BOARDS = ['skull-clicker', 'memory-match', 'memory-match-15', 'memory-match-10',
+                'commander-bingo',
                 'mana-clash', 'mana-clash-wins', 'pham-shock'];
 
   function esc(s) {
@@ -56,7 +58,7 @@
   }
 
   function formatScore(game, score, scoreLog) {
-    if (game === 'memory-match') return score + ' moves';
+    if (game.indexOf('memory-match') === 0) return score + ' moves';
     if (game === 'commander-bingo') return score;
     if (game === 'skull-clicker') return formatBigScore(score, scoreLog);
     return score.toLocaleString();

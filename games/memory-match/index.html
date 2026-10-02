@@ -94,7 +94,7 @@
 
     .card-back {
       background: var(--gray-mid);
-      border: 1px solid #444;
+      border: 1px solid var(--border-mid);
       transform: rotateY(180deg);
     }
 
@@ -106,8 +106,19 @@
 
     .card.matched .card-front { display: none; }
     .card.matched .card-back {
-      border: 2px solid #00cc66;
+      border: 2px solid var(--red);
     }
+
+    .mm-status {
+      font-size: 14px;
+      color: var(--text-sec);
+      margin: -12px 0 16px;
+      min-height: 1.4em;
+      text-align: center;
+    }
+    .mm-status a { color: var(--red); }
+
+    .win-message p.win-note { font-size: 15px; color: var(--text-sec); }
 
     .win-message {
       display: none;
@@ -162,10 +173,10 @@
     .card-front.cb-basic::after { content: '♦'; color: var(--text-pri); opacity: 0.5; }
     .card-front.cb-phamily { background: linear-gradient(135deg, #1a0000, #111); border-color: #cc0000; }
     .card-front.cb-phamily::after { content: '💀'; color: var(--red); opacity: 0.6; }
-    .card-front.cb-rare { background: linear-gradient(135deg, #0a0a1e, #111); border-color: #3344aa; }
-    .card-front.cb-rare::after { content: '🃏'; color: #4466ee; opacity: 0.6; }
-    .card-front.cb-legendary { background: linear-gradient(135deg, #1a0a1a, #111); border-color: #8833cc; }
-    .card-front.cb-legendary::after { content: '✨'; color: #aa44ff; opacity: 0.6; }
+    .card-front.cb-rare { background: linear-gradient(135deg, var(--gray-hi), var(--gray-lo)); border-color: var(--text-pri); }
+    .card-front.cb-rare::after { content: '🃏'; color: var(--text-pri); opacity: 0.6; }
+    .card-front.cb-legendary { background: radial-gradient(circle, var(--red-dim), var(--gray-lo)); border: 2px solid var(--red); }
+    .card-front.cb-legendary::after { content: '✨'; color: var(--red); opacity: 0.6; }
     .card-front.cb-cobweb { background: linear-gradient(135deg, #1c1c1c, #0a0a0a); border-color: #666; }
     .card-front.cb-cobweb::after { content: '🕸️'; color: #ddd; opacity: 0.55; }
     .card-front.cb-crypt { background: linear-gradient(135deg, #160606, #0a0a0a); border-color: #660000; }
@@ -196,6 +207,7 @@
     &nbsp;&middot;&nbsp;
     Pairs: <span id="pairCount">0</span> / <span id="totalPairs">20</span>
   </div>
+  <div class="mm-status" id="mmStatus" role="status"></div>
   <div class="cosmetics-bar" id="cosmeticsBar" hidden>
     <div>
       <div class="cosmetic-label">Card Back</div>
@@ -215,6 +227,7 @@
   <div class="win-message" id="winMessage">
     <h2>You Win!</h2>
     <p>Completed in <span id="finalMoves">0</span> moves</p>
+    <p class="win-note" id="winNote"></p>
     <button class="restart-btn" onclick="startGame()">Play Again</button>
   </div>
 
@@ -363,21 +376,39 @@
     let ownedCardBacks = [];
     let ownedEmoteSets = [];
 
-    let cards = [];
     let flipped = [];
     let matched = 0;
     let moves = 0;
-    let locked = false;
-    let totalPairs = 4;
+    let flipCount = 0;
+    let locked = true;
+    let totalPairs = 20;
+    let gen = 0;
+    let ranked = null;
+    let deal = { images: [], alts: [] };
+    let flipChain = Promise.resolve();
+    const timers = new Set();
 
-    function getActiveImages() {
+    function later(fn, ms) {
+      const g = gen;
+      const id = setTimeout(() => {
+        timers.delete(id);
+        if (g === gen) fn();
+      }, ms);
+      timers.add(id);
+    }
+
+    function clearTimers() {
+      for (const id of timers) clearTimeout(id);
+      timers.clear();
+    }
+
+    function getActiveSet() {
       const set = EMOTE_SETS[activeEmoteSet] || EMOTE_SETS.default;
-      const alts = set.alts || set.images.map(() => 'card');
-      return {
-        images: [...set.images, ...set.images],
-        alts: [...alts, ...alts],
-        pairTotal: set.images.length,
-      };
+      return { images: set.images, alts: set.alts || set.images.map(() => 'card') };
+    }
+
+    function gameInProgress() {
+      return flipCount > 0 && matched < totalPairs;
     }
 
     async function loadMMCosmetics() {
@@ -397,9 +428,6 @@
         if (ownedCardBacks.length > 0 || ownedEmoteSets.length > 0) {
           document.getElementById('cosmeticsBar').hidden = false;
         }
-        /* The board was dealt before the inventory answered; redeal with the
-           equipped look if nobody has started playing it yet. */
-        if (moves === 0 && matched === 0) startGame();
       } catch {}
     }
 
@@ -494,14 +522,24 @@
       activeCardBack = item ? getCosmeticId(item, 'cb') : 'default';
       equippedCardBackId = item ? item.id : 'default';
       showCosmeticError('');
-      startGame();
+      paintCardBacks();
       const r = await saveEquip('card-back', item ? item.id : 'none');
       if (r.ok) return;
       activeCardBack = prev.key;
       equippedCardBackId = prev.id;
       sel.value = prev.id;
-      startGame();
+      paintCardBacks();
       showCosmeticError("Couldn't save card back: " + r.error);
+    }
+
+    function cardBackClass() {
+      const cls = (CARD_BACKS[activeCardBack] || {}).cssClass || '';
+      return cls ? 'card-front ' + cls : 'card-front';
+    }
+
+    function paintCardBacks() {
+      const cls = cardBackClass();
+      document.querySelectorAll('#board .card-front').forEach(el => { el.className = cls; });
     }
 
     async function applyEmoteSet() {
@@ -511,14 +549,19 @@
       const item = ownedEmoteSets.find(i => i.id === id);
       activeEmoteSet = item ? getCosmeticId(item, 'emote') : 'default';
       equippedEmoteSetId = item ? item.id : 'default';
-      showCosmeticError('');
-      startGame();
+      const midGame = gameInProgress();
+      if (midGame) {
+        showCosmeticError('New card set deals with your next game.');
+      } else {
+        showCosmeticError('');
+        startGame();
+      }
       const r = await saveEquip('emote-set', item ? item.id : 'none');
       if (r.ok) return;
       activeEmoteSet = prev.key;
       equippedEmoteSetId = prev.id;
       sel.value = prev.id;
-      startGame();
+      if (!midGame && !gameInProgress()) startGame();
       showCosmeticError("Couldn't save card set: " + r.error);
     }
 
@@ -531,82 +574,203 @@
       return a;
     }
 
-    function startGame() {
+    async function mmApi(body) {
+      try {
+        const res = await fetch('/api/memory-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => null);
+        return { ok: res.ok, status: res.status, data, error: (data && data.error) || ('Server returned ' + res.status) };
+      } catch {
+        return { ok: false, status: 0, data: null, error: 'Network error' };
+      }
+    }
+
+    function setStatus(text, withLogin) {
+      const el = document.getElementById('mmStatus');
+      el.textContent = text;
+      if (withLogin) {
+        const a = document.createElement('a');
+        a.href = '/api/auth/twitch';
+        a.target = '_top';
+        a.textContent = 'Log in with Twitch to rank';
+        el.appendChild(document.createTextNode(' '));
+        el.appendChild(a);
+      }
+    }
+
+    function setCounters() {
+      document.getElementById('moveCount').textContent = moves;
+      document.getElementById('pairCount').textContent = matched;
+      document.getElementById('totalPairs').textContent = totalPairs;
+    }
+
+    function renderBoard(pairs) {
+      totalPairs = pairs;
+      setCounters();
       const board = document.getElementById('board');
+      const cls = cardBackClass();
+      board.textContent = '';
+      for (let i = 0; i < pairs * 2; i++) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.index = i;
+        card.onclick = () => flipCard(card);
+        const inner = document.createElement('div');
+        inner.className = 'card-inner';
+        const front = document.createElement('div');
+        front.className = cls;
+        const back = document.createElement('div');
+        back.className = 'card-back';
+        inner.append(front, back);
+        card.appendChild(inner);
+        board.appendChild(card);
+      }
+    }
+
+    function setFace(el, face) {
+      el.dataset.pair = face;
+      const back = el.querySelector('.card-back');
+      back.textContent = '';
+      const img = document.createElement('img');
+      img.src = deal.images[face] || '';
+      img.alt = deal.alts[face] || 'card';
+      back.appendChild(img);
+    }
+
+    function clearFace(el) {
+      delete el.dataset.pair;
+      el.querySelector('.card-back').textContent = '';
+    }
+
+    function dealLocal() {
+      const deck = shuffle([...deal.images.keys(), ...deal.images.keys()]);
+      totalPairs = deal.images.length;
+      renderBoard(totalPairs);
+      document.querySelectorAll('#board .card').forEach((el, i) => setFace(el, deck[i]));
+    }
+
+    function startGame() {
+      gen++;
+      clearTimers();
+      const g = gen;
+      flipped = [];
       matched = 0;
       moves = 0;
-      flipped = [];
-      locked = false;
-
-      document.getElementById('moveCount').textContent = '0';
-      document.getElementById('pairCount').textContent = '0';
+      flipCount = 0;
+      locked = true;
+      ranked = null;
+      flipChain = Promise.resolve();
       document.getElementById('winMessage').classList.remove('show');
 
-      const { images, alts, pairTotal } = getActiveImages();
-      totalPairs = pairTotal;
-      document.getElementById('totalPairs').textContent = totalPairs;
+      deal = getActiveSet();
+      renderBoard(deal.images.length);
+      setStatus('Dealing…');
 
-      const pairs = [];
-      images.forEach((src, i) => {
-        pairs.push({ id: i, pairId: i % pairTotal, src, alt: alts[i] });
+      mmApi({ action: 'start', set: activeEmoteSet }).then(r => {
+        if (g !== gen) return;
+        if (r.ok && r.data && r.data.gameId) {
+          ranked = { gameId: r.data.gameId, seq: 0, broken: false, onBoard: !!r.data.ranked };
+          if (r.data.pairs !== totalPairs) renderBoard(r.data.pairs);
+          setStatus(ranked.onBoard ? 'Ranked · ' + totalPairs + '-pair board' : 'Unranked deck size');
+        } else {
+          dealLocal();
+          if (r.status === 401) setStatus('Unranked practice.', true);
+          else if (r.status === 0) setStatus('Offline · unranked practice.');
+          else setStatus('Unranked: ' + r.error);
+        }
+        locked = false;
       });
-
-      cards = shuffle(pairs);
-
-      const cbClass = CARD_BACKS[activeCardBack]?.cssClass || '';
-
-      board.innerHTML = cards.map((card, index) => `
-        <div class="card" data-index="${index}" data-pair="${card.pairId}" onclick="flipCard(this)">
-          <div class="card-inner">
-            <div class="card-front ${cbClass}"></div>
-            <div class="card-back">
-              <img src="${card.src}" alt="${card.alt}">
-            </div>
-          </div>
-        </div>
-      `).join('');
     }
 
     function flipCard(el) {
-      if (locked) return;
+      if (locked || flipped.length >= 2) return;
       if (el.classList.contains('flipped') || el.classList.contains('matched')) return;
-      if (flipped.length >= 2) return;
 
       el.classList.add('flipped');
       flipped.push(el);
+      flipCount++;
 
-      if (flipped.length === 2) {
-        moves++;
-        document.getElementById('moveCount').textContent = moves;
-        locked = true;
-
-        const a = flipped[0].dataset.pair;
-        const b = flipped[1].dataset.pair;
-
-        if (a === b) {
-          flipped[0].classList.add('matched');
-          flipped[1].classList.add('matched');
-          matched++;
-          document.getElementById('pairCount').textContent = matched;
-          flipped = [];
-          locked = false;
-
-          if (matched === totalPairs) {
-            setTimeout(() => {
-              document.getElementById('finalMoves').textContent = moves;
-              document.getElementById('winMessage').classList.add('show');
-              submitMMScore(moves);
-            }, 500);
-          }
-        } else {
-          setTimeout(() => {
-            flipped[0].classList.remove('flipped');
-            flipped[1].classList.remove('flipped');
-            flipped = [];
-            locked = false;
-          }, 800);
-        }
+      if (ranked) {
+        serverFlip(el);
+        return;
       }
+      if (flipped.length === 2) {
+        const [a, b] = flipped;
+        settlePair(a, b, a.dataset.pair === b.dataset.pair, moves + 1, null);
+      }
+    }
+
+    function serverFlip(el) {
+      const g = gen;
+      const game = ranked;
+      const index = Number(el.dataset.index);
+      const seq = game.seq++;
+      flipChain = flipChain.then(async () => {
+        if (g !== gen || game.broken) return;
+        const r = await mmApi({ action: 'flip', gameId: game.gameId, index, seq });
+        if (g !== gen || game.broken) return;
+        if (!r.ok || !r.data || typeof r.data.face !== 'number') {
+          game.broken = true;
+          rankedLost(r.error);
+          return;
+        }
+        const d = r.data;
+        setFace(el, d.face);
+        if (typeof d.first !== 'number') return;
+        const first = document.querySelector('#board .card[data-index="' + d.first + '"]');
+        settlePair(first, el, !!d.match, d.moves, d.done ? d : null);
+      });
+    }
+
+    function settlePair(a, b, isMatch, newMoves, result) {
+      moves = newMoves;
+      if (isMatch) {
+        a.classList.add('matched');
+        b.classList.add('matched');
+        matched++;
+        flipped = [];
+        setCounters();
+        if (matched === totalPairs) {
+          locked = true;
+          later(() => showWin(result), 500);
+        }
+        return;
+      }
+      setCounters();
+      locked = true;
+      later(() => {
+        a.classList.remove('flipped');
+        b.classList.remove('flipped');
+        flipped = [];
+        locked = false;
+        if (ranked) {
+          later(() => {
+            if (!a.classList.contains('flipped')) clearFace(a);
+            if (!b.classList.contains('flipped')) clearFace(b);
+          }, 400);
+        }
+      }, 800);
+    }
+
+    function rankedLost(error) {
+      locked = true;
+      setStatus('Lost the ranked game (' + error + '). Dealing a new one…');
+      later(startGame, 1800);
+    }
+
+    function showWin(result) {
+      document.getElementById('finalMoves').textContent = moves;
+      let note;
+      if (!ranked) note = 'Unranked run. Log in to put it on the board.';
+      else if (!result || !result.recorded) note = "That run couldn't be recorded on the board.";
+      else if (result.improved) note = 'New personal best on the ' + totalPairs + '-pair board.';
+      else note = 'Your best on the ' + totalPairs + '-pair board is ' + result.best + ' moves.';
+      document.getElementById('winNote').textContent = note;
+      document.getElementById('winMessage').classList.add('show');
     }
 
     document.addEventListener('keydown', (e) => {
@@ -615,17 +779,7 @@
       }
     });
 
-    function submitMMScore(moveCount) {
-      fetch('/api/leaderboards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ game: 'memory-match', score: moveCount }),
-      }).catch(function () {});
-    }
-
-    loadMMCosmetics();
-    startGame();
+    loadMMCosmetics().then(startGame, startGame);
   </script>
 </body>
 </html>

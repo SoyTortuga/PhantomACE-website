@@ -210,16 +210,14 @@ async function get(env, q = 'game=all') {
   check('redeeming the backup does not duplicate the badge',
     inv(env, '101').items.filter(i => i.id === 'monthly_mana-clash_2026-09_1').length, 1);
 
-  /* A score posted later on the 1st lands on the fresh board. */
-  const post = await onRequestPost({
-    env,
-    request: new Request('https://test.local/api/leaderboards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie('505') },
-      body: JSON.stringify({ game: 'memory-match', score: 20 }),
-    }),
+  /* A score a game server writes later on the 1st lands on the fresh board.
+     (Every prize board is serverOnly now, so this is how scores arrive --
+     e.g. memory-match.js recordResult -- not a browser POST.) */
+  await env.MARKETPLACE.mutate('lb_memory_match', (lb) => {
+    const list = Array.isArray(lb) ? lb : [];
+    list.push({ id: '505', name: 'U505', score: 20, updatedAt: Date.now() });
+    return list;
   });
-  check('post-award score accepted', (await post.json()).updated, true);
   check('it sits alone on the new month board', board(env, 'lb_memory_match').map(e => e.id), ['505']);
 
   /* Second request: no re-award, the new score survives. */
@@ -231,7 +229,10 @@ async function get(env, q = 'game=all') {
   check('second request: new month board kept', board(env, 'lb_memory_match').map(e => e.id), ['505']);
 }
 
-/* ── A score posted on the 1st BEFORE any GET triggers the award first ── */
+/* ── A POST on the 1st BEFORE any GET still settles the award first ──
+   Prize boards refuse browser writes (serverOnly), but the request still
+   runs the settle, so September is paid out and wiped even if the only
+   traffic on the 1st is a refused POST. */
 {
   setClock('2026-10-01T08:00:00Z');
   whispers = [];
@@ -245,10 +246,10 @@ async function get(env, q = 'game=all') {
       body: JSON.stringify({ game: 'memory-match', score: 3 }),
     }),
   });
-  check('first-of-month post accepted', (await post.json()).updated, true);
-  ok('September settled before the write', env._months.has('2026-09'));
-  ok('the new score did NOT win September', !inv(env, '606'));
-  check('and starts October\'s board', board(env, 'lb_memory_match').map(e => e.id), ['606']);
+  check('a browser write to a prize board is refused', post.status, 403);
+  ok('September settled anyway', env._months.has('2026-09'));
+  ok('the refused score did NOT win September', !inv(env, '606'));
+  check('and the board was wiped for October', board(env, 'lb_memory_match'), []);
 }
 
 /* ── Catch-up: nobody visited on the 1st ──────────────────────────────── */
