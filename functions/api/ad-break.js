@@ -56,11 +56,21 @@ export async function onRequestPost(context) {
        without this the only symptom is breaks quietly never registering. */
     console.warn('[ad-break] subscription revoked:',
                  body.subscription?.status || 'unknown reason');
+    const { recordEventSubRevocation } = await import('./bot/dashboard.js');
+    await recordEventSubRevocation(env, body, 'ad-break');
     return json({ ok: true });
   }
 
   if (check.messageType === 'notification' && body.event) {
-    await recordBreakBegin(env, body.event);
+    /* Never 500 at Twitch: repeated failures disable the subscription, and
+       the message id is already claimed, so a retry could not help. */
+    try {
+      await recordBreakBegin(env, body.event);
+    } catch (err) {
+      console.error('[ad-break] could not record the break:', err && err.message);
+    }
+    const { clearEventSubRevocation } = await import('./bot/dashboard.js');
+    await clearEventSubRevocation(env, body.subscription && body.subscription.type);
   }
 
   return json({ ok: true });

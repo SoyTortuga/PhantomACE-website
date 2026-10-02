@@ -50,6 +50,59 @@ function json(data, status = 200) {
   });
 }
 
+/* Twitch's global cheermote prefixes. A cheer's text carries its bits as
+   tokens like "Cheer100" or "Kappa50", which read as noise on stream. */
+const CHEERMOTE_PREFIXES = new Set([
+  'cheer', 'doodlecheer', 'biblethump', 'cheerwhal', 'corgo', 'scoops', 'uni',
+  'showlove', 'party', 'seemsgood', 'pride', 'kappa', 'frankerz', 'heyguys',
+  'dansgame', 'elegiggle', 'trihard', 'kreygasm', '4head', 'swiftrage',
+  'notlikethis', 'failfish', 'vohiyo', 'pjsalt', 'mrdestructoid', 'bday',
+  'ripcheer', 'shamrock', 'bitboss', 'streamlabs', 'muxy', 'holidaycheer',
+  'goal', 'anon', 'charity',
+]);
+const CHEER_TOKEN = /^(.*?[A-Za-z])(\d+)$/;
+
+/**
+ * The cheer's message with its cheermote tokens removed. Pure — exported
+ * for tests.
+ *
+ * Known prefixes (and anything with "cheer" in it) always go. A channel can
+ * also have its own custom cheermote prefix, which no list knows; so when the
+ * known tokens do not account for every bit cheered, remaining
+ * letters-then-digits tokens are removed too, but only until the bits add up
+ * — "mp3" in a message that is already fully accounted for survives.
+ */
+export function stripCheermotes(message, bits) {
+  const tokens = String(message == null ? '' : message).split(/\s+/).filter(Boolean);
+  const total = Number(bits) || 0;
+  const drop = new Set();
+  let counted = 0;
+
+  tokens.forEach((t, i) => {
+    const m = CHEER_TOKEN.exec(t);
+    if (!m) return;
+    const prefix = m[1].toLowerCase();
+    if (CHEERMOTE_PREFIXES.has(prefix) || prefix.includes('cheer')) {
+      drop.add(i);
+      counted += Number(m[2]) || 0;
+    }
+  });
+
+  if (counted < total) {
+    tokens.forEach((t, i) => {
+      if (drop.has(i) || counted >= total) return;
+      const m = CHEER_TOKEN.exec(t);
+      if (!m) return;
+      const amount = Number(m[2]) || 0;
+      if (amount <= 0 || counted + amount > total) return;
+      drop.add(i);
+      counted += amount;
+    });
+  }
+
+  return tokens.filter((_, i) => !drop.has(i)).join(' ').trim();
+}
+
 export async function getMilestoneConfig(env) {
   const rec = await env.MARKETPLACE.get(CONFIG_KEY, 'json');
   return { ...DEFAULTS, ...(rec || {}) };
@@ -83,7 +136,8 @@ async function handleEvent(env, type, event) {
     if (!(await isAlertEnabled(env, 'cheer'))) return { fired: false, reason: 'cheer alerts disabled' };
     const who = event.is_anonymous ? 'An anonymous cheerer' : (event.user_name || event.user_login || 'Someone');
     const bits = Number(event.bits) || 0;
-    const message = event.message ? String(event.message).slice(0, 200) : '';
+    /* Stripped before the length cap, so the cap measures words people read. */
+    const message = event.message ? stripCheermotes(event.message, bits).slice(0, 200) : '';
     await pushOverlayEvent(env, { type: 'cheer', user: who, bits, message });
     try {
       const { recordActivity } = await import('./activity.js');
@@ -243,7 +297,19 @@ export async function onRequestPost(context) {
           console.error('[milestones] hatch failed:', err.message);
         }
       }
+
+      const { clearEventSubRevocation } = await import('./bot/dashboard.js');
+      await clearEventSubRevocation(env, type);
     }
+    return json({ ok: true });
+  }
+
+  /* Five subscription types land here (sub, gift, raid, follow, cheer), and
+     this route had no revocation branch at all — a revoked one simply went
+     quiet. Recorded so Bot Control can say which. */
+  if (check.messageType === 'revocation') {
+    const { recordEventSubRevocation } = await import('./bot/dashboard.js');
+    await recordEventSubRevocation(env, body, 'milestones');
     return json({ ok: true });
   }
 

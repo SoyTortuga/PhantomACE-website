@@ -63,46 +63,86 @@ const REWARD_HANDLERS = {
   'pham-checkin': async (env, userId, redemption) => {
     const { getStreamInfo } = await import('./stream-info.js');
     const { streamId, startedAt } = await getStreamInfo(env);
+    const { recordCheckin, resolvePendingCheckins } = await import('./checkin-rewards.js');
+    const displayName = redemption.user_name || redemption.user_login || '';
 
-    let position = null;   // 1-based arrival order this broadcast
+    /* 1-based arrival order; null means a redelivery of a check-in already
+       recorded. For a pending check-in it is the provisional place in the
+       waiting list — the final one is assigned when it is settled. */
+    let position = null;
 
-    await env.MARKETPLACE.mutate('checkin_current', (current) => {
-      /* A new broadcast replaces the list wholesale. Twitch's per-stream
-         limit has already reset by this point, so carrying the old list
-         forward would let one person appear twice in what reads as a single
-         stream's attendance. */
-      const sameStream = current && streamId && current.streamId === streamId;
-      const rec = sameStream
-        ? current
-        : { streamId: streamId || null, startedAt: startedAt || null, checkins: [] };
+    if (!streamId) {
+      /* ── WHICH STREAM IS UNKNOWN, NOT NEW ────────────────────────────────
+         Twitch reports a channel offline for roughly its first minute live,
+         and a lookup can simply fail. A null id used to count as "a new
+         broadcast": the list was replaced, so the next real check-in started
+         again at position 1 (another early bird), and the history got an
+         entry with no stream id — which skipped the duplicate check, reset
+         the streak to 1, and broke the next stream's "were they at the
+         previous one" test too.
 
-      /* Defensive: Twitch enforces one per user per stream, but a webhook can
-         be redelivered, and a redelivery is not a second check-in. */
-      if (rec.checkins.some(c => String(c.userId) === String(userId))) return undefined;
-
-      const at = Date.now();
-      rec.checkins.push({
-        userId: String(userId),
-        displayName: redemption.user_name || redemption.user_login || '',
-        at,
-        /* Minutes into the broadcast — the actual question being asked is
-           "when did they start watching", and a wall-clock timestamp alone
-           makes that arithmetic the reader's problem. */
-        minutesIn: rec.startedAt ? Math.max(0, Math.round((at - Date.parse(rec.startedAt)) / 60000)) : null,
+         Now the check-in waits in `pending`, beside whatever list is there,
+         and is settled once the stream id is known: by the next check-in
+         that has one, or by the server's minute tick recording the stream
+         (resolvePendingCheckins). Position, streak and entries are all
+         decided then, against the right broadcast. */
+      await env.MARKETPLACE.mutate('checkin_current', (current) => {
+        const rec = current && Array.isArray(current.checkins)
+          ? current
+          : { streamId: null, startedAt: null, checkins: [] };
+        rec.pending = Array.isArray(rec.pending) ? rec.pending : [];
+        if (rec.pending.some(p => String(p.userId) === String(userId))) return undefined;
+        rec.pending.push({ userId: String(userId), displayName, at: Date.now() });
+        position = rec.pending.length;
+        return rec;
       });
-      position = rec.checkins.length;
-      return rec;
-    });
+    } else {
+      /* Earlier arrivals first, so a pending check-in keeps the place in the
+         order it actually earned. */
+      await resolvePendingCheckins(env, streamId, startedAt);
 
-    /* History, streak and any entries earned. Separate from the list above
-       because that one is "who is here now" and is thrown away each
-       broadcast; this is the durable record streaks are computed from. */
-    const { recordCheckin } = await import('./checkin-rewards.js');
-    await recordCheckin(env, {
-      userId,
-      username: redemption.user_name || redemption.user_login || '',
-      streamId, startedAt, position,
-    });
+      await env.MARKETPLACE.mutate('checkin_current', (current) => {
+        /* A new broadcast replaces the list wholesale. Twitch's per-stream
+           limit has already reset by this point, so carrying the old list
+           forward would let one person appear twice in what reads as a single
+           stream's attendance. */
+        const sameStream = current && current.streamId === streamId;
+        const rec = sameStream
+          ? current
+          : {
+            streamId, startedAt: startedAt || null, checkins: [],
+            /* Anything still waiting for its stream id is not this list's to drop. */
+            pending: current && Array.isArray(current.pending) ? current.pending : [],
+          };
+        if (!Array.isArray(rec.checkins)) rec.checkins = [];
+
+        /* Defensive: Twitch enforces one per user per stream, but a webhook can
+           be redelivered, and a redelivery is not a second check-in. */
+        if (rec.checkins.some(c => String(c.userId) === String(userId))) return undefined;
+
+        const at = Date.now();
+        rec.checkins.push({
+          userId: String(userId),
+          displayName,
+          at,
+          /* Minutes into the broadcast — the actual question being asked is
+             "when did they start watching", and a wall-clock timestamp alone
+             makes that arithmetic the reader's problem. */
+          minutesIn: rec.startedAt ? Math.max(0, Math.round((at - Date.parse(rec.startedAt)) / 60000)) : null,
+        });
+        position = rec.checkins.length;
+        return rec;
+      });
+
+      /* History, streak and any entries earned. Separate from the list above
+         because that one is "who is here now" and is thrown away each
+         broadcast; this is the durable record streaks are computed from. */
+      await recordCheckin(env, {
+        userId,
+        username: displayName,
+        streamId, startedAt, position,
+      });
+    }
 
     /* EVENT BADGES. A window that is closed grants nothing and costs one
        comparison, so this runs on every check-in rather than being switched
@@ -351,14 +391,28 @@ export async function onRequestPost(context) {
       });
     } catch (err) { console.error('[channel-points] activity record failed:', err.message); }
 
+    /* NEVER 500 AT TWITCH. A database blip used to escape as a 500, Twitch
+       retried, and enough failures disable the subscription. The verifier
+       has already claimed this message id, so a retry would have been
+       answered as a duplicate anyway — logging and answering 200 loses
+       nothing, and keeps the subscription alive. */
     if (handlerKey && REWARD_HANDLERS[handlerKey]) {
-      await REWARD_HANDLERS[handlerKey](env, twitchUserId, event);
+      try {
+        await REWARD_HANDLERS[handlerKey](env, twitchUserId, event);
+      } catch (err) {
+        console.error(`[channel-points] ${handlerKey} handler failed:`, err && err.message);
+      }
     }
+
+    const { clearEventSubRevocation } = await import('./bot/dashboard.js');
+    await clearEventSubRevocation(env, body.subscription && body.subscription.type);
 
     return json({ ok: true });
   }
 
   if (messageType === 'revocation') {
+    const { recordEventSubRevocation } = await import('./bot/dashboard.js');
+    await recordEventSubRevocation(env, body, 'channel-points');
     return json({ ok: true });
   }
 

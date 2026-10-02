@@ -308,6 +308,15 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
   };
 
   async function checkIn(userId) {
+    /* On air, with a known broadcast. A check-in whose stream Twitch has not
+       confirmed is held as pending and gets its history once the id is
+       known (test-checkin-stream-fallback.js); this suite is about badges,
+       so it checks in to a stream Twitch has already named. Stamped from the
+       stubbed clock so the 30-second cache counts as fresh. */
+    store.set('twitch_live_cache', JSON.stringify({
+      live: true, streamId: 'stream-badges', startedAt: new Date(Date.now() - 600000).toISOString(),
+      viewerCount: 10, checkedAt: Date.now(),
+    }));
     const raw = JSON.stringify({
       subscription: { type: 'channel.channel_points_custom_reward_redemption.add' },
       event: { id: 'r' + userId, user_id: String(userId), user_name: 'viewer' + userId, reward: { id: 'rw', title: 'Pham Check-In' } },

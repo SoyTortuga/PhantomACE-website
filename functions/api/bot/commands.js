@@ -205,7 +205,25 @@ async function markVip(env, userId, name) {
   }
 }
 
-async function handleChatMessage(env, event) {
+/* ── ANSWER TWITCH FIRST ─────────────────────────────────────────────────
+   Bot replies on the hot paths — maze clears, scramble rounds, !entries —
+   used to be awaited before the webhook answered, so every Helix send sat
+   between Twitch and its 200. Twitch retries slow answers and disables
+   subscriptions that keep failing, and the chat-message subscription sees
+   every line typed. The game state is still settled before answering (it
+   is what the reply is about); only the outbound messages wait, queued in
+   order and sent once the response is on its way. */
+function deferSends(context, jobs) {
+  if (!jobs.length) return;
+  const run = (async () => {
+    for (const job of jobs) {
+      try { await job(); } catch (err) { console.error('[bot] deferred chat send failed:', err && err.message); }
+    }
+  })();
+  if (context && typeof context.waitUntil === 'function') context.waitUntil(run);
+}
+
+async function handleChatMessage(env, event, outbox = []) {
   await recordSubMonths(env, event);
   const parsed = parseCommand(event);
 
@@ -231,7 +249,7 @@ async function handleChatMessage(env, event) {
     if (mazeSaid) {
       if (mazeSaid.length) {
         const { sendChatMessage } = await import('./send-chat.js');
-        for (const m of mazeSaid) await sendChatMessage(env, m);
+        for (const m of mazeSaid) outbox.push(() => sendChatMessage(env, m));
       }
       return;
     }
@@ -250,7 +268,7 @@ async function handleChatMessage(env, event) {
       });
       /* A guess can produce more than one line — a round timing out and the
          next one opening land together. */
-      for (const a of (said || [])) await announceGame(env, a);
+      for (const a of (said || [])) outbox.push(() => announceGame(env, a));
     } catch (err) {
       /* A broken game must not break chat commands. */
       console.error('[chat-game]', err.message);
@@ -265,7 +283,7 @@ async function handleChatMessage(env, event) {
      which is correct for !drop and would have made !entries answer only the
      three people who least need to ask. */
   if (parsed.command === '!entries') {
-    await handleEntriesCommand(env, event);
+    outbox.push(() => handleEntriesCommand(env, event));
     return;
   }
 
@@ -340,14 +358,27 @@ export async function onRequestPost(context) {
     const event = body.event;
     if (!event) return json({ ok: true });
 
+    const outbox = [];
     if (subType === 'channel.chat.message') {
-      await handleChatMessage(env, event);
+      /* Never 500 at Twitch — see the note in hype-train.js. The message id
+         is already claimed, so a retry could not have helped anyway. */
+      try {
+        await handleChatMessage(env, event, outbox);
+      } catch (err) {
+        console.error('[bot] chat message handler failed:', err && err.message);
+      }
     }
 
+    const { clearEventSubRevocation } = await import('./dashboard.js');
+    await clearEventSubRevocation(env, subType);
+
+    deferSends(context, outbox);
     return json({ ok: true });
   }
 
   if (messageType === 'revocation') {
+    const { recordEventSubRevocation } = await import('./dashboard.js');
+    await recordEventSubRevocation(env, body, 'bot/commands');
     return json({ ok: true });
   }
 

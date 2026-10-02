@@ -170,6 +170,10 @@ export async function onRequestPost(context) {
   }
 
   if (messageType === 'revocation') {
+    /* Recorded for Bot Control's revoked banner. Cleared there once Create
+       Subscriptions re-registers the type. */
+    const { recordEventSubRevocation } = await import('./bot/dashboard.js');
+    await recordEventSubRevocation(env, body, 'prediction-events');
     return json({ ok: true });
   }
 

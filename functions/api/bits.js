@@ -75,6 +75,15 @@ export async function onRequestPost(context) {
       }
     }
 
+    const { clearEventSubRevocation } = await import('./bot/dashboard.js');
+    await clearEventSubRevocation(env, type);
+
+    return json({ ok: true });
+  }
+
+  if (check.messageType === 'revocation') {
+    const { recordEventSubRevocation } = await import('./bot/dashboard.js');
+    await recordEventSubRevocation(env, body, 'bits');
     return json({ ok: true });
   }
 

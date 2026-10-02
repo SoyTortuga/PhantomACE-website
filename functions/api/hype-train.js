@@ -29,20 +29,71 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
+const STATE_KEY = 'hype_train_active';
+const STATE_TTL = 3600;
+
+/**
+ * Every reward level at or below `level` this train has not paid yet,
+ * ascending. Pure — exported for tests.
+ *
+ * NOT `LEVEL_REWARDS[level]`. That was an exact match, so a train that went
+ * 4 → 6 in one contribution (a gift-sub bomb does it routinely) never paid
+ * level 5 at all: no progress event ever carried level 5.
+ */
+export function dueRewardLevels(level, droppedLevels) {
+  const done = new Set((droppedLevels || []).map(Number));
+  return Object.keys(LEVEL_REWARDS)
+    .map(Number)
+    .filter(l => l <= Number(level) && !done.has(l))
+    .sort((a, b) => a - b);
+}
+
 async function handleHypeTrainProgress(env, event) {
   const level = event.level;
 
-  const stateKey = 'hype_train_active';
-  let state = await env.MARKETPLACE.get(stateKey, 'json') || { id: null, droppedLevels: [], alertedLevels: [] };
+  /* ── CLAIMED UNDER THE LOCK ─────────────────────────────────────────────
+     This was a plain get → put. Twitch sends a progress event per
+     contribution, so two landing together both read "level 5 not dropped",
+     both pulled four codes, and chat got eight. The levels to alert and the
+     levels to pay are now decided and marked inside one mutate(), so exactly
+     one delivery owns each; the codes are pulled afterwards, outside it. */
+  let newAlert = false;
+  let claimed = [];
+  let startedAt = Date.now();
+  let ended = false;
 
-  /* A new train id resets the per-train bookkeeping. Without this, a second
-     train in the same session would inherit the first one's dropped and
-     alerted levels and silently skip them. */
-  if (state.id !== event.id) {
-    state = { id: event.id, startedAt: Date.now(), droppedLevels: [], alertedLevels: [] };
-  }
-  state.droppedLevels = state.droppedLevels || [];
-  state.alertedLevels = state.alertedLevels || [];
+  await env.MARKETPLACE.mutate(STATE_KEY, (current) => {
+    let state = current || { id: null, droppedLevels: [], alertedLevels: [] };
+    /* A new train id resets the per-train bookkeeping. Without this, a second
+       train in the same session would inherit the first one's dropped and
+       alerted levels and silently skip them. */
+    if (state.id !== event.id) {
+      state = { id: event.id, startedAt: Date.now(), droppedLevels: [], alertedLevels: [] };
+    }
+    /* Already over: a late progress event changes nothing. */
+    if (state.status === 'ended') { ended = true; return undefined; }
+    state.droppedLevels = state.droppedLevels || [];
+    state.alertedLevels = state.alertedLevels || [];
+    startedAt = state.startedAt || startedAt;
+
+    /* One alert per level reached, not per progress event — Twitch sends
+       progress on every contribution, so this would otherwise fire dozens of
+       times at the same level. */
+    if (!state.alertedLevels.includes(level)) {
+      state.alertedLevels.push(level);
+      newAlert = true;
+    }
+
+    claimed = dueRewardLevels(level, state.droppedLevels);
+    state.droppedLevels.push(...claimed);
+
+    /* Written every time, as before, so the expiry slides with the train:
+       a row that lapsed mid-train would come back empty and re-pay every
+       level already paid. */
+    return state;
+  }, { expirationTtl: STATE_TTL });
+
+  if (ended) return;
 
   /* ── THIS USED TO RETURN IMMEDIATELY ────────────────────────────────────
      The old first act was `const reward = LEVEL_REWARDS[level]; if (!reward)
@@ -56,22 +107,26 @@ async function handleHypeTrainProgress(env, event) {
 
      And no overlay alert was possible for a level that paid no code, which
      is most of them. */
-  await env.MARKETPLACE.put('hype_train_site', JSON.stringify({
-    id: event.id,
-    level,
-    total: event.total,
-    goal: event.goal,
-    startedAt: state.startedAt || Date.now(),
-    status: 'active',
-  }), { expirationTtl: 3600 });
+  /* Never moves backwards: two progress events answered out of order must
+     not show the banner dropping a level. */
+  await env.MARKETPLACE.mutate('hype_train_site', (current) => {
+    if (current && current.id === event.id && current.status === 'active' &&
+        Number(current.level) > Number(level)) return undefined;
+    return {
+      id: event.id,
+      level,
+      total: event.total,
+      goal: event.goal,
+      startedAt,
+      status: 'active',
+    };
+  }, { expirationTtl: STATE_TTL });
 
-  /* One alert per level reached, not per progress event — Twitch sends
-     progress on every contribution, so this would otherwise fire dozens of
-     times at the same level. */
-  if (!state.alertedLevels.includes(level)) {
-    state.alertedLevels.push(level);
-    const { pushOverlayEvent } = await import('./overlay/events.js');
-    await pushOverlayEvent(env, { type: 'hype-level', level, total: event.total, goal: event.goal });
+  if (newAlert) {
+    try {
+      const { pushOverlayEvent } = await import('./overlay/events.js');
+      await pushOverlayEvent(env, { type: 'hype-level', level, total: event.total, goal: event.goal });
+    } catch (err) { console.error('[hype-train] overlay alert failed:', err.message); }
     try {
       const { recordActivity } = await import('./activity.js');
       await recordActivity(env, {
@@ -82,13 +137,14 @@ async function handleHypeTrainProgress(env, event) {
     } catch (err) { console.error('[hype-train] activity record failed:', err.message); }
   }
 
-  const reward = LEVEL_REWARDS[level];
-  if (!reward || state.droppedLevels.includes(level)) {
-    /* Nothing to drop, but the alert bookkeeping above still has to persist
-       or the next progress event re-alerts the same level. */
-    await env.MARKETPLACE.put(stateKey, JSON.stringify(state), { expirationTtl: 3600 });
-    return;
+  for (const rewardLevel of claimed) {
+    await payRewardLevel(env, event.id, rewardLevel);
   }
+}
+
+/* Pull, register, record and announce one claimed reward level. */
+async function payRewardLevel(env, trainId, level) {
+  const reward = LEVEL_REWARDS[level];
 
   const codes = [];
   for (let i = 0; i < reward.count; i++) {
@@ -96,13 +152,17 @@ async function handleHypeTrainProgress(env, event) {
     if (code) codes.push(code);
   }
   if (codes.length === 0) {
-    /* Pool exhausted. Saved anyway, for the same reason as above. */
-    await env.MARKETPLACE.put(stateKey, JSON.stringify(state), { expirationTtl: 3600 });
+    /* Pool exhausted. Released again so a later progress event — after a
+       restock — can still pay it, which is what the old code did by simply
+       not marking it. */
+    console.error(`[hype-train] ${reward.rarity} pool empty — level ${level} not paid`);
+    await env.MARKETPLACE.mutate(STATE_KEY, (current) => {
+      if (!current || current.id !== trainId || !Array.isArray(current.droppedLevels)) return undefined;
+      current.droppedLevels = current.droppedLevels.filter(l => Number(l) !== level);
+      return current;
+    }, { expirationTtl: STATE_TTL });
     return;
   }
-
-  state.droppedLevels.push(level);
-  await env.MARKETPLACE.put(stateKey, JSON.stringify(state), { expirationTtl: 3600 });
 
   const drop = {
     level,
@@ -113,10 +173,11 @@ async function handleHypeTrainProgress(env, event) {
     expiresAt: Date.now() + (CODE_EXPIRY_SECONDS * 1000),
   };
 
-  const dropsKey = 'hype_train_drops';
-  const drops = await env.MARKETPLACE.get(dropsKey, 'json') || [];
-  drops.push(drop);
-  await env.MARKETPLACE.put(dropsKey, JSON.stringify(drops), { expirationTtl: CODE_EXPIRY_SECONDS });
+  await env.MARKETPLACE.mutate('hype_train_drops', (current) => {
+    const drops = Array.isArray(current) ? current : [];
+    drops.push(drop);
+    return drops;
+  }, { expirationTtl: CODE_EXPIRY_SECONDS });
 
   /* Make each dropped code claimable. Without this the code is just a
      string in chat that nothing recognises — which is what it was while the
@@ -150,17 +211,32 @@ async function handleHypeTrainProgress(env, event) {
 }
 
 async function handleHypeTrainBegin(env, event) {
-  const state = {
-    id: event.id,
-    level: 1,
-    total: event.total,
-    goal: event.goal,
-    startedAt: Date.now(),
-    droppedLevels: [],
-    status: 'active',
-  };
-  await env.MARKETPLACE.put('hype_train_active', JSON.stringify(state), { expirationTtl: 3600 });
-  await env.MARKETPLACE.put('hype_train_site', JSON.stringify(state), { expirationTtl: 3600 });
+  /* Under the same lock as progress, and keeping what is already known about
+     THIS train: deliveries are not ordered, and a begin answered after the
+     first progress used to wipe droppedLevels — so the next progress event
+     paid the same level again. */
+  let state = null;
+  let staleBegin = false;
+  await env.MARKETPLACE.mutate(STATE_KEY, (current) => {
+    const same = current && current.id === event.id;
+    if (same && current.status === 'ended') { staleBegin = true; return undefined; }
+    state = {
+      id: event.id,
+      level: 1,
+      total: event.total,
+      goal: event.goal,
+      startedAt: same && current.startedAt ? current.startedAt : Date.now(),
+      droppedLevels: same && Array.isArray(current.droppedLevels) ? current.droppedLevels : [],
+      alertedLevels: same && Array.isArray(current.alertedLevels) ? current.alertedLevels : [],
+      status: 'active',
+    };
+    return state;
+  }, { expirationTtl: STATE_TTL });
+  if (staleBegin) return;
+  await env.MARKETPLACE.mutate('hype_train_site', (current) => {
+    if (current && current.id === event.id && current.status === 'active') return undefined;
+    return { id: state.id, level: 1, total: event.total, goal: event.goal, startedAt: state.startedAt, status: 'active' };
+  }, { expirationTtl: STATE_TTL });
 
   /* Light up Skull Clicker too: a train fires a site-wide cursed-skull
      frenzy for everyone playing. Best-effort — an event must never break the
@@ -187,7 +263,17 @@ async function handleHypeTrainBegin(env, event) {
 }
 
 async function handleHypeTrainEnd(env, event) {
-  const state = await env.MARKETPLACE.get('hype_train_active', 'json') || {};
+  /* Marked ended rather than deleted. A progress event for this train that
+     is answered after its end (deliveries are not ordered) would otherwise
+     find no row, start the train's bookkeeping from nothing and pay every
+     level a second time. */
+  let state = {};
+  await env.MARKETPLACE.mutate(STATE_KEY, (current) => {
+    state = current && current.id === event.id ? current : { id: event.id, droppedLevels: [], alertedLevels: [] };
+    state.status = 'ended';
+    state.endedAt = Date.now();
+    return state;
+  }, { expirationTtl: STATE_TTL });
 
   const summary = {
     id: event.id,
@@ -198,7 +284,6 @@ async function handleHypeTrainEnd(env, event) {
     status: 'ended',
   };
   await env.MARKETPLACE.put('hype_train_site', JSON.stringify(summary), { expirationTtl: 300 });
-  await env.MARKETPLACE.delete('hype_train_active');
 
   try {
     const { recordActivity } = await import('./activity.js');
@@ -275,18 +360,33 @@ export async function onRequestPost(context) {
     const event = body.event;
     if (!event) return json({ ok: true });
 
-    if (subType === 'channel.hype_train.begin') {
-      await handleHypeTrainBegin(env, event);
-    } else if (subType === 'channel.hype_train.progress') {
-      await handleHypeTrainProgress(env, event);
-    } else if (subType === 'channel.hype_train.end') {
-      await handleHypeTrainEnd(env, event);
+    /* NEVER 500 AT TWITCH. A database blip used to escape as a 500, Twitch
+       retried, and enough failures disable the subscription — which then
+       needs the admin page to bring back. Answering 200 after a failure
+       loses nothing a retry would have saved: the verifier has already
+       claimed this message id, so a redelivery is answered as a duplicate
+       before reaching the handler anyway. */
+    try {
+      if (subType === 'channel.hype_train.begin') {
+        await handleHypeTrainBegin(env, event);
+      } else if (subType === 'channel.hype_train.progress') {
+        await handleHypeTrainProgress(env, event);
+      } else if (subType === 'channel.hype_train.end') {
+        await handleHypeTrainEnd(env, event);
+      }
+    } catch (err) {
+      console.error(`[hype-train] ${subType} handler failed:`, err && err.message);
     }
+
+    const { clearEventSubRevocation } = await import('./bot/dashboard.js');
+    await clearEventSubRevocation(env, subType);
 
     return json({ ok: true });
   }
 
   if (messageType === 'revocation') {
+    const { recordEventSubRevocation } = await import('./bot/dashboard.js');
+    await recordEventSubRevocation(env, body, 'hype-train');
     return json({ ok: true });
   }
 

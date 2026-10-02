@@ -361,8 +361,20 @@ const T0 = Date.parse('2026-09-19T12:00:00Z');
 
   const setup = fs.readFileSync(path.join(REPO, 'functions/api/admin/bot-setup.js'), 'utf8');
   ok('bot-setup requests the ads scope', /channel:read:ads/.test(setup));
-  ok('in the consent URL, not only in a check',
-     /const broadcasterScopes = [\s\S]{0,200}channel:read:ads/.test(setup));
+
+  /* THE CONSENT URL IS BUILT FROM THE REQUIRED LIST. bot-setup moved to one
+     full grant: the scope string is REQUIRED_BROADCASTER_SCOPES joined, the
+     same array the status check verifies, so the two cannot drift. That
+     makes "is read:ads in the consent URL" two facts, both pinned: the URL
+     is that array, and read:ads is in that array. */
+  const required = /const REQUIRED_BROADCASTER_SCOPES = \[([\s\S]*?)\];/.exec(setup)?.[1] || '';
+  const requiredScopes = [...required.matchAll(/'([^']+)'/g)].map(m => m[1]);
+  ok('the consent URL is the required-scope list, not a separate string',
+     /const broadcasterScopes = REQUIRED_BROADCASTER_SCOPES\.join\(' '\);/.test(setup) &&
+     /scope=\$\{encodeURIComponent\(broadcasterScopes\)\}/.test(setup));
+  ok('in the consent URL, not only in a check', requiredScopes.includes('channel:read:ads'));
+  ok('and the status check verifies that same list',
+     /REQUIRED_BROADCASTER_SCOPES\.filter\(sc => !granted\.includes\(sc\)\)/.test(setup));
   ok('and creates the subscription', /type: 'channel\.ad_break\.begin'/.test(setup));
   ok('pointed at this route', /callback: `\$\{origin\}\/api\/ad-break`/.test(setup));
 
@@ -372,12 +384,22 @@ const T0 = Date.parse('2026-09-19T12:00:00Z');
   ok('the subscription is conditional on the scope',
      /if \(granted\.includes\('channel:read:ads'\)\) \{/.test(setup));
 
-  /* Anchored to the consent string, not the file. The header above explains
-     at length why channel:manage:ads is withheld, and scanning the whole
-     source flags that prose as the thing it is ruling out. */
-  const consent = /const broadcasterScopes = ([\s\S]*?);\n/.exec(setup)?.[1] || '';
-  ok('the consent URL asks for read:ads', /channel:read:ads/.test(consent));
-  ok('and does not ask to manage ads', !/channel:manage:ads/.test(consent));
+  ok('the consent URL asks for read:ads', requiredScopes.includes('channel:read:ads'));
+
+  /* THE SITE ONLY WATCHES ADS. The full grant now includes
+     channel:manage:ads (the broadcaster authorizes once for everything), so
+     the old "the consent URL does not ask to manage ads" check no longer
+     describes the code — it passed only because it scanned the line
+     `REQUIRED_BROADCASTER_SCOPES.join(' ')`, which names no scope at all.
+     What that check protected still holds and is pinned here instead: no
+     ad code ever ACTS on the channel's monetisation — no snooze, no
+     commercial start — whatever the token could do. */
+  const adCode = ['functions/api/ad-break.js', 'functions/api/ads/state.js']
+    .map(f => fs.readFileSync(path.join(REPO, f), 'utf8')).join('\n');
+  ok('no ad code snoozes a break', !/ads\/schedule\/snooze/.test(adCode));
+  ok('no ad code starts a commercial', !/helix\/channels\/commercial/.test(adCode));
+  ok('the ad code only ever GETs the schedule',
+     !/method:\s*'(POST|PATCH|PUT|DELETE)'/.test(fs.readFileSync(path.join(REPO, 'functions/api/ads/state.js'), 'utf8')));
 
   const router = fs.readFileSync(path.join(REPO, 'server/router.js'), 'utf8');
   ok('the state library is not published as a route', /'api\/ads\/state\.js'/.test(router));

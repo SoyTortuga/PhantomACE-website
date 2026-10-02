@@ -31,6 +31,10 @@
 const KEY = 'maze_current';
 const FIRST_SIZE = 4;               /* map 1 — the broadcaster's spec */
 const CONTRIBUTOR_CAP = 300;        /* spam-safe; a raid cannot balloon the doc */
+/* No move for this long and the maze puts itself away. It used to stay
+   active until someone remembered !maze off — on the overlay for the rest of
+   the stream, and taking the state lock for every direction-shaped message. */
+export const MAZE_IDLE_MS = 10 * 60 * 1000;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -422,6 +426,37 @@ export async function stopMaze(env) {
   return summary;
 }
 
+/**
+ * Stop a maze nobody has moved in MAZE_IDLE_MS. Lazy, like every clock on
+ * this site: the overlay's poll is what notices. The check repeats inside
+ * the lock, so a move landing at the same moment wins and exactly one
+ * caller announces the break.
+ */
+export async function stopIdleMaze(env, now = Date.now()) {
+  let summary = null;
+  await env.MARKETPLACE.mutate(KEY, (state) => {
+    if (!state || state.status !== 'active') return undefined;
+    const last = Number(state.updatedAt) || Number(state.startedAt) || 0;
+    if (now - last < MAZE_IDLE_MS) return undefined;
+    state.status = 'off';
+    state.stoppedReason = 'idle';
+    state.updatedAt = now;
+    summary = { level: state.level, size: state.size, totalMoves: state.totalMoves };
+    return state;
+  });
+  if (!summary) return null;
+  _resetHint();
+  try {
+    const { sendChatMessage } = await import('./send-chat.js');
+    await sendChatMessage(env,
+      `🧭 No moves in ${Math.round(MAZE_IDLE_MS / 60000)} minutes — the maze is taking a break ` +
+      `(reached maze ${summary.level}, ${summary.size}×${summary.size}). A mod can bring it back with !maze on.`);
+  } catch (err) {
+    console.error('[maze] idle-stop announcement failed:', err.message);
+  }
+  return summary;
+}
+
 /* ── Routes ──────────────────────────────────────────────────────────── */
 
 export async function onRequestGet(context) {
@@ -437,8 +472,17 @@ export async function onRequestGet(context) {
     staff = await isModerator(env, session);
   }
 
-  const state = await env.MARKETPLACE.get(KEY, 'json');
+  let state = await env.MARKETPLACE.get(KEY, 'json');
   if (!state) return json({ status: 'off', staff });
+
+  if (state.status === 'active' &&
+      Date.now() - (Number(state.updatedAt) || Number(state.startedAt) || 0) >= MAZE_IDLE_MS) {
+    try {
+      if (await stopIdleMaze(env)) state = await env.MARKETPLACE.get(KEY, 'json') || state;
+    } catch (err) {
+      console.error('[maze] idle stop failed:', err.message);
+    }
+  }
 
   /* Contributor names are chat-public already; totals are the fun part.
      Everything else is the board itself, which is the whole point of the

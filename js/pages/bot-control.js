@@ -103,9 +103,33 @@ function renderPools(pools) {
   }).join('');
 }
 
+/* Twitch's revocation reasons, in words a broadcaster can act on. */
+const REVOKE_REASONS = {
+  authorization_revoked: 'the authorizing account removed the app or a permission',
+  user_removed: 'the account no longer exists',
+  notification_failures_exceeded: 'too many deliveries to the site failed',
+  version_removed: 'Twitch retired this subscription version',
+  moderator_removed: 'the bot lost moderator status',
+};
+
+function renderRevoked(revoked) {
+  const box = document.getElementById('botRevoked');
+  if (!box) return;
+  const list = Array.isArray(revoked) ? revoked : [];
+  box.innerHTML = list.map(function (r) {
+    const why = REVOKE_REASONS[r.reason] || r.reason || 'unknown reason';
+    const when = r.at ? new Date(r.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    return '<div class="bot-status-msg error" role="alert" style="font-size:14px">' +
+      '<b>' + escapeBotHtml(r.type) + '</b> revoked — re-run Create Subscriptions on the bot setup page. ' +
+      '(' + escapeBotHtml(why) + (when ? ', ' + escapeBotHtml(when) : '') + ')' +
+      '</div>';
+  }).join('');
+}
+
 function renderWarnings(data) {
   const box = document.getElementById('botWarnings');
   if (!box) return;
+  renderRevoked(data.subscriptions && data.subscriptions.revoked);
   const warnings = [];
 
   /* Hype train drops cannot fire without this subscription and the failure
@@ -134,20 +158,24 @@ function renderSubs(subs) {
   var grid = document.getElementById('botSubsGrid');
   if (!grid) return;
   if (!subs) { grid.innerHTML = '<p class="bot-muted">Subscription status unavailable.</p>'; return; }
+  var revokedRows = subs.revokedRows || {};
   var rows = [
-    ['Subscriptions', subs.subs],
-    ['Gift subs', subs.giftSubs],
-    ['Raids', subs.raids],
-    ['Channel-point redemptions', subs.redemptions],
-    ['Hype train', subs.hypeTrain],
-    ['Chat commands', subs.chat],
+    ['Subscriptions', subs.subs, revokedRows.subs],
+    ['Gift subs', subs.giftSubs, revokedRows.giftSubs],
+    ['Raids', subs.raids, revokedRows.raids],
+    ['Channel-point redemptions', subs.redemptions, revokedRows.redemptions],
+    ['Hype train', subs.hypeTrain, revokedRows.hypeTrain],
+    ['Chat commands', subs.chat, revokedRows.chat],
   ];
   grid.innerHTML = rows.map(function (r) {
-    var ok = !!r[1];
+    /* Registered is a snapshot taken when the subscriptions were created;
+       a revocation Twitch sent since outranks it. */
+    var ok = !!r[1] && !r[2];
+    var note = r[2] ? 'revoked — re-run Create Subscriptions' : (r[1] ? 'active' : 'not registered');
     return '<div class="bot-sub-row ' + (ok ? 'ok' : 'missing') + '">' +
       '<span class="bot-sub-state">' + (ok ? '✅' : '❌') + '</span>' +
       '<span class="bot-sub-name">' + escapeBotHtml(r[0]) + '</span>' +
-      '<span class="bot-sub-note">' + (ok ? 'active' : 'not registered') + '</span>' +
+      '<span class="bot-sub-note">' + note + '</span>' +
       '</div>';
   }).join('');
 }
@@ -212,15 +240,19 @@ function renderCheckins(c) {
 
   /* Hidden entirely when offline with nobody checked in — an empty panel on
      a channel that is not live says nothing worth the space. */
-  if (!c || (!c.live && !c.count)) {
+  if (!c || (!c.live && !c.count && !c.pending)) {
     section.hidden = true;
     return;
   }
   section.hidden = false;
 
+  const pendingNote = c.pending
+    ? '<p class="bot-muted">' + c.pending + ' more waiting for Twitch to confirm the stream — they keep their place.</p>'
+    : '';
+
   if (!c.count) {
     box.innerHTML = '<p class="bot-muted">' +
-      (c.live ? 'Live — nobody has checked in yet this stream.' : 'No check-ins.') + '</p>';
+      (c.live ? 'Live — nobody has checked in yet this stream.' : 'No check-ins.') + '</p>' + pendingNote;
     return;
   }
 
@@ -237,7 +269,7 @@ function renderCheckins(c) {
   box.innerHTML =
     '<div class="bot-checkin-count">' + c.count + (c.count === 1 ? ' check-in' : ' check-ins') +
     (c.recent.length < c.count ? ' (showing ' + c.recent.length + ')' : '') + '</div>' +
-    '<ul class="bot-checkin-list">' + rows + '</ul>';
+    '<ul class="bot-checkin-list">' + rows + '</ul>' + pendingNote;
 }
 
 async function refreshDashboard() {
@@ -945,14 +977,67 @@ function initPredictionPanel() {
 }
 
 
+/* ── Mythic needs a second click ─────────────────────────────────────────
+   The top tier sits one button-width from Rare, and a mythic code is the
+   prize the whole month builds toward — a slip should cost a click, not a
+   code. Built into the page rather than window.confirm(), which some
+   embedded browsers (OBS docks among them) silently answer false. The
+   count is read when the confirm opens and shown in it, so what is
+   confirmed is exactly what fires; the strip times out on its own. */
+var mythicConfirmTimer = null;
+
+function closeMythicConfirm() {
+  var box = document.getElementById('botMythicConfirm');
+  if (box) box.hidden = true;
+  if (mythicConfirmTimer) { clearTimeout(mythicConfirmTimer); mythicConfirmTimer = null; }
+}
+
+function openMythicConfirm(count, sourceBtn) {
+  var box = document.getElementById('botMythicConfirm');
+  var text = document.getElementById('botMythicConfirmText');
+  var go = document.getElementById('botMythicConfirmGo');
+  if (!box || !text || !go) {
+    fireBotAction({ action: 'drop', rarity: 'mythic', count: count }, sourceBtn);
+    return;
+  }
+  text.textContent = 'Drop ' + count + ' Mythic code' + (count === 1 ? '' : 's') +
+    ' to chat? Mythic is the top prize tier.';
+  go.dataset.count = String(count);
+  box.hidden = false;
+  go.focus();
+  if (mythicConfirmTimer) clearTimeout(mythicConfirmTimer);
+  mythicConfirmTimer = setTimeout(closeMythicConfirm, 15000);
+}
+
+function readDropCount() {
+  var countEl = document.getElementById('botDropCount');
+  return countEl ? Math.max(1, Math.min(10, parseInt(countEl.value, 10) || 1)) : 1;
+}
+
 function initBotControlPanel() {
   document.querySelectorAll('.bot-drop-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var countEl = document.getElementById('botDropCount');
-      var count = countEl ? Math.max(1, Math.min(10, parseInt(countEl.value, 10) || 1)) : 1;
+      var count = readDropCount();
+      if (btn.dataset.rarity === 'mythic') {
+        openMythicConfirm(count, btn);
+        return;
+      }
+      closeMythicConfirm();
       fireBotAction({ action: 'drop', rarity: btn.dataset.rarity, count: count }, btn);
     });
   });
+
+  var mythicGo = document.getElementById('botMythicConfirmGo');
+  var mythicCancel = document.getElementById('botMythicConfirmCancel');
+  if (mythicGo) {
+    mythicGo.addEventListener('click', function () {
+      var count = Math.max(1, Math.min(10, parseInt(mythicGo.dataset.count, 10) || 1));
+      closeMythicConfirm();
+      fireBotAction({ action: 'drop', rarity: 'mythic', count: count },
+        document.querySelector('.bot-drop-btn[data-rarity="mythic"]'));
+    });
+  }
+  if (mythicCancel) mythicCancel.addEventListener('click', closeMythicConfirm);
 
   document.querySelectorAll('.bot-egg-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {

@@ -31,6 +31,11 @@ const ROUND_MS = 180000;
 const REVEAL_MS = 12000;
 const WIN_ENTRIES = 2;
 const MAX_SCORES = 200;
+/* Rounds in a row that close with nobody solving them before an
+   auto-continuing game takes a break. The overlay poll drives the clock, so
+   without this an OBS scene left open after a BRB posted a fresh scramble to
+   chat every three minutes for the rest of the stream. */
+export const MAX_IDLE_ROUNDS = 3;
 
 /* ── The word list ───────────────────────────────────────────────────────
    Lives in chat-game-words.js — sixteen hundred entries is data, and it
@@ -197,12 +202,17 @@ export function advance(game, now = Date.now()) {
 
   if (game.status === 'running' && now >= game.endsAt) {
     endRound(game, now);
+    /* Ran out with no winner: one more unanswered round in a row. */
+    game.idleRounds = (Number(game.idleRounds) || 0) + 1;
     closed = { word: game.word, round: game.round };
+    /* The last one before the break says so in its own line, rather than
+       promising "next one coming up" and then going quiet. */
+    if (game.autoContinue && game.idleRounds >= MAX_IDLE_ROUNDS) closed.final = true;
     changed = true;
   }
 
   if (game.status === 'reveal' && now >= game.revealUntil) {
-    if (game.autoContinue) {
+    if (game.autoContinue && (Number(game.idleRounds) || 0) < MAX_IDLE_ROUNDS) {
       startRound(game, now);
       opened = { category: game.category, display: game.display, round: game.round };
     } else {
@@ -219,8 +229,22 @@ function freshGame() {
     status: 'idle', round: 0, word: null, category: null, display: null,
     startedAt: null, endsAt: null, revealUntil: null,
     answered: [], winner: null, scores: {}, recent: [], autoContinue: true,
+    idleRounds: 0,
   };
 }
+
+/* ── Is a round even running? ───────────────────────────────────────────
+   offerGuess is offered EVERY ordinary chat message, and used to open a
+   locked transaction on the game row for each one even with no game on.
+   Same answer as the maze's: remember "nothing is running" for a few
+   seconds, in-process (this server is single-instance). controlGame()
+   clears it on start, so the first guess after Start is never refused by
+   a stale "off". Only "idle" is remembered — a reveal turns into the next
+   round by itself, so it has to keep being asked. */
+let idleHint = { idle: false, at: 0 };
+const IDLE_HINT_MS = 15000;
+
+export function _resetGuessHint() { idleHint = { idle: false, at: 0 }; }
 
 /* ── The chat scramble ───────────────────────────────────────────────────
    Announcements only, never a reply to a guess. Not a rate-limit rule any
@@ -240,7 +264,9 @@ export async function announceGame(env, announce) {
   } else if (announce.kind === 'win') {
     await sendChatMessage(env, `@${announce.name} got it — ${announce.word.toUpperCase()}! +2 giveaway entries.`);
   } else if (announce.kind === 'timeout') {
-    await sendChatMessage(env, `Time! It was ${announce.word.toUpperCase()}. Next one coming up.`);
+    await sendChatMessage(env, announce.final
+      ? `Time! It was ${announce.word.toUpperCase()}. Nobody's cracked the last ${MAX_IDLE_ROUNDS} — the scramble is taking a break. A mod can bring it back with !scramble.`
+      : `Time! It was ${announce.word.toUpperCase()}. Next one coming up.`);
   } else if (announce.kind === 'skip') {
     await sendChatMessage(env, `Skipped — it was ${announce.word.toUpperCase()}.`);
   } else if (announce.kind === 'stop') {
@@ -263,6 +289,7 @@ export async function announceGame(env, announce) {
  */
 export async function offerGuess(env, { userId, name, text }) {
   if (!userId) return null;
+  if (idleHint.idle && Date.now() - idleHint.at < IDLE_HINT_MS) return null;
 
   const announce = [];
   let credited = null;
@@ -271,9 +298,10 @@ export async function offerGuess(env, { userId, name, text }) {
     const game = current && current.status ? current : freshGame();
     const now = Date.now();
     const { changed, closed, opened } = advance(game, now);
-    if (closed) announce.push({ kind: 'timeout', word: closed.word });
+    if (closed) announce.push({ kind: 'timeout', word: closed.word, final: !!closed.final });
     if (opened) announce.push({ kind: 'start', category: opened.category, display: opened.display });
 
+    idleHint = { idle: game.status === 'idle', at: now };
     if (game.status !== 'running') return changed ? game : undefined;
 
     const id = String(userId);
@@ -295,6 +323,7 @@ export async function offerGuess(env, { userId, name, text }) {
     if (game.winner) return game;
 
     game.winner = { userId: id, name, at: now };
+    game.idleRounds = 0;
     const prev = game.scores[id] || { name, points: 0 };
     game.scores[id] = { name, points: prev.points + 1 };
 
@@ -340,11 +369,19 @@ export async function tickGame(env) {
   const announce = [];
   let game = null;
 
+  /* An idle game has nothing to tick and shows the overlay nothing, so a
+     poll against one need not take the row's lock either. */
+  if (idleHint.idle && Date.now() - idleHint.at < IDLE_HINT_MS) {
+    return { game: { status: 'idle' }, announce };
+  }
+
   await env.MARKETPLACE.mutate(KEY, (current) => {
     game = current && current.status ? current : freshGame();
-    const { changed, closed, opened } = advance(game, Date.now());
-    if (closed) announce.push({ kind: 'timeout', word: closed.word });
+    const now = Date.now();
+    const { changed, closed, opened } = advance(game, now);
+    if (closed) announce.push({ kind: 'timeout', word: closed.word, final: !!closed.final });
     if (opened) announce.push({ kind: 'start', category: opened.category, display: opened.display });
+    idleHint = { idle: game.status === 'idle', at: now };
     return changed ? game : undefined;
   });
 
@@ -396,6 +433,7 @@ export async function onRequestPost(context) {
 export async function controlGame(env, action, opts = {}) {
   let announce = null;
   let state = null;
+  if (action === 'start') _resetGuessHint();
 
   await env.MARKETPLACE.mutate(KEY, (current) => {
     const game = current && current.status ? current : freshGame();
@@ -413,6 +451,8 @@ export async function controlGame(env, action, opts = {}) {
     } else if (action === 'skip') {
       if (game.status === 'idle') return undefined;
       announce = { kind: 'skip', word: game.word };
+      /* A mod pressing Skip is someone watching — the idle count restarts. */
+      game.idleRounds = 0;
       startRound(game, now);
     } else if (action === 'stop') {
       if (game.status === 'idle') return undefined;
@@ -426,6 +466,7 @@ export async function controlGame(env, action, opts = {}) {
     return game;
   });
 
+  if (state) idleHint = { idle: state.status === 'idle', at: Date.now() };
   if (!state) return { error: 'Nothing to do — no game is running.' };
   return { success: true, announce, state: publicState(state) };
 }

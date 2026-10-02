@@ -25,6 +25,91 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
+/* ── REVOKED SUBSCRIPTIONS ───────────────────────────────────────────────
+   Twitch revokes a subscription when the authorising token loses a scope,
+   the user is gone, or the callback failed too often — and then simply
+   stops sending. The panel's "registered" list is a snapshot bot-setup wrote
+   when the subscriptions were created, so a revoked one stayed green there
+   forever. Every webhook route now records a revocation here, one row for
+   the whole channel keyed by subscription type, and the panel shows each as
+   a red banner until it is fixed.
+
+   An entry clears two ways: that type delivers a notification again (the
+   routes call clearEventSubRevocation), or Create Subscriptions re-registers
+   the type after the revocation (judged here, from the createdAt bot-setup
+   stamps — which also covers routes that cannot clear on notification).
+
+   Exported from this route rather than a new library file: a handler-less
+   module under functions/ has to be declared in server/router.js. */
+export const REVOKED_KEY = 'eventsub_revoked';
+
+let revokedTypesCache = { types: null, at: 0 };
+const REVOKED_CACHE_MS = 60000;
+
+export async function recordEventSubRevocation(env, body, route) {
+  const sub = (body && body.subscription) || {};
+  const type = String(sub.type || 'unknown');
+  const entry = {
+    type,
+    reason: String(sub.status || 'unknown'),
+    at: Date.now(),
+    route: route || null,
+  };
+  console.warn(`[eventsub] ${type} subscription revoked: ${entry.reason}`);
+  try {
+    await env.MARKETPLACE.mutate(REVOKED_KEY, (current) => {
+      const rec = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+      rec[type] = entry;
+      return rec;
+    });
+    revokedTypesCache = { types: null, at: 0 };
+  } catch (err) {
+    console.error('[eventsub] could not record revocation:', err.message);
+  }
+}
+
+/* Called on every notification, chat messages included, so the common case
+   — nothing revoked — costs one read a minute, not one per message. */
+export async function clearEventSubRevocation(env, type) {
+  if (!type) return;
+  try {
+    const now = Date.now();
+    if (!revokedTypesCache.types || now - revokedTypesCache.at > REVOKED_CACHE_MS) {
+      const current = await env.MARKETPLACE.get(REVOKED_KEY, 'json');
+      revokedTypesCache = {
+        types: new Set(current && typeof current === 'object' ? Object.keys(current) : []),
+        at: now,
+      };
+    }
+    if (!revokedTypesCache.types.has(type)) return;
+    await env.MARKETPLACE.mutate(REVOKED_KEY, (current) => {
+      if (!current || !current[type]) return undefined;
+      delete current[type];
+      return current;
+    });
+    revokedTypesCache.types.delete(type);
+  } catch (err) {
+    console.error('[eventsub] could not clear revocation:', err.message);
+  }
+}
+
+export function _resetRevokedCache() { revokedTypesCache = { types: null, at: 0 }; }
+
+/** Revocations still standing: not since re-created by Create Subscriptions. */
+export function activeRevocations(revoked, subs) {
+  const rec = revoked && typeof revoked === 'object' && !Array.isArray(revoked) ? revoked : {};
+  const created = new Map();
+  for (const s of Array.isArray(subs) ? subs : []) {
+    const t = String(s && s.type || '');
+    const at = Number(s && s.createdAt) || 0;
+    if (!created.has(t) || created.get(t) < at) created.set(t, at);
+  }
+  return Object.values(rec)
+    .filter(r => r && r.type && !(created.get(r.type) > (Number(r.at) || 0)))
+    .sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0))
+    .map(r => ({ type: r.type, reason: r.reason || 'unknown', at: r.at || null }));
+}
+
 export async function onRequestGet(context) {
   const { env, request } = context;
   const session = getSession(request);
@@ -94,6 +179,14 @@ export async function onRequestGet(context) {
      the panel surfaces this rather than leaving a silent gap to discover live.
      Read from the stored list bot-setup writes; a live Twitch re-check lives on
      the bot-setup page. */
+  let revoked = [];
+  try {
+    revoked = activeRevocations(await env.MARKETPLACE.get(REVOKED_KEY, 'json'), subs);
+  } catch (err) {
+    console.error('[dashboard] could not read revocations:', err.message);
+  }
+  const isRevoked = (pred) => revoked.some(r => pred(r.type));
+
   const subscriptions = {
     subs: subTypes.includes('channel.subscribe'),
     giftSubs: subTypes.includes('channel.subscription.gift'),
@@ -102,6 +195,16 @@ export async function onRequestGet(context) {
     hypeTrain: hasHypeTrainSub,
     chat: subTypes.includes('channel.chat.message'),
     total: subTypes.length,
+    /* Per-row: a snapshot "registered" can still be dead at Twitch. */
+    revokedRows: {
+      subs: isRevoked(t => t === 'channel.subscribe'),
+      giftSubs: isRevoked(t => t === 'channel.subscription.gift'),
+      raids: isRevoked(t => t === 'channel.raid'),
+      redemptions: isRevoked(t => t === 'channel.channel_points_custom_reward_redemption.add'),
+      hypeTrain: isRevoked(t => t.startsWith('channel.hype_train')),
+      chat: isRevoked(t => t === 'channel.chat.message'),
+    },
+    revoked,
   };
 
   /* ── Pham Check-ins for the broadcast on air ──────────────────────────
@@ -120,6 +223,9 @@ export async function onRequestGet(context) {
     /* Most recent first — mid-stream the question is who just arrived. */
     recent: current ? current.checkins.slice(-25).reverse() : [],
     stale: !!(stored && !current),
+    /* Check-ins waiting for Twitch to say which broadcast they belong to —
+       settled within about a minute (checkin-rewards.js). */
+    pending: stored && Array.isArray(stored.pending) ? stored.pending.length : 0,
   };
 
   /* The OBS browser-source URL, key included, so it can be copied rather

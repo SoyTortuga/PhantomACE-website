@@ -454,11 +454,17 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
 
   /* Ten rounds, nobody ever guessing. Each round is wound past its
      deadline rather than waited out. */
+  /* Rounds that SOMEONE solves keep it going indefinitely — each is wound
+     past its deadline after a win, so only the poll moves it on. */
   for (let i = 0; i < 10; i++) {
     let g = read(env);
-    g.endsAt = Date.now() - 1;
-    write(env, g);
-    announced.push(...kinds((await tickGame(env)).announce));
+    if (i % 3 === 2) {
+      await offerGuess(env, { userId: 'w' + i, name: 'solver', text: g.word });
+    } else {
+      g.endsAt = Date.now() - 1;
+      write(env, g);
+      announced.push(...kinds((await tickGame(env)).announce));
+    }
 
     g = read(env);
     g.revealUntil = Date.now() - 1;
@@ -468,11 +474,90 @@ check('normalise strips everything but letters and digits', normalise('A-b C!1')
     words.push(read(env).word);
   }
 
-  check('ten silent rounds still run', read(env).status, 'running');
+  check('rounds with an occasional winner keep running', read(env).status, 'running');
   check('and reach round eleven', read(env).round, 11);
-  check('every round announced its answer', announced.filter(k => k === 'timeout').length, 10);
+  check('every unsolved round announced its answer', announced.filter(k => k === 'timeout').length, 7);
   check('and every new round announced itself', announced.filter(k => k === 'start').length, 10);
   check('with no round left behind', new Set(words).size, 11);
+}
+
+/* ── A game nobody is playing puts itself away ───────────────────────────
+   THE BUG THIS GUARDS. The overlay poll is the clock, so a BRB scene left
+   open in OBS kept posting a fresh scramble to chat every three minutes for
+   the rest of the stream. Three unsolved rounds in a row and it stops, and
+   says so in the line that reveals the third answer. */
+{
+  const env = makeEnv();
+  await controlGame(env, 'start', {});
+
+  const timeouts = [];
+  const starts = [];
+  for (let i = 0; i < 3; i++) {
+    let g = read(env);
+    g.endsAt = Date.now() - 1;
+    write(env, g);
+    const t1 = await tickGame(env);
+    timeouts.push(...t1.announce.filter(a => a.kind === 'timeout'));
+
+    g = read(env);
+    g.revealUntil = Date.now() - 1;
+    write(env, g);
+    const t2 = await tickGame(env);
+    starts.push(...t2.announce.filter(a => a.kind === 'start'));
+  }
+
+  check('three unsolved rounds each reveal their answer', timeouts.length, 3);
+  check('the first two promise another round', timeouts.slice(0, 2).map(a => !!a.final), [false, false]);
+  check('the third says the game is taking a break', !!timeouts[2].final, true);
+  check('only two new rounds were opened', starts.length, 2);
+  check('and the game is idle', read(env).status, 'idle');
+  check('the overlay is told nothing is running', publicState(read(env)).status, 'idle');
+
+  const later = await tickGame(env);
+  check('a later poll says nothing', later.announce, []);
+  check('and a chat line is not a guess', await offerGuess(env, { userId: 'x', name: 'x', text: 'hello' }), null);
+
+  /* A mod brings it back. */
+  await controlGame(env, 'start', {});
+  check('a restart runs again', read(env).status, 'running');
+  check('with the idle count cleared', read(env).idleRounds, 0);
+}
+
+{
+  /* A win in between resets the count — two unsolved, one solved, two
+     unsolved is still a game being played. */
+  const env = makeEnv();
+  await controlGame(env, 'start', {});
+  const wind = async (solve) => {
+    let g = read(env);
+    if (solve) await offerGuess(env, { userId: 's', name: 's', text: g.word });
+    else { g.endsAt = Date.now() - 1; write(env, g); await tickGame(env); }
+    g = read(env);
+    g.revealUntil = Date.now() - 1;
+    write(env, g);
+    await tickGame(env);
+  };
+  await wind(false); await wind(false); await wind(true); await wind(false); await wind(false);
+  check('a solved round resets the idle count', read(env).status, 'running');
+  check('which now stands at two', read(env).idleRounds, 2);
+}
+
+{
+  /* With nothing running, an ordinary chat line takes no lock at all. */
+  const env = makeEnv();
+  let locks = 0;
+  const inner = env.MARKETPLACE.mutate;
+  env.MARKETPLACE.mutate = (k, fn) => { locks++; return inner.call(env.MARKETPLACE, k, fn); };
+  await offerGuess(env, { userId: '1', name: 'a', text: 'first message' });
+  const afterFirst = locks;
+  for (let i = 0; i < 20; i++) await offerGuess(env, { userId: String(i), name: 'n', text: 'chatter ' + i });
+  check('the first message finds no game', afterFirst, 1);
+  check('and the next twenty do not even ask', locks, 1);
+
+  await controlGame(env, 'start', {});
+  const before = locks;
+  await offerGuess(env, { userId: '1', name: 'a', text: 'a guess' });
+  ok('a started game hears the very next message', locks > before);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

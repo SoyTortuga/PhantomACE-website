@@ -38,6 +38,9 @@
          role field does not say so. -->
     <div id="botControlPanel" hidden>
 
+      <!-- Red, one per revoked EventSub type: Twitch has stopped sending it. -->
+      <div id="botRevoked"></div>
+
       <div id="botWarnings"></div>
 
       <div id="botStatusMsg" class="bot-status-msg" hidden></div>
@@ -77,6 +80,15 @@
               <button class="btn-secondary bot-drop-btn" data-rarity="uncommon">Uncommon</button>
               <button class="btn-secondary bot-drop-btn" data-rarity="rare">Rare</button>
               <button class="btn-secondary bot-drop-btn" data-rarity="mythic">Mythic</button>
+            </div>
+            <!-- Mythic asks twice. In-page rather than window.confirm(), which
+                 some embedded browsers answer false without showing. -->
+            <div class="bot-status-msg error" id="botMythicConfirm" role="alertdialog" aria-labelledby="botMythicConfirmText" style="font-size:14px" hidden>
+              <p id="botMythicConfirmText">Drop a Mythic code to chat?</p>
+              <div class="giveaway-actions">
+                <button class="btn-primary" id="botMythicConfirmGo" type="button">Drop Mythic</button>
+                <button class="btn-secondary" id="botMythicConfirmCancel" type="button">Cancel</button>
+              </div>
             </div>
           </div>
 
