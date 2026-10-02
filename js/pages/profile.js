@@ -248,6 +248,9 @@
       section('Showcase', showcase) +
       section('Favourite dino', dino) +
       section('Standings', standings) +
+      /* The Seasonal Grimoire: filled by profile-grimoire.js on the same
+         'profile:rendered' seam the Room and comment wall use. */
+      section('Seasonal Grimoire', '<div id="profGrimoire"><p class="grim-state">Loading grimoire…</p></div>') +
       /* Filled by profile-room.js on the same event as the comments. */
       section('Room', '<div id="profRoom"><p class="rm-state">Loading room…</p></div>') +
       /* Filled by profile-comments.js once this page has said who the
