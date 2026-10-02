@@ -80,6 +80,16 @@ export async function onRequestPost(context) {
       console.error('[mtgbbb/end] could not clear mtgbbb_current:', err.message);
     }
 
+    /* Settle last month's prizes first, so a box finished after midnight on
+       the 1st counts for the new month rather than the board about to be paid
+       out and wiped. Idempotent; never blocks the end of a game. */
+    try {
+      const { maybeRunMonthlyAwards } = await import('../leaderboards.js');
+      await maybeRunMonthlyAwards(env);
+    } catch (err) {
+      console.error('[mtgbbb/end] monthly award settle failed:', err.message);
+    }
+
     /* Every player who scored above zero, not only the winner — a strong
        showing in a losing seat still deserves to register on the board.
        Best score kept, exactly like Mana Clash's SCORE_BOARD. */

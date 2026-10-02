@@ -59,14 +59,17 @@ const BOARDS = {
 };
 
 /* ── Monthly top-3 prizes ─────────────────────────
-   On the last day of the month, the top 3 on each
-   competitive game's board (phamily-time excluded —
-   it's a watch-time pass with its own reward system,
-   not a game leaderboard) get a code at:
+   Once a new month has begun (SEASON_TZ), the first
+   leaderboard request settles the PREVIOUS month: the
+   top 3 on each competitive game's board (phamily-time
+   excluded — it's a watch-time pass with its own reward
+   system, not a game leaderboard) win a profile badge:
      1st = mythic, 2nd = rare, 3rd = uncommon
-   Codes are whispered directly to the winner (not
-   queued for a chat drop) with a 7-day redemption
-   window, then that game's board resets to empty. ── */
+   The badge goes straight into the winner's inventory
+   (game 'profile', so it can be equipped/showcased) —
+   that is the on-site record, and it does not depend on
+   a whisper arriving. A backup code, restricted to the
+   winner, is also minted and whispered. ── */
 
 const MONTHLY_GAME_LABELS = {
   /* Skull Clicker is intentionally absent: its board here (sc_leaderboard) is
@@ -91,69 +94,184 @@ const MONTHLY_CODE_DURATION_SECONDS = 604800; // 7 days
 /* Month boundary + labels come from the shared season calendar (SEASON_TZ), so
    leaderboard awards settle on the same month as the giveaway ledger and Phamily
    Time — not on a separate UTC clock. */
-import { monthKey, isLastDayOfMonth, monthLabel } from './season-time.js';
+import { prevMonthKey, monthLabel } from './season-time.js';
 
-async function maybeRunMonthlyAwards(env) {
-  const now = new Date();
-  if (!isLastDayOfMonth(now)) return;
+/* "September 2026" for a 'YYYY-MM' key. Mid-month noon UTC is the same
+   calendar month in SEASON_TZ, so monthLabel names the key's own month. */
+function labelForMonthKey(mk) {
+  const [y, m] = String(mk).split('-').map(Number);
+  return monthLabel(new Date(Date.UTC(y, m - 1, 15, 12)));
+}
 
-  const key = monthKey(now);
+/* Months this process already knows are settled, per env, so a month's worth
+   of leaderboard polls does not each attempt the claim INSERT. Purely a
+   shortcut — claimMonthlyAward stays the source of truth. */
+const settledMonths = new WeakMap();
 
-  /* One atomic claim, replacing a get-then-put on monthly_awards_done_*.
-     That pair could NOT stop a double-run despite the comment that said it
-     did: two requests on the last day of the month both read no flag, both
-     wrote it, and both handed out prizes — duplicate winners, duplicate
-     prize codes whispered. INSERT ... ON CONFLICT DO NOTHING RETURNING
-     returns a row to exactly one caller per month, ever. */
+/* The prize itself, written straight into the winner's inventory under the
+   inventory's lock. Idempotent on item id, so a later redemption of the backup
+   code (handleRedeem dedupes non-consumables by id) cannot double it. */
+async function grantAwardBadge(env, userId, item) {
+  await env.MARKETPLACE.mutate(`inv_${userId}`, (inv) => {
+    const cur = inv || { userId: String(userId), items: [], equips: {} };
+    cur.items = Array.isArray(cur.items) ? cur.items : [];
+    if (!cur.equips) cur.equips = {};
+    if (cur.items.some(i => i && i.id === item.id)) return undefined;
+    cur.items.push({
+      id: item.id,
+      game: item.game,
+      type: item.type,
+      name: item.name,
+      rarity: item.rarity,
+      consumable: false,
+      quantity: 1,
+      grantedAt: Date.now(),
+      source: 'monthly-award',
+    });
+    return cur;
+  });
+}
+
+/* Read a board and empty it in ONE locked operation. The snapshot is what the
+   month is awarded from; anything written after the lock releases lands on the
+   fresh board and counts for the new month. A get-then-put here would let a
+   score posted between the two be read by nobody and wiped. */
+async function snapshotAndWipe(env, key) {
+  let snapshot = [];
+  await env.MARKETPLACE.mutate(key, (current) => {
+    snapshot = Array.isArray(current) ? current : [];
+    return snapshot.length ? [] : undefined;
+  });
+  return snapshot;
+}
+
+/**
+ * Settle the PREVIOUS SEASON_TZ month's leaderboard prizes, once.
+ *
+ * Runs on the first leaderboard request on/after the 1st. Because the claim
+ * is keyed by the previous month and checked on every request (until this
+ * process has seen it settled), a month whose 1st had no traffic is still
+ * awarded by whichever request comes next — that is the catch-up.
+ *
+ * @returns {Promise<null | {month: string, label: string, awards: object[]}>}
+ *   null when there was nothing to do (already settled / claimed elsewhere).
+ */
+export async function maybeRunMonthlyAwards(env, now = new Date()) {
+  const key = prevMonthKey(now);
+  if (settledMonths.get(env) === key) return null;
+
+  /* One atomic claim: INSERT ... ON CONFLICT DO NOTHING RETURNING hands a row
+     to exactly one caller per month, ever, so two simultaneous requests on the
+     1st cannot both pay out. */
   const claimed = await env.MARKETPLACE.claimMonthlyAward(key);
-  if (!claimed) return;
+  settledMonths.set(env, key);
+  if (!claimed) return null;
 
-  const label = monthLabel(now);
+  const label = labelForMonthKey(key);
   const summaryLines = [];
+  const awards = [];
 
   for (const [game, board] of Object.entries(BOARDS)) {
     const gameLabel = MONTHLY_GAME_LABELS[game];
     if (!gameLabel) continue;
 
-    const lb = await env.MARKETPLACE.get(board.key, 'json') || [];
-    const winners = lb.filter(e => !String(e.id).startsWith('guest_')).slice(0, 3);
+    let snapshot;
+    try {
+      snapshot = await snapshotAndWipe(env, board.key);
+    } catch (err) {
+      console.error(`[leaderboards] monthly ${key}: could not snapshot ${board.key}; ` +
+        `its standings were NOT awarded and roll into next month:`, err && err.message);
+      continue;
+    }
+
+    const winners = snapshot
+      .filter(e => e && e.id && !String(e.id).startsWith('guest_'))
+      .slice(0, 3);
     if (winners.length === 0) continue;
 
     const placementNames = [];
 
     for (let i = 0; i < winners.length; i++) {
       const winner = winners[i];
+      const userId = String(winner.id);
       const placement = MONTHLY_PLACEMENTS[i];
+      const item = {
+        id: `monthly_${game}_${key}_${i + 1}`,
+        game: 'profile',
+        type: 'badge',
+        name: `${gameLabel} ${placement.suffix} — ${label}`,
+        rarity: placement.rarity,
+      };
+      const award = {
+        game, place: i + 1, userId, name: winner.name, score: winner.score,
+        itemId: item.id, granted: false, code: null, whispered: false,
+      };
 
       try {
-        const record = await createItemCode(env, {
-          id: `monthly_${game}_${key}_${i + 1}`,
-          game,
-          type: 'badge',
-          name: `${gameLabel} ${placement.suffix} — ${label}`,
-          rarity: placement.rarity,
-        });
-        await activateItemCode(env, record.code, MONTHLY_CODE_DURATION_SECONDS);
-
-        const msg = `${placement.medal} You placed #${i + 1} in ${gameLabel} for ${label}! ` +
-          `Your ${placement.rarity} code: ${record.code} — redeem it at phantomace.tv/redeem.html ` +
-          `within the next 7 days.`;
-        await sendWhisper(env, winner.id, msg);
-      } catch {
-        // Skip this placement rather than aborting the whole run.
+        await grantAwardBadge(env, userId, item);
+        award.granted = true;
+      } catch (err) {
+        console.error(`[leaderboards] monthly ${key}: inventory grant failed for ${game} #${i + 1} ` +
+          `(user ${userId}, ${winner.name}):`, err && err.message);
       }
 
+      /* Backup code, locked to this winner — useless to anyone else who sees
+         the whisper. If the grant above failed, this is the recovery path. */
+      try {
+        const record = await createItemCode(env, item, { restrictedTo: [userId] });
+        await activateItemCode(env, record.code, MONTHLY_CODE_DURATION_SECONDS);
+        award.code = record.code;
+      } catch (err) {
+        console.error(`[leaderboards] monthly ${key}: code mint failed for ${game} #${i + 1} ` +
+          `(user ${userId}, ${winner.name}):`, err && err.message);
+      }
+
+      const where = award.granted
+        ? `Your ${placement.rarity} badge is already in your inventory — equip it at phantomace.tv/inventory.html`
+        : `Your ${placement.rarity} badge is waiting`;
+      const backup = award.code
+        ? (award.granted
+          ? `. Missing? Redeem backup code ${award.code} at phantomace.tv/redeem.html within 7 days.`
+          : `: redeem code ${award.code} at phantomace.tv/redeem.html within 7 days.`)
+        : '.';
+      try {
+        award.whispered = !!(await sendWhisper(env, userId,
+          `${placement.medal} You placed #${i + 1} in ${gameLabel} for ${label}! ${where}${backup}`));
+      } catch (err) {
+        console.error(`[leaderboards] monthly ${key}: whisper threw for user ${userId}:`, err && err.message);
+      }
+
+      if (!award.granted && !award.code) {
+        console.error(`[leaderboards] monthly ${key}: ${game} #${i + 1} (user ${userId}, ${winner.name}, ` +
+          `score ${winner.score}) received NOTHING — grant manually: ${JSON.stringify(item)}`);
+      } else if (!award.whispered) {
+        console.error(`[leaderboards] monthly ${key}: whisper not delivered to ${game} #${i + 1} ` +
+          `(user ${userId}, ${winner.name}); badge granted=${award.granted}, backup code=${award.code}`);
+      }
+
+      awards.push(award);
       placementNames.push(`${placement.medal} ${winner.name}`);
     }
 
     summaryLines.push(`${gameLabel}: ${placementNames.join(' ')}`);
-    await env.MARKETPLACE.put(board.key, JSON.stringify([]));
   }
 
   if (summaryLines.length > 0) {
-    const announcement = `🏆 ${label} Champions! ${summaryLines.join(' | ')} — codes have been whispered to you. Congrats!`;
-    await announceAction(env, announcement, 'monthly-awards');
+    const announcement = `🏆 ${label} Champions! ${summaryLines.join(' | ')} — your badges are in your inventory. Congrats!`;
+    try {
+      const res = await announceAction(env, announcement, 'monthly-awards');
+      if (res && res.success === false) console.error(`[leaderboards] monthly ${key}: announcement not sent:`, res.error);
+    } catch (err) {
+      console.error(`[leaderboards] monthly ${key}: announcement threw:`, err && err.message);
+    }
   }
+
+  return { month: key, label, awards };
+}
+
+async function settleQuietly(env) {
+  try { await maybeRunMonthlyAwards(env); }
+  catch (err) { console.error('[leaderboards] monthly awards failed:', err && err.message); }
 }
 
 function json(data, status = 200) {
@@ -176,7 +294,7 @@ function getPlayer(request, body) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
-  await maybeRunMonthlyAwards(env);
+  await settleQuietly(env);
 
   const url = new URL(request.url);
   const game = url.searchParams.get('game');
@@ -221,7 +339,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { env, request } = context;
-  await maybeRunMonthlyAwards(env);
+  await settleQuietly(env);
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
@@ -241,18 +359,24 @@ export async function onRequestPost(context) {
   /* Increment-mode boards (e.g. PhamShock wins) count occurrences rather
      than track a best single score — every valid POST means "this
      happened once more," so there's no score to validate or compare. */
+  /* Every write below is a mutate(), never get-then-put: a put built from a
+     read taken before the monthly snapshot-and-wipe would otherwise write the
+     whole old month back onto the fresh board (and two simultaneous posts
+     would drop one of them). */
   if (board.mode === 'increment') {
-    const lb = await env.MARKETPLACE.get(board.key, 'json') || [];
-    const existing = lb.find(e => e.id === player.id);
-    if (existing) {
-      existing.score += 1;
-      existing.name = player.name;
-      existing.updatedAt = Date.now();
-    } else {
-      lb.push({ id: player.id, name: player.name, score: 1, updatedAt: Date.now() });
-    }
-    lb.sort((a, b) => b.score - a.score);
-    await env.MARKETPLACE.put(board.key, JSON.stringify(lb.slice(0, MAX_ENTRIES)));
+    await env.MARKETPLACE.mutate(board.key, (current) => {
+      const lb = Array.isArray(current) ? current : [];
+      const existing = lb.find(e => e.id === player.id);
+      if (existing) {
+        existing.score += 1;
+        existing.name = player.name;
+        existing.updatedAt = Date.now();
+      } else {
+        lb.push({ id: player.id, name: player.name, score: 1, updatedAt: Date.now() });
+      }
+      lb.sort((a, b) => b.score - a.score);
+      return lb.slice(0, MAX_ENTRIES);
+    });
     return json({ success: true, updated: true });
   }
 
@@ -262,51 +386,46 @@ export async function onRequestPost(context) {
     const scoreLog = parseScoreLog(body.score, body.scoreLog);
     if (!(scoreLog > 0)) return json({ error: 'Invalid score' }, 400);
     const scoreVal = cleanScore(body.score);
-    const lbB = await env.MARKETPLACE.get(board.key, 'json') || [];
-    const ex = lbB.find(e => e.id === player.id);
-    if (ex) {
-      if (scoreLog > parseScoreLog(ex.score, ex.scoreLog)) {
+    let updatedB = false;
+    await env.MARKETPLACE.mutate(board.key, (current) => {
+      const lbB = Array.isArray(current) ? current : [];
+      const ex = lbB.find(e => e.id === player.id);
+      if (ex) {
+        if (!(scoreLog > parseScoreLog(ex.score, ex.scoreLog))) return undefined;
         ex.score = scoreVal; ex.scoreLog = scoreLog; ex.name = player.name; ex.updatedAt = Date.now();
       } else {
-        return json({ success: true, updated: false });
+        lbB.push({ id: player.id, name: player.name, score: scoreVal, scoreLog, updatedAt: Date.now() });
       }
-    } else {
-      lbB.push({ id: player.id, name: player.name, score: scoreVal, scoreLog, updatedAt: Date.now() });
-    }
-    lbB.sort((a, b) => parseScoreLog(b.score, b.scoreLog) - parseScoreLog(a.score, a.scoreLog));
-    await env.MARKETPLACE.put(board.key, JSON.stringify(lbB.slice(0, MAX_ENTRIES)));
-    return json({ success: true, updated: true });
+      lbB.sort((a, b) => parseScoreLog(b.score, b.scoreLog) - parseScoreLog(a.score, a.scoreLog));
+      updatedB = true;
+      return lbB.slice(0, MAX_ENTRIES);
+    });
+    return json({ success: true, updated: updatedB });
   }
 
   const score = finiteScore(body.score);
   if (score <= 0) return json({ error: 'Invalid score' }, 400);
+  const stored = board.sort === 'asc' ? Math.round(score) : Math.floor(score);
 
-  const lb = await env.MARKETPLACE.get(board.key, 'json') || [];
-
-  const existing = lb.find(e => e.id === player.id);
-  if (existing) {
-    const isBetter = board.sort === 'asc'
-      ? score < existing.score
-      : score > existing.score;
-    if (isBetter) {
-      existing.score = board.sort === 'asc' ? Math.round(score) : Math.floor(score);
+  let updated = false;
+  await env.MARKETPLACE.mutate(board.key, (current) => {
+    const lb = Array.isArray(current) ? current : [];
+    const existing = lb.find(e => e.id === player.id);
+    if (existing) {
+      const isBetter = board.sort === 'asc'
+        ? score < existing.score
+        : score > existing.score;
+      if (!isBetter) return undefined;
+      existing.score = stored;
       existing.name = player.name;
       existing.updatedAt = Date.now();
     } else {
-      return json({ success: true, updated: false });
+      lb.push({ id: player.id, name: player.name, score: stored, updatedAt: Date.now() });
     }
-  } else {
-    lb.push({
-      id: player.id,
-      name: player.name,
-      score: board.sort === 'asc' ? Math.round(score) : Math.floor(score),
-      updatedAt: Date.now(),
-    });
-  }
+    lb.sort((a, b) => board.sort === 'asc' ? a.score - b.score : b.score - a.score);
+    updated = true;
+    return lb.slice(0, MAX_ENTRIES);
+  });
 
-  lb.sort((a, b) => board.sort === 'asc' ? a.score - b.score : b.score - a.score);
-  const trimmed = lb.slice(0, MAX_ENTRIES);
-  await env.MARKETPLACE.put(board.key, JSON.stringify(trimmed));
-
-  return json({ success: true, updated: true });
+  return json({ success: true, updated });
 }

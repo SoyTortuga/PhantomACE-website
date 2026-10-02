@@ -1044,6 +1044,17 @@ function isRanked(room) {
 async function recordResult(env, room) {
   if (!isRanked(room)) return;
 
+  /* Settle last month's prizes before writing, so a game finished after
+     midnight on the 1st counts for the new month instead of landing on the
+     board that is about to be paid out and wiped. Idempotent (one atomic claim
+     per month); never allowed to stop a result from being recorded. */
+  try {
+    const { maybeRunMonthlyAwards } = await import('./leaderboards.js');
+    await maybeRunMonthlyAwards(env);
+  } catch (err) {
+    console.error('[mana-clash] monthly award settle failed:', err.message);
+  }
+
   await env.MARKETPLACE.mutate(WINS_BOARD, (current) => {
     const lb = Array.isArray(current) ? current : [];
     const winner = room.players[room.winner];
