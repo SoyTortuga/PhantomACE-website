@@ -102,6 +102,17 @@ export function validateReason(raw) {
   return { value };
 }
 
+/** An edit that @names somebody new sends notifications the way a new
+    post does, so it spends from the same per-minute allowance. An edit
+    that names nobody new is free: it tells no one anything. `adding` is
+    the count of newly named people; `recentPosts` is postingWindow()'s. */
+export function editMentionRule({ adding = 0, recentPosts = 0 }) {
+  if (adding > 0 && recentPosts >= POSTS_PER_MINUTE) {
+    return no('Slow down: wait a minute before naming more people.', 429);
+  }
+  return ok;
+}
+
 /** Editing and deleting your own post — the same conditions. Deleting
     somebody else's is moderation: see moderate.js and staffRule. */
 export function ownPostRule({ session, post }) {

@@ -23,9 +23,12 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import {
   POSTS_PER_MINUTE, THREADS_PER_TEN_MINUTES, isSubscriber, threadRule, replyRule, ownPostRule,
+  commentRule, editMentionRule,
 } from '../../functions/api/forum/rules.js';
 import {
   createThread, createReply, getThread, listPosts, getPost, editPost, deleteOwnPost, pageOfPost,
+  ForumError, underLimit, postingWindow, recentPostCount, createComment, addMentions, editOwnPost,
+  recentMentionEditCount,
 } from '../../functions/api/forum/queries.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +133,17 @@ const staffOnly = { id: 'announcements', staffOnly: true, subOnly: false };
     status(ownPostRule({ session: modNotSub, staff: true, post: mine })), 403);
 }
 
+/* ── editMentionRule ─────────────────────────────────────────────────── */
+{
+  /* LOAD-BEARING: remove the check from editMentionRule and these fail. */
+  check('an edit naming nobody new is free even at the limit',
+    status(editMentionRule({ adding: 0, recentPosts: POSTS_PER_MINUTE })), 'ok');
+  check('an edit naming somebody new under the limit is fine',
+    status(editMentionRule({ adding: 3, recentPosts: POSTS_PER_MINUTE - 1 })), 'ok');
+  check('an edit naming somebody new at the limit is 429',
+    status(editMentionRule({ adding: 1, recentPosts: POSTS_PER_MINUTE })), 429);
+}
+
 /* ── The write queries, on a real database ───────────────────────────── */
 const db = new PGlite();
 await db.exec(SQL);
@@ -185,6 +199,85 @@ const inTx = (fn) => db.transaction((tx) => fn(tx));
   const p2 = (await listPosts(db, threadId, 2)).posts[0];
   check('the 21st post is on page 2', await pageOfPost(db, threadId, p2.id), 2);
   check('a tombstone still occupies its slot on page 1', await pageOfPost(db, threadId, r1.postId), 1);
+}
+
+/* ── The rate limit is judged INSIDE the transaction ─────────────────────
+   The routes used to count the window with one query and write with a
+   transaction after it, so a burst of simultaneous requests all counted the
+   same window and all got through. They now call underLimit() as the first
+   thing in the posting transaction (lock, count, rule), which is what these
+   reproduce. pglite is a single connection, so the advisory lock itself is
+   not contended here; what IS proved is that the count is taken in the same
+   transaction as the write and that a refusal rolls it back. The "old
+   shape" case shows the suite can tell the difference. */
+{
+  const tryAll = (n, fn) => Promise.allSettled(Array.from({ length: n }, (_, i) => fn(i)));
+  const fulfilled = (rs) => rs.filter(r => r.status === 'fulfilled').length;
+  const refusedWith = (rs, code) => rs.filter(r => r.status === 'rejected' && r.reason instanceof ForumError && r.reason.status === code).length;
+
+  const { threadId } = await inTx(tx => createThread(tx, { categoryId: 'general', userId: 'host', title: 'Burst', body: 'go' }));
+  const t = await getThread(db, threadId);
+  const burster = { user_id: 'burst1', subTier: 0 };
+
+  /* The old shape: count first, outside, then write. */
+  const old = await tryAll(POSTS_PER_MINUTE + 3, async (i) => {
+    const recentPosts = await recentPostCount(db, 'burst0', 1);
+    const rule = replyRule({ session: { user_id: 'burst0' }, staff: false, category: open, thread: t, recentPosts });
+    if (!rule.ok) throw new ForumError('refused', rule.error, rule.status);
+    return inTx(tx => createReply(tx, { threadId, userId: 'burst0', body: 'old ' + i }));
+  });
+  check('the old shape lets a burst past the limit (why it moved)', fulfilled(old) > POSTS_PER_MINUTE, true);
+
+  /* LOAD-BEARING: the new shape. */
+  const burst = await tryAll(POSTS_PER_MINUTE + 3, (i) => inTx(async (tx) => {
+    await underLimit(tx, 'burst1', w => replyRule({ session: burster, staff: false, category: open, thread: t, recentPosts: w.recentPosts }));
+    return createReply(tx, { threadId, userId: 'burst1', body: 'new ' + i });
+  }));
+  check('a burst of replies: exactly the allowance gets through', fulfilled(burst), POSTS_PER_MINUTE);
+  check('and the rest are refused with 429', refusedWith(burst, 429), 3);
+  check('nothing refused was written', await recentPostCount(db, 'burst1', 1), POSTS_PER_MINUTE);
+
+  /* Topics: two per ten minutes, under the same lock. */
+  const topics = await tryAll(4, (i) => inTx(async (tx) => {
+    await underLimit(tx, 'burst2',
+      w => threadRule({ session: { user_id: 'burst2' }, staff: false, category: open, recentThreads: w.recentThreads, recentPosts: w.recentPosts }),
+      { threads: true });
+    return createThread(tx, { categoryId: 'general', userId: 'burst2', title: 'T' + i, body: 'b' });
+  }));
+  check('a burst of topics: exactly two', fulfilled(topics), THREADS_PER_TEN_MINUTES);
+  check('the rest 429', refusedWith(topics, 429), 2);
+
+  /* Profile comments. */
+  const owner = { userId: 'wall1' };
+  const comments = await tryAll(POSTS_PER_MINUTE + 2, (i) => inTx(async (tx) => {
+    await underLimit(tx, 'burst3', w => commentRule({ session: { user_id: 'burst3' }, owner, enabled: true, recentPosts: w.recentPosts }));
+    return createComment(tx, { profileId: 'wall1', userId: 'burst3', body: 'c' + i });
+  }));
+  check('a burst of comments: exactly the allowance', fulfilled(comments), POSTS_PER_MINUTE);
+
+  /* Edits that named somebody new spend from the same window. */
+  const { postId } = await inTx(tx => createThread(tx, { categoryId: 'general', userId: 'burst4', title: 'E', body: 'start' }));
+  await inTx(tx => createReply(tx, { threadId, userId: 'burst4', body: 'two' }));
+  await inTx(tx => createReply(tx, { threadId, userId: 'burst4', body: 'three' }));
+  await inTx(tx => editOwnPost(tx, { id: postId, userId: 'burst4', body: 'hi @n1', resolved: [{ login: 'n1', userId: 'n1id' }] }));
+  check('a mention-adding edit is counted', await recentMentionEditCount(db, 'burst4', 1), 1);
+  check('a post\'s own mentions are not counted as an edit', await (async () => {
+    await inTx(async (tx) => {
+      const out = await createReply(tx, { threadId, userId: 'burst5', body: '@n1' });
+      await addMentions(tx, { postId: out.postId, byUserId: 'burst5', userIds: ['n1id'] });
+    });
+    return recentMentionEditCount(db, 'burst5', 1);
+  })(), 0);
+  check('the window adds them up: 3 posts + 1 naming edit', (await inTx(tx => postingWindow(tx, 'burst4'))).recentPosts, 4);
+  await inTx(tx => createReply(tx, { threadId, userId: 'burst4', body: 'four' }));
+  let refused = null;
+  try {
+    await inTx(async (tx) => {
+      await underLimit(tx, 'burst4', w => replyRule({ session: { user_id: 'burst4' }, staff: false, category: open, thread: t, recentPosts: w.recentPosts }));
+      return createReply(tx, { threadId, userId: 'burst4', body: 'five' });
+    });
+  } catch (err) { refused = err; }
+  check('so after 4 posts and a naming edit, the next write is refused', refused && refused.status, 429);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

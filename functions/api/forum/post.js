@@ -11,7 +11,7 @@
    ══════════════════════════════════════════════ */
 
 import { getPool, withTransaction } from '../../../server/lib/db.js';
-import { parseId, validateBody, getPost, editPost, deleteOwnPost, reportPost, addMentions } from './queries.js';
+import { ForumError, parseId, validateBody, getPost, editOwnPost, deleteOwnPost, reportPost } from './queries.js';
 import { ownPostRule, reportRule, validateReason } from './rules.js';
 import { parseMentions, resolveMentions } from './mentions.js';
 import { authorsFor } from './authors.js';
@@ -74,19 +74,21 @@ export async function onRequestPost(context) {
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
     if (action === 'edit') {
-      /* An edit can name somebody new. Anyone already named is a no-op
-         through the mentions PK, so nobody is told twice. */
-      const mentioned = await resolveMentions(env, parseMentions(body.value));
-      const done = await withTransaction(async (tx) => {
-        const ok = await editPost(tx, { id, body: body.value });
-        if (ok) await addMentions(tx, { postId: id, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
-        return ok;
-      });
-      if (!done) return json({ error: 'That post has already been removed.' }, 410);
-      /* The identities of anyone newly named, so the page can link them
-         without a reload. */
-      const ids = mentioned.map(m => m.userId);
-      return json({ ok: true, body: body.value, mentions: ids, authors: await authorsFor(env, ids) });
+      /* Only names the previous version did not have are told, and only
+         if the edit fits the same per-minute allowance a new post spends —
+         otherwise repeated edits would be a notification cannon. The diff
+         and the allowance are both taken inside the transaction. */
+      const resolved = await resolveMentions(env, parseMentions(body.value));
+      let out;
+      try {
+        out = await withTransaction(tx => editOwnPost(tx, { id, userId: session.user_id, body: body.value, resolved }));
+      } catch (err) {
+        if (err instanceof ForumError) return json({ error: err.message }, err.status);
+        throw err;
+      }
+      /* The identities of everyone the new body links, so the page can
+         link them without a reload. */
+      return json({ ok: true, body: body.value, mentions: out.mentions, authors: await authorsFor(env, out.mentions) });
     }
 
     const done = await withTransaction(tx => deleteOwnPost(tx, { id, userId: session.user_id }));

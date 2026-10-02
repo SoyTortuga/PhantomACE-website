@@ -21,10 +21,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
-import { parseMentions, resolveMentions } from '../../functions/api/forum/mentions.js';
+import { parseMentions, resolveMentions, newMentions } from '../../functions/api/forum/mentions.js';
+import { POSTS_PER_MINUTE } from '../../functions/api/forum/rules.js';
 import {
   createThread, createReply, createComment, addMentions, listPosts, listComments,
   listNotifications, unreadCount, markNotificationsRead, moderateDeletePost, authorIds,
+  ForumError, editOwnPost, getPost, recentMentionEditCount,
 } from '../../functions/api/forum/queries.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -146,6 +148,79 @@ const notifs = async (userId) => (await listNotifications(db, userId)).map(n => 
   check('the author of a removed post is told, with the reason', [mod.postId, mod.reason], [r.postId, 'off topic']);
   const stale = (await listNotifications(db, '100')).find(n => n.postId === r.postId);
   check('the reply notification for the removed post still lists, flagged', [stale.kind, stale.postDeleted], ['reply', true]);
+}
+
+/* ── Edits: only names the previous version did not have ─────────────── */
+{
+  const A = { login: 'alpha', userId: '601' };
+  const B = { login: 'beta', userId: '602' };
+  const C = { login: 'gamma', userId: '603' };
+
+  check('newMentions: a name already there is not new', newMentions('hi @alpha', [A, B]), [B]);
+  check('newMentions: compared without case', newMentions('hi @ALPHA', [A]), []);
+  check('newMentions: everything is new against an empty body', newMentions('', [A, B]), [A, B]);
+  check('newMentions: a name inside an email before does not count as named', newMentions('x@alpha.com', [A]), [A]);
+
+  const mentionsOf = async (uid) => (await notifs(uid)).filter(n => n[0] === 'mention').length;
+
+  const { postId } = await inTx(async (tx) => {
+    const out = await createThread(tx, { categoryId: 'general', userId: '500', title: 'Edits', body: 'hello @alpha' });
+    await addMentions(tx, { postId: out.postId, byUserId: '500', userIds: ['601'] });
+    return out;
+  });
+  check('the original mention is told once', await mentionsOf('601'), 1);
+
+  const e1 = await inTx(tx => editOwnPost(tx, { id: postId, userId: '500', body: 'hello @alpha and @beta', resolved: [A, B] }));
+  check('an edit that adds a name tells only the new one', e1.notified, 1);
+  check('beta is told', await mentionsOf('602'), 1);
+  check('alpha is not told again', await mentionsOf('601'), 1);
+  check('the edit returns every id the new body links', e1.mentions, ['601', '602']);
+  check('the body was replaced', (await getPost(db, postId)).body, 'hello @alpha and @beta');
+
+  const e2 = await inTx(tx => editOwnPost(tx, { id: postId, userId: '500', body: 'hello @alpha and @beta!', resolved: [A, B] }));
+  check('an edit that names nobody new tells nobody', e2.notified, 0);
+  check('and is not counted against the allowance', await recentMentionEditCount(db, '500', 1), 1);
+
+  await inTx(tx => editOwnPost(tx, { id: postId, userId: '500', body: 'hello @alpha', resolved: [A] }));
+  const e3 = await inTx(tx => editOwnPost(tx, { id: postId, userId: '500', body: 'hello @alpha @beta', resolved: [A, B] }));
+  check('removing a name and putting it back does not tell them twice', [e3.notified, await mentionsOf('602')], [0, 1]);
+
+  /* Repeated edits cannot outrun the allowance: one post (1) and each
+     naming edit (1 each) share POSTS_PER_MINUTE. */
+  const { postId: spamId } = await inTx(tx => createThread(tx, { categoryId: 'general', userId: '700', title: 'Spam', body: 'nothing' }));
+  const people = Array.from({ length: POSTS_PER_MINUTE + 2 }, (_, i) => ({ login: 'victim' + i, userId: String(800 + i) }));
+  let body = 'nothing';
+  const outcomes = [];
+  for (let i = 0; i < people.length; i++) {
+    body += ' @' + people[i].login;
+    const next = body;
+    try {
+      const r = await inTx(tx => editOwnPost(tx, { id: spamId, userId: '700', body: next, resolved: people.slice(0, i + 1) }));
+      outcomes.push(r.notified);
+    } catch (err) {
+      outcomes.push(err instanceof ForumError ? err.status : 'threw');
+    }
+  }
+  /* LOAD-BEARING: remove the allowance check from editOwnPost and every
+     edit notifies. */
+  check('naming edits stop at the allowance: 1 post + 4 edits, then 429',
+    outcomes, [1, 1, 1, 1, 429, 429, 429]);
+  check('the refused edits wrote nothing: still the fourth version',
+    (await getPost(db, spamId)).body, 'nothing @victim0 @victim1 @victim2 @victim3');
+  check('and told nobody past the limit', await mentionsOf('804'), 0);
+
+  /* LOAD-BEARING: the diff. Without it every name in the body counts as
+     new, the allowance check runs, and fixing a typo is refused. */
+  let plain;
+  try {
+    plain = await inTx(tx => editOwnPost(tx, { id: spamId, userId: '700', body: 'nothing @victim0 @victim1 @victim2 @victim3 (typo fixed)', resolved: people.slice(0, 4) }));
+  } catch (err) { plain = { notified: err.status || 'threw' }; }
+  check('a plain edit still works while the allowance is spent', plain.notified, 0);
+
+  await inTx(tx => moderateDeletePost(tx, { id: postId, byUserId: '900', reason: 'x' }));
+  let gone = null;
+  try { await inTx(tx => editOwnPost(tx, { id: postId, userId: '500', body: 'back @gamma', resolved: [C] })); } catch (err) { gone = err; }
+  check('editing a removed post is 410 and tells nobody', [gone && gone.status, await mentionsOf('603')], [410, 0]);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

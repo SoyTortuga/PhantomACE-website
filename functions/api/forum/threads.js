@@ -14,8 +14,8 @@
 import { getPool, withTransaction } from '../../../server/lib/db.js';
 import { isModerator } from '../admin/moderators.js';
 import {
-  parseCategoryId, parsePage, validateTitle, validateBody,
-  getCategory, listThreads, createThread, recentThreadCount, recentPostCount, addMentions, authorIds,
+  ForumError, parseCategoryId, parsePage, validateTitle, validateBody,
+  getCategory, listThreads, createThread, underLimit, addMentions, authorIds,
 } from './queries.js';
 import { threadRule } from './rules.js';
 import { authorsFor } from './authors.js';
@@ -55,20 +55,29 @@ export async function onRequestPost(context) {
   try {
     const category = categoryId ? await getCategory(db, categoryId) : null;
     const staff = await isModerator(env, session);
-    const [recentThreads, recentPosts] = session && session.user_id
-      ? await Promise.all([recentThreadCount(db, session.user_id, 10), recentPostCount(db, session.user_id, 1)])
-      : [0, 0];
 
-    const rule = threadRule({ session, staff, category, recentThreads, recentPosts });
+    /* Everything but the rate limits first, to fail fast. The limits are
+       judged inside the transaction under the poster's lock, so a burst
+       cannot all count the same window. */
+    const rule = threadRule({ session, staff, category });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
     /* Resolved before the transaction (KV reads), written inside it. */
     const mentioned = await resolveMentions(env, parseMentions(body.value));
-    const made = await withTransaction(async (tx) => {
-      const out = await createThread(tx, { categoryId, userId: session.user_id, title: title.value, body: body.value });
-      await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
-      return out;
-    });
+    let made;
+    try {
+      made = await withTransaction(async (tx) => {
+        await underLimit(tx, session.user_id,
+          w => threadRule({ session, staff, category, recentThreads: w.recentThreads, recentPosts: w.recentPosts }),
+          { threads: true });
+        const out = await createThread(tx, { categoryId, userId: session.user_id, title: title.value, body: body.value });
+        await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+        return out;
+      });
+    } catch (err) {
+      if (err instanceof ForumError) return json({ error: err.message }, err.status);
+      throw err;
+    }
     return json({ id: made.threadId }, 201);
   } catch (err) {
     console.error('[forum/threads] post:', err.message);
@@ -92,7 +101,13 @@ export async function onRequestGet(context) {
     if (!category) return json({ error: 'No such board' }, 404);
     const { threads, total, pages } = await listThreads(db, categoryId, page);
     const authors = await authorsFor(env, authorIds(threads));
-    return json({ category, threads, page, pages, total, authors });
+    /* Whether to offer New Topic: the board's own rule, answered here with
+       the moderator list and subTier rather than in the page from the
+       cookie's display role. */
+    const session = getSession(request);
+    const staff = await isModerator(env, session);
+    const canPost = threadRule({ session, staff, category }).ok;
+    return json({ category, threads, page, pages, total, authors, viewer: { staff, canPost } });
   } catch (err) {
     console.error('[forum/threads]', err.message);
     return json({ error: 'Forum unavailable' }, 503);

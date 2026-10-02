@@ -4,7 +4,12 @@
    One thread: its metadata, one page of its posts oldest first (deleted
    ones as tombstones), and the identities of everyone on the page.
 
-   GET is public. POST /api/forum/thread { id, body } replies: a session,
+   GET is public, and says what the viewer may do (`viewer.staff`,
+   `viewer.canReply`) so the page draws controls from the server's answer
+   rather than the cookie's display role. A removed topic is readable by
+   staff only, marked `thread.deleted`.
+
+   POST /api/forum/thread { id, body } replies: a session,
    the board's rule, not locked, room under the rate limit. The reply
    transaction locks the thread row, so a lock landing at the same moment
    is seen rather than raced; a ForumError from it is a real answer, not a
@@ -15,7 +20,7 @@ import { getPool, withTransaction } from '../../../server/lib/db.js';
 import { isModerator } from '../admin/moderators.js';
 import {
   ForumError, parseId, parsePage, validateBody,
-  getThread, getCategory, listPosts, createReply, recentPostCount, pageOfPost, addMentions, authorIds,
+  getThread, getCategory, listPosts, createReply, underLimit, pageOfPost, addMentions, authorIds,
 } from './queries.js';
 import { replyRule } from './rules.js';
 import { authorsFor } from './authors.js';
@@ -55,15 +60,19 @@ export async function onRequestPost(context) {
     const thread = await getThread(db, id);
     const category = thread ? await getCategory(db, thread.categoryId) : null;
     const staff = await isModerator(env, session);
-    const recentPosts = session && session.user_id ? await recentPostCount(db, session.user_id, 1) : 0;
 
-    const rule = replyRule({ session, staff, category, thread, recentPosts });
+    /* Everything but the rate limit, to fail fast before the KV reads.
+       The limit is judged inside the transaction, under the poster's
+       lock, so a burst of simultaneous replies cannot all count the same
+       window and all get through. */
+    const rule = replyRule({ session, staff, category, thread });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
     const mentioned = await resolveMentions(env, parseMentions(body.value));
     let made;
     try {
       made = await withTransaction(async (tx) => {
+        await underLimit(tx, session.user_id, w => replyRule({ session, staff, category, thread, recentPosts: w.recentPosts }));
         const out = await createReply(tx, { threadId: id, userId: session.user_id, body: body.value });
         await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
         return out;
@@ -92,11 +101,18 @@ export async function onRequestGet(context) {
   try { db = getPool(); } catch { return json({ error: 'Forum unavailable' }, 503); }
 
   try {
-    const thread = await getThread(db, id);
+    /* Staff by the moderator list, never the cookie's role. A removed
+       topic is still 404 to everyone else; staff get it, marked
+       `deleted`, so they can read it and restore it. */
+    const session = getSession(request);
+    const staff = await isModerator(env, session);
+    const thread = await getThread(db, id, { includeDeleted: staff });
     if (!thread) return json({ error: 'No such topic' }, 404);
+    const category = await getCategory(db, thread.categoryId);
     const { posts, total, pages } = await listPosts(db, id, page);
     const authors = await authorsFor(env, authorIds([thread], posts));
-    return json({ thread, posts, page, pages, total, authors });
+    const canReply = !thread.deleted && replyRule({ session, staff, category, thread }).ok;
+    return json({ thread, posts, page, pages, total, authors, viewer: { staff, canReply } });
   } catch (err) {
     console.error('[forum/thread]', err.message);
     return json({ error: 'Forum unavailable' }, 503);

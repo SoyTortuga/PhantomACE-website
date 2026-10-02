@@ -1,7 +1,9 @@
 /* ══════════════════════════════════════════════
    /api/forum/moderate — staff only
 
-   GET   the open report queue, oldest first, with the people involved.
+   GET   the open report queue, oldest first, with the people involved,
+         and the most recently removed topics (`removedThreads`) so a
+         removal can be found again and restored.
    POST  { action, id, reason? }
            pin | unpin | lock | unlock      id = thread
            delete-thread | restore-thread   id = thread  (delete: reason)
@@ -21,7 +23,7 @@ import { getPool, withTransaction } from '../../../server/lib/db.js';
 import { isModerator } from '../admin/moderators.js';
 import {
   parseId, getThread, getPost, setThreadFlags, deleteThread, restoreThread,
-  moderateDeletePost, restorePost, listOpenReports, resolveReports,
+  moderateDeletePost, restorePost, listOpenReports, resolveReports, listDeletedThreads,
 } from './queries.js';
 import { staffRule, validateReason } from './rules.js';
 import { authorsFor } from './authors.js';
@@ -59,10 +61,12 @@ export async function onRequestGet(context) {
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
     const reports = await listOpenReports(db);
+    const removedThreads = await listDeletedThreads(db, 25);
     const ids = [];
     for (const r of reports) ids.push(r.reporterId, r.authorId);
+    for (const t of removedThreads) { ids.push(t.userId); if (t.deletedBy) ids.push(t.deletedBy); }
     const authors = await authorsFor(env, ids);
-    return json({ reports, authors });
+    return json({ reports, removedThreads, authors });
   } catch (err) {
     console.error('[forum/moderate] get:', err.message);
     return json({ error: 'Forum unavailable' }, 503);

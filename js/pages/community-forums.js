@@ -11,10 +11,12 @@
    swallowed posts when the API was down would be worse than an error.
 
    Who you are comes from getSession() in auth.js — the same cookie the
-   header reads. It decides what to DRAW: a composer, a reply box, edit
-   and delete on your own posts, the moderation controls if your role
-   says staff. It decides nothing about what is ALLOWED; the server
-   refuses on its own terms and the refusal is shown as written.
+   header reads — and is used only to know which posts are yours. What
+   you may DO (staff controls, New Topic, the reply box) comes from the
+   `viewer` block each API answer carries, because the cookie's role does
+   not know about site moderators or subscriber-only boards. Nothing here
+   decides what is ALLOWED; the server refuses on its own terms and the
+   refusal is shown as written.
    ══════════════════════════════════════════════ */
 
 (function () {
@@ -48,10 +50,6 @@
 
   function me() {
     try { return typeof getSession === 'function' ? getSession() : null; } catch (e) { return null; }
-  }
-  /* Display only. The server decides with the moderator list. */
-  function looksLikeStaff(sess) {
-    return !!sess && (sess.role === 'moderator' || sess.role === 'broadcaster');
   }
   function login() {
     if (typeof loginWithTwitch === 'function') loginWithTwitch();
@@ -158,12 +156,19 @@
     });
   }
 
-  function pager(page, pages, hrefFor) {
+  /* A board lists newest activity first, so page 1 is the newest; a topic
+     lists its posts oldest first, so page 1 is the earliest. The labels
+     say which way each arrow goes for the list they sit under. */
+  var BOARD_PAGES = { prev: 'Newer', next: 'Older' };
+  var TOPIC_PAGES = { prev: 'Earlier', next: 'Later' };
+
+  function pager(page, pages, hrefFor, labels) {
     if (pages <= 1) return '';
+    var l = labels || BOARD_PAGES;
     var html = '<nav class="forum-pagination" aria-label="Pages">';
-    html += page > 1 ? '<a href="' + esc(hrefFor(page - 1)) + '">&lsaquo; Newer</a>' : '<span class="forum-page-off">&lsaquo; Newer</span>';
+    html += page > 1 ? '<a href="' + esc(hrefFor(page - 1)) + '">&lsaquo; ' + l.prev + '</a>' : '<span class="forum-page-off">&lsaquo; ' + l.prev + '</span>';
     html += '<span class="forum-page-num">Page ' + page + ' of ' + pages + '</span>';
-    html += page < pages ? '<a href="' + esc(hrefFor(page + 1)) + '">Older &rsaquo;</a>' : '<span class="forum-page-off">Older &rsaquo;</span>';
+    html += page < pages ? '<a href="' + esc(hrefFor(page + 1)) + '">' + l.next + ' &rsaquo;</a>' : '<span class="forum-page-off">' + l.next + ' &rsaquo;</span>';
     return html + '</nav>';
   }
 
@@ -192,7 +197,7 @@
     api('/api/forum/categories').then(function (r) {
       if (!r.ok) return failed(view, r.data.error || 'The forum is unavailable right now.');
       var authors = r.data.authors || {};
-      var staffBar = looksLikeStaff(me())
+      var staffBar = r.data.viewer && r.data.viewer.staff
         ? '<div class="forum-staff-bar"><a href="/community?view=reports">Moderation queue</a></div>'
         : '';
       setViewHtml(view, staffBar + '<div class="forum-categories">' + r.data.categories.map(function (c) {
@@ -227,12 +232,16 @@
 
   /* ── One board ───────────────────────────────────────────────────── */
 
-  function composerHtml(category) {
-    var sess = me();
-    if (!sess) {
+  /* `viewer.canPost` is the server running the board's own rule (staff
+     list, subTier) for this person; the page only draws what it says. */
+  function composerHtml(category, viewer) {
+    if (!me()) {
       return '<button class="btn-primary forum-new-btn" type="button" data-act="login">Log in to post</button>';
     }
-    if (category.staffOnly && !looksLikeStaff(sess)) return '';
+    if (!viewer || !viewer.canPost) {
+      if (category.subOnly && !category.staffOnly) return '<span class="forum-flag">Subscribers post here</span>';
+      return '';
+    }
     return '<button class="btn-primary forum-new-btn" type="button" data-act="new-topic">New Topic</button>';
   }
 
@@ -259,9 +268,9 @@
       var hrefFor = function (p) { return '/community?c=' + encodeURIComponent(categoryId) + (p > 1 ? '&page=' + p : ''); };
       var html = '<div class="forum-thread-header"><h3>' + esc(d.category.name) + '</h3>' +
         '<div class="forum-thread-header-right"><span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span>' +
-        composerHtml(d.category) + '</div></div>' + composerForm();
+        composerHtml(d.category, d.viewer) + '</div></div>' + (d.viewer && d.viewer.canPost ? composerForm() : '');
       if (!d.threads.length) {
-        html += '<div class="forum-empty card"><p>No topics here yet.' + (me() ? ' Start one.' : '') + '</p></div>';
+        html += '<div class="forum-empty card"><p>No topics here yet.' + (d.viewer && d.viewer.canPost ? ' Start one.' : '') + '</p></div>';
       } else {
         html += '<div class="forum-thread-list">' + d.threads.map(function (t) {
           var href = '/thread/' + esc(t.id);
@@ -285,6 +294,11 @@
 
   function wireComposer(view, categoryId) {
     var form = view.querySelector('#newThreadForm');
+    view.addEventListener('click', function (e) {
+      var act = e.target.closest('[data-act]');
+      if (!act) return;
+      if (act.getAttribute('data-act') === 'login') login();
+    });
     if (!form) return;
     var title = form.querySelector('#newThreadTitle');
     var body = form.querySelector('#newThreadBody');
@@ -295,7 +309,6 @@
       var act = e.target.closest('[data-act]');
       if (!act) return;
       var a = act.getAttribute('data-act');
-      if (a === 'login') login();
       if (a === 'new-topic') { form.hidden = false; title.focus(); act.hidden = true; }
       if (a === 'cancel-topic') {
         form.hidden = true; title.value = ''; body.value = ''; err.hidden = true;
@@ -348,12 +361,16 @@
     '</div>';
   }
 
-  function replyBoxHtml(t) {
+  function replyBoxHtml(t, viewer) {
+    if (t.deleted) return '<div class="forum-readonly-note">This topic has been removed. Only staff can see it.</div>';
     if (t.locked) return '<div class="forum-readonly-note">This topic is locked.</div>';
     var sess = me();
     if (!sess) {
       return '<div class="forum-reply-prompt card"><p>Log in to reply to this topic.</p>' +
         '<button class="btn-primary" type="button" data-act="login">Log In</button></div>';
+    }
+    if (!viewer || !viewer.canReply) {
+      return '<div class="forum-readonly-note">You cannot reply on this board.</div>';
     }
     return '<form id="replyForm" class="forum-reply-form">' +
       '<textarea id="replyBody" class="forum-textarea" placeholder="Write a reply" rows="4" maxlength="' + BODY_MAX + '" required></textarea>' +
@@ -364,6 +381,13 @@
 
   /** The strip of moderator controls under a topic's title. */
   function modBarHtml(t) {
+    if (t.deleted) {
+      return '<div class="forum-mod-bar">' +
+        '<span class="forum-mod-label">Removed</span>' +
+        '<button type="button" data-act="mod" data-mod="restore-thread" data-id="' + esc(t.id) + '">Restore topic</button>' +
+        '<div class="forum-error" hidden></div>' +
+      '</div>';
+    }
     return '<div class="forum-mod-bar">' +
       '<span class="forum-mod-label">Moderate</span>' +
       '<button type="button" data-act="mod" data-mod="' + (t.pinned ? 'unpin' : 'pin') + '" data-id="' + esc(t.id) + '">' + (t.pinned ? 'Unpin' : 'Pin') + '</button>' +
@@ -382,12 +406,13 @@
         return failed(view, r.status === 404 ? 'That topic is not here. It may have been removed.' : (r.data.error || 'The forum is unavailable right now.'));
       }
       var d = r.data, t = d.thread, authors = d.authors || {};
+      var viewer = d.viewer || {};
       currentAuthors = authors;
       var sess = me();
       var ctx = {
         myId: sess && sess.user_id != null ? String(sess.user_id) : null,
-        staff: looksLikeStaff(sess),
-        locked: !!t.locked,
+        staff: !!viewer.staff,
+        locked: !!t.locked || !!t.deleted,
       };
       document.title = t.title + ' | PhantomACE';
       crumbs([{ text: t.categoryName, href: '/community?c=' + encodeURIComponent(t.categoryId) }, { text: t.title }]);
@@ -395,13 +420,14 @@
 
       var html = '<div class="forum-thread-view">';
       html += '<div class="forum-topic-head">' +
+        (t.deleted ? '<span class="forum-flag forum-flag-locked">Removed</span>' : '') +
         (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
         (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
         '<h1 class="forum-post-title">' + esc(t.title) + '</h1></div>';
       if (ctx.staff) html += modBarHtml(t);
       html += d.posts.map(function (p, i) { return postHtml(p, authors, ctx, d.page === 1 && i === 0); }).join('');
-      html += pager(d.page, d.pages, hrefFor);
-      html += replyBoxHtml(t);
+      html += pager(d.page, d.pages, hrefFor, TOPIC_PAGES);
+      html += replyBoxHtml(t, viewer);
       setViewHtml(view, html + '</div>');
       wireThread(view, id);
 
@@ -565,11 +591,28 @@
       if (!r.ok) return failed(view, r.data.error || 'The queue is unavailable right now.');
       var authors = r.data.authors || {};
       var reports = r.data.reports || [];
-      if (!reports.length) {
-        view.innerHTML = '<div class="forum-empty card"><p>Nothing reported. Quiet is good.</p></div>';
-        return;
-      }
-      setViewHtml(view, '<div class="forum-thread-header"><h3>Reports</h3>' +
+      var removed = r.data.removedThreads || [];
+      var removedHtml = removed.length
+        ? '<div class="forum-thread-header"><h3>Removed topics</h3>' +
+            '<span class="forum-thread-count">' + removed.length + ' most recent</span></div>' +
+          '<div class="forum-thread-list">' + removed.map(function (t) {
+            return '<div class="card forum-report">' +
+              '<div class="forum-thread-title"><span class="forum-flag forum-flag-locked">Removed</span>' +
+                '<a href="/thread/' + esc(t.id) + '">' + esc(t.title) + '</a></div>' +
+              '<div class="forum-thread-meta">' +
+                authorLine(authors, t.userId, 'forum-author-sm') +
+                '<span class="forum-thread-time">in ' + esc(t.categoryName) + ', removed ' + timeAgo(t.deletedAt) + '</span>' +
+              '</div>' +
+              '<div class="forum-error" hidden></div>' +
+              '<div class="forum-form-actions">' +
+                '<button type="button" class="pill-btn" data-act="mod" data-mod="restore-thread" data-id="' + esc(t.id) + '">Restore topic</button>' +
+              '</div>' +
+            '</div>';
+          }).join('') + '</div>'
+        : '';
+      var reportsHtml = !reports.length
+        ? '<div class="forum-empty card"><p>Nothing reported. Quiet is good.</p></div>'
+        : '<div class="forum-thread-header"><h3>Reports</h3>' +
         '<span class="forum-thread-count">' + reports.length + ' open</span></div>' +
         reports.map(function (rep) {
           var where = rep.threadId
@@ -592,7 +635,8 @@
             '</div>' +
             (rep.postDeleted ? '' : reasonForm('delete-post', rep.postId, 'Reason (the author will see it)', 'Remove post')) +
           '</div>';
-        }).join(''));
+        }).join('');
+      setViewHtml(view, reportsHtml + removedHtml);
       view.addEventListener('click', function (e) {
         var act = e.target.closest('[data-act]');
         if (!act) return;

@@ -42,9 +42,6 @@
   function me() {
     try { return typeof getSession === 'function' ? getSession() : null; } catch (e) { return null; }
   }
-  function looksLikeStaff(sess) {
-    return !!sess && (sess.role === 'moderator' || sess.role === 'broadcaster');
-  }
   function login() {
     if (typeof loginWithTwitch === 'function') loginWithTwitch();
     else location.href = '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname + location.search);
@@ -173,8 +170,30 @@
       '<div class="forum-error" id="settingsError" hidden></div>';
   }
 
+  /* Which wall is showing. The listeners below are bound to the host ONCE
+     and read this, so a re-render (after a post, a delete, a switch) does
+     not stack another set of handlers on the same element — which is what
+     used to make Delete ask three times and send three requests. */
+  var state = { host: null, userId: null, page: 1 };
+
+  /* A link to another page of this wall that keeps whatever identifies
+     the profile in the URL: /user/<login> keeps its path, and the older
+     /profile?u=<login> keeps its ?u= — dropping it sent the reader to
+     their own wall. */
+  function pageHref(n) {
+    var q = new URLSearchParams(location.search);
+    if (n > 1) q.set('cpage', String(n)); else q.delete('cpage');
+    var s = q.toString();
+    return location.pathname + (s ? '?' + s : '') + '#profComments';
+  }
+
   function render(host, userId, page) {
+    state.host = host;
+    state.userId = userId;
+    state.page = page;
+    wire(host);
     api('/api/forum/comments?id=' + encodeURIComponent(userId) + '&page=' + page).then(function (r) {
+      if (state.userId !== userId) return;
       if (!r.ok) {
         clearNameEffects(host);
         host.innerHTML = '<div class="forum-empty card"><p>' + esc(r.data.error || 'Comments are unavailable right now.') + '</p></div>';
@@ -185,7 +204,7 @@
       var sess = me();
       var ctx = {
         myId: sess && sess.user_id != null ? String(sess.user_id) : null,
-        staff: looksLikeStaff(sess),
+        staff: !!(d.viewer && d.viewer.staff),
         isOwner: !!(d.viewer && d.viewer.isOwner),
       };
       var html = '';
@@ -197,54 +216,42 @@
         html += d.comments.map(function (c) { return commentHtml(c, authors, ctx); }).join('');
         if (d.pages > 1) {
           html += '<nav class="forum-pagination" aria-label="Pages">' +
-            (d.page > 1 ? '<a href="?cpage=' + (d.page - 1) + '">&lsaquo; Newer</a>' : '<span class="forum-page-off">&lsaquo; Newer</span>') +
+            (d.page > 1 ? '<a href="' + esc(pageHref(d.page - 1)) + '">&lsaquo; Newer</a>' : '<span class="forum-page-off">&lsaquo; Newer</span>') +
             '<span class="forum-page-num">Page ' + d.page + ' of ' + d.pages + '</span>' +
-            (d.page < d.pages ? '<a href="?cpage=' + (d.page + 1) + '">Older &rsaquo;</a>' : '<span class="forum-page-off">Older &rsaquo;</span>') +
+            (d.page < d.pages ? '<a href="' + esc(pageHref(d.page + 1)) + '">Older &rsaquo;</a>' : '<span class="forum-page-off">Older &rsaquo;</span>') +
           '</nav>';
         }
       }
       clearNameEffects(host);
       host.innerHTML = html;
       paintNameEffects(host);
-      wire(host, userId, page);
     }).catch(function () {
       clearNameEffects(host);
       host.innerHTML = '<div class="forum-empty card"><p>Comments are unavailable right now.</p></div>';
     });
   }
 
-  function wire(host, userId, page) {
-    var switches = host.querySelectorAll('input[data-setting]');
-    for (var s = 0; s < switches.length; s++) {
-      switches[s].addEventListener('change', function () {
-        var sw = this;
-        var err = host.querySelector('#settingsError');
-        err.hidden = true;
-        sw.disabled = true;
-        var patch = { action: 'settings' };
-        patch[sw.getAttribute('data-setting')] = sw.checked;
-        api('/api/forum/comments', patch).then(function (r) {
-          if (!r.ok) { sw.checked = !sw.checked; sw.disabled = false; return showError(err, r); }
-          render(host, userId, page);
-        }).catch(function () { sw.checked = !sw.checked; sw.disabled = false; showError(err, null); });
-      });
-    }
+  function rerender(page) {
+    if (state.host) render(state.host, state.userId, page == null ? state.page : page);
+  }
 
-    var form = host.querySelector('#commentForm');
-    if (form) {
-      var body = form.querySelector('#commentBody');
-      var err = form.querySelector('#commentError');
-      var submit = form.querySelector('button[type=submit]');
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        err.hidden = true;
-        submit.disabled = true;
-        api('/api/forum/comments', { id: userId, body: body.value }).then(function (r) {
-          if (!r.ok) { submit.disabled = false; return showError(err, r); }
-          render(host, userId, 1);
-        }).catch(function () { submit.disabled = false; showError(err, null); });
-      });
-    }
+  function wire(host) {
+    if (host.getAttribute('data-comments-wired') === '1') return;
+    host.setAttribute('data-comments-wired', '1');
+
+    host.addEventListener('change', function (e) {
+      var sw = e.target.closest('input[data-setting]');
+      if (!sw) return;
+      var err = host.querySelector('#settingsError');
+      if (err) err.hidden = true;
+      sw.disabled = true;
+      var patch = { action: 'settings' };
+      patch[sw.getAttribute('data-setting')] = sw.checked;
+      api('/api/forum/comments', patch).then(function (r) {
+        if (!r.ok) { sw.checked = !sw.checked; sw.disabled = false; if (err) showError(err, r); return; }
+        rerender();
+      }).catch(function () { sw.checked = !sw.checked; sw.disabled = false; if (err) showError(err, null); });
+    });
 
     host.addEventListener('click', function (e) {
       var act = e.target.closest('[data-act]');
@@ -253,7 +260,7 @@
       if (a === 'login') return login();
       var card = act.closest('[data-post]');
       if (a === 'edit' && card) return startEdit(card);
-      if (a === 'delete' && card) return deleteOwn(card, host, userId, page);
+      if (a === 'delete' && card) return deleteOwn(card, act);
       if (a === 'cancel-edit' && card) return endEdit(card);
       if (a === 'show-reason' && card) {
         var f = card.querySelector('.forum-reason-form[data-reason-act="' + act.getAttribute('data-form') + '"]');
@@ -263,6 +270,20 @@
     });
 
     host.addEventListener('submit', function (e) {
+      if (e.target.id === 'commentForm') {
+        e.preventDefault();
+        var cform = e.target;
+        var cerr = cform.querySelector('#commentError');
+        var csubmit = cform.querySelector('button[type=submit]');
+        if (csubmit.disabled) return;
+        cerr.hidden = true;
+        csubmit.disabled = true;
+        api('/api/forum/comments', { id: state.userId, body: cform.querySelector('#commentBody').value }).then(function (r) {
+          if (!r.ok) { csubmit.disabled = false; return showError(cerr, r); }
+          rerender(1);
+        }).catch(function () { csubmit.disabled = false; showError(cerr, null); });
+        return;
+      }
       var form = e.target.closest('.forum-reason-form');
       if (!form) return;
       e.preventDefault();
@@ -284,7 +305,7 @@
           if (b) b.remove();
           return;
         }
-        render(host, userId, page);
+        rerender();
       }).catch(function () { submit.disabled = false; showError(err, null); });
     });
   }
@@ -330,14 +351,16 @@
     card.querySelector('.forum-error').hidden = true;
   }
 
-  function deleteOwn(card, host, userId, page) {
+  function deleteOwn(card, btn) {
+    if (btn.disabled) return;
     if (!window.confirm('Remove this comment?')) return;
     var err = card.querySelector('.forum-error');
     err.hidden = true;
+    btn.disabled = true;
     api('/api/forum/post', { action: 'delete', id: card.getAttribute('data-post') }).then(function (r) {
-      if (!r.ok) return showError(err, r);
-      render(host, userId, page);
-    }).catch(function () { showError(err, null); });
+      if (!r.ok) { btn.disabled = false; return showError(err, r); }
+      rerender();
+    }).catch(function () { btn.disabled = false; showError(err, null); });
   }
 
   document.addEventListener('profile:rendered', function (e) {

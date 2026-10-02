@@ -24,7 +24,8 @@
    ══════════════════════════════════════════════ */
 
 import { getPool, withTransaction } from '../../../server/lib/db.js';
-import { parsePage, validateBody, listComments, createComment, recentPostCount, addMentions, authorIds } from './queries.js';
+import { isModerator } from '../admin/moderators.js';
+import { ForumError, parsePage, validateBody, listComments, createComment, underLimit, addMentions, authorIds } from './queries.js';
 import { commentRule } from './rules.js';
 import { authorsFor } from './authors.js';
 import { parseMentions, resolveMentions } from './mentions.js';
@@ -78,12 +79,15 @@ export async function onRequestGet(context) {
     if (!owner) return json({ error: 'There is nobody by that name.' }, 404);
     const { comments, total, pages } = await listComments(db, id, page);
     const authors = await authorsFor(env, authorIds(comments));
+    /* staff is the moderator list's answer, so the wall offers Remove to
+       site moderators whose cookie role says nothing about it. */
+    const staff = await isModerator(env, session);
     return json({
       owner: { userId: owner.userId, login: owner.login, displayName: owner.displayName },
       enabled: owner.commentsEnabled,
       mentionsEnabled: owner.mentionsEnabled,
       comments, page, pages, total, authors,
-      viewer: { isOwner: !!session && String(session.user_id) === id },
+      viewer: { isOwner: !!session && String(session.user_id) === id, staff },
     });
   } catch (err) {
     console.error('[forum/comments] get:', err.message);
@@ -131,16 +135,25 @@ export async function onRequestPost(context) {
 
   try {
     const owner = await ownerOf(env, id);
-    const recentPosts = session && session.user_id ? await recentPostCount(db, session.user_id, 1) : 0;
-    const rule = commentRule({ session, owner, enabled: owner ? owner.commentsEnabled : true, recentPosts });
+    const enabled = owner ? owner.commentsEnabled : true;
+    /* Everything but the rate limit first; the limit is judged inside the
+       transaction under the poster's lock so a burst cannot slip past. */
+    const rule = commentRule({ session, owner, enabled });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
     const mentioned = await resolveMentions(env, parseMentions(body.value));
-    const made = await withTransaction(async (tx) => {
-      const out = await createComment(tx, { profileId: id, userId: session.user_id, body: body.value });
-      await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
-      return out;
-    });
+    let made;
+    try {
+      made = await withTransaction(async (tx) => {
+        await underLimit(tx, session.user_id, w => commentRule({ session, owner, enabled, recentPosts: w.recentPosts }));
+        const out = await createComment(tx, { profileId: id, userId: session.user_id, body: body.value });
+        await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+        return out;
+      });
+    } catch (err) {
+      if (err instanceof ForumError) return json({ error: err.message }, err.status);
+      throw err;
+    }
     return json({ postId: made.postId }, 201);
   } catch (err) {
     console.error('[forum/comments] post:', err.message);

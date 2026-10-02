@@ -24,7 +24,7 @@ import { staffRule, reportRule, validateReason, REASON_MAX } from '../../functio
 import {
   createThread, createReply, getThread, listThreads, listPosts, getPost,
   setThreadFlags, deleteThread, restoreThread, moderateDeletePost, restorePost,
-  reportPost, listOpenReports, openReportCount, resolveReports,
+  reportPost, listOpenReports, openReportCount, resolveReports, listDeletedThreads,
 } from '../../functions/api/forum/queries.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -144,9 +144,17 @@ const other = await inTx(tx => createThread(tx, { categoryId: 'general', userId:
   check('its posts are untouched', (await listPosts(db, other.threadId)).posts[0].body, 'x');
   check('flags on a removed topic are refused', await inTx(tx => setThreadFlags(tx, other.threadId, { pinned: true })), false);
   check('removing it twice does nothing', await inTx(tx => deleteThread(tx, { id: other.threadId, byUserId: MOD })), false);
+  /* Staff read it with includeDeleted, marked; nobody else reads it. */
+  const staffView = await getThread(db, other.threadId, { includeDeleted: true });
+  check('staff can still open a removed topic, marked deleted', [staffView && staffView.title, staffView && staffView.deleted], ['Other', true]);
+  check('a live topic read that way is marked not deleted', (await getThread(db, threadId, { includeDeleted: true })).deleted, false);
+  check('the ordinary read carries no deleted field', 'deleted' in (await getThread(db, threadId)), false);
+  const removedList = await listDeletedThreads(db);
+  check('the removed list has it, with who removed it', removedList.map(t => [t.id, t.deletedBy]), [[other.threadId, MOD]]);
   check('restore', await inTx(tx => restoreThread(tx, { id: other.threadId })), true);
   check('it is back', (await getThread(db, other.threadId)).title, 'Other');
   check('restoring a live topic does nothing', await inTx(tx => restoreThread(tx, { id: other.threadId })), false);
+  check('and it leaves the removed list', await listDeletedThreads(db), []);
 }
 
 /* The report queue. */

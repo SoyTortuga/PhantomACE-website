@@ -15,6 +15,9 @@
    documents before Postgres. See docs/FORUM-PLAN.md §3.
    ══════════════════════════════════════════════ */
 
+import { newMentions } from './mentions.js';
+import { editMentionRule } from './rules.js';
+
 export const PER_PAGE = 20;
 export const TITLE_MAX = 120;
 export const BODY_MAX = 8000;
@@ -170,15 +173,38 @@ async function countThreads(db, categoryId) {
   return rows[0].n;
 }
 
-/** A thread and the board it sits on. A deleted thread is nobody's to read. */
-export async function getThread(db, id) {
+/** A thread and the board it sits on. A deleted thread is nobody's to read
+    — except staff, who ask with includeDeleted so they can look at it and
+    restore it. Only then does the result carry `deleted`. */
+export async function getThread(db, id, { includeDeleted = false } = {}) {
   const { rows } = await db.query(`
     SELECT t.id, t.category_id, t.user_id, t.title, t.pinned, t.locked, t.reply_count,
-           t.created_at, t.last_post_at, c.name AS category_name
+           t.created_at, t.last_post_at, t.deleted_at, c.name AS category_name
     FROM forum_threads t JOIN forum_categories c ON c.id = t.category_id
-    WHERE t.id = $1 AND t.deleted_at IS NULL`, [id]);
+    WHERE t.id = $1 ${includeDeleted ? '' : 'AND t.deleted_at IS NULL'}`, [id]);
   const r = rows[0];
-  return r ? { ...shapeThread(r), categoryName: r.category_name } : null;
+  if (!r) return null;
+  const out = { ...shapeThread(r), categoryName: r.category_name };
+  if (includeDeleted) out.deleted = !!r.deleted_at;
+  return out;
+}
+
+/** Removed topics, most recently removed first, for the staff queue's
+    restore list. */
+export async function listDeletedThreads(db, limit = 50) {
+  const { rows } = await db.query(`
+    SELECT t.id, t.category_id, t.user_id, t.title, t.pinned, t.locked, t.reply_count,
+           t.created_at, t.last_post_at, t.deleted_at, t.deleted_by, c.name AS category_name
+    FROM forum_threads t JOIN forum_categories c ON c.id = t.category_id
+    WHERE t.deleted_at IS NOT NULL
+    ORDER BY t.deleted_at DESC, t.id DESC
+    LIMIT $1`, [limit]);
+  return rows.map(r => ({
+    ...shapeThread(r),
+    categoryName: r.category_name,
+    deletedAt: iso(r.deleted_at),
+    deletedBy: r.deleted_by == null ? null : String(r.deleted_by),
+  }));
 }
 
 /** One page of a thread, oldest first. Deleted posts are INCLUDED, as
@@ -214,6 +240,53 @@ export async function recentThreadCount(db, userId, minutes) {
     SELECT count(*)::int AS n FROM forum_threads
     WHERE user_id = $1 AND created_at > now() - ($2 || ' minutes')::interval`, [String(userId), String(minutes)]);
   return rows[0].n;
+}
+
+/** Edits by this person in the last `minutes` that @named somebody new.
+    A post's own mentions are written in its creating transaction, where
+    now() is the post's created_at; anything later on the same post came
+    from an edit. One edit is one transaction, so its rows share a stamp. */
+export async function recentMentionEditCount(db, userId, minutes) {
+  const { rows } = await db.query(`
+    SELECT count(*)::int AS n FROM (
+      SELECT DISTINCT m.post_id, m.created_at
+      FROM forum_mentions m JOIN forum_posts p ON p.id = m.post_id
+      WHERE p.user_id = $1
+        AND m.created_at > now() - ($2 || ' minutes')::interval
+        AND m.created_at > p.created_at
+    ) x`, [String(userId), String(minutes)]);
+  return rows[0].n;
+}
+
+/** Serialise one person's writes. Taken as the FIRST statement of a
+    posting transaction: a second request from the same person waits here
+    until the first commits, and its counts (fresh snapshot per statement
+    under READ COMMITTED) then include what the first wrote. Without it two
+    requests in the same instant both count four and both post. */
+export async function lockPoster(tx, userId) {
+  await tx.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, ['forum_post:' + String(userId)]);
+}
+
+/** The rate-limit window, read under the poster's lock. `recentPosts`
+    counts new posts and comments plus edits that named somebody new, so an
+    edit cannot be used to send mentions faster than posting could. */
+export async function postingWindow(tx, userId, { threads = false } = {}) {
+  await lockPoster(tx, userId);
+  const posts = await recentPostCount(tx, userId, 1);
+  const edits = await recentMentionEditCount(tx, userId, 1);
+  const recentThreads = threads ? await recentThreadCount(tx, userId, 10) : 0;
+  return { recentPosts: posts + edits, recentThreads };
+}
+
+/** Inside a posting transaction: take the window under the lock and let
+    `decide(window)` — a rules.js rule — answer. A refusal throws a
+    ForumError, which rolls the transaction back and which the route shows
+    as written. */
+export async function underLimit(tx, userId, decide, opts) {
+  const w = await postingWindow(tx, userId, opts);
+  const rule = decide(w);
+  if (!rule || !rule.ok) throw new ForumError('refused', (rule && rule.error) || 'Refused.', (rule && rule.status) || 403);
+  return w;
 }
 
 /* ── Writes. Each expects to be INSIDE a transaction. ───────────────── */
@@ -280,6 +353,47 @@ export async function getPost(db, id) {
     threadDeleted: !!r.thread_deleted_at,
     isOpening: !!r.is_opening,
   };
+}
+
+/** The live body of a post, row-locked for the edit about to replace it,
+    or null if it was removed. The edit's mention diff is taken against
+    THIS, not a read from before the transaction, so two edits racing each
+    other cannot both count the same name as new. */
+export async function lockPostBody(tx, id) {
+  const { rows } = await tx.query(
+    `SELECT body FROM forum_posts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, [id]);
+  return rows.length ? rows[0].body : null;
+}
+
+/** Everyone a post has ever @named (and been told about). */
+export async function mentionIdsOf(db, postId) {
+  const { rows } = await db.query(
+    `SELECT user_id FROM forum_mentions WHERE post_id = $1 ORDER BY user_id`, [postId]);
+  return rows.map(r => String(r.user_id));
+}
+
+/** An author's edit, whole: the previous text read under a row lock, the
+    names it adds worked out against that text, the mention allowance spent
+    only if it adds any, then the new body and the new mentions — nobody
+    already named in the previous version is told again. `resolved` is
+    resolveMentions() over the new body (KV reads, done before the
+    transaction). Returns the ids to link in the new body. */
+export async function editOwnPost(tx, { id, userId, body, resolved }) {
+  await lockPoster(tx, userId);
+  const previous = await lockPostBody(tx, id);
+  if (previous == null) throw new ForumError('gone', 'That post has already been removed.', 410);
+  const fresh = newMentions(previous, resolved);
+  if (fresh.length) {
+    const { recentPosts } = await postingWindow(tx, userId);
+    const rule = editMentionRule({ adding: fresh.length, recentPosts });
+    if (!rule.ok) throw new ForumError('slow', rule.error, rule.status);
+  }
+  await editPost(tx, { id, body });
+  const notified = fresh.length
+    ? await addMentions(tx, { postId: id, byUserId: userId, userIds: fresh.map(m => m.userId) })
+    : 0;
+  const known = new Set(await mentionIdsOf(tx, id));
+  return { mentions: (resolved || []).map(m => String(m.userId)).filter(u => known.has(u)), notified };
 }
 
 /** Replace the body and stamp edited_at. False if the post was deleted

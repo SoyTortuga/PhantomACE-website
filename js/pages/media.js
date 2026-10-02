@@ -39,7 +39,12 @@ async function loadGallery() {
      does not know about site moderators, so the button was hidden from
      exactly the people it is for. */
   const uploadBtn = document.getElementById('uploadBtn');
-  if (uploadBtn) uploadBtn.style.display = canManage ? '' : 'none';
+  if (uploadBtn) {
+    /* Drop the cookie-role class too: with it still on, display '' falls
+       back to roles.css's `display: none` for a list moderator. */
+    uploadBtn.classList.remove('role-moderator');
+    uploadBtn.style.display = canManage ? '' : 'none';
+  }
 
   renderGallery();
 }
@@ -69,7 +74,12 @@ function renderItem(item, index) {
      under Highlights is still a video, and an image filed under Clips is
      still an image — the old check read the category and got both wrong. */
   const playHtml = item.type === 'video' ? '<div class="gallery-item-play"></div>' : '';
-  const roleClass = item.role ? `role-${item.role}` : '';
+  /* No role-<role> class on the tile. /api/media already left out
+     everything this viewer may not see, judged with the moderator list;
+     roles.css would hide the rest again by the cookie's role, which says
+     "follower" for a site moderator, so they lost moderator-only items the
+     server had deliberately sent them. The lock chip still says who it is
+     for. */
 
   /* Videos have no still to show, so the tile renders the video element
      itself with preload="metadata" — enough for the browser to paint a
@@ -83,7 +93,7 @@ function renderItem(item, index) {
     : '';
 
   return `
-    <div class="gallery-item ${roleClass}" data-index="${index}" role="button" tabindex="0" aria-label="Open ${escapeAttr(item.title)}">
+    <div class="gallery-item" data-index="${index}" role="button" tabindex="0" aria-label="Open ${escapeAttr(item.title)}">
       ${mediaHtml}
       <span class="gallery-item-badge ${badgeClass}">${escapeHtml(item.category)}</span>
       ${lockHtml}

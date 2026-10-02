@@ -40,6 +40,14 @@ export function parseMentions(body) {
   return out;
 }
 
+/** Of the people a new version names, the ones the previous version did
+    not. `resolved` is resolveMentions() over the new body; `previousBody`
+    is the text being replaced. Compared by login, as typed. */
+export function newMentions(previousBody, resolved) {
+  const before = new Set(parseMentions(previousBody));
+  return (resolved || []).filter(m => !before.has(String(m.login).toLowerCase()));
+}
+
 /** [{ login, userId }] for every login that resolves to somebody who has
     not opted out. Order preserved; unresolved names are simply absent. */
 export async function resolveMentions(env, logins) {

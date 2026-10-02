@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createMediaStore } from '../lib/media-store.js';
 import * as mediaList from '../../functions/api/media/index.js';
 import * as mediaUpload from '../../functions/api/media/upload.js';
@@ -159,6 +160,13 @@ async function list(env, who) {
     mod.data.items.map(i => i.title).sort(), ['Mods only', 'Public', 'Subs only']);
   check('and is offered the controls', mod.data.canManage, true);
   check('their effective role is moderator', mod.data.viewerRole, 'moderator');
+
+  /* The page must not hide again what the server chose to send. roles.css
+     hides `.role-<role>` by the COOKIE's role, which says follower/visitor
+     for a site moderator — so a tile carrying that class vanished for the
+     very person the server had just sent it to. */
+  const pageJs = fs.readFileSync(fileURLToPath(new URL('../../js/pages/media.js', import.meta.url)), 'utf8');
+  ok('media.js does not put a role-<role> class on gallery tiles', !/role-\$\{/.test(pageJs) && !/roleClass/.test(pageJs));
 }
 
 /* ── Serving: the path is the untrusted input ────────────────────────── */
