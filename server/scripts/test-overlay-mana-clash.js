@@ -249,9 +249,13 @@ const post = (env, body, userId) => route.onRequestPost({
 
   const css = fs.readFileSync(path.join(REPO, 'css/pages/overlay.css'), 'utf8');
   ok('and the panel gets out of the way', /body\.ov-alerting \.ov-mc/.test(css));
-  /* The project forbids box-shadow outright. */
-  const mc = css.slice(css.indexOf('.ov-mc {'));
-  ok('with no box-shadow anywhere in it', !/box-shadow/.test(mc));
+  /* The project forbids box-shadow outright. Comments are stripped first:
+     the stylesheet explains the rule in prose ("no box-shadow anywhere"),
+     and a check that reads documentation as a declaration fails on the
+     explanation and proves nothing about the code. */
+  const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('the panel rule exists', cssCode.indexOf('.ov-mc {') !== -1);
+  ok('with no box-shadow declared anywhere in the overlay', !/box-shadow\s*:/.test(cssCode));
 }
 
 /* ── The card never goes quiet ──────────────────────────────── */
@@ -266,7 +270,8 @@ const post = (env, body, userId) => route.onRequestPost({
   const path = await import('node:path');
   const { fileURLToPath } = await import('node:url');
   const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-  const js = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  /* The overlay controls moved off bot-control onto the Overlay Dashboard. */
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
   const fn = /async function loadOvMc\(\)[\s\S]*?\n\}/.exec(js);
   ok('the loader exists', !!fn);
   const body = fn ? fn[0] : '';
@@ -279,7 +284,7 @@ const post = (env, body, userId) => route.onRequestPost({
   /* The bug itself: a bare `return` on !ok with nothing shown. */
   ok('no silent return on a failed response', !/if \(!res\.ok\) return;/.test(body));
 
-  const html = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
+  const html = fs.readFileSync(path.join(REPO, 'overlay-dashboard.html'), 'utf8');
   ok('and the picker says something before the first answer', /Loading rooms/.test(html));
 }
 

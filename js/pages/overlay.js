@@ -72,6 +72,89 @@
   var showing = false;
   var faults = 0;
 
+  /* ── QUEUE POLICY ──────────────────────────────────────────────────────
+     A follow-bot wave is two hundred follows in a minute; played one card at
+     a time that is ~25 minutes of "X followed!" standing in front of every
+     sub and raid. So:
+       • MERGE: a follow arriving while another follow is still QUEUED folds
+         into it, so the whole wave becomes one "+N new followers" card. The
+         merged card shows only the count — a hate-raid's usernames are
+         exactly the thing that must not reach the stream.
+       • PRIORITY: the queue is kept sorted by tier (stable within a tier), so
+         a sub/raid/gift/drop/giveaway jumps ahead of queued follows instead
+         of waiting behind them.
+       • CAP: at most MAX_QUEUE waiting cards. Over the cap, the newest
+         lowest-tier card is dropped first; a giveaway/wheel reveal is never
+         dropped (a moderator pressed a button and is watching for it). */
+  var MAX_QUEUE = 25;
+  var ALERT_TIER = {
+    'giveaway-spin': 3, 'wheel-spin': 3, raid: 3, giftsub: 3, sub: 3, 'hype-level': 3, drop: 3,
+    cheer: 2, 'bingo-call': 2, 'bingo-win': 2, 'mtgbbb-pull': 2, 'mtgbbb-bingo': 2,
+    follow: 1,
+  };
+  var NEVER_DROP = { 'giveaway-spin': true, 'wheel-spin': true };
+  var MERGEABLE = { follow: true };
+
+  function tierOf(ev) { return ALERT_TIER[ev.type] || 2; }
+
+  function mergeAlert(into, ev) {
+    var merged = {};
+    for (var k in into) merged[k] = into[k];
+    merged.count = (Number(into.count) || 1) + (Number(ev.count) || 1);
+    merged.seq = ev.seq;
+    return merged;
+  }
+
+  function enqueue(ev) {
+    if (MERGEABLE[ev.type]) {
+      for (var m = queue.length - 1; m >= 0; m--) {
+        if (queue[m].type === ev.type) { queue[m] = mergeAlert(queue[m], ev); return; }
+      }
+    }
+    var tier = tierOf(ev);
+    var at = queue.length;
+    while (at > 0 && tierOf(queue[at - 1]) < tier) at--;
+    queue.splice(at, 0, ev);
+    while (queue.length > MAX_QUEUE) {
+      var drop = -1;
+      for (var d = queue.length - 1; d >= 0; d--) {
+        if (!NEVER_DROP[queue[d].type]) { drop = d; break; }
+      }
+      if (drop === -1) break;
+      queue.splice(drop, 1);
+    }
+  }
+
+  /* ── SERVER CLOCK ──────────────────────────────────────────────────────
+     Event times (ev.at) and Twitch's lock times are SERVER clock values, but
+     this page runs on the streaming PC, whose clock can be minutes out. A PC
+     two minutes fast used to read every alert as older than the replay window
+     and silently drop all of them. Each poll's serverNow gives a sample of
+     (server - local), taken at the midpoint of the round trip; the estimate
+     is smoothed so one slow reply cannot jerk it, and re-seated outright when
+     a sample disagrees by more than any round trip could explain (the PC's
+     clock was stepped). Until the first sample it is 0 — the old behaviour. */
+  var serverOffset = 0;
+  var serverOffsetKnown = false;
+  var OFFSET_MAX_RTT_MS = 5000;
+  var OFFSET_RESEAT_MS = 5000;
+  var OFFSET_SMOOTHING = 0.2;
+
+  function noteServerClock(serverNow, sentAt, recvAt) {
+    if (typeof serverNow !== 'number' || !isFinite(serverNow)) return;
+    var rtt = recvAt - sentAt;
+    if (!(rtt >= 0) || rtt > OFFSET_MAX_RTT_MS) return;
+    var sample = serverNow - (sentAt + rtt / 2);
+    if (!serverOffsetKnown || Math.abs(sample - serverOffset) > OFFSET_RESEAT_MS) {
+      serverOffset = sample;
+      serverOffsetKnown = true;
+      return;
+    }
+    serverOffset += (sample - serverOffset) * OFFSET_SMOOTHING;
+  }
+
+  function serverTime() { return Date.now() + serverOffset; }
+
   /* The reload token this page loaded with. `undefined` until the first
      answer arrives; once set, any change means somebody pressed the button
      in the control panel. */
@@ -310,6 +393,11 @@
     }
     /* Twitch-native FOLLOW — a warm, low-key alert (common tier). */
     if (ev.type === 'follow') {
+      /* A merged wave (see enqueue) — the count only, never the names. */
+      var followers = Number(ev.count) || 1;
+      if (followers > 1) {
+        return { art: ART.love, kind: 'New Followers', title: '+' + followers + ' new followers', sub: 'Welcome to the crypt', rarity: 'common' };
+      }
       return { art: ART.love, kind: 'New Follower', title: esc(ev.user || 'Someone') + ' followed!', sub: 'Welcome to the crypt', rarity: 'common' };
     }
     /* Twitch-native CHEER — bits amount headlined, tier by amount using the
@@ -1024,6 +1112,17 @@
      .ov-prediction[hidden] guard in overlay.css. */
   var PRED_REVEAL_MS = 8000;    // how long the resolved winner stays before hiding
   var PRED_CANCEL_MS = 3500;    // brief "canceled" note, then hide
+  /* SAFETY CAPS. The panel normally hides on 'end', but an 'end' can fail to
+     arrive — a revoked EventSub subscription, the overlay reloading after it
+     fired, a lost webhook. A panel that never hides also blocks the idle
+     self-reload for the rest of the stream. So every shown state carries its
+     own hide timer (in predTimers, so the next state replaces it):
+       • ACTIVE hides at the prediction's own lock time + a grace (Twitch's
+         window is at most 30 min, so no lock time means 30 min + grace);
+       • LOCKED hides 30 min after the lock. */
+  var PRED_WINDOW_MAX_MS = 30 * 60 * 1000;
+  var PRED_LOCK_GRACE_MS = 5 * 60 * 1000;
+  var PRED_LOCKED_MAX_MS = 30 * 60 * 1000;
   var predTimers = [];
   function clearPredTimers() {
     predTimers.forEach(clearInterval);
@@ -1100,6 +1199,10 @@
 
     var state = ev.state;
 
+    /* A teardown for a prediction alert that was switched off (events.js
+       sends it `quiet`): close whatever is up, show no reveal. */
+    if (ev.quiet) { clearPrediction(); return; }
+
     if (state === 'end') {
       var status = String(ev.status || '').toUpperCase();
       if (status === 'CANCELED') {
@@ -1126,7 +1229,12 @@
       if (timerEl) timerEl.textContent = 'LOCKED';
       renderPredOutcomes(ev, null);
       panel.hidden = false;
-      return;                            // locked — no countdown, nothing ticking
+      /* No countdown, nothing ticking — only the one safety hide timer,
+         measured from the lock (server clock) and never longer than the cap. */
+      var lockedAt = ev.locksAt ? Date.parse(ev.locksAt) : NaN;
+      var lockedLeft = isFinite(lockedAt) ? lockedAt + PRED_LOCKED_MAX_MS - serverTime() : PRED_LOCKED_MAX_MS;
+      predTimers.push(setTimeout(clearPrediction, Math.max(0, Math.min(PRED_LOCKED_MAX_MS, lockedLeft))));
+      return;
     }
 
     /* begin / progress → ACTIVE */
@@ -1136,14 +1244,20 @@
     panel.hidden = false;
 
     var locksAt = ev.locksAt ? Date.parse(ev.locksAt) : 0;
+    var hasLock = !!locksAt && !Number.isNaN(locksAt);
+    var activeLeft = hasLock ? locksAt - serverTime() + PRED_LOCK_GRACE_MS : PRED_WINDOW_MAX_MS + PRED_LOCK_GRACE_MS;
+    predTimers.push(setTimeout(clearPrediction,
+      Math.max(0, Math.min(PRED_WINDOW_MAX_MS + PRED_LOCK_GRACE_MS, activeLeft))));
+
     if (!timerEl) return;
-    if (!locksAt || Number.isNaN(locksAt)) { timerEl.textContent = ''; return; }
+    if (!hasLock) { timerEl.textContent = ''; return; }
 
     var tick = function () {
       /* NOTHING RUNS WHILE HIDDEN: bail (and stop) the instant the panel is
-         down or the lock time has passed. */
+         down or the lock time has passed. Measured on the SERVER clock — the
+         lock time is Twitch's, and the streaming PC's clock may be off. */
       if (panel.hidden) { clearInterval(iv); return; }
-      var ms = locksAt - Date.now();
+      var ms = locksAt - serverTime();
       if (ms <= 0) { timerEl.textContent = 'Locking…'; clearInterval(iv); return; }
       var secs = Math.ceil(ms / 1000);
       var mins = Math.floor(secs / 60);
@@ -1353,19 +1467,59 @@
     window.ovSetFault('alerts', on, 'overlay disconnected');
   }
 
+  /* ONE POLL IN FLIGHT. A fixed setInterval fired the next request whether or
+     not the last had answered, so on a slow link replies landed out of order
+     and an older reply could move the cursor BACKWARDS and replay alerts. Each
+     poll now schedules the next only when it settles. A watchdog abandons a
+     request that never answers (aborting it where the browser can), counts it
+     as a fault, and moves on — a hung fetch must not stop the chain. A reply
+     that lands after its watchdog fired is ignored. */
+  var POLL_TIMEOUT_MS = 8000;
+  var pollTimer = null;
+
+  function schedulePoll(ms) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(poll, ms);
+  }
+
+  function pollFailed() {
+    faults++;
+    if (faults >= FAULTS_BEFORE_NOTICE) setFault(true);
+  }
+
   function poll() {
+    pollTimer = null;
     var url = '/api/overlay/events?key=' + encodeURIComponent(key) +
               (cursor === null ? '' : '&since=' + cursor) +
               (audioMuted ? '' : '&iid=' + encodeURIComponent(overlayIid));
 
-    fetch(url, { cache: 'no-store' })
+    var settled = false;
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    var watchdog = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      if (ctrl) { try { ctrl.abort(); } catch (e) {} }
+      pollFailed();
+      schedulePoll(POLL_MS);
+    }, POLL_TIMEOUT_MS);
+    function finish() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
+      schedulePoll(POLL_MS);
+    }
+
+    var sentAt = Date.now();
+    fetch(url, ctrl ? { cache: 'no-store', signal: ctrl.signal } : { cache: 'no-store' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       })
       .then(function (data) {
+        if (settled) return;            // the watchdog already gave up on this one
         faults = 0;
         setFault(false);
+        noteServerClock(data.serverNow, sentAt, Date.now());
 
         /* Alert volume, set from the control panel. Sent on every poll so a
            change reaches the open overlay within a second, no reload. */
@@ -1406,19 +1560,37 @@
         /* No stored position — a genuinely first run. Take the current
            place and show nothing, or every alert since the server started
            would arrive at once. */
+        var latest = Number(data.latestSeq) || 0;
         if (cursor === null) {
-          cursor = data.latestSeq || 0;
+          cursor = latest;
           rememberCursor(cursor);
           return;
         }
 
+        /* THE FEED WAS RESET. The server's position is behind ours — its store
+           was wiped or restarted, and its seq numbering started over. Waiting
+           for it to climb past our old cursor would silently swallow every
+           alert until then. Restart from the beginning of the new feed; the
+           replay window still keeps anything stale off air. */
+        if (latest < cursor) {
+          cursor = 0;
+          return;
+        }
+
         if (data.events && data.events.length) {
-          var now = Date.now();
+          var now = serverTime();
+          var from = cursor;
           for (var i = 0; i < data.events.length; i++) {
             var ev = data.events[i];
+            /* Already played (or counted as seen). The cursor only ever moves
+               forward, and anything at or behind it is never shown twice. */
+            if (!(Number(ev.seq) > from)) continue;
             /* Anything older than the replay window is counted as seen and
                dropped. This is what stops a resumed cursor from replaying a
-               backlog after the overlay has been closed for hours. */
+               backlog after the overlay has been closed for hours. Compared on
+               the SERVER clock (ev.at is server time), so a streaming PC whose
+               clock runs fast or slow neither drops live alerts nor replays
+               stale ones. */
             if (ev.at && now - ev.at > MAX_REPLAY_MS) continue;
             /* The check-in nudge is not a stage alert — show it in the corner
                directly, off the queue, so it never delays or is delayed by a
@@ -1431,17 +1603,24 @@
                queue — begin/progress/lock/end update it in place; it never
                blocks (or is blocked by) a sub/raid card. */
             if (ev.type === 'prediction') { showPrediction(ev); continue; }
-            queue.push(ev);
+            enqueue(ev);
           }
-          cursor = data.latestSeq;
-          rememberCursor(cursor);
-          pump();
         }
+
+        /* Monotonic: only ever forward, and only written when it moves.
+           Advanced BEFORE pump(), so a card that throws while rendering can
+           never leave the batch unacknowledged and replay it next poll. */
+        if (latest > cursor) {
+          cursor = latest;
+          rememberCursor(cursor);
+        }
+        pump();
       })
       .catch(function () {
-        faults++;
-        if (faults >= FAULTS_BEFORE_NOTICE) setFault(true);
-      });
+        if (settled) return;
+        pollFailed();
+      })
+      .then(finish);
   }
 
   /* PERIODIC IDLE SELF-RELOAD.
@@ -1462,12 +1641,20 @@
   var loadedAt = Date.now();
   var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovPrediction'];
 
+  /* A panel is down if its poller hid it OR a layout preset switched it off
+     (overlay-apply-layout.js forces style.display = 'none' and leaves the
+     `hidden` attribute to the game). Either way nothing is on screen, so it
+     must not hold off the idle reload. */
+  function panelIsDown(el) {
+    return el.hidden || el.style.display === 'none';
+  }
+
   function overlayIsIdle() {
     if (showing || queue.length) return false;
     if (document.body.classList.contains('ov-alerting')) return false;
     for (var i = 0; i < IDLE_PANEL_IDS.length; i++) {
       var el = document.getElementById(IDLE_PANEL_IDS[i]);
-      if (el && !el.hidden) return false;
+      if (el && !panelIsDown(el)) return false;
     }
     return true;
   }
@@ -1489,5 +1676,4 @@
   }
 
   poll();
-  setInterval(poll, POLL_MS);
 })();

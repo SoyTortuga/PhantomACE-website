@@ -134,9 +134,10 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
   const reg = read('server/lib/registry.js');
   ok('the volume is a registered singleton', /overlay_alert_volume:\s*\{ table: 'singletons'/.test(reg));
 
-  const js = read('js/pages/bot-control.js');
+  /* The volume slider and the check-in card live on the Overlay Dashboard. */
+  const js = read('js/pages/overlay-dashboard.js');
   ok('the panel has a volume slider that saves on release', /action: 'alert-volume'/.test(js) && /getElementById\('ovAlertVolume'\)/.test(js));
-  const html = read('bot-control.html');
+  const html = read('overlay-dashboard.html');
   ok('the volume slider is in the markup', /id="ovAlertVolume"/.test(html));
 }
 
@@ -151,16 +152,16 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
   ok('the reminder config is a registered singleton', /checkin_reminder:\s*\{ table: 'singletons'/.test(reg));
 }
 
-/* ── The bot-control card ─────────────────────────────────────────────── */
+/* ── The Overlay Dashboard card ───────────────────────────────────────── */
 {
-  const html = read('bot-control.html');
+  const html = read('overlay-dashboard.html');
   ok('the panel has the reminder card', /id="ovCheckinSection"/.test(html));
   ok('with Show Now, a timer toggle, an interval and Save',
      /id="ovCheckinBtn"/.test(html) && /id="ovCheckinToggleBtn"/.test(html) &&
      /id="ovCheckinInterval"/.test(html) && /id="ovCheckinSaveBtn"/.test(html));
 
-  const js = read('js/pages/bot-control.js');
-  ok('Show Now fires the manual action', /action: 'checkin-alert'/.test(js));
+  const js = read('js/pages/overlay-dashboard.js');
+  ok('Show Now fires the manual action', /getElementById\('ovCheckinBtn'\)/.test(js) && /\{ action: 'checkin-alert' \}/.test(js));
   ok('the timer settings post the config action', /action: 'checkin-reminder-config'/.test(js));
   ok('and the panel loads the current config', /d\.checkinReminder/.test(js));
 }

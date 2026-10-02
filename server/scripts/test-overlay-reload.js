@@ -179,10 +179,12 @@ const ask = (env, body, userId) => feed.onRequestPost({
   ok('through a changed URL, not reload()', !/location\.reload\(/.test(code));
   ok('carrying a cache-busting parameter', /searchParams\.set\('r'/.test(code));
 
-  const html = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
+  /* The reload button lives on the Overlay Dashboard (moved off bot-control). */
+  const html = fs.readFileSync(path.join(REPO, 'overlay-dashboard.html'), 'utf8');
   ok('the panel has the button', /id="ovReloadBtn"/.test(html));
-  const js = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
-  ok('and it is wired up', /ovReloadBtn/.test(js) && /reloadOverlay/.test(js));
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  ok('and it is wired up', /getElementById\('ovReloadBtn'\)/.test(js) && /function reloadOverlay\(/.test(js) &&
+     /addEventListener\('click', function \(\) \{ reloadOverlay\(/.test(js));
 }
 
 /* ── Registered, because an unmapped key is a 500 ────────────────────── */

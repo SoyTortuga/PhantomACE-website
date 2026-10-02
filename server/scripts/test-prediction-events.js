@@ -164,7 +164,10 @@ const OUTCOMES = [
   await notify(env, 'channel.prediction.end', { id: 'p1', title: 'Who wins?', status: 'resolved', winning_outcome_id: 'o1', outcomes: OUTCOMES });
 
   const ev = overlayEvents(env);
-  check('every state pushed one overlay event', ev.map(e => e.state), ['begin', 'progress', 'progress', 'lock', 'end']);
+  /* Progress is a snapshot: the second REPLACES the first in the buffer
+     rather than appending, so the shared feed holds one progress at most. */
+  check('every state reached the overlay feed, progress coalesced to the latest', ev.map(e => e.state), ['begin', 'progress', 'lock', 'end']);
+  ok('the surviving progress is the newer one (a fresh seq)', ev[1].seq > ev[0].seq + 1);
   check('the overlay events are all type prediction', ev.every(e => e.type === 'prediction'), true);
   check('the last one is the resolved winner', ev[ev.length - 1].winningOutcomeId, 'o1');
 }
@@ -185,8 +188,46 @@ const OUTCOMES = [
   check('and they are begin, lock, end only', types, ['prediction-begin', 'prediction-end', 'prediction-lock']);
   ok('no progress row leaked into the feed', !rows.some(r => /progress/.test(r.type)));
 
-  /* Meanwhile the overlay saw all eight states. */
-  check('the overlay still saw every state', overlayEvents(env).length, 8);
+  /* Meanwhile the overlay feed holds begin, ONE progress, lock and end. */
+  check('the overlay feed carries every state, progress coalesced', overlayEvents(env).map(e => e.state), ['begin', 'progress', 'lock', 'end']);
+}
+
+/* ── PROGRESS CANNOT FLOOD THE SHARED BUFFER ──────────────────────────
+   The overlay feed is 60 slots shared with every alert. A busy prediction
+   fires progress on every vote; appended, two hundred of them would evict the
+   sub and raid that landed just before — exactly the alerts that must not be
+   lost while the overlay is behind. */
+{
+  const env = makeEnv();
+  const { pushOverlayEvent } = await import('../../functions/api/overlay/events.js');
+  await pushOverlayEvent(env, { type: 'sub', who: 'Subber' });
+  await pushOverlayEvent(env, { type: 'raid', who: 'Raider', viewers: 12 });
+  await notify(env, 'channel.prediction.begin', { id: 'p3', title: 'Flood', outcomes: OUTCOMES, locks_at: '2026-09-29T00:02:00Z' });
+  for (let i = 0; i < 200; i++) {
+    await notify(env, 'channel.prediction.progress', { id: 'p3', title: 'Flood', outcomes: OUTCOMES, locks_at: '2026-09-29T00:02:00Z' });
+  }
+  const all = JSON.parse(env._store.get('overlay_events')).events;
+  ok('the sub survives two hundred progress events', all.some(e => e.type === 'sub'));
+  ok('and so does the raid', all.some(e => e.type === 'raid'));
+  check('only one progress is buffered', all.filter(e => e.state === 'progress').length, 1);
+  check('the feed seq still counted every push', JSON.parse(env._store.get('overlay_events')).seq, 203);
+}
+
+/* ── A switched-off prediction alert still tears its panel down ───────
+   Toggling predictions off mid-prediction used to swallow the 'end', so the
+   panel stayed up for the rest of the stream. The end now goes through,
+   marked quiet: the overlay closes the panel without a reveal. Begin and
+   progress stay blocked. */
+{
+  const env = makeEnv();
+  env._store.set('alert_toggles', JSON.stringify({ prediction: false }));
+  await notify(env, 'channel.prediction.begin', { id: 'p4', title: 'Off', outcomes: OUTCOMES, locks_at: '2026-09-29T00:02:00Z' });
+  await notify(env, 'channel.prediction.progress', { id: 'p4', title: 'Off', outcomes: OUTCOMES, locks_at: '2026-09-29T00:02:00Z' });
+  await notify(env, 'channel.prediction.lock', { id: 'p4', title: 'Off', outcomes: OUTCOMES, locked_at: '2026-09-29T00:02:00Z' });
+  await notify(env, 'channel.prediction.end', { id: 'p4', title: 'Off', status: 'resolved', winning_outcome_id: 'o1', outcomes: OUTCOMES });
+  const ev = overlayEvents(env);
+  check('a disabled prediction pushes only its end', ev.map(e => e.state), ['end']);
+  check('and that end is quiet (teardown, no reveal)', ev[0].quiet, true);
 }
 
 /* ── webhook_callback_verification returns the challenge as text/plain ── */

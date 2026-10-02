@@ -102,24 +102,57 @@ export async function getOverlayKey(env) {
   return key;
 }
 
+/* TEARDOWN EVENTS BYPASS THE TOGGLE. A standing panel that a toggleable event
+   opened must still be told to close: switching predictions off mid-prediction
+   used to swallow the 'end', leaving the panel up for good and blocking the
+   overlay's idle self-reload. A teardown for a disabled type is still sent,
+   but marked `quiet` — the overlay closes the panel without the reveal. */
+function isTeardownEvent(event) {
+  return event.type === 'prediction' && event.state === 'end';
+}
+
+/* LOW-VALUE EVENTS ARE EVICTED FIRST. The buffer is shared, so a follow-bot
+   wave (or anything spammy) arriving while the overlay is behind would push
+   the sub that landed just before it out of the window. When over the cap,
+   the oldest of these goes first; only when none is left does the oldest
+   event overall. */
+function isEvictFirst(e) {
+  return e && (e.type === 'follow' || (e.type === 'prediction' && e.state === 'progress'));
+}
+
 /**
  * Append an event. Never throws — an overlay problem must not take down the
  * webhook or the drop that triggered it. A missed alert is a cosmetic loss;
  * a 500 back to Twitch risks the subscription itself.
+ *
+ * opts.replace(e) — optional predicate: buffered events it matches are removed
+ * before this one is appended, so a high-frequency state snapshot (prediction
+ * progress) occupies ONE slot instead of flooding the shared buffer. The new
+ * event still takes a fresh seq, so a client that already saw the old one
+ * still receives the update.
  */
-export async function pushOverlayEvent(env, event) {
+export async function pushOverlayEvent(env, event, opts) {
   if (!event || !event.type) return;
+  const replace = opts && typeof opts.replace === 'function' ? opts.replace : null;
   try {
     /* Central enable/disable gate: a toggled-off alert type is dropped before
-       it is ever enqueued, so it cannot reach the overlay by any path. */
-    if (await isAlertDisabled(env, event.type)) return;
+       it is ever enqueued, so it cannot reach the overlay by any path — except
+       a teardown, which goes through quietly (see isTeardownEvent). */
+    if (await isAlertDisabled(env, event.type)) {
+      if (!isTeardownEvent(event)) return;
+      event = { ...event, quiet: true };
+    }
     await env.MARKETPLACE.mutate(KEY, (current) => {
       const rec = current && Array.isArray(current.events)
         ? current
         : { events: [], seq: 0 };
+      if (replace) rec.events = rec.events.filter(e => !replace(e));
       rec.seq = (Number(rec.seq) || 0) + 1;
       rec.events.push({ ...event, seq: rec.seq, at: Date.now() });
-      if (rec.events.length > MAX_EVENTS) rec.events = rec.events.slice(-MAX_EVENTS);
+      while (rec.events.length > MAX_EVENTS) {
+        const i = rec.events.findIndex(isEvictFirst);
+        rec.events.splice(i === -1 ? 0 : i, 1);
+      }
       return rec;
     });
   } catch (err) {

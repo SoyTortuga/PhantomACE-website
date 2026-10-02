@@ -30,7 +30,6 @@
   var scoresEl = document.getElementById('ovScScores');
 
   var state = null;
-  var offset = 0;              // serverNow - Date.now()
   var timer = null;
 
   function esc(s) {
@@ -127,10 +126,13 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data) return;
-        offset = (data.serverNow || Date.now()) - Date.now();
         /* Absolute local time, so the countdown runs smoothly between polls
-           instead of stepping once a second when a reply lands. */
-        data.endsAtLocal = Date.now() + offset + (data.msLeft || 0);
+           instead of stepping once a second when a reply lands. msLeft is
+           already RELATIVE (the server did endsAt - its own now), so it
+           anchors to the local clock directly — adding a server/local clock
+           offset on top would shift the countdown by however far off the OBS
+           PC's clock is. */
+        data.endsAtLocal = Date.now() + (Number(data.msLeft) || 0);
         state = data;
         render();
       })

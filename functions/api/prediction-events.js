@@ -143,10 +143,18 @@ export async function onRequestPost(context) {
     const overlayEvent = predictionOverlayEvent(subType, event);
     if (!overlayEvent) return json({ ok: true });
 
-    /* The overlay panel updates on EVERY state, including progress. */
+    /* The overlay panel updates on EVERY state, including progress. But
+       progress is a SNAPSHOT, not an alert: each one supersedes the last, so
+       it REPLACES any buffered progress instead of appending. Otherwise a busy
+       prediction fills the shared 60-slot feed and evicts real sub/raid alerts
+       while the overlay is behind. Twitch runs one prediction per channel at a
+       time, so "any prediction progress" is "this prediction's progress". */
     try {
       const { pushOverlayEvent } = await import('./overlay/events.js');
-      await pushOverlayEvent(env, overlayEvent);
+      const opts = overlayEvent.state === 'progress'
+        ? { replace: (e) => e.type === 'prediction' && e.state === 'progress' }
+        : undefined;
+      await pushOverlayEvent(env, overlayEvent, opts);
     } catch (err) { console.error('[prediction-events] overlay push failed:', err.message); }
 
     /* The activity feed records begin / lock / end ONLY — never progress. */
