@@ -25,7 +25,7 @@ const EARNINGS_TTL_SECONDS = 2592000; // ignored by the registry (expiry: none)
 
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
-  const match = cookie.match(/pham_session=([^;]+)/);
+  const match = cookie.match(/(?:^|;\s*)pham_session=([^;]+)/);
   if (!match) return null;
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }

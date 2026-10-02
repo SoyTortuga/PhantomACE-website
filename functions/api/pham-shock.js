@@ -43,7 +43,7 @@ function json(data, s = 200) {
 
 function getSession(req) {
   const c = req.headers.get('Cookie') || '';
-  const m = c.match(/pham_session=([^;]+)/);
+  const m = c.match(/(?:^|;\s*)pham_session=([^;]+)/);
   if (!m) return null;
   try { return JSON.parse(decodeURIComponent(m[1])); } catch { return null; }
 }

@@ -100,7 +100,7 @@ const RANKED_GOAL = 10000;
 
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
-  const match = cookie.match(/pham_session=([^;]+)/);
+  const match = cookie.match(/(?:^|;\s*)pham_session=([^;]+)/);
   if (!match) return null;
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
