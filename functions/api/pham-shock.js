@@ -140,7 +140,24 @@ function applyDamage(hit, weapon, alive, terrain, dmg) {
   }
 }
 
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/* Everything random about a round comes from the room itself, so resolving
+   the same round twice produces the same battle byte for byte. The lock
+   already makes a second resolve impossible; this makes it harmless too. */
+function roundRng(room, what) {
+  return mulberry32(hashStr(`${room.code}:${room.round}:${room.terrainSeed}:${what}`));
+}
+
 function resolve(room) {
+  if (room.resolvedRound === room.round) return false;
+  room.resolvedRound = room.round;
+
+  const rng = roundRng(room, 'subs');
   const terrain = makeTerrain(room.terrainSeed);
   for (const e of room.explosions) digTerrain(terrain, e.x, e.y, e.r);
 
@@ -189,10 +206,10 @@ function resolve(room) {
 
       if (w.splitter) {
         for (let j = 0; j < (w.subs || 4); j++) {
-          const a2 = -Math.PI * 0.2 - Math.random() * Math.PI * 0.6;
-          const dir = Math.random() > 0.5 ? 1 : -1;
-          const svx = Math.cos(a2) * (2 + Math.random() * 2) * dir;
-          const svy = Math.sin(a2) * (3 + Math.random() * 2);
+          const a2 = -Math.PI * 0.2 - rng() * Math.PI * 0.6;
+          const dir = rng() > 0.5 ? 1 : -1;
+          const svx = Math.cos(a2) * (2 + rng() * 2) * dir;
+          const svy = Math.sin(a2) * (3 + rng() * 2);
           const sh = simShot(hit.x, hit.y - 5, svx, svy, terrain, room.wind, alive);
           /* Sub-shells are ordinary shells: they land, crater and hurt. */
           if (sh) {
@@ -230,6 +247,7 @@ function resolve(room) {
   const aliveNow = Object.values(room.players).filter(p => !p.eliminated);
   if (aliveNow.length <= 1 || room.round >= MAX_ROUNDS) {
     room.status = 'finished';
+    room.finishedAt = Date.now();
     if (aliveNow.length === 1) {
       room.winner = Object.keys(room.players).find(id => !room.players[id].eliminated);
     } else if (aliveNow.length === 0) {
@@ -245,6 +263,12 @@ function resolve(room) {
     room.phase = 'resolving';
     room.resolvedAt = Date.now();
   }
+  return true;
+}
+
+function allSubmitted(room) {
+  const alive = Object.values(room.players).filter(p => !p.eliminated);
+  return alive.length > 0 && alive.every(p => p.submitted);
 }
 
 function checkTimers(room) {
@@ -252,14 +276,13 @@ function checkTimers(room) {
   let changed = false;
 
   if (room.phase === 'aiming' && room.roundStartedAt && Date.now() - room.roundStartedAt >= ROUND_MS) {
-    resolve(room);
-    changed = true;
+    changed = resolve(room) || changed;
   }
 
-  if (room.phase === 'resolving' && room.resolvedAt && Date.now() - room.resolvedAt >= RESOLVE_MS) {
+  if (room.status === 'playing' && room.phase === 'resolving' && room.resolvedAt && Date.now() - room.resolvedAt >= RESOLVE_MS) {
     room.round++;
-    room.wind += (Math.random() - 0.5) * 2;
-    room.wind = Math.max(-8, Math.min(8, room.wind));
+    const gust = roundRng(room, 'wind')();
+    room.wind = Math.max(-8, Math.min(8, room.wind + (gust - 0.5) * 2));
     room.phase = 'aiming';
     room.roundStartedAt = Date.now();
     room.resolvedAt = null;
@@ -271,13 +294,121 @@ function checkTimers(room) {
   return changed;
 }
 
+/* ══ What a client sees ══════════════════════════════════════════════════
+   Room codes are public (list-rooms), so get-state is effectively public
+   too. It never carries the password, the kicked list, or anybody's locked
+   shot: a submission is angle + power + weapon, which mid-aim is the whole
+   of somebody's turn. Nobody needs their own back either -- the page only
+   reads `submitted`, and resolve() clears every submission when the round
+   plays out, which is where the shots become public as roundResults. */
+function publicView(room, now = Date.now()) {
+  const { password, kicked, ...rest } = room;
+  const out = { ...rest, hasPassword: !!password, players: {} };
+  for (const [id, p] of Object.entries(room.players || {})) {
+    const { submission, ...pub } = p;
+    out.players[id] = pub;
+  }
+  if (room.phase === 'aiming' && room.roundStartedAt) {
+    out.timeLeft = Math.max(0, ROUND_MS - (now - room.roundStartedAt));
+  }
+  return out;
+}
+
+/* ══ Wins ════════════════════════════════════════════════════════════════
+   Written here when resolve() ends the match, never POSTed by the winner's
+   browser: the board pays monthly prizes and the server already knows who
+   won. Same key the leaderboards page reads for 'pham-shock'.
+
+   Counted only for a real match -- at least two signed-in players still
+   in the room at the end (guest ids are minted by the browser, so a guest
+   opponent is a free sparring dummy), and at least one opponent actually
+   knocked out. A match everyone else walked away from is not a win. */
+const WIN_BOARD = 'lb_shell_shock';
+const WIN_BOARD_MAX = 50;
+const MIN_SIGNED_IN = 2;
+
+function isGuestId(id) { return String(id).startsWith('guest_'); }
+
+function countsForBoard(room) {
+  if (!room || room.status !== 'finished' || !room.winner) return false;
+  const winner = room.players[room.winner];
+  if (!winner || winner.eliminated || isGuestId(room.winner)) return false;
+  const ids = Object.keys(room.players);
+  if (ids.filter(id => !isGuestId(id)).length < MIN_SIGNED_IN) return false;
+  return ids.some(id => id !== room.winner && room.players[id].eliminated);
+}
+
+async function recordWin(env, room) {
+  try {
+    const { maybeRunMonthlyAwards } = await import('./leaderboards.js');
+    await maybeRunMonthlyAwards(env);
+  } catch (err) {
+    console.error('[pham-shock] monthly award settle failed:', err && err.message);
+  }
+
+  const winner = room.players[room.winner];
+  await env.MARKETPLACE.mutate(WIN_BOARD, (current) => {
+    const lb = Array.isArray(current) ? current : [];
+    const row = lb.find(e => e.id === room.winner);
+    if (row) { row.score += 1; row.name = winner.name; row.updatedAt = Date.now(); }
+    else lb.push({ id: room.winner, name: winner.name, score: 1, updatedAt: Date.now() });
+    lb.sort((a, b) => b.score - a.score);
+    return lb.slice(0, WIN_BOARD_MAX);
+  });
+}
+
+/**
+ * Claim the finished match under the room's own lock, then record it. Any
+ * request can be the one that ends a match, so several can see `finished`
+ * at once; only the one that flips winRecorded writes the board. Rooms
+ * finished before this existed carry no finishedAt and are left alone --
+ * their winner's browser already reported them.
+ */
+async function settle(env, code, room) {
+  if (!room || room.status !== 'finished' || room.winRecorded || !room.finishedAt) return;
+  let claimed = null;
+  await env.MARKETPLACE.mutate(roomKey(code), (current) => {
+    if (!current || current.status !== 'finished' || current.winRecorded || !current.finishedAt) return undefined;
+    current.winRecorded = true;
+    claimed = current;
+    return current;
+  }, { expirationTtl: ROOM_TTL });
+  if (claimed && countsForBoard(claimed)) await recordWin(env, claimed);
+}
+
+/* ══ Room writes ═════════════════════════════════════════════════════════
+   Every read-modify-write goes through mutate(), which holds the row's
+   lock. Shots are simultaneous, so two landing in the same tick is the
+   normal case; a get-then-put kept one and dropped the other, and two polls
+   crossing the deadline each ran resolve() and stored different battles. */
+function roomKey(code) { return 'ps_room_' + code; }
+
+function normCode(v) { return String(v || '').toUpperCase().trim(); }
+
+async function withRoom(env, code, fn) {
+  let failed = null;
+  const room = await env.MARKETPLACE.mutate(roomKey(code), (current) => {
+    if (!current) { failed = json({ error: 'Room not found' }, 404); return undefined; }
+    const moved = checkTimers(current);
+    const err = fn(current);
+    if (err) { failed = err; return moved ? current : undefined; }
+    return current;
+  }, { expirationTtl: ROOM_TTL });
+  if (room) await settle(env, code, room);
+  return { failed, room };
+}
+
+function num(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export async function onRequestGet(ctx) {
   const { env, request } = ctx;
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
 
   if (action === 'list-rooms') {
-    // One query rather than a list() plus a get() per room.
     const rows = await env.MARKETPLACE.listValues({ prefix: 'ps_room_' });
     const rooms = [];
     for (const { value: room } of rows) {
@@ -293,18 +424,17 @@ export async function onRequestGet(ctx) {
   }
 
   if (action === 'get-state') {
-    const code = url.searchParams.get('code');
+    const code = normCode(url.searchParams.get('code'));
     if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
+    /* Writes only when the clock moved something; every player polls this
+       every two seconds. */
+    const room = await env.MARKETPLACE.mutate(roomKey(code), (current) => {
+      if (!current) return undefined;
+      return checkTimers(current) ? current : undefined;
+    }, { expirationTtl: ROOM_TTL });
     if (!room) return json({ error: 'Room not found' }, 404);
-
-    const changed = checkTimers(room);
-    if (changed) await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
-
-    if (room.phase === 'aiming' && room.roundStartedAt) {
-      room.timeLeft = Math.max(0, ROUND_MS - (Date.now() - room.roundStartedAt));
-    }
-    return json(room);
+    await settle(env, code, room);
+    return json(publicView(room));
   }
 
   return json({ error: 'Invalid action' }, 400);
@@ -319,201 +449,196 @@ export async function onRequestPost(ctx) {
   if (!player) return json({ error: 'Not authenticated' }, 401);
 
   if (body.action === 'create-room') {
-    let code, exists;
     for (let i = 0; i < 10; i++) {
-      code = genCode();
-      exists = await env.MARKETPLACE.get('ps_room_' + code);
-      if (!exists) break;
-    }
-    if (exists) return json({ error: 'Could not generate code' }, 500);
-
-    const room = {
-      code, host: player.id, hostName: player.name,
-      password: body.password || null, status: 'lobby',
-      terrainSeed: Math.floor(Math.random() * 2147483647),
-      round: 0, phase: null, wind: 0,
-      roundStartedAt: null, resolvedAt: null,
-      players: {
-        [player.id]: {
-          name: player.name, img: player.img, hp: 100, x: 0,
-          ammo: {}, angle: 45, power: 50,
-          submitted: false, submission: null,
-          eliminated: false, color: 0, ready: false,
+      const candidate = genCode();
+      const fresh = {
+        code: candidate, host: player.id, hostName: player.name,
+        password: body.password || null, status: 'lobby',
+        terrainSeed: Math.floor(Math.random() * 2147483647),
+        round: 0, phase: null, wind: 0,
+        roundStartedAt: null, resolvedAt: null,
+        players: {
+          [player.id]: {
+            name: player.name, img: player.img, hp: 100, x: 0,
+            ammo: {}, angle: 45, power: 50,
+            submitted: false, submission: null,
+            eliminated: false, color: 0, ready: false,
+          },
         },
-      },
-      explosions: [], roundResults: null, damageMap: null, winner: null,
-    };
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
-    return json({ success: true, code });
+        kicked: [],
+        explosions: [], roundResults: null, damageMap: null, winner: null,
+      };
+      let claimed = false;
+      await env.MARKETPLACE.mutate(roomKey(candidate), (current) => {
+        if (current) return undefined;
+        claimed = true;
+        return fresh;
+      }, { expirationTtl: ROOM_TTL });
+      if (claimed) return json({ success: true, code: candidate });
+    }
+    return json({ error: 'Could not generate code' }, 500);
   }
 
-  if (body.action === 'join-room') {
-    const code = (body.code || '').toUpperCase().trim();
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'lobby') return json({ error: 'Game already started' }, 400);
-    if (Object.keys(room.players).length >= MAX_PLAYERS) return json({ error: 'Room full' }, 400);
-    if (room.password && body.password !== room.password) return json({ error: 'Wrong password' }, 403);
+  const code = normCode(body.code);
+  if (!code) return json({ error: 'Missing code' }, 400);
 
-    room.players[player.id] = {
-      name: player.name, img: player.img, hp: 100, x: 0,
-      ammo: {}, angle: 45, power: 50,
-      submitted: false, submission: null,
-      eliminated: false, color: nextColor(room.players), ready: false,
-    };
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+  if (body.action === 'join-room') {
+    const { failed } = await withRoom(env, code, (room) => {
+      if (Array.isArray(room.kicked) && room.kicked.includes(player.id)) {
+        return json({ error: 'The host removed you from this room.' }, 403);
+      }
+      if (room.players[player.id]) return null;
+      if (room.status !== 'lobby') return json({ error: 'Game already started' }, 400);
+      if (Object.keys(room.players).length >= MAX_PLAYERS) return json({ error: 'Room full' }, 400);
+      if (room.password && body.password !== room.password) return json({ error: 'Wrong password' }, 403);
+      room.players[player.id] = {
+        name: player.name, img: player.img, hp: 100, x: 0,
+        ammo: {}, angle: 45, power: 50,
+        submitted: false, submission: null,
+        eliminated: false, color: nextColor(room.players), ready: false,
+      };
+      return null;
+    });
+    if (failed) return failed;
     return json({ success: true, code });
   }
 
   if (body.action === 'leave-room') {
-    const code = body.code;
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    delete room.players[player.id];
-    if (!Object.keys(room.players).length) {
-      await env.MARKETPLACE.delete('ps_room_' + code);
-      return json({ success: true });
-    }
-    if (room.host === player.id) {
-      const nh = Object.keys(room.players)[0];
-      room.host = nh;
-      room.hostName = room.players[nh].name;
-    }
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    let emptied = false;
+    const { failed } = await withRoom(env, code, (room) => {
+      if (!room.players[player.id]) return null;
+      delete room.players[player.id];
+      if (!Object.keys(room.players).length) { emptied = true; return null; }
+      if (room.host === player.id) {
+        const nh = Object.keys(room.players)[0];
+        room.host = nh;
+        room.hostName = room.players[nh].name;
+      }
+      /* The round may have been waiting only on the player who left. */
+      if (room.status === 'playing' && room.phase === 'aiming' && allSubmitted(room)) resolve(room);
+      return null;
+    });
+    if (failed) return failed;
+    if (emptied) await env.MARKETPLACE.delete(roomKey(code));
     return json({ success: true });
   }
 
   if (body.action === 'set-color') {
-    const code = body.code;
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
-    const p = room.players[player.id];
-    if (!p) return json({ error: 'Not in this room' }, 403);
-
-    const color = Math.round(body.color);
-    if (!Number.isInteger(color) || color < 0 || color >= MAX_PLAYERS) return json({ error: 'Invalid color' }, 400);
-    const taken = Object.entries(room.players).some(([id, o]) => id !== player.id && o.color === color);
-    if (taken) return json({ error: 'Color taken' }, 400);
-
-    p.color = color;
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    const color = Math.round(num(body.color, NaN));
+    const { failed } = await withRoom(env, code, (room) => {
+      if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
+      const p = room.players[player.id];
+      if (!p) return json({ error: 'Not in this room' }, 403);
+      if (!Number.isInteger(color) || color < 0 || color >= MAX_PLAYERS) return json({ error: 'Invalid color' }, 400);
+      const taken = Object.entries(room.players).some(([id, o]) => id !== player.id && o.color === color);
+      if (taken) return json({ error: 'Color taken' }, 400);
+      p.color = color;
+      return null;
+    });
+    if (failed) return failed;
     return json({ success: true });
   }
 
   if (body.action === 'set-ready') {
-    const code = body.code;
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
-    const p = room.players[player.id];
-    if (!p) return json({ error: 'Not in this room' }, 403);
-
-    p.ready = !!body.ready;
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    const { failed } = await withRoom(env, code, (room) => {
+      if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
+      const p = room.players[player.id];
+      if (!p) return json({ error: 'Not in this room' }, 403);
+      p.ready = !!body.ready;
+      return null;
+    });
+    if (failed) return failed;
     return json({ success: true });
   }
 
   if (body.action === 'kick-player') {
-    const code = body.code;
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.host !== player.id) return json({ error: 'Only host can kick' }, 403);
-    if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
-    const targetId = body.targetId;
-    if (!targetId || targetId === player.id) return json({ error: 'Invalid target' }, 400);
-    if (!room.players[targetId]) return json({ error: 'Player not found' }, 404);
-
-    delete room.players[targetId];
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    const targetId = String(body.targetId || '');
+    const { failed } = await withRoom(env, code, (room) => {
+      if (room.host !== player.id) return json({ error: 'Only host can kick' }, 403);
+      if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
+      if (!targetId || targetId === player.id) return json({ error: 'Invalid target' }, 400);
+      if (!room.players[targetId]) return json({ error: 'Player not found' }, 404);
+      delete room.players[targetId];
+      /* Remembered, or they are back from the room list a second later. */
+      room.kicked = Array.isArray(room.kicked) ? room.kicked : [];
+      if (!room.kicked.includes(targetId)) room.kicked.push(targetId);
+      return null;
+    });
+    if (failed) return failed;
     return json({ success: true });
   }
 
   if (body.action === 'start-game') {
-    const code = body.code;
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.host !== player.id) return json({ error: 'Only host can start' }, 403);
-    if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
+    const { failed } = await withRoom(env, code, (room) => {
+      if (room.host !== player.id) return json({ error: 'Only host can start' }, 403);
+      if (room.status !== 'lobby') return json({ error: 'Already started' }, 400);
 
-    const pIds = Object.keys(room.players);
-    if (pIds.length < 2) return json({ error: 'Need at least 2 players' }, 400);
-    if (!pIds.every(id => room.players[id].ready)) return json({ error: 'All players must be ready' }, 400);
+      const pIds = Object.keys(room.players);
+      if (pIds.length < 2) return json({ error: 'Need at least 2 players' }, 400);
+      if (!pIds.every(id => room.players[id].ready)) return json({ error: 'All players must be ready' }, 400);
 
-    const terrain = makeTerrain(room.terrainSeed);
-    const margin = Math.floor(GAME_W * 0.05);
-    const spacing = (GAME_W - margin * 2) / Math.max(1, pIds.length - 1);
+      const margin = Math.floor(GAME_W * 0.05);
+      const spacing = (GAME_W - margin * 2) / Math.max(1, pIds.length - 1);
 
-    pIds.forEach((id, i) => {
-      const p = room.players[id];
-      p.x = Math.round(pIds.length === 1 ? GAME_W / 2 : margin + spacing * i);
-      p.hp = 100;
-      p.eliminated = false;
-      p.submitted = false;
-      p.submission = null;
-      p.angle = p.x < GAME_W / 2 ? 45 : 135;
-      p.power = 50;
-      const ammo = {};
-      WEAPONS.forEach((w, wi) => { if (w.ammo !== 999) ammo[wi] = w.ammo; });
-      p.ammo = ammo;
+      pIds.forEach((id, i) => {
+        const p = room.players[id];
+        p.x = Math.round(pIds.length === 1 ? GAME_W / 2 : margin + spacing * i);
+        p.hp = 100;
+        p.eliminated = false;
+        p.submitted = false;
+        p.submission = null;
+        p.angle = p.x < GAME_W / 2 ? 45 : 135;
+        p.power = 50;
+        const ammo = {};
+        WEAPONS.forEach((w, wi) => { if (w.ammo !== 999) ammo[wi] = w.ammo; });
+        p.ammo = ammo;
+      });
+
+      room.status = 'playing';
+      room.phase = 'aiming';
+      room.round = 1;
+      room.resolvedRound = 0;
+      room.wind = Math.round((Math.random() - 0.5) * 8 * 10) / 10;
+      room.roundStartedAt = Date.now();
+      room.resolvedAt = null;
+      room.explosions = [];
+      room.roundResults = null;
+      room.damageMap = null;
+      room.winner = null;
+      room.finishedAt = null;
+      room.winRecorded = false;
+      return null;
     });
-
-    room.status = 'playing';
-    room.phase = 'aiming';
-    room.round = 1;
-    room.wind = Math.round((Math.random() - 0.5) * 8 * 10) / 10;
-    room.roundStartedAt = Date.now();
-    room.explosions = [];
-    room.roundResults = null;
-    room.damageMap = null;
-    room.winner = null;
-
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+    if (failed) return failed;
     return json({ success: true });
   }
 
   if (body.action === 'submit-turn') {
-    const code = body.code;
-    if (!code) return json({ error: 'Missing code' }, 400);
-    const room = await env.MARKETPLACE.get('ps_room_' + code, 'json');
-    if (!room) return json({ error: 'Room not found' }, 404);
-    if (room.status !== 'playing' || room.phase !== 'aiming') return json({ error: 'Not in aiming phase' }, 400);
+    const angle = Math.max(0, Math.min(180, Math.round(num(body.angle, 45))));
+    const power = Math.max(10, Math.min(100, Math.round(num(body.power, 50))));
+    const weapon = Math.max(0, Math.min(WEAPONS.length - 1, Math.round(num(body.weapon, 0))));
 
-    checkTimers(room);
-    if (room.phase !== 'aiming') {
-      await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
-      return json({ error: 'Round ended' }, 400);
-    }
+    const { failed } = await withRoom(env, code, (room) => {
+      if (room.status !== 'playing') return json({ error: 'Game is not in progress' }, 400);
+      if (room.phase !== 'aiming') return json({ error: 'Round ended' }, 400);
+      const p = room.players[player.id];
+      if (!p) return json({ error: 'Not in this room' }, 403);
+      if (p.eliminated) return json({ error: 'Eliminated' }, 400);
+      if (p.submitted) return json({ error: 'Already submitted' }, 400);
 
-    const p = room.players[player.id];
-    if (!p) return json({ error: 'Not in this room' }, 403);
-    if (p.eliminated) return json({ error: 'Eliminated' }, 400);
-    if (p.submitted) return json({ error: 'Already submitted' }, 400);
+      const w = WEAPONS[weapon];
+      if (w.ammo !== 999 && (p.ammo[weapon] || 0) <= 0) return json({ error: 'No ammo' }, 400);
 
-    const angle = Math.max(0, Math.min(180, Math.round(body.angle || 45)));
-    const power = Math.max(10, Math.min(100, Math.round(body.power || 50)));
-    const weapon = Math.max(0, Math.min(WEAPONS.length - 1, Math.round(body.weapon || 0)));
-
-    const w = WEAPONS[weapon];
-    if (w.ammo !== 999 && (p.ammo[weapon] || 0) <= 0) {
-      return json({ error: 'No ammo' }, 400);
-    }
-
-    p.submitted = true;
-    p.submission = { angle, power, weapon };
-
-    const allDone = Object.values(room.players).every(pl => pl.eliminated || pl.submitted);
-    if (allDone) resolve(room);
-
-    await env.MARKETPLACE.put('ps_room_' + code, JSON.stringify(room), { expirationTtl: ROOM_TTL });
+      p.submitted = true;
+      p.submission = { angle, power, weapon };
+      if (allSubmitted(room)) resolve(room);
+      return null;
+    });
+    if (failed) return failed;
     return json({ success: true });
   }
 
   return json({ error: 'Invalid action' }, 400);
 }
+
+export { resolve as _resolve, publicView as _publicView, countsForBoard as _countsForBoard };

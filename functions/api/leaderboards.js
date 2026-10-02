@@ -50,7 +50,9 @@ const BOARDS = {
      is not a leaderboard. */
   'mana-clash':       { key: 'lb_mana_clash',   label: 'High Score',  sort: 'desc', serverOnly: true },
   'mana-clash-wins':  { key: 'lb_mana_clash_wins', label: 'Wins',     sort: 'desc', mode: 'increment', serverOnly: true },
-  'pham-shock':      { key: 'lb_shell_shock',  label: 'Wins',        sort: 'desc', mode: 'increment' },
+  /* Written by pham-shock.js when resolve() settles a real multi-player
+     match (recordWin), never by a browser -- one curl used to add a win. */
+  'pham-shock':      { key: 'lb_shell_shock',  label: 'Wins',        sort: 'desc', mode: 'increment', serverOnly: true },
   'phamily-time':     { key: 'lb_phamily_time', label: 'Hours',       sort: 'desc' },
   /* Written by end.js from the room's own computed scores, same shape as
      Mana Clash's SCORE_BOARD — points come from mtgbbb-scoring, never from

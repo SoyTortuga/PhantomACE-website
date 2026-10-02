@@ -32,7 +32,7 @@
 
     /* ── SPLASH ── */
     #splashScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; overflow-y: auto; }
-    .splash-title { font-family: var(--font-display); font-size: 36px; font-weight: 800; color: var(--red); text-shadow: 0 0 30px var(--red)40; letter-spacing: 2px; }
+    .splash-title { font-family: var(--font-display); font-size: 36px; font-weight: 800; color: var(--red); text-shadow: 0 0 30px color-mix(in srgb, var(--red) 25%, transparent); letter-spacing: 2px; }
     .splash-sub { font-size: 17px;
  text-shadow: none; color: var(--text-pri); text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
     .splash-sections { display: flex; gap: 12px; width: 100%; max-width: 560px; flex-wrap: wrap; }
@@ -55,8 +55,8 @@
 
     /* ── LOBBY ── */
     #lobbyScreen { flex-direction: column; align-items: center; padding: 24px 16px; gap: 16px; min-height: 100vh; }
-    .lobby-code { font-size: 67px; font-weight: 800; letter-spacing: 8px; color: var(--red); text-shadow: 0 0 20px var(--red)50; cursor: pointer; }
-    .lobby-code:hover { text-shadow: 0 0 30px var(--red)80; }
+    .lobby-code { font-size: 67px; font-weight: 800; letter-spacing: 8px; color: var(--red); text-shadow: 0 0 20px var(--red-dim); cursor: pointer; }
+    .lobby-code:hover { text-shadow: 0 0 30px color-mix(in srgb, var(--red) 50%, transparent); }
     .lobby-status { font-size: 15px;
  text-shadow: none; color: var(--text-pri); text-transform: uppercase; letter-spacing: 0.12em; }
     .player-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 400px; }
@@ -65,7 +65,7 @@
     .player-name { font-size: 18px;
  text-shadow: none; font-weight: 600; flex: 1; }
     .player-host-tag { font-size: 14px;
- text-shadow: none; color: var(--red); text-transform: uppercase; letter-spacing: 0.1em; background: var(--red)20; padding: 2px 6px; border-radius: 3px; }
+ text-shadow: none; color: var(--red); text-transform: uppercase; letter-spacing: 0.1em; background: var(--red-glow); padding: 2px 6px; border-radius: 3px; }
     .player-ready-tag { font-size: 14px;
  text-shadow: none; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
     .player-ready-tag.ready { color: #00cc66; background: #00cc6620; }
@@ -88,7 +88,7 @@
  text-shadow: none; color: var(--text-pri); max-width: 60px; overflow: hidden; text-overflow: ellipsis; }
     .pbar-hp { font-size: 14px;
  text-shadow: none; font-weight: 700; color: var(--text-pri); }
-    .pbar-item.me { border: 1px solid var(--red)60; }
+    .pbar-item.me { border: 1px solid var(--red-dim); }
     .pbar-item.dead { opacity: 0.3; }
     .pbar-item .pbar-hpbar { width: 30px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
     .pbar-item .pbar-hpfill { height: 100%; background: #00cc66; transition: width 0.3s; }
@@ -127,7 +127,9 @@
  text-shadow: none; margin-left: auto; }
 
     .status-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 20; pointer-events: none; }
-    .status-overlay .big { font-size: 39px; font-weight: 800; color: #ff3b3b; text-shadow: 0 0 20px var(--red)60; }
+    .status-overlay .big { font-size: 39px; font-weight: 800; color: #ff3b3b; text-shadow: 0 0 20px var(--red-dim); }
+    .game-notice { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 25; padding: 6px 14px; background: var(--gray-mid); border: 1px solid var(--red); border-radius: 4px; color: var(--text-pri); font-size: 15px; text-shadow: none; pointer-events: none; white-space: nowrap; }
+    .game-notice[hidden] { display: none; }
     .status-overlay .sub { font-size: 18px;
  text-shadow: none; color: #fff; margin-top: 6px; }
 
@@ -206,6 +208,7 @@
       <div class="big" id="statusBig"></div>
       <div class="sub" id="statusSub"></div>
     </div>
+    <div class="game-notice" id="gameNotice" role="status" hidden></div>
   </div>
   <div class="controls-bar" id="controlsBar">
     <div class="aim-group">
@@ -275,6 +278,9 @@ let lastAnimatedRound = 0;
 let isAnimating = false;
 let projectiles = [], particles = [];
 let submitted = false;
+let firing = false;
+let lastExpSig = '';
+let noticeTimer = null;
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
@@ -386,7 +392,7 @@ function renderLobby(room) {
   const isHost = room.host === myEffId;
   const players = Object.entries(room.players);
   const allReady = players.length > 0 && players.every(([, p]) => p.ready);
-  document.getElementById('lobbyStatus').textContent = room.password ? '🔒 Password Protected' : '🔓 Open Room';
+  document.getElementById('lobbyStatus').textContent = room.hasPassword ? '🔒 Password Protected' : '🔓 Open Room';
   document.getElementById('startBtn').disabled = players.length < 2 || !isHost || !allReady;
 
   const me = room.players[myEffId];
@@ -575,18 +581,28 @@ function digTerrain(t, cx, cy, r) {
 
 function tY(x) { return GH - terrain[Math.max(0, Math.min(GW - 1, Math.round(x)))]; }
 
+function expSig(e) { return e ? e.x + ',' + e.y + ',' + e.r : ''; }
+
 function rebuildTerrain(room) {
+  const exps = room.explosions || [];
+  /* Only ever append what is new -- unless the history no longer starts
+     with what was already dug, in which case start over from the seed. */
+  if (terrain && (exps.length < lastExplosionCount ||
+      (lastExplosionCount > 0 && expSig(exps[lastExplosionCount - 1]) !== lastExpSig))) {
+    terrain = null;
+  }
   if (!terrain) {
     terrain = makeTerrain(room.terrainSeed);
     lastExplosionCount = 0;
+    lastExpSig = '';
     terrainDirty = true;
   }
-  const exps = room.explosions || [];
   if (exps.length > lastExplosionCount) {
     for (let i = lastExplosionCount; i < exps.length; i++) {
       digTerrain(terrain, exps[i].x, exps[i].y, exps[i].r);
     }
     lastExplosionCount = exps.length;
+    lastExpSig = expSig(exps[exps.length - 1]);
     terrainDirty = true;
   }
 }
@@ -865,6 +881,14 @@ function showStatus(big, sub) {
 }
 function hideStatus() { document.getElementById('statusOverlay').style.display = 'none'; }
 
+function showNotice(msg) {
+  const el = document.getElementById('gameNotice');
+  el.textContent = msg;
+  el.hidden = false;
+  if (noticeTimer) clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { el.hidden = true; noticeTimer = null; }, 4000);
+}
+
 function renderPlayersBar(room) {
   const bar = document.getElementById('playersBar');
   const mid = getMyId();
@@ -956,16 +980,35 @@ function aimAtPoint(clientX, clientY) {
 
 canvas.addEventListener('click', e => aimAtPoint(e.clientX, e.clientY));
 
+const FIRE_ERRORS = {
+  'Round ended': 'Too late -- that round already fired.',
+  'No ammo': 'Out of ammo for {w}.',
+  'Eliminated': 'You are out -- spectating.',
+};
+
 async function submitTurn() {
-  if (submitted || !roomState || roomState.phase !== 'aiming') return;
+  if (firing || submitted || !roomState || roomState.phase !== 'aiming') return;
   const me = roomState.players[getMyId()];
   if (!me || me.eliminated) return;
 
-  const data = await api('POST', {
-    action: 'submit-turn', code: roomCode,
-    angle: localAngle, power: localPower, weapon: selectedWeapon,
-  });
-  if (data.error) return;
+  firing = true;
+  let data;
+  try {
+    data = await api('POST', {
+      action: 'submit-turn', code: roomCode,
+      angle: localAngle, power: localPower, weapon: selectedWeapon,
+    });
+  } catch {
+    data = { error: 'Connection lost -- try again.' };
+  } finally {
+    firing = false;
+  }
+  if (data.error && data.error !== 'Already submitted') {
+    const msg = data.error in FIRE_ERRORS ? FIRE_ERRORS[data.error] : data.error;
+    showNotice(String(msg).replace('{w}', (WEAPONS[selectedWeapon] || WEAPONS[0]).name));
+    if (data.error === 'Round ended') pollNow();
+    return;
+  }
 
   submitted = true;
   document.getElementById('controlsBar').style.display = 'none';
@@ -1007,15 +1050,6 @@ function showGameOver(room) {
       <span style="color:${p.eliminated ? '#ff4444' : '#00cc66'}">${p.eliminated ? 'KO' : p.hp + ' HP'}</span>
     </div>
   `).join('');
-
-  if (room.winner === getMyId()) {
-    fetch('/api/leaderboards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ game: 'pham-shock' }),
-    }).catch(() => {});
-  }
 }
 
 function backToSplash() {
@@ -1040,9 +1074,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp') { localPower = Math.min(100, localPower + 1); document.getElementById('powerSlider').value = localPower; document.getElementById('powerVal').textContent = localPower; }
   if (e.key === 'ArrowDown') { localPower = Math.max(10, localPower - 1); document.getElementById('powerSlider').value = localPower; document.getElementById('powerVal').textContent = localPower; }
   if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); submitTurn(); }
-  if (e.key >= '1' && e.key <= '5') {
-    const idx = parseInt(e.key) - 1;
-    if (WEAPONS[idx]) { selectedWeapon = idx; buildWeaponUI(me); }
+  if (/^[0-9]$/.test(e.key)) {
+    const idx = e.key === '0' ? 9 : parseInt(e.key, 10) - 1;
+    const w = WEAPONS[idx];
+    if (w && (w.ammo === Infinity || (me.ammo[idx] || 0) > 0)) { selectedWeapon = idx; buildWeaponUI(me); }
   }
 });
 
