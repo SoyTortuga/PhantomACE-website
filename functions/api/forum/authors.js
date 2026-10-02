@@ -35,8 +35,11 @@ function equippedItem(items, equips, slot, type) {
 
 /* profile_ and inv_ are independent, so read them together. The inventory is
    read ONCE here and the name-effect is derived from it inline — this used to
-   read inv_ a second time per author through the cosmetics resolver. */
+   read inv_ a second time per author through the cosmetics resolver. Guests
+   have neither a profile nor an inventory, so they short-circuit to anonymous
+   without touching the store (guest inventories are never read). */
 async function identity(env, id) {
+  if (String(id).startsWith('guest_')) return UNKNOWN(id);
   const [p, inv] = await Promise.all([
     env.MARKETPLACE.get(`profile_${id}`, 'json'),
     env.MARKETPLACE.get(`inv_${id}`, 'json').catch(() => null),

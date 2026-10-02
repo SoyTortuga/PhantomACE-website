@@ -16,6 +16,7 @@ import { isModerator } from '../admin/moderators.js';
 import {
   ForumError, parseCategoryId, parsePage, validateTitle, validateBody,
   getCategory, listThreads, createThread, underLimit, addMentions, authorIds,
+  unreadAmong, followedAmong,
 } from './queries.js';
 import { threadRule } from './rules.js';
 import { authorsFor } from './authors.js';
@@ -107,7 +108,17 @@ export async function onRequestGet(context) {
     const session = getSession(request);
     const staff = await isModerator(env, session);
     const canPost = threadRule({ session, staff, category }).ok;
-    return json({ category, threads, page, pages, total, authors, viewer: { staff, canPost } });
+    /* For a logged-in reader, which of these they follow and which have
+       moved since they last read them — one query each, not one per row. */
+    let unread = [], followed = [];
+    if (session && session.user_id != null) {
+      const ids = threads.map(t => t.id);
+      [unread, followed] = await Promise.all([
+        unreadAmong(db, session.user_id, ids),
+        followedAmong(db, session.user_id, ids),
+      ]);
+    }
+    return json({ category, threads, page, pages, total, authors, unread, followed, viewer: { staff, canPost } });
   } catch (err) {
     console.error('[forum/threads]', err.message);
     return json({ error: 'Forum unavailable' }, 503);

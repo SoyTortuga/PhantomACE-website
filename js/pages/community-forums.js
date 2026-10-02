@@ -25,9 +25,19 @@
   var TITLE_MAX = 120;
   var BODY_MAX = 8000;
   var REASON_MAX = 500;
+  var SEARCH_MAX = 100;
   /* The identities the current page arrived with, so an edit that names
      somebody new can link them without a reload. */
   var currentAuthors = {};
+
+  /* The reactions a post can carry: the room guestbook's twelve stamps, by
+     id, drawn here as their glyphs. The server owns the allowlist; this is
+     only how they look. */
+  var REACTION_GLYPH = {
+    skull: '💀', ghost: '👻', pumpkin: '🎃', bat: '🦇', candle: '🕯️', rose: '🥀',
+    crown: '👑', star: '✦', flame: '🔥', paw: '🐾', heart: '🖤', clover: '🍀',
+  };
+  var REACTION_ORDER = ['skull', 'ghost', 'pumpkin', 'bat', 'candle', 'rose', 'crown', 'star', 'flame', 'paw', 'heart', 'clover'];
 
   function esc(s) {
     var d = document.createElement('div');
@@ -156,6 +166,16 @@
     });
   }
 
+  /* The search box every forum view carries. It submits to /community with
+     ?search=, so searching from a topic lands back on the boards page. */
+  function searchBarHtml(current) {
+    return '<form class="forum-search-form" role="search">' +
+      '<input type="search" class="forum-input forum-search-input" name="q" placeholder="Search topics and posts" ' +
+        'maxlength="' + SEARCH_MAX + '" value="' + esc(current || '') + '" aria-label="Search the forum">' +
+      '<button class="pill-btn" type="submit">Search</button>' +
+    '</form>';
+  }
+
   /* A board lists newest activity first, so page 1 is the newest; a topic
      lists its posts oldest first, so page 1 is the earliest. The labels
      say which way each arrow goes for the list they sit under. */
@@ -197,10 +217,11 @@
     api('/api/forum/categories').then(function (r) {
       if (!r.ok) return failed(view, r.data.error || 'The forum is unavailable right now.');
       var authors = r.data.authors || {};
-      var staffBar = r.data.viewer && r.data.viewer.staff
-        ? '<div class="forum-staff-bar"><a href="/community?view=reports">Moderation queue</a></div>'
-        : '';
-      setViewHtml(view, staffBar + '<div class="forum-categories">' + r.data.categories.map(function (c) {
+      var links = [];
+      if (me()) links.push('<a href="/community?view=following">Topics you follow</a>');
+      if (r.data.viewer && r.data.viewer.staff) links.push('<a href="/community?view=reports">Moderation queue</a>');
+      var staffBar = links.length ? '<div class="forum-staff-bar">' + links.join('') + '</div>' : '';
+      setViewHtml(view, searchBarHtml('') + staffBar + '<div class="forum-categories">' + r.data.categories.map(function (c) {
         var newest = c.newest
           ? '<div class="forum-category-newest">' +
               '<a href="/thread/' + esc(c.newest.id) + '">' + esc(c.newest.title) + '</a>' +
@@ -265,8 +286,10 @@
       }
       var d = r.data, authors = d.authors || {};
       crumbs([{ text: d.category.name }]);
+      var unread = {}; (d.unread || []).forEach(function (id) { unread[id] = 1; });
+      var followed = {}; (d.followed || []).forEach(function (id) { followed[id] = 1; });
       var hrefFor = function (p) { return '/community?c=' + encodeURIComponent(categoryId) + (p > 1 ? '&page=' + p : ''); };
-      var html = '<div class="forum-thread-header"><h3>' + esc(d.category.name) + '</h3>' +
+      var html = searchBarHtml('') + '<div class="forum-thread-header"><h3>' + esc(d.category.name) + '</h3>' +
         '<div class="forum-thread-header-right"><span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span>' +
         composerHtml(d.category, d.viewer) + '</div></div>' + (d.viewer && d.viewer.canPost ? composerForm() : '');
       if (!d.threads.length) {
@@ -278,6 +301,8 @@
             '<div class="forum-thread-title">' +
               (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
               (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
+              (unread[t.id] ? '<span class="forum-flag forum-chip-new">New</span>' : '') +
+              (followed[t.id] ? '<span class="forum-flag forum-flag-locked">Following</span>' : '') +
               '<a href="' + href + '">' + esc(t.title) + '</a></div>' +
             '<div class="forum-thread-meta">' +
               authorLine(authors, t.userId, 'forum-author-sm') +
@@ -329,6 +354,37 @@
 
   /* ── One topic ───────────────────────────────────────────────────── */
 
+  /** The Follow / Following toggle that sits by a topic's title. */
+  function followBtnHtml(following) {
+    return '<button type="button" class="forum-follow-btn' + (following ? ' following' : '') +
+      '" data-act="toggle-follow" aria-pressed="' + (following ? 'true' : 'false') + '">' +
+      (following ? 'Following ✓' : '☆ Follow') + '</button>';
+  }
+
+  /** One reaction tally, a toggle: `on` when it is one of yours. */
+  function reactionChip(emoji, count, mine) {
+    return '<button type="button" class="forum-reaction' + (mine ? ' on' : '') + '" data-react="' + esc(emoji) + '" title="' + esc(emoji) + '">' +
+      '<span class="forum-reaction-glyph">' + (REACTION_GLYPH[emoji] || '◆') + '</span>' +
+      '<span class="forum-reaction-count">' + count + '</span></button>';
+  }
+
+  /** The reaction row under a post: the marks it already carries, a ＋ that
+      opens the full picker, and the picker itself. `data` is this post's
+      entry from the thread's reactions map (tallies + which are yours). */
+  function reactionBarHtml(postId, data) {
+    data = data || { tallies: {}, mine: [] };
+    var mine = {}; (data.mine || []).forEach(function (e) { mine[e] = 1; });
+    var tallies = data.tallies || {};
+    var chips = REACTION_ORDER.filter(function (e) { return tallies[e]; }).map(function (e) {
+      return reactionChip(e, tallies[e], !!mine[e]);
+    }).join('');
+    var picker = '<div class="forum-reaction-picker" hidden>' + REACTION_ORDER.map(function (e) {
+      return '<button type="button" class="forum-reaction-opt' + (mine[e] ? ' on' : '') + '" data-react="' + e + '" title="' + e + '">' + REACTION_GLYPH[e] + '</button>';
+    }).join('') + '</div>';
+    var add = '<button type="button" class="forum-reaction-add" data-act="react-pick" aria-label="Add a reaction" title="Add a reaction">＋</button>';
+    return '<div class="forum-reaction-bar" data-react-post="' + esc(postId) + '">' + chips + add + picker + '</div>';
+  }
+
   function postHtml(p, authors, ctx, op) {
     var mine = !!ctx.myId && String(p.userId) === ctx.myId;
     var controls = [];
@@ -343,6 +399,7 @@
         '<div class="forum-error" hidden></div>' +
       '</div>';
     }
+    if (ctx.myId && ctx.canReply) controls.push('<button type="button" data-act="quote">Quote</button>');
     if (mine && !ctx.locked) {
       controls.push('<button type="button" data-act="edit">Edit</button>');
       controls.push('<button type="button" data-act="delete">Delete</button>');
@@ -355,6 +412,7 @@
           ' <span class="forum-post-edited"' + (p.editedAt ? '' : ' hidden') + '>(edited)</span></span>' +
         (controls.length ? '<span class="forum-post-actions">' + controls.join('') + '</span>' : '') + '</div>' +
       '<div class="forum-post-body">' + linkMentions(p, authors) + '</div>' +
+      reactionBarHtml(p.id, ctx.reactions[p.id]) +
       '<div class="forum-error" hidden></div>' +
       (ctx.myId && !mine ? reasonForm('report', p.id, 'Why should a moderator look at this?', 'Send report') : '') +
       (ctx.staff && !mine ? reasonForm('delete-post', p.id, 'Reason (the author will see it)', 'Remove post') : '') +
@@ -413,17 +471,21 @@
         myId: sess && sess.user_id != null ? String(sess.user_id) : null,
         staff: !!viewer.staff,
         locked: !!t.locked || !!t.deleted,
+        canReply: !!viewer.canReply,
+        reactions: d.reactions || {},
       };
       document.title = t.title + ' | PhantomACE';
       crumbs([{ text: t.categoryName, href: '/community?c=' + encodeURIComponent(t.categoryId) }, { text: t.title }]);
       var hrefFor = function (p) { return '/thread/' + encodeURIComponent(id) + (p > 1 ? '?page=' + p : ''); };
 
-      var html = '<div class="forum-thread-view">';
+      var html = searchBarHtml('') + '<div class="forum-thread-view">';
       html += '<div class="forum-topic-head">' +
         (t.deleted ? '<span class="forum-flag forum-flag-locked">Removed</span>' : '') +
         (t.pinned ? '<span class="forum-flag">Pinned</span>' : '') +
         (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
-        '<h1 class="forum-post-title">' + esc(t.title) + '</h1></div>';
+        '<h1 class="forum-post-title">' + esc(t.title) + '</h1>' +
+        (ctx.myId && !t.deleted ? followBtnHtml(viewer.following) : '') +
+        '</div>';
       if (ctx.staff) html += modBarHtml(t);
       html += d.posts.map(function (p, i) { return postHtml(p, authors, ctx, d.page === 1 && i === 0); }).join('');
       html += pager(d.page, d.pages, hrefFor, TOPIC_PAGES);
@@ -440,11 +502,27 @@
 
   function wireThread(view, threadId) {
     view.addEventListener('click', function (e) {
+      /* Reactions carry data-react rather than data-act: a tally or a
+         picker option, both toggles on the post they sit in. */
+      var react = e.target.closest('[data-react]');
+      if (react) {
+        if (!me()) return login();
+        var bar = react.closest('.forum-reaction-bar');
+        if (bar) return toggleReaction(bar, react.getAttribute('data-react'));
+      }
       var act = e.target.closest('[data-act]');
       if (!act) return;
       var a = act.getAttribute('data-act');
       if (a === 'login') return login();
+      if (a === 'toggle-follow') return toggleFollow(act, threadId);
+      if (a === 'react-pick') {
+        var pbar = act.closest('.forum-reaction-bar');
+        var picker = pbar && pbar.querySelector('.forum-reaction-picker');
+        if (picker) picker.hidden = !picker.hidden;
+        return;
+      }
       var card = act.closest('[data-post]');
+      if (a === 'quote' && card) return quotePost(view, card);
       if (a === 'edit' && card) return startEdit(card);
       if (a === 'delete' && card) return deletePost(card);
       if (a === 'cancel-edit' && card) return endEdit(card);
@@ -583,7 +661,137 @@
     }).catch(function () { showError(err, null); });
   }
 
+  /* Follow / unfollow a topic. The button shows the server's answer so a
+     failed request leaves the label honest. */
+  function toggleFollow(btn, threadId) {
+    var following = btn.classList.contains('following');
+    btn.disabled = true;
+    api('/api/forum/follows', { id: threadId, action: following ? 'unfollow' : 'follow' }).then(function (r) {
+      btn.disabled = false;
+      if (!r.ok) return;
+      var nowF = !!r.data.following;
+      btn.classList.toggle('following', nowF);
+      btn.setAttribute('aria-pressed', nowF ? 'true' : 'false');
+      btn.innerHTML = nowF ? 'Following ✓' : '☆ Follow';
+    }).catch(function () { btn.disabled = false; });
+  }
+
+  /* Toggle one reaction on a post. The server returns the whole post's
+     reaction state, which the bar is rebuilt from — so two people reacting
+     at once never leave a stale count. */
+  function toggleReaction(bar, emoji) {
+    if (!REACTION_GLYPH[emoji]) return;
+    var postId = bar.getAttribute('data-react-post');
+    var existing = bar.querySelector('[data-react="' + emoji + '"]');
+    var mine = !!(existing && existing.classList.contains('on'));
+    api('/api/forum/reactions', { id: postId, emoji: emoji, action: mine ? 'remove' : 'add' }).then(function (r) {
+      if (!r.ok) return;
+      var wrap = document.createElement('div');
+      wrap.innerHTML = reactionBarHtml(postId, r.data.reactions);
+      bar.replaceWith(wrap.firstChild);
+    }).catch(function () {});
+  }
+
+  /* Quote a post into the reply box: an attribution line and the body as a
+     blockquote, in plain text — the reply is plain text, so the > marks are
+     just how a quote reads. */
+  function quotePost(view, card) {
+    var form = view.querySelector('#replyForm');
+    var textarea = form && form.querySelector('#replyBody');
+    if (!textarea) return;
+    var bodyEl = card.querySelector('.forum-post-body');
+    var nameEl = card.querySelector('.forum-author-name');
+    var name = nameEl ? nameEl.textContent.trim() : 'someone';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = bodyEl.innerHTML.replace(/<br\s*\/?>/g, '\n');
+    var text = tmp.textContent.replace(/\n{3,}/g, '\n\n').trim();
+    var quoted = text.split('\n').map(function (l) { return '> ' + l; }).join('\n');
+    var block = name + ' wrote:\n' + quoted + '\n\n';
+    textarea.value = (textarea.value ? textarea.value.replace(/\s*$/, '') + '\n\n' : '') + block;
+    textarea.focus();
+    try { textarea.setSelectionRange(textarea.value.length, textarea.value.length); } catch (e) {}
+    textarea.scrollIntoView({ block: 'center' });
+  }
+
+  /* ── Topics you follow ───────────────────────────────────────────── */
+
+  function renderFollowing(view, page) {
+    crumbs([{ text: 'Topics you follow' }]);
+    if (!me()) return failed(view, 'Log in to follow topics.');
+    api('/api/forum/follows?page=' + page).then(function (r) {
+      if (!r.ok) return failed(view, (r.data && r.data.error) || 'Could not load the topics you follow.');
+      var d = r.data, authors = d.authors || {};
+      var hrefFor = function (p) { return '/community?view=following' + (p > 1 ? '&page=' + p : ''); };
+      var html = searchBarHtml('') + '<div class="forum-thread-header"><h3>Topics you follow</h3>' +
+        '<span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span></div>';
+      if (!d.threads.length) {
+        html += '<div class="forum-empty card"><p>You are not following anything yet. Open a topic and press Follow to hear when someone replies.</p></div>';
+      } else {
+        html += '<div class="forum-thread-list">' + d.threads.map(function (t) {
+          var href = '/thread/' + esc(t.id);
+          return '<div class="card forum-thread-row' + (t.pinned ? ' forum-thread-pinned' : '') + '" data-href="' + href + '">' +
+            '<div class="forum-thread-title">' +
+              (t.unread ? '<span class="forum-flag forum-chip-new">New</span>' : '') +
+              (t.locked ? '<span class="forum-flag forum-flag-locked">Locked</span>' : '') +
+              '<a href="' + href + '">' + esc(t.title) + '</a></div>' +
+            '<div class="forum-thread-meta">' +
+              authorLine(authors, t.userId, 'forum-author-sm') +
+              '<span class="forum-thread-time">in ' + esc(t.categoryName) + ' · ' + timeAgo(t.lastPostAt) + '</span>' +
+              '<span class="forum-thread-replies">' + t.replyCount + ' ' + (t.replyCount === 1 ? 'reply' : 'replies') + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+      }
+      setViewHtml(view, html + pager(d.page, d.pages, hrefFor));
+    }).catch(function () { failed(view, 'Could not load the topics you follow.'); });
+  }
+
+  /* ── Search ──────────────────────────────────────────────────────── */
+
+  function renderSearch(view, q, page) {
+    crumbs([{ text: 'Search' }]);
+    document.title = 'Search | PhantomACE';
+    api('/api/forum/search?q=' + encodeURIComponent(q) + '&page=' + page).then(function (r) {
+      if (!r.ok) {
+        var html = searchBarHtml(q) + '<div class="forum-empty card"><p>' + esc((r.data && r.data.error) || 'That search did not work.') + '</p></div>';
+        return setViewHtml(view, html);
+      }
+      var d = r.data, authors = d.authors || {};
+      var hrefFor = function (p) { return '/community?search=' + encodeURIComponent(q) + (p > 1 ? '&page=' + p : ''); };
+      var html = searchBarHtml(d.query) + '<div class="forum-thread-header"><h3>Results for “' + esc(d.query) + '”</h3>' +
+        '<span class="forum-thread-count">' + d.total + ' ' + (d.total === 1 ? 'topic' : 'topics') + '</span></div>';
+      if (!d.results.length) {
+        html += '<div class="forum-empty card"><p>Nothing matched. Try fewer or different words.</p></div>';
+      } else {
+        html += '<div class="forum-thread-list">' + d.results.map(function (t) {
+          var href = '/thread/' + esc(t.id);
+          return '<div class="card forum-thread-row" data-href="' + href + '">' +
+            '<div class="forum-thread-title"><a href="' + href + '">' + esc(t.title) + '</a>' +
+              (t.matchedIn === 'post' ? '<span class="forum-flag forum-flag-locked">In a reply</span>' : '') + '</div>' +
+            (t.snippet ? '<div class="forum-search-snippet">' + esc(t.snippet) + '</div>' : '') +
+            '<div class="forum-thread-meta">' +
+              authorLine(authors, t.userId, 'forum-author-sm') +
+              '<span class="forum-thread-time">in ' + esc(t.categoryName) + ' · ' + timeAgo(t.lastPostAt) + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+      }
+      setViewHtml(view, html + pager(d.page, d.pages, hrefFor));
+    }).catch(function () { failed(view, 'That search did not work.'); });
+  }
+
   /* ── The moderation queue ────────────────────────────────────────── */
+
+  var MOD_ACTION_LABEL = {
+    pin: 'pinned', unpin: 'unpinned', lock: 'locked', unlock: 'unlocked',
+    'delete-thread': 'removed topic', 'restore-thread': 'restored topic',
+    'delete-post': 'removed post', 'restore-post': 'restored post', resolve: 'dismissed reports on',
+  };
+  function modLogTarget(l) {
+    if (l.targetType === 'thread') return '<a href="/thread/' + esc(l.targetId) + '">topic #' + esc(l.targetId) + '</a>';
+    if (l.targetType === 'post') return 'post #' + esc(l.targetId);
+    return 'a report';
+  }
 
   function renderQueue(view) {
     crumbs([{ text: 'Moderation queue' }]);
@@ -592,6 +800,8 @@
       var authors = r.data.authors || {};
       var reports = r.data.reports || [];
       var removed = r.data.removedThreads || [];
+      var removedPosts = r.data.removedPosts || [];
+      var modLog = r.data.modLog || [];
       var removedHtml = removed.length
         ? '<div class="forum-thread-header"><h3>Removed topics</h3>' +
             '<span class="forum-thread-count">' + removed.length + ' most recent</span></div>' +
@@ -636,7 +846,39 @@
             (rep.postDeleted ? '' : reasonForm('delete-post', rep.postId, 'Reason (the author will see it)', 'Remove post')) +
           '</div>';
         }).join('');
-      setViewHtml(view, reportsHtml + removedHtml);
+      var removedPostsHtml = removedPosts.length
+        ? '<div class="forum-thread-header"><h3>Removed posts</h3>' +
+            '<span class="forum-thread-count">' + removedPosts.length + ' most recent</span></div>' +
+          removedPosts.map(function (p) {
+            var where = p.threadId
+              ? '<a href="/thread/' + esc(p.threadId) + '#post-' + esc(p.id) + '">' + esc(p.threadTitle || 'a topic') + '</a>'
+              : '<span>a profile comment</span>';
+            return '<div class="card forum-report">' +
+              '<div class="forum-report-meta">' + authorLine(authors, p.userId, 'forum-author-sm') + ' in ' + where +
+                ' <span class="forum-thread-time">removed ' + timeAgo(p.deletedAt) + '</span></div>' +
+              (p.reason ? '<div class="forum-report-reason">' + esc(p.reason) + '</div>' : '') +
+              '<div class="forum-report-excerpt">' + esc(p.excerpt || '') + '</div>' +
+              '<div class="forum-error" hidden></div>' +
+              '<div class="forum-form-actions">' +
+                '<button type="button" class="pill-btn" data-act="mod" data-mod="restore-post" data-id="' + esc(p.id) + '">Restore post</button>' +
+              '</div>' +
+            '</div>';
+          }).join('')
+        : '';
+      var modLogHtml = modLog.length
+        ? '<div class="forum-thread-header"><h3>Moderation log</h3>' +
+            '<span class="forum-thread-count">last ' + modLog.length + '</span></div>' +
+          '<div class="forum-modlog">' + modLog.map(function (l) {
+            return '<div class="forum-modlog-entry">' +
+              authorLine(authors, l.actorId, 'forum-author-sm') +
+              ' <span class="forum-modlog-action">' + esc(MOD_ACTION_LABEL[l.action] || l.action) + '</span> ' +
+              modLogTarget(l) +
+              (l.detail ? ' <span class="forum-modlog-detail">“' + esc(l.detail) + '”</span>' : '') +
+              ' <span class="forum-thread-time">' + timeAgo(l.at) + '</span>' +
+            '</div>';
+          }).join('') + '</div>'
+        : '';
+      setViewHtml(view, reportsHtml + removedHtml + removedPostsHtml + modLogHtml);
       view.addEventListener('click', function (e) {
         var act = e.target.closest('[data-act]');
         if (!act) return;
@@ -661,6 +903,18 @@
     if (card) location.href = card.getAttribute('data-href');
   });
 
+  /* The search box on any forum view sends you to the boards page with the
+     query. One handler for all of them, including the one on a topic. */
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest('.forum-search-form');
+    if (!form) return;
+    e.preventDefault();
+    var input = form.querySelector('[name=q]');
+    var q = (input && input.value || '').trim();
+    if (q.length < 2) { if (input) input.focus(); return; }
+    location.href = '/community.html?search=' + encodeURIComponent(q);
+  });
+
   document.addEventListener('DOMContentLoaded', function () {
     var q = new URLSearchParams(location.search);
     var page = Math.max(1, parseInt(q.get('page') || '1', 10) || 1);
@@ -675,6 +929,9 @@
 
     var view = document.getElementById('forumView');
     if (!view) return;
+    var searchQ = q.get('search');
+    if (searchQ) return renderSearch(view, searchQ, page);
+    if (q.get('view') === 'following') return renderFollowing(view, page);
     if (q.get('view') === 'reports') return renderQueue(view);
     var c = (q.get('c') || '').toLowerCase();
     if (c) renderBoard(view, c, page); else renderHome(view);

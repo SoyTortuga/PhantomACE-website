@@ -21,6 +21,7 @@ import { isModerator } from '../admin/moderators.js';
 import {
   ForumError, parseId, parsePage, validateBody,
   getThread, getCategory, listPosts, createReply, underLimit, pageOfPost, addMentions, authorIds,
+  notifyFollowers, reactionsForPosts, isFollowing, markThreadRead,
 } from './queries.js';
 import { replyRule } from './rules.js';
 import { authorsFor } from './authors.js';
@@ -75,6 +76,7 @@ export async function onRequestPost(context) {
         await underLimit(tx, session.user_id, w => replyRule({ session, staff, category, thread, recentPosts: w.recentPosts }));
         const out = await createReply(tx, { threadId: id, userId: session.user_id, body: body.value });
         await addMentions(tx, { postId: out.postId, byUserId: session.user_id, userIds: mentioned.map(m => m.userId) });
+        await notifyFollowers(tx, { threadId: id, postId: out.postId, actorId: session.user_id });
         return out;
       });
     } catch (err) {
@@ -111,8 +113,16 @@ export async function onRequestGet(context) {
     const category = await getCategory(db, thread.categoryId);
     const { posts, total, pages } = await listPosts(db, id, page);
     const authors = await authorsFor(env, authorIds([thread], posts));
+    const viewerId = session && session.user_id != null ? session.user_id : null;
+    const reactions = await reactionsForPosts(db, posts.map(p => p.id), viewerId);
     const canReply = !thread.deleted && replyRule({ session, staff, category, thread }).ok;
-    return json({ thread, posts, page, pages, total, authors, viewer: { staff, canReply } });
+    const following = viewerId ? await isFollowing(db, id, viewerId) : false;
+    /* Opening a topic is reading it: clear its unread marker for this
+       person. Not for staff peering at a removed one. */
+    if (viewerId && !thread.deleted) {
+      try { await markThreadRead(db, { threadId: id, userId: viewerId }); } catch { /* a read mark is not worth failing the page */ }
+    }
+    return json({ thread, posts, page, pages, total, authors, reactions, viewer: { staff, canReply, following } });
   } catch (err) {
     console.error('[forum/thread]', err.message);
     return json({ error: 'Forum unavailable' }, 503);

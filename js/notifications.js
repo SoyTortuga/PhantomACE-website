@@ -46,6 +46,7 @@ function describeServerNotif(n) {
   let text, href = null;
   switch (n.kind) {
     case 'reply':      text = `${who} replied to ${where}`; break;
+    case 'follow':     text = `${who} replied to ${where}, which you follow`; break;
     case 'mention':    text = `${who} mentioned you in ${where}`; break;
     case 'comment':    text = `${who} commented on your profile`; break;
     case 'moderation': text = 'A moderator removed your post' + (n.reason ? `: ${n.reason}` : ''); break;
@@ -178,6 +179,7 @@ function getNotifIcon(type) {
     case 'raid': return '⚔️';
     case 'system': return '🔔';
     case 'reply': return '💬';
+    case 'follow': return '🔖';
     case 'mention': return '@';
     case 'comment': return '✍️';
     case 'moderation': return '🛡️';

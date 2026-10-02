@@ -24,6 +24,7 @@ import { isModerator } from '../admin/moderators.js';
 import {
   parseId, getThread, getPost, setThreadFlags, deleteThread, restoreThread,
   moderateDeletePost, restorePost, listOpenReports, resolveReports, listDeletedThreads,
+  logModAction, listModLog, listDeletedPosts,
 } from './queries.js';
 import { staffRule, validateReason } from './rules.js';
 import { authorsFor } from './authors.js';
@@ -60,13 +61,19 @@ export async function onRequestGet(context) {
     const rule = staffRule({ session, staff });
     if (!rule.ok) return json({ error: rule.error }, rule.status);
 
-    const reports = await listOpenReports(db);
-    const removedThreads = await listDeletedThreads(db, 25);
+    const [reports, removedThreads, removedPosts, modLog] = await Promise.all([
+      listOpenReports(db),
+      listDeletedThreads(db, 25),
+      listDeletedPosts(db, 25),
+      listModLog(db, 50),
+    ]);
     const ids = [];
     for (const r of reports) ids.push(r.reporterId, r.authorId);
     for (const t of removedThreads) { ids.push(t.userId); if (t.deletedBy) ids.push(t.deletedBy); }
+    for (const p of removedPosts) { ids.push(p.userId); if (p.deletedBy) ids.push(p.deletedBy); }
+    for (const l of modLog) ids.push(l.actorId);
     const authors = await authorsFor(env, ids);
-    return json({ reports, removedThreads, authors });
+    return json({ reports, removedThreads, removedPosts, modLog, authors });
   } catch (err) {
     console.error('[forum/moderate] get:', err.message);
     return json({ error: 'Forum unavailable' }, 503);
@@ -108,18 +115,30 @@ export async function onRequestPost(context) {
     if (action === 'pin' || action === 'unpin' || action === 'lock' || action === 'unlock') {
       const flags = action === 'pin' ? { pinned: true } : action === 'unpin' ? { pinned: false }
                   : action === 'lock' ? { locked: true } : { locked: false };
-      const done = await withTransaction(tx => setThreadFlags(tx, id, flags));
+      const done = await withTransaction(async (tx) => {
+        const d = await setThreadFlags(tx, id, flags);
+        if (d) await logModAction(tx, { actorId: me, action, targetType: 'thread', targetId: id });
+        return d;
+      });
       if (!done) return json({ error: 'That topic is not here.' }, 404);
       const thread = await getThread(db, id);
       return json({ ok: true, thread });
     }
     if (action === 'delete-thread') {
-      const done = await withTransaction(tx => deleteThread(tx, { id, byUserId: me }));
+      const done = await withTransaction(async (tx) => {
+        const d = await deleteThread(tx, { id, byUserId: me });
+        if (d) await logModAction(tx, { actorId: me, action, targetType: 'thread', targetId: id, detail: reason });
+        return d;
+      });
       if (!done) return json({ error: 'That topic is already removed.' }, 410);
       return json({ ok: true });
     }
     if (action === 'restore-thread') {
-      const done = await withTransaction(tx => restoreThread(tx, { id }));
+      const done = await withTransaction(async (tx) => {
+        const d = await restoreThread(tx, { id });
+        if (d) await logModAction(tx, { actorId: me, action, targetType: 'thread', targetId: id });
+        return d;
+      });
       if (!done) return json({ error: 'That topic is not removed.' }, 409);
       return json({ ok: true });
     }
@@ -132,16 +151,25 @@ export async function onRequestPost(context) {
       await withTransaction(async (tx) => {
         await moderateDeletePost(tx, { id, byUserId: me, reason });
         await resolveReports(tx, { postId: id, byUserId: me });
+        await logModAction(tx, { actorId: me, action, targetType: 'post', targetId: id, detail: reason });
       });
       return json({ ok: true });
     }
     if (action === 'restore-post') {
-      const done = await withTransaction(tx => restorePost(tx, { id }));
+      const done = await withTransaction(async (tx) => {
+        const d = await restorePost(tx, { id });
+        if (d) await logModAction(tx, { actorId: me, action, targetType: 'post', targetId: id });
+        return d;
+      });
       if (!done) return json({ error: 'That post is not removed.' }, 409);
       return json({ ok: true });
     }
     if (action === 'resolve') {
-      const n = await withTransaction(tx => resolveReports(tx, { postId: id, byUserId: me }));
+      const n = await withTransaction(async (tx) => {
+        const count = await resolveReports(tx, { postId: id, byUserId: me });
+        if (count) await logModAction(tx, { actorId: me, action, targetType: 'report', targetId: id });
+        return count;
+      });
       return json({ ok: true, resolved: n });
     }
     return json({ error: 'Bad request' }, 400);

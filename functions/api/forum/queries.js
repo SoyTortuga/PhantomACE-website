@@ -682,3 +682,296 @@ export function authorIds(...lists) {
   }
   return [...out];
 }
+
+/* ══════════════════════════════════════════════
+   SOCIAL — search, follows, unread, reactions, moderation log (009)
+
+   The same shape as everything above: pure functions over a db with one
+   method, query(sql, params). Reads take the pool; writes expect to be
+   inside a transaction. Covered by server/scripts/test-forum-social.js
+   against pglite with 006 + 009 applied.
+   ══════════════════════════════════════════════ */
+
+/* ── Search ──────────────────────────────────────────────────────────── */
+
+/** Returns { value } or { error }. Two characters is the floor — a single
+    letter matches half the board and is never what someone meant. */
+export function validateQuery(raw) {
+  const value = normalise(raw).replace(/\s+/g, ' ');
+  if (value.length < 2) return { error: 'Search for at least two characters.' };
+  if (value.length > 100) return { error: 'That search is too long.' };
+  return { value };
+}
+
+/** An ILIKE pattern that matches the term anywhere, with the term's own
+    %, _ and \ taken literally rather than as wildcards. */
+function likePattern(term) {
+  return '%' + String(term).replace(/[\\%_]/g, (c) => '\\' + c) + '%';
+}
+
+/** Topics whose title, or any live post, contains the term. One row per
+    topic: title hits rank above body-only hits, then by latest activity.
+    A body hit carries the newest matching post as a snippet so the result
+    can say where the word was. Deleted topics and deleted posts are out of
+    it — you cannot search your way to a tombstone. */
+export async function searchForum(db, term, page = 1, perPage = PER_PAGE) {
+  const pat = likePattern(term);
+  const { rows } = await db.query(`
+    WITH matches AS (
+      SELECT t.id, t.category_id, t.user_id, t.title, t.last_post_at, t.created_at, t.reply_count,
+             c.name AS category_name,
+             (t.title ILIKE $1) AS title_match,
+             (SELECT p.body FROM forum_posts p
+                WHERE p.thread_id = t.id AND p.deleted_at IS NULL AND p.body ILIKE $1
+                ORDER BY p.created_at DESC, p.id DESC LIMIT 1) AS snippet
+      FROM forum_threads t
+      JOIN forum_categories c ON c.id = t.category_id
+      WHERE t.deleted_at IS NULL
+        AND (t.title ILIKE $1
+             OR EXISTS (SELECT 1 FROM forum_posts p
+                          WHERE p.thread_id = t.id AND p.deleted_at IS NULL AND p.body ILIKE $1))
+    )
+    SELECT *, count(*) OVER() AS total FROM matches
+    ORDER BY title_match DESC, last_post_at DESC, id DESC
+    LIMIT $2 OFFSET $3`, [pat, perPage, (page - 1) * perPage]);
+  const total = rows.length ? Number(rows[0].total) : 0;
+  const results = rows.map((r) => ({
+    id: String(r.id),
+    categoryId: r.category_id,
+    categoryName: r.category_name,
+    userId: String(r.user_id),
+    title: r.title,
+    replyCount: Number(r.reply_count) || 0,
+    lastPostAt: iso(r.last_post_at),
+    matchedIn: r.title_match ? 'title' : 'post',
+    snippet: r.title_match ? null : snippetAround(r.snippet, term),
+  }));
+  return { results, total, pages: Math.max(1, Math.ceil(total / perPage)) };
+}
+
+/** A short window of a body around the first hit, so a long post does not
+    arrive whole. Plain text; the client escapes it. */
+function snippetAround(body, term, radius = 90) {
+  if (!body) return null;
+  const hay = String(body);
+  const at = hay.toLowerCase().indexOf(String(term).toLowerCase());
+  if (at < 0) return hay.slice(0, radius * 2).replace(/\s+/g, ' ').trim();
+  const start = Math.max(0, at - radius);
+  const end = Math.min(hay.length, at + term.length + radius);
+  return (start > 0 ? '… ' : '') + hay.slice(start, end).replace(/\s+/g, ' ').trim() + (end < hay.length ? ' …' : '');
+}
+
+/* ── Follows ─────────────────────────────────────────────────────────── */
+
+/** Start following. A second press is the PK's business and comes back
+    false, not an error. */
+export async function followThread(tx, { threadId, userId }) {
+  const { rows } = await tx.query(
+    `INSERT INTO forum_thread_follows (thread_id, user_id) VALUES ($1, $2)
+     ON CONFLICT DO NOTHING RETURNING thread_id`, [threadId, String(userId)]);
+  return rows.length === 1;
+}
+
+export async function unfollowThread(tx, { threadId, userId }) {
+  const { rows } = await tx.query(
+    `DELETE FROM forum_thread_follows WHERE thread_id = $1 AND user_id = $2 RETURNING thread_id`,
+    [threadId, String(userId)]);
+  return rows.length === 1;
+}
+
+export async function isFollowing(db, threadId, userId) {
+  if (!userId) return false;
+  const { rows } = await db.query(
+    `SELECT 1 FROM forum_thread_follows WHERE thread_id = $1 AND user_id = $2`, [threadId, String(userId)]);
+  return rows.length === 1;
+}
+
+/** Of the thread ids given, those this person follows — for drawing the
+    Following marker on a board without a query per row. */
+export async function followedAmong(db, userId, threadIds) {
+  const ids = (threadIds || []).map(String);
+  if (!userId || !ids.length) return [];
+  const { rows } = await db.query(
+    `SELECT thread_id FROM forum_thread_follows WHERE user_id = $1 AND thread_id = ANY($2::bigint[])`,
+    [String(userId), ids]);
+  return rows.map((r) => String(r.thread_id));
+}
+
+/** The topics a person follows, latest activity first, each carrying
+    whether it has moved since they last read it. */
+export async function listFollowedThreads(db, userId, page = 1, perPage = PER_PAGE) {
+  const { rows } = await db.query(`
+    SELECT t.id, t.category_id, t.user_id, t.title, t.pinned, t.locked, t.reply_count,
+           t.created_at, t.last_post_at, c.name AS category_name,
+           (r.last_read_at IS NULL OR t.last_post_at > r.last_read_at) AS unread,
+           count(*) OVER() AS total
+    FROM forum_thread_follows f
+    JOIN forum_threads t ON t.id = f.thread_id AND t.deleted_at IS NULL
+    JOIN forum_categories c ON c.id = t.category_id
+    LEFT JOIN forum_thread_reads r ON r.thread_id = t.id AND r.user_id = f.user_id
+    WHERE f.user_id = $1
+    ORDER BY t.last_post_at DESC, t.id DESC
+    LIMIT $2 OFFSET $3`, [String(userId), perPage, (page - 1) * perPage]);
+  const total = rows.length ? Number(rows[0].total) : 0;
+  const threads = rows.map((r) => ({ ...shapeThread(r), categoryName: r.category_name, unread: !!r.unread }));
+  return { threads, total, pages: Math.max(1, Math.ceil(total / perPage)) };
+}
+
+/** Tell a topic's followers that a reply landed. The replier is not told,
+    and neither is the starter — createReply already sent them 'reply', so a
+    starter who also follows is not notified twice. In the reply's own
+    transaction, so a follow notification exists only if the reply does. */
+export async function notifyFollowers(tx, { threadId, postId, actorId }) {
+  const { rows } = await tx.query(`
+    INSERT INTO notifications (user_id, kind, post_id)
+    SELECT f.user_id, 'follow', $2
+    FROM forum_thread_follows f
+    JOIN forum_threads t ON t.id = f.thread_id
+    WHERE f.thread_id = $1 AND f.user_id <> $3 AND f.user_id <> t.user_id
+    RETURNING id`, [threadId, postId, String(actorId)]);
+  return rows.length;
+}
+
+/* ── Unread tracking ─────────────────────────────────────────────────── */
+
+/** Mark a topic read for a person, now. A single upsert, safe on the pool.
+    Called when they open the topic. */
+export async function markThreadRead(db, { threadId, userId }) {
+  await db.query(`
+    INSERT INTO forum_thread_reads (thread_id, user_id, last_read_at) VALUES ($1, $2, now())
+    ON CONFLICT (thread_id, user_id) DO UPDATE SET last_read_at = now()`, [threadId, String(userId)]);
+}
+
+/** Of the thread ids given, those with activity since this person last read
+    them. A topic never opened has no read row and is NOT counted — the
+    marker means "new since you looked", not "you have not looked". */
+export async function unreadAmong(db, userId, threadIds) {
+  const ids = (threadIds || []).map(String);
+  if (!userId || !ids.length) return [];
+  const { rows } = await db.query(`
+    SELECT t.id FROM forum_threads t
+    JOIN forum_thread_reads r ON r.thread_id = t.id AND r.user_id = $1
+    WHERE t.id = ANY($2::bigint[]) AND t.last_post_at > r.last_read_at`,
+    [String(userId), ids]);
+  return rows.map((r) => String(r.id));
+}
+
+/** How many followed topics have moved since they were last read — the
+    number worth a badge on a "Following" link. */
+export async function unreadFollowCount(db, userId) {
+  if (!userId) return 0;
+  const { rows } = await db.query(`
+    SELECT count(*)::int AS n
+    FROM forum_thread_follows f
+    JOIN forum_threads t ON t.id = f.thread_id AND t.deleted_at IS NULL
+    LEFT JOIN forum_thread_reads r ON r.thread_id = t.id AND r.user_id = f.user_id
+    WHERE f.user_id = $1 AND (r.last_read_at IS NULL OR t.last_post_at > r.last_read_at)`,
+    [String(userId)]);
+  return rows[0].n;
+}
+
+/* ── Reactions ───────────────────────────────────────────────────────── */
+
+/** The closed set of marks a post can carry — the room guestbook's twelve
+    stamps, by id. A reaction is stored as one of these; the client owns the
+    glyphs. Validating here keeps whoever posts from inventing marks. */
+export const REACTION_IDS = ['skull', 'ghost', 'pumpkin', 'bat', 'candle', 'rose', 'crown', 'star', 'flame', 'paw', 'heart', 'clover'];
+const REACTION_SET = new Set(REACTION_IDS);
+export function isReaction(emoji) {
+  return REACTION_SET.has(String(emoji || ''));
+}
+
+export async function addReaction(tx, { postId, userId, emoji }) {
+  const { rows } = await tx.query(
+    `INSERT INTO forum_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)
+     ON CONFLICT DO NOTHING RETURNING post_id`, [postId, String(userId), String(emoji)]);
+  return rows.length === 1;
+}
+
+export async function removeReaction(tx, { postId, userId, emoji }) {
+  const { rows } = await tx.query(
+    `DELETE FROM forum_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3 RETURNING post_id`,
+    [postId, String(userId), String(emoji)]);
+  return rows.length === 1;
+}
+
+/** { [postId]: { tallies: { emoji: count }, mine: [emoji] } } for a page of
+    posts in one query — tallies for everyone, `mine` only for the viewer.
+    A post with no reactions is simply absent from the map. */
+export async function reactionsForPosts(db, postIds, viewerId) {
+  const ids = (postIds || []).map(String);
+  const out = {};
+  if (!ids.length) return out;
+  const { rows } = await db.query(`
+    SELECT post_id, emoji, count(*)::int AS n,
+           bool_or(user_id = $2) AS mine
+    FROM forum_reactions
+    WHERE post_id = ANY($1::bigint[])
+    GROUP BY post_id, emoji`, [ids, viewerId == null ? '' : String(viewerId)]);
+  for (const r of rows) {
+    const pid = String(r.post_id);
+    if (!out[pid]) out[pid] = { tallies: {}, mine: [] };
+    out[pid].tallies[r.emoji] = r.n;
+    if (r.mine) out[pid].mine.push(r.emoji);
+  }
+  return out;
+}
+
+/** The reaction state of one post, after a toggle, so the client redraws
+    exactly that post's bar from the server's count. */
+export async function reactionsForPost(db, postId, viewerId) {
+  const map = await reactionsForPosts(db, [postId], viewerId);
+  return map[String(postId)] || { tallies: {}, mine: [] };
+}
+
+/* ── Moderation log + restore bin ────────────────────────────────────── */
+
+/** One line in the moderation record. Inside the action's own transaction,
+    so the log and the thing it describes commit together. */
+export async function logModAction(tx, { actorId, action, targetType, targetId, detail = '' }) {
+  await tx.query(
+    `INSERT INTO forum_mod_log (actor_id, action, target_type, target_id, detail)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [String(actorId), String(action), String(targetType), String(targetId), String(detail || '')]);
+}
+
+export async function listModLog(db, limit = 50) {
+  const { rows } = await db.query(`
+    SELECT id, actor_id, action, target_type, target_id, detail, created_at
+    FROM forum_mod_log ORDER BY created_at DESC, id DESC LIMIT $1`, [limit]);
+  return rows.map((r) => ({
+    id: String(r.id),
+    actorId: String(r.actor_id),
+    action: r.action,
+    targetType: r.target_type,
+    targetId: String(r.target_id),
+    detail: r.detail || '',
+    at: iso(r.created_at),
+  }));
+}
+
+/** Removed posts, most recently removed first, for the restore bin — the
+    reply tombstones a moderator cannot otherwise reach without the thread.
+    Each carries enough to judge it: the body it hid, who removed it, why. */
+export async function listDeletedPosts(db, limit = 50) {
+  const { rows } = await db.query(`
+    SELECT p.id, p.thread_id, p.profile_id, p.user_id, p.deleted_at, p.deleted_by, p.delete_reason,
+           left(p.body, 240) AS excerpt, t.title AS thread_title
+    FROM forum_posts p
+    LEFT JOIN forum_threads t ON t.id = p.thread_id
+    WHERE p.deleted_at IS NOT NULL
+      AND (p.deleted_by IS NOT NULL AND p.deleted_by <> p.user_id)
+    ORDER BY p.deleted_at DESC, p.id DESC
+    LIMIT $1`, [limit]);
+  return rows.map((r) => ({
+    id: String(r.id),
+    threadId: r.thread_id == null ? null : String(r.thread_id),
+    threadTitle: r.thread_title || null,
+    profileId: r.profile_id == null ? null : String(r.profile_id),
+    userId: String(r.user_id),
+    deletedBy: r.deleted_by == null ? null : String(r.deleted_by),
+    reason: r.delete_reason || null,
+    excerpt: r.excerpt || '',
+    deletedAt: iso(r.deleted_at),
+  }));
+}
