@@ -176,9 +176,11 @@ async function post(env, who, body) {
   check('a level not yet reached is refused',
     (await post(env, 'sub', { action: 'claim-reward', rewardKey: '10_follower_cardback_common' })).status, 400);
 
-  const first = await post(env, 'sub', { action: 'claim-reward', rewardKey: '2_follower_giveaway_common' });
+  /* A non-giveaway reward, since giveaway rewards are now auto-credited and no
+     longer go through the claim/already-claimed path. */
+  const first = await post(env, 'sub', { action: 'claim-reward', rewardKey: '4_follower_room-piece_common' });
   check('the first claim succeeds', first.status, 200);
-  const second = await post(env, 'sub', { action: 'claim-reward', rewardKey: '2_follower_giveaway_common' });
+  const second = await post(env, 'sub', { action: 'claim-reward', rewardKey: '4_follower_room-piece_common' });
   check('claiming it again is refused', second.status, 400);
   check('and named as already claimed', second.data.error, 'Already claimed');
 }
@@ -230,10 +232,13 @@ check('the test clock is in October', MK, '2026-10');
   check('and the egg stack is one, not six',
     inventory(env, uid).items.find(i => i.id === '6_phamily_egg_common').quantity, 1);
 
+  /* Giveaway rewards are auto-credited on the heartbeat now, not claimed, so a
+     manual claim of one is a harmless no-op that credits nothing. (The
+     auto-credit path itself is covered by test-phamily-autocredit.js.) */
   const ga = await many({ action: 'claim-reward', rewardKey: '2_follower_giveaway_common' });
-  check('six parallel claims of giveaway entries: exactly one succeeds', ga.filter(r => r.status === 200).length, 1);
-  check('and the ledger holds one payout (2 entries), not six',
-    JSON.parse(env._store.get(ledgerKey(uid, MK))).entries, 2);
+  check('every parallel giveaway claim answers 200 as a no-op', ga.every(r => r.status === 200), true);
+  check('and no manual claim wrote anything to the ledger',
+    env._store.get(ledgerKey(uid, MK)), undefined);
 
   const ms = await many({ action: 'claim-milestone', milestoneLevel: 15 });
   check('six parallel milestone claims: exactly one succeeds', ms.filter(r => r.status === 200).length, 1);
@@ -245,8 +250,8 @@ check('the test clock is in October', MK, '2026-10');
   check('each key recorded once',
     row.claimedRewards.filter((k, i, a) => a.indexOf(k) !== i), []);
   check('the milestone recorded once', row.claimedMilestones, [15]);
-  check('all-time counts the four real claims, not twenty-four',
-    JSON.parse(env._store.get(`pt_alltime_${uid}`)).totalRewardsClaimed, 4);
+  check('all-time counts the three real claims (dice, egg, milestone), not twenty-four; giveaway no-ops do not count',
+    JSON.parse(env._store.get(`pt_alltime_${uid}`)).totalRewardsClaimed, 3);
 }
 
 /* claim-all twice at once (a double click, a second tab) must not pay any

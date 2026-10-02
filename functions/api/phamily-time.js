@@ -114,6 +114,13 @@ function getSubTier(session) {
 const PT_TTL = 5184000;
 function userDataKey(userId, mk) { return `pt_${userId}_${mk}`; }
 
+/* A reward key is `level_track_type_rarity`; the type never contains an
+   underscore (skull-skin, room-piece, click-effect use hyphens), so a
+   giveaway key is exactly the ones carrying the `_giveaway_` segment. Used to
+   seed the auto-credit ratchet from rewards a row CLAIMED under the old
+   claim-to-credit model, so those are never paid a second time. */
+function isGiveawayKey(key) { return String(key).includes('_giveaway_'); }
+
 function blankUserData(userId, mk) {
   return {
     userId,
@@ -122,6 +129,9 @@ function blankUserData(userId, mk) {
     level: 0,
     claimedRewards: [],
     claimedMilestones: [],
+    /* Giveaway-entry reward KEYS already auto-credited this month — the
+       ratchet behind "added automatically". See handleHeartbeat. */
+    giveawayCredited: [],
     attendance: {},
     lastHeartbeat: 0,
   };
@@ -314,6 +324,26 @@ async function handleHeartbeat(env, session, mk, now) {
      lock should never be held across a network call. */
   const live = await isChannelLive(env);
 
+  /* The giveaway-entry rewards on this viewer's track(s), so the mutate below
+     can credit every one whose level has been reached — the reward copy has
+     always said "added automatically", and this is what makes that true.
+     Everyone earns the follower track; subscribers also earn phamily. Built
+     before the lock (it is an import + a memoised table read), never inside
+     it. `toCredit` collects what this beat newly credited so the entries can
+     be added after the row lock is released. */
+  const { rewardTablesFor, rewardKeyFor } = await import('./phamily-rewards.js');
+  const ptTables = rewardTablesFor(mk);
+  const giveawayRewards = [];
+  for (const track of (getSubTier(session) > 0 ? ['follower', 'phamily'] : ['follower'])) {
+    const list = track === 'phamily' ? ptTables.phamily : ptTables.follower;
+    for (const r of list) {
+      if (r.type === 'giveaway') {
+        giveawayRewards.push({ key: rewardKeyFor(r, track), level: r.level, rarity: r.rarity, name: r.name });
+      }
+    }
+  }
+  const toCredit = [];
+
   /* ── SAY WHAT THIS BEAT ACTUALLY DID ────────────────────────────────────
      The response used to carry only `live`, which is not the same question
      as "did my time count". Three of these cases credit nothing while the
@@ -338,6 +368,7 @@ async function handleHeartbeat(env, session, mk, now) {
   const data = await mutateUserData(env, session.user_id, mk, (d) => {
     const gap = d.lastHeartbeat > 0 ? (timestamp - d.lastHeartbeat) : null;
     creditedSeconds = 0;
+    toCredit.length = 0;
     if (!live) {
       reason = 'offline';
     } else if (gap === null) {
@@ -356,6 +387,26 @@ async function handleHeartbeat(env, session, mk, now) {
       creditedSeconds = Math.round(Math.max(0, gap) / 1000);
       reason = 'credited';
     }
+
+    /* ── GIVEAWAY ENTRIES ARE ADDED AUTOMATICALLY ───────────────────────────
+       Credited the moment the level is reached, not on a manual claim — this
+       is what the "added automatically" copy promises. Driven off d.level (so
+       it settles up regardless of why this beat ran: credited, first-beat,
+       even offline), and idempotent: giveawayCredited is the per-month ratchet,
+       one entry per reward KEY. Seeded on first touch from any giveaway rewards
+       this row already CLAIMED under the old claim-to-credit model, so a user
+       who claimed before this shipped is never paid twice. The entries
+       themselves are added AFTER this write commits (below). */
+    if (!Array.isArray(d.giveawayCredited)) {
+      d.giveawayCredited = d.claimedRewards.filter(isGiveawayKey);
+    }
+    for (const g of giveawayRewards) {
+      if (g.level <= d.level && !d.giveawayCredited.includes(g.key)) {
+        d.giveawayCredited.push(g.key);
+        toCredit.push(g);
+      }
+    }
+
     d.lastHeartbeat = Math.max(d.lastHeartbeat || 0, timestamp);
     /* The community Watch Time board prints this. Refreshed every beat (same
        write, same lock) so a Twitch rename shows up on the next heartbeat. */
@@ -372,6 +423,20 @@ async function handleHeartbeat(env, session, mk, now) {
     allTime.totalHours = Math.max(allTime.totalHours || 0, data.hours);
     allTime.bestLevel = Math.max(allTime.bestLevel || 0, data.level);
   });
+
+  /* Add the entries now that the ratchet above is committed. If this half
+     fails the viewer is short some entries and the row already says they were
+     credited — recoverable, and the same tradeoff the check-in streak rewards
+     make. Doing it the other way (pay first, record after) would re-pay on
+     every heartbeat forever. The source stays `phamily:<name>` so the giveaway
+     history labels these exactly as the manual claim used to. */
+  if (toCredit.length) {
+    const { addEntries } = await import('./giveaway-entries.js');
+    for (const g of toCredit) {
+      const entries = GIVEAWAY_ENTRIES_BY_RARITY[g.rarity] || GIVEAWAY_ENTRIES_BY_RARITY.common;
+      await addEntries(env, session.user_id, session.display_name, entries, `phamily:${g.name || 'Giveaway Entries'}`);
+    }
+  }
 
   return json({
     hours: Math.round(data.hours * 10) / 10,
@@ -516,6 +581,16 @@ async function handleClaimReward(env, session, mk, body) {
   const reward = findReward(rewardKey, mk);
   if (!reward) return json({ error: 'No such reward' }, 400);
 
+  /* Giveaway-entry rewards are credited automatically the moment the level is
+     reached (see handleHeartbeat) — the reward copy says "added automatically".
+     A manual claim must therefore NOT grant a second time: it records nothing
+     and grants nothing, so a viewer who reached the level AND clicks claim (or
+     whose claim-all once swept it up) is never double-credited. This also
+     covers claim-prev, which routes through here. */
+  if (reward.type === 'giveaway') {
+    return json({ success: true, rewardKey, autoCredited: true });
+  }
+
   /* The follower track is open to everyone. The phamily track is the
      subscriber bonus ON TOP of it — a subscriber earns BOTH tracks at a
      given level, not one instead of the other. This used to route through
@@ -593,8 +668,14 @@ async function handleClaimAll(env, session, mk) {
      on top of it, not instead of it — see handleClaimReward. */
   const tracks = getSubTier(session) > 0 ? ['follower', 'phamily'] : ['follower'];
 
+  /* Giveaway rewards are excluded from the plan: they are credited
+     automatically on the heartbeat, so claim-all has nothing to do for them
+     (and handleClaimReward would no-op them anyway). Everything else on the
+     track is still a manual claim. */
   const rewards = tracks
-    .flatMap(track => earnedRewards(track, data.level, mk).map(r => rewardKeyFor(r, track)))
+    .flatMap(track => earnedRewards(track, data.level, mk)
+      .filter(r => r.type !== 'giveaway')
+      .map(r => rewardKeyFor(r, track)))
     .filter(key => !data.claimedRewards.includes(key));
 
   const milestones = earnedMilestones(data.level, mk)

@@ -18,11 +18,14 @@
    stream_log is written by the server's minute tick, so a stream NOBODY
    checks into is still recorded and correctly breaks everyone's streak.
 
-   REWARDS ARE GRANTED ONCE PER STREAK LENGTH REACHED, not once per stream.
-   Hitting 5 pays out at 5; staying on 5 pays nothing further; reaching 10
-   pays again. Stored per-user as the highest tier already paid, because
-   "did I already give them this" is the only question that stops a restart
-   or a redelivered webhook from paying twice.
+   REWARDS ARE GRANTED ONCE PER STREAK LENGTH REACHED, PER RUN — not once per
+   stream. Hitting 5 pays out at 5; staying on 5 pays nothing further; reaching
+   10 pays again. paidStreak is the high-water mark WITHIN the current unbroken
+   run and resets to 0 when the run restarts, so a streak that breaks and climbs
+   back EARNS the tiers again (turning up for ten more streams after a lapse is
+   worth rewarding). A redelivered webhook is still not a second attendance —
+   the duplicate guard below catches it before any of this runs — so it never
+   pays twice within a run.
    ══════════════════════════════════════════════ */
 
 const HISTORY_LIMIT = 100;   // per-viewer streams kept
@@ -234,12 +237,18 @@ export async function recordCheckin(env, { userId, username, streamId, startedAt
     rec.bestStreak = Math.max(Number(rec.bestStreak) || 0, rec.streak);
     rec.total = (Number(rec.total) || 0) + 1;
 
+    /* The run restarted, so the per-run payout ratchet restarts with it: a
+       rebuilt streak re-earns the tiers it passes. Reset here, before the
+       tier loop below reads it. */
+    if (!attendedPrevious) rec.paidStreak = 0;
+
     rec.streams.push({ streamId: sid, startedAt: startedAt || null, at: Date.now(), position: position || null });
     if (rec.streams.length > HISTORY_LIMIT) rec.streams = rec.streams.slice(-HISTORY_LIMIT);
 
-    /* Pay every tier newly reached. paidStreak is the ratchet: it only ever
-       goes up, so a broken-and-rebuilt streak does not re-pay tiers this
-       account has already been given. */
+    /* Pay every tier newly reached THIS run. paidStreak is the ratchet within
+       one unbroken run (reset to 0 above when the run restarts), so staying on
+       a streak never re-pays a tier, while a broken-and-rebuilt streak earns
+       the tiers again. */
     const paid = Number(rec.paidStreak) || 0;
     const awards = [];
     for (const tier of STREAK_TIERS) {

@@ -370,6 +370,20 @@
   font-weight: bold;
 }
 
+/* Giveaway-entry rewards are added automatically the moment the level is
+   reached — there is nothing to claim. They read as "credited": in-hand like a
+   claimed reward, but marked in giveaway red rather than claim green. */
+.pt-reward-node[data-state="credited"] .pt-reward-icon {
+  border-color: var(--red);
+  opacity: 1;
+}
+.pt-reward-node[data-state="credited"] .pt-reward-badge {
+  background: var(--red);
+  color: #fff;
+  font-weight: bold;
+}
+.pt-reward-node[data-state="credited"] .pt-reward-stem { background: var(--red); opacity: 0.5; }
+
 .pt-reward-node[data-state="ready"] .pt-reward-icon {
   border-color: var(--amber);
   animation: pt-pulse 1.8s ease-in-out infinite;

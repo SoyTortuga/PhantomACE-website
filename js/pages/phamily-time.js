@@ -153,6 +153,11 @@
        for non-subs no matter their level. The follower track has no such
        gate; everyone, subs included, earns it. */
     if (track === 'phamily' && !userIsSub) return 'locked';
+    /* Giveaway-entry rewards are credited automatically when the level is
+       reached — the server does it on the watch heartbeat, so there is no
+       Claim step. 'credited' is a distinct state from 'ready' precisely so the
+       pass never shows a Claim button for them. */
+    if (reward.type === 'giveaway') return reward.level <= userLevel ? 'credited' : 'locked';
     if (reward.level <= userLevel) return 'ready';
     return 'locked';
   }
@@ -306,7 +311,7 @@
            emoji instead of in a corner. */
         const badgeEl = document.createElement('div');
         badgeEl.className = 'pt-reward-badge';
-        badgeEl.textContent = state === 'claimed' ? '✓' : state === 'locked' ? '🔒' : '!';
+        badgeEl.textContent = (state === 'claimed' || state === 'credited') ? '✓' : state === 'locked' ? '🔒' : '!';
         iconEl.appendChild(badgeEl);
 
         const lvlEl = document.createElement('div');
@@ -409,11 +414,18 @@
     } else if (state === 'claimed') {
       claimBtn.hidden = true;
       statusEl.textContent = 'Claimed';
+    } else if (state === 'credited') {
+      /* No Claim button: giveaway entries are added to this month's ledger
+         automatically as soon as the level is reached. */
+      claimBtn.hidden = true;
+      statusEl.textContent = 'Added automatically — no claim needed';
     } else {
       claimBtn.hidden = true;
       statusEl.textContent = (track === 'phamily' && !userIsSub)
         ? 'Subscribe to unlock the Phamily track'
-        : 'Reach level ' + reward.level + ' to unlock';
+        : reward.type === 'giveaway'
+          ? 'Reach level ' + reward.level + ' — added automatically'
+          : 'Reach level ' + reward.level + ' to unlock';
     }
 
     positionPopover(e);
@@ -537,12 +549,13 @@
     const btn = document.getElementById('ptClaimAllBtn');
     if (!btn) return;
     /* Follower track counts for everyone; phamily is the subscriber bonus
-       on top of it, so it only adds to the count for subs. */
+       on top of it, so it only adds to the count for subs. Giveaway rewards
+       are excluded — they are auto-credited, not claimable. */
     let ready = followerRewards.filter(r =>
-      r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'follower'))).length;
+      r.type !== 'giveaway' && r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'follower'))).length;
     if (userIsSub) {
       ready += phamilyRewards.filter(r =>
-        r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'phamily'))).length;
+        r.type !== 'giveaway' && r.level <= userLevel && !claimedRewards.includes(rewardKey(r, 'phamily'))).length;
     }
     ready += milestones.filter(m => m.level <= userLevel && !claimedMilestones.includes(m.level)).length;
     btn.hidden = ready === 0;
@@ -693,13 +706,15 @@
     /* LAST month's table, not this one's: the names, art and milestone
        titles shown here are what the claim will actually pay. */
     const prevTables = rewardTablesFor(prevMonth.month);
+    /* Giveaway rewards are excluded: they were auto-credited last month as the
+       levels were reached, so there is nothing to claim here in grace. */
     const readyFollower = prevTables.follower.filter(r =>
-      r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'follower')));
+      r.type !== 'giveaway' && r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'follower')));
     /* Same gate as getRewardState: the phamily track requires a CURRENT
        subscription, not whatever the viewer's status was last month. */
     const readyPhamily = userIsSub
       ? prevTables.phamily.filter(r =>
-          r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'phamily')))
+          r.type !== 'giveaway' && r.level <= prevMonth.level && !prevMonth.claimedRewards.includes(rewardKey(r, 'phamily')))
       : [];
     const readyMilestones = prevTables.milestones.filter(ms =>
       ms.level <= prevMonth.level && !prevMonth.claimedMilestones.includes(ms.level));
