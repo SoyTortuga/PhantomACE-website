@@ -21,7 +21,7 @@ import send from 'send';
 import 'dotenv/config';
 
 import { toWebRequest, writeWebResponse, isHostAllowed } from './adapter.js';
-import { verifySession, readCookie } from '../functions/api/auth/session-crypto.js';
+import { gateSessionCookie } from '../functions/api/auth/session-crypto.js';
 import { createStatic } from './static.js';
 import { buildRoutes, matchRoute } from './router.js';
 import { createPool, waitForDatabase } from './lib/db.js';
@@ -299,23 +299,17 @@ async function main() {
          An invalid or forged cookie is STRIPPED rather than rejected with
          an error: the request simply proceeds as logged out, which is what
          a tampered cookie deserves and keeps public pages working for
-         someone with stale cookie state. */
-      const rawCookie = readCookie(req.headers.cookie, 'pham_session');
-      if (rawCookie) {
-        const session = await verifySession(rawCookie, process.env.SESSION_SECRET);
-        if (session) {
-          /* Rewritten into the legacy plain form the handlers already
-             parse, so signing needed no changes across 23 files. */
-          req.headers.cookie = `pham_session=${encodeURIComponent(JSON.stringify(session))}`;
-        } else {
-          const others = String(req.headers.cookie || '')
-            .split(';')
-            .map(s => s.trim())
-            .filter(s => s && !s.startsWith('pham_session='));
-          req.headers.cookie = others.join('; ');
-          console.warn(`[auth] rejected an unverifiable session cookie on ${url.pathname}`);
-        }
-      }
+         someone with stale cookie state.
+
+         The WHOLE header is replaced, never filtered. The handlers match
+         /pham_session=/ unanchored, so any cookie left behind — including
+         a look-alike such as `xpham_session=<forged JSON>` on a request with
+         no real session cookie at all — would be read and trusted by them.
+         See gateSessionCookie() in session-crypto.js. */
+      const gated = await gateSessionCookie(req.headers.cookie, process.env.SESSION_SECRET);
+      if (gated.cookie) req.headers.cookie = gated.cookie;
+      else delete req.headers.cookie;
+      if (gated.rejected) console.warn(`[auth] rejected an unverifiable session cookie on ${url.pathname}`);
 
       /* Not a file under functions/ — this server is a single point of
          failure in a way Cloudflare Pages never was, so it needs something

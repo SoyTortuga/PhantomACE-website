@@ -106,6 +106,30 @@ export async function verifySession(cookieValue, secret) {
   }
 }
 
+/**
+ * The Cookie header the route handlers are allowed to see.
+ *
+ * Returns `pham_session=<verified plain JSON>` when the signed session checks
+ * out, and NOTHING otherwise — the rest of the header is always dropped.
+ *
+ * The handlers find the session with an unanchored /pham_session=/ match, so
+ * passing any other cookie through lets a look-alike name such as
+ * `xpham_session=<forged JSON>` slip past the anchored check here and be
+ * trusted by them. No handler reads any other cookie, so keeping only the
+ * verified session costs nothing.
+ *
+ * @returns {Promise<{ cookie: string|null, rejected: boolean }>}
+ *   `rejected` is true when a pham_session cookie was present but failed
+ *   verification (worth a log line); a plain logged-out request is not.
+ */
+export async function gateSessionCookie(header, secret) {
+  const raw = readCookie(header, 'pham_session');
+  if (!raw) return { cookie: null, rejected: false };
+  const session = await verifySession(raw, secret);
+  if (!session) return { cookie: null, rejected: true };
+  return { cookie: `pham_session=${encodeURIComponent(JSON.stringify(session))}`, rejected: false };
+}
+
 /** Read one cookie out of a Cookie header. */
 export function readCookie(header, name) {
   if (!header) return null;
