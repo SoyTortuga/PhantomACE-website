@@ -20,6 +20,7 @@
    ══════════════════════════════════════════════ */
 
 import { knownTheme } from './cosmetics.js';
+import { monthKey } from './giveaway-entries.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -151,7 +152,21 @@ export async function onRequestGet(context) {
     return json({ error: 'No such profile' }, 404);
   }
 
-  const inv = await env.MARKETPLACE.get(`inv_${userId}`, 'json') || { items: [], equips: {} };
+  /* These records are independent of one another, so read them all at once
+     instead of a dozen serial round-trips: the inventory, subscriber tenure,
+     this month's Phamily Time, the favourite dino, and every leaderboard the
+     profile can place on. Each read swallows its own failure so one missing
+     record never costs the rest of the profile. */
+  const mk = monthKey();
+  const [inv0, subSeen, pt, park, ...boardRows] = await Promise.all([
+    env.MARKETPLACE.get(`inv_${userId}`, 'json').catch(() => null),
+    env.MARKETPLACE.get(`sub_months_${userId}`, 'json').catch(() => null),
+    env.MARKETPLACE.get(`pt_${userId}_${mk}`, 'json').catch(() => null),
+    env.MARKETPLACE.get(`dino_park_${userId}`, 'json').catch(() => null),
+    ...BOARDS.map(b => env.MARKETPLACE.get(b.key, 'json').catch(() => null)),
+  ]);
+
+  const inv = inv0 || { items: [], equips: {} };
   const items = Array.isArray(inv.items) ? inv.items : [];
   const equips = (inv.equips && inv.equips.profile) || {};
 
@@ -202,42 +217,34 @@ export async function onRequestGet(context) {
      since it began being recorded, and for the broadcaster, who cannot
      subscribe to themselves. */
   let tenure = null;
-  try {
-    const seen = await env.MARKETPLACE.get(`sub_months_${userId}`, 'json');
-    if (seen) {
-      tenure = {
-        months: Number(seen.months) || 0,
-        tier: Number(seen.tier) || 1,
-        founder: !!seen.founder,
-        /* The CURRENT standing, unlike the badge in their inventory. VIP is
-           granted and revoked, so the item records that it happened and
-           this records whether it still holds. */
-        vip: !!seen.vip,
-      };
-    }
-  } catch { /* the store cannot answer; a profile without tenure still renders */ }
+  if (subSeen) {
+    tenure = {
+      months: Number(subSeen.months) || 0,
+      tier: Number(subSeen.tier) || 1,
+      founder: !!subSeen.founder,
+      /* The CURRENT standing, unlike the badge in their inventory. VIP is
+         granted and revoked, so the item records that it happened and
+         this records whether it still holds. */
+      vip: !!subSeen.vip,
+    };
+  }
 
   /* Phamily Time: this month's watch level. */
   let phamilyTime = null;
-  try {
-    const { monthKey } = await import('./giveaway-entries.js');
-    const pt = await env.MARKETPLACE.get(`pt_${userId}_${monthKey()}`, 'json');
-    if (pt) {
-      phamilyTime = {
-        level: Number(pt.level) || 0,
-        minutes: Number(pt.minutes) || 0,
-        month: monthKey(),
-      };
-    }
-  } catch { /* optional */ }
+  if (pt) {
+    phamilyTime = {
+      level: Number(pt.level) || 0,
+      minutes: Number(pt.minutes) || 0,
+      month: mk,
+    };
+  }
 
   /* Their favourite dino, if they have chosen one. Already sanitised when
      the park was saved — see dino-park.js — so it is echoed rather than
      re-checked here. The nickname is player-authored and is escaped at
      render like any other. */
   let favoriteDino = null;
-  try {
-    const park = await env.MARKETPLACE.get(`dino_park_${userId}`, 'json');
+  {
     const fav = park && park.state && park.state.favorite;
     if (fav && fav.specId && fav.src) {
       favoriteDino = {
@@ -258,17 +265,17 @@ export async function onRequestGet(context) {
         mutationLabel: fav.mutationLabel || '',
       };
     }
-  } catch { /* a profile without a dino still renders */ }
+  }
 
-  /* Standings, only on boards they actually appear on. */
+  /* Standings, only on boards they actually appear on. The board rows were
+     fetched alongside everything else above; placingIn is pure. */
   const standings = [];
-  for (const board of BOARDS) {
+  BOARDS.forEach((board, i) => {
     try {
-      const rows = await env.MARKETPLACE.get(board.key, 'json');
-      const placing = placingIn(rows, userId, board);
+      const placing = placingIn(boardRows[i], userId, board);
       if (placing) standings.push(placing);
     } catch { /* one missing board must not cost the others */ }
-  }
+  });
   standings.sort((a, b) => a.rank - b.rank);
 
   return json({

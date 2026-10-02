@@ -76,27 +76,32 @@ export async function resolveEquippedCosmetics(env, userIds) {
   /* Every requested id gets an answer, guests included. */
   for (const id of requested) out[id] = { nameEffect: null, banner: null };
 
-  /* One read per unique real user — dedupe, drop guests. */
+  /* One read per unique real user — dedupe, drop guests. The reads are
+     independent, so they run in parallel: a leaderboard with cosmetics used to
+     do ~80 inventory reads strictly in series, one network round-trip each. */
   const unique = [...new Set(requested)].filter(id => id && !id.startsWith('guest_'));
 
-  for (const id of unique) {
-    let inv = null;
+  const invs = await Promise.all(unique.map(async (id) => {
     try {
-      inv = await env.MARKETPLACE.get(`inv_${id}`, 'json');
+      return await env.MARKETPLACE.get(`inv_${id}`, 'json');
     } catch {
-      inv = null;                       // one unreadable inventory must not fail the batch
+      return null;                      // one unreadable inventory must not fail the batch
     }
-    if (!inv) continue;
+  }));
+
+  unique.forEach((id, i) => {
+    const inv = invs[i];
+    if (!inv) return;
 
     const equips = (inv.equips && inv.equips.profile) || {};
     const items = Array.isArray(inv.items) ? inv.items : [];
-    const byId = (iid) => (iid ? items.find(i => i.id === iid) || null : null);
+    const byId = (iid) => (iid ? items.find(it => it.id === iid) || null : null);
 
     out[id] = {
       nameEffect: nameEffectVariant(byId(equips['name-effect'])),
       banner: bannerVariant(byId(equips.banner)),
     };
-  }
+  });
 
   return out;
 }

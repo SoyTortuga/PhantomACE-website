@@ -15,7 +15,7 @@
    Library, not a route: declared in NON_ROUTE_MODULES.
    ══════════════════════════════════════════════ */
 
-import { resolveEquippedCosmetics } from '../cosmetics.js';
+import { nameEffectVariant } from '../cosmetics.js';
 
 const MAX_AUTHORS = 80;
 
@@ -33,12 +33,18 @@ function equippedItem(items, equips, slot, type) {
   };
 }
 
+/* profile_ and inv_ are independent, so read them together. The inventory is
+   read ONCE here and the name-effect is derived from it inline — this used to
+   read inv_ a second time per author through the cosmetics resolver. */
 async function identity(env, id) {
-  const p = await env.MARKETPLACE.get(`profile_${id}`, 'json');
+  const [p, inv] = await Promise.all([
+    env.MARKETPLACE.get(`profile_${id}`, 'json'),
+    env.MARKETPLACE.get(`inv_${id}`, 'json').catch(() => null),
+  ]);
   if (!p) return UNKNOWN(id);
-  const inv = await env.MARKETPLACE.get(`inv_${id}`, 'json');
   const items = inv && Array.isArray(inv.items) ? inv.items : [];
   const equips = (inv && inv.equips && inv.equips.profile) || {};
+  const nameEffectItem = equips['name-effect'] ? items.find(i => i && i.id === equips['name-effect']) || null : null;
   return {
     userId: id,
     login: p.login || '',
@@ -46,23 +52,19 @@ async function identity(env, id) {
     avatar: p.avatar || '',
     title: equippedItem(items, equips, 'title', 'title'),
     badge: equippedItem(items, equips, 'badge', 'badge'),
+    nameEffect: nameEffectVariant(nameEffectItem),
   };
 }
 
 /** { [userId]: identity } for every id given. One missing record must not
     cost the page the others, so each failure becomes an anonymous entry.
-    Name-effect variants are resolved for the whole set in one batched call
-    (one KV read per unique real id) and stapled on as `nameEffect`. */
+    Each author costs one profile_ + one inv_ read, run in parallel. */
 export async function authorsFor(env, userIds) {
   const ids = [...new Set((userIds || []).filter(Boolean).map(String))].slice(0, MAX_AUTHORS);
   const out = {};
-  const [, fx] = await Promise.all([
-    Promise.all(ids.map(async (id) => {
-      try { out[id] = await identity(env, id); }
-      catch { out[id] = UNKNOWN(id); }
-    })),
-    resolveEquippedCosmetics(env, ids).catch(() => ({})),
-  ]);
-  for (const id of ids) out[id].nameEffect = (fx[id] && fx[id].nameEffect) || null;
+  await Promise.all(ids.map(async (id) => {
+    try { out[id] = await identity(env, id); }
+    catch { out[id] = UNKNOWN(id); }
+  }));
   return out;
 }

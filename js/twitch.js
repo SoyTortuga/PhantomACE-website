@@ -2,6 +2,8 @@ const TWITCH_CHANNEL = 'phantomace';
 const STATUS_POLL_INTERVAL = 60000;
 
 let pollTimer = null;
+let hypeTimer = null;
+const HYPE_POLL_INTERVAL = 15000;
 
 async function fetchTwitchStatus() {
   try {
@@ -146,13 +148,35 @@ async function sendPhamilyHeartbeatIfLive(status) {
   }
 }
 
-function startTwitchPolling() {
-  setupHeroEmbed();
+/* Polling runs only while the tab is visible. A backgrounded tab on a home
+   rig is pure load for nothing anyone is looking at, so we clear the timers on
+   hide and restart them (with one immediate refresh) on show. */
+function startPollTimers() {
+  stopPollTimers();
   pollTwitchStatus();
-  if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(pollTwitchStatus, STATUS_POLL_INTERVAL);
   pollHypeTrain();
-  setInterval(pollHypeTrain, 15000);
+  hypeTimer = setInterval(pollHypeTrain, HYPE_POLL_INTERVAL);
+}
+
+function stopPollTimers() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (hypeTimer) { clearInterval(hypeTimer); hypeTimer = null; }
+}
+
+function startTwitchPolling() {
+  setupHeroEmbed();
+  if (typeof document !== 'undefined' && document.hidden) {
+    /* Hidden at load: don't poll yet; the visibility handler starts us. */
+  } else {
+    startPollTimers();
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stopPollTimers();
+      else startPollTimers();
+    });
+  }
 }
 
 async function pollHypeTrain() {

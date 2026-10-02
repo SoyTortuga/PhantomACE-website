@@ -110,10 +110,11 @@ export async function onRequestGet(context) {
     return json({ background: rec });
   }
 
-  const listed = await env.MARKETPLACE.list({ prefix: KEY_PREFIX });
+  /* One query for the whole family instead of a list() followed by a get()
+     per key — listValues returns {name, value} rows in a single scan. */
+  const rows = await env.MARKETPLACE.listValues({ prefix: KEY_PREFIX });
   const out = [];
-  for (const k of listed.keys || []) {
-    const rec = await env.MARKETPLACE.get(k.name, 'json');
+  for (const { value: rec } of rows) {
     if (rec && rec.published) out.push(rec);
   }
 
@@ -123,8 +124,7 @@ export async function onRequestGet(context) {
   if (url.searchParams.get('drafts') === '1') {
     const session = getSession(request);
     if (isBroadcaster(env, session) || await isModerator(env, session)) {
-      for (const k of listed.keys || []) {
-        const rec = await env.MARKETPLACE.get(k.name, 'json');
+      for (const { value: rec } of rows) {
         if (rec && !rec.published) out.push(rec);
       }
     }

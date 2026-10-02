@@ -68,9 +68,24 @@ const ALLOWED_HOSTS = new Set([
 
 /* Ported from _headers. The /api/* block from that file is deliberately NOT
    ported: it was verified inert on Pages, and applying its
-   `Cache-Control: public, max-age=60` would newly cache per-user
+   `Cache-Control: public, max-age=60` to EVERY route would cache per-user
    authenticated responses and stale the 2s game polling. API responses get
-   no-store instead. */
+   no-store by default.
+
+   Two deliberate exceptions, so viewer polling doesn't all land on the rig:
+   (1) a handler that sets its OWN Cache-Control is respected (twitch-status
+   and twitch-schedule ask for 60s / 300s on purpose — the blanket no-store
+   used to silently erase that); (2) the handful of GET reads below are
+   identical for every viewer, so they carry a short shared-cache (s-maxage)
+   window for the edge while browsers still revalidate (max-age=0). NB: for
+   s-maxage to do anything, the Cloudflare Cache Rule for /api/* must respect
+   origin headers rather than bypass caching on these paths. Keep this list to
+   responses that NEVER vary by account. */
+const PUBLIC_CACHE_SECONDS = 10;
+const PUBLIC_CACHE_PATHS = new Set([
+  '/api/leaderboards',
+  '/api/game-activity',
+]);
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -467,9 +482,17 @@ async function main() {
         if (!webRes || typeof webRes.status !== 'number') {
           throw new Error(`handler for ${url.pathname} did not return a Response`);
         }
-        const withNoStore = new Response(method === 'HEAD' ? null : webRes.body, webRes);
-        withNoStore.headers.set('Cache-Control', 'no-store');
-        await writeWebResponse(res, withNoStore);
+        const out = new Response(method === 'HEAD' ? null : webRes.body, webRes);
+        /* Respect a handler's own Cache-Control; otherwise no-store, except the
+           public, viewer-identical GET reads that may sit briefly at the edge. */
+        if (!webRes.headers.has('Cache-Control')) {
+          if (method === 'GET' && PUBLIC_CACHE_PATHS.has(url.pathname)) {
+            out.headers.set('Cache-Control', `public, max-age=0, s-maxage=${PUBLIC_CACHE_SECONDS}`);
+          } else {
+            out.headers.set('Cache-Control', 'no-store');
+          }
+        }
+        await writeWebResponse(res, out);
         return;
       }
 

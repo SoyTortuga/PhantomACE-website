@@ -51,6 +51,16 @@ function fakeKV(seed = {}) {
     async list({ prefix } = {}) {
       return { keys: [...store.keys()].filter(k => !prefix || k.startsWith(prefix)).map(name => ({ name })) };
     },
+    /* Mirrors the real DAL: one scan returning {name, value} for a prefix. */
+    async listValues({ prefix } = {}) {
+      const out = [];
+      for (const [name, raw] of store) {
+        if (!prefix || name.startsWith(prefix)) {
+          out.push({ name, value: raw === undefined ? null : JSON.parse(raw) });
+        }
+      }
+      return out;
+    },
   };
 }
 

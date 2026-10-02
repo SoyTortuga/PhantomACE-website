@@ -58,8 +58,9 @@ node server/scripts/mint-badge-code.js --badge mini-golf --days 1 --confirm --se
 ## Automatic — no action required
 
 - **Month-end resets.** Skull Clicker's monthly progress reset ("wipe the run, keep the
-  legacy") and every game's leaderboard reset fire automatically on the UTC month
-  boundary. Nothing to run at month-end.
+  legacy") and every game's leaderboard reset fire automatically on the **Pacific**
+  (America/Los_Angeles) month boundary — the shared season calendar in
+  `functions/api/season-time.js`, not UTC. Nothing to run at month-end.
 - Skull Clicker leaderboards are **display-only** (no prizes); monthly prize codes come
   only from Memory Match, Commander Bingo, Mana Clash (score + wins), PhamShock, MTGBBB.
 

@@ -1,15 +1,15 @@
 # PhantomACE Community Website
 
 ## Project Overview
-Static HTML/CSS/JS community website for Twitch broadcaster PhantomACE. Hosted on Cloudflare Pages with serverless API functions (Cloudflare Workers + KV storage). Gothic dark theme with red (#FF0000) accents on black backgrounds.
+Static HTML/CSS/JS community website for Twitch broadcaster PhantomACE. Self-hosted on the rig: one Node process (`server/index.js`) serves the static site AND the API, backed by Postgres. The rig IS production `phantomace.tv` — Cloudflare provides only DNS/TLS/CDN in front of a Cloudflare Tunnel; there is no Cloudflare Pages or KV any more. Deploy = `git pull` on the rig (+ `nssm restart phantomace-web` for `server/**` or `functions/**` changes). Gothic dark theme with red (#FF0000) accents on black backgrounds.
 
 ## Tech Stack
 - **Frontend:** Vanilla HTML, CSS, JS (no frameworks)
-- **Backend:** Cloudflare Pages Functions (`functions/api/`)
-- **Storage:** Cloudflare KV (namespace: `MARKETPLACE`)
-- **Auth:** Twitch OAuth via `pham_session` cookie
-- **Fonts:** PHANTOMACE.otf (titles), GODOFWAR.TTF (headers), system-ui (body)
-- **Dev Server:** `npx wrangler pages dev . --port 8789`
+- **Backend:** Node (`server/index.js`) running the handlers under `functions/api/` via a small adapter — handlers keep their `(context) => Response` shape, so the tree still reads like Cloudflare Pages Functions.
+- **Storage:** Postgres, behind a KV-shaped data-access layer injected as `env.MARKETPLACE` (`server/lib/kv.js`); every key prefix is mapped in `server/lib/registry.js`.
+- **Auth:** Twitch OAuth via signed `pham_session` cookie
+- **Fonts:** GodOfWar (`--font-display`/`--font-gothic`, all titles/headers), Grenze (`--font-ui`, body, 14px base), system-ui (`--font-system`, tool pages only) — all self-hosted in `assets/fonts/`
+- **Dev Server:** `node server/index.js` (port 8789; needs `server/.env` + a reachable Postgres)
 
 ## Code Style Rules
 - Return only executable code. No introductory text, conversational fluff, or post-code summaries.
@@ -142,7 +142,7 @@ GPU/compositor memory grows until OBS crashes.
 │   ├── shell-shock/index.html (PhamShock)
 │   ├── dino-park/index.html
 │   └── memory-match/index.html
-├── functions/api/                              # Cloudflare Workers
+├── functions/api/                              # API handlers (run by server/index.js)
 │   ├── auth/ (twitch.js, logout.js, recheck-roles.js)
 │   ├── bingo/ (create, join, call, state, end)
 │   ├── media/ (upload.js)
@@ -154,11 +154,11 @@ GPU/compositor memory grows until OBS crashes.
 ```
 
 ## API Pattern
-All serverless functions follow this pattern:
-- `getSession(request)` parses `pham_session` cookie
+All API handlers follow this pattern:
+- `getSession(request)` parses the `pham_session` cookie
 - `json(data, status)` helper returns JSON responses
-- `onRequestGet(context)` / `onRequestPost(context)` exports
-- KV keys use prefixes: `mc_room_` (Mana Clash), `ps_room_` (PhamShock), `inv_` (inventory), etc.
+- `onRequestGet(context)` / `onRequestPost(context)` exports (file-based routing in `server/router.js`; a handler-less library file under `functions/` MUST be listed in `NON_ROUTE_MODULES` or boot fails)
+- Storage keys use prefixes: `mc_room_` (Mana Clash), `ps_room_` (PhamShock), `inv_` (inventory), etc. — **every new exact key or prefix must be added to `server/lib/registry.js`** or the route 500s/mis-maps. Use `env.MARKETPLACE.mutate(key, fn)` (advisory-locked read-modify-write) for any contended write.
 - Room-based multiplayer: polling pattern (client polls GET every 2s), server resolves state
 
 ## Auth Flow
