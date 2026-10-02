@@ -73,6 +73,20 @@ function mintGiveawayCode() {
   return out;
 }
 
+/* The store the running server handed its handlers as env.MARKETPLACE.
+   Exists for lib/eventsub.js: its verifier is called by eight webhook routes
+   as verifyEventSub(request, secret, rawBody) — no env, no store — and
+   message-id dedupe has to be atomic in the database. Recording the store
+   here lets that dedupe live in the verifier, once, instead of in every
+   route. index.js creates exactly one store, so "most recent" is "the" store;
+   a process that never creates one (route tests with a stub env) gets null
+   and the verifier simply skips dedupe. */
+let primaryStore = null;
+
+export function getPrimaryKVStore() {
+  return primaryStore;
+}
+
 export function createKVStore(pool) {
   function mustResolve(key, op) {
     const target = resolveKey(key);
@@ -452,10 +466,12 @@ export function createKVStore(pool) {
     return removed;
   }
 
-  return {
+  const store = {
     get, put, delete: del, list,
     mutate, listValues, claim, withLock,
     pullGiveawayCode, topUpGiveawayCodes, giveawayPoolLevels, claimMonthlyAward,
     reap,
   };
+  primaryStore = store;
+  return store;
 }

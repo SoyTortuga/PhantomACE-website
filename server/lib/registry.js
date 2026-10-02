@@ -354,6 +354,22 @@ export const FAMILIES = [
   /* Per-asker cooldown for !entries. Group (a): the TTL IS the rule, so the
      row disappearing is what lets someone ask again. */
   { prefix: 'bot_cooldown_entries_', table: 'cp_queues',  expiry: 'real' },
+
+  /* Short-lived dedupe markers. Both 'real': the row's presence IS the
+     "already seen" answer, so it must stop being visible when the window
+     closes. Filed in `singletons`, which the reaper sweeps and which carries
+     a partial index on expires_at, so a high-churn family costs nothing to
+     reclaim. Neither prefix begins any exact singleton key (eventsub_msg_ is
+     not eventsub_subscriptions), so exact-first resolution keeps them apart.
+
+     follow_seen_{userId} — milestones.js: one follow alerts once per 10 min.
+     Unregistered at first, which threw on every channel.follow.
+
+     eventsub_msg_{messageId} — lib/eventsub.js: Twitch delivers at least
+     once and retries slow answers with the SAME message id; this is what
+     stops a redelivery re-firing alerts, code drops and dino hatches. */
+  { prefix: 'follow_seen_',    table: 'singletons',       expiry: 'real' },
+  { prefix: 'eventsub_msg_',   table: 'singletons',       expiry: 'real' },
 ];
 
 /* Keys the migration handles specially instead of copying into a table.

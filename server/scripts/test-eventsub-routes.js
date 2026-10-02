@@ -138,6 +138,149 @@ for (const [name, spec, rel] of ROUTES) {
   check('no route reads the EventSub signature header without the shared verifier', offenders, []);
 }
 
+/* ── Message-id dedupe reaches every route, with no route edits ──────────
+   The routes call verifyEventSub(request, secret, body) with no store; the
+   verifier dedupes through the store the server created. So this builds a
+   REAL kv.js store — createKVStore over a fake pg pool that honours the
+   advisory lock and the expiry column — exactly as index.js does, and then
+   drives every webhook route's own onRequestPost.
+
+   The route's env.MARKETPLACE is a separate counting stub, so "no side
+   effects" is measured: a duplicate must be answered before the handler
+   touches storage at all. */
+{
+  const { createKVStore } = await import('../lib/kv.js');
+
+  function fakePool() {
+    const rows = new Map();
+    const locks = new Map();
+    const tick = () => new Promise(r => setImmediate(r));
+    return {
+      rows,
+      async query() { throw new Error('dedupe should only use mutate()'); },
+      async connect() {
+        let release = null;
+        return {
+          async query(sql, params = []) {
+            if (/^\s*BEGIN/.test(sql)) return { rows: [] };
+            if (/pg_advisory_xact_lock/.test(sql)) {
+              const k = params[0];
+              const prev = locks.get(k) || Promise.resolve();
+              const mine = new Promise(r => { release = r; });
+              locks.set(k, prev.then(() => mine));
+              await prev;
+              return { rows: [] };
+            }
+            if (/^\s*SELECT value, expires_at/.test(sql)) {
+              await tick();
+              const row = rows.get(params[0]);
+              const live = row && (!row.expires_at || row.expires_at > new Date());
+              return { rows: live ? [row] : [] };
+            }
+            if (/^\s*INSERT/.test(sql)) {
+              await tick();
+              rows.set(params[0], { value: JSON.parse(params[1]), expires_at: params[2] });
+              return { rows: [] };
+            }
+            if (/^\s*(COMMIT|ROLLBACK)/.test(sql)) {
+              if (release) release();
+              release = null;
+              return { rows: [] };
+            }
+            throw new Error('unexpected SQL: ' + sql);
+          },
+          release() {},
+        };
+      },
+    };
+  }
+
+  const pool = fakePool();
+  createKVStore(pool);
+
+  function countingKV() {
+    const kv = { touches: 0 };
+    for (const op of ['get', 'put', 'delete', 'list', 'listValues', 'claim', 'withLock']) {
+      kv[op] = async () => { kv.touches++; return op === 'list' ? { keys: [], list_complete: true } : null; };
+    }
+    kv.mutate = async (k, fn) => { kv.touches++; return fn(null); };
+    kv.pullGiveawayCode = async () => { kv.touches++; return null; };
+    return kv;
+  }
+
+  async function notify(mod, id, kv) {
+    const raw = JSON.stringify({ subscription: { type: 'test.dedupe' }, event: {} });
+    const ts = new Date().toISOString();
+    const request = new Request('https://phantomace.tv/api/x', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'twitch-eventsub-message-type': 'notification',
+        'twitch-eventsub-message-id': id,
+        'twitch-eventsub-message-timestamp': ts,
+        'twitch-eventsub-message-signature': await signEventSub(SECRET, id, ts, raw),
+      },
+      body: raw,
+    });
+    try {
+      const res = await mod.onRequestPost({ env: { TWITCH_EVENTSUB_SECRET: SECRET, MARKETPLACE: kv }, request, waitUntil() {} });
+      return { status: res.status, text: await res.text() };
+    } catch (err) {
+      return { status: 'threw', text: err.message };
+    }
+  }
+
+  /* Handlers log about the stub env; silenced for the section, once, so
+     concurrent calls cannot restore each other's stubs. */
+  const quiet = { error: console.error, log: console.log, warn: console.warn };
+  console.error = console.log = console.warn = () => {};
+
+  const DUP = /Duplicate EventSub message/;
+  const ALL_ROUTES = [
+    ...ROUTES.map(([name, spec]) => [name, spec]),
+    ['ad break', '../../functions/api/ad-break.js'],
+    ['bits', '../../functions/api/bits.js'],
+    ['prediction events', '../../functions/api/prediction-events.js'],
+  ];
+
+  for (const [name, spec] of ALL_ROUTES) {
+    const mod = await import(spec);
+    const slug = name.replace(/\s+/g, '-');
+
+    /* (b) the same id twice. */
+    const firstKV = countingKV();
+    const first = await notify(mod, `dedupe-${slug}-A`, firstKV);
+    check(`${name}: first delivery is answered 200`, first.status, 200);
+    ok(`${name}: and handled, not deduped`, !DUP.test(first.text));
+
+    const repeatKV = countingKV();
+    const repeat = await notify(mod, `dedupe-${slug}-A`, repeatKV);
+    check(`${name}: a redelivered message id is answered 200`, repeat.status, 200);
+    ok(`${name}: as a duplicate`, DUP.test(repeat.text));
+    check(`${name}: with no storage side effects at all`, repeatKV.touches, 0);
+
+    /* (c) a different id is not mistaken for a repeat. */
+    const other = await notify(mod, `dedupe-${slug}-B`, countingKV());
+    check(`${name}: a different message id is answered 200`, other.status, 200);
+    ok(`${name}: and proceeds`, !DUP.test(other.text));
+  }
+
+  /* The claim landed in the real store, under the registered key, with a
+     real expiry — kv.js only writes expires_at for a 'real' family, so a
+     null here would mean the registry entry had lost its expiry. */
+  const row = pool.rows.get('eventsub_msg_dedupe-milestones-A');
+  ok('the claim is stored as eventsub_msg_<id>', !!row);
+  const ttl = row && row.expires_at ? (row.expires_at.getTime() - Date.now()) / 1000 : 0;
+  ok('and expires after roughly the replay window', ttl > 600 && ttl <= 660);
+
+  /* Atomic through the real mutate(): concurrent deliveries of one id. */
+  const mod = await import('../../functions/api/hype-train.js');
+  const racers = await Promise.all([1, 2, 3].map(() => notify(mod, 'dedupe-race', countingKV())));
+  Object.assign(console, quiet);
+  check('three concurrent deliveries of one id: exactly one is handled',
+    racers.filter(r => !DUP.test(r.text)).length, 1);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

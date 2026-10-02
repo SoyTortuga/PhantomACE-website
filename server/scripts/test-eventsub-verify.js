@@ -28,7 +28,7 @@
    ══════════════════════════════════════════════ */
 
 import nodecrypto from 'node:crypto';
-import { verifyEventSub, signEventSub } from '../lib/eventsub.js';
+import { verifyEventSub, signEventSub, DEDUPE_TTL_SECONDS } from '../lib/eventsub.js';
 
 let passed = 0;
 const failures = [];
@@ -230,6 +230,109 @@ const ago = (ms) => new Date(Date.now() - ms).toISOString();
   const sigBig = await signEventSub(SECRET, ID, ts, big);
   check('a large body verifies',
     (await verifyEventSub(req({ ts, sig: sigBig }), SECRET, big)).ok, true);
+}
+
+/* ── Message-id dedupe ───────────────────────────────────────────────────
+   Twitch delivers at least once and retries a slow answer with the SAME
+   message id. Without dedupe a redelivery re-fired alerts, code drops and
+   dino hatches. The store below mimics kv.js's mutate(): a per-key lock
+   (the advisory lock) with real awaits inside it, so two concurrent
+   deliveries genuinely interleave unless the lock serialises them. */
+{
+  function lockingStore({ fail = false } = {}) {
+    const rows = new Map();
+    const locks = new Map();
+    const calls = [];
+    const tick = () => new Promise(r => setImmediate(r));
+    return {
+      rows, calls,
+      async mutate(key, fn, options) {
+        calls.push({ key, options });
+        if (fail) throw new Error('database unreachable');
+        const prev = locks.get(key) || Promise.resolve();
+        let release;
+        const mine = new Promise(r => { release = r; });
+        locks.set(key, prev.then(() => mine));
+        await prev;
+        try {
+          await tick();
+          const current = rows.has(key) ? rows.get(key) : null;
+          await tick();
+          const next = await fn(current);
+          if (next !== undefined) rows.set(key, next);
+          return next === undefined ? current : next;
+        } finally { release(); }
+      },
+    };
+  }
+
+  const signed = async (id, type = 'notification') => {
+    const ts = now();
+    return { r: req({ id, ts, type, sig: await signEventSub(SECRET, id, ts, BODY) }), ts };
+  };
+
+  /* (b) the same message id twice: the second is a no-op 200. */
+  const kv = lockingStore();
+  const a = await signed('dup-1');
+  const first = await verifyEventSub(a.r, SECRET, BODY, { kv });
+  const again = await verifyEventSub(a.r, SECRET, BODY, { kv });
+  check('first delivery of an id proceeds', first.ok, true);
+  check('and reports the id it claimed', first.messageId, 'dup-1');
+  check('a redelivery of the same id does not proceed', again.ok, false);
+  check('it is flagged as a duplicate', again.duplicate, true);
+  check('and is answered 200 so Twitch stops retrying', again.status, 200);
+  check('the claim is keyed eventsub_msg_<id>', [...kv.rows.keys()], ['eventsub_msg_dup-1']);
+  check('with the dedupe TTL', kv.calls[0].options.expirationTtl, DEDUPE_TTL_SECONDS);
+  ok('which covers the whole replay window', DEDUPE_TTL_SECONDS >= 600);
+
+  /* (c) different ids both proceed. */
+  const b = await signed('dup-2');
+  const c = await signed('dup-3');
+  check('a different id proceeds', (await verifyEventSub(b.r, SECRET, BODY, { kv })).ok, true);
+  check('and so does a third', (await verifyEventSub(c.r, SECRET, BODY, { kv })).ok, true);
+
+  /* Atomic: two concurrent deliveries of one id — exactly one proceeds. */
+  const race = lockingStore();
+  const d = await signed('race-1');
+  const results = await Promise.all([1, 2, 3, 4].map(() => verifyEventSub(d.r, SECRET, BODY, { kv: race })));
+  check('four concurrent deliveries of one id: exactly one proceeds',
+    results.filter(x => x.ok).length, 1);
+  check('the other three are 200 duplicates',
+    results.filter(x => !x.ok && x.duplicate && x.status === 200).length, 3);
+
+  /* Challenges and revocations are idempotent and must keep working — a
+     deduped challenge would answer without the challenge text. */
+  const ch = lockingStore();
+  const e = await signed('challenge-1', 'webhook_callback_verification');
+  check('a challenge proceeds', (await verifyEventSub(e.r, SECRET, BODY, { kv: ch })).ok, true);
+  check('and so does its retry', (await verifyEventSub(e.r, SECRET, BODY, { kv: ch })).ok, true);
+  const rv = await signed('revoke-1', 'revocation');
+  check('a revocation proceeds', (await verifyEventSub(rv.r, SECRET, BODY, { kv: ch })).ok, true);
+  check('and so does its retry', (await verifyEventSub(rv.r, SECRET, BODY, { kv: ch })).ok, true);
+  check('neither touches the dedupe store', ch.calls.length, 0);
+
+  /* Dedupe never weakens verification: a forged redelivery is still a 403,
+     and a forgery never burns the id for the genuine message. */
+  const g = lockingStore();
+  const f = await signed('forge-1');
+  const forged = await verifyEventSub(f.r, SECRET + 'x', BODY, { kv: g });
+  check('a forged notification is still refused', forged.status, 403);
+  check('without claiming the id', g.rows.size, 0);
+  check('so the genuine one still proceeds', (await verifyEventSub(f.r, SECRET, BODY, { kv: g })).ok, true);
+
+  /* A store that errors must not lose the event. */
+  const broken = lockingStore({ fail: true });
+  const h = await signed('broken-1');
+  const errLog = console.error;
+  console.error = () => {};
+  const survived = await verifyEventSub(h.r, SECRET, BODY, { kv: broken });
+  console.error = errLog;
+  check('an unreachable dedupe store fails open', survived.ok, true);
+
+  /* No store at all (kv: null, or a process that never created one). */
+  const i = await signed('none-1');
+  check('kv: null skips dedupe', (await verifyEventSub(i.r, SECRET, BODY, { kv: null })).ok, true);
+  check('twice', (await verifyEventSub(i.r, SECRET, BODY, { kv: null })).ok, true);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
