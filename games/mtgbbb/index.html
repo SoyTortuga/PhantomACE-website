@@ -491,7 +491,12 @@
         document.getElementById('codeInfo').textContent = code;
         showScreen('cardScreen');
         await pollState();
-        pollTimer = setInterval(pollState, 2000);
+        /* Skip the periodic poll while the tab is backgrounded — chat can't
+           see a card they're not looking at, so it's pure load on the rig.
+           The visibilitychange handler below snaps the board up to date the
+           moment the tab is shown again. Direct awaited pollState() calls
+           after an action still run regardless. */
+        pollTimer = setInterval(() => { if (!document.hidden) pollState(); }, 2000);
         loadItemCounts();
       } catch {
         errorEl.textContent = 'Network error — try again.';
@@ -500,6 +505,10 @@
         btn.textContent = 'Join Game';
       }
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (pollTimer && !document.hidden) pollState();
+    });
 
     async function pollState() {
       try {

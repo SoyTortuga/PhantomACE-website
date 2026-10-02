@@ -117,6 +117,8 @@
     .weapon-btn.active { border-color: var(--red); color: var(--text-pri); background: #330000; }
     .weapon-btn .ammo { color: #ff6666; font-size: 14px;
  text-shadow: none; }
+    .weapon-btn .wkey { color: var(--text-dim); font-size: 13px; margin-right: 4px; }
+    .weapon-btn.active .wkey { color: var(--red); }
 
     .wind-display { font-size: 15px;
  text-shadow: none; color: var(--text-pri); display: flex; align-items: center; gap: 4px; }
@@ -141,6 +143,35 @@
  text-shadow: none; padding: 4px 12px; background: var(--gray-mid); border-radius: 4px; }
     .game-over-overlay .standing-rank { font-weight: 700; min-width: 20px; }
     .game-over-overlay .standing-color { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ── MOBILE ──
+       On a phone the battlefield is already letterboxed (960×500 landscape
+       canvas in a portrait frame), so the win is a control strip that is
+       actually thumb-usable instead of a cramped multi-row wrap: each aim
+       slider gets a full-width row and stretches to a real tap target, the
+       ten weapons sit in one horizontal-scroll row with bigger buttons, and
+       FIRE spans its own row. dvh keeps it honest under the collapsing URL
+       bar; the splash/lobby scroll rather than clip. */
+    @media (max-width: 640px) {
+      .splash-title { font-size: 28px; }
+      .splash-sub { font-size: 15px; letter-spacing: 0.12em; }
+      #lobbyScreen { overflow-y: auto; }
+      .lobby-code { font-size: 44px; letter-spacing: 4px; }
+
+      #gameScreen { height: 100vh; height: 100dvh; }
+      .controls-bar { gap: 6px; padding: 6px 8px; }
+      .controls-bar .aim-group { flex: 1 1 100%; }
+      .aim-group input[type=range] { flex: 1; width: auto; height: 26px; }
+      .wind-display { flex: 1 1 auto; }
+      .weapon-bar {
+        flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start;
+        width: 100%; -webkit-overflow-scrolling: touch;
+      }
+      .weapon-btn { padding: 8px 10px; flex-shrink: 0; }
+      #fireBtn { margin-left: 0; flex: 1 1 100%; padding: 10px; }
+
+      .game-over-overlay .winner { font-size: 34px; }
+    }
   </style>
 </head>
 <body>
@@ -930,7 +961,10 @@ function buildWeaponUI(me) {
     const btn = document.createElement('button');
     btn.className = 'weapon-btn' + (i === selectedWeapon ? ' active' : '');
     const ammoLeft = w.ammo === Infinity ? '' : ` <span class="ammo">${me.ammo[i] || 0}</span>`;
-    btn.innerHTML = w.name + ammoLeft;
+    /* The hotkey that selects this weapon: 1–9 for the first nine, 0 for the
+       tenth (matches the keydown handler). Shown so keys 6–10 are findable. */
+    const key = i === 9 ? '0' : String(i + 1);
+    btn.innerHTML = `<span class="wkey">${key}</span>` + w.name + ammoLeft;
     const disabled = w.ammo !== Infinity && (me.ammo[i] || 0) <= 0;
     if (disabled) { btn.style.opacity = '0.35'; btn.style.pointerEvents = 'none'; }
     btn.onclick = () => { selectedWeapon = i; buildWeaponUI(me); };

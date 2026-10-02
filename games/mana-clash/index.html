@@ -2191,9 +2191,18 @@ async function poll() {
   } catch { /* a dropped poll is not worth showing; the next one lands */ }
 }
 
+function schedulePoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  /* Nobody can act on a backgrounded game, so a 1.5s poll while the tab is
+     hidden is pure load on the home rig. Back off to a slow idle poll (still
+     enough to notice the room closing) and snap back to the fast poll the
+     moment the tab is shown again — see the visibilitychange handler below. */
+  pollTimer = setInterval(poll, document.hidden ? 15000 : 1500);
+}
+
 function startPolling() {
   stopPolling();
-  pollTimer = setInterval(poll, 1500);
+  schedulePoll();
   tickTimer = setInterval(tick, 200);
   poll();
 }
@@ -2203,6 +2212,12 @@ function stopPolling() {
   if (tickTimer) clearInterval(tickTimer);
   pollTimer = tickTimer = null;
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!pollTimer) return; /* not in a room — nothing to reschedule */
+  schedulePoll();
+  if (!document.hidden) poll(); /* catch up right away on return */
+});
 
 /* ── Remembering the room across a refresh ─────────────────────────────
    The room code lives in sessionStorage (this tab only, gone when the tab

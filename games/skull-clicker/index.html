@@ -5297,13 +5297,26 @@
     scheduleCursed();
     { const nt = document.getElementById('newsTicker'); if (nt) nt.textContent = pickNews(); }
     setInterval(cycleNews, 11000);
+    /* Network pollers back off while the tab is hidden — the idle game keeps
+       ticking locally, but a backgrounded tab has no reason to hit the rig for
+       the shared raid/event/reward state every few seconds. The queued raid
+       damage still flushes (it only fires when there's damage to send), and
+       the visibilitychange handler catches all three up the instant the tab is
+       shown again. */
     pollSkullEvent();
-    setInterval(pollSkullEvent, 30000);
+    setInterval(() => { if (!document.hidden) pollSkullEvent(); }, 30000);
     pollRaid();
-    setInterval(pollRaid, 4000);
+    setInterval(() => { if (!document.hidden) pollRaid(); }, 4000);
     setInterval(flushRaidDamage, RAID_FLUSH_MS);
     fetchRaidReward();
-    setInterval(fetchRaidReward, 30000);
+    setInterval(() => { if (!document.hidden) fetchRaidReward(); }, 30000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      pollRaid();
+      pollSkullEvent();
+      fetchRaidReward();
+    });
   </script>
 </body>
 </html>
