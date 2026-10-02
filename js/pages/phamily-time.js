@@ -458,6 +458,18 @@
       { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit' }).format(new Date());
   }
 
+  /* Pacific wall-clock Y/M/D for now — the same calendar the server keys on
+     (season-time.js). The streak, grace window and attendance grid count by
+     day-of-month, so they must read the Pacific day, not the browser's UTC or
+     local day, or they jump a day a few hours either side of local midnight
+     and disagree with the server at the month boundary. */
+  function localYMD() {
+    const s = new Intl.DateTimeFormat('en-CA',
+      { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [y, m, day] = s.split('-').map(Number);
+    return { y, m, day };
+  }
+
   const TABLES = new Map();
   function rewardTablesFor(mk) {
     const month = String(mk);
@@ -1082,7 +1094,7 @@
 
     const [y, mo] = prevMonth.month.split('-').map(Number);
     const monthLabel = new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const today = new Date().getDate();
+    const today = localYMD().day;
     const graceDaysLeft = Math.max(0, GRACE_DAYS - today + 1);
 
     const card = document.createElement('div');
@@ -1200,7 +1212,7 @@
     }
 
     const attendance = data.attendance || {};
-    const today = new Date().getUTCDate();
+    const { y: curY, m: curM, day: today } = localYMD();
     let streak = 0;
     for (let d = today; d >= 1; d--) {
       if (attendance[String(d)] > 0) streak++;
@@ -1208,10 +1220,10 @@
     }
     document.getElementById('ptCurrentStreak').textContent = streak;
 
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const daysInMonth = new Date(curY, curM, 0).getDate();
     const streamDays = new Set();
     for (let d = 1; d <= daysInMonth; d++) {
-      const dow = new Date(new Date().getFullYear(), new Date().getMonth(), d).getDay();
+      const dow = new Date(curY, curM - 1, d).getDay();
       if (dow >= 1 && dow <= 5) streamDays.add(d);
     }
     const streams = [];

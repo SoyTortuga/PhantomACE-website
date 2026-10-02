@@ -51,7 +51,10 @@
     -->
 
     <div class="giveaway-banner">
-      <div class="giveaway-month" id="giveawayMonth">September 2026</div>
+      <!-- Placeholder only. On load, JS writes the live month here — first a
+           Pacific-anchored client fallback, then the server's authoritative
+           `month` from /api/giveaway-entries (see the script below). -->
+      <div class="giveaway-month" id="giveawayMonth">October 2026</div>
       <!-- Static. Unlike #giveawayMonth above, nothing writes to these two —
            edit them here when the prize changes, alongside the art. -->
       <h2 class="giveaway-title" id="giveawayTitle">Secret Lair &times; The Hobbit: Desolation</h2>
@@ -122,7 +125,7 @@
       <p style="font-size: 14px; color: var(--text-sec); max-width: 560px; margin: 0 auto 16px; line-height: 1.6;">
         During select streams, redeem the <strong style="color: var(--text-pri);">"Enter Giveaway"</strong> channel points reward to enter a live drawing for a bigger prize. When entries close, PhantomACE spins the wheel live on stream — the winner gets a prize code whispered to them directly on Twitch.
       </p>
-      <p style="font-size: 13px; color: var(--text-dim);">Already have a code? <a href="/redeem.html" style="color: var(--red);">Redeem it here</a>.</p>
+      <p style="font-size: 13px; color: var(--text-dim);">Already have a code? <a href="/giveaway.html#entryClaim" style="color: var(--red);">Redeem it here</a>.</p>
     </div>
   </section>
 
@@ -226,47 +229,79 @@
   <script src="/js/twitch.js" defer></script>
   <script src="/js/pages/giveaway.js" defer></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const monthEl = document.getElementById('giveawayMonth');
-      if (monthEl) {
-        const now = new Date();
-        monthEl.textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    /* The month label and countdown are anchored to the giveaway's Pacific
+       month boundary — the same calendar the server draws on (season-time.js).
+       GET /api/giveaway-entries returns `month` (YYYY-MM) and `endsAt` (the
+       exact instant entries close), so the page renders the server's values
+       rather than recomputing the boundary in the browser's own timezone. */
+    let giveawayEndsAt = null;
+    let countdownTimer = null;
+
+    function formatGiveawayMonth(ym) {
+      const [y, m] = String(ym || '').split('-').map(Number);
+      if (!y || !m) return '';
+      // Mid-month at UTC noon purely to name the month — no timezone slippage.
+      return new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('en-US', {
+        month: 'long', year: 'numeric', timeZone: 'UTC',
+      });
+    }
+
+    function renderCountdown() {
+      const countdownEl = document.getElementById('giveawayCountdown');
+      if (!countdownEl || !giveawayEndsAt) return;
+      const diff = giveawayEndsAt - Date.now();
+
+      if (diff <= 0) {
+        countdownEl.innerHTML = '<span style="color: var(--red); font-family: var(--font-system); font-size: 14px;">Drawing soon!</span>';
+        return;
       }
 
-      const countdownEl = document.getElementById('giveawayCountdown');
-      if (countdownEl) {
-        function updateCountdown() {
-          const now = new Date();
-          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-          const diff = endOfMonth - now;
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
 
-          if (diff <= 0) {
-            countdownEl.innerHTML = '<span style="color: var(--red); font-family: var(--font-system); font-size: 14px;">Drawing soon!</span>';
-            return;
-          }
+      countdownEl.innerHTML = `
+        <div class="countdown-unit">
+          <span class="countdown-num">${days}</span>
+          <span class="countdown-label">Days</span>
+        </div>
+        <div class="countdown-unit">
+          <span class="countdown-num">${hours}</span>
+          <span class="countdown-label">Hours</span>
+        </div>
+        <div class="countdown-unit">
+          <span class="countdown-num">${mins}</span>
+          <span class="countdown-label">Min</span>
+        </div>
+      `;
+    }
 
-          const days = Math.floor(diff / 86400000);
-          const hours = Math.floor((diff % 86400000) / 3600000);
-          const mins = Math.floor((diff % 3600000) / 60000);
+    /* Maps a ledger entry's server-written source string to a display label.
+       The sources are drop:<tier>, phamily:<reward>, amoe, bingo:<rarity>,
+       maze:level<n>, chat-scramble, checkin:<label> and mtgbbb:<rarity>. The
+       channel-points "Enter Giveaway" reward runs a separate live drawing and
+       never writes to this monthly ledger, so there is no channel-points
+       source here — anything unrecognised shows as a plain "Entry". */
+    function entrySourceLabel(src) {
+      if (src.startsWith('drop:')) return src.slice(5).replace(/^./, c => c.toUpperCase()) + ' drop';
+      if (src.startsWith('phamily:')) return 'Phamily Time';
+      if (src.startsWith('bingo:')) return 'Commander Bingo';
+      if (src.startsWith('maze:')) return 'Chat maze';
+      if (src.startsWith('checkin:')) return 'Stream check-in';
+      if (src.startsWith('mtgbbb:')) return 'MTGBBB';
+      if (src === 'chat-scramble') return 'Chat scramble';
+      if (src === 'amoe') return 'Free entry';
+      return 'Entry';
+    }
 
-          countdownEl.innerHTML = `
-            <div class="countdown-unit">
-              <span class="countdown-num">${days}</span>
-              <span class="countdown-label">Days</span>
-            </div>
-            <div class="countdown-unit">
-              <span class="countdown-num">${hours}</span>
-              <span class="countdown-label">Hours</span>
-            </div>
-            <div class="countdown-unit">
-              <span class="countdown-num">${mins}</span>
-              <span class="countdown-label">Min</span>
-            </div>
-          `;
-        }
-
-        updateCountdown();
-        setInterval(updateCountdown, 60000);
+    document.addEventListener('DOMContentLoaded', () => {
+      // Immediate Pacific-anchored fallback so the label isn't stale before
+      // the tracker fetch answers; loadEntryTracker() then uses the server's.
+      const monthEl = document.getElementById('giveawayMonth');
+      if (monthEl) {
+        monthEl.textContent = new Date().toLocaleDateString('en-US', {
+          month: 'long', year: 'numeric', timeZone: 'America/Los_Angeles',
+        });
       }
 
       loadEntryTracker();
@@ -291,11 +326,17 @@
         set('statParticipants', fmt(d.participants));
         set('statYourEntries', d.loggedIn ? fmt(d.you ? d.you.entries : 0) : '—');
 
+        if (d.month) set('giveawayMonth', formatGiveawayMonth(d.month));
+
         if (d.endsAt) {
+          giveawayEndsAt = d.endsAt;
+          renderCountdown();
+          if (!countdownTimer) countdownTimer = setInterval(renderCountdown, 60000);
           // Shown as a date rather than a duration; the banner countdown
           // above already covers time-remaining, and two live counters
-          // disagreeing by a second looks broken.
-          set('statEndsIn', new Date(d.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+          // disagreeing by a second looks broken. Pinned to the broadcaster's
+          // timezone so the close date reads as the Pacific boundary.
+          set('statEndsIn', new Date(d.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }));
         }
 
         renderPrize(d.prize);
@@ -321,18 +362,7 @@
           const items = (d.you && d.you.history) || [];
           hist.innerHTML = items.length
             ? '<div class="entry-history-title">Recent entries</div>' + items.map(h => {
-                /* Anything unrecognised falls through to "Channel points",
-                   which was fine when drops were the only other source.
-                   Phamily Time writes phamily:<reward>, so name it rather
-                   than mislabel it. */
-                const src = String(h.source || '');
-                const label = src.startsWith('drop:')
-                  ? src.slice(5).replace(/^./, c => c.toUpperCase()) + ' drop'
-                  : src.startsWith('phamily:')
-                    ? 'Phamily Time'
-                    : src === 'amoe'
-                      ? 'Free entry'
-                      : 'Channel points';
+                const label = entrySourceLabel(String(h.source || ''));
                 const when = new Date(h.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
                 return `<div class="entry-history-row"><span>${label}</span><span class="entry-history-n">+${Number(h.entries || 0)}</span><span class="entry-history-when">${when}</span></div>`;
               }).join('')
