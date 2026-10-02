@@ -231,10 +231,11 @@ export const SINGLETONS = {
   giveaway_state:        { table: 'singletons', expiry: 'real' },
   giveaway_entrants:     { table: 'singletons', expiry: 'real' },
   giveaway_winner:       { table: 'singletons', expiry: 'real' },
-  /* The monthly-ledger draw's winner record (MONTHLY_WINNER_KEY in bot/giveaway.js),
-     written with a 24h TTL like giveaway_winner. Was missed in the migration, which
-     made every GET /api/bot/giveaway 500 (the page swallowed it) and would have made
-     the monthly draw's write throw too. */
+  /* LEGACY monthly-ledger winner record — one key for every month, 24h TTL.
+     Superseded by the giveaway_monthly_winner_<YYYY-MM> family below; bot/giveaway.js
+     still READS it (never writes) so a winner drawn before the per-month records
+     shipped is honoured until it expires. Exact keys resolve before prefixes, so
+     this cannot be mistaken for a month. */
   giveaway_monthly_winner: { table: 'singletons', expiry: 'real' },
   hype_train_active:     { table: 'singletons', expiry: 'real' },
   hype_train_site:       { table: 'singletons', expiry: 'real' },
@@ -370,6 +371,13 @@ export const FAMILIES = [
      stops a redelivery re-firing alerts, code drops and dino hatches. */
   { prefix: 'follow_seen_',    table: 'singletons',       expiry: 'real' },
   { prefix: 'eventsub_msg_',   table: 'singletons',       expiry: 'real' },
+
+  /* giveaway_monthly_winner_{YYYY-MM} — that month's ledger-draw winner, its
+     reel, whether the prize code went out, and any re-rolls (bot/giveaway.js).
+     'none': it is the winner HISTORY, and the sent flag is what stops a re-draw
+     handing out a second mythic code — a TTL would silently erase that guard.
+     The bare legacy key `giveaway_monthly_winner` stays an exact singleton above. */
+  { prefix: 'giveaway_monthly_winner_', table: 'singletons', expiry: 'none' },
 ];
 
 /* Keys the migration handles specially instead of copying into a table.

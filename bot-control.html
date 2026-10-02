@@ -168,13 +168,13 @@
 
             <div class="giveaway-actions">
               <button class="btn-primary" id="monthlyDrawBtn">Draw Monthly Winner</button>
-              <button class="btn-secondary" id="monthlyDrawPrevBtn" hidden>Draw Last Month</button>
+              <button class="btn-secondary" id="monthlyDrawPrevBtn" hidden disabled>Draw Last Month</button>
             </div>
             <p class="bot-muted" id="monthlyPrevNote" hidden></p>
 
             <div class="giveaway-winner-panel" id="monthlyWinnerPanel" hidden>
-              <p>Winner: <b id="monthlyWinnerName"></b> <span class="giveaway-winner-rarity" id="monthlyWinnerMeta"></span></p>
-              <div class="giveaway-code-form">
+              <p>This month: <b id="monthlyWinnerName"></b> <span class="giveaway-winner-rarity" id="monthlyWinnerMeta"></span></p>
+              <div class="giveaway-code-form" id="monthlyCodeForm">
                 <select id="monthlyCodeTier">
                   <option value="">— mythic (the monthly prize) —</option>
                   <option value="common">Common</option>
@@ -184,6 +184,21 @@
                 </select>
                 <input type="text" id="monthlyCodeManual" placeholder="...or paste a specific code">
                 <button class="btn-primary" id="monthlySendCodeBtn">Give Code to Winner</button>
+              </div>
+            </div>
+
+            <div class="giveaway-winner-panel" id="monthlyPrevWinnerPanel" hidden>
+              <p>Last month: <b id="monthlyPrevWinnerName"></b> <span class="giveaway-winner-rarity" id="monthlyPrevWinnerMeta"></span></p>
+              <div class="giveaway-code-form" id="monthlyPrevCodeForm">
+                <select id="monthlyPrevCodeTier">
+                  <option value="">— mythic (the monthly prize) —</option>
+                  <option value="common">Common</option>
+                  <option value="uncommon">Uncommon</option>
+                  <option value="rare">Rare</option>
+                  <option value="mythic">Mythic</option>
+                </select>
+                <input type="text" id="monthlyPrevCodeManual" placeholder="...or paste a specific code">
+                <button class="btn-primary" id="monthlyPrevSendCodeBtn">Give Code to Winner</button>
               </div>
             </div>
           </div>

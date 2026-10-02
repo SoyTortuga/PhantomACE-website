@@ -33,7 +33,9 @@ function renderBotActionFeed(log) {
       body = '<b>' + label + '</b> code dropped by ' + escapeBotHtml(entry.actor || 'unknown') + failedNote;
     } else if (entry.type === 'giveaway-winner') {
       tag = 'Winner';
-      body = '<b>' + escapeBotHtml(entry.username || 'unknown') + '</b> picked as giveaway winner by ' + escapeBotHtml(entry.actor || 'unknown');
+      body = '<b>' + escapeBotHtml(entry.username || 'unknown') + '</b> picked as ' +
+        (entry.month ? escapeBotHtml(entry.month) + ' monthly' : 'giveaway') + ' winner by ' + escapeBotHtml(entry.actor || 'unknown') +
+        (entry.reroll ? ' (re-roll, replaced ' + escapeBotHtml(entry.previous || 'unknown') + (entry.forced ? ' after their code was sent — FORCED' : '') + ')' : '');
     } else if (entry.type === 'giveaway-code') {
       tag = 'Prize';
       body = 'Prize code whispered to <b>' + escapeBotHtml(entry.username || 'unknown') + '</b> by ' + escapeBotHtml(entry.actor || 'unknown') + failedNote;
@@ -426,10 +428,15 @@ async function loadGiveawayState() {
     setGiveawayOpenUI(data.open, data.entrantCount, data.rarity);
     renderGiveawayReel(data.entrants);
     if (data.winner) showGiveawayWinner(data.winner);
-    /* The monthly-ledger draw is a separate event with its own winner record;
-       show it if one has been drawn this month. */
-    if (data.monthlyWinner) showMonthlyWinner(data.monthlyWinner);
-    renderMonthlyPrev(data.monthlyPrev);
+    /* The monthly-ledger draw is a separate event with one record PER MONTH:
+       this month's winner, and last month's while it is still in its grace
+       window (or still waiting on its code). */
+    const grace = data.monthlyGrace || null;
+    monthlyMonths.current = grace ? grace.current : (data.monthly && data.monthly.month) || null;
+    monthlyMonths.prev = grace ? grace.month : null;
+    renderMonthlyWinner('current', data.monthlyWinner);
+    renderMonthlyWinner('prev', data.monthlyPrevWinner);
+    renderMonthlyPrev(data.monthlyPrev, grace);
   } catch {
     /* leave panel as-is */
   }
@@ -437,91 +444,126 @@ async function loadGiveawayState() {
 
 /* ── Monthly ledger draw ──────────────────────
    A separate event from the Big Prize spin above: WEIGHTED by entry count,
-   drawn over the whole month's ledger, its own winner record. The grand reel
-   plays on the OBS overlay; this panel just runs the draw and hands out the
-   locked prize code, mirroring the Big Prize send-code flow. */
-function showMonthlyWinner(w) {
-  if (!w) return;
-  const panel = document.getElementById('monthlyWinnerPanel');
-  const nameEl = document.getElementById('monthlyWinnerName');
-  const metaEl = document.getElementById('monthlyWinnerMeta');
+   drawn over the whole month's ledger, one winner record per month. The grand
+   reel plays on the OBS overlay; this panel just runs the draw and hands out
+   the locked prize code, mirroring the Big Prize send-code flow. Every send
+   names its month, so a code always goes to the winner of the month drawn. */
+const monthlyMonths = { current: null, prev: null };
+const MONTHLY_IDS = {
+  current: {
+    panel: 'monthlyWinnerPanel', name: 'monthlyWinnerName', meta: 'monthlyWinnerMeta', form: 'monthlyCodeForm',
+    tier: 'monthlyCodeTier', manual: 'monthlyCodeManual', send: 'monthlySendCodeBtn', draw: 'monthlyDrawBtn',
+  },
+  prev: {
+    panel: 'monthlyPrevWinnerPanel', name: 'monthlyPrevWinnerName', meta: 'monthlyPrevWinnerMeta', form: 'monthlyPrevCodeForm',
+    tier: 'monthlyPrevCodeTier', manual: 'monthlyPrevCodeManual', send: 'monthlyPrevSendCodeBtn', draw: 'monthlyDrawPrevBtn',
+  },
+};
+
+function renderMonthlyWinner(which, w) {
+  const ids = MONTHLY_IDS[which];
+  const panel = document.getElementById(ids.panel);
+  if (!panel) return;
+  if (!w) { panel.hidden = true; panel.dataset.winner = ''; return; }
+  const nameEl = document.getElementById(ids.name);
+  const metaEl = document.getElementById(ids.meta);
+  const form = document.getElementById(ids.form);
   if (nameEl) nameEl.textContent = w.username || '';
   if (metaEl) {
     const bits = [];
     if (w.month) bits.push(w.month);
     if (w.entries != null) bits.push(w.entries + (w.entries === 1 ? ' entry' : ' entries'));
     if (w.totalEntries != null) bits.push('pool ' + w.totalEntries);
-    if (w.sent) bits.push('code sent');
-    metaEl.textContent = bits.length ? '— ' + bits.join(' • ') : '';
+    if (w.rerolls) bits.push('re-rolled ' + w.rerolls + 'x');
+    bits.push(w.sent ? 'code sent' : 'code not sent yet');
+    metaEl.textContent = '— ' + bits.join(' • ');
     metaEl.className = 'giveaway-winner-rarity rarity-mythic';
   }
-  if (panel) panel.hidden = false;
+  /* Once the code is out the form goes away: the server refuses a second
+     send anyway, and a visible button invites the attempt. */
+  if (form) form.hidden = !!w.sent;
+  panel.dataset.winner = w.username || '';
+  panel.dataset.sent = w.sent ? '1' : '';
+  panel.hidden = false;
 }
 
-/* The previous UTC month, when it had entrants, so the broadcaster can still
-   draw the just-ended month after the ledger rolled over at UTC midnight. */
-let monthlyPrevMonth = null;
-function renderMonthlyPrev(p) {
+/* "Draw Last Month" exists only during the grace window (days 1..7 of the
+   new month, Pacific) and only when that month had entrants. The server is
+   the authority — it refuses the draw outside the window — this mirrors it. */
+function renderMonthlyPrev(p, grace) {
   const btn = document.getElementById('monthlyDrawPrevBtn');
   const note = document.getElementById('monthlyPrevNote');
-  const has = p && p.totalPeople > 0 && p.totalEntries > 0;
-  monthlyPrevMonth = has ? p.month : null;
+  const open = !!(grace && grace.open);
+  const has = open && p && p.totalPeople > 0 && p.totalEntries > 0;
   if (btn) {
     btn.hidden = !has;
+    btn.disabled = !has;
     if (has) btn.textContent = 'Draw Last Month (' + p.month + ')';
   }
   if (note) {
     note.hidden = !has;
     if (has) note.textContent = 'Last month (' + p.month + '): ' + p.totalEntries +
       (p.totalEntries === 1 ? ' entry' : ' entries') + ' across ' + p.totalPeople +
-      (p.totalPeople === 1 ? ' person' : ' people') + ' — still drawable.';
+      (p.totalPeople === 1 ? ' person' : ' people') + ' — drawable through day ' + grace.lastDay +
+      ' (today is day ' + grace.day + ').';
   }
 }
 
-/* `month` omitted → current month (primary button); set → the previous-month
-   grace draw (secondary button). */
-async function drawMonthlyWinnerAction(month) {
-  const prev = typeof month === 'string' && month;
-  const btn = document.getElementById(prev ? 'monthlyDrawPrevBtn' : 'monthlyDrawBtn');
+/* which = 'current' (primary button) or 'prev' (the grace-window button).
+   Re-rolling an unsent winner asks first; a winner whose code already went
+   out is refused by the server, and only the broadcaster can force past it. */
+async function drawMonthlyWinnerAction(which, force) {
+  const ids = MONTHLY_IDS[which];
+  const month = which === 'prev' ? monthlyMonths.prev : null;
+  if (which === 'prev' && !month) return;
+  const panel = document.getElementById(ids.panel);
+  const shown = panel && !panel.hidden ? panel.dataset.winner : '';
+  if (!force && shown && !(panel.dataset.sent) &&
+      !confirm('Re-roll ' + (month || monthlyMonths.current || 'this month') + '? ' + shown + ' has not been sent a code yet and will be replaced.')) {
+    return;
+  }
+
+  const btn = document.getElementById(ids.draw);
   const label = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Drawing...'; }
-  document.getElementById('monthlyWinnerPanel').hidden = true;
+  let retryForced = false;
   try {
     const res = await fetch('/api/bot/giveaway', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'draw-monthly', month: prev || undefined }),
+      body: JSON.stringify({ action: 'draw-monthly', month: month || undefined, force: force === true || undefined }),
     });
     const data = await res.json();
     if (data.success) {
-      showMonthlyWinner({
-        username: data.winner.username,
-        entries: data.winner.entries,
-        totalEntries: data.totalEntries,
-        totalPeople: data.totalPeople,
-        month: data.month,
-        sent: false,
-      });
+      await loadGiveawayState();
       showBotStatus(
         'Monthly winner drawn for ' + data.month + ': ' + data.winner.username + ' (' + data.winner.entries +
         ' entries, from ' + data.totalEntries + ' across ' + data.totalPeople +
         (data.totalPeople === 1 ? ' person' : ' people') + '). The reel is spinning on the overlay.',
         false
       );
+    } else if (res.status === 409 && data.alreadySent && !force) {
+      retryForced = confirm(data.error + '\n\nForce a re-draw anyway? This gives a SECOND prize and only the broadcaster can do it.');
+      if (!retryForced) showBotStatus(data.error, true);
     } else {
       showBotStatus(data.error || 'Could not draw a monthly winner.', true);
+      if (data.graceClosed) await loadGiveawayState();
     }
   } catch {
     showBotStatus('Network error drawing the monthly winner.', true);
   }
   if (btn) { btn.disabled = false; btn.textContent = label; }
+  if (retryForced) await drawMonthlyWinnerAction(which, true);
 }
 
-async function sendMonthlyCode() {
-  const btn = document.getElementById('monthlySendCodeBtn');
-  const tier = document.getElementById('monthlyCodeTier').value;
-  const manualCode = document.getElementById('monthlyCodeManual').value.trim();
+async function sendMonthlyCode(which) {
+  const ids = MONTHLY_IDS[which];
+  const month = monthlyMonths[which];
+  const btn = document.getElementById(ids.send);
+  const tier = document.getElementById(ids.tier).value;
+  const manualCode = document.getElementById(ids.manual).value.trim();
+  if (!month) { showBotStatus('Reload the panel — the month for this winner is unknown.', true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
   try {
@@ -529,13 +571,13 @@ async function sendMonthlyCode() {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'send-monthly-code', rarity: tier || undefined, code: manualCode || undefined }),
+      body: JSON.stringify({ action: 'send-monthly-code', month: month, rarity: tier || undefined, code: manualCode || undefined }),
     });
     const data = await res.json();
     if (data.success) {
       showBotStatus(
-        String(data.rarity || '').toUpperCase() + ' code locked to ' + (data.winner ? data.winner.username : 'the winner') +
-        ' — waiting on their giveaway page for 7 days.' +
+        String(data.rarity || '').toUpperCase() + ' code for ' + (data.month || month) + ' locked to ' +
+        (data.winner ? data.winner.username : 'the winner') + ' — waiting on their giveaway page for 7 days.' +
         (data.whispered ? ' Whisper sent too.' : ' The whisper did not send; the page has it.'),
         false
       );
@@ -685,14 +727,12 @@ function initGiveawayPanel() {
   if (sendBtn) sendBtn.addEventListener('click', sendGiveawayCode);
   if (resetBtn) resetBtn.addEventListener('click', resetGiveaway);
 
-  const monthlyDrawBtn = document.getElementById('monthlyDrawBtn');
-  const monthlyDrawPrevBtn = document.getElementById('monthlyDrawPrevBtn');
-  const monthlySendBtn = document.getElementById('monthlySendCodeBtn');
-  if (monthlyDrawBtn) monthlyDrawBtn.addEventListener('click', drawMonthlyWinnerAction);
-  if (monthlyDrawPrevBtn) monthlyDrawPrevBtn.addEventListener('click', function () {
-    if (monthlyPrevMonth) drawMonthlyWinnerAction(monthlyPrevMonth);
+  ['current', 'prev'].forEach(function (which) {
+    const drawBtn = document.getElementById(MONTHLY_IDS[which].draw);
+    const sendBtnM = document.getElementById(MONTHLY_IDS[which].send);
+    if (drawBtn) drawBtn.addEventListener('click', function () { drawMonthlyWinnerAction(which); });
+    if (sendBtnM) sendBtnM.addEventListener('click', function () { sendMonthlyCode(which); });
   });
-  if (monthlySendBtn) monthlySendBtn.addEventListener('click', sendMonthlyCode);
 
   /* WATCH THE ENTRIES ARRIVE.
      This state was read once at page load and then only after a reset, so a

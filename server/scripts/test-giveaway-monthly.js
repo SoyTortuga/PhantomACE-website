@@ -30,6 +30,8 @@ import {
   ledgerKey, monthKey, redeemDropCode, getPrize, PRIZE_WINDOW_SECONDS,
 } from '../../functions/api/giveaway-entries.js';
 import * as control from '../../functions/api/bot/giveaway.js';
+import { resolveKey } from '../lib/registry.js';
+import { runMonthlyDraw } from './draw-monthly-giveaway.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -80,6 +82,7 @@ globalThis.fetch = async (url, opts = {}) => {
 
 function makeEnv({ pools = { mythic: 3, rare: 3 } } = {}) {
   const store = new Map();
+  const ttls = new Map();
   const chains = new Map();
   const codePools = {};
   for (const [tier, n] of Object.entries(pools)) {
@@ -96,7 +99,10 @@ function makeEnv({ pools = { mythic: 3, rare: 3 } } = {}) {
     TWITCH_CLIENT_SECRET: 'secret',
     MARKETPLACE: {
       async get(k, t) { if (!store.has(k)) return null; const r = store.get(k); return t === 'json' ? JSON.parse(r) : r; },
-      async put(k, v) { store.set(k, typeof v === 'string' ? v : JSON.stringify(v)); },
+      async put(k, v, opts) {
+        store.set(k, typeof v === 'string' ? v : JSON.stringify(v));
+        ttls.set(k, opts && opts.expirationTtl ? opts.expirationTtl : null);
+      },
       async delete(k) { store.delete(k); },
       async mutate(k, fn) {
         const prev = chains.get(k) || Promise.resolve();
@@ -123,6 +129,7 @@ function makeEnv({ pools = { mythic: 3, rare: 3 } } = {}) {
       },
     },
     _store: store,
+    _ttls: ttls,
     _pools: codePools,
   };
 }
@@ -148,9 +155,15 @@ function panelRequest(body, userId = BROADCASTER) {
     body: JSON.stringify(body),
   });
 }
-const post = (env, body, userId) => control.onRequestPost({ env, request: panelRequest(body, userId) });
+const post = (env, body, userId, now) => control.onRequestPost({ env, request: panelRequest(body, userId), now });
+const getPanel = (env, now, userId = BROADCASTER) => control.onRequestGet({
+  env, now,
+  request: new Request('https://phantomace.tv/api/bot/giveaway', { headers: { Cookie: `pham_session=${session(userId)}` } }),
+});
 
 const M = monthKey();
+const winnerKey = (month) => `giveaway_monthly_winner_${month}`;
+const stored = (env, month) => { const raw = env._store.get(winnerKey(month)); return raw ? JSON.parse(raw) : null; };
 
 /* ── Weighted pick: deterministic bands ──────────────────────────────────
    Sorted most-entries-first, each entrant owns a band the width of its
@@ -264,8 +277,9 @@ const M = monthKey();
   ok('a winner is returned with an entry count', r.winner && typeof r.winner.entries === 'number');
   check('reporting the pool it came from', [r.totalEntries, r.totalPeople], [10, 2]);
 
-  const stored = JSON.parse(env._store.get('giveaway_monthly_winner'));
-  check('the winner is stored under the monthly key', stored.username, r.winner.username);
+  const rec = stored(env, M);
+  check('the winner is stored under its own month key', rec.username, r.winner.username);
+  ok('and the legacy single key is never written', !env._store.has('giveaway_monthly_winner'));
   check('the Big Prize winner key is untouched', JSON.parse(env._store.get('giveaway_winner')).username, 'bigprize');
 
   const feed = JSON.parse(env._store.get('overlay_events'));
@@ -279,11 +293,14 @@ const M = monthKey();
   ok('whose landing index names the winner', spin.entrants[spin.winnerIndex].username === r.winner.username);
 
   /* The reveal is stored on the winner so it can be replayed later. */
-  ok('the monthly winner stores its reel payload for replay', stored.reveal && Array.isArray(stored.reveal.entrants) && stored.reveal.entrants.length === 48);
+  ok('the monthly winner stores its reel payload for replay', rec.reveal && Array.isArray(rec.reveal.entrants) && rec.reveal.entrants.length === 48);
 
-  /* Re-drawing just overwrites — no pending-winner guard on this event. */
+  /* An UNSENT winner may be re-rolled — and the re-roll is logged. */
   const again = await (await post(env, { action: 'draw-monthly' })).json();
-  check('re-drawing is allowed (no pending guard)', again.success, true);
+  check('re-rolling an unsent winner is allowed', again.success, true);
+  check('the replaced winner is kept in history', stored(env, M).history.length, 1);
+  const log = JSON.parse(env._store.get('bot_action_log'));
+  check('the re-roll is logged as one', [log[0].type, log[0].reroll, log[0].previous, log[0].forced], ['giveaway-winner', true, rec.username, false]);
 }
 
 /* ── Replay last reveal (the Overlay Dashboard button) ────────────────── */
@@ -362,7 +379,7 @@ const M = monthKey();
   seedLedger(env, M, { alice: 3 });
   const drawn = await post(env, { action: 'draw-monthly' }, '12345');
   check('a viewer cannot draw the monthly winner', drawn.status, 403);
-  ok('and no winner was recorded', !env._store.get('giveaway_monthly_winner'));
+  ok('and no winner was recorded', !stored(env, M) && !env._store.get('giveaway_monthly_winner'));
 
   const sendCode = await post(env, { action: 'send-monthly-code' }, '12345');
   check('nor send a monthly code', sendCode.status, 403);
@@ -375,6 +392,213 @@ const M = monthKey();
   const env = makeEnv();
   const bad = await post(env, { action: 'not-a-real-action' });
   check('an unknown action is still rejected', bad.status, 400);
+}
+
+/* ══ HARDENING: per-month records, sent-guard, grace window ═════════════
+   Fixed instants on the Pacific season calendar, injected as context.now:
+     DAY2      2026-10-02 12:00 PT  — grace open, cur 2026-10, prev 2026-09
+     DAY7_LATE 2026-10-07 23:30 PT  — still day 7 (UTC already says the 8th)
+     DAY8      2026-10-08 00:30 PT  — grace closed
+     DAY8_NOON 2026-10-08 12:00 PT */
+const DAY2 = Date.UTC(2026, 9, 2, 19, 0, 0);
+const DAY7_LATE = Date.UTC(2026, 9, 8, 6, 30, 0);
+const DAY8 = Date.UTC(2026, 9, 8, 7, 30, 0);
+const DAY8_NOON = Date.UTC(2026, 9, 8, 19, 0, 0);
+const CUR = '2026-10', PREV = '2026-09';
+const MOD = '777';
+const withMod = (env) => env._store.set('site_moderators', JSON.stringify({ entries: [{ userId: MOD, displayName: 'mod' }] }));
+
+/* ── Re-draw after the code was sent is refused; only the broadcaster may force ── */
+{
+  const env = makeEnv({ pools: { mythic: 5 } });
+  withMod(env);
+  seedLedger(env, CUR, { alice: 5, bob: 5 });
+  check('draw', (await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2)).status, 200);
+  check('send', (await post(env, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2)).status, 200);
+  const sentRec = stored(env, CUR);
+  check('the record is marked sent', sentRec.sent, true);
+
+  const again = await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2);
+  check('a re-draw after the code went out is refused', again.status, 409);
+  const againBody = await again.json();
+  ok('with a clear error naming the winner and month', againBody.alreadySent && againBody.error.includes(sentRec.username) && againBody.error.includes(CUR));
+  check('and the sent record is untouched', stored(env, CUR), sentRec);
+
+  const modRedraw = await post(env, { action: 'draw-monthly' }, MOD, DAY2);
+  check('a moderator without force is refused too', modRedraw.status, 409);
+  const modForce = await post(env, { action: 'draw-monthly', force: true }, MOD, DAY2);
+  check('a moderator cannot force it', modForce.status, 403);
+  ok('and is told only the broadcaster can', /only the broadcaster/i.test((await modForce.json()).error));
+  check('still untouched after the moderator tries', stored(env, CUR), sentRec);
+
+  const truthy = await post(env, { action: 'draw-monthly', force: 'true' }, BROADCASTER, DAY2);
+  check('force must be literally true', truthy.status, 409);
+
+  const forced = await post(env, { action: 'draw-monthly', force: true }, BROADCASTER, DAY2);
+  check('the broadcaster CAN force a re-draw', forced.status, 200);
+  const after = stored(env, CUR);
+  check('the new record starts unsent', after.sent, false);
+  check('and keeps the sent winner (and their code) in history', [after.history[0].username, after.history[0].sent, after.history[0].code], [sentRec.username, true, sentRec.code]);
+  const log = JSON.parse(env._store.get('bot_action_log'));
+  check('the forced re-draw is logged as forced', [log[0].reroll, log[0].forced], [true, true]);
+}
+
+/* ── Last month is drawable only through day 7, Pacific ─────────────── */
+{
+  const env = makeEnv();
+  seedLedger(env, PREV, { olduser: 4 });
+  seedLedger(env, CUR, { newuser: 2 });
+
+  const late7 = await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY7_LATE);
+  check('day 7 at 23:30 PT (already the 8th in UTC) is still in the window', late7.status, 200);
+  check('and draws last month', stored(env, PREV).month, PREV);
+
+  const env2 = makeEnv();
+  seedLedger(env2, PREV, { olduser: 4 });
+  const day8 = await post(env2, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY8);
+  check('day 8 at 00:30 PT refuses last month', day8.status, 400);
+  const day8Body = await day8.json();
+  ok('saying the window closed', day8Body.graceClosed === true && /closed after day 7/.test(day8Body.error));
+  ok('and nothing was written', !stored(env2, PREV));
+  check('day 8 noon refuses it too', (await post(env2, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY8_NOON)).status, 400);
+  check('even the broadcaster forcing', (await post(env2, { action: 'draw-monthly', month: PREV, force: true }, BROADCASTER, DAY8_NOON)).status, 400);
+  check('two months back is never drawable', (await post(env2, { action: 'draw-monthly', month: '2026-08' }, BROADCASTER, DAY2)).status, 400);
+
+  const g2 = await (await getPanel(env2, DAY2)).json();
+  check('status on day 2: grace open', [g2.monthlyGrace.open, g2.monthlyGrace.day, g2.monthlyGrace.month, g2.monthlyGrace.current], [true, 2, PREV, CUR]);
+  check('and last month\'s pool is offered', g2.monthlyPrev && g2.monthlyPrev.totalEntries, 4);
+  const g8 = await (await getPanel(env2, DAY8)).json();
+  check('status on day 8: grace closed', g8.monthlyGrace.open, false);
+  check('and last month\'s pool is no longer offered', g8.monthlyPrev, null);
+}
+
+/* ── Current and last month never overwrite each other ───────────────── */
+{
+  const env = makeEnv({ pools: { mythic: 5 } });
+  seedLedger(env, PREV, { olduser: 4 });
+  seedLedger(env, CUR, { newuser: 2 });
+
+  await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY2);
+  await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2);
+  check('last month\'s winner is under its own key', stored(env, PREV).username, 'olduser');
+  check('this month\'s under its own', stored(env, CUR).username, 'newuser');
+  check('the last-month reveal is labelled with its month', stored(env, PREV).reveal.label, `Monthly Giveaway · ${PREV}`);
+  check('the current one is not', stored(env, CUR).reveal.label, 'Monthly Giveaway');
+
+  const sentPrev = await (await post(env, { action: 'send-monthly-code', month: PREV }, BROADCASTER, DAY2)).json();
+  check('sending for last month goes to last month\'s winner', [sentPrev.success, sentPrev.month, sentPrev.winner.username], [true, PREV, 'olduser']);
+  check('last month is marked sent', stored(env, PREV).sent, true);
+  check('this month is NOT', stored(env, CUR).sent, false);
+  check('one code left the pool', env._pools.mythic.length, 4);
+
+  check('a re-draw of this month is still allowed (unsent)', (await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2)).status, 200);
+  check('without touching last month', stored(env, PREV).sent, true);
+
+  const panel = await (await getPanel(env, DAY2)).json();
+  check('the panel shows this month\'s winner', panel.monthlyWinner && panel.monthlyWinner.month, CUR);
+  check('and last month\'s during grace', panel.monthlyPrevWinner && panel.monthlyPrevWinner.month, PREV);
+  ok('without shipping the 48-name reel strip', !('reveal' in panel.monthlyWinner) && panel.monthlyWinner.replayable === true);
+  check('re-roll count is surfaced', panel.monthlyWinner.rerolls, 1);
+
+  const day8 = await (await getPanel(env, DAY8_NOON)).json();
+  check('after grace a SENT last-month winner drops off the panel', day8.monthlyPrevWinner, null);
+
+  /* Replay targets the month asked for, else the most recent draw. */
+  const rPrev = await (await post(env, { action: 'replay', which: 'monthly', month: PREV }, BROADCASTER, DAY2)).json();
+  check('replay with a month re-pushes that month', [rPrev.who, rPrev.month], ['olduser', PREV]);
+  const rDefault = await (await post(env, { action: 'replay', which: 'monthly' }, BROADCASTER, DAY2)).json();
+  check('replay without one re-pushes the latest draw', rDefault.month, CUR);
+  check('the status replay entry names that same record', panel.replay.monthly.month, CUR);
+  check('replay of an out-of-range month is refused', (await post(env, { action: 'replay', which: 'monthly', month: '2020-01' }, BROADCASTER, DAY2)).status, 400);
+}
+
+/* ── An UNSENT last-month winner stays on the panel past grace ───────── */
+{
+  const env = makeEnv({ pools: { mythic: 2 } });
+  seedLedger(env, PREV, { olduser: 4 });
+  await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY7_LATE);
+  const day8 = await (await getPanel(env, DAY8_NOON)).json();
+  check('an undelivered prize does not vanish on day 8', day8.monthlyPrevWinner && day8.monthlyPrevWinner.username, 'olduser');
+  const send = await (await post(env, { action: 'send-monthly-code', month: PREV }, BROADCASTER, DAY8_NOON)).json();
+  check('and its code can still be sent', [send.success, send.month], [true, PREV]);
+}
+
+/* ── Records persist with no TTL; the family is registered as permanent ── */
+{
+  const env = makeEnv({ pools: { mythic: 2 } });
+  seedLedger(env, CUR, { alice: 3 });
+  await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2);
+  check('the draw writes no TTL', env._ttls.get(winnerKey(CUR)), null);
+  await post(env, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2);
+  check('the send writes no TTL either', env._ttls.get(winnerKey(CUR)), null);
+  check('the per-month family resolves to a permanent singleton row', resolveKey(winnerKey(CUR)), { table: 'singletons', expiry: 'none' });
+  check('the legacy key keeps its own exact entry', resolveKey('giveaway_monthly_winner'), { table: 'singletons', expiry: 'real' });
+}
+
+/* ── The legacy single key is still read ─────────────────────────────── */
+{
+  const env = makeEnv({ pools: { mythic: 2 } });
+  seedLedger(env, CUR, { alice: 3 });
+  env._store.set('giveaway_monthly_winner', JSON.stringify({ userId: 'legacyWinner', username: 'legacyWinner', month: CUR, sent: true, code: 'OLD', reveal: { entrants: [{ username: 'legacyWinner' }], winnerIndex: 0 } }));
+
+  const panel = await (await getPanel(env, DAY2)).json();
+  check('the panel shows a legacy winner for its month', panel.monthlyWinner && panel.monthlyWinner.username, 'legacyWinner');
+  check('a legacy SENT winner still blocks a re-draw', (await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2)).status, 409);
+  check('and refuses a second send', (await post(env, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2)).status, 400);
+  check('a legacy record from another month is ignored', (await (await getPanel(env, Date.UTC(2026, 10, 2, 19))).json()).monthlyWinner, null);
+
+  const env2 = makeEnv({ pools: { mythic: 2 } });
+  env2._store.set('giveaway_monthly_winner', JSON.stringify({ userId: 'legacyWinner', username: 'legacyWinner', month: CUR, sent: false, rarity: 'mythic' }));
+  const send = await (await post(env2, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2)).json();
+  check('an unsent legacy winner can be sent its code', [send.success, send.winner.username], [true, 'legacyWinner']);
+  check('which lands in the per-month record', stored(env2, CUR).sent, true);
+  check('and the legacy key is left as it was', JSON.parse(env2._store.get('giveaway_monthly_winner')).sent, false);
+}
+
+/* ── Two sends at once pull ONE code ─────────────────────────────────── */
+{
+  const env = makeEnv({ pools: { mythic: 5 } });
+  seedLedger(env, CUR, { alice: 3 });
+  await post(env, { action: 'draw-monthly' }, BROADCASTER, DAY2);
+  const [a, b] = await Promise.all([
+    post(env, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2),
+    post(env, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2),
+  ]);
+  check('exactly one concurrent send succeeds', [a.status, b.status].sort(), [200, 409]);
+  check('and only one mythic code left the pool', env._pools.mythic.length, 4);
+  ok('the claim marker is cleared once sent', !('sendingAt' in stored(env, CUR)));
+
+  const env2 = makeEnv({ pools: { mythic: 0 } });
+  seedLedger(env2, CUR, { alice: 3 });
+  await post(env2, { action: 'draw-monthly' }, BROADCASTER, DAY2);
+  check('an empty pool fails the send', (await post(env2, { action: 'send-monthly-code', month: CUR }, BROADCASTER, DAY2)).status, 400);
+  ok('and releases the claim so it can be retried', !('sendingAt' in stored(env2, CUR)));
+  check('a re-roll is not blocked by a released claim', (await post(env2, { action: 'draw-monthly' }, BROADCASTER, DAY2)).status, 200);
+}
+
+/* ── The rig draw script: Pacific month, per-month key, same guard ───── */
+{
+  const src = fs.readFileSync(path.join(HERE, 'draw-monthly-giveaway.js'), 'utf8');
+  ok('the script no longer does UTC month math', !/getUTCMonth|getUTCFullYear/.test(src));
+  ok('it takes the default month from season-time prevMonthKey', /prevMonthKey/.test(src) && /season-time\.js/.test(src));
+
+  const env = makeEnv();
+  seedLedger(env, '2026-08', { scriptUser: 6 });
+  const dry = await runMonthlyDraw(env, { month: '2026-08' });
+  check('dry run draws but writes nothing', [dry.status, stored(env, '2026-08')], ['dry-run', null]);
+  const real = await runMonthlyDraw(env, { month: '2026-08', confirm: true });
+  check('confirm writes the per-month key', [real.status, stored(env, '2026-08').username], ['stored', 'scriptUser']);
+  check('with no TTL', env._ttls.get(winnerKey('2026-08')), null);
+  ok('and never the legacy key', !env._store.has('giveaway_monthly_winner'));
+
+  const rec = stored(env, '2026-08');
+  env._store.set(winnerKey('2026-08'), JSON.stringify({ ...rec, sent: true, code: 'X1' }));
+  const refused = await runMonthlyDraw(env, { month: '2026-08', confirm: true });
+  check('the script refuses a re-draw after send', refused.status, 'refused');
+  check('leaving the record alone', stored(env, '2026-08').code, 'X1');
+  const forced = await runMonthlyDraw(env, { month: '2026-08', confirm: true, force: true });
+  check('--force re-draws it', [forced.status, stored(env, '2026-08').sent, stored(env, '2026-08').history.length], ['stored', false, 1]);
+  check('a malformed month is rejected', (await runMonthlyDraw(env, { month: 'sept' })).status, 'bad-month');
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

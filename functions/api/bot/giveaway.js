@@ -12,17 +12,169 @@
    ══════════════════════════════════════════════ */
 
 import { pullGiveawayCode, sendWhisper, getBroadcasterToken, logBotAction, TIER_INFO } from './send-chat.js';
+import { monthKey, prevMonthKey, dayOfMonth } from '../season-time.js';
 
 const ENTRANTS_KEY = 'giveaway_entrants';
 const STATE_KEY = 'giveaway_state';
 const WINNER_KEY = 'giveaway_winner';
-/* The MONTHLY-ledger draw's winner lives under its OWN key, never WINNER_KEY.
-   The two draws are different events — the Big Prize is a live channel-points
-   spin, the monthly draw is over the accumulated ledger — and sharing a record
-   would let one draw's pending-winner guard block or clobber the other. */
-const MONTHLY_WINNER_KEY = 'giveaway_monthly_winner';
 const CODE_MAX_LENGTH = 60;
 const STATE_TTL = 86400;
+
+/* ── MONTHLY WINNER RECORDS ───────────────────────────────────────────────
+   The MONTHLY-ledger draw's winner lives under its OWN keys, never WINNER_KEY.
+   The two draws are different events — the Big Prize is a live channel-points
+   spin, the monthly draw is over the accumulated ledger — and sharing a record
+   would let one draw's pending-winner guard block or clobber the other.
+
+   ONE RECORD PER MONTH, KEPT FOREVER. It used to be a single 24h key, so
+   drawing last month overwrote this month's unsent winner (and vice versa),
+   a re-draw after the code went out reset sent:false and allowed a second
+   mythic prize, and nothing remembered who won anything. Now each month has
+   giveaway_monthly_winner_<YYYY-MM>, written with no TTL, and a sent record
+   refuses a re-draw unless the broadcaster forces it.
+
+   The old single key is still READ (never written) for a month whose
+   per-month record does not exist, so a winner drawn just before this shipped
+   is neither lost nor re-drawable past its sent flag. */
+const MONTHLY_WINNER_PREFIX = 'giveaway_monthly_winner_';
+export const LEGACY_MONTHLY_WINNER_KEY = 'giveaway_monthly_winner';
+
+/* Last month may only be drawn on days 1..7 of the new (Pacific) month. */
+export const MONTHLY_GRACE_DAYS = 7;
+
+/* How long a send-monthly-code claim holds the record before it lapses. */
+const SEND_LOCK_MS = 60000;
+
+function sendInFlight(rec) {
+  return !!(rec && rec.sendingAt && Date.now() - rec.sendingAt < SEND_LOCK_MS);
+}
+
+export function monthlyWinnerKey(month) {
+  return `${MONTHLY_WINNER_PREFIX}${month}`;
+}
+
+/** That month's winner record, falling back to the legacy single key. */
+export async function readMonthlyWinner(env, month) {
+  const rec = await env.MARKETPLACE.get(monthlyWinnerKey(month), 'json');
+  if (rec) return rec;
+  const legacy = await env.MARKETPLACE.get(LEGACY_MONTHLY_WINNER_KEY, 'json');
+  return legacy && legacy.month === month ? legacy : null;
+}
+
+/** Persist a winner record under its own month's key, with no expiry. */
+export async function storeMonthlyWinner(env, record) {
+  await env.MARKETPLACE.put(monthlyWinnerKey(record.month), JSON.stringify(record));
+}
+
+/** Which months are drawable at `now` (Pacific calendar, season-time.js). */
+export function monthlyGrace(now = new Date()) {
+  const day = dayOfMonth(now);
+  return {
+    open: day <= MONTHLY_GRACE_DAYS,
+    day,
+    lastDay: MONTHLY_GRACE_DAYS,
+    current: monthKey(now),
+    month: prevMonthKey(now),
+  };
+}
+
+/**
+ * Why a re-draw over `existing` must be refused, or null when it may go ahead.
+ * An UNSENT winner may be re-rolled freely; a SENT one already holds a real
+ * prize, so only the broadcaster passing force may draw again.
+ */
+export function redrawRefusal(existing, { force = false, broadcaster = false } = {}) {
+  if (existing && !existing.sent && sendInFlight(existing)) {
+    return { status: 409, error: `${existing.username}'s ${existing.month} code is being sent right now — wait a moment and check again.` };
+  }
+  if (!existing || !existing.sent) return null;
+  if (force && broadcaster) return null;
+  if (force) {
+    return { status: 403, error: `Only the broadcaster can force a re-draw of ${existing.month} after its code was sent.` };
+  }
+  return {
+    status: 409,
+    error: `${existing.username} already won ${existing.month} and was sent a code. Drawing again would hand out a second prize — the broadcaster can force it if that is really intended.`,
+  };
+}
+
+/**
+ * The stored winner record (and its overlay reveal) for a ledger draw.
+ * Shared with server/scripts/draw-monthly-giveaway.js so both write the same
+ * shape. A re-draw carries the replaced winner into `history`.
+ */
+export function buildMonthlyWinnerRecord(draw, { currentMonth = monthKey(), previous = null, buildReel } = {}) {
+  const reel = buildReel(draw.entrants, draw.winner);
+  const reveal = {
+    entrants: reel.pool,
+    winnerIndex: reel.winnerIndex,
+    rarity: 'mythic',
+    who: draw.winner.username,
+    label: draw.month === currentMonth ? 'Monthly Giveaway' : `Monthly Giveaway · ${draw.month}`,
+    note: `Drawn from ${draw.totalEntries} entries across ${draw.totalPeople} ${draw.totalPeople === 1 ? 'person' : 'people'}`,
+  };
+  const history = previous
+    ? [...(Array.isArray(previous.history) ? previous.history : []), {
+        userId: previous.userId,
+        username: previous.username,
+        entries: previous.entries,
+        pickedAt: previous.pickedAt || null,
+        sent: !!previous.sent,
+        sentAt: previous.sentAt || null,
+        code: previous.code || null,
+      }]
+    : [];
+  return {
+    userId: draw.winner.userId,
+    username: draw.winner.username,
+    entries: draw.winner.entries,
+    month: draw.month,
+    totalEntries: draw.totalEntries,
+    totalPeople: draw.totalPeople,
+    rarity: 'mythic',
+    pickedAt: Date.now(),
+    sent: false,
+    reveal,
+    history,
+  };
+}
+
+/* What the panel needs about a monthly winner — not the 48-name reel strip. */
+function panelMonthly(rec) {
+  if (!rec) return null;
+  const { reveal, history, ...rest } = rec;
+  return { ...rest, rerolls: Array.isArray(history) ? history.length : 0, replayable: !!reveal };
+}
+
+/* The most recently drawn of the given records. */
+function latestMonthly(...recs) {
+  return recs.filter(Boolean).sort((a, b) => (b.pickedAt || 0) - (a.pickedAt || 0))[0] || null;
+}
+
+/**
+ * The monthly record a send or replay acts on. An explicit body.month (current
+ * or previous only) wins; without one it is whichever of the two was drawn
+ * most recently — the month the operator just drew.
+ */
+async function targetMonthly(env, body, grace) {
+  if (body.month) {
+    const month = String(body.month);
+    if (month !== grace.current && month !== grace.month) {
+      return { error: `Only the current (${grace.current}) or previous (${grace.month}) month's winner can be used here.` };
+    }
+    return { month, winner: await readMonthlyWinner(env, month) };
+  }
+  const winner = latestMonthly(
+    await readMonthlyWinner(env, grace.current),
+    await readMonthlyWinner(env, grace.month),
+  );
+  return { month: winner ? winner.month : grace.current, winner };
+}
+
+/* Tests inject the clock through the handler context; HTTP cannot reach it. */
+function nowOf(context) {
+  return typeof context.now === 'number' ? new Date(context.now) : new Date();
+}
 
 /* The DISPLAY spec per rarity — the base title, a label for the panel, and
    the colour that tells the rarities apart in a viewer's reward list. It no
@@ -196,13 +348,20 @@ export async function onRequestGet(context) {
      separate: its own winner record, and a live pool preview (current month's
      non-guest entry totals) so the panel can say what a draw would pull from
      WITHOUT drawing anyone — the totals are a read, the draw is a POST. */
-  const { monthlyLedgerTotals, prevMonthKey } = await import('../giveaway-entries.js');
-  const monthly = await monthlyLedgerTotals(env);
-  /* Previous UTC month's pool, so the panel can offer "draw last month" during
-     the grace window after the ledger rolls over — only worth showing when that
-     month actually had entrants. */
-  const monthlyPrev = await monthlyLedgerTotals(env, prevMonthKey());
-  const monthlyWinner = await env.MARKETPLACE.get(MONTHLY_WINNER_KEY, 'json') || null;
+  const { monthlyLedgerTotals } = await import('../giveaway-entries.js');
+  const grace = monthlyGrace(nowOf(context));
+  const monthly = await monthlyLedgerTotals(env, grace.current);
+  /* Last month's pool is only offered while it is still drawable (days
+     1..7, Pacific). The server refuses the draw outside that window; the panel
+     just mirrors it. */
+  const monthlyPrev = grace.open ? await monthlyLedgerTotals(env, grace.month) : null;
+  const monthlyWinner = await readMonthlyWinner(env, grace.current);
+  /* Last month's winner shows during the grace window, and AFTER it too while
+     its code is still unsent — an undelivered prize must never drop off the
+     panel just because the calendar moved. */
+  const prevRec = await readMonthlyWinner(env, grace.month);
+  const monthlyPrevWinner = prevRec && (grace.open || !prevRec.sent) ? prevRec : null;
+  const replayMonthly = latestMonthly(monthlyWinner, prevRec);
 
   return json({
     open: !!state.open,
@@ -215,13 +374,16 @@ export async function onRequestGet(context) {
     rewardConfigured: !!rewardId,
     monthly,
     monthlyPrev,
-    monthlyWinner,
+    monthlyWinner: panelMonthly(monthlyWinner),
+    monthlyPrevWinner: panelMonthly(monthlyPrevWinner),
+    monthlyGrace: { open: grace.open, day: grace.day, lastDay: grace.lastDay, month: grace.month, current: grace.current },
     /* Whether each reveal can be replayed onto the overlay (a winner with a
        stored reel payload exists), plus who, for the Overlay Dashboard's
-       "Replay last reveal" buttons to enable/label themselves. */
+       "Replay last reveal" buttons to enable/label themselves. The monthly
+       entry names the same record a month-less replay re-pushes. */
     replay: {
       big: winner && winner.reveal ? { who: winner.username, rarity: winner.rarity || null } : null,
-      monthly: monthlyWinner && monthlyWinner.reveal ? { who: monthlyWinner.username, month: monthlyWinner.month || null } : null,
+      monthly: replayMonthly && replayMonthly.reveal ? { who: replayMonthly.username, month: replayMonthly.month || null } : null,
     },
   });
 }
@@ -487,21 +649,33 @@ export async function onRequestPost(context) {
   /* ── THE MONTHLY LEDGER DRAW ──────────────────────────────────────────
      A separate event from the Big Prize spin above: it draws over the month's
      accumulated entry ledger, WEIGHTED by entry count, and never touches the
-     Big Prize keys. Re-drawing simply overwrites the monthly winner record —
-     there is no pending-winner guard here, so a moderator can re-roll freely,
-     and the Big Prize draw cannot be blocked by (or block) this one. */
+     Big Prize keys, so the Big Prize draw cannot be blocked by (or block)
+     this one. Each month has its own permanent record: an UNSENT winner may
+     be re-rolled (logged, with the replaced name kept in history), a SENT one
+     is refused unless the broadcaster passes force. */
   if (body.action === 'draw-monthly') {
-    const { drawMonthlyWinner, buildWeightedReelPool, monthKey, prevMonthKey } = await import('../giveaway-entries.js');
-    /* Draw the current UTC month by default. A `month` may be passed to draw the
-       just-ended month during the grace window (the ledger rolls on the UTC
-       calendar, so a broadcaster west of UTC crosses over while still "this
-       month" locally). Restricted to current or previous month — older months
-       aren't drawable from the UI to avoid re-rolling settled history by mistake. */
-    const cur = monthKey(), prev = prevMonthKey();
+    const { drawMonthlyWinner, buildWeightedReelPool } = await import('../giveaway-entries.js');
+    /* The current Pacific month by default. `month` may name the previous
+       month, but only during the grace window (days 1..7) — after that last
+       month is settled history. Anything older is never drawable here. */
+    const grace = monthlyGrace(nowOf(context));
+    const cur = grace.current, prev = grace.month;
     const month = body.month ? String(body.month) : cur;
     if (month !== cur && month !== prev) {
       return json({ error: `Only the current (${cur}) or previous (${prev}) month can be drawn here.` }, 400);
     }
+    if (month === prev && !grace.open) {
+      return json({
+        error: `Drawing ${prev} closed after day ${grace.lastDay} of ${cur} (Pacific). Only ${cur} can be drawn now.`,
+        graceClosed: true,
+      }, 400);
+    }
+
+    const { isBroadcaster } = await import('../admin/moderators.js');
+    const existing = await readMonthlyWinner(env, month);
+    const refusal = redrawRefusal(existing, { force: body.force === true, broadcaster: isBroadcaster(env, session) });
+    if (refusal) return json({ error: refusal.error, alreadySent: true, month }, refusal.status);
+
     const draw = await drawMonthlyWinner(env, { month });
     if (!draw.winner) {
       return json({ error: `Nobody has entered for ${month} yet.` }, 400);
@@ -509,38 +683,19 @@ export async function onRequestPost(context) {
 
     /* The prize is drawn at the grand (mythic) tier — this is the big monthly
        giveaway — but the reveal LABEL says "Monthly Giveaway" rather than a
-       rarity, and send-monthly-code still lets a moderator override the tier. */
-    /* The exact overlay reel payload, stored so "Replay last reveal" can
-       re-push the SAME monthly spin (same bounded weighted strip, same landing
-       row, same label/note) without re-drawing a different winner. */
-    const reel = buildWeightedReelPool(draw.entrants, draw.winner);
-    const reveal = {
-      entrants: reel.pool,
-      winnerIndex: reel.winnerIndex,
-      rarity: 'mythic',
-      who: draw.winner.username,
-      label: month === prev ? `Monthly Giveaway · ${month}` : 'Monthly Giveaway',
-      note: `Drawn from ${draw.totalEntries} entries across ${draw.totalPeople} ${draw.totalPeople === 1 ? 'person' : 'people'}`,
-    };
-
-    const winner = {
-      userId: draw.winner.userId,
-      username: draw.winner.username,
-      entries: draw.winner.entries,
-      month: draw.month,
-      totalEntries: draw.totalEntries,
-      totalPeople: draw.totalPeople,
-      rarity: 'mythic',
-      pickedAt: Date.now(),
-      sent: false,
-      reveal,
-    };
-    await env.MARKETPLACE.put(MONTHLY_WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
+       rarity, and send-monthly-code still lets a moderator override the tier.
+       The reel payload is stored so "Replay last reveal" re-pushes the SAME
+       spin without re-drawing a different winner. */
+    const winner = buildMonthlyWinnerRecord(draw, { currentMonth: cur, previous: existing, buildReel: buildWeightedReelPool });
+    const reveal = winner.reveal;
+    await storeMonthlyWinner(env, winner);
 
     await logBotAction(env, {
       type: 'giveaway-winner',
       username: winner.username,
+      month: winner.month,
       actor: session.display_name || 'broadcaster',
+      ...(existing ? { reroll: true, previous: existing.username, forced: !!existing.sent } : {}),
     });
 
     /* Put the same grand reel on stream, at mythic-tier grandeur, labelled as
@@ -560,19 +715,47 @@ export async function onRequestPost(context) {
   }
 
   if (body.action === 'send-monthly-code') {
-    const winner = await env.MARKETPLACE.get(MONTHLY_WINNER_KEY, 'json');
-    if (!winner) return json({ error: 'No monthly winner drawn yet.' }, 400);
-    if (winner.sent) return json({ error: 'A code was already sent to this monthly winner.' }, 400);
+    /* Sends for the month the operator drew: body.month when the panel names
+       it, otherwise the most recently drawn of this month and last. */
+    const target = await targetMonthly(env, body, monthlyGrace(nowOf(context)));
+    if (target.error) return json({ error: target.error }, 400);
+    const found = target.winner;
+    if (!found) return json({ error: `No monthly winner drawn for ${target.month} yet.` }, 400);
+    if (found.sent) return json({ error: `A code was already sent to ${found.username} for ${found.month}.` }, 400);
 
     /* Defaults to the draw's tier (mythic), but a moderator can hand out a
        different tier deliberately — same shape as the Big Prize send-code. */
-    const tier = String(body.rarity || winner.rarity || 'mythic').toLowerCase();
+    const tier = String(body.rarity || found.rarity || 'mythic').toLowerCase();
     if (!TIER_INFO[tier]) return json({ error: `Unknown rarity "${tier}".` }, 400);
-
     let code = (body.code || '').trim();
-    if (!code) code = await pullGiveawayCode(env, tier);
-    if (!code) return json({ error: `No codes left in the ${tier} pool.` }, 400);
     if (code.length > CODE_MAX_LENGTH) return json({ error: 'Code is too long.' }, 400);
+
+    /* CLAIM THE SEND under the month's row lock before a code leaves the
+       pool, so a double click (or two moderators) cannot pull two mythic
+       codes for one win. A legacy-only record is copied into its per-month
+       key here. The claim lapses on its own after SEND_LOCK_MS if a send dies
+       half-way, and is released at once on the failures below. */
+    let claimed = null;
+    await env.MARKETPLACE.mutate(monthlyWinnerKey(found.month), (cur) => {
+      const rec = cur || found;
+      if (rec.sent || sendInFlight(rec)) return undefined;
+      claimed = { ...rec, sendingAt: Date.now() };
+      return claimed;
+    });
+    if (!claimed) {
+      return json({ error: `The ${found.month} code was already sent, or is being sent right now.` }, 409);
+    }
+    const winner = claimed;
+    const release = async () => {
+      await env.MARKETPLACE.mutate(monthlyWinnerKey(winner.month), (cur) => {
+        if (!cur || cur.sent) return undefined;
+        const { sendingAt, ...rest } = cur;
+        return rest;
+      });
+    };
+
+    if (!code) code = await pullGiveawayCode(env, tier);
+    if (!code) { await release(); return json({ error: `No codes left in the ${tier} pool.` }, 400); }
 
     /* Register it AND record the prize, locked to the winner for the 7-day
        window, so it is claimable on /giveaway exactly like a Big Prize win. */
@@ -589,16 +772,18 @@ export async function onRequestPost(context) {
     const message = `🏆 You won the MONTHLY giveaway! Your code: ${code} — it is locked to your account and waiting on phantomace.tv/giveaway for 7 days. Congrats!`;
     const sent = await sendWhisper(env, winner.userId, message);
 
+    delete winner.sendingAt;
     winner.sent = true;
     winner.whispered = sent;
     winner.code = code;
     winner.rarity = tier;
     winner.sentAt = Date.now();
-    await env.MARKETPLACE.put(MONTHLY_WINNER_KEY, JSON.stringify(winner), { expirationTtl: STATE_TTL });
+    await storeMonthlyWinner(env, winner);
 
     await logBotAction(env, {
       type: 'giveaway-code',
       username: winner.username,
+      month: winner.month,
       rarity: tier,
       code,
       actor: session.display_name || 'broadcaster',
@@ -611,6 +796,7 @@ export async function onRequestPost(context) {
       whispered: sent,
       rarity: tier,
       entries,
+      month: winner.month,
       expiresAt: prize ? prize.expiresAt : null,
       winner: { ...publicEntrant(winner), sent: true, sentAt: winner.sentAt },
     });
@@ -620,11 +806,18 @@ export async function onRequestPost(context) {
      Re-push a stored winner's giveaway-spin reveal to the overlay, for the
      Overlay Dashboard's "Replay last reveal" buttons. The draws themselves
      stay on Bot Control; this only re-shows the reel that already happened.
-     which='monthly' replays the monthly draw, anything else the Big Prize. */
+     which='monthly' replays the monthly draw (body.month, or the most recently
+     drawn of this month and last), anything else the Big Prize. */
   if (body.action === 'replay') {
     const which = body.which === 'monthly' ? 'monthly' : 'big';
-    const key = which === 'monthly' ? MONTHLY_WINNER_KEY : WINNER_KEY;
-    const winner = await env.MARKETPLACE.get(key, 'json');
+    let winner;
+    if (which === 'monthly') {
+      const target = await targetMonthly(env, body, monthlyGrace(nowOf(context)));
+      if (target.error) return json({ error: target.error }, 400);
+      winner = target.winner;
+    } else {
+      winner = await env.MARKETPLACE.get(WINNER_KEY, 'json');
+    }
     if (!winner || !winner.reveal) {
       return json({
         error: which === 'monthly'
@@ -634,7 +827,7 @@ export async function onRequestPost(context) {
     }
     const { pushOverlayEvent } = await import('../overlay/events.js');
     await pushOverlayEvent(env, { type: 'giveaway-spin', ...winner.reveal });
-    return json({ success: true, which, who: winner.username });
+    return json({ success: true, which, who: winner.username, month: which === 'monthly' ? winner.month || null : undefined });
   }
 
   return json({ error: 'Invalid action' }, 400);
