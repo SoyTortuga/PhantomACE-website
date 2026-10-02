@@ -29,7 +29,7 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 import { createPool, waitForDatabase } from '../lib/db.js';
 import { createKVStore } from '../lib/kv.js';
 import { resolveDatabaseUrl } from '../lib/service-env.js';
-import { MILESTONES, themeKeyFor } from '../../functions/api/phamily-rewards.js';
+import { MILESTONES, themeKeyFor, rewardTablesFor } from '../../functions/api/phamily-rewards.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -49,7 +49,16 @@ const line = (s = '') => console.log(s);
 const BADGE_ID = /^ms_(\d+)_badge_/;
 const BADGE_MONTH = /_(\d{4}-\d{2})$/;   // the earned month is baked into the id suffix
 
-const RANK = new Map(MILESTONES.map(m => [m.level, m.title]));
+const RANK = new Map(MILESTONES.map(m => [m.level, m.title]));   // which levels exist; same every month
+
+/* The rank TITLE is themed per month (October's 15 is Trick-or-Treater, the
+   base month's is Initiate), so a badge is labelled from the table of the month
+   it was earned in — not whatever month this script happens to run in. */
+function rankFor(level, month) {
+  const ms = month ? rewardTablesFor(month).milestones : MILESTONES;
+  const hit = ms.find(m => m.level === level);
+  return hit ? hit.title : RANK.get(level);
+}
 
 /* Artwork follows the THEME of the month the badge was earned (that month is in
    the badge id), so a Halloween badge backfilled later still gets its Halloween
@@ -174,7 +183,7 @@ async function main() {
         if (i.meta && i.meta.image) continue;
         /* Merged, not replaced — an item may carry meta this script knows
            nothing about. */
-        i.meta = { ...(i.meta || {}), image: artFor(level, monthOf(i.id)), milestoneLevel: level, rank: RANK.get(level) };
+        i.meta = { ...(i.meta || {}), image: artFor(level, monthOf(i.id)), milestoneLevel: level, rank: rankFor(level, monthOf(i.id)) };
         n++;
       }
       if (!n) return undefined;

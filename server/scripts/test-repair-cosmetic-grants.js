@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ITEM_FOR, isBroken, LEGACY_KEYS, resolveClaim } from './repair-cosmetic-grants.js';
-import { FOLLOWER_REWARDS, PHAMILY_REWARDS } from '../../functions/api/phamily-rewards.js';
+import { FOLLOWER_REWARDS, PHAMILY_REWARDS, rewardTablesFor } from '../../functions/api/phamily-rewards.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -137,9 +137,12 @@ const ok = (label, cond) => check(label, !!cond, true);
 
   /* The collision that made this necessary, kept as a live example: if
      the table ever stops sharing an id across two types, the dedupe key
-     could go back to being the id alone — and this says so. */
+     could go back to being the id alone — and this says so. Pinned to a
+     base month: a seasonal theme re-skins 'void' away, and this example
+     must not start failing on the 1st of a themed month. */
+  const base = rewardTablesFor('2026-09');
   const byId = {};
-  for (const r of [...FOLLOWER_REWARDS, ...PHAMILY_REWARDS].filter(r => ITEM_FOR[r.type])) {
+  for (const r of [...base.follower, ...base.phamily].filter(r => ITEM_FOR[r.type])) {
     const it = ITEM_FOR[r.type](r.cosmeticId);
     (byId[it.id] = byId[it.id] || new Set()).add(it.type);
   }

@@ -101,9 +101,13 @@ export const LEGACY_KEYS = {
   '115_phamily_cosmetic_mythic': '115_phamily_skull-skin_mythic',
 };
 
-/** findReward, but it also answers for keys that have since been renamed. */
-export function resolveClaim(key) {
-  return findReward(key) || (LEGACY_KEYS[key] ? findReward(LEGACY_KEYS[key]) : null);
+/** findReward, but it also answers for keys that have since been renamed.
+    `mk` is the month the claim was made in: the pass is themed per month, so
+    the same key names different cosmetics in different months (September's
+    85_follower_skull-skin_rare is Blood, October's is Bonewhite). Omitting it
+    means the current month, which is only right for current-month claims. */
+export function resolveClaim(key, mk) {
+  return findReward(key, mk) || (LEGACY_KEYS[key] ? findReward(LEGACY_KEYS[key], mk) : null);
 }
 
 /** Is this stored item one of the wrecks? */
@@ -157,13 +161,14 @@ async function main() {
   line(`Phamily Time records: ${months.length}`);
   const claimsByUser = new Map();
   for (const row of months) {
-    const m = /^pt_([0-9]+)_\d{4}-\d{2}$/.exec(String(row.name || ''));
+    /* Keep each claim's month — it decides which themed cosmetic is owed. */
+    const m = /^pt_([0-9]+)_(\d{4}-\d{2})$/.exec(String(row.name || ''));
     if (!m) continue;
     const keys = (row.value && Array.isArray(row.value.claimedRewards)) ? row.value.claimedRewards : [];
     if (!keys.length) continue;
-    const set = claimsByUser.get(m[1]) || new Set();
-    for (const k of keys) set.add(String(k));
-    claimsByUser.set(m[1], set);
+    const claims = claimsByUser.get(m[1]) || new Map();
+    for (const k of keys) claims.set(`${m[2]}|${k}`, { key: String(k), mk: m[2] });
+    claimsByUser.set(m[1], claims);
   }
   line(`People with claims: ${claimsByUser.size}`);
 
@@ -172,16 +177,21 @@ async function main() {
   let unknownKeys = 0;
   let legacyKeys = 0;
   let goneCosmetics = 0;
-  for (const [userId, keys] of claimsByUser) {
+  for (const [userId, claims] of claimsByUser) {
     const owed = [];
-    for (const key of keys) {
-      const reward = resolveClaim(key);
+    const seen = new Set();   // one entry per item, however many months owed it
+    for (const { key, mk } of claims.values()) {
+      const reward = resolveClaim(key, mk);
       if (!reward) { unknownKeys++; continue; }
-      if (!findReward(key)) legacyKeys++;
+      if (!findReward(key, mk)) legacyKeys++;
       if (!ITEM_FOR[reward.type]) continue;
       if (!reward.cosmeticId) continue;
       if (!stillReal(reward.type, reward.cosmeticId)) { goneCosmetics++; continue; }
-      owed.push({ key, reward, item: ITEM_FOR[reward.type](reward.cosmeticId) });
+      const item = ITEM_FOR[reward.type](reward.cosmeticId);
+      const id = `${item.type}\u0000${item.id}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      owed.push({ key, reward, item });
     }
     if (owed.length) owedByUser.set(userId, owed);
   }

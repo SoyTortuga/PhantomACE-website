@@ -11,27 +11,41 @@ const MAX_LEVEL = 150;
 const GRACE_DAYS = 7;
 
 function inventoryKey(userId) { return `inv_${userId}`; }
-async function getInventory(env, userId) {
-  return await env.MARKETPLACE.get(inventoryKey(userId), 'json') || { userId, items: [], equips: {} };
-}
-async function saveInventory(env, userId, inv) {
-  await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
-}
+
+/* EVERY WRITE IN THIS FILE IS A mutate(), NEVER get-then-put.
+   The claim handlers, the heartbeat and grantItem all used to read a row,
+   change it and write it back with nothing held in between. Two claims of
+   the same key in parallel both read "not claimed" and both paid; a
+   heartbeat landing in the middle of claim-all wrote back the claimedRewards
+   list it had read before the claims, quietly un-claiming them so they could
+   be claimed (and paid) again. mutate() runs the read and the write under
+   one per-key lock, and every check that decides whether to write lives
+   INSIDE its mutator so it sees the row as it is now, not as it was. */
 async function grantItem(env, userId, item) {
-  const inv = await getInventory(env, userId);
   /* IDENTITY IS TYPE AND ID, NOT ID ALONE. Cosmetic ids are namespaced
      per type by the games that read them — Skull Clicker filters on
      `i.type === 'skull-skin'` and looks the id up in that type's own
      table — so 'void' legitimately names both the Dark Altar skin
      (level 65) and the Void click effect (level 85). Matching on id
      alone made the second of those a duplicate of the first: the claim
-     was spent and nothing was granted. */
-  const same = (i) => i && i.id === item.id && i.type === item.type;
-  if (!item.consumable && inv.items.find(same)) return;
-  const existing = item.consumable && inv.items.find(same);
-  if (existing) { existing.quantity = (existing.quantity || 1) + (item.quantity || 1); }
-  else { inv.items.push({ ...item, grantedAt: Date.now(), source: 'phamily-time' }); }
-  await saveInventory(env, userId, inv);
+     was spent and nothing was granted.
+     A card back or emote pack is ALSO the same item when its name matches:
+     Memory Match knows them only by name, and older grants carried the
+     reward key as their id, so a repeat of the same cosmetic under the new
+     name-derived id must still dedupe against them. */
+  const byName = NAME_KEYED_ITEM_TYPES.includes(item.type);
+  const same = (i) => i && ((i.id === item.id && i.type === item.type)
+    || (byName && i.type === item.type && !!item.name && i.name === item.name));
+  await env.MARKETPLACE.mutate(inventoryKey(userId), (cur) => {
+    const inv = cur && typeof cur === 'object' ? cur : { userId, items: [], equips: {} };
+    if (!Array.isArray(inv.items)) inv.items = [];
+    if (!inv.equips || typeof inv.equips !== 'object') inv.equips = {};
+    if (!item.consumable && inv.items.find(same)) return undefined;
+    const existing = item.consumable && inv.items.find(same);
+    if (existing) { existing.quantity = (existing.quantity || 1) + (item.quantity || 1); }
+    else { inv.items.push({ ...item, grantedAt: Date.now(), source: 'phamily-time' }); }
+    return inv;
+  });
 }
 
 /* pullGiveawayCode used to live here. Phamily Time no longer draws from the
@@ -53,6 +67,7 @@ function getSession(request) {
    viewer's watch minutes land in the same month (and same local day) as their
    giveaway entries. */
 import { monthKey, prevMonthOf, daysLeftInMonth, daysInMonth as seasonDaysInMonth, dayOfMonth } from './season-time.js';
+import { NAME_KEYED_ITEM_TYPES, nameKeyedItemId } from './phamily-rewards.js';
 const prevMonthKey = prevMonthOf;
 
 function isInGracePeriod(now) {
@@ -93,9 +108,11 @@ function getSubTier(session) {
   return 0;
 }
 
-async function getUserData(env, userId, mk) {
-  const key = `pt_${userId}_${mk}`;
-  return await env.MARKETPLACE.get(key, 'json') || {
+const PT_TTL = 5184000;
+function userDataKey(userId, mk) { return `pt_${userId}_${mk}`; }
+
+function blankUserData(userId, mk) {
+  return {
     userId,
     month: mk,
     hours: 0,
@@ -107,14 +124,28 @@ async function getUserData(env, userId, mk) {
   };
 }
 
-async function saveUserData(env, userId, mk, data) {
-  const key = `pt_${userId}_${mk}`;
-  await env.MARKETPLACE.put(key, JSON.stringify(data), { expirationTtl: 5184000 });
+/* A stored row, or a blank one, with every list present — so a mutator can
+   push without first checking the shape. */
+function asUserData(cur, userId, mk) {
+  const d = cur && typeof cur === 'object' ? cur : blankUserData(userId, mk);
+  if (!Array.isArray(d.claimedRewards)) d.claimedRewards = [];
+  if (!Array.isArray(d.claimedMilestones)) d.claimedMilestones = [];
+  if (!d.attendance || typeof d.attendance !== 'object') d.attendance = {};
+  return d;
 }
 
-async function getAllTimeStats(env, userId) {
-  const key = `pt_alltime_${userId}`;
-  return await env.MARKETPLACE.get(key, 'json') || {
+async function getUserData(env, userId, mk) {
+  return asUserData(await env.MARKETPLACE.get(userDataKey(userId, mk), 'json'), userId, mk);
+}
+
+/** Read-modify-write of one month's row under the per-key lock. */
+async function mutateUserData(env, userId, mk, fn) {
+  return env.MARKETPLACE.mutate(userDataKey(userId, mk),
+    (cur) => fn(asUserData(cur, userId, mk)), { expirationTtl: PT_TTL });
+}
+
+function blankAllTime() {
+  return {
     totalHours: 0,
     monthsActive: 0,
     totalRewardsClaimed: 0,
@@ -124,9 +155,19 @@ async function getAllTimeStats(env, userId) {
   };
 }
 
-async function saveAllTimeStats(env, userId, stats) {
-  const key = `pt_alltime_${userId}`;
-  await env.MARKETPLACE.put(key, JSON.stringify(stats));
+async function getAllTimeStats(env, userId) {
+  return await env.MARKETPLACE.get(`pt_alltime_${userId}`, 'json') || blankAllTime();
+}
+
+/* The all-time row is written by the heartbeat AND by every claim, so it
+   takes the same lock: an unlocked increment raced by a heartbeat lost it. */
+async function mutateAllTimeStats(env, userId, fn) {
+  return env.MARKETPLACE.mutate(`pt_alltime_${userId}`, (cur) => {
+    const s = cur && typeof cur === 'object' ? cur : blankAllTime();
+    if (!Array.isArray(s.activeMonths)) s.activeMonths = [];
+    fn(s);
+    return s;
+  });
 }
 
 /* ── GET — fetch user's current state ─────────── */
@@ -244,11 +285,12 @@ export async function onRequestPost(context) {
 }
 
 async function handleHeartbeat(env, session, mk, now) {
-  const data = await getUserData(env, session.user_id, mk);
   const timestamp = now.getTime();
   const INTERVAL = 60000;
   const MAX_GAP = 120000;
 
+  /* Asked BEFORE taking the row lock: it can reach out to Twitch, and the
+     lock should never be held across a network call. */
   const live = await isChannelLive(env);
 
   /* ── SAY WHAT THIS BEAT ACTUALLY DID ────────────────────────────────────
@@ -265,41 +307,46 @@ async function handleHeartbeat(env, session, mk, now) {
                     credited, because the viewer may not have been watching.
 
      A viewer staring at a page that says "live" while nothing accrues has no
-     way to tell a working system from a broken one. Now the page can. */
-  const gap = data.lastHeartbeat > 0 ? (timestamp - data.lastHeartbeat) : null;
+     way to tell a working system from a broken one. Now the page can.
+
+     All of it inside the row lock, so a beat landing mid-claim updates the
+     row the claim just wrote instead of overwriting it with a copy read
+     beforehand — which used to un-claim rewards so they could be paid twice. */
   let creditedSeconds = 0;
   let reason;
+  const data = await mutateUserData(env, session.user_id, mk, (d) => {
+    const gap = d.lastHeartbeat > 0 ? (timestamp - d.lastHeartbeat) : null;
+    creditedSeconds = 0;
+    if (!live) {
+      reason = 'offline';
+    } else if (gap === null) {
+      reason = 'first-beat';
+    } else if (gap >= MAX_GAP) {
+      reason = 'gap';
+    } else {
+      const elapsed = Math.max(0, gap) / 3600000;
+      const boosted = elapsed * getBoostRate(session);
+      d.hours = Math.min(d.hours + boosted, MAX_LEVEL);
+      d.level = Math.min(Math.floor(d.hours), MAX_LEVEL);
 
-  if (!live) {
-    reason = 'offline';
-  } else if (gap === null) {
-    reason = 'first-beat';
-  } else if (gap >= MAX_GAP) {
-    reason = 'gap';
-  } else {
-    const elapsed = Math.min(gap, MAX_GAP) / 3600000;
-    const boosted = elapsed * getBoostRate(session);
-    data.hours = Math.min(data.hours + boosted, MAX_LEVEL);
-    data.level = Math.min(Math.floor(data.hours), MAX_LEVEL);
+      const dayStr = String(dayOfMonth(now));
+      d.attendance[dayStr] = (d.attendance[dayStr] || 0) + elapsed;
 
-    const dayStr = String(dayOfMonth(now));
-    data.attendance[dayStr] = (data.attendance[dayStr] || 0) + elapsed;
+      creditedSeconds = Math.round(Math.max(0, gap) / 1000);
+      reason = 'credited';
+    }
+    d.lastHeartbeat = Math.max(d.lastHeartbeat || 0, timestamp);
+    return d;
+  });
 
-    creditedSeconds = Math.round(gap / 1000);
-    reason = 'credited';
-  }
-
-  data.lastHeartbeat = timestamp;
-  await saveUserData(env, session.user_id, mk, data);
-
-  const allTime = await getAllTimeStats(env, session.user_id);
-  if (!allTime.activeMonths.includes(mk)) {
-    allTime.activeMonths.push(mk);
-    allTime.monthsActive = allTime.activeMonths.length;
-  }
-  allTime.totalHours = Math.max(allTime.totalHours, data.hours);
-  allTime.bestLevel = Math.max(allTime.bestLevel, data.level);
-  await saveAllTimeStats(env, session.user_id, allTime);
+  await mutateAllTimeStats(env, session.user_id, (allTime) => {
+    if (!allTime.activeMonths.includes(mk)) {
+      allTime.activeMonths.push(mk);
+      allTime.monthsActive = allTime.activeMonths.length;
+    }
+    allTime.totalHours = Math.max(allTime.totalHours || 0, data.hours);
+    allTime.bestLevel = Math.max(allTime.bestLevel || 0, data.level);
+  });
 
   return json({
     hours: Math.round(data.hours * 10) / 10,
@@ -327,8 +374,13 @@ const REWARD_ITEM_MAP = {
     return { game:'dino-park', type:'egg', consumable:true, quantity:1,
       meta: { rarity, guaranteed, mutant } };
   },
-  cardback: (rarity, name) => ({ game:'memory-match', type:'cardback', consumable:false }),
-  emote: (rarity, name) => ({ game:'memory-match', type:'emote-pack', consumable:false }),
+  /* Memory Match knows these by NAME, and the id used to be the reward key
+     — the same every month — so a themed month's card back deduped against
+     the base month's and was never granted. See nameKeyedItemId. */
+  cardback: (rarity, name) =>
+    ({ id: nameKeyedItemId('cardback', name), game:'memory-match', type:'cardback', consumable:false }),
+  emote: (rarity, name) =>
+    ({ id: nameKeyedItemId('emote-pack', name), game:'memory-match', type:'emote-pack', consumable:false }),
   bingo: (rarity, name) => {
     const isWildcard = name.toLowerCase().includes('wildcard');
     return { game:'commander-bingo', type: isWildcard ? 'wildcard' : 'bonus-card', consumable:true, quantity:1 };
@@ -431,18 +483,14 @@ async function handleClaimReward(env, session, mk, body) {
   const rewardKey = String(body.rewardKey || '');
   if (!rewardKey) return json({ error: 'Missing reward key' }, 400);
 
+  /* Looked up in the table of the month that EARNED it, which is `mk` — the
+     current month for claim-reward, the previous one for claim-prev. This
+     used to read the current month's table regardless, so during October's
+     grace week a September key paid October's content. */
   const { findReward } = await import('./phamily-rewards.js');
-  const reward = findReward(rewardKey);
+  const reward = findReward(rewardKey, mk);
   if (!reward) return json({ error: 'No such reward' }, 400);
 
-  const data = await getUserData(env, session.user_id, mk);
-
-  if (data.claimedRewards.includes(rewardKey)) {
-    return json({ error: 'Already claimed' }, 400);
-  }
-  if (reward.level > data.level) {
-    return json({ error: 'Level not reached' }, 400);
-  }
   /* The follower track is open to everyone. The phamily track is the
      subscriber bonus ON TOP of it — a subscriber earns BOTH tracks at a
      given level, not one instead of the other. This used to route through
@@ -453,8 +501,18 @@ async function handleClaimReward(env, session, mk, body) {
     return json({ error: 'Phamily track rewards require an active subscription' }, 403);
   }
 
-  data.claimedRewards.push(rewardKey);
-  await saveUserData(env, session.user_id, mk, data);
+  /* The check and the record are ONE locked step. Checked outside the lock,
+     two parallel claims of the same key both saw "not claimed" and both
+     paid. Exactly one caller can move a key into claimedRewards; everyone
+     else is told it is already claimed and grants nothing. */
+  let refusal = null;
+  await mutateUserData(env, session.user_id, mk, (data) => {
+    if (data.claimedRewards.includes(rewardKey)) { refusal = 'Already claimed'; return undefined; }
+    if (reward.level > data.level) { refusal = 'Level not reached'; return undefined; }
+    data.claimedRewards.push(rewardKey);
+    return data;
+  });
+  if (refusal) return json({ error: refusal }, 400);
 
   await grantReward(env, session, {
     id: rewardKey,
@@ -471,9 +529,9 @@ async function handleClaimReward(env, session, mk, body) {
     cosmeticId: reward.cosmeticId,
   });
 
-  const allTime = await getAllTimeStats(env, session.user_id);
-  allTime.totalRewardsClaimed++;
-  await saveAllTimeStats(env, session.user_id, allTime);
+  await mutateAllTimeStats(env, session.user_id, (allTime) => {
+    allTime.totalRewardsClaimed = (allTime.totalRewardsClaimed || 0) + 1;
+  });
 
   return json({ success: true, rewardKey, granted: { type: reward.type, rarity: reward.rarity, name: reward.name } });
 }
@@ -494,6 +552,12 @@ async function handleClaimReward(env, session, mk, body) {
  * granted are genuinely granted — the claim was recorded before the item was
  * handed over — and un-granting them would be a bigger lie than saying
  * plainly that three of five landed.
+ *
+ * CANNOT DOUBLE-PAY. The list below is only a plan, read without a lock; the
+ * decision for each reward is made again inside its own handler's locked
+ * mutate. A second claim-all (a double click, a second tab) racing this one
+ * finds each key already claimed and grants nothing for it — and that is
+ * not a failure, so it is skipped rather than reported.
  */
 async function handleClaimAll(env, session, mk) {
   const { earnedRewards, earnedMilestones, rewardKeyFor } =
@@ -505,10 +569,10 @@ async function handleClaimAll(env, session, mk) {
   const tracks = getSubTier(session) > 0 ? ['follower', 'phamily'] : ['follower'];
 
   const rewards = tracks
-    .flatMap(track => earnedRewards(track, data.level).map(r => rewardKeyFor(r, track)))
+    .flatMap(track => earnedRewards(track, data.level, mk).map(r => rewardKeyFor(r, track)))
     .filter(key => !data.claimedRewards.includes(key));
 
-  const milestones = earnedMilestones(data.level)
+  const milestones = earnedMilestones(data.level, mk)
     .map(m => m.level)
     .filter(level => !data.claimedMilestones.includes(level));
 
@@ -526,14 +590,16 @@ async function handleClaimAll(env, session, mk) {
 
   for (const rewardKey of rewards) {
     const res = await handleClaimReward(env, session, mk, { rewardKey });
-    if (res.status === 200) claimedRewards.push(rewardKey);
-    else failed.push({ rewardKey, error: (await res.clone().json()).error });
+    if (res.status === 200) { claimedRewards.push(rewardKey); continue; }
+    const error = (await res.clone().json()).error;
+    if (error !== 'Already claimed') failed.push({ rewardKey, error });
   }
 
   for (const milestoneLevel of milestones) {
     const res = await handleClaimMilestone(env, session, mk, { milestoneLevel });
-    if (res.status === 200) claimedMilestones.push(milestoneLevel);
-    else failed.push({ milestoneLevel, error: (await res.clone().json()).error });
+    if (res.status === 200) { claimedMilestones.push(milestoneLevel); continue; }
+    const error = (await res.clone().json()).error;
+    if (error !== 'Already claimed') failed.push({ milestoneLevel, error });
   }
 
   return json({
@@ -549,22 +615,22 @@ async function handleClaimMilestone(env, session, mk, body) {
   const milestoneLevel = Math.floor(Number(body.milestoneLevel));
   if (!milestoneLevel) return json({ error: 'Missing milestone level' }, 400);
 
+  /* The claim's own month, like findReward: the title, the bonus items and
+     their theme all come from the table of the month that earned it, so a
+     September milestone claimed in October's grace week is September's. */
   const { findMilestone, themeKeyFor } = await import('./phamily-rewards.js');
-  const milestone = findMilestone(milestoneLevel);
+  const milestone = findMilestone(milestoneLevel, mk);
   if (!milestone) return json({ error: 'No such milestone' }, 400);
 
-  const data = await getUserData(env, session.user_id, mk);
-
-  if (data.claimedMilestones.includes(milestoneLevel)) {
-    return json({ error: 'Already claimed' }, 400);
-  }
-
-  if (milestoneLevel > data.level) {
-    return json({ error: 'Level not reached' }, 400);
-  }
-
-  data.claimedMilestones.push(milestoneLevel);
-  await saveUserData(env, session.user_id, mk, data);
+  /* Checked and recorded in one locked step — see handleClaimReward. */
+  let refusal = null;
+  await mutateUserData(env, session.user_id, mk, (data) => {
+    if (data.claimedMilestones.includes(milestoneLevel)) { refusal = 'Already claimed'; return undefined; }
+    if (milestoneLevel > data.level) { refusal = 'Level not reached'; return undefined; }
+    data.claimedMilestones.push(milestoneLevel);
+    return data;
+  });
+  if (refusal) return json({ error: refusal }, 400);
 
   const milestoneTitle = milestone.title;
   /* Subscriber status from subTier, not from the role string. role is a
@@ -628,9 +694,9 @@ async function handleClaimMilestone(env, session, mk, body) {
     }
   }
 
-  const allTime = await getAllTimeStats(env, session.user_id);
-  allTime.totalRewardsClaimed++;
-  await saveAllTimeStats(env, session.user_id, allTime);
+  await mutateAllTimeStats(env, session.user_id, (allTime) => {
+    allTime.totalRewardsClaimed = (allTime.totalRewardsClaimed || 0) + 1;
+  });
 
   return json({ success: true, milestoneLevel });
 }

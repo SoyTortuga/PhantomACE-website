@@ -38,11 +38,29 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
+/* ── A clock the tests control ───────────────────────────────────────
+   The tables are a function of the month, so nothing here may depend on
+   what today happens to be. setNow() moves the global clock that
+   monthKey() reads; every month-dependent assertion names its month. */
+const RealDate = Date;
+let FAKE_NOW = null;
+globalThis.Date = class extends RealDate {
+  constructor(...a) { if (a.length || FAKE_NOW === null) super(...a); else super(FAKE_NOW); }
+  static now() { return FAKE_NOW === null ? RealDate.now() : FAKE_NOW; }
+};
+const setNow = (iso) => { FAKE_NOW = iso === null ? null : RealDate.parse(iso); };
+
 /* ── The drift guard ─────────────────────────────────────────────────────
    The client's definitions are lifted out of the page and run here. They
-   close over REWARD_ICONS and MILESTONE_INTERVAL and nothing else, so they
-   evaluate cleanly outside a browser. */
-{
+   close over REWARD_ICONS, MILESTONE_INTERVAL and the three theme maps and
+   nothing else, so they evaluate cleanly outside a browser.
+
+   Compared for EVERY month either side names a theme for, plus unthemed
+   months on both sides of them — the month is passed in, never read from
+   today's date, so a theme cannot pass this guard just because it is not
+   live yet. */
+const BASE_MONTHS = ['2026-09', '2026-11', '2027-03'];
+const clientSide = (() => {
   const src = fs.readFileSync(path.join(REPO, 'js/pages/phamily-time.js'), 'utf8');
 
   const grab = (re, what) => {
@@ -54,16 +72,24 @@ const ok = (label, cond) => check(label, !!cond, true);
   const pieces = [
     grab(/const REWARD_ICONS = \{[\s\S]*?\n {2}\};/, 'REWARD_ICONS'),
     grab(/const MILESTONE_INTERVAL = [^;]+;/, 'MILESTONE_INTERVAL'),
-    grab(/ {2}function defineFollowerRewards\(\) \{[\s\S]*?\n {2}\}/, 'defineFollowerRewards'),
-    grab(/ {2}function definePhamilyRewards\(\) \{[\s\S]*?\n {2}\}/, 'definePhamilyRewards'),
-    grab(/ {2}function defineMilestones\(\) \{[\s\S]*?\n {2}\}/, 'defineMilestones'),
+    grab(/const FOLLOWER_THEMES = \{[\s\S]*?\n {2}\};/, 'FOLLOWER_THEMES'),
+    grab(/const PHAMILY_THEMES = \{[\s\S]*?\n {2}\};/, 'PHAMILY_THEMES'),
+    grab(/const MILESTONE_THEMES = \{[\s\S]*?\n {2}\};/, 'MILESTONE_THEMES'),
+    grab(/ {2}function defineFollowerRewards\(mk\) \{[\s\S]*?\n {2}\}/, 'defineFollowerRewards(mk)'),
+    grab(/ {2}function definePhamilyRewards\(mk\) \{[\s\S]*?\n {2}\}/, 'definePhamilyRewards(mk)'),
+    grab(/ {2}function defineMilestones\(mk\) \{[\s\S]*?\n {2}\}/, 'defineMilestones(mk)'),
   ];
 
-  const clientSide = new Function(
+  return new Function(
     pieces.join('\n') +
-    '\nreturn { follower: defineFollowerRewards(), phamily: definePhamilyRewards(), milestones: defineMilestones() };'
+    '\nreturn {' +
+    '  build: (mk) => ({ follower: defineFollowerRewards(mk), phamily: definePhamilyRewards(mk), milestones: defineMilestones(mk) }),' +
+    '  months: [...new Set([...Object.keys(FOLLOWER_THEMES), ...Object.keys(PHAMILY_THEMES), ...Object.keys(MILESTONE_THEMES)])],' +
+    '};'
   )();
+})();
 
+{
   /* Compared entry by entry, not array against array. Diffing two
      twenty-five element lists as one blob prints both in full and leaves you
      to spot the changed word — which is the opposite of what a drift guard
@@ -80,9 +106,132 @@ const ok = (label, cond) => check(label, !!cond, true);
     check(`${what}: every entry matches the page`, differing, []);
   };
 
-  compare('follower track', clientSide.follower, R.FOLLOWER_REWARDS);
-  compare('phamily track', clientSide.phamily, R.PHAMILY_REWARDS);
-  compare('milestones', clientSide.milestones, R.MILESTONES);
+  check('the page and the server theme the same months',
+    clientSide.months.slice().sort(), R.THEMED_MONTHS);
+  ok('at least one themed month is covered', R.THEMED_MONTHS.length > 0);
+
+  const months = [...new Set([...R.THEMED_MONTHS, ...clientSide.months, ...BASE_MONTHS])].sort();
+  for (const mk of months) {
+    const page = clientSide.build(mk);
+    const server = R.rewardTablesFor(mk);
+    compare(`${mk} follower track`, page.follower, server.follower);
+    compare(`${mk} phamily track`, page.phamily, server.phamily);
+    compare(`${mk} milestones`, page.milestones, server.milestones);
+  }
+
+  /* A themed month must actually differ from a base month, or the guard
+     above is comparing two copies of the same unthemed table. */
+  for (const mk of R.THEMED_MONTHS) {
+    const themed = R.rewardTablesFor(mk);
+    const base = R.rewardTablesFor('2026-09');
+    ok(`${mk} re-skins something on the follower track`,
+      JSON.stringify(themed.follower) !== JSON.stringify(base.follower));
+    ok(`${mk} re-skins the milestones`,
+      JSON.stringify(themed.milestones) !== JSON.stringify(base.milestones));
+    /* Keys are identical across months — that is what lets a grace claim
+       name last month's reward with this month's key. */
+    for (const track of ['follower', 'phamily']) {
+      check(`${mk} ${track} keys match a base month`,
+        themed[track].map(r => R.rewardKeyFor(r, track)), base[track].map(r => R.rewardKeyFor(r, track)));
+    }
+  }
+}
+
+/* ── THE MONTH IS ASKED, NOT REMEMBERED ──────────────────────────────
+   The tables used to be built once at import, so a server started in
+   October kept October's content into November, and a grace claim of a
+   September key was looked up in October's table. */
+{
+  check('a September key resolves to September content',
+    R.findReward('10_follower_cardback_common', '2026-09').name, 'Basic Card Back');
+  check('the same key in October is October content',
+    R.findReward('10_follower_cardback_common', '2026-10').name, 'Cobweb Card Back');
+  check('and in November it is back to base',
+    R.findReward('10_follower_cardback_common', '2026-11').name, 'Basic Card Back');
+  check('a September skull skin is September\'s cosmetic',
+    R.findReward('85_follower_skull-skin_rare', '2026-09').cosmeticId, 'blood');
+  check('October\'s is October\'s', R.findReward('85_follower_skull-skin_rare', '2026-10').cosmeticId, 'bonewhite');
+  check('a September milestone has September\'s title', R.findMilestone(15, '2026-09').title, 'Initiate');
+  check('October\'s has October\'s', R.findMilestone(15, '2026-10').title, 'Trick-or-Treater');
+  const sepDice = R.findMilestone(60, '2026-09').bonusItems.find(b => b.type === 'dice');
+  check('a September milestone bonus is September\'s dice', sepDice.cosmeticId, 'crimson');
+  const sepBanner = R.findMilestone(45, '2026-09').bonusItems.find(b => b.type === 'banner');
+  check('and a September banner carries no theme', sepBanner.meta, undefined);
+  check('earnedRewards follows the month it is given',
+    R.earnedRewards('follower', 10, '2026-10').find(r => r.type === 'cardback').name, 'Cobweb Card Back');
+  check('earnedMilestones too', R.earnedMilestones(15, '2026-09')[0].title, 'Initiate');
+
+  /* The current-month exports are live views, not load-time snapshots. */
+  setNow('2026-10-15T19:00:00Z');
+  check('FOLLOWER_REWARDS in October is October',
+    R.FOLLOWER_REWARDS.find(r => r.level === 10 && r.type === 'cardback').name, 'Cobweb Card Back');
+  check('MILESTONES in October is October', R.MILESTONES[0].title, 'Trick-or-Treater');
+  check('findReward with no month means the current month',
+    R.findReward('10_follower_cardback_common').name, 'Cobweb Card Back');
+  setNow('2026-11-02T19:00:00Z');
+  check('the same running module in November is November',
+    R.FOLLOWER_REWARDS.find(r => r.level === 10 && r.type === 'cardback').name, 'Basic Card Back');
+  check('MILESTONES in November is base', R.MILESTONES[0].title, 'Initiate');
+  check('findReward with no month follows the clock',
+    R.findReward('10_follower_cardback_common').name, 'Basic Card Back');
+  ok('the views still behave as arrays', Array.isArray(R.PHAMILY_REWARDS) && [...R.PHAMILY_REWARDS].length === R.PHAMILY_REWARDS.length);
+  check('and survive JSON', JSON.stringify(R.MILESTONES), JSON.stringify(R.rewardTablesFor('2026-11').milestones));
+  let threw = false;
+  try { R.FOLLOWER_REWARDS.push({}); } catch { threw = true; }
+  ok('and are read-only', threw && R.FOLLOWER_REWARDS.length === R.rewardTablesFor('2026-11').follower.length);
+  setNow(null);
+}
+
+/* ── CARD BACKS AND EMOTE PACKS: ONE ID PER COSMETIC ─────────────────
+   These used to be granted with the reward KEY as their id. The key is the
+   same every month, so October's Cobweb Card Back deduped against
+   September's Basic Card Back and was never granted. The id is now the type
+   plus the name: distinct per cosmetic, stable for a repeat of the same. */
+{
+  check('a card back id is type plus name',
+    R.nameKeyedItemId('cardback', 'Cobweb Card Back'), 'cardback-cobweb-card-back');
+  check('and an emote pack likewise',
+    R.nameKeyedItemId('emote-pack', 'Spooky Emote Pack'), 'emote-pack-spooky-emote-pack');
+  ok('October\'s card back is a different item from September\'s',
+    R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-10').name) !==
+    R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-09').name));
+  check('the same cosmetic in two base months is the same item',
+    R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-09').name),
+    R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-11').name));
+
+  /* Memory Match resolves these BY NAME, so the id change cannot affect
+     what it draws — but every name the pass hands out must resolve to
+     something the game actually has, rather than the fallback. */
+  const mm = fs.readFileSync(path.join(REPO, 'games/memory-match/index.html'), 'utf8');
+  const fnSrc = mm.match(/function getCosmeticId\(item, prefix\) \{[\s\S]*?\n {4}\}/);
+  ok('Memory Match still resolves cosmetics by name', !!fnSrc && /item\.name/.test(fnSrc[0]));
+  const getCosmeticId = new Function(`${fnSrc[0]}\nreturn getCosmeticId;`)();
+  const keysOf = (decl) => {
+    const block = mm.slice(mm.indexOf(decl), mm.indexOf('};', mm.indexOf(decl)));
+    return [...block.matchAll(/^ {6}([a-z]+): \{/gm)].map(m => m[1]);
+  };
+  const CARD_BACKS = keysOf('const CARD_BACKS = {');
+  const EMOTE_SETS = keysOf('const EMOTE_SETS = {');
+  ok('the game defines card backs', CARD_BACKS.length >= 4);
+  ok('and emote sets', EMOTE_SETS.length >= 3);
+
+  for (const mk of [...new Set([...R.THEMED_MONTHS, ...BASE_MONTHS])]) {
+    const t = R.rewardTablesFor(mk);
+    const all = [...t.follower, ...t.phamily];
+    const cbs = all.filter(r => r.type === 'cardback');
+    const emotes = all.filter(r => r.type === 'emote');
+    check(`${mk}: every card back resolves to one the game draws`,
+      cbs.filter(r => !CARD_BACKS.includes(getCosmeticId({ name: r.name }, 'cb'))).map(r => r.name), []);
+    check(`${mk}: every emote pack resolves to one the game draws`,
+      emotes.filter(r => !EMOTE_SETS.includes(getCosmeticId({ name: r.name }, 'emote'))).map(r => r.name), []);
+    const ids = [...cbs.map(r => R.nameKeyedItemId('cardback', r.name)), ...emotes.map(r => R.nameKeyedItemId('emote-pack', r.name))];
+    check(`${mk}: no two of them share an id`, ids.filter((id, i) => ids.indexOf(id) !== i), []);
+  }
+  const oct = R.rewardTablesFor('2026-10');
+  const octNames = [...oct.follower, ...oct.phamily].filter(r => r.type === 'cardback' || r.type === 'emote').map(r => r.name);
+  const octResolved = octNames.map(n => getCosmeticId({ name: n }, n.includes('Emote') ? 'emote' : 'cb'));
+  check('October\'s names resolve to October\'s cosmetics, not the fallbacks',
+    octResolved.filter(id => ['basic', 'bonus'].includes(id)), []);
 }
 
 /* ── The table itself ────────────────────────────────────────────────── */

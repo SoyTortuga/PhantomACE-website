@@ -26,9 +26,19 @@
 /* The season month ('YYYY-MM' in the broadcaster's timezone) drives the
    monthly cosmetic THEME below. Shared with the giveaway ledger, the watch
    handler and the seasonal reset, so a themed reward lands in the same month
-   as the watch time that earned it. The client mirror in
-   js/pages/phamily-time.js computes the SAME Pacific month with its own small
-   monthKey(); test-phamily-rewards.js compares the two tables entry by entry. */
+   as the watch time that earned it.
+
+   THE TABLES ARE A FUNCTION OF THE MONTH, NOT OF WHEN THE MODULE LOADED.
+   They used to be built once at import with monthKey() read inside each
+   define*(), which broke two ways:
+     - a server started in October kept serving October's table into
+       November, because nothing ever rebuilt it
+     - a grace-period claim of LAST month's reward (claim-prev) looked its key
+       up in THIS month's table, so a September key paid October content
+   Every lookup now names the month it is asking about (rewardTablesFor(mk)),
+   memoised per month. The client mirror in js/pages/phamily-time.js has the
+   same per-month builder; test-phamily-rewards.js compares the two for every
+   themed month plus an unthemed one. */
 import { monthKey } from './season-time.js';
 
 const REWARD_ICONS = {
@@ -49,7 +59,47 @@ const REWARD_ICONS = {
 
 const MILESTONE_INTERVAL = 15;
 
-function defineFollowerRewards() {
+/* ── SEASONAL THEMES ───────────────────────────────────────────────────
+   A month-keyed cosmetic skin over the base table. A reward override touches
+   cosmeticId / name / desc ONLY — never level, type, rarity or icon — so every
+   reward KEY is identical to a base month and claim-state is unchanged. Slots
+   are keyed `${level}_${type}_${rarity}`. Milestone themes replace the ten
+   titles, stamp meta.theme on every banner / name-effect bonus (the cosmetics
+   resolver yields <theme>-<tier>) and re-skin the bonus dice by level.
+   Duplicated verbatim in js/pages/phamily-time.js; the drift guard compares
+   both sides for every month named here. A new theme month goes in these
+   three maps AND in SEASON_THEMES below. */
+const FOLLOWER_THEMES = {
+  '2026-10': {
+    '10_cardback_common': { name:'Cobweb Card Back', desc:'A cobweb-laced card back for Memory Match' },
+    '22_emote_uncommon':  { name:'Spooky Emote Pack', desc:'A spooky emote set for Memory Match' },
+    '55_cardback_rare':   { name:'Bat Card Back', desc:'A bat-swarm card back for Memory Match' },
+    '85_skull-skin_rare': { cosmeticId:'bonewhite', name:'Bonewhite Skull', desc:'The Bonewhite Skull theme for Skull Clicker' },
+    '95_dice_rare':       { cosmeticId:'ash', name:'Ashen Dice', desc:'Ashen-grey dice for Mana Clash' },
+  },
+};
+const PHAMILY_THEMES = {
+  '2026-10': {
+    '10_cardback_uncommon': { name:'Crypt Card Back', desc:'A crypt-carved card back for Memory Match' },
+    '22_emote_uncommon':    { name:'Haunted Emote Pack', desc:'A haunted emote set for Memory Match' },
+    '48_dice_rare':         { cosmeticId:'slate', name:'Graveslate Dice', desc:'Graveslate dice for Mana Clash' },
+    '55_cardback_rare':     { name:'Ghost Card Back', desc:'A ghostly card back for Memory Match' },
+    '65_skull-skin_rare':   { cosmeticId:'graveash', name:'Graveash Skull', desc:'The Graveash Skull theme for Skull Clicker' },
+    '85_click-effect_rare': { cosmeticId:'wraith', name:'Wraith Wisp', desc:'The Wraith Wisp click effect for Skull Clicker' },
+    '95_dice_rare':         { cosmeticId:'pitch', name:'Pitch Black Dice', desc:'Pitch-black dice for Mana Clash' },
+    '115_skull-skin_mythic':{ cosmeticId:'reapermoon', name:'Reaper Moon Skull', desc:'The Reaper Moon Skull theme for Skull Clicker' },
+    '130_dice_mythic':      { cosmeticId:'ember', name:'Ember Dice', desc:'Ember-lit dice for Mana Clash' },
+  },
+};
+const MILESTONE_THEMES = {
+  '2026-10': {
+    theme: 'halloween',
+    titles: ['Trick-or-Treater','Candle Bearer','Grave Tender','Pumpkin Knight','Hex Weaver','Nightstalker','Crypt Keeper','Soul Reaper','Dread Warden','Harbinger of Hallows'],
+    dice: { 60: { cosmeticId:'blood', name:'Bloodletter Dice' }, 135: { cosmeticId:'wraith', name:'Wraithsilk Dice' } },
+  },
+};
+
+function defineFollowerRewards(mk) {
   const r = [];
   const giveawayLevels = [
     [2,'common'],[5,'common'],[8,'common'],[12,'common'],[16,'common'],
@@ -104,24 +154,7 @@ function defineFollowerRewards() {
       type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
       name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
   }
-  /* ── SEASONAL THEME ─────────────────────────────────────────────────
-     A month-keyed cosmetic skin over the September table. It overrides a
-     reward's cosmeticId / name / desc ONLY — never its level, type, rarity or
-     icon — so every reward KEY is identical to a base month and claim-state
-     is unchanged. Base months get no override and build byte-for-byte as
-     before. Slots are keyed `${level}_${type}_${rarity}`. Duplicated in
-     js/pages/phamily-time.js (which computes the SAME Pacific month with its
-     own monthKey); test-phamily-rewards.js compares the two entry by entry. */
-  const THEMES = {
-    '2026-10': {
-      '10_cardback_common': { name:'Cobweb Card Back', desc:'A cobweb-laced card back for Memory Match' },
-      '22_emote_uncommon':  { name:'Spooky Emote Pack', desc:'A spooky emote set for Memory Match' },
-      '55_cardback_rare':   { name:'Bat Card Back', desc:'A bat-swarm card back for Memory Match' },
-      '85_skull-skin_rare': { cosmeticId:'bonewhite', name:'Bonewhite Skull', desc:'The Bonewhite Skull theme for Skull Clicker' },
-      '95_dice_rare':       { cosmeticId:'ash', name:'Ashen Dice', desc:'Ashen-grey dice for Mana Clash' },
-    },
-  };
-  const theme = THEMES[monthKey()];
+  const theme = FOLLOWER_THEMES[mk];
   if (theme) {
     for (const rw of r) {
       const o = theme[`${rw.level}_${rw.type}_${rw.rarity}`];
@@ -135,7 +168,7 @@ function defineFollowerRewards() {
   return r.sort((a,b) => a.level - b.level);
 }
 
-function definePhamilyRewards() {
+function definePhamilyRewards(mk) {
   const r = [];
   const giveawayLevels = [
     [2,'uncommon'],[5,'uncommon'],[8,'uncommon'],[12,'uncommon'],[16,'uncommon'],
@@ -212,21 +245,7 @@ function definePhamilyRewards() {
       type:'room-piece', icon:REWARD_ICONS.room, cosmeticId:pieceId,
       name:`Room: ${label}`, desc:`A ${label} piece for My Room` });
   }
-  /* ── SEASONAL THEME ── see defineFollowerRewards for the full note. ──── */
-  const THEMES = {
-    '2026-10': {
-      '10_cardback_uncommon': { name:'Crypt Card Back', desc:'A crypt-carved card back for Memory Match' },
-      '22_emote_uncommon':    { name:'Haunted Emote Pack', desc:'A haunted emote set for Memory Match' },
-      '48_dice_rare':         { cosmeticId:'slate', name:'Graveslate Dice', desc:'Graveslate dice for Mana Clash' },
-      '55_cardback_rare':     { name:'Ghost Card Back', desc:'A ghostly card back for Memory Match' },
-      '65_skull-skin_rare':   { cosmeticId:'graveash', name:'Graveash Skull', desc:'The Graveash Skull theme for Skull Clicker' },
-      '85_click-effect_rare': { cosmeticId:'wraith', name:'Wraith Wisp', desc:'The Wraith Wisp click effect for Skull Clicker' },
-      '95_dice_rare':         { cosmeticId:'pitch', name:'Pitch Black Dice', desc:'Pitch-black dice for Mana Clash' },
-      '115_skull-skin_mythic':{ cosmeticId:'reapermoon', name:'Reaper Moon Skull', desc:'The Reaper Moon Skull theme for Skull Clicker' },
-      '130_dice_mythic':      { cosmeticId:'ember', name:'Ember Dice', desc:'Ember-lit dice for Mana Clash' },
-    },
-  };
-  const theme = THEMES[monthKey()];
+  const theme = PHAMILY_THEMES[mk];
   if (theme) {
     for (const rw of r) {
       const o = theme[`${rw.level}_${rw.type}_${rw.rarity}`];
@@ -240,7 +259,7 @@ function definePhamilyRewards() {
   return r.sort((a,b) => a.level - b.level);
 }
 
-function defineMilestones() {
+function defineMilestones(mk) {
   const ms = [];
   const followerBundles = [
     ['Initiate','Badge + Title'],
@@ -307,25 +326,13 @@ function defineMilestones() {
       bonusItems: phamilyBundles[i][2],
     });
   }
-  /* ── SEASONAL THEME ─────────────────────────────────────────────────
-     Overrides the ten milestone titles, and within the phamily bonus bundles
-     stamps meta.theme on every banner / name-effect (so the cosmetics
-     resolver yields halloween-<tier>) and re-skins the dice. Rarity, type and
-     level are untouched, so claim-state is unchanged. Duplicated in
-     js/pages/phamily-time.js; compared entry by entry by the drift guard. */
-  const THEME_MS = {
-    '2026-10': {
-      titles: ['Trick-or-Treater','Candle Bearer','Grave Tender','Pumpkin Knight','Hex Weaver','Nightstalker','Crypt Keeper','Soul Reaper','Dread Warden','Harbinger of Hallows'],
-      dice: { 60: { cosmeticId:'blood', name:'Bloodletter Dice' }, 135: { cosmeticId:'wraith', name:'Wraithsilk Dice' } },
-    },
-  };
-  const mt = THEME_MS[monthKey()];
+  const mt = MILESTONE_THEMES[mk];
   if (mt) {
     for (let i = 0; i < ms.length; i++) {
       ms[i].title = mt.titles[i];
       for (const b of (ms[i].bonusItems || [])) {
         if (b.type === 'banner' || b.type === 'nameeffect') {
-          b.meta = { ...(b.meta || {}), theme:'halloween' };
+          b.meta = { ...(b.meta || {}), theme:mt.theme };
         } else if (b.type === 'dice' && mt.dice[ms[i].level]) {
           b.cosmeticId = mt.dice[ms[i].level].cosmeticId;
           b.name = mt.dice[ms[i].level].name;
@@ -336,20 +343,22 @@ function defineMilestones() {
   return ms;
 }
 
-export const FOLLOWER_REWARDS = defineFollowerRewards();
-export const PHAMILY_REWARDS = definePhamilyRewards();
-export const MILESTONES = defineMilestones();
 export { MILESTONE_INTERVAL };
 
 /* The seasonal cosmetic theme active for a season month ('YYYY-MM'), or null.
-   The reward and milestone tables above re-skin themselves by this same month
-   key; this names the theme in ONE place so the grant path (e.g. the themed
+   Names the theme in ONE place so the grant path (e.g. the themed
    milestone-badge art) can branch on it without re-deriving a table. A new
-   theme month must be added both here and to the inline tables above. */
+   theme month must be added both here and to the three theme maps above. */
 const SEASON_THEMES = { '2026-10': 'halloween' };
 export function themeKeyFor(mk = monthKey()) {
   return SEASON_THEMES[String(mk)] || null;
 }
+
+/** Every month any theme map names — what the drift guard must cover. */
+export const THEMED_MONTHS = [...new Set([
+  ...Object.keys(SEASON_THEMES), ...Object.keys(FOLLOWER_THEMES),
+  ...Object.keys(PHAMILY_THEMES), ...Object.keys(MILESTONE_THEMES),
+])].sort();
 
 /* The key the client sends and the server stores, built the same way on both
    sides: level_track_type_rarity. It is the identity of a reward, so the
@@ -358,27 +367,87 @@ export function rewardKeyFor(reward, track) {
   return `${reward.level}_${track}_${reward.type}_${reward.rarity}`;
 }
 
-/** Every claimable reward, keyed. Built once at module load. */
-const BY_KEY = new Map();
-for (const [track, list] of [['follower', FOLLOWER_REWARDS], ['phamily', PHAMILY_REWARDS]]) {
-  for (const reward of list) {
-    BY_KEY.set(rewardKeyFor(reward, track), { ...reward, track });
+/* ── ONE MONTH'S TABLES, MEMOISED ─────────────────────────────────────
+   Built on first use for a month and kept. Bounded so a stray month string
+   cannot grow the cache without limit; a rebuild is cheap and deterministic. */
+const TABLES = new Map();
+const TABLES_MAX = 36;
+
+export function rewardTablesFor(mk = monthKey()) {
+  const month = String(mk);
+  let t = TABLES.get(month);
+  if (t) return t;
+  const follower = defineFollowerRewards(month);
+  const phamily = definePhamilyRewards(month);
+  const milestones = defineMilestones(month);
+  const byKey = new Map();
+  for (const [track, list] of [['follower', follower], ['phamily', phamily]]) {
+    for (const reward of list) byKey.set(rewardKeyFor(reward, track), { ...reward, track });
   }
+  t = { month, follower, phamily, milestones, byKey };
+  if (TABLES.size >= TABLES_MAX) TABLES.clear();
+  TABLES.set(month, t);
+  return t;
 }
 
+/* ── THE CURRENT MONTH'S TABLES, AS LIVE ARRAYS ───────────────────────
+   FOLLOWER_REWARDS / PHAMILY_REWARDS / MILESTONES are still imported by the
+   scripts and tests. They used to be snapshots taken at import, which is the
+   stale-month bug in miniature, so each is now a read-only view that resolves
+   to the current month's table on every access. Anything that needs a
+   SPECIFIC month calls rewardTablesFor(mk) instead. */
+function currentMonthView(pick) {
+  const live = () => pick(rewardTablesFor(monthKey()));
+  const refuse = () => false;
+  return new Proxy([], {
+    /* Methods are NOT bound to the real table: they run with the view as
+       `this`, so map/filter/find read through it while push/splice hit the
+       refusing traps below instead of editing the memoised month. */
+    get: (_t, prop, receiver) => Reflect.get(live(), prop, receiver),
+    has: (_t, prop) => Reflect.has(live(), prop),
+    ownKeys: () => Reflect.ownKeys(live()),
+    getOwnPropertyDescriptor: (_t, prop) => Reflect.getOwnPropertyDescriptor(live(), prop),
+    set: refuse,
+    defineProperty: refuse,
+    deleteProperty: refuse,
+  });
+}
+export const FOLLOWER_REWARDS = currentMonthView(t => t.follower);
+export const PHAMILY_REWARDS = currentMonthView(t => t.phamily);
+export const MILESTONES = currentMonthView(t => t.milestones);
+
 /**
- * Look up a reward by its key.
+ * Look up a reward by its key, in the table of the month it was earned in.
  *
  * Returns null for anything not on the track — which is the point. A key the
  * table does not contain cannot be granted, however well-formed it looks.
+ *
+ * `mk` is the month whose watch time earned the reward: the current month for
+ * an ordinary claim, the PREVIOUS month for a grace-period claim. Keys are
+ * identical across months; what they pay is not.
  */
-export function findReward(key) {
-  return BY_KEY.get(String(key)) || null;
+export function findReward(key, mk = monthKey()) {
+  return rewardTablesFor(mk).byKey.get(String(key)) || null;
 }
 
-export function findMilestone(level) {
+export function findMilestone(level, mk = monthKey()) {
   const n = Math.floor(Number(level));
-  return MILESTONES.find(m => m.level === n) || null;
+  return rewardTablesFor(mk).milestones.find(m => m.level === n) || null;
+}
+
+/* ── ITEM IDS FOR COSMETICS THE GAME KNOWS BY NAME ────────────────────
+   Memory Match resolves a card back or emote pack by its NAME (see
+   getCosmeticId in games/memory-match/index.html), and these used to be
+   granted with the reward KEY as their id. The key is identical every month,
+   so October's Cobweb Card Back carried the same id as September's Basic
+   Card Back and grantItem deduped it into nothing. The id is now the item
+   type plus a slug of the name: distinct cosmetics differ, and the same
+   cosmetic repeated in a later month dedupes. */
+export const NAME_KEYED_ITEM_TYPES = ['cardback', 'emote-pack'];
+
+export function nameKeyedItemId(type, name) {
+  const slug = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${type}-${slug || 'unnamed'}`;
 }
 
 /**
@@ -394,15 +463,16 @@ export function trackFor(subTier) {
   return (Number(subTier) || 0) > 0 ? 'phamily' : 'follower';
 }
 
-/** Rewards on `track` at or below `level`, in level order. */
-export function earnedRewards(track, level) {
-  const list = track === 'phamily' ? PHAMILY_REWARDS : FOLLOWER_REWARDS;
+/** Rewards on `track` at or below `level`, in level order, for month `mk`. */
+export function earnedRewards(track, level, mk = monthKey()) {
+  const t = rewardTablesFor(mk);
+  const list = track === 'phamily' ? t.phamily : t.follower;
   const lvl = Math.floor(Number(level) || 0);
   return list.filter(r => r.level <= lvl);
 }
 
-/** Milestones at or below `level`. */
-export function earnedMilestones(level) {
+/** Milestones at or below `level`, for month `mk`. */
+export function earnedMilestones(level, mk = monthKey()) {
   const lvl = Math.floor(Number(level) || 0);
-  return MILESTONES.filter(m => m.level <= lvl);
+  return rewardTablesFor(mk).milestones.filter(m => m.level <= lvl);
 }
