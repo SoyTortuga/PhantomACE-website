@@ -388,25 +388,88 @@ check('the test clock is in October', MK, '2026-10');
 {
   const env = makeEnv();
   const uid = USERS.viewer.user_id;
-  setNow('2026-11-10T19:00:00Z');
-  const NOV = '2026-11';
-  seedUser(env, uid, { level: 20, month: NOV });
+  setNow('2026-12-10T19:00:00Z');
+  const DEC = '2026-12';
+  seedUser(env, uid, { level: 20, month: DEC });
   seedInventory(env, uid, [
     { id: '10_follower_cardback_common', game: 'memory-match', type: 'cardback', name: 'Basic Card Back', consumable: false },
   ]);
   const r = await post(env, 'viewer', { action: 'claim-reward', rewardKey: '10_follower_cardback_common' });
-  check('November\'s Basic Card Back claims', r.status, 200);
+  check('December\'s Basic Card Back claims', r.status, 200);
   check('but is not granted twice to someone who owns it under the old id',
     inventory(env, uid).items.filter(i => i.type === 'cardback').length, 1);
 
   const env2 = makeEnv();
-  seedUser(env2, uid, { level: 20, month: NOV });
+  seedUser(env2, uid, { level: 20, month: DEC });
   seedInventory(env2, uid, [
     { id: 'cardback-basic-card-back', game: 'memory-match', type: 'cardback', name: 'Basic Card Back', consumable: false },
   ]);
   await post(env2, 'viewer', { action: 'claim-reward', rewardKey: '10_follower_cardback_common' });
   check('nor under the new id',
     inventory(env2, uid).items.filter(i => i.type === 'cardback').length, 1);
+  setNow('2026-10-03T19:00:00Z');
+}
+
+/* ══ NOVEMBER — DEAD HARVEST ══════════════════════════════════════════
+   A November claim pays November's harvest content; a November milestone
+   gets the harvest badge art and harvest-themed banner / name effect. A
+   viewer who already owns October's cosmetics still receives every one. */
+{
+  const env = makeEnv();
+  const uid = USERS.sub.user_id;
+  setNow('2026-11-12T20:00:00Z');
+  const NOV = '2026-11';
+  seedUser(env, uid, { level: 150, month: NOV });
+  seedInventory(env, uid, [
+    { id: 'cardback-cobweb-card-back', game: 'memory-match', type: 'cardback', name: 'Cobweb Card Back', consumable: false },
+    { id: 'bonewhite', game: 'skull-clicker', type: 'skull-skin', name: 'Bonewhite Skull', consumable: false },
+  ]);
+
+  const all = await post(env, 'sub', { action: 'claim-all' });
+  check('a November claim-all succeeds', all.status, 200);
+  check('with nothing failed', all.data.failed, []);
+  check('and every milestone claimed', all.data.milestones.length, 10);
+
+  const items = inventory(env, uid).items;
+  const ids = (type) => items.filter(i => i.type === type).map(i => i.id).sort();
+  const names = (type) => items.filter(i => i.type === type).map(i => i.name).sort();
+  check('November\'s card backs land beside October\'s', names('cardback'),
+    ['Bone Sickle Card Back', 'Card Back', 'Carrion Crow Card Back', 'Cobweb Card Back', 'Hollow Moon Card Back', 'Withered Wheat Card Back']);
+  check('November\'s emote packs', names('emote-pack'), ['Barrow Emote Pack', 'Harvest Emote Pack']);
+  check('November\'s skull skins beside October\'s', ids('skull-skin'), ['bonewhite', 'chaff', 'crowfeather', 'hollowmoon']);
+  check('November\'s click effect', ids('click-effect'), ['bonesickle']);
+  check('all six harvest dice', ids('dice'), ['chaff', 'crowfeather', 'hollow', 'scarecrow', 'scythe', 'withered']);
+  check('November\'s room pieces are the third tenth',
+    ids('room-piece').filter(id => /snacks/.test(id)),
+    ['room-piece-snacks-r2c2', 'room-piece-snacks-r2c3', 'room-piece-snacks-r2c4', 'room-piece-snacks-r2c5',
+     'room-piece-snacks-r2c6', 'room-piece-snacks-r2c7', 'room-piece-snacks-r2c8']);
+
+  const badge = items.find(i => i.id === 'ms_15_badge_2026-11');
+  check('a November milestone badge uses the harvest art', badge && badge.meta.image, '/assets/badges/milestones/ms-harvest-15.png');
+  check('and November\'s title', badge && badge.name, 'Gleaner Badge');
+  check('the top title', (items.find(i => i.id === 'ms_150_title_2026-11') || {}).name, 'Lord of the Last Harvest');
+  const themed = items.filter(i => i.type === 'banner' || i.type === 'name-effect');
+  ok('November grants banners and name effects', themed.length >= 6);
+  check('every one is harvest-themed', themed.filter(i => !i.meta || i.meta.theme !== 'harvest').map(i => i.id), []);
+  setNow('2026-10-03T19:00:00Z');
+}
+
+/* In December's grace week, a November key still pays November. */
+{
+  const env = makeEnv();
+  const uid = USERS.sub.user_id;
+  setNow('2026-12-03T20:00:00Z');
+  seedUser(env, uid, { level: 100, month: '2026-11' });
+  await post(env, 'sub', { action: 'claim-prev', type: 'reward', rewardKey: '85_follower_skull-skin_rare' });
+  await post(env, 'sub', { action: 'claim-prev', type: 'milestone', milestoneLevel: 45 });
+  const items = inventory(env, uid).items;
+  check('a November skull skin grace-claimed in December is Hollow Moon',
+    items.filter(i => i.type === 'skull-skin').map(i => i.id), ['hollowmoon']);
+  const badge = items.find(i => i.id === 'ms_45_badge_2026-11');
+  check('a November milestone grace-claimed in December keeps the harvest art and title',
+    badge && [badge.name, badge.meta.image], ['Field Warden Badge', '/assets/badges/milestones/ms-harvest-45.png']);
+  check('and its banner stays harvest-themed',
+    (items.find(i => i.id === 'ms_45_banner_2026-11') || {}).meta, { theme: 'harvest' });
   setNow('2026-10-03T19:00:00Z');
 }
 

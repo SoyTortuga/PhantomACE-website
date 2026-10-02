@@ -95,6 +95,13 @@
       '85_skull-skin_rare': { cosmeticId:'bonewhite', name:'Bonewhite Skull', desc:'The Bonewhite Skull theme for Skull Clicker' },
       '95_dice_rare':       { cosmeticId:'ash', name:'Ashen Dice', desc:'Ashen-grey dice for Mana Clash' },
     },
+    '2026-11': {
+      '10_cardback_common': { name:'Withered Wheat Card Back', desc:'A withered-wheat card back for Memory Match' },
+      '22_emote_uncommon':  { name:'Barrow Emote Pack', desc:'A barrow-dug emote set for Memory Match' },
+      '55_cardback_rare':   { name:'Carrion Crow Card Back', desc:'A carrion-crow card back for Memory Match' },
+      '85_skull-skin_rare': { cosmeticId:'hollowmoon', name:'Hollow Moon Skull', desc:'The Hollow Moon Skull theme for Skull Clicker' },
+      '95_dice_rare':       { cosmeticId:'withered', name:'Withered Wheat Dice', desc:'Withered-wheat dice for Mana Clash' },
+    },
   };
   const PHAMILY_THEMES = {
     '2026-10': {
@@ -108,12 +115,28 @@
       '115_skull-skin_mythic':{ cosmeticId:'reapermoon', name:'Reaper Moon Skull', desc:'The Reaper Moon Skull theme for Skull Clicker' },
       '130_dice_mythic':      { cosmeticId:'ember', name:'Ember Dice', desc:'Ember-lit dice for Mana Clash' },
     },
+    '2026-11': {
+      '10_cardback_uncommon': { name:'Bone Sickle Card Back', desc:'A bone-sickle card back for Memory Match' },
+      '22_emote_uncommon':    { name:'Harvest Emote Pack', desc:'A harvest emote set for Memory Match' },
+      '48_dice_rare':         { cosmeticId:'chaff', name:'Chaff & Husk Dice', desc:'Chaff-and-husk dice for Mana Clash' },
+      '55_cardback_rare':     { name:'Hollow Moon Card Back', desc:'A hollow-moon card back for Memory Match' },
+      '65_skull-skin_rare':   { cosmeticId:'chaff', name:'Chaff Field Skull', desc:'The Chaff Field Skull theme for Skull Clicker' },
+      '85_click-effect_rare': { cosmeticId:'bonesickle', name:'Bone Sickle Slash', desc:'The Bone Sickle Slash click effect for Skull Clicker' },
+      '95_dice_rare':         { cosmeticId:'crowfeather', name:'Crowfeather Dice', desc:'Crowfeather dice for Mana Clash' },
+      '115_skull-skin_mythic':{ cosmeticId:'crowfeather', name:'Crowfeather Skull', desc:'The Crowfeather Skull theme for Skull Clicker' },
+      '130_dice_mythic':      { cosmeticId:'hollow', name:'Hollow Moon Dice', desc:'Hollow-moon dice for Mana Clash' },
+    },
   };
   const MILESTONE_THEMES = {
     '2026-10': {
       theme: 'halloween',
       titles: ['Trick-or-Treater','Candle Bearer','Grave Tender','Pumpkin Knight','Hex Weaver','Nightstalker','Crypt Keeper','Soul Reaper','Dread Warden','Harbinger of Hallows'],
       dice: { 60: { cosmeticId:'blood', name:'Bloodletter Dice' }, 135: { cosmeticId:'wraith', name:'Wraithsilk Dice' } },
+    },
+    '2026-11': {
+      theme: 'harvest',
+      titles: ['Gleaner','Crow Caller','Field Warden','Scarecrow Knight','Harvest Witch','Bone Thresher','Barrow Keeper','Sickle Saint','Hollow Lord','Lord of the Last Harvest'],
+      dice: { 60: { cosmeticId:'scythe', name:'Bone Sickle Dice' }, 135: { cosmeticId:'scarecrow', name:'Scarecrow Dice' } },
     },
   };
 
@@ -124,9 +147,10 @@
      edited in place on the 1st, so September's table "became" October's:
      a grace claim of a September piece paid October's, and the viewer's
      own October claim of that key then deduped to nothing.
+     Each tenth is the next run of that set's pieces in catalog order.
      A month with no entry uses the latest entry at or before it. NOTE: no
-     third tenth has been authored, so November onward keeps October's
-     pieces until a '2026-11' entry is added here (and in the mirror).
+     fourth tenth has been authored, so December onward keeps November's
+     pieces until a '2026-12' entry is added here (and in the mirror).
      Duplicated in functions/api/phamily-rewards.js; the drift guard compares every
      month. See docs/ROOM-PLAN.md. */
   const FOLLOWER_ROOM_DRIPS = {
@@ -152,6 +176,17 @@
       [119,'snacks-r1c12'], [124,'led-strips-r2c2'], [131,'snacks-r1c13'],
       [136,'led-strips-r2c3'], [142,'snacks-r2c1'],
     ],
+    '2026-11': [
+      [4,'snacks-r2c2'], [9,'posters-r1c7'], [14,'consoles-r1c7'],
+      [21,'keyboards-r1c5'], [26,'led-strips-r2c4'], [32,'monitors-r1c5'],
+      [37,'smart-r1c5'], [43,'pc-towers-r1c3'], [48,'snacks-r2c3'],
+      [54,'posters-r1c8'], [59,'consoles-r2c1'], [64,'keyboards-r1c6'],
+      [69,'led-strips-r2c5'], [76,'monitors-r1c6'], [81,'smart-r1c6'],
+      [87,'snacks-r2c4'], [92,'posters-r2c1'], [98,'consoles-r2c2'],
+      [103,'led-strips-r2c6'], [109,'snacks-r2c5'], [114,'led-strips-r2c7'],
+      [119,'snacks-r2c6'], [124,'led-strips-r2c8'], [131,'snacks-r2c7'],
+      [136,'led-strips-r2c9'], [142,'snacks-r2c8'],
+    ],
   };
   const PHAMILY_ROOM_DRIPS = {
     '2026-09': [
@@ -175,6 +210,17 @@
       [89,'led-strips-r1c9'], [93,'snacks-r1c11'], [98,'led-strips-r2c1'],
       [103,'snacks-r1c12'], [108,'led-strips-r2c2'], [112,'snacks-r1c13'],
       [117,'led-strips-r2c3'], [122,'snacks-r2c1'],
+    ],
+    '2026-11': [
+      [3,'snacks-r2c2'], [7,'posters-r1c7'], [13,'consoles-r1c7'],
+      [17,'keyboards-r1c5'], [21,'led-strips-r2c4'], [27,'monitors-r1c5'],
+      [32,'smart-r1c5'], [37,'pc-towers-r1c3'], [41,'snacks-r2c3'],
+      [46,'posters-r1c8'], [51,'consoles-r2c1'], [54,'keyboards-r1c6'],
+      [59,'led-strips-r2c5'], [64,'monitors-r1c6'], [69,'smart-r1c6'],
+      [74,'snacks-r2c4'], [79,'posters-r2c1'], [84,'consoles-r2c2'],
+      [89,'led-strips-r2c6'], [93,'snacks-r2c5'], [98,'led-strips-r2c7'],
+      [103,'snacks-r2c6'], [108,'led-strips-r2c8'], [112,'snacks-r2c7'],
+      [117,'led-strips-r2c9'], [122,'snacks-r2c8'],
     ],
   };
   function roomDripFor(drips, mk) {

@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as R from '../../functions/api/phamily-rewards.js';
-import { piece, basicCategories } from '../../functions/api/room-catalog.js';
+import { piece, pieces as catalogPieces, basicCategories } from '../../functions/api/room-catalog.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -60,7 +60,7 @@ const setNow = (iso) => { FAKE_NOW = iso === null ? null : RealDate.parse(iso); 
    months on both sides of them — the month is passed in, never read from
    today's date, so a theme cannot pass this guard just because it is not
    live yet. */
-const BASE_MONTHS = ['2026-08', '2026-09', '2026-11', '2027-03'];
+const BASE_MONTHS = ['2026-08', '2026-09', '2026-12', '2027-03'];
 const clientSide = (() => {
   const src = fs.readFileSync(path.join(REPO, 'js/pages/phamily-time.js'), 'utf8');
 
@@ -153,21 +153,40 @@ const clientSide = (() => {
   const pieces = (mk, track) => R.rewardTablesFor(mk)[track]
     .filter(r => r.type === 'room-piece').map(r => [R.rewardKeyFor(r, track), r.cosmeticId]);
 
+  /* Each authored month must be the NEXT tenth of every set in catalog
+     order: same levels, same per-set counts, no piece repeated from any
+     earlier month. */
+  const bySet = {};
+  for (const p of catalogPieces()) (bySet[p.category] = bySet[p.category] || []).push(p.id);
+  const setOf = (id) => id.replace(/-r\d+c\d+$/, '');
   for (const track of ['follower', 'phamily']) {
-    const sep = pieces('2026-09', track), oct = pieces('2026-10', track);
-    check(`${track}: September and October drip at the same keys`, sep.map(p => p[0]), oct.map(p => p[0]));
-    check(`${track}: and every September piece differs from October's`,
-      sep.filter((p, i) => p[1] === oct[i][1]).map(p => p[0]), []);
-    ok(`${track}: September drips the first tenth`, sep.every(p => /-r1c[1-7]$/.test(p[1])));
-    check(`${track}: no September piece reappears in October`,
-      sep.map(p => p[1]).filter(id => oct.some(o => o[1] === id)), []);
-    check(`${track}: a month with no drip of its own keeps the latest before it`,
-      pieces('2026-11', track), oct);
-    check(`${track}: a month before the first drip uses the first`, pieces('2026-08', track), sep);
+    const months = R.ROOM_DRIP_MONTHS;
+    const first = pieces(months[0], track);
+    months.forEach((mk, n) => {
+      const cur = pieces(mk, track);
+      check(`${track} ${mk}: drips at the same keys as ${months[0]}`, cur.map(p => p[0]), first.map(p => p[0]));
+      check(`${track} ${mk}: same per-set counts`, cur.map(p => setOf(p[1])), first.map(p => setOf(p[1])));
+      const counts = {};
+      for (const p of cur) counts[setOf(p[1])] = (counts[setOf(p[1])] || 0) + 1;
+      const expected = {};
+      for (const [set, k] of Object.entries(counts)) expected[set] = bySet[set].slice(n * k, (n + 1) * k);
+      const actual = {};
+      for (const p of cur) (actual[setOf(p[1])] = actual[setOf(p[1])] || []).push(p[1]);
+      check(`${track} ${mk}: is tenth #${n + 1} of every set, in catalog order`, actual, expected);
+      for (const earlier of months.slice(0, n)) {
+        const prior = new Set(pieces(earlier, track).map(p => p[1]));
+        check(`${track} ${mk}: shares no piece with ${earlier}`, cur.map(p => p[1]).filter(id => prior.has(id)), []);
+      }
+    });
+    const last = months[months.length - 1];
+    check(`${track}: a month after the last drip keeps the last`, pieces('2027-03', track), pieces(last, track));
+    check(`${track}: a month before the first drip uses the first`, pieces('2026-08', track), first);
   }
+  check('three months of drip are authored', R.ROOM_DRIP_MONTHS, ['2026-09', '2026-10', '2026-11']);
   check('a September room-piece key resolves to September\'s piece',
     R.findReward('4_follower_room-piece_common', '2026-09').cosmeticId, 'snacks-r1c1');
-  check('and in October to October\'s', R.findReward('4_follower_room-piece_common', '2026-10').cosmeticId, 'snacks-r1c8');
+  check('in October to October\'s', R.findReward('4_follower_room-piece_common', '2026-10').cosmeticId, 'snacks-r1c8');
+  check('and in November to November\'s', R.findReward('4_follower_room-piece_common', '2026-11').cosmeticId, 'snacks-r2c2');
 
   /* Every month's pieces must be real catalog pieces of a set nobody has
      by default, and no track may drip the same piece twice in one month.
@@ -192,13 +211,16 @@ const clientSide = (() => {
     R.findReward('10_follower_cardback_common', '2026-09').name, 'Basic Card Back');
   check('the same key in October is October content',
     R.findReward('10_follower_cardback_common', '2026-10').name, 'Cobweb Card Back');
-  check('and in November it is back to base',
-    R.findReward('10_follower_cardback_common', '2026-11').name, 'Basic Card Back');
+  check('November\'s is November\'s',
+    R.findReward('10_follower_cardback_common', '2026-11').name, 'Withered Wheat Card Back');
+  check('and in December it is back to base',
+    R.findReward('10_follower_cardback_common', '2026-12').name, 'Basic Card Back');
   check('a September skull skin is September\'s cosmetic',
     R.findReward('85_follower_skull-skin_rare', '2026-09').cosmeticId, 'blood');
   check('October\'s is October\'s', R.findReward('85_follower_skull-skin_rare', '2026-10').cosmeticId, 'bonewhite');
   check('a September milestone has September\'s title', R.findMilestone(15, '2026-09').title, 'Initiate');
   check('October\'s has October\'s', R.findMilestone(15, '2026-10').title, 'Trick-or-Treater');
+  check('November\'s has November\'s', R.findMilestone(15, '2026-11').title, 'Gleaner');
   const sepDice = R.findMilestone(60, '2026-09').bonusItems.find(b => b.type === 'dice');
   check('a September milestone bonus is September\'s dice', sepDice.cosmeticId, 'crimson');
   const sepBanner = R.findMilestone(45, '2026-09').bonusItems.find(b => b.type === 'banner');
@@ -216,15 +238,17 @@ const clientSide = (() => {
     R.findReward('10_follower_cardback_common').name, 'Cobweb Card Back');
   setNow('2026-11-02T19:00:00Z');
   check('the same running module in November is November',
-    R.FOLLOWER_REWARDS.find(r => r.level === 10 && r.type === 'cardback').name, 'Basic Card Back');
-  check('MILESTONES in November is base', R.MILESTONES[0].title, 'Initiate');
+    R.FOLLOWER_REWARDS.find(r => r.level === 10 && r.type === 'cardback').name, 'Withered Wheat Card Back');
+  check('MILESTONES in November is November', R.MILESTONES[0].title, 'Gleaner');
+  setNow('2026-12-02T19:00:00Z');
+  check('and in December is base', R.MILESTONES[0].title, 'Initiate');
   check('findReward with no month follows the clock',
     R.findReward('10_follower_cardback_common').name, 'Basic Card Back');
   ok('the views still behave as arrays', Array.isArray(R.PHAMILY_REWARDS) && [...R.PHAMILY_REWARDS].length === R.PHAMILY_REWARDS.length);
-  check('and survive JSON', JSON.stringify(R.MILESTONES), JSON.stringify(R.rewardTablesFor('2026-11').milestones));
+  check('and survive JSON', JSON.stringify(R.MILESTONES), JSON.stringify(R.rewardTablesFor('2026-12').milestones));
   let threw = false;
   try { R.FOLLOWER_REWARDS.push({}); } catch { threw = true; }
-  ok('and are read-only', threw && R.FOLLOWER_REWARDS.length === R.rewardTablesFor('2026-11').follower.length);
+  ok('and are read-only', threw && R.FOLLOWER_REWARDS.length === R.rewardTablesFor('2026-12').follower.length);
   setNow(null);
 }
 
@@ -243,7 +267,7 @@ const clientSide = (() => {
     R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-09').name));
   check('the same cosmetic in two base months is the same item',
     R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-09').name),
-    R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-11').name));
+    R.nameKeyedItemId('cardback', R.findReward('10_follower_cardback_common', '2026-12').name));
 
   /* Memory Match resolves these BY NAME, so the id change cannot affect
      what it draws — but every name the pass hands out must resolve to
@@ -273,11 +297,67 @@ const clientSide = (() => {
     const ids = [...cbs.map(r => R.nameKeyedItemId('cardback', r.name)), ...emotes.map(r => R.nameKeyedItemId('emote-pack', r.name))];
     check(`${mk}: no two of them share an id`, ids.filter((id, i) => ids.indexOf(id) !== i), []);
   }
-  const oct = R.rewardTablesFor('2026-10');
-  const octNames = [...oct.follower, ...oct.phamily].filter(r => r.type === 'cardback' || r.type === 'emote').map(r => r.name);
-  const octResolved = octNames.map(n => getCosmeticId({ name: n }, n.includes('Emote') ? 'emote' : 'cb'));
-  check('October\'s names resolve to October\'s cosmetics, not the fallbacks',
-    octResolved.filter(id => ['basic', 'bonus'].includes(id)), []);
+  /* A themed month's card backs and emote packs must each resolve to their
+     OWN cosmetic — never a fallback, never one another's, never an older
+     month's. Resolution is by keyword, so a careless name silently draws
+     the wrong art. */
+  const resolvedBy = new Map();
+  for (const mk of R.THEMED_MONTHS) {
+    const t = R.rewardTablesFor(mk);
+    const named = [...t.follower, ...t.phamily].filter(r => r.type === 'cardback' || r.type === 'emote');
+    const resolved = named.map(r => `${r.type}:${getCosmeticId({ name: r.name }, r.type === 'emote' ? 'emote' : 'cb')}`);
+    check(`${mk}: names resolve to themed cosmetics, not the fallbacks`,
+      resolved.filter(id => /:(basic|bonus)$/.test(id)), []);
+    check(`${mk}: each resolves to a different cosmetic`, resolved.filter((id, i) => resolved.indexOf(id) !== i), []);
+    for (const id of resolved) {
+      if (resolvedBy.has(id)) failures.push(`${mk}: ${id} was already ${resolvedBy.get(id)}'s`);
+      else { resolvedBy.set(id, mk); passed++; }
+    }
+  }
+  const novCb = [...R.rewardTablesFor('2026-11').follower, ...R.rewardTablesFor('2026-11').phamily]
+    .filter(r => r.type === 'cardback').map(r => r.name);
+  check('November\'s card backs are exactly the four the game ships',
+    novCb.slice().sort(), ['Bone Sickle Card Back', 'Carrion Crow Card Back', 'Hollow Moon Card Back', 'Withered Wheat Card Back']);
+  check('no card back is named with "harvest" (that keyword is the emote pack\'s)',
+    R.THEMED_MONTHS.flatMap(mk => [...R.rewardTablesFor(mk).follower, ...R.rewardTablesFor(mk).phamily])
+      .filter(r => r.type === 'cardback' && /harvest/i.test(r.name)).map(r => r.name), []);
+  check('nor any "Scarecrow ... Card Back"',
+    R.THEMED_MONTHS.flatMap(mk => [...R.rewardTablesFor(mk).follower, ...R.rewardTablesFor(mk).phamily])
+      .filter(r => r.type === 'cardback' && /scarecrow/i.test(r.name)).map(r => r.name), []);
+}
+
+/* ── SKULL CLICKER: every skin / click effect names a theme the game has,
+   and its name does not trip an older theme's keyword. The game resolves an
+   item by NAME first and falls back to its id. ───────────────────────── */
+{
+  const sc = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
+  const fnSrc = sc.match(/function getCosmeticThemeId\(item\) \{[\s\S]*?\n {4}\}/);
+  ok('Skull Clicker still resolves cosmetics by name', !!fnSrc);
+  const resolve = new Function(`${fnSrc[0]}\nreturn getCosmeticThemeId;`)();
+  for (const mk of [...new Set([...R.THEMED_MONTHS, ...BASE_MONTHS])]) {
+    const t = R.rewardTablesFor(mk);
+    const skins = [...t.follower, ...t.phamily].filter(r => r.type === 'skull-skin' || r.type === 'click-effect');
+    check(`${mk}: every skin / click effect id is defined in the game`,
+      skins.filter(r => !sc.includes(`'${r.cosmeticId}': { name:`)).map(r => r.cosmeticId), []);
+    check(`${mk}: and each name resolves to its own id`,
+      skins.filter(r => resolve({ id: r.cosmeticId, name: r.name }) !== r.cosmeticId).map(r => `${r.name}->${resolve({ id: r.cosmeticId, name: r.name })}`), []);
+  }
+}
+
+/* ── THEME KEYS ──────────────────────────────────────────────────────── */
+{
+  check('October is halloween', R.themeKeyFor('2026-10'), 'halloween');
+  check('November is harvest', R.themeKeyFor('2026-11'), 'harvest');
+  check('December is unthemed', R.themeKeyFor('2026-12'), null);
+  for (const mk of R.THEMED_MONTHS) {
+    const ms = R.rewardTablesFor(mk).milestones;
+    const stamped = ms.flatMap(m => m.bonusItems || []).filter(b => b.type === 'banner' || b.type === 'nameeffect');
+    check(`${mk}: every banner / name effect carries the month's theme key`,
+      stamped.filter(b => !b.meta || b.meta.theme !== R.themeKeyFor(mk)).map(b => b.name), []);
+    check(`${mk}: ten distinct titles`, new Set(ms.map(m => m.title)).size, 10);
+  }
+  check('November\'s titles in order', R.rewardTablesFor('2026-11').milestones.map(m => m.title),
+    ['Gleaner', 'Crow Caller', 'Field Warden', 'Scarecrow Knight', 'Harvest Witch', 'Bone Thresher', 'Barrow Keeper', 'Sickle Saint', 'Hollow Lord', 'Lord of the Last Harvest']);
 }
 
 /* ── The table itself ────────────────────────────────────────────────── */
@@ -433,21 +513,30 @@ const clientSide = (() => {
   ok('the game defines dice sets', sets.length >= 2);
   ok('and classic is one of them', sets.includes('classic'));
 
-  const diceRewards = [...R.FOLLOWER_REWARDS, ...R.PHAMILY_REWARDS].filter(r => r.type === 'dice');
-  const diceBonuses = R.MILESTONES.flatMap(m => m.bonusItems || []).filter(b => b.type === 'dice');
-  ok('the pass still advertises dice', diceRewards.length + diceBonuses.length >= 4);
+  /* Every month, not just the current one: a themed month's dice must
+     exist in the game before that month arrives. */
+  for (const mk of [...new Set([...R.THEMED_MONTHS, ...BASE_MONTHS])]) {
+    const t = R.rewardTablesFor(mk);
+    const diceRewards = [...t.follower, ...t.phamily].filter(r => r.type === 'dice');
+    const diceBonuses = t.milestones.flatMap(m => m.bonusItems || []).filter(b => b.type === 'dice');
+    ok(`${mk}: the pass still advertises dice`, diceRewards.length + diceBonuses.length >= 4);
 
-  const orphans = [...diceRewards, ...diceBonuses]
-    .filter(r => !sets.includes(r.cosmeticId))
-    .map(r => `${r.name}:${r.cosmeticId}`);
-  check('every dice reward names a set the game has', orphans, []);
+    const orphans = [...diceRewards, ...diceBonuses]
+      .filter(r => !sets.includes(r.cosmeticId))
+      .map(r => `${r.name}:${r.cosmeticId}`);
+    check(`${mk}: every dice reward names a set the game has`, orphans, []);
 
-  /* And no two award the same one, or the second is a duplicate grant --
-     spent from the track and silently doing nothing, which is the shape of
-     the original bug. */
-  const ids = [...diceRewards, ...diceBonuses].map(r => r.cosmeticId);
-  const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
-  check('and no two hand out the same set', dupes, []);
+    /* And no two award the same one, or the second is a duplicate grant --
+       spent from the track and silently doing nothing, which is the shape
+       of the original bug. */
+    const ids = [...diceRewards, ...diceBonuses].map(r => r.cosmeticId);
+    check(`${mk}: and no two hand out the same set`, ids.filter((id, i) => ids.indexOf(id) !== i), []);
+  }
+  const nov = R.rewardTablesFor('2026-11');
+  check('November\'s six dice are exactly the harvest sets',
+    [...nov.follower, ...nov.phamily].filter(r => r.type === 'dice').map(r => r.cosmeticId)
+      .concat(nov.milestones.flatMap(m => m.bonusItems || []).filter(b => b.type === 'dice').map(b => b.cosmeticId)).sort(),
+    ['chaff', 'crowfeather', 'hollow', 'scarecrow', 'scythe', 'withered']);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
