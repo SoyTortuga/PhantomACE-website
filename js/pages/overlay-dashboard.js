@@ -1368,8 +1368,53 @@ function showOdDenied(message, offerLogin) {
   if (loginBtn) loginBtn.hidden = !offerLogin;
 }
 
+/* Stream Night Modes — POST-only start/stop for the three chat-vs-stream
+   sessions. No live-state readout: two of the three GETs are overlay-key gated,
+   and the overlay panels already show "is it live" on stream. */
+async function nightPost(url, body, btn, okMsg) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && (d.success || d.ok || res.status === 200)) {
+      showBotStatus(okMsg, false);
+    } else if (res.status === 403) {
+      showBotStatus(d.error || 'Staff only.', true);
+    } else if (res.status === 404) {
+      showBotStatus('Route 404 — the server needs restarting after the last pull.', true);
+    } else {
+      showBotStatus(d.error || 'Could not change that mode.', true);
+    }
+  } catch { showBotStatus('Network error.', true); }
+  if (btn) btn.disabled = false;
+}
+
+function initStreamNight() {
+  const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+
+  on('odTitheStartBtn', function (e) {
+    const goal = parseInt((document.getElementById('odTitheGoal') || {}).value, 10);
+    if (!goal || goal < 1) { showBotStatus('Enter a Bone Tithe goal first.', true); return; }
+    const mins = parseInt((document.getElementById('odTitheMins') || {}).value, 10);
+    const body = { action: 'start', goal: goal };
+    if (mins && mins > 0) body.minutes = mins;
+    nightPost('/api/bone-tithe', body, e.currentTarget, 'Bone Tithe started — the goal panel is on the overlay.');
+  });
+  on('odTitheStopBtn', function (e) { nightPost('/api/bone-tithe', { action: 'stop' }, e.currentTarget, 'Bone Tithe stopped.'); });
+
+  on('odClashStartBtn', function (e) { nightPost('/api/mana-clash-chat', { action: 'start' }, e.currentTarget, 'Streamer vs Chat started — chat plays with !clash.'); });
+  on('odClashStopBtn', function (e) { nightPost('/api/mana-clash-chat', { action: 'end' }, e.currentTarget, 'Streamer vs Chat ended.'); });
+
+  on('odWindStartBtn', function (e) { nightPost('/api/pham-wind-night', { action: 'start' }, e.currentTarget, 'Wind Night started — chat steers with !wind left / !wind right.'); });
+  on('odWindStopBtn', function (e) { nightPost('/api/pham-wind-night', { action: 'end' }, e.currentTarget, 'Wind Night ended.'); });
+}
+
 function initOverlayDashboard(data) {
   initPanic();
+  initStreamNight();
   initAlertLog();
   initOvMc();
   initOvBingo();

@@ -162,6 +162,31 @@
             <p class="bot-section-desc" style="margin-top:10px">MTGBBB is a hosted game — create and run it from the Host UI. This only shows the live game and can end it.</p>
           </div>
 
+          <div class="card bot-section bot-grid-full" id="odNightSection">
+            <h3>Stream Night Modes</h3>
+            <p class="bot-section-desc">One-click start and stop for the chat-vs-stream events. Each shows its own overlay panel while live and clears itself when it ends. Chat drives them with !hit / !clash / !wind.</p>
+
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Bone Tithe</span>
+              <input type="number" id="odTitheGoal" class="od-night-input" min="1" placeholder="Goal (skulls)">
+              <input type="number" id="odTitheMins" class="od-night-input" min="1" placeholder="Minutes (opt)">
+              <button class="btn-primary" id="odTitheStartBtn">Start</button>
+              <button class="btn-secondary" id="odTitheStopBtn">Stop</button>
+            </div>
+
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Streamer vs Chat — Mana Clash</span>
+              <button class="btn-primary" id="odClashStartBtn">Start</button>
+              <button class="btn-secondary" id="odClashStopBtn">End</button>
+            </div>
+
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">PhamShock Wind Night</span>
+              <button class="btn-primary" id="odWindStartBtn">Start</button>
+              <button class="btn-secondary" id="odWindStopBtn">End</button>
+            </div>
+          </div>
+
         </div>
       </section>
 

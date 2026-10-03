@@ -271,3 +271,16 @@
   border: 1px solid var(--border-mid);
   flex: none;
 }
+
+/* Stream Night Modes — compact numeric inputs in the control rows. */
+.od-night-input {
+  width: 8.5em;
+  padding: 6px 8px;
+  background: var(--black);
+  color: var(--text-pri);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+.od-night-input::placeholder { color: var(--text-dim); }
