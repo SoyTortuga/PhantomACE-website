@@ -162,6 +162,46 @@
 
     .restart-btn:hover { background: #cc0000; }
 
+    .mode-bar {
+      display: flex; gap: 8px; margin-bottom: 14px; justify-content: center;
+    }
+    .mode-btn {
+      padding: 6px 16px; background: var(--gray-mid); color: var(--text-pri);
+      border: 1px solid var(--border-mid); border-radius: 3px; font-size: 14px;
+      font-family: inherit; cursor: pointer; text-shadow: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .mode-btn:hover { border-color: var(--red); }
+    .mode-btn.active { border-color: var(--red); color: var(--red); }
+
+    .daily-panel {
+      width: 100%; max-width: 480px; margin: 0 auto 16px;
+      background: var(--gray-lo); border: 1px solid var(--border-mid);
+      border-radius: 6px; padding: 14px 16px;
+    }
+    .daily-panel h2 {
+      font-family: var(--font-display); font-size: 17px; color: var(--red);
+      margin-bottom: 4px; letter-spacing: normal;
+    }
+    .daily-panel .daily-date { font-size: 13px; color: var(--text-sec); margin-bottom: 10px; }
+    .daily-panel .daily-you {
+      font-size: 14px; color: var(--text-pri); margin-bottom: 10px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border-mid);
+    }
+    .daily-panel .daily-you strong { color: var(--red); }
+    .daily-top { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+    .daily-top li {
+      display: flex; align-items: baseline; gap: 8px; font-size: 14px;
+      padding: 3px 4px; border-radius: 3px; color: var(--text-pri);
+    }
+    .daily-top li.me { background: var(--red-dim); color: #fff; }
+    .daily-top .dt-rank { width: 2.2em; text-align: right; color: var(--text-sec); flex: none; }
+    .daily-top li.me .dt-rank { color: #fff; }
+    .daily-top .dt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .daily-top .dt-score { flex: none; color: var(--text-sec); }
+    .daily-top li.me .dt-score { color: #fff; }
+    .daily-top .dt-empty { color: var(--text-sec); font-style: italic; }
+
     [hidden] { display: none !important; }
 
     .cosmetics-bar {
@@ -209,12 +249,22 @@
 </head>
 <body>
   <h1>Memory Match</h1>
+  <div class="mode-bar">
+    <button class="mode-btn active" id="modeRanked" type="button" onclick="setMode('ranked')">Ranked</button>
+    <button class="mode-btn" id="modeDaily" type="button" onclick="setMode('daily')">Daily Challenge</button>
+  </div>
   <div class="stats">
     Moves: <span id="moveCount">0</span>
     &nbsp;&middot;&nbsp;
     Pairs: <span id="pairCount">0</span> / <span id="totalPairs">20</span>
   </div>
   <div class="mm-status" id="mmStatus" role="status"></div>
+  <div class="daily-panel" id="dailyPanel" hidden>
+    <h2>Daily Challenge</h2>
+    <div class="daily-date" id="dailyDate"></div>
+    <div class="daily-you" id="dailyYou" hidden></div>
+    <ol class="daily-top" id="dailyTopList"></ol>
+  </div>
   <div class="cosmetics-bar" id="cosmeticsBar" hidden>
     <div>
       <div class="cosmetic-label">Card Back</div>
@@ -390,6 +440,7 @@
     let locked = true;
     let totalPairs = 20;
     let gen = 0;
+    let mode = 'ranked';
     let ranked = null;
     let deal = { images: [], alts: [] };
     let flipChain = Promise.resolve();
@@ -732,7 +783,7 @@
       const seq = game.seq++;
       flipChain = flipChain.then(async () => {
         if (g !== gen || game.broken) return;
-        const r = await mmApi({ action: 'flip', gameId: game.gameId, index, seq });
+        const r = await mmApi({ action: 'flip', gameId: game.gameId, index, seq, mode: game.daily ? 'daily' : 'ranked' });
         if (g !== gen || game.broken) return;
         if (!r.ok || !r.data || typeof r.data.face !== 'number') {
           game.broken = true;
@@ -791,13 +842,165 @@
       later(startGame, 1800);
     }
 
+    function setMode(next) {
+      if (mode === next) return;
+      mode = next;
+      document.getElementById('modeRanked').classList.toggle('active', mode === 'ranked');
+      document.getElementById('modeDaily').classList.toggle('active', mode === 'daily');
+      document.getElementById('dailyPanel').hidden = mode !== 'daily';
+      if (mode === 'daily') startDaily();
+      else startGame();
+    }
+
+    function startDaily() {
+      gen++;
+      clearTimers();
+      const g = gen;
+      flipped = [];
+      matched = 0;
+      moves = 0;
+      flipCount = 0;
+      locked = true;
+      ranked = null;
+      flipChain = Promise.resolve();
+      document.getElementById('winMessage').classList.remove('show');
+      document.getElementById('dailyPanel').hidden = false;
+      /* The daily is the same deal for everyone, so it always uses the default
+         set — a pack can't make today's board shorter. */
+      deal = { images: DEFAULT_IMAGES, alts: DEFAULT_NAMES };
+      totalPairs = 20;
+      renderBoard(totalPairs);
+      setStatus('Loading today’s board…');
+
+      mmApi({ action: 'start', mode: 'daily' }).then(r => {
+        if (g !== gen) return;
+        if (!r.ok || !r.data) {
+          renderBoard(totalPairs);
+          if (r.status === 401) setStatus('Log in to play the daily challenge.', true);
+          else setStatus('Daily unavailable: ' + r.error);
+          renderDailyPanel(null);
+          return;
+        }
+        const d = r.data;
+        renderDailyPanel(d);
+        if (d.dailyDone) {
+          locked = true;
+          document.getElementById('board').textContent = '';
+          setStatus('You’ve finished today’s daily.');
+          return;
+        }
+        ranked = { gameId: d.gameId, seq: 0, broken: false, daily: true, onBoard: false };
+        totalPairs = d.pairs;
+        renderBoard(totalPairs);
+        if (d.resumed && d.game) applyDailyResume(d.game);
+        setCounters();
+        setStatus(d.resumed ? 'Resumed today’s board.' : 'Today’s board · one attempt, fewest moves wins.');
+        locked = false;
+      });
+    }
+
+    /* Rebuild a half-played daily board from the server's public state so a
+       refresh resumes the run rather than restarting its move count. */
+    function applyDailyResume(game) {
+      moves = game.moves || 0;
+      matched = game.pairsFound || 0;
+      ranked.seq = game.seq || 0;
+      const cards = document.querySelectorAll('#board .card');
+      for (const r of (game.revealed || [])) {
+        const el = cards[r.index];
+        if (!el) continue;
+        setFace(el, r.face);
+        if (r.matched) {
+          el.classList.add('matched', 'flipped');
+          el.setAttribute('aria-label', 'Card ' + (r.index + 1) + ', matched');
+          el.removeAttribute('tabindex');
+        } else {
+          el.classList.add('flipped');
+          el.setAttribute('aria-pressed', 'true');
+          flipped.push(el);
+        }
+      }
+    }
+
+    function renderDailyPanel(d) {
+      const panel = document.getElementById('dailyPanel');
+      panel.hidden = false;
+      const dateEl = document.getElementById('dailyDate');
+      dateEl.textContent = d && d.dayKey ? formatDailyDate(d.dayKey) : '';
+      const you = document.getElementById('dailyYou');
+      if (d && (d.dailyDone || typeof d.rank === 'number')) {
+        const total = d.total || 0;
+        you.innerHTML = '';
+        you.appendChild(document.createTextNode('Your result: '));
+        const b = document.createElement('strong');
+        b.textContent = d.best + (d.best === 1 ? ' move' : ' moves');
+        you.appendChild(b);
+        you.appendChild(document.createTextNode(d.rank ? ' · rank ' + d.rank + ' of ' + total : ''));
+        you.hidden = false;
+      } else {
+        you.hidden = true;
+      }
+      const list = document.getElementById('dailyTopList');
+      list.textContent = '';
+      const top = (d && d.top) || [];
+      if (top.length === 0) {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.className = 'dt-empty';
+        span.textContent = 'No finishers yet today — be the first.';
+        li.appendChild(span);
+        list.appendChild(li);
+        return;
+      }
+      const medals = ['🥇', '🥈', '🥉'];
+      for (const row of top) {
+        const li = document.createElement('li');
+        if (row.you) li.className = 'me';
+        const rank = document.createElement('span');
+        rank.className = 'dt-rank';
+        rank.textContent = medals[row.rank - 1] || (row.rank + '.');
+        const name = document.createElement('span');
+        name.className = 'dt-name';
+        name.textContent = row.name;
+        const score = document.createElement('span');
+        score.className = 'dt-score';
+        score.textContent = row.score;
+        li.append(rank, name, score);
+        list.appendChild(li);
+      }
+    }
+
+    function formatDailyDate(dk) {
+      const [y, m, day] = String(dk).split('-').map(Number);
+      if (!y || !m || !day) return dk;
+      const months = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+      return months[m - 1] + ' ' + day + ', ' + y;
+    }
+
     function showWin(result) {
       document.getElementById('finalMoves').textContent = moves;
+      const restart = document.querySelector('#winMessage .restart-btn');
       let note;
-      if (!ranked) note = 'Unranked run. Log in to put it on the board.';
-      else if (!result || !result.recorded) note = "That run couldn't be recorded on the board.";
-      else if (result.improved) note = 'New personal best on the ' + totalPairs + '-pair board.';
-      else note = 'Your best on the ' + totalPairs + '-pair board is ' + result.best + ' moves.';
+      if (ranked && ranked.daily) {
+        if (!result || !result.recorded) {
+          note = result && result.already
+            ? "You'd already finished today's daily."
+            : "That daily run couldn't be recorded.";
+        } else if (result.rank) {
+          note = 'Recorded · rank ' + result.rank + ' of ' + result.total + ' today.';
+        } else {
+          note = 'Recorded on today’s board.';
+        }
+        if (restart) restart.hidden = true;
+        if (result) renderDailyPanel(Object.assign({ dayKey: result.dayKey, dailyDone: true }, result));
+      } else {
+        if (restart) restart.hidden = false;
+        if (!ranked) note = 'Unranked run. Log in to put it on the board.';
+        else if (!result || !result.recorded) note = "That run couldn't be recorded on the board.";
+        else if (result.improved) note = 'New personal best on the ' + totalPairs + '-pair board.';
+        else note = 'Your best on the ' + totalPairs + '-pair board is ' + result.best + ' moves.';
+      }
       document.getElementById('winNote').textContent = note;
       document.getElementById('winMessage').classList.add('show');
     }

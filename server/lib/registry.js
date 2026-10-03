@@ -160,6 +160,7 @@ export const SINGLETONS = {
   overlay_state:         { table: 'singletons', expiry: 'real' },
   alert_sounds:          { table: 'singletons', expiry: 'none' },
   stream_now:            { table: 'singletons', expiry: 'real' },
+  bone_tithe:            { table: 'singletons', expiry: 'none' },
 
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
@@ -384,6 +385,9 @@ export const FAMILIES = [
   /* mm_game_{userId} — memory-match.js: the one in-progress server-dealt game
      per player (deck + flip log), sliding 1h TTL; a new start replaces it. */
   { prefix: 'mm_game_',        table: 'singletons',       expiry: 'real' },
+  /* Memory Match daily challenge: mm_daily_game_<userId> (in-progress board,
+     sliding 1h) and mm_daily_<dayKey> (that day's ranked results, 3d). */
+  { prefix: 'mm_daily_',       table: 'singletons',       expiry: 'real' },
   /* Cosmetic gift bell: a disposable per-recipient queue (gift_inbox_<userId>),
      read-and-cleared on the next inventory load; TTL is the backstop. */
   { prefix: 'gift_inbox_',     table: 'singletons',       expiry: 'real' },

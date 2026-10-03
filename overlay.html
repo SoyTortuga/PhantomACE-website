@@ -95,6 +95,21 @@
     <ol class="ov-raid-top" id="ovRaidTop"></ol>
   </div>
 
+  <!-- Skull Clicker Bone Tithe: a community offering goal. One horizontal
+       progress bar the whole site fills by tithing skulls together. Hidden
+       unless a tithe is live; shows a "goal met" state briefly on completion,
+       then clears itself (no animation loop, slow idle poll — marathon-safe). -->
+  <div class="ov-tithe" id="ovTithe" hidden>
+    <div class="ov-tithe-head">
+      <span class="ov-tithe-title" id="ovTitheTitle">Bone Tithe</span>
+      <span class="ov-tithe-pct" id="ovTithePct"></span>
+    </div>
+    <div class="ov-tithe-track"><i id="ovTitheBar"></i></div>
+    <div class="ov-tithe-amt" id="ovTitheAmt"></div>
+    <div class="ov-tithe-sub" id="ovTitheSub"></div>
+    <ol class="ov-tithe-top" id="ovTitheTop"></ol>
+  </div>
+
   <!-- Commander Bingo: the same standing furniture as MTGBBB — call
        progress and player count up top, and a WINNERS board below (this
        game has no per-player score, so "who's winning" is who the host has
@@ -189,6 +204,7 @@
   <script src="/games/commander-bingo/events.js" defer></script>
   <script src="/js/pages/overlay-commander-bingo.js" defer></script>
   <script src="/js/pages/overlay-skull-raid.js" defer></script>
+  <script src="/js/pages/overlay-bone-tithe.js" defer></script>
   <script src="/js/pages/overlay-mana-clash.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>
   <script src="/js/pages/overlay-layout.js" defer></script>

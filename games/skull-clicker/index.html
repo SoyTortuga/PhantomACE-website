@@ -399,6 +399,44 @@
  text-shadow: none; color: #fff; text-align: center; }
     @media (prefers-reduced-motion: reduce) { .raid-track i { transition: none; } }
 
+    /* Bone Tithe — community offering goal (in-game). A shared stream goal the
+       whole site fills by offering skulls together. */
+    .tithe-banner {
+      margin: 0 12px 8px; padding: 10px 14px;
+      background: rgba(20,0,0,0.92); border: 1px solid var(--red); border-radius: 6px;
+    }
+    .tithe-banner.is-complete { border-color: #ffb300; }
+    .tithe-head { display: flex; align-items: center; gap: 8px; }
+    .tithe-title { font-size: 17px;
+ text-shadow: none; font-weight: 800; color: #ff5555; flex: 1; }
+    .tithe-banner.is-complete .tithe-title { color: #ffb300; }
+    .tithe-pct { font-size: 15px;
+ text-shadow: none; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+    .tithe-track {
+      position: relative; height: 16px; margin: 6px 0 4px; background: #1a0000;
+      border: 1px solid #3a0000; border-radius: 4px; overflow: hidden;
+    }
+    .tithe-track i { display: block; height: 100%; background: linear-gradient(90deg,var(--red),#ff5a1f); transition: width 0.4s; }
+    .tithe-banner.is-complete .tithe-track i { background: linear-gradient(90deg,#ff5a1f,#ffb300); }
+    .tithe-amt {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000;
+    }
+    .tithe-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+    .tithe-sub { font-size: 13px;
+ text-shadow: none; color: #fff; flex: 1; }
+    .tithe-btn {
+      padding: 7px 16px; border-radius: 4px; font-size: 15px;
+ text-shadow: none; font-weight: 800;
+      cursor: pointer; font-family: inherit; text-decoration: none; flex: none;
+      background: var(--red); color: #fff; border: none;
+    }
+    .tithe-btn:hover { background: #cc0000; }
+    .tithe-btn:disabled { opacity: 0.5; cursor: default; }
+    .tithe-login { font-size: 13px;
+ text-shadow: none; color: #ff5555; text-decoration: underline; flex: none; }
+    @media (prefers-reduced-motion: reduce) { .tithe-track i { transition: none; } }
+
     /* Raid reward banner (claim your code in-game) */
     .reward-banner {
       margin: 0 12px 8px; padding: 12px; text-align: center;
@@ -942,6 +980,7 @@
 
     <div class="buff-bar" id="buffBar"></div>
     <div class="raid-banner" id="raidBanner" hidden></div>
+    <div class="tithe-banner" id="titheBanner" hidden></div>
     <div class="reward-banner" id="rewardBanner" hidden></div>
 
     <!-- The living world: every building you own appears here and stacks up,
@@ -2937,6 +2976,114 @@
         '<div class="raid-track"><i style="width:' + pct + '%"></i>' +
           '<span class="raid-hp">' + formatNum(raidState.hp) + ' / ' + formatNum(raidState.maxHp) + '</span></div>' +
         (top ? '<div class="raid-top">Top: ' + top + '</div>' : '<div class="raid-top">Click the skull to strike!</div>');
+    }
+
+    /* ═══════ BONE TITHE (community offering goal) ═══════
+       A shared stream goal: the broadcaster sets a target, and the whole site
+       fills it by offering skulls. Server-authoritative — an offer is clamped to
+       what the player's lifetime skulls support, so the client only decides HOW
+       MUCH to put up (10% of the current bank), never what gets credited. */
+    let titheState = null;
+    let titheSeenStatus = null;
+    let titheOffering = false;
+
+    function titheActive() { return titheState && titheState.status === 'active'; }
+    function titheLoginUrl() { return '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname + location.search); }
+
+    async function pollTithe() {
+      try {
+        const res = await fetch('/api/bone-tithe', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        applyTithe(await res.json());
+      } catch (e) { /* the tithe is a bonus, never load-bearing */ }
+    }
+
+    function applyTithe(s) {
+      const prev = titheSeenStatus;
+      titheState = s;
+      renderTitheBanner();
+      if (s && s.status !== prev) {
+        titheSeenStatus = s.status;
+        if (s.status === 'complete' && prev === 'active') {
+          showBuffToast('🦴 Bone Tithe complete — the Reaper is sated! Frenzy!', 'reap');
+        } else if (s.status === 'active' && prev !== 'active') {
+          showBuffToast('🦴 A Bone Tithe rises — offer your skulls!', 'rush');
+        }
+      }
+    }
+
+    function renderTitheBanner() {
+      const el = document.getElementById('titheBanner');
+      if (!el) return;
+      const s = titheState;
+      if (!s || (s.status !== 'active' && s.status !== 'complete')) { el.hidden = true; return; }
+      const complete = s.status === 'complete';
+      const goal = s.goal || 0;
+      const progress = Math.min(goal, s.progress || 0);
+      const pct = goal > 0 ? Math.max(0, Math.min(100, (progress / goal) * 100)) : 0;
+      const session = typeof readPhamSession === 'function' ? readPhamSession() : null;
+      const loggedIn = !!(session && session.user_id);
+      el.classList.toggle('is-complete', complete);
+      el.hidden = false;
+      let foot;
+      if (complete) {
+        foot = '<div class="tithe-foot"><span class="tithe-sub">☠️ Goal met — the Reaper is sated. Frenzy for all!</span></div>';
+      } else if (loggedIn) {
+        foot = '<div class="tithe-foot"><span class="tithe-sub">Offer 10% of your skulls to the cause</span>' +
+          '<button class="tithe-btn" id="titheOfferBtn" onclick="offerToTithe()"' + (titheOffering ? ' disabled' : '') + '>Offer</button></div>';
+      } else {
+        foot = '<div class="tithe-foot"><span class="tithe-sub">Offer your skulls to the shared goal</span>' +
+          '<a class="tithe-login" target="_top" href="' + titheLoginUrl() + '">Log in to offer</a></div>';
+      }
+      el.innerHTML =
+        '<div class="tithe-head"><span class="tithe-title">🦴 ' + escSkull(s.title || 'Bone Tithe') + '</span>' +
+          '<span class="tithe-pct">' + (complete ? 'GOAL MET' : Math.floor(pct) + '%') + '</span></div>' +
+        '<div class="tithe-track"><i style="width:' + pct + '%"></i>' +
+          '<span class="tithe-amt">' + formatNum(progress) + ' / ' + formatNum(goal) + '</span></div>' +
+        foot;
+    }
+
+    /* Offer a tithe: 10% of the current bank, never more than the goal still
+       needs. Deducted locally and the amount sent to the server, which re-clamps
+       it to what the player's lifetime supports; any uncredited remainder (the
+       goal filled first, or a stale save) is refunded to the bank. */
+    async function offerToTithe() {
+      if (titheOffering || !titheActive()) return;
+      const session = typeof readPhamSession === 'function' ? readPhamSession() : null;
+      if (!session || !session.user_id) return;
+      const remaining = Math.max(0, (titheState.goal || 0) - (titheState.progress || 0));
+      if (remaining <= 0) return;
+      const amtDec = Decimal.min(skulls.mul(0.1).floor(), new Decimal(remaining), skulls.floor());
+      const amt = Number(amtDec.toString());
+      if (!(amt >= 1)) { showBuffToast('Not enough skulls to tithe yet.', 'frenzy'); return; }
+
+      titheOffering = true;
+      renderTitheBanner();
+      /* Spend locally, then sync the save so the server sees the current (and
+         unchanged, monotonic) lifetime before it validates the offer. */
+      skulls = Decimal.max(0, skulls.sub(amtDec));
+      save();
+      render();
+      try {
+        const res = await fetch('/api/bone-tithe', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'offer', amount: amt }),
+        });
+        const d = res.ok ? await res.json() : null;
+        const credited = d && typeof d.credited === 'number' ? d.credited : 0;
+        const refund = Math.max(0, amt - credited);
+        if (refund > 0) { skulls = skulls.add(refund); render(); }
+        if (credited > 0) showBuffToast('🦴 Offered ' + formatNum(credited) + ' skulls to the tithe!', 'reap');
+        else if (!d) { skulls = skulls.add(amt); render(); }   /* request failed outright — give it all back */
+        if (d) applyTithe(d);
+      } catch (e) {
+        skulls = skulls.add(amt); render();   /* network error — nothing was offered */
+      } finally {
+        titheOffering = false;
+        renderTitheBanner();
+      }
+      save();
     }
 
     /* A quick particle burst where a cursed skull was popped (juice). */
@@ -5310,12 +5457,15 @@
     setInterval(flushRaidDamage, RAID_FLUSH_MS);
     fetchRaidReward();
     setInterval(() => { if (!document.hidden) fetchRaidReward(); }, 30000);
+    pollTithe();
+    setInterval(() => { if (!document.hidden) pollTithe(); }, 5000);
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
       pollRaid();
       pollSkullEvent();
       fetchRaidReward();
+      pollTithe();
     });
   </script>
 </body>

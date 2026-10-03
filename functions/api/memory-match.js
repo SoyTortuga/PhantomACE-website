@@ -22,10 +22,30 @@
    lb_memory_match_10.
    ══════════════════════════════════════════════ */
 
+import { SEASON_TZ } from './season-time.js';
+
 const GAME_TTL = 3600;
 const MAX_ENTRIES = 50;
 const MAX_FLIPS = 4000;
 const GAME_PREFIX = 'mm_game_';
+
+/* ── Daily seed mode ──────────────────────────────────────────────────
+   One fixed board per Pacific calendar day: every player is dealt the SAME
+   shuffle, derived deterministically from the date, so the daily is a single
+   shared puzzle AND the deal is server-authoritative (the client can neither
+   pick an easier layout nor retry it). Always the 20-pair default set, so
+   nobody's cosmetic pack makes the daily shorter. One completion per player
+   per day is recorded; a started board resumes rather than re-deals, so the
+   move count can't be reset by refreshing.
+
+   DAILY_GAME_PREFIX and DAILY_BOARD_PREFIX both begin 'mm_daily_', so a single
+   registry family (mm_daily_ -> singletons, 'real') maps the in-progress game
+   (mm_daily_game_<userId>) and the per-day board (mm_daily_<dayKey>). */
+const DAILY_PAIRS = 20;
+const DAILY_GAME_PREFIX = 'mm_daily_game_';
+const DAILY_BOARD_PREFIX = 'mm_daily_';
+const DAILY_TTL = 60 * 60 * 24 * 3;   // a day's board lingers a couple days, then clears
+const MAX_DAILY_ENTRIES = 500;
 
 /* Pair counts per card set, matching EMOTE_SETS in games/memory-match. A set
    key the game draws with the default images (any pack name that resolves
@@ -109,6 +129,56 @@ export function dealDeck(pairs, randInt = secureInt) {
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return deck;
+}
+
+/* 'YYYY-MM-DD' for the instant in the stream timezone (same calendar every
+   monthly cycle rolls on). en-CA formats as YYYY-MM-DD, so a day rolls at
+   Pacific midnight, not UTC. season-time exports no dayKey, so derive it here
+   from the one SEASON_TZ it does export. */
+export function dayKey(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: SEASON_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+}
+
+/* A deterministic unbiased integer generator seeded from a string: xmur3 to a
+   32-bit seed, mulberry32 for the stream, rejection sampling for an unbiased
+   [0, n). Same seed string -> same sequence -> same deck, on any machine. */
+function seededRandInt(seedStr) {
+  let h = 1779033703 ^ seedStr.length;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let a = (h ^= h >>> 16) >>> 0;
+  const next = () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (t ^ (t >>> 14)) >>> 0;
+  };
+  return (n) => {
+    const limit = Math.floor(0x100000000 / n) * n;
+    for (;;) { const x = next(); if (x < limit) return x % n; }
+  };
+}
+
+export function dailySeedString(dk, pairs = DAILY_PAIRS) {
+  return `memory-match-daily:${dk}:${pairs}`;
+}
+
+/* The one deck for a given day — dealt through the same shuffle as a ranked
+   game, only with a seeded RNG instead of the CSPRNG. */
+export function seededDeck(pairs, dk) {
+  return dealDeck(pairs, seededRandInt(dailySeedString(dk, pairs)));
+}
+
+/* Today's board, trimmed to a public top-N: names and scores only (no user
+   ids leak), with the asking player's own row flagged. */
+function dailyTop(results, youId, n = 10) {
+  return results.slice(0, n).map((r, i) => ({
+    rank: i + 1, name: r.name, score: r.score, you: String(r.id) === String(youId),
+  }));
 }
 
 async function ownsSet(env, userId, set) {
@@ -199,7 +269,12 @@ async function handleStart(env, player, body) {
   });
 }
 
-async function handleFlip(env, player, body) {
+/* The shared flip engine for both ranked and daily games: identical move
+   validation and server-held solution, differing only in which game key it
+   mutates and which recorder settles the finished run. The daily path passes
+   the same object shape, so anti-cheat (server deals, server reveals one face,
+   stale/forged/out-of-order flips rejected) carries over unchanged. */
+async function doFlip(env, player, body, gameKey, finisher) {
   const { gameId, index, seq } = body;
   if (typeof gameId !== 'string' || !gameId) return json({ error: 'Missing game.' }, 400);
   if (!Number.isInteger(index)) return json({ error: 'Bad card index.' }, 400);
@@ -208,7 +283,7 @@ async function handleFlip(env, player, body) {
   let err = null;
   let out = null;
   let finished = null;
-  await env.MARKETPLACE.mutate(GAME_PREFIX + player.userId, (g) => {
+  await env.MARKETPLACE.mutate(gameKey, (g) => {
     if (!g || g.gameId !== gameId || g.userId !== player.userId) {
       err = [404, 'That game is gone. Deal a new one.'];
       return undefined;
@@ -240,7 +315,7 @@ async function handleFlip(env, player, body) {
     if (g.pairsFound === g.pairs) {
       g.done = true;
       g.finishedAt = Date.now();
-      finished = { pairs: g.pairs, moves: g.moves };
+      finished = { pairs: g.pairs, moves: g.moves, dayKey: g.dayKey };
     }
     return g;
   }, { expirationTtl: GAME_TTL });
@@ -250,18 +325,135 @@ async function handleFlip(env, player, body) {
 
   out.done = true;
   try {
-    Object.assign(out, await recordResult(env, player, finished));
+    Object.assign(out, await finisher(env, player, finished));
   } catch (e) {
-    console.error('[memory-match] board write failed:', e && e.message);
+    console.error('[memory-match] result write failed:', e && e.message);
     Object.assign(out, { recorded: false, best: null, improved: false, board: null });
   }
   return json(out);
+}
+
+function handleFlip(env, player, body) {
+  return doFlip(env, player, body, GAME_PREFIX + player.userId, recordResult);
+}
+
+function handleDailyFlip(env, player, body) {
+  return doFlip(env, player, body, DAILY_GAME_PREFIX + player.userId, recordDailyResult);
+}
+
+/* Record a finished daily run on the day's board. One entry per player, so a
+   second completion is a no-op (idempotent) — but the start gate already
+   refuses a replay once a player is on the board, so this is defence in depth.
+   The board is this day's ranking, fewest moves first; it is never written to
+   the monthly ranked boards. */
+async function recordDailyResult(env, player, finished) {
+  const dk = finished.dayKey || dayKey();
+  const key = DAILY_BOARD_PREFIX + dk;
+  let already = false;
+  let best = finished.moves;
+  let rank = null;
+  let total = 0;
+  await env.MARKETPLACE.mutate(key, (current) => {
+    const board = (current && Array.isArray(current.results))
+      ? current : { dayKey: dk, pairs: finished.pairs, results: [] };
+    const sort = (arr) => arr.sort((a, b) => (a.score - b.score) || ((a.finishedAt || 0) - (b.finishedAt || 0)));
+    const existing = board.results.find(r => String(r.id) === player.userId);
+    if (existing) {
+      already = true;
+      best = existing.score;
+      sort(board.results);
+      rank = board.results.findIndex(r => String(r.id) === player.userId) + 1;
+      total = board.results.length;
+      return undefined;
+    }
+    board.results.push({ id: player.userId, name: player.displayName, score: finished.moves, finishedAt: Date.now() });
+    sort(board.results);
+    if (board.results.length > MAX_DAILY_ENTRIES) board.results = board.results.slice(0, MAX_DAILY_ENTRIES);
+    rank = board.results.findIndex(r => String(r.id) === player.userId) + 1;
+    total = board.results.length;
+    return board;
+  }, { expirationTtl: DAILY_TTL });
+
+  const stored = await env.MARKETPLACE.get(key, 'json');
+  const results = (stored && Array.isArray(stored.results)) ? stored.results : [];
+  return {
+    recorded: !already, already, best, rank, total,
+    dayKey: dk, board: 'memory-match-daily', top: dailyTop(results, player.userId),
+  };
+}
+
+async function handleDailyStart(env, player) {
+  const dk = dayKey();
+  const board = await env.MARKETPLACE.get(DAILY_BOARD_PREFIX + dk, 'json');
+  const results = (board && Array.isArray(board.results)) ? board.results : [];
+  const idx = results.findIndex(r => String(r.id) === player.userId);
+  if (idx >= 0) {
+    return json({
+      daily: true, dailyDone: true, dayKey: dk, pairs: DAILY_PAIRS,
+      best: results[idx].score, rank: idx + 1, total: results.length,
+      top: dailyTop(results, player.userId),
+    });
+  }
+
+  /* A board already started today resumes rather than re-deals, so the move
+     count can't be reset by refreshing a half-played daily. */
+  const existing = await env.MARKETPLACE.get(DAILY_GAME_PREFIX + player.userId, 'json');
+  if (existing && existing.dayKey === dk && !existing.done) {
+    return json({
+      daily: true, dayKey: dk, pairs: existing.pairs, board: 'memory-match-daily',
+      gameId: existing.gameId, resumed: true, game: publicGame(existing),
+      total: results.length, top: dailyTop(results, player.userId),
+    });
+  }
+
+  const pairs = DAILY_PAIRS;
+  const game = {
+    gameId: crypto.randomUUID(),
+    userId: player.userId,
+    set: 'default',
+    pairs,
+    daily: true,
+    dayKey: dk,
+    deck: seededDeck(pairs, dk),
+    matched: new Array(pairs * 2).fill(0),
+    open: null,
+    flips: [],
+    moves: 0,
+    pairsFound: 0,
+    done: false,
+    startedAt: Date.now(),
+  };
+  await env.MARKETPLACE.mutate(DAILY_GAME_PREFIX + player.userId, () => game, { expirationTtl: GAME_TTL });
+  return json({
+    daily: true, dayKey: dk, pairs, board: 'memory-match-daily', gameId: game.gameId, resumed: false,
+    total: results.length, top: dailyTop(results, player.userId),
+  });
+}
+
+async function dailyGet(env, player) {
+  const dk = dayKey();
+  const board = await env.MARKETPLACE.get(DAILY_BOARD_PREFIX + dk, 'json');
+  const results = (board && Array.isArray(board.results)) ? board.results : [];
+  const idx = results.findIndex(r => String(r.id) === player.userId);
+  const g = await env.MARKETPLACE.get(DAILY_GAME_PREFIX + player.userId, 'json');
+  const game = (g && g.dayKey === dk && !g.done) ? publicGame(g) : null;
+  return json({
+    mode: 'daily', dayKey: dk, pairs: DAILY_PAIRS,
+    done: idx >= 0,
+    best: idx >= 0 ? results[idx].score : null,
+    rank: idx >= 0 ? idx + 1 : null,
+    total: results.length,
+    top: dailyTop(results, player.userId),
+    game,
+  });
 }
 
 export async function onRequestGet(context) {
   const { env, request } = context;
   const player = getPlayer(request);
   if (!player) return json({ error: 'Not logged in' }, 401);
+  const url = new URL(request.url);
+  if (url.searchParams.get('mode') === 'daily') return dailyGet(env, player);
   const g = await env.MARKETPLACE.get(GAME_PREFIX + player.userId, 'json');
   if (!g) return json({ game: null });
   return json({ game: publicGame(g) });
@@ -276,7 +468,8 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
   if (!body || typeof body !== 'object') return json({ error: 'Invalid request' }, 400);
 
-  if (body.action === 'start') return handleStart(env, player, body);
-  if (body.action === 'flip') return handleFlip(env, player, body);
+  const daily = body.mode === 'daily' || body.daily === true;
+  if (body.action === 'start') return daily ? handleDailyStart(env, player) : handleStart(env, player, body);
+  if (body.action === 'flip') return daily ? handleDailyFlip(env, player, body) : handleFlip(env, player, body);
   return json({ error: 'Unknown action' }, 400);
 }

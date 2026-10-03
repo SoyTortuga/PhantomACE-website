@@ -966,6 +966,62 @@ html, body {
 @media (prefers-reduced-motion: reduce) { .ov-raid-track i { transition: none; } }
 
 /* ══════════════════════════════════════════════
+   BONE TITHE — the community offering goal.
+
+   A horizontal progress bar the whole site fills by tithing skulls. Black/
+   grey/red/white only, full borders (no side rails), no shadow, no blur. The
+   author rule setting display:flex beats the UA [hidden]{display:none}, so the
+   guard restores hiding when the panel carries [hidden].
+   ══════════════════════════════════════════════ */
+.ov-tithe[hidden] { display: none; }
+.ov-tithe {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: 360px;
+  max-width: 72vw;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 14px 12px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid #2a2a2a;
+  border-radius: 7px;
+  font-family: system-ui, sans-serif;
+}
+.ov-tithe.is-complete { border-color: #ff0000; }
+.ov-tithe-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ov-tithe-title {
+  font-size: 13px; font-weight: 800; letter-spacing: 0.04em;
+  color: #ff5555; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ov-tithe-pct { font-size: 13px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; flex: none; }
+.ov-tithe.is-complete .ov-tithe-pct { color: #ff5a1f; }
+.ov-tithe-track {
+  position: relative;
+  width: 100%;
+  height: 16px;
+  background: #160000;
+  border: 1px solid #3a0000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ov-tithe-track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ff0000, #ff5a1f);
+  transition: width 0.5s ease;
+}
+.ov-tithe.is-complete .ov-tithe-track i { background: linear-gradient(90deg, #ff5a1f, #ffffff); }
+.ov-tithe-amt { font-size: 11px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; text-align: center; }
+.ov-tithe-sub { font-size: 10px; color: #9a9a9a; text-align: center; }
+.ov-tithe-top { list-style: none; margin: 2px 0 0; padding: 0; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.ov-tithe-top li { font-size: 10px; color: #ddd; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .ov-tithe-track i { transition: none; } }
+
+/* ══════════════════════════════════════════════
    COMMANDER BINGO — the standing panel.
 
    The same furniture as MTGBBB (progress bar, roster count, a board) so the
