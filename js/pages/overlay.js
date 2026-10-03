@@ -723,15 +723,29 @@
   var ALERT_SOUND_COOLDOWN_MS = 1500;
   var lastAlertSoundAt = 0;
   var alertSound = null;
+  var alertSoundSrcNow = '';     // src currently loaded on the reused element
+  /* Per-alert custom sounds set from the Overlay Dashboard, refreshed from the
+     poll (see poll()). { type: { url, volume } }. A type not listed falls back
+     to the default sting. */
+  var alertSoundCfg = {};
   function playAlertSound(type) {
     if (!SOUND_ALERT_TYPES[type]) return;
     if (audioMuted || !isAudioLeader) return;
     var now = Date.now();
     if (now - lastAlertSoundAt < ALERT_SOUND_COOLDOWN_MS) return;
     lastAlertSoundAt = now;
+    /* Per-type uploaded sound → default sting → silence. The per-type volume is
+       relative to the shared alert volume, so the master slider still attenuates
+       and muting still silences everything. */
+    var cfg = alertSoundCfg[type];
+    var src = (cfg && typeof cfg.url === 'string' && cfg.url) ? cfg.url : ALERT_SOUND_SRC;
+    var perVol = (cfg && typeof cfg.volume === 'number') ? Math.max(0, Math.min(1, cfg.volume)) : 1;
     try {
-      if (!alertSound) alertSound = new Audio(ALERT_SOUND_SRC);   // created once, reused
-      alertSound.volume = alertVolume;
+      if (!alertSound) alertSound = new Audio();                  // created once, reused
+      /* Swap src only when the chosen sound changes — not every fire — so the
+         same sting is not re-fetched each time. */
+      if (src !== alertSoundSrcNow) { alertSound.src = src; alertSoundSrcNow = src; }
+      alertSound.volume = alertVolume * perVol;
       alertSound.currentTime = 0;                                 // restart the one element
       alertSound.play().catch(function () { /* blocked outside OBS, or file absent — silent */ });
     } catch (e) { /* no Audio element — the card still shows */ }
@@ -1744,6 +1758,12 @@
            within a poll, no reload. */
         if (typeof data.hatchSound === 'boolean') {
           hatchSoundOn = data.hatchSound;
+        }
+        /* Per-alert custom sounds, set from the dashboard; reaches the overlay
+           within a poll, no reload. Absent field (older server) leaves the
+           default sting in place. */
+        if (data.alertSounds && typeof data.alertSounds === 'object') {
+          alertSoundCfg = data.alertSounds;
         }
 
         /* RELOAD ON COMMAND. An OBS browser source holds this page open for

@@ -35,15 +35,24 @@ const TYPE_EXT = {
   'image/webp': 'webp',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
+  /* Short alert stings uploaded from the Overlay Dashboard. The extension is
+     derived from the content type like everything else, so audio/mp4 is stored
+     as .m4a rather than colliding with video/mp4's .mp4. */
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/mp4': 'm4a',
 };
 
 const EXT_TYPE = Object.fromEntries(Object.entries(TYPE_EXT).map(([t, e]) => [e, t]));
 
 /** Exactly what this store generates, and nothing else. */
-const NAME_RE = /^[0-9]{13}_[a-z0-9]{10}\.(jpg|png|gif|webp|mp4|webm)$/;
+const NAME_RE = /^[0-9]{13}_[a-z0-9]{10}\.(jpg|png|gif|webp|mp4|webm|mp3|ogg|wav|m4a)$/;
 
 export const MAX_SIZE = 10 * 1024 * 1024;
 export const ALLOWED_TYPES = Object.keys(TYPE_EXT);
+/** The audio subset of ALLOWED_TYPES — callers cap these smaller than media. */
+export const AUDIO_TYPES = Object.keys(TYPE_EXT).filter(t => t.startsWith('audio/'));
 
 export function createMediaStore(dir) {
   const root = path.resolve(dir);

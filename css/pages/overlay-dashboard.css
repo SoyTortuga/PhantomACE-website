@@ -189,6 +189,65 @@
   font-size: 13px;
 }
 
+/* ── Alert Sounds ──────────────────────────────
+   One row per alert type: name, current-state label, a volume slider, then the
+   Upload / Test / Clear controls. Rows wrap on a narrow screen and divide with a
+   top border — no side-border rails, no box-shadow. */
+.od-sounds {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.od-sound-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 0;
+}
+.od-sound-row + .od-sound-row {
+  border-top: 1px solid var(--border);
+}
+.od-sound-name {
+  font-weight: 700;
+  color: var(--text-pri);
+  min-width: 90px;
+}
+.od-sound-state {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 96px;
+}
+.od-sound-volwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+.od-sound-vol {
+  flex: 1 1 auto;
+  min-width: 90px;
+  vertical-align: middle;
+}
+.od-sound-volval {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-sec);
+  min-width: 40px;
+  text-align: right;
+}
+.od-sound-row .btn-secondary {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 600px) {
+  .od-sound-name,
+  .od-sound-state { min-width: 0; flex: 1 1 100%; }
+  .od-sound-volwrap { flex: 1 1 100%; }
+  .od-sound-row .btn-secondary { flex: 1 1 auto; min-height: 42px; }
+}
+
 /* ── Customizable Wheel ────────────────────────
    One editable row per segment: label, weight, colour swatch + select. */
 .od-wheel-rows {

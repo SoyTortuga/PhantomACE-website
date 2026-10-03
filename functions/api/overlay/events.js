@@ -355,6 +355,12 @@ export async function onRequestGet(context) {
   const hcfg = await env.MARKETPLACE.get('dino_hatch_config', 'json');
   const hatchSound = !!(hcfg && hcfg.sound === true);
 
+  /* Per-alert custom sounds, read each poll so an upload or change reaches the
+     open overlay within a second with no reload — same as alertVolume. The
+     overlay falls back to its default sting for any type not listed here. */
+  const { readAlertSounds } = await import('../alert-sounds.js');
+  const alertSounds = await readAlertSounds(env);
+
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded
      source must not replay an hour of alerts onto the stream. */
@@ -382,6 +388,7 @@ export async function onRequestGet(context) {
     alertVolume: alertVolume,
     audioLeader: audioLeader,
     hatchSound: hatchSound,
+    alertSounds: alertSounds,
     serverNow: Date.now(),
   }), {
     status: 200,

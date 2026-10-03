@@ -158,6 +158,7 @@ export const SINGLETONS = {
   overlay_control:       { table: 'singletons', expiry: 'none' },
   room_of_week:          { table: 'singletons', expiry: 'none' },
   overlay_state:         { table: 'singletons', expiry: 'real' },
+  alert_sounds:          { table: 'singletons', expiry: 'none' },
 
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a

@@ -21,8 +21,15 @@
    what the file is.
    ══════════════════════════════════════════════ */
 
+/* The allowlist comes from the media store so the pre-check here cannot drift
+   from what the store will actually accept in put(). Audio was added for the
+   overlay's per-alert sounds. */
+import { ALLOWED_TYPES, AUDIO_TYPES } from '../../../server/lib/media-store.js';
+
 const MAX_SIZE = 10 * 1024 * 1024;
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+/* A sting is a second or two — cap it far below the image/video limit so a
+   mis-uploaded song cannot sit on the overlay's audio path. */
+const MAX_AUDIO_SIZE = 2 * 1024 * 1024;
 const MAX_INDEX = 500;
 
 function json(data, status = 200) {
@@ -42,7 +49,7 @@ function getSession(request) {
 /* Must match the filter bar and the form's own <select> on media.html.
    A category the page cannot filter by is an item nobody will ever see
    except under "All". */
-const CATEGORIES = ['clip', 'screenshot', 'art', 'highlight'];
+const CATEGORIES = ['clip', 'screenshot', 'art', 'highlight', 'audio'];
 
 /* Visibility, lowest first — the same ladder js/auth.js uses. '' means
    everyone, including logged-out visitors. */
@@ -73,14 +80,17 @@ export async function onRequestPost(context) {
   /* Who may SEE it, not who uploaded it. Empty means everyone. */
   const visibility = String(formData.get('role') || '');
 
+  const isAudio = AUDIO_TYPES.includes(file.type);
+
   if (!file || typeof file.arrayBuffer !== 'function') return json({ error: 'No file received.' }, 400);
   if (!title) return json({ error: 'Give it a title.' }, 400);
   if (!CATEGORIES.includes(category)) return json({ error: 'Unknown category.' }, 400);
   if (visibility && !ROLES.includes(visibility)) return json({ error: 'Unknown visibility.' }, 400);
-  if (file.size > MAX_SIZE) return json({ error: 'File too large — 10MB maximum.' }, 400);
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return json({ error: 'Images (jpg, png, gif, webp) and video (mp4, webm) only.' }, 400);
+    return json({ error: 'Images (jpg, png, gif, webp), video (mp4, webm) and audio (mp3, ogg, wav, m4a) only.' }, 400);
   }
+  if (isAudio && file.size > MAX_AUDIO_SIZE) return json({ error: 'Audio too large — 2MB maximum.' }, 400);
+  if (!isAudio && file.size > MAX_SIZE) return json({ error: 'File too large — 10MB maximum.' }, 400);
 
   let name;
   try {
@@ -96,7 +106,7 @@ export async function onRequestPost(context) {
     title,
     category,
     role: visibility || null,
-    type: file.type.startsWith('video/') ? 'video' : 'image',
+    type: isAudio ? 'audio' : (file.type.startsWith('video/') ? 'video' : 'image'),
     contentType: file.type,
     size: file.size,
     uploadedBy: session.display_name,
@@ -104,13 +114,19 @@ export async function onRequestPost(context) {
     uploadedAt: Date.now(),
   };
 
-  /* mutate() rather than get-then-put: two moderators uploading at once
-     would otherwise each write an index built before the other's entry, and
-     one upload would vanish from the page while its file sat on disk. */
-  await env.MARKETPLACE.mutate('media_index', (current) => {
-    const index = Array.isArray(current) ? current : [];
-    return [meta, ...index].slice(0, MAX_INDEX);
-  });
+  /* Audio is a utility upload — an overlay alert sting referenced only by the
+     alert_sounds config, never a gallery item. Keeping it out of media_index
+     stops a sound from showing as a broken tile on the public media page; the
+     file is still served from /cdn/media and the url is returned below. */
+  if (!isAudio) {
+    /* mutate() rather than get-then-put: two moderators uploading at once
+       would otherwise each write an index built before the other's entry, and
+       one upload would vanish from the page while its file sat on disk. */
+    await env.MARKETPLACE.mutate('media_index', (current) => {
+      const index = Array.isArray(current) ? current : [];
+      return [meta, ...index].slice(0, MAX_INDEX);
+    });
+  }
 
   return json({ success: true, item: meta });
 }

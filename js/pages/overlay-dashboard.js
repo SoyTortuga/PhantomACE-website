@@ -785,6 +785,192 @@ function initAlertToggles() {
     .catch(function () { /* leave empty */ });
 }
 
+/* ── Alert Sounds ────────────────────────────────────────────────────────────
+   One row per celebratory alert type. Upload a sting (via the shared media
+   upload endpoint, which now accepts audio), set a volume, Test it, or Clear it
+   back to the overlay's default. The config lives at /api/alert-sounds and the
+   overlay reads it on its poll. */
+var OD_SOUND_TYPES = [
+  { type: 'sub', label: 'New Sub' },
+  { type: 'resub', label: 'Resub' },
+  { type: 'giftsub', label: 'Gift Subs' },
+  { type: 'raid', label: 'Raid' },
+  { type: 'follow', label: 'Follow' },
+  { type: 'cheer', label: 'Cheer' },
+];
+var OD_SOUND_DEFAULT = '/assets/audio/alert.mp3';
+/* One reused element for previews — never new Audio() per press. */
+var odTestAudio = null;
+/* { type: { url, volume } } — mirrors the stored config so a volume drag can
+   re-save with the current url, and Test knows what to play. */
+var odSoundState = {};
+
+function odSoundStatus(type, text) {
+  const row = document.querySelector('.od-sound-row[data-type="' + type + '"]');
+  if (!row) return;
+  const state = row.querySelector('.od-sound-state');
+  if (state) state.textContent = text;
+}
+
+function renderAlertSounds() {
+  const box = document.getElementById('odAlertSounds');
+  if (!box) return;
+  box.innerHTML = '';
+  OD_SOUND_TYPES.forEach(function (a) {
+    const cfg = odSoundState[a.type];
+    const vol = cfg && typeof cfg.volume === 'number' ? Math.round(cfg.volume * 100) : 100;
+
+    const row = document.createElement('div');
+    row.className = 'od-sound-row';
+    row.dataset.type = a.type;
+
+    const name = document.createElement('span');
+    name.className = 'od-sound-name';
+    name.textContent = a.label;
+
+    const state = document.createElement('span');
+    state.className = 'od-sound-state';
+    state.textContent = cfg && cfg.url ? 'Custom sound' : 'Default';
+
+    const vwrap = document.createElement('span');
+    vwrap.className = 'od-sound-volwrap';
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.className = 'od-sound-vol';
+    slider.min = '0'; slider.max = '100'; slider.step = '5'; slider.value = String(vol);
+    const vval = document.createElement('span');
+    vval.className = 'od-sound-volval';
+    vval.textContent = vol + '%';
+    slider.addEventListener('input', function () { vval.textContent = slider.value + '%'; });
+    slider.addEventListener('change', function () { onSoundVolume(a.type, parseInt(slider.value, 10)); });
+    vwrap.appendChild(slider);
+    vwrap.appendChild(vval);
+
+    const upload = document.createElement('button');
+    upload.className = 'btn-secondary od-sound-upload'; upload.type = 'button';
+    upload.textContent = cfg && cfg.url ? 'Replace' : 'Upload';
+
+    const test = document.createElement('button');
+    test.className = 'btn-secondary od-sound-test'; test.type = 'button'; test.textContent = 'Test';
+
+    const clear = document.createElement('button');
+    clear.className = 'btn-secondary od-sound-clear'; clear.type = 'button'; clear.textContent = 'Clear';
+    clear.disabled = !(cfg && cfg.url);
+
+    const file = document.createElement('input');
+    file.type = 'file'; file.className = 'od-sound-file'; file.accept = 'audio/mpeg,audio/ogg,audio/wav,audio/mp4,.mp3,.ogg,.wav,.m4a'; file.hidden = true;
+
+    upload.addEventListener('click', function () { file.click(); });
+    file.addEventListener('change', function () {
+      if (file.files && file.files[0]) uploadSound(a.type, file.files[0], upload, slider);
+      file.value = '';
+    });
+    test.addEventListener('click', function () { testSound(a.type, parseInt(slider.value, 10)); });
+    clear.addEventListener('click', function () { clearSound(a.type, clear); });
+
+    row.appendChild(name);
+    row.appendChild(state);
+    row.appendChild(vwrap);
+    row.appendChild(upload);
+    row.appendChild(test);
+    row.appendChild(clear);
+    row.appendChild(file);
+    box.appendChild(row);
+  });
+}
+
+async function postAlertSound(payload) {
+  const res = await fetch('/api/alert-sounds', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  });
+  const d = await res.json().catch(function () { return {}; });
+  return { ok: res.ok, status: res.status, data: d };
+}
+
+async function uploadSound(type, fileObj, btn, slider) {
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  odSoundStatus(type, 'Uploading…');
+  try {
+    const fd = new FormData();
+    fd.set('title', 'Alert sound: ' + type);
+    fd.set('category', 'audio');
+    fd.set('file', fileObj);
+    const up = await fetch('/api/media/upload', { method: 'POST', credentials: 'same-origin', body: fd });
+    const upData = await up.json().catch(function () { return {}; });
+    if (!up.ok || !upData.item || !upData.item.url) {
+      showBotStatus(upData.error || 'Could not upload that sound.', true);
+      odSoundStatus(type, odSoundState[type] && odSoundState[type].url ? 'Custom sound' : 'Default');
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+      return;
+    }
+    const volume = Math.max(0, Math.min(1, (parseInt(slider && slider.value, 10) || 100) / 100));
+    const saved = await postAlertSound({ type: type, url: upData.item.url, volume: volume });
+    if (saved.ok && saved.data.success) {
+      odSoundState = saved.data.sounds || odSoundState;
+      showBotStatus('Alert sound set for ' + type + '.', false);
+      renderAlertSounds();
+    } else {
+      showBotStatus(saved.data.error || 'Could not save that sound.', true);
+      odSoundStatus(type, odSoundState[type] && odSoundState[type].url ? 'Custom sound' : 'Default');
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+  } catch {
+    showBotStatus('Network error uploading the sound.', true);
+    odSoundStatus(type, odSoundState[type] && odSoundState[type].url ? 'Custom sound' : 'Default');
+    if (btn) { btn.disabled = false; btn.textContent = original; }
+  }
+}
+
+async function onSoundVolume(type, pct) {
+  const cfg = odSoundState[type];
+  const volume = Math.max(0, Math.min(1, (pct || 0) / 100));
+  /* With no uploaded sound there is nothing to attach a volume to; the value is
+     kept on screen and used when a sound is uploaded. */
+  if (!cfg || !cfg.url) return;
+  const saved = await postAlertSound({ type: type, url: cfg.url, volume: volume });
+  if (saved.ok && saved.data.success) {
+    odSoundState = saved.data.sounds || odSoundState;
+    showBotStatus('Volume set for ' + type + ' (' + pct + '%).', false);
+  } else {
+    showBotStatus(saved.data.error || 'Could not save the volume.', true);
+  }
+}
+
+function testSound(type, pct) {
+  const cfg = odSoundState[type];
+  const src = cfg && cfg.url ? cfg.url : OD_SOUND_DEFAULT;
+  try {
+    if (!odTestAudio) odTestAudio = new Audio();
+    if (odTestAudio.src.indexOf(src) === -1) odTestAudio.src = src;
+    odTestAudio.volume = Math.max(0, Math.min(1, (pct || 0) / 100));
+    odTestAudio.currentTime = 0;
+    odTestAudio.play().catch(function () { showBotStatus('Could not play the sound (none uploaded yet, or the file is missing).', true); });
+  } catch { /* no audio element */ }
+}
+
+async function clearSound(type, btn) {
+  if (btn) btn.disabled = true;
+  const saved = await postAlertSound({ type: type, clear: true });
+  if (saved.ok && saved.data.success) {
+    odSoundState = saved.data.sounds || {};
+    showBotStatus('Alert sound for ' + type + ' reset to default.', false);
+    renderAlertSounds();
+  } else {
+    showBotStatus(saved.data.error || 'Could not clear that sound.', true);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function initAlertSounds() {
+  const box = document.getElementById('odAlertSounds');
+  if (!box) return;
+  fetch('/api/alert-sounds', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { odSoundState = (d && d.sounds) ? d.sounds : {}; renderAlertSounds(); })
+    .catch(function () { odSoundState = {}; renderAlertSounds(); });
+}
+
 /* ── Giveaway: replay last reveal ──────────────────────────────────────────
    The draws live on Bot Control; this only re-pushes the last stored reel.
    Each button is greyed until the server reports a stored reveal for it. */
@@ -1193,6 +1379,7 @@ function initOverlayDashboard(data) {
   initGamesOnOverlay();
   initTestAlerts();
   initAlertToggles();
+  initAlertSounds();
   initWheel();
   initGiveawayReplay();
   if (data.isBroadcaster) initOverlayPanel(data.overlayUrl);
