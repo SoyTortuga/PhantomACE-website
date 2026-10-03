@@ -143,6 +143,33 @@
     <ol class="ov-mc-list" id="ovMcList"></ol>
   </div>
 
+  <!-- Streamer vs Chat clash: its OWN standing panel (not the room panel
+       above), driven by mana-clash-chat.js. The streamer's frozen roll sits on
+       one side, chat's pooled hand on the other, resolved server-side. A
+       movable panel like the others; hidden until a clash is live, and it
+       yields to an alert the same way the room panel does. -->
+  <div class="ov-vsc" id="ovVsc" hidden>
+    <div class="ov-vsc-head">
+      <span class="ov-vsc-title">MANA CLASH</span>
+      <span class="ov-vsc-sub">Streamer vs Chat</span>
+      <span class="ov-vsc-timer" id="ovVscTimer"></span>
+    </div>
+    <div class="ov-vsc-body">
+      <div class="ov-vsc-side" id="ovVscStreamer">
+        <div class="ov-vsc-who">Streamer</div>
+        <div class="ov-vsc-dice" id="ovVscStreamerDice"></div>
+        <div class="ov-vsc-score" id="ovVscStreamerScore">0</div>
+      </div>
+      <div class="ov-vsc-vs" id="ovVscVs">VS</div>
+      <div class="ov-vsc-side" id="ovVscChat">
+        <div class="ov-vsc-who">Chat <span class="ov-vsc-count" id="ovVscChatCount"></span></div>
+        <div class="ov-vsc-dice" id="ovVscChatDice"></div>
+        <div class="ov-vsc-score" id="ovVscChatScore">0</div>
+      </div>
+    </div>
+    <div class="ov-vsc-note" id="ovVscNote"></div>
+  </div>
+
   <!-- Pham Check-In reminder: the reaper raising a sign, shown on a timer
        or the moderator button. A movable panel like the others (position it
        in the layout editor); hidden until it fires. -->
@@ -206,6 +233,7 @@
   <script src="/js/pages/overlay-skull-raid.js" defer></script>
   <script src="/js/pages/overlay-bone-tithe.js" defer></script>
   <script src="/js/pages/overlay-mana-clash.js" defer></script>
+  <script src="/js/pages/overlay-mana-clash-chat.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>
   <script src="/js/pages/overlay-layout.js" defer></script>
 </body>

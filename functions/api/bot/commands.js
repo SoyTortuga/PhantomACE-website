@@ -334,6 +334,28 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* !clash — a chatter joins the live Streamer-vs-Chat Mana Clash. Their
+     command rolls one fair die into chat's shared pool, resolved server-side
+     against the streamer's frozen roll with the real Mana Clash scoring. One
+     die per chatter per clash (the rate limit, enforced in mana-clash-chat.js),
+     bounded participant map, no per-message log. No active clash → a quiet
+     no-op. Deliberately silent like !hit: the overlay is the feedback, and a
+     reply per chatter would bury the channel during exactly the busy minute
+     the clash is open. */
+  if (parsed.command === '!clash') {
+    try {
+      const { clashFromChat } = await import('../mana-clash-chat.js');
+      await clashFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+      });
+    } catch (err) {
+      /* A broken clash must not break chat commands. */
+      console.error('[mana-clash-chat/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

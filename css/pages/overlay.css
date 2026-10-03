@@ -1388,6 +1388,147 @@ body.ov-alerting .ov-mc {
   padding: 6px 10px;
 }
 
+/* ══════════════════════════════════════════════
+   STREAMER vs CHAT — the clash event panel
+
+   A sibling of the room panel above, same flat-translucent-black-plus-border
+   look (no box-shadow, no backdrop-filter — depth from borders, which also
+   composites cleanly over game footage). Hidden until a clash is live; yields
+   to an alert the same way .ov-mc does.
+   ══════════════════════════════════════════════ */
+
+/* The panel sets display:flex below, which would beat the UA
+   [hidden]{display:none}, so hiding needs this explicit guard. */
+.ov-vsc[hidden] { display: none; }
+.ov-vsc {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(620px, 56vw);
+  padding: 16px 20px 14px;
+  background: rgba(8, 8, 8, 0.9);
+  border: 1px solid #2a2a2a;
+  border-top: 3px solid #ff0000;
+  border-radius: 8px;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 5;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+body.ov-alerting .ov-vsc {
+  opacity: 0.22;
+  transform: translate(-50%, calc(-50% + 90px)) scale(0.97);
+}
+
+.ov-vsc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ov-vsc-title {
+  font-family: 'GodOfWar', serif;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: #ff0000;
+}
+.ov-vsc-sub {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #999;
+}
+.ov-vsc-timer {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffaa00;
+}
+
+.ov-vsc-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ov-vsc-side {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #262626;
+  border-radius: 6px;
+  text-align: center;
+}
+/* A win brightens its own border; a loss dims the whole side. State is shown
+   by border and opacity, never a coloured side-rail. */
+.ov-vsc-side.is-win { border-color: #ff0000; }
+.ov-vsc-side.is-lose { opacity: 0.5; }
+
+.ov-vsc-who {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #ddd;
+  margin-bottom: 8px;
+}
+.ov-vsc-count { color: #999; font-weight: 400; }
+
+.ov-vsc-dice {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 26px;
+}
+.ov-vsc-die {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  font-style: normal;
+  color: #fff;
+  background: #111;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+}
+/* The scoring dice in the best keep — brighter so the score reads. */
+.ov-vsc-die.is-kept {
+  color: #ffaa00;
+  border-color: rgba(255, 170, 0, 0.5);
+  background: #1a1206;
+}
+
+.ov-vsc-score {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-vsc-vs {
+  flex: 0 0 auto;
+  font-family: 'GodOfWar', serif;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  color: #ff0000;
+}
+
+.ov-vsc-note {
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #ccc;
+  min-height: 16px;
+}
+
 
 /* ── Chat Maze ─────────────────────────────────────────────────────────
    The featured panel while a maze runs: board dead-centre right, the pad
