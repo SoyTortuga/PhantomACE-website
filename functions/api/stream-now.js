@@ -48,7 +48,11 @@ export const STREAM_NOW_TTL_SECONDS = 180;
    not the room-based artillery game — it rides this one pointer like the others
    so starting it retires whatever game was on stream (one game on stream, last
    writer wins). Its own overlay panel polls its own endpoint for the wind. */
-const GAMES = ['bingo', 'mtgbbb', 'maze', 'scramble', 'mana-clash', 'phamshock'];
+/* 'dino-park' is the Dino Stream Safari event (dino-safari.js), not the
+   single-player park — it rides this one pointer like the others so starting a
+   Safari retires whatever game was on stream. Its own overlay panel polls its
+   own endpoint for the current wild spawn. */
+const GAMES = ['bingo', 'mtgbbb', 'maze', 'scramble', 'mana-clash', 'phamshock', 'dino-park'];
 
 /**
  * Refresh (or set) the pointer for `info.game`, sliding its TTL forward.

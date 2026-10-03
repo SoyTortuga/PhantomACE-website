@@ -378,6 +378,28 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* !catch — a chatter races to catch the live wild dino during a Dino Stream
+     Safari. Their command adds them to the current spawn's catchers; when the
+     catch window closes the winner (raffle or first, per the session's rule) is
+     granted that exact dino as an egg, server-side (dino-safari.js). One catch
+     per chatter per spawn (the rate limit), bounded catcher set, no per-message
+     log. No live Safari / closed window → a quiet no-op. Silent like
+     !hit / !clash / !wind: the overlay is the feedback, and a reply per chatter
+     would bury the channel during the seconds the window is open. */
+  if (parsed.command === '!catch') {
+    try {
+      const { catchFromChat } = await import('../dino-safari.js');
+      await catchFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+      });
+    } catch (err) {
+      /* A broken catch must not break chat commands. */
+      console.error('[dino-safari/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

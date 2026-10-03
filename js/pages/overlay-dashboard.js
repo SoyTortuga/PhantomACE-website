@@ -1410,6 +1410,13 @@ function initStreamNight() {
 
   on('odWindStartBtn', function (e) { nightPost('/api/pham-wind-night', { action: 'start' }, e.currentTarget, 'Wind Night started — chat steers with !wind left / !wind right.'); });
   on('odWindStopBtn', function (e) { nightPost('/api/pham-wind-night', { action: 'end' }, e.currentTarget, 'Wind Night ended.'); });
+
+  on('odSafariStartBtn', function (e) {
+    const rule = (document.getElementById('odSafariRule') || {}).value === 'first' ? 'first' : 'raffle';
+    nightPost('/api/dino-safari', { action: 'start', rule: rule },
+      e.currentTarget, 'Dino Safari started (' + (rule === 'first' ? 'first catch' : 'raffle') + ') — chat catches wild dinos with !catch.');
+  });
+  on('odSafariStopBtn', function (e) { nightPost('/api/dino-safari', { action: 'stop' }, e.currentTarget, 'Dino Safari ended.'); });
 }
 
 function initOverlayDashboard(data) {

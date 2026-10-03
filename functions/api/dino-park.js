@@ -101,7 +101,18 @@ export async function grantEgg(env, userId, rarity, opts = {}) {
   if (!userId) return { success: false, error: 'Missing user' };
   if (!HATCH_TIMES[rarity]) return { success: false, error: 'Invalid rarity' };
 
-  const speciesId = rollSpeciesId(rarity);
+  /* A caller may PIN the exact species. The overlay hatch reveal and the Dino
+     Stream Safari both show a SPECIFIC wild dino on stream, so the egg the
+     winner receives must be that dino — not a fresh re-roll. A pin is honoured
+     only when it exists AND sits at the requested rarity (so an egg can never be
+     filed under the wrong tier); anything else falls back to the uniform
+     in-tier roll, exactly as every existing caller already gets. */
+  let speciesId;
+  if (opts.speciesId && SPECIES[opts.speciesId] && SPECIES[opts.speciesId].rarity === rarity) {
+    speciesId = opts.speciesId;
+  } else {
+    speciesId = rollSpeciesId(rarity);
+  }
   if (!speciesId) return { success: false, error: 'Invalid rarity' };
 
   /* ── WHY THIS IS UNDER A LOCK ───────────────────────────────────────

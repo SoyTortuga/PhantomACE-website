@@ -1630,6 +1630,123 @@ body.ov-alerting .ov-wind {
 .ov-wind-note b { color: #fff; }
 
 
+/* ── Dino Stream Safari ────────────────────────────────────────────────
+   A standing panel like the wind/clash ones: hidden until a Safari is live,
+   shows the current wild dino (art + name + rarity), the catch countdown, and
+   the winner when a spawn resolves. The rarity colours are the sanctioned
+   palette exception (css/variables.css tokens, never hardcoded). Borders carry
+   the depth — no box-shadow, no side-border rails, no backdrop-filter. */
+.ov-safari[hidden] { display: none; }
+.ov-safari {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 42vw);
+  padding: 14px 18px 12px;
+  background: rgba(8, 8, 8, 0.9);
+  border: 1px solid #2a2a2a;
+  border-top: 3px solid #ff0000;
+  border-radius: 8px;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 5;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+body.ov-alerting .ov-safari {
+  opacity: 0.22;
+  transform: translate(-50%, calc(-50% + 90px)) scale(0.97);
+}
+
+.ov-safari-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ov-safari-title {
+  font-family: 'GodOfWar', serif;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: #ff0000;
+}
+.ov-safari-sub {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #999;
+}
+
+.ov-safari-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ov-safari-art {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid #333;
+  border-radius: 8px;
+}
+.ov-safari-info {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ov-safari-name {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ov-safari-rarity {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fff;
+}
+.ov-safari-timer {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  margin-top: 2px;
+}
+
+/* Rarity drives the name, the rarity label and the art frame — the one
+   sanctioned use of the rarity palette, from the shared tokens. */
+.ov-safari[data-rarity="common"]    .ov-safari-rarity { color: var(--rarity-common); }
+.ov-safari[data-rarity="uncommon"]  .ov-safari-rarity { color: var(--rarity-uncommon); }
+.ov-safari[data-rarity="rare"]      .ov-safari-rarity { color: var(--rarity-rare); }
+.ov-safari[data-rarity="epic"]      .ov-safari-rarity { color: var(--rarity-epic); }
+.ov-safari[data-rarity="legendary"] .ov-safari-rarity { color: var(--rarity-legendary); }
+.ov-safari[data-rarity="uncommon"]  .ov-safari-art { border-color: var(--rarity-uncommon); }
+.ov-safari[data-rarity="rare"]      .ov-safari-art { border-color: var(--rarity-rare); }
+.ov-safari[data-rarity="epic"]      .ov-safari-art { border-color: var(--rarity-epic); }
+.ov-safari[data-rarity="legendary"] .ov-safari-art { border-color: var(--rarity-legendary); }
+
+.ov-safari-note {
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: #ccc;
+}
+.ov-safari-note b { color: #fff; }
+.ov-safari.is-won .ov-safari-note { color: #fff; font-weight: 700; }
+
+
 /* ── Chat Maze ─────────────────────────────────────────────────────────
    The featured panel while a maze runs: board dead-centre right, the pad
    underneath doubling as the live command indicator, the last few inputs

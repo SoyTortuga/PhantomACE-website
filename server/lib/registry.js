@@ -163,6 +163,7 @@ export const SINGLETONS = {
   bone_tithe:            { table: 'singletons', expiry: 'none' },
   mana_clash_vs_chat:    { table: 'singletons', expiry: 'real' },
   pham_wind_night:       { table: 'singletons', expiry: 'real' },
+  dino_safari:           { table: 'singletons', expiry: 'real' },
 
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a
