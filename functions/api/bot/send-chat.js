@@ -377,6 +377,10 @@ export async function dropItemAction(env, code, actorLabel) {
     source: 'manual',
     expiresAt: record.expiresAt,
     redeemPath: '/redeem',
+    /* A dino egg has its own egg-video overlay alert, so skip the standard
+       "claim the code" card for it — the chat message and live-drops feed
+       still carry the code. Other item drops keep their card. */
+    overlayAlert: record.item.type !== 'egg',
   });
 
   const sent = await sendChatMessage(env, msg);

@@ -88,6 +88,14 @@ function eggEvents(env) {
   let rec; try { rec = JSON.parse(raw); } catch { return []; }
   return (rec && Array.isArray(rec.events) ? rec.events : []).filter(e => e.type === 'egg-video');
 }
+/* Any 'drop' cards (the standard "claim the code" overlay alert). An egg has
+   its own video, so it must push NONE of these. */
+function dropCards(env) {
+  const raw = env._store.get('overlay_events');
+  if (!raw) return [];
+  let rec; try { rec = JSON.parse(raw); } catch { return []; }
+  return (rec && Array.isArray(rec.events) ? rec.events : []).filter(e => e.type === 'drop');
+}
 const fresh = () => { refuseSend = false; return makeEnv(); };
 
 /* ── Every rarity fires exactly one egg-video event, tagged with its rarity ── */
@@ -99,6 +107,7 @@ for (const rarity of ['common', 'uncommon', 'rare', 'mythic']) {
   check(`a ${rarity} egg drop pushes exactly one egg-video event`, evs.length, 1);
   check(`and the event carries the ${rarity} rarity`, evs[0] && evs[0].rarity, rarity);
   check(`and marks it not a mutation`, evs[0] && evs[0].mutation, false);
+  check(`a ${rarity} egg drop fires NO standard drop card`, dropCards(env).length, 0);
 }
 
 /* ── A mutation egg fires the clip too, flagged as a mutation ─────────────── */

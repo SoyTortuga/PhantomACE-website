@@ -276,19 +276,25 @@ export async function recordLiveDrop(env, entry) {
      same reason the feed itself is: this is the single point every drop
      passes through, so nothing can be added later that reaches chat without
      reaching the screen. */
-  const { pushOverlayEvent } = await import('./overlay/events.js');
-  await pushOverlayEvent(env, {
-    type: 'drop',
-    kind: entry.kind,
-    code: entry.code,
-    rarity: entry.rarity,
-    entries: entry.entries || null,
-    itemName: entry.itemName || null,
-    source: entry.source,
-    level: entry.level || null,
-    redeemPath: entry.redeemPath,
-    expiresAt: entry.expiresAt,
-  });
+  /* overlayAlert:false suppresses only the on-screen "claim the code" card,
+     not the chat message or the live-drops feed below. Dino egg drops use this
+     — they have their own egg-video alert, so the standard drop card would be a
+     duplicate. Every other drop keeps its card (default on). */
+  if (entry.overlayAlert !== false) {
+    const { pushOverlayEvent } = await import('./overlay/events.js');
+    await pushOverlayEvent(env, {
+      type: 'drop',
+      kind: entry.kind,
+      code: entry.code,
+      rarity: entry.rarity,
+      entries: entry.entries || null,
+      itemName: entry.itemName || null,
+      source: entry.source,
+      level: entry.level || null,
+      redeemPath: entry.redeemPath,
+      expiresAt: entry.expiresAt,
+    });
+  }
   await env.MARKETPLACE.mutate(LIVE_DROPS_KEY, (current) => {
     const list = current && Array.isArray(current.drops) ? current.drops : [];
     /* Prune by each entry's OWN expiry, never by an external event. */
