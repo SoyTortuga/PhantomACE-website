@@ -36,9 +36,13 @@ the broadcaster grants `channel:read:ads`.
   tables, mirror + drift guard gone), #7 auto-credit giveaway entries on level-up
   + per-run 3/5/10 streak bonuses, #8 next-month preview + past-seasons view +
   Past Winners block + owned-duplicate→entries. No migrations.
-- **In progress: Overlay (A)** — scoped as a split with Streamlabs (alerts → our
-  overlay; tips/widgets/goal-bars/scenes stay on Streamlabs). Order: #3 → #1 → #5 → #2.
-- Remaining after A: Stream interactivity (D).
+- **Overlay epic (A) — DONE & deployed** (split with Streamlabs: alerts → our
+  overlay, tips/widgets/goal-bars/scenes stay on Streamlabs). #3 overlay-state
+  snapshot, #1 resub alerts + alert sounds, #5 replay/hype-bar/wheel, #2 audio
+  slice (uploadable per-alert sounds). #2 image/text/thresholds and #4 ad-holds
+  (needs channel:read:ads) remain parked.
+- **In progress: Stream interactivity (D)** — #10 pointer → #9 !bingo → #11
+  chat-raid → #12 night modes.
 
 ---
 
