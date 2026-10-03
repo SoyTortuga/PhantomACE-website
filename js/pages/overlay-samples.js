@@ -192,6 +192,14 @@
       art.style.backgroundPositionX = '0';
     }
     var bar = $('ovRaidBar'); if (bar) bar.style.height = '64%';
+    var split = $('ovRaidSplit');
+    if (split) {
+      split.hidden = false;
+      var sc = $('ovRaidSplitChat'); if (sc) sc.style.width = '38%';
+      var ss = $('ovRaidSplitSite'); if (ss) ss.style.width = '62%';
+      set('ovRaidChatDmg', '1.2K');
+      set('ovRaidSiteDmg', '2.0K');
+    }
     var mins = $('ovRaidMinions'); if (mins) mins.classList.add('empty');
     var top = $('ovRaidTop');
     if (top) top.innerHTML = '<li>chatKnight · 1.2K</li><li>boneMob · 800</li><li>freezy · 540</li>';

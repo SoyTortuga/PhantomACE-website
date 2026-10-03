@@ -45,6 +45,11 @@
   var barEl = document.getElementById('ovRaidBar');
   var trackEl = barEl ? barEl.parentElement : null;
   var hpEl = document.getElementById('ovRaidHp');
+  var splitEl = document.getElementById('ovRaidSplit');
+  var splitChatEl = document.getElementById('ovRaidSplitChat');
+  var splitSiteEl = document.getElementById('ovRaidSplitSite');
+  var chatDmgEl = document.getElementById('ovRaidChatDmg');
+  var siteDmgEl = document.getElementById('ovRaidSiteDmg');
   var minionsEl = document.getElementById('ovRaidMinions');
   var miniEl = document.getElementById('ovRaidMini');
   var miniBarEl = document.getElementById('ovRaidMiniBar');
@@ -129,6 +134,24 @@
     var shielded = !!s.shielded;
     artEl.classList.toggle('shielded', shielded);
     if (trackEl) trackEl.classList.toggle('shielded', shielded);
+
+    /* Chat vs site damage split — two aggregate totals, drawn as a proportional
+       bar. Updated in place; hidden until the boss has taken any damage. */
+    if (splitEl) {
+      var chatD = Math.max(0, s.chatDamage || 0);
+      var siteD = Math.max(0, s.siteDamage || 0);
+      var totalD = chatD + siteD;
+      if (totalD > 0) {
+        splitEl.hidden = false;
+        var chatPct = (chatD / totalD) * 100;
+        splitChatEl.style.width = chatPct + '%';
+        splitSiteEl.style.width = (100 - chatPct) + '%';
+        chatDmgEl.textContent = fmt(chatD);
+        siteDmgEl.textContent = fmt(siteD);
+      } else {
+        splitEl.hidden = true;
+      }
+    }
 
     var m = s.minions || { hp: 0, maxHp: 0 };
     minionsShown = m.hp > 0;

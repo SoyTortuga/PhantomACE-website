@@ -78,6 +78,15 @@
     <div class="ov-raid-pct" id="ovRaidPct"></div>
     <div class="ov-raid-track"><i id="ovRaidBar"></i></div>
     <div class="ov-raid-hp" id="ovRaidHp"></div>
+    <!-- Chat vs site damage: a split bar + two totals. Hidden until the boss
+         has taken a hit from either side. Updates in place; no growth. -->
+    <div class="ov-raid-split" id="ovRaidSplit" hidden>
+      <div class="ov-raid-splitbar"><i class="chat" id="ovRaidSplitChat"></i><i class="site" id="ovRaidSplitSite"></i></div>
+      <div class="ov-raid-splitlabels">
+        <span class="chat"><b id="ovRaidChatDmg">0</b> chat</span>
+        <span class="site"><b id="ovRaidSiteDmg">0</b> site</span>
+      </div>
+    </div>
     <div class="ov-raid-minions empty" id="ovRaidMinions">
       <div class="ov-raid-mini-row"><div class="ov-raid-mini" id="ovRaidMini"></div></div>
       <div class="ov-raid-mini-bar"><i id="ovRaidMiniBar"></i></div>

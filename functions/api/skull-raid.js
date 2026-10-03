@@ -104,6 +104,14 @@ const REDEMPTION_MIN_VIEWERS = 3;   /* a boss redeemed off-stream/in testing sti
 const RAID_CODE_SECONDS = 604800;    /* 7-day redemption on defeat codes */
 const RAID_REWARD_CAP = 100;         /* most participants paid per kill */
 
+/* One `!hit` in Twitch chat lands this much. Small and fixed — a chatter is
+   not mashing a button, they are typing a command, so this is a nudge toward
+   the co-op kill rather than a damage source that rivals a site clicker. The
+   per-account token bucket (RAID_RATE_PER_SEC/RAID_BURST) still caps a scripted
+   chatter to the SAME ceiling a site striker has, so raising this never lets a
+   spammer out-damage a real player. */
+export const CHAT_HIT_DAMAGE = 5;
+
 const MECH_INTERVAL_MS = 15000;      /* boss acts this often */
 const HEAL_PCT = 0.03;               /* attack heals this much of max HP */
 const SHIELD_MS = 6000;              /* skill guard duration */
@@ -272,6 +280,117 @@ function maybeSummon(raid) {
   }
 }
 
+/* Land ONE striker's damage on an active boss whose mechanics are already
+   resolved, IN PLACE, through the exact same rate buckets, contributor model
+   and fight rules a site strike uses. Shared by the site `hit` POST and the
+   chat `!hit` command so neither can drift from the other's limiter — there is
+   one damage path, not two.
+
+   `source` is 'site' or 'chat'; it ONLY picks which aggregate counter to add
+   the landed clicks to (raid.siteDamage / raid.chatDamage). Those are two
+   running totals, never a per-hit log, so tracking damage by source cannot grow
+   the record. `ipKey` applies the shared per-address guest bucket (site guests
+   only; chat strikers pass null — they are per-account by Twitch id).
+
+   Returns { landed, justDefeated }. A refused/fully-throttled strike returns
+   landed 0 but still persists the mechanics/bucket state via its caller. */
+function landStrike(raid, player, damage, now, ipKey, source) {
+  raid.contributors = (raid.contributors && typeof raid.contributors === 'object') ? raid.contributors : {};
+  const known = Object.prototype.hasOwnProperty.call(raid.contributors, player.id);
+  if (!known && !admitContributor(raid.contributors, player)) return { landed: 0, justDefeated: false };
+  const c = known ? raid.contributors[player.id] : { name: player.name, dmg: 0 };
+  refill(c, now, RAID_RATE_PER_SEC, RAID_BURST);
+  let allowed = Math.min(damage, Math.floor(c.k));
+  let ipB = null;
+  if (ipKey) {
+    ipB = ipBucket(raid, ipKey, now);
+    allowed = ipB ? Math.min(allowed, Math.floor(ipB.k)) : 0;
+  }
+  if (allowed <= 0) {
+    if (known) raid.contributors[player.id] = c;
+    return { landed: 0, justDefeated: false };
+  }
+  c.k -= allowed;
+  if (ipB) ipB.k -= allowed;
+
+  /* The scythe-guard halves the strike. */
+  let eff = allowed * ((raid.shieldUntil || 0) > now ? SHIELD_REDUCE : 1);
+
+  /* Minions soak half of it until they are cleared. */
+  raid.minions = raid.minions || { hp: 0, maxHp: 0 };
+  if (raid.minions.hp > 0) {
+    const toMin = eff * MINION_SPLIT;
+    raid.minions.hp = Math.max(0, raid.minions.hp - toMin);
+    eff = eff * (1 - MINION_SPLIT);
+    if (raid.minions.hp <= 0) { raid.minions = { hp: 0, maxHp: 0 }; raid.minionDeaths = (raid.minionDeaths || 0) + 1; }
+  }
+
+  raid.hp = Math.max(0, raid.hp - eff);
+  maybeSummon(raid);
+
+  c.dmg = (Number(c.dmg) || 0) + allowed;
+  c.name = player.name;
+  raid.contributors[player.id] = c;
+
+  /* Aggregate damage-by-source — two counters, bounded, never a log. */
+  if (source === 'chat') raid.chatDamage = (Number(raid.chatDamage) || 0) + allowed;
+  else raid.siteDamage = (Number(raid.siteDamage) || 0) + allowed;
+
+  let justDefeated = false;
+  if (raid.hp <= 0) {
+    raid.status = 'defeated';
+    raid.defeatedAt = now;
+    /* Credit the top contributor, not whoever landed the last hit — a co-op
+       boss rewards the effort, not the reflex. */
+    const topC = Object.values(raid.contributors).sort((a, b) => b.dmg - a.dmg)[0];
+    raid.defeatedBy = topC ? topC.name : player.name;
+    justDefeated = true;
+  }
+  return { landed: allowed, justDefeated };
+}
+
+/* ── A chat strike: `!hit` in Twitch chat lands CHAT_HIT_DAMAGE on the live
+   boss, attributed to a CHAT contributor keyed by the chatter's Twitch id in
+   its own namespace (`chat_<userId>`, distinct from the site's `u_`/`guest_`).
+   It runs through the same mutate() lock, token bucket and contributor rules a
+   site strike uses — so a scripted chatter is throttled to the SAME per-account
+   ceiling, and chat damage counts toward the kill and the overlay's chat-vs-site
+   split. No active boss → a quiet no-op.
+
+   A chat striker earns no leaderboard/inventory reward they are not entitled
+   to: awardRaidRewards pays only ids that start with 'u_', so a 'chat_' id
+   never gets a defeat code however much it deals. A viewer who is not on the
+   site thus contributes to the fight and the split display, and nothing more.
+   Called from bot/commands.js on `!hit`. Returns { ok, status, landed, defeated }. */
+export async function strikeRaidFromChat(env, { userId, name } = {}) {
+  if (!env || !env.MARKETPLACE || !userId) return { ok: false, status: 'none', landed: 0 };
+  const player = { id: 'chat_' + String(userId).slice(0, 40), name: cleanName(name, 'Chatter'), guest: false };
+  let landed = 0, justDefeated = false, after = null;
+  await env.MARKETPLACE.mutate(RAID_KEY, (raid) => {
+    after = raid;
+    if (!raid || raid.status !== 'active') return undefined;
+    const now = Date.now();
+    if (expireIfDue(raid, now)) return raid;
+    resolveMechanics(raid);
+    const r = landStrike(raid, player, CHAT_HIT_DAMAGE, now, null, 'chat');
+    landed = r.landed; justDefeated = r.justDefeated;
+    after = raid;
+    return raid;
+  });
+  const status = after ? publicState(after).status : 'none';
+  if (status !== 'active' && status !== 'defeated') return { ok: false, status: 'none', landed: 0 };
+  if (justDefeated) {
+    try {
+      const { setSkullEvent } = await import('./skull-clicker.js');
+      await setSkullEvent(env, 'frenzy', FRENZY_MS);
+    } catch (err) { console.error('[skull-raid] chat kill frenzy failed:', err.message); }
+    try {
+      await awardRaidRewards(env, after);
+    } catch (err) { console.error('[skull-raid] chat kill rewards failed:', err.message); }
+  }
+  return { ok: landed > 0, status, landed, defeated: justDefeated };
+}
+
 /* On a kill, code everyone who pulled their weight: an uncommon for every
    account that dealt at least minRewardDamage(), upgraded to a rare for the
    single top damager. Each code is RESTRICTED to its recipient, so a
@@ -342,6 +461,7 @@ function buildRaid({ hp, minutes, name, source }) {
     source: source || 'manual',
     contributors: {},
     attackCount: 0, skillCount: 0, summonCount: 0, minionDeaths: 0,
+    chatDamage: 0, siteDamage: 0,
     shieldUntil: 0,
     nextTickAt: Date.now() + MECH_INTERVAL_MS,
     summonedThresholds: [],
@@ -412,6 +532,9 @@ function publicState(raid) {
     shielded: (raid.shieldUntil || 0) > Date.now(),
     minions: { hp: Math.max(0, m.hp || 0), maxHp: m.maxHp || 0 },
     top,
+    /* Chat vs site damage — two aggregate totals the overlay splits. */
+    chatDamage: Math.max(0, Math.floor(raid.chatDamage || 0)),
+    siteDamage: Math.max(0, Math.floor(raid.siteDamage || 0)),
     source: raid.source || 'manual',
   };
 }
@@ -508,56 +631,13 @@ export async function onRequestPost(context) {
 
       resolveMechanics(raid);
 
-      /* Rate limit: the strike lands only as far as this striker's bucket
-         (and, for a guest, its address's bucket) allows. A refused or
-         fully-throttled strike still persists the mechanics/bucket state. */
-      raid.contributors = (raid.contributors && typeof raid.contributors === 'object') ? raid.contributors : {};
-      const known = Object.prototype.hasOwnProperty.call(raid.contributors, player.id);
-      if (!known && !admitContributor(raid.contributors, player)) return raid;
-      const c = known ? raid.contributors[player.id] : { name: player.name, dmg: 0 };
-      refill(c, now, RAID_RATE_PER_SEC, RAID_BURST);
-      let allowed = Math.min(damage, Math.floor(c.k));
-      let ipB = null;
-      if (ipKey) {
-        ipB = ipBucket(raid, ipKey, now);
-        allowed = ipB ? Math.min(allowed, Math.floor(ipB.k)) : 0;
-      }
-      if (allowed <= 0) {
-        if (known) raid.contributors[player.id] = c;
-        return raid;
-      }
-      c.k -= allowed;
-      if (ipB) ipB.k -= allowed;
-      landed = allowed;
-
-      /* The scythe-guard halves the strike. */
-      let eff = allowed * ((raid.shieldUntil || 0) > now ? SHIELD_REDUCE : 1);
-
-      /* Minions soak half of it until they are cleared. */
-      raid.minions = raid.minions || { hp: 0, maxHp: 0 };
-      if (raid.minions.hp > 0) {
-        const toMin = eff * MINION_SPLIT;
-        raid.minions.hp = Math.max(0, raid.minions.hp - toMin);
-        eff = eff * (1 - MINION_SPLIT);
-        if (raid.minions.hp <= 0) { raid.minions = { hp: 0, maxHp: 0 }; raid.minionDeaths = (raid.minionDeaths || 0) + 1; }
-      }
-
-      raid.hp = Math.max(0, raid.hp - eff);
-      maybeSummon(raid);
-
-      c.dmg = (Number(c.dmg) || 0) + allowed;
-      c.name = player.name;
-      raid.contributors[player.id] = c;
-
-      if (raid.hp <= 0) {
-        raid.status = 'defeated';
-        raid.defeatedAt = now;
-        /* Credit the top contributor, not whoever landed the last hit — a
-           co-op boss should reward the effort, not the reflex. */
-        const topC = Object.values(raid.contributors).sort((a, b) => b.dmg - a.dmg)[0];
-        raid.defeatedBy = topC ? topC.name : player.name;
-        justDefeated = true;
-      }
+      /* One shared damage path (rate buckets, guard, minions, credit, kill),
+         tagged as a site strike for the chat-vs-site split. A guest also draws
+         from its address's bucket. A refused/throttled strike returns landed 0
+         but the mutated mechanics/bucket state still persists. */
+      const r = landStrike(raid, player, damage, now, ipKey, 'site');
+      landed = r.landed;
+      justDefeated = r.justDefeated;
       after = raid;
       return raid;
     });

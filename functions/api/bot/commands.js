@@ -310,6 +310,30 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* !hit — a chatter strikes the live Skull Clicker raid boss. The whole point
+     is the viewers who never open the site: their damage counts toward the co-op
+     kill and shows on the overlay beside site damage, pulling chat into the
+     fight. Attributed to a chat contributor keyed by the chatter's Twitch id,
+     rate-limited per account server-side by skull-raid's OWN token bucket (the
+     same ceiling site strikers have), so a scripted spammer gains nothing. No
+     active boss → a quiet no-op. A chat-only striker with no site account earns
+     no code/leaderboard reward — only their damage lands. Settled here before
+     the webhook answers; deliberately silent (no chat reply), so there is
+     nothing to defer and nothing to spam — the overlay HP bar is the feedback. */
+  if (parsed.command === '!hit') {
+    try {
+      const { strikeRaidFromChat } = await import('../skull-raid.js');
+      await strikeRaidFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+      });
+    } catch (err) {
+      /* A broken raid strike must not break chat commands. */
+      console.error('[skull-raid/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

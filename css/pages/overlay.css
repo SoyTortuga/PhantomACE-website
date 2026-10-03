@@ -919,6 +919,29 @@ html, body {
 .ov-raid-track.shielded i { background: linear-gradient(180deg, #ffffff, #8a8a8a); }
 .ov-raid-hp { font-size: 10px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
 .ov-raid-pct { font-size: 13px; font-weight: 800; color: #ff5555; }
+/* Chat vs site damage split — red = chat (the viewers !hit pulls in), light
+   grey = the site. Black/grey/red/white only; a flat two-segment bar, no
+   shadow, no side rails. */
+.ov-raid-split[hidden] { display: none; }
+.ov-raid-split { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.ov-raid-splitbar {
+  display: flex; width: 100%; height: 6px;
+  background: #160000;
+  border: 1px solid #3a0000;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ov-raid-splitbar i { display: block; height: 100%; transition: width 0.4s ease; }
+.ov-raid-splitbar i.chat { background: #ff0000; }
+.ov-raid-splitbar i.site { background: #b0b0b0; }
+.ov-raid-splitlabels {
+  display: flex; justify-content: space-between; width: 100%;
+  font-size: 9px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ov-raid-splitlabels .chat { color: #ff5555; }
+.ov-raid-splitlabels .site { color: #c6c6c6; }
+.ov-raid-splitlabels b { font-weight: 800; }
+@media (prefers-reduced-motion: reduce) { .ov-raid-splitbar i { transition: none; } }
 /* Minions — the summoned adds */
 .ov-raid-minions { display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 0; }
 .ov-raid-minions.empty { display: none; }
