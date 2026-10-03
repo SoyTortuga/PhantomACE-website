@@ -32,6 +32,31 @@
   var state = null;
   var timer = null;
 
+  /* ── WHAT'S ON STREAM GATE ──────────────────────────────────────────────
+     Polls /api/chat-game (which also drives the round clock server-side) only
+     while the one `whatsOn` pointer (js/pages/overlay.js) names scramble; hides
+     and goes silent otherwise. The scramble has no host page — its own live
+     status keeps the pointer alive (the state route refreshes it while a round
+     runs, and it self-retires after the idle rounds), so a hidden panel does no
+     network. `mine()` is undefined until the bus answers, or without overlay.js
+     (and in the headless test) — then it falls back to polling as before. */
+  var MY_GAME = 'scramble';
+  var bus = (typeof window !== 'undefined' && window.PhamWhatsOn) ? window.PhamWhatsOn : null;
+  function mine() {
+    if (!bus) return undefined;
+    var w = bus.get();
+    if (w === undefined) return undefined;
+    return !!(w && w.game === MY_GAME);
+  }
+  var lastVerdict;
+  function onBus() {
+    var v = mine();
+    if (v === lastVerdict) return;
+    lastVerdict = v;
+    clearTimeout(timer);
+    timer = setTimeout(poll, 0);
+  }
+
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -122,6 +147,14 @@
   }
 
   function poll() {
+    /* Not our game (and the bus has said so): hide, no fetch, check back slowly. */
+    if (mine() === false) {
+      state = null;
+      render();
+      clearTimeout(timer);
+      timer = setTimeout(poll, IDLE_POLL_MS);
+      return;
+    }
     fetch('/api/chat-game', { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
@@ -144,6 +177,7 @@
       });
   }
 
+  if (bus) bus.subscribe(onBus);
   setInterval(tick, 200);
   poll();
 })();

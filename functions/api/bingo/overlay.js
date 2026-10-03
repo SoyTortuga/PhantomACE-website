@@ -1,3 +1,5 @@
+import { refreshStreamNow, clearStreamNow } from '../stream-now.js';
+
 const GAME_TTL = 14400;
 const POINTER = 'bingo_current';
 
@@ -83,6 +85,9 @@ export async function takeOverlay(env, code) {
   let prev = null;
   await env.MARKETPLACE.mutate(POINTER, (cur) => { prev = cur; return { code: c, at: Date.now() }; });
   await releaseRooms(env, prev, c);
+  /* Put it on the unified "what's on stream" pointer too, so the overlay's one
+     whatsOn read shows this game. Last-writer-wins replaces any other game. */
+  await refreshStreamNow(env, { game: 'bingo', code: c });
 }
 
 /** Point the overlay at nothing, switching off whichever room had it. */
@@ -93,6 +98,9 @@ export async function clearOverlay(env) {
     return cur ? { code: null, at: Date.now() } : undefined;
   });
   await releaseRooms(env, prev, null);
+  /* Take bingo off the unified pointer immediately — but only if bingo is what
+     it currently shows, so clearing bingo cannot blank another live game. */
+  await clearStreamNow(env, 'bingo');
 }
 
 /** Take the pointer off `code` when its game ends — only if it still names it. */
@@ -102,6 +110,11 @@ export async function releaseOnEnd(env, code) {
     if (!cur || pointerCode(cur) !== c) return undefined;
     return { code: null, ended: c, at: Date.now() };
   });
+  /* Explicit end clears the unified pointer now (its "clear on end" path), but
+     only if it still names THIS room. The post-end award alerts keep firing off
+     bingo_current.ended above — they never read stream_now, so a null here does
+     not suppress a final win alert. */
+  await clearStreamNow(env, 'bingo', c);
 }
 
 /** Drop a pointer that names a room which no longer exists — only if it still does. */

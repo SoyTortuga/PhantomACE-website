@@ -42,6 +42,27 @@
 
   var timer = null;
 
+  /* ── WHAT'S ON STREAM GATE ──────────────────────────────────────────────
+     Shows and polls its own state only while the one `whatsOn` pointer
+     (js/pages/overlay.js) names mtgbbb; hides and goes silent otherwise.
+     `mine()` is undefined until the bus has answered, or if overlay.js is not
+     present — then the panel falls back to polling on its own as before. */
+  var MY_GAME = 'mtgbbb';
+  var bus = (typeof window !== 'undefined' && window.PhamWhatsOn) ? window.PhamWhatsOn : null;
+  function mine() {
+    if (!bus) return undefined;
+    var w = bus.get();
+    if (w === undefined) return undefined;
+    return !!(w && w.game === MY_GAME);
+  }
+  var lastVerdict;
+  function onBus() {
+    var v = mine();
+    if (v === lastVerdict) return;
+    lastVerdict = v;
+    schedule(0);
+  }
+
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -101,6 +122,7 @@
   }
 
   function poll() {
+    if (mine() === false) { hide(); schedule(IDLE_POLL_MS); return; }
     fetch('/api/mtgbbb/state?current=1', { cache: 'no-store' })
       .then(function (r) {
         /* A 404 is the ordinary case, not a fault: it is what "no game right
@@ -126,5 +148,6 @@
       });
   }
 
+  if (bus) bus.subscribe(onBus);
   poll();
 })();

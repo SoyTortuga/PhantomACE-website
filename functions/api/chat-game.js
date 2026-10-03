@@ -45,6 +45,8 @@ export const MAX_IDLE_ROUNDS = 3;
 import { WORDS } from './chat-game-words.js';
 export { WORDS };
 
+import { refreshStreamNow, clearStreamNow } from './stream-now.js';
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -397,6 +399,18 @@ export async function onRequestGet(context) {
      a game runs, so rounds close on time without anything scheduled. */
   const { game, announce } = await tickGame(env);
 
+  /* KEEP-ALIVE: while a round is live (running or revealing), every poll slides
+     the unified "what's on stream" pointer forward. The scramble is a chat game
+     shown on the overlay with no separate host page, so its own live status IS
+     the presence signal — and it self-retires after MAX_IDLE_ROUNDS unsolved
+     rounds (status -> idle), at which point this stops refreshing and the pointer
+     lapses. Best-effort; a miss is cosmetic. */
+  if (game && game.status && game.status !== 'idle') {
+    try { await refreshStreamNow(env, { game: 'scramble' }); } catch (err) {
+      console.error('[chat-scramble] could not refresh stream_now:', err.message);
+    }
+  }
+
   /* The poll is also what tells chat a new round has opened, because the
      overlay is optional and the bot's message is the only prompt a
      chat-only game gets. Exactly one caller sees each transition — it
@@ -468,5 +482,15 @@ export async function controlGame(env, action, opts = {}) {
 
   if (state) idleHint = { idle: state.status === 'idle', at: Date.now() };
   if (!state) return { error: 'Nothing to do — no game is running.' };
+
+  /* START/skip put the scramble on the unified pointer immediately (so the panel
+     appears before the first state poll); STOP takes it off now. Best-effort. */
+  try {
+    if (state.status === 'idle') await clearStreamNow(env, 'scramble');
+    else await refreshStreamNow(env, { game: 'scramble' });
+  } catch (err) {
+    console.error('[chat-scramble] could not update stream_now:', err.message);
+  }
+
   return { success: true, announce, state: publicState(state) };
 }

@@ -190,6 +190,20 @@ export async function onRequestPost(context) {
 
   if (failure) return failure;
 
+  /* HOST ACTIVITY keeps the unified "what's on stream" pointer alive — a mark,
+     pack-count nudge or undo is the moderator actively running the box. Gated to
+     the room mtgbbb_current actually names, so marking in a stale room cannot
+     steal the stream. Best-effort; a miss leans on the host poll. */
+  try {
+    const current = await env.MARKETPLACE.get('mtgbbb_current', 'json');
+    if (current && current.code === code) {
+      const { refreshStreamNow } = await import('../stream-now.js');
+      await refreshStreamNow(env, { game: 'mtgbbb', code, setName: current.setName });
+    }
+  } catch (err) {
+    console.error('[mtgbbb/mark] could not refresh stream_now:', err.message);
+  }
+
   if (overlayJobs.length) {
     const { pushOverlayEvent } = await import('../overlay/events.js');
     for (const ev of overlayJobs) await pushOverlayEvent(env, ev);

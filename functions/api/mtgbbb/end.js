@@ -80,6 +80,15 @@ export async function onRequestPost(context) {
       console.error('[mtgbbb/end] could not clear mtgbbb_current:', err.message);
     }
 
+    /* Take MTGBBB off the unified pointer now, but only if it still names this
+       room — a newer game may have claimed the stream since. */
+    try {
+      const { clearStreamNow } = await import('../stream-now.js');
+      await clearStreamNow(env, 'mtgbbb', code);
+    } catch (err) {
+      console.error('[mtgbbb/end] could not clear stream_now:', err.message);
+    }
+
     /* Settle last month's prizes first, so a box finished after midnight on
        the 1st counts for the new month rather than the board about to be paid
        out and wiped. Idempotent; never blocks the end of a game. */

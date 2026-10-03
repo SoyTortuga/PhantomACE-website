@@ -163,6 +163,16 @@ export async function onRequestPost(context) {
     console.error('[mtgbbb/create] could not set mtgbbb_current:', err.message);
   }
 
+  /* Put it on the unified "what's on stream" pointer so the overlay's one
+     whatsOn read shows this box. Last-writer-wins, so starting MTGBBB replaces
+     whatever else was on stream. Best-effort, like the pointer above. */
+  try {
+    const { refreshStreamNow } = await import('../stream-now.js');
+    await refreshStreamNow(env, { game: 'mtgbbb', code, setName: room.setName });
+  } catch (err) {
+    console.error('[mtgbbb/create] could not set stream_now:', err.message);
+  }
+
   return json({
     success: true, code, setName: room.setName, boxes, packCount: room.packCount,
     treatments, poolSize: room.pool.length, callYourShot: room.callYourShot,

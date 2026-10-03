@@ -40,12 +40,37 @@
   var latest = null;
   var cellPx = 0;
 
+  /* ── WHAT'S ON STREAM GATE ──────────────────────────────────────────────
+     Fetches /api/bot/maze only while the one `whatsOn` pointer
+     (js/pages/overlay.js) names maze; hides and goes silent otherwise. The maze
+     has no host page — its own live status is what keeps the pointer alive (the
+     state route refreshes it while active, and self-retires on idle), so a hidden
+     maze panel does no network at all. `mine()` is undefined until the bus has
+     answered, or without overlay.js — then it falls back to polling as before. */
+  var MY_GAME = 'maze';
+  var bus = (typeof window !== 'undefined' && window.PhamWhatsOn) ? window.PhamWhatsOn : null;
+  function mine() {
+    if (!bus) return undefined;
+    var w = bus.get();
+    if (w === undefined) return undefined;
+    return !!(w && w.game === MY_GAME);
+  }
+  var lastVerdict;
+  function onBus() {
+    var v = mine();
+    if (v === lastVerdict) return;
+    lastVerdict = v;
+    schedule(0);
+  }
+
   function schedule(ms) {
     if (timer) clearTimeout(timer);
     timer = setTimeout(poll, ms);
   }
 
   function poll() {
+    /* Not our game (and the bus has said so): stay hidden, no fetch. */
+    if (mine() === false) { panel.hidden = true; lastLevel = null; schedule(IDLE_POLL_MS); return; }
     fetch('/api/bot/maze', { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (g) {
@@ -193,5 +218,6 @@
     });
   }
 
+  if (bus) bus.subscribe(onBus);
   poll();
 })();

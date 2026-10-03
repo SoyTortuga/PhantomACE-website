@@ -1,6 +1,7 @@
 import { TOTAL_EVENTS } from './squares.js';
 import { readPointer, pointerCode, dropStalePointer } from './overlay.js';
 import { standings, paidPrizes } from './end.js';
+import { refreshStreamNow } from '../stream-now.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -139,7 +140,20 @@ export async function onRequestGet(context) {
     /* Only the host is told whether the room is the one on stream — it is
        what the host page's overlay switch shows. Kept off every player's
        2-second poll, which has no use for it. */
-    if (out.isHost) out.onOverlay = pointerCode(await readPointer(env)) === code;
+    if (out.isHost) {
+      out.onOverlay = pointerCode(await readPointer(env)) === code;
+      /* THE HOST POLL IS THE KEEP-ALIVE. The host page polls this every few
+         seconds while open; that slides the unified pointer's TTL forward so a
+         quiet-but-live game stays on stream. The public ?current=1 overlay poll
+         carries no session, so it never reaches here — close the host tab and
+         the pointer lapses within the TTL and the overlay clears itself. Gated
+         to onOverlay so a side-room host does not keep the stream pointer up. */
+      if (out.onOverlay && game.status === 'active') {
+        try { await refreshStreamNow(env, { game: 'bingo', code }); } catch (err) {
+          console.error('[bingo/state] could not refresh stream_now:', err.message);
+        }
+      }
+    }
 
     /* The host's live roster and, once ended, the results and who has been
        paid — so a refreshed host page restores the panel with a real player

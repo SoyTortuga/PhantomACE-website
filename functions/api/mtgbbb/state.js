@@ -45,11 +45,13 @@ export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
   let code = (url.searchParams.get('code') || '').toUpperCase().trim();
+  let usedCurrent = false;
 
   if (!code && url.searchParams.get('current')) {
     const current = await env.MARKETPLACE.get('mtgbbb_current', 'json');
     if (!current || !current.code) return json({ error: 'No MTGBBB game is live.' }, 404);
     code = current.code;
+    usedCurrent = true;
   }
   if (!code) return json({ error: 'Missing code' }, 400);
 
@@ -97,6 +99,29 @@ export async function onRequestGet(context) {
   };
 
   const session = getSession(request);
+
+  /* THE HOST POLL IS THE KEEP-ALIVE for the unified "what's on stream" pointer.
+     The moderator panel polls ?code=XXX with a session while open; that slides
+     the TTL so a quiet-but-live box stays on stream. The public ?current=1
+     overlay poll carries no session, so it never refreshes — close the panel and
+     the pointer lapses within the TTL. Gated to the host of the room that is
+     actually current, and only while active. */
+  if (session && session.user_id && String(session.user_id) === String(room.host) && room.status === 'active') {
+    try {
+      let isCurrent = usedCurrent;
+      if (!isCurrent) {
+        const current = await env.MARKETPLACE.get('mtgbbb_current', 'json');
+        isCurrent = !!(current && String(current.code || '').toUpperCase().trim() === code);
+      }
+      if (isCurrent) {
+        const { refreshStreamNow } = await import('../stream-now.js');
+        await refreshStreamNow(env, { game: 'mtgbbb', code, setName: room.setName });
+      }
+    } catch (err) {
+      console.error('[mtgbbb/state] could not refresh stream_now:', err.message);
+    }
+  }
+
   if (session && session.user_id) {
     const myId = 'u_' + session.user_id;
     const me = room.players.find(p => p.id === myId);

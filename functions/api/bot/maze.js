@@ -28,6 +28,8 @@
    playing, not a lookalike.
    ══════════════════════════════════════════════ */
 
+import { refreshStreamNow, clearStreamNow } from '../stream-now.js';
+
 const KEY = 'maze_current';
 const FIRST_SIZE = 4;               /* map 1 — the broadcaster's spec */
 const CONTRIBUTOR_CAP = 300;        /* spam-safe; a raid cannot balloon the doc */
@@ -330,7 +332,13 @@ async function performMove(env, dir, name, { hint = false, userId = null } = {})
      log line, never an unwind. The winning mover gets one giveaway entry;
      the drop posts its own chat lines through the same machinery as every
      other drop, cooldown included. */
+  /* A clear is maze activity AND a level change — refresh the unified pointer
+     so its header level updates at once (the sliding keep-alive otherwise rides
+     the overlay's own GET-while-active poll below). */
   if (cleared) {
+    try { await refreshStreamNow(env, { game: 'maze', level: cleared.level + 1 }); } catch (err) {
+      console.error('[maze] could not refresh stream_now:', err.message);
+    }
     if (cleared.userId) {
       try {
         const { addEntries } = await import('../giveaway-entries.js');
@@ -392,6 +400,11 @@ export async function startMaze(env) {
   await env.MARKETPLACE.put(KEY, JSON.stringify(state));
   _resetHint();
 
+  /* START puts the maze on the unified "what's on stream" pointer. */
+  try { await refreshStreamNow(env, { game: 'maze', level: state.level }); } catch (err) {
+    console.error('[maze] could not set stream_now:', err.message);
+  }
+
   try {
     const { sendChatMessage } = await import('./send-chat.js');
     await sendChatMessage(env, buildStartMessage());
@@ -412,6 +425,13 @@ export async function stopMaze(env) {
     return state;
   });
   _resetHint();
+
+  /* Explicit stop takes the maze off the unified pointer now. */
+  if (summary) {
+    try { await clearStreamNow(env, 'maze'); } catch (err) {
+      console.error('[maze] could not clear stream_now:', err.message);
+    }
+  }
 
   if (summary) {
     try {
@@ -446,6 +466,12 @@ export async function stopIdleMaze(env, now = Date.now()) {
   });
   if (!summary) return null;
   _resetHint();
+  /* Idle self-stop also retires the unified pointer. (It would lapse on its own
+     within the TTL once nothing refreshes it, but clearing now hides the panel
+     the moment the maze puts itself away.) */
+  try { await clearStreamNow(env, 'maze'); } catch (err) {
+    console.error('[maze] could not clear stream_now:', err.message);
+  }
   try {
     const { sendChatMessage } = await import('./send-chat.js');
     await sendChatMessage(env,
@@ -481,6 +507,18 @@ export async function onRequestGet(context) {
       if (await stopIdleMaze(env)) state = await env.MARKETPLACE.get(KEY, 'json') || state;
     } catch (err) {
       console.error('[maze] idle stop failed:', err.message);
+    }
+  }
+
+  /* KEEP-ALIVE: while the maze is genuinely active, every poll of this state
+     slides the unified "what's on stream" pointer forward (and keeps its header
+     level fresh). The maze has no separate host page — it is a chat game shown on
+     the overlay — so its own live status IS the presence signal, and stopIdleMaze
+     above retires it after MAZE_IDLE_MS of no moves, at which point this stops
+     refreshing and the pointer lapses. Best-effort; a miss is cosmetic. */
+  if (state.status === 'active') {
+    try { await refreshStreamNow(env, { game: 'maze', level: state.level }); } catch (err) {
+      console.error('[maze] could not refresh stream_now:', err.message);
     }
   }
 

@@ -44,6 +44,32 @@
   if (new URLSearchParams(location.search).get('layout')) return;
 
   var key = new URLSearchParams(location.search).get('key') || '';
+
+  /* ── WHAT'S ON STREAM — the one pointer the game panels read ────────────
+     The server returns `whatsOn` on every poll (the single pointer that
+     replaced the four per-game panel polls). This publishes it to the four
+     standing-game panels (bingo/mtgbbb/maze/scramble) so each shows only when
+     it is the live game and does not poll its own state endpoint while hidden.
+
+     A tiny get/subscribe bus on window. `get()` returns `undefined` until the
+     first poll answers — a panel treats that as "bus not ready yet" and falls
+     back to its own poll, so it still works if this file ever fails to load.
+     After the first answer `get()` returns the value (null = nothing on). */
+  window.PhamWhatsOn = (function () {
+    var last, has = false, subs = [];
+    return {
+      get: function () { return has ? last : undefined; },
+      subscribe: function (fn) {
+        if (typeof fn !== 'function') return;
+        subs.push(fn);
+        if (has) { try { fn(last); } catch (e) {} }
+      },
+      _set: function (v) {
+        last = v; has = true;
+        for (var i = 0; i < subs.length; i++) { try { subs[i](v); } catch (e) {} }
+      },
+    };
+  })();
   /* How far back a reload will replay. OBS shuts a browser source down when
      its scene is not visible unless told otherwise, and a page that skips
      straight to "now" on every load drops every alert that fired while it
@@ -1804,6 +1830,13 @@
            source rehydrates its prediction/hype/ad panels immediately, without
            replaying (see applyOverlayState). */
         applyOverlayState(data.overlayState);
+
+        /* WHAT'S ON STREAM. Publish the one pointer to the game panels every
+           poll, including the first-run path that returns just below — so a
+           freshly opened source shows the live game at once. `whatsOn` is absent
+           on an older server; publish null then (nothing on) rather than leaving
+           the panels to poll forever. */
+        if (window.PhamWhatsOn) window.PhamWhatsOn._set(data.whatsOn || null);
 
         /* No stored position — a genuinely first run. Take the current
            place and show nothing, or every alert since the server started

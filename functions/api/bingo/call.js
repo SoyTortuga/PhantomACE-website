@@ -1,5 +1,6 @@
 import { TOTAL_EVENTS, squareText } from './squares.js';
-import { readPointer, alertsAllowed } from './overlay.js';
+import { readPointer, alertsAllowed, pointerCode } from './overlay.js';
+import { refreshStreamNow } from '../stream-now.js';
 
 const GAME_TTL = 14400;
 
@@ -75,6 +76,15 @@ export async function onRequestPost(context) {
   }, { expirationTtl: GAME_TTL });
 
   if (failure) return failure;
+
+  /* HOST ACTIVITY keeps the unified "what's on stream" pointer alive — but only
+     while this room is the one on the overlay, so calling squares in a side room
+     never steals the stream. Best-effort; a miss just leans on the host poll. */
+  if (pointerCode(pointer) === code) {
+    try { await refreshStreamNow(env, { game: 'bingo', code }); } catch (err) {
+      console.error('[bingo/call] could not refresh stream_now:', err.message);
+    }
+  }
 
   /* The label is the server's own text for the square — never the request
      body, which let any host put arbitrary text on stream. Best-effort: an

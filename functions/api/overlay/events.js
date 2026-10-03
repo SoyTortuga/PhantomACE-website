@@ -361,6 +361,14 @@ export async function onRequestGet(context) {
   const { readAlertSounds } = await import('../alert-sounds.js');
   const alertSounds = await readAlertSounds(env);
 
+  /* WHAT'S ON STREAM. The one pointer that replaced the four per-game panel
+     polls (bingo/mtgbbb/maze/scramble). Read-only here — the public overlay
+     poll must NEVER refresh it, or a game would stay on stream for as long as
+     any viewer's OBS is open. Only writers (a game's start/activity and the
+     host's own poll) keep it alive; see functions/api/stream-now.js. */
+  const { readStreamNow } = await import('../stream-now.js');
+  const whatsOn = await readStreamNow(env);
+
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded
      source must not replay an hour of alerts onto the stream. */
@@ -385,6 +393,11 @@ export async function onRequestGet(context) {
        countdown). The overlay reads prediction/hype/ad from here — one place —
        and rehydrates it on a reload without replaying. See writeOverlaySlice. */
     overlayState: await readOverlayState(env),
+    /* The single "what's on stream" pointer, or null. The four game panels
+       (bingo/mtgbbb/maze/scramble) read THIS to decide whether to show and
+       which game is live, instead of each polling its own key — see
+       js/pages/overlay.js (publishes it) and the per-game panel scripts. */
+    whatsOn: whatsOn,
     alertVolume: alertVolume,
     audioLeader: audioLeader,
     hatchSound: hatchSound,

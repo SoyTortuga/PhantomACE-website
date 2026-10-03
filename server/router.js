@@ -46,6 +46,12 @@ const NON_ROUTE_MODULES = new Set([
   /* Live state + which broadcast is on air. Library, no handler. */
   'api/stream-info.js',
 
+  /* The one "what's on stream" pointer (Epic D #10): refresh/read/clear for the
+     unified bingo/mtgbbb/maze/scramble overlay pointer. Library, no handler;
+     overlay/events.js reads it into the poll payload and each game's writers
+     refresh it. Covered by server/scripts/test-stream-now.js. */
+  'api/stream-now.js',
+
   /* Check-in history, streaks and arrival rewards. Library, no handler. */
   'api/checkin-rewards.js',
 

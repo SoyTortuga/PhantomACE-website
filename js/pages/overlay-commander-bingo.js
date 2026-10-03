@@ -43,6 +43,29 @@
 
   var timer = null;
 
+  /* ── WHAT'S ON STREAM GATE ──────────────────────────────────────────────
+     The overlay publishes one `whatsOn` pointer (js/pages/overlay.js). This
+     panel shows — and fetches its own detailed state — ONLY while that pointer
+     names bingo. When another game (or nothing) is on, it hides and never hits
+     the network. `mine()` is undefined until the bus has answered once, or if
+     this runs without overlay.js at all; in that case the panel falls back to
+     polling on its own exactly as it used to. */
+  var MY_GAME = 'bingo';
+  var bus = (typeof window !== 'undefined' && window.PhamWhatsOn) ? window.PhamWhatsOn : null;
+  function mine() {
+    if (!bus) return undefined;
+    var w = bus.get();
+    if (w === undefined) return undefined;
+    return !!(w && w.game === MY_GAME);
+  }
+  var lastVerdict;
+  function onBus() {
+    var v = mine();
+    if (v === lastVerdict) return;   // only react to a real change, not every poll
+    lastVerdict = v;
+    schedule(0);
+  }
+
   /* id -> square text, from the shared BINGO_EVENTS list overlay.html loads.
      Absent only if that file failed to load, in which case a called square
      falls back to its number rather than breaking the panel. */
@@ -119,6 +142,9 @@
   }
 
   function poll() {
+    /* Not our game (and the bus has said so): stay hidden, no fetch, check back
+       slowly. A hidden panel does no network and nothing per-frame. */
+    if (mine() === false) { hide(); schedule(IDLE_POLL_MS); return; }
     fetch('/api/bingo/state?current=1', { cache: 'no-store' })
       .then(function (r) {
         /* A 404 is the ordinary "no game right now" case, not a fault. Only a
@@ -145,5 +171,6 @@
       });
   }
 
+  if (bus) bus.subscribe(onBus);
   poll();
 })();
