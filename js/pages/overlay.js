@@ -2164,7 +2164,47 @@
     document.body.appendChild(bar);
   }
 
-  if (isMonitor) buildMonitorBar();
+  /* Browser autoplay policy: a normal tab (unlike OBS's browser source) will
+     not play audio until the user has interacted with the page. Show a one-time
+     gate whose click both satisfies that gesture AND directly primes a media
+     element, so every later alert .play() is allowed. */
+  function showAudioUnlockGate() {
+    if (document.getElementById('ovAudioGate')) return;
+    var gate = document.createElement('div');
+    gate.id = 'ovAudioGate';
+    gate.setAttribute('role', 'button');
+    gate.tabIndex = 0;
+    gate.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;' +
+      'flex-direction:column;align-items:center;justify-content:center;gap:14px;' +
+      'background:var(--black,#0a0a0a);color:var(--white,#fff);cursor:pointer;' +
+      'font-family:var(--font-ui,system-ui);text-align:center;padding:24px;';
+    var icon = document.createElement('div');
+    icon.textContent = '🔊';            // speaker emoji
+    icon.style.cssText = 'font-size:54px;';
+    var msg = document.createElement('div');
+    msg.style.cssText = 'font-size:20px;max-width:28em;line-height:1.4;';
+    msg.textContent = 'Click to enable overlay audio';
+    var sub = document.createElement('div');
+    sub.style.cssText = 'font-size:13px;color:var(--text-muted,#aaa);max-width:30em;';
+    sub.textContent = 'Keep this tab open on your desktop. It plays overlay alerts for you only and does not affect the stream.';
+    gate.appendChild(icon); gate.appendChild(msg); gate.appendChild(sub);
+    function unlock() {
+      /* The click itself grants the page audio activation; priming a media
+         element here makes the unlock immediate and certain. */
+      try { var a = new Audio(); a.muted = true; var p = a.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+      try {
+        var v = document.getElementById('ovEggVideo');
+        if (v) { v.muted = true; var vp = v.play(); if (vp && vp.then) vp.then(function () { v.pause(); v.currentTime = 0; v.muted = false; }).catch(function () { v.muted = false; }); }
+      } catch (e) {}
+      gate.removeEventListener('click', unlock);
+      if (gate.parentNode) gate.parentNode.removeChild(gate);
+    }
+    gate.addEventListener('click', unlock);
+    gate.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') unlock(); });
+    document.body.appendChild(gate);
+  }
+
+  if (isMonitor) { buildMonitorBar(); showAudioUnlockGate(); }
 
   poll();
 })();

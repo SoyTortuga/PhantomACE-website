@@ -139,7 +139,7 @@ const dashHtml = read('overlay-dashboard.html');
 /* ── 6. The control bar is monitor-only, and the dashboard links to it ───── */
 {
   ok('the monitor control bar is built only when isMonitor',
-    /if\s*\(isMonitor\)\s*buildMonitorBar\(\)/.test(overlay));
+    /if\s*\(isMonitor\)\s*\{?\s*buildMonitorBar\(\)/.test(overlay));
   ok('overlay.html does NOT ship the monitor bar markup (built in JS, never captured)',
     !/ovMonitorBar/.test(overlayHtml));
   ok('the control bar carries a volume slider', /type\s*=\s*['"]range['"]/.test(overlay) &&
