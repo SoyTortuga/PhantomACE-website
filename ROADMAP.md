@@ -36,7 +36,9 @@ the broadcaster grants `channel:read:ads`.
   tables, mirror + drift guard gone), #7 auto-credit giveaway entries on level-up
   + per-run 3/5/10 streak bonuses, #8 next-month preview + past-seasons view +
   Past Winners block + owned-duplicate→entries. No migrations.
-- Remaining: Overlay / leave Streamlabs (A), Stream interactivity (D).
+- **In progress: Overlay (A)** — scoped as a split with Streamlabs (alerts → our
+  overlay; tips/widgets/goal-bars/scenes stay on Streamlabs). Order: #3 → #1 → #5 → #2.
+- Remaining after A: Stream interactivity (D).
 
 ---
 
@@ -132,18 +134,29 @@ still pay. New KV: a winners table (likely the existing monthly-winner records �
 
 ---
 
-## Epic A — Overlay / leave Streamlabs
+## Epic A — Overlay (split with Streamlabs)
+
+**Division of responsibility (owner decision):** ALL event alerts move to the
+PhantomACE overlay — follow, sub, **resub**, gift sub, raid, cheer/bits — with
+sounds and custom media. **Streamlabs keeps** donations/tips (money), its chat-box
+and event-list widgets, follower/sub **goal bars**, and scene/transition/encoder
+tooling. So #3 drops its goal-meter piece (goals stay on Streamlabs), and #1 is
+narrower than first scoped because alerts already route through our overlay queue
+via `functions/api/milestones.js`.
 
 ### #3 One overlay state snapshot (~M, foundation)
-One record for current prediction, hype-train progress, ad countdown and goals, returned
-with each overlay poll. Fixes the stuck-prediction panel and restore-on-reload, and gives
-the hype bar / goal meters one source. Everything else in this epic reads from it.
+One record for current prediction, hype-train progress, and ad countdown (NOT goals —
+those stay on Streamlabs), returned with each overlay poll. Fixes the stuck-prediction
+panel and restore-on-reload, and gives the hype bar one source. The rest of the epic
+reads from it.
 
-### #1 Resub alerts + alert sounds (~M, highest visible value)
-Subscribe `channel.subscription.message` (resubs currently show nothing) and add sound to
-sub/raid/follow/cheer alerts. The explicit "biggest gap for leaving Streamlabs." Reuse the
-single-reused-Audio-element pattern already used for the check-in chime; keep overlay
-marathon-safe (clear everything after each fire).
+### #1 Resub alerts + alert sounds (~S–M)
+Most alerts already fire on our overlay (milestones.js → overlay queue: sub, gift sub,
+raid, follow, cheer). The real gaps: (a) **resubs** — subscribe
+`channel.subscription.message` in bot-setup and handle it in milestones.js → a 'resub'
+overlay alert (cumulative months / streak / shared message); (b) **alert sounds** — the
+alert box plays no audio today (only the check-in chime does). Add a sound per alert,
+reusing the single-reused-Audio-element pattern, rate-limited and marathon-safe.
 
 ### #5 Replay buttons, hype bar, wheel redemption (~S)
 Replay button per activity-feed row, a hype-train progress bar (reads #3), and wiring the
@@ -151,8 +164,10 @@ spin-the-wheel channel-point reward to the wheel (today it only queues).
 
 ### #2 Custom alert media (~L, ~3–4 days)
 Private alerts namespace accepting audio; per-alert config (image, sound, volume, text
-template, duration, thresholds); bounded reused Audio pool on the overlay; an upload card
-per alert type on the dashboard. `media-store.js` already does most of the storage work.
+template, duration, thresholds) for every alert type now owned by our overlay; bounded
+reused Audio pool on the overlay; an upload card per alert type on the dashboard.
+`media-store.js` already does most of the storage work. Built after #1 finalizes the
+alert set.
 
 ### #4 Hold drops during ad breaks — PARKED
 Pause drops/reveals during ads, "ads incoming" 60s ahead, welcome-back nudge after. The ad
