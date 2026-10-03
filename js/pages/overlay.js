@@ -115,7 +115,7 @@
   var MAX_QUEUE = 25;
   var ALERT_TIER = {
     'giveaway-spin': 3, 'wheel-spin': 3, raid: 3, giftsub: 3, sub: 3, resub: 3, 'hype-level': 3, drop: 3,
-    cheer: 2, 'bingo-call': 2, 'bingo-win': 2, 'mtgbbb-pull': 2, 'mtgbbb-bingo': 2,
+    cheer: 2, 'bingo-call': 2, 'bingo-win': 2, 'bingo-claim': 2, 'mtgbbb-pull': 2, 'mtgbbb-bingo': 2,
     follow: 1,
   };
   var NEVER_DROP = { 'giveaway-spin': true, 'wheel-spin': true };
@@ -523,6 +523,21 @@
         title: esc(ev.label || 'A square was called'),
         sub: progress,
         rarity: 'common',
+      };
+    }
+
+    /* ── Verified `!bingo` from chat ─────────────────────────────────────
+       A viewer claimed a bingo in chat and the server checked their card
+       against the called squares. Distinct from bingo-win, which is a prize
+       the host already awarded: this is the moment the claim lands, before the
+       host confirms. The name is event-derived, so it is escaped here. */
+    if (ev.type === 'bingo-claim') {
+      return {
+        art: ART.hype, ms: 5000,
+        kind: 'VERIFIED BINGO',
+        title: esc(ev.who || 'A player') + ' called bingo!',
+        sub: 'Verified — host to award the prize',
+        rarity: 'rare',
       };
     }
 

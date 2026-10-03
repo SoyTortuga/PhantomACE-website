@@ -287,6 +287,29 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* !bingo — a viewer claims a bingo, VERIFIED server-side against their own
+     card and the called squares. The claim and the overlay alert are settled
+     here (state before the webhook answers, like the games above); only the
+     chat reply is deferred. A false claim, or one from someone with no card,
+     alerts nothing and is rate-limited inside verify.js. */
+  if (parsed.command === '!bingo') {
+    try {
+      const { verifyBingoClaim } = await import('../bingo/verify.js');
+      const r = await verifyBingoClaim(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+      });
+      if (r && r.chat) {
+        const { sendChatMessage } = await import('./send-chat.js');
+        outbox.push(() => sendChatMessage(env, r.chat));
+      }
+    } catch (err) {
+      /* A broken verify must not break chat commands. */
+      console.error('[bingo/verify]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

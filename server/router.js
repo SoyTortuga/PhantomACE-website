@@ -52,6 +52,12 @@ const NON_ROUTE_MODULES = new Set([
      refresh it. Covered by server/scripts/test-stream-now.js. */
   'api/stream-now.js',
 
+  /* Commander Bingo's `!bingo` verification (Epic D #9): checks a chatter's
+     card against the called squares, records the claim and pushes the overlay
+     alert. Library, no handler; bot/commands.js imports verifyBingoClaim.
+     Covered by server/scripts/test-bingo-chat-claim.js. */
+  'api/bingo/verify.js',
+
   /* Check-in history, streaks and arrival rewards. Library, no handler. */
   'api/checkin-rewards.js',
 

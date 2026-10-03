@@ -162,6 +162,11 @@ export async function onRequestGet(context) {
     if (out.isHost) {
       out.roster = standings(game);
       out.prizes = paidPrizes(game);
+      /* Verified `!bingo` claims from chat — server-checked, newest first — so
+         the host page can show them and award straight from the list. */
+      out.claims = (Array.isArray(game.claims) ? game.claims : [])
+        .map(c => ({ playerId: c.playerId, name: c.name, bingos: c.bingos, at: c.at }))
+        .sort((a, b) => (b.at || 0) - (a.at || 0));
       if (game.endedAt) out.endedAt = game.endedAt;
     }
 

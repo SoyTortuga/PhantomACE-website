@@ -72,7 +72,7 @@ const ALERT_TOGGLES_KEY = 'alert_toggles';
 export const TOGGLEABLE_ALERT_TYPES = [
   'sub', 'resub', 'giftsub', 'raid', 'hype-level', 'follow', 'cheer', 'drop',
   'dino-hatch', 'giveaway-spin', 'prediction', 'bingo-call', 'bingo-win',
-  'mtgbbb-pull', 'mtgbbb-bingo',
+  'bingo-claim', 'mtgbbb-pull', 'mtgbbb-bingo',
 ];
 
 /* A short per-env cache so a gift-sub bomb (twenty pushes in a second) does not

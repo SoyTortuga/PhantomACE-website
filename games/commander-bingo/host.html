@@ -169,6 +169,32 @@
     .roster-chip b { color: var(--red); margin-left: 4px; }
     .roster-empty { font-size: 14px; color: var(--text-dim); padding-top: 3px; }
 
+    /* Verified `!bingo` claims from chat — server-checked, awaiting the host. */
+    .claims {
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      background: var(--gray-lo);
+      border: 1px solid var(--red);
+      border-radius: 4px;
+    }
+    .claims[hidden] { display: none; }
+    .claims-label {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--red);
+      margin-bottom: 8px;
+    }
+    .claims-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; }
+    .claim-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 4px 8px;
+      border: 1px solid var(--border-mid);
+      border-radius: 3px;
+    }
+    .claim-name { font-size: 14px; color: var(--text-pri); white-space: nowrap; }
+    .claim-name b { color: var(--red); margin-left: 5px; }
+
     .event-call-btn:disabled { opacity: 0.5; cursor: wait; }
     .end-game-btn:disabled { opacity: 0.5; cursor: wait; }
 
@@ -689,6 +715,11 @@
       <div class="roster-list" id="rosterList"></div>
     </div>
 
+    <div class="claims" id="claimsPanel" hidden>
+      <div class="claims-label">Verified bingo claims</div>
+      <div class="claims-list" id="claimsList"></div>
+    </div>
+
     <div class="host-body">
       <div class="cat-sidebar">
         <button class="cat-tab active" data-cat="all" onclick="setCat('all')">All</button>
@@ -1123,6 +1154,7 @@
 
         document.getElementById('playerCount').textContent = g.playerCount || 0;
         if (Array.isArray(g.roster)) renderRoster(g.roster);
+        renderClaims(g.claims, g.prizes);
 
         if (seq === callSeq && pendingCalls.size === 0 && Array.isArray(g.calledEvents)) {
           syncCalled(g.calledEvents);
@@ -1169,6 +1201,44 @@
       list.innerHTML = roster.map(r =>
         '<span class="roster-chip' + (r.bingos > 0 ? ' has-bingo' : '') + '">' + escHtml(r.name || 'Player') +
         (r.bingos > 0 ? '<b>' + r.bingos + '</b>' : '') + '</span>').join('');
+    }
+
+    /* Verified `!bingo` claims from chat — the server has already checked each
+       card against the called squares, so these are real bingos the host can
+       award straight from the list. A claim already paid shows its prize; the
+       Award control reuses the same endpoint and awardPrize() as the results
+       screen. */
+    function renderClaims(claims, prizes) {
+      const panel = document.getElementById('claimsPanel');
+      if (!panel) return;
+      const list = document.getElementById('claimsList');
+      const arr = Array.isArray(claims) ? claims : [];
+      if (!arr.length) { panel.hidden = true; list.innerHTML = ''; return; }
+      const paid = new Map((prizes || []).map(p => [p.playerId, p]));
+      panel.hidden = false;
+      list.innerHTML = arr.map(c => {
+        const head = '<span class="claim-name">' + escHtml(c.name || 'Player') +
+          '<b>' + (c.bingos || 1) + ' bingo' + ((c.bingos || 1) > 1 ? 's' : '') + '</b></span>';
+        let ctrl;
+        const prize = paid.get(c.playerId);
+        if (prize) {
+          ctrl = '<div class="lb-award">' + paidLabel(prize) + '</div>';
+        } else if (!c.playerId || !String(c.playerId).startsWith('u_')) {
+          ctrl = '<div class="lb-award"><span class="lb-award-na">no account</span></div>';
+        } else {
+          const opts = RARITIES.map(t =>
+            '<option value="' + t.id + '">' + t.label + ' · ' + t.entries + '</option>').join('');
+          ctrl = '<div class="lb-award">' +
+            '<select class="lb-award-tier" data-id="' + escAttr(c.playerId) + '">' + opts + '</select>' +
+            '<button class="lb-award-btn" data-id="' + escAttr(c.playerId) +
+            '" data-name="' + escAttr(c.name || 'Player') + '">Award</button>' +
+            '</div>';
+        }
+        return '<div class="claim-row">' + head + ctrl + '</div>';
+      }).join('');
+      list.querySelectorAll('.lb-award-btn').forEach(btn => {
+        btn.addEventListener('click', () => awardPrize(btn));
+      });
     }
 
     let playerPollTimer = null;
