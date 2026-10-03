@@ -644,6 +644,43 @@
   var overlayIid = Math.random().toString(36).slice(2) + Date.now().toString(36);
   var isAudioLeader = true;
 
+  /* ── AUDIO MONITOR MODE (overlay.html?monitor=1) ────────────────────────
+     OBS captures the overlay's audio INTO the stream, so chat hears every
+     alert/chime/hatch/egg clip but the streamer at the desk does not. The
+     monitor is a copy the streamer keeps open in a NORMAL browser window (never
+     an OBS source) purely so THEY hear that audio too. It differs from a normal
+     overlay in exactly three ways, each gated behind this flag:
+       1. It always plays locally — isAudioLeader is forced true and the poll
+          NEVER overrides it from the server's election (see poll()).
+       2. It stays OUT of the stream's leader election — it never sends &iid, so
+          electAudioLeader never sees it and the OBS source stays the one true
+          leader. The stream mix is unchanged; no doubling.
+       3. It uses its OWN volume + mute, persisted in localStorage, independent
+          of the control panel's master alertVolume (which still drives the OBS
+          source on stream). A small on-page control bar (built only here, never
+          captured) exposes that volume + mute to the streamer.
+     Non-monitor behaviour is byte-for-byte unchanged. */
+  var isMonitor = (function () {
+    try { return new URLSearchParams(location.search).get('monitor') === '1'; }
+    catch (e) { return false; }
+  })();
+  var MONITOR_VOL_KEY = 'ov_monitor_vol';
+  var MONITOR_MUTE_KEY = 'ov_monitor_mute';
+  var monitorVolume = 0.7;                    // 0..1, the monitor's own default
+  if (isMonitor) {
+    try {
+      var mv = parseFloat(window.localStorage.getItem(MONITOR_VOL_KEY));
+      if (Number.isFinite(mv) && mv >= 0 && mv <= 1) monitorVolume = mv;
+    } catch (e) { /* no storage; default volume */ }
+    var mm = false;
+    try { mm = window.localStorage.getItem(MONITOR_MUTE_KEY) === '1'; } catch (e) {}
+    /* Force the monitor to behave as the local audio leader; its mute is its own
+       toggle, not the stream's ?muted flag. */
+    isAudioLeader = true;
+    audioMuted = mm;
+    alertVolume = monitorVolume;              // playback volume = local value, never the server's
+  }
+
   /* ── Dino hatch sounds ────────────────────────────────────────────────
      One sting per rarity, played once on the reveal keyed to the clutch's TOP
      rarity — a 50-gift bomb is one animation and one sound, never fifty.
@@ -1815,7 +1852,10 @@
     pollTimer = null;
     var url = '/api/overlay/events?key=' + encodeURIComponent(key) +
               (cursor === null ? '' : '&since=' + cursor) +
-              (audioMuted ? '' : '&iid=' + encodeURIComponent(overlayIid));
+              /* A muted source — and the desktop monitor — never sends its iid, so
+                 electAudioLeader never counts it and the OBS source stays the one
+                 true audio leader for the stream. */
+              ((audioMuted || isMonitor) ? '' : '&iid=' + encodeURIComponent(overlayIid));
 
     var settled = false;
     var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
@@ -1846,14 +1886,19 @@
         noteServerClock(data.serverNow, sentAt, Date.now());
 
         /* Alert volume, set from the control panel. Sent on every poll so a
-           change reaches the open overlay within a second, no reload. */
-        if (typeof data.alertVolume === 'number') {
+           change reaches the open overlay within a second, no reload. The
+           desktop monitor ignores it — it drives playback from its OWN local
+           volume so changing the stream's master slider never touches it. */
+        if (!isMonitor && typeof data.alertVolume === 'number') {
           alertVolume = Math.max(0, Math.min(1, data.alertVolume / 100));
         }
         /* One overlay plays the check-in chime. The server picks it; every
            other open source stays silent so the stream doesn't hear it two or
-           three times. Absent field (older server) leaves us free to play. */
-        if (typeof data.audioLeader === 'string') {
+           three times. Absent field (older server) leaves us free to play. The
+           monitor never yields — it forces isAudioLeader true and skips this so
+           it always plays locally, while staying out of the election entirely
+           (it sends no iid, so it is never chosen as the stream's leader). */
+        if (!isMonitor && typeof data.audioLeader === 'string') {
           isAudioLeader = (data.audioLeader === overlayIid);
         }
         /* Hatch stings on/off, set from the bot panel; reaches the overlay
@@ -2035,6 +2080,91 @@
       selfReload();
     }, RELOAD_CHECK_MS);
   }
+
+  /* ── Monitor control bar ────────────────────────────────────────────────
+     Built ONLY in monitor mode, so an OBS source never gets these nodes and the
+     stream is never at risk of capturing them. A small control strip the
+     streamer uses to set the monitor's own volume + mute; both persist in
+     localStorage and drive only the LOCAL alertVolume/audioMuted, never the
+     stream's master slider. Styled with the shared tokens (variables.css is
+     linked on the page) — no box-shadow, no side-border rails, no blur. */
+  function persistMonitor() {
+    try { window.localStorage.setItem(MONITOR_VOL_KEY, String(monitorVolume)); } catch (e) {}
+    try { window.localStorage.setItem(MONITOR_MUTE_KEY, audioMuted ? '1' : '0'); } catch (e) {}
+  }
+  function buildMonitorBar() {
+    if (document.getElementById('ovMonitorBar')) return;
+
+    var style = document.createElement('style');
+    style.textContent =
+      '.ov-monitor-bar{position:fixed;left:16px;bottom:16px;z-index:9999;' +
+      'display:flex;align-items:center;gap:12px;' +
+      'padding:10px 14px;border-radius:8px;' +
+      'background:var(--black,#0a0a0a);border:1px solid var(--red,#FF0000);' +
+      'font-family:var(--font-ui,system-ui);font-size:14px;color:var(--white,#fff);}' +
+      '.ov-monitor-bar .ov-mon-dot{width:9px;height:9px;border-radius:50%;' +
+      'background:var(--red,#FF0000);}' +
+      '.ov-monitor-bar.is-muted .ov-mon-dot{background:var(--gray-500,#888);}' +
+      '.ov-monitor-bar label{text-transform:uppercase;letter-spacing:.06em;' +
+      'font-size:12px;color:var(--text-muted,#aaa);}' +
+      '.ov-monitor-bar input[type=range]{width:140px;accent-color:var(--red,#FF0000);cursor:pointer;}' +
+      '.ov-monitor-bar button{font-family:inherit;font-size:13px;cursor:pointer;' +
+      'padding:6px 12px;border-radius:6px;color:#fff;' +
+      'background:var(--red,#FF0000);border:1px solid var(--red,#FF0000);}' +
+      '.ov-monitor-bar.is-muted button{background:transparent;color:var(--white,#fff);' +
+      'border:1px solid var(--border,#333);}' +
+      '.ov-monitor-bar .ov-mon-val{min-width:38px;text-align:right;' +
+      'font-variant-numeric:tabular-nums;color:var(--text-muted,#aaa);}';
+    document.head.appendChild(style);
+
+    var bar = document.createElement('div');
+    bar.className = 'ov-monitor-bar' + (audioMuted ? ' is-muted' : '');
+    bar.id = 'ovMonitorBar';
+
+    var dot = document.createElement('span');
+    dot.className = 'ov-mon-dot';
+
+    var title = document.createElement('label');
+    title.textContent = 'Audio Monitor';
+
+    var slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '100';
+    slider.step = '1';
+    slider.value = String(Math.round(monitorVolume * 100));
+
+    var val = document.createElement('span');
+    val.className = 'ov-mon-val';
+    val.textContent = Math.round(monitorVolume * 100) + '%';
+
+    var muteBtn = document.createElement('button');
+    muteBtn.type = 'button';
+    muteBtn.textContent = audioMuted ? 'Unmute' : 'Mute';
+
+    slider.addEventListener('input', function () {
+      monitorVolume = Math.max(0, Math.min(1, (Number(slider.value) || 0) / 100));
+      alertVolume = monitorVolume;             // drives every local playback path
+      val.textContent = Math.round(monitorVolume * 100) + '%';
+      persistMonitor();
+    });
+
+    muteBtn.addEventListener('click', function () {
+      audioMuted = !audioMuted;                // reuses the existing audio gate
+      muteBtn.textContent = audioMuted ? 'Unmute' : 'Mute';
+      bar.classList.toggle('is-muted', audioMuted);
+      persistMonitor();
+    });
+
+    bar.appendChild(dot);
+    bar.appendChild(title);
+    bar.appendChild(slider);
+    bar.appendChild(val);
+    bar.appendChild(muteBtn);
+    document.body.appendChild(bar);
+  }
+
+  if (isMonitor) buildMonitorBar();
 
   poll();
 })();
