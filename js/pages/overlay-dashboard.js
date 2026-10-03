@@ -1437,6 +1437,11 @@ function initOverlayDashboard(data) {
   initWheel();
   initGiveawayReplay();
   if (data.isBroadcaster) initOverlayPanel(data.overlayUrl);
+  /* The audio monitor is a full overlay instance and needs the overlay KEY to
+     connect — the static href has none, so point it at the keyed overlay URL
+     plus &monitor=1. Without this the monitor shows "overlay key rejected". */
+  const monLink = document.getElementById('odMonitorLink');
+  if (monLink && data.overlayUrl) monLink.href = data.overlayUrl + '&monitor=1';
 }
 
 document.addEventListener('DOMContentLoaded', async function () {

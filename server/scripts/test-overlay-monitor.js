@@ -157,6 +157,12 @@ const dashHtml = read('overlay-dashboard.html');
   ok('the dashboard link opens in a new tab', /\/overlay\.html\?monitor=1['"][^>]*target\s*=\s*['"]_blank['"]/.test(dashHtml));
   ok("the dashboard explains it won't affect stream audio",
     /won't affect stream audio|plays locally only/i.test(dashHtml));
+  /* The monitor is a full overlay instance and must carry the overlay KEY, or
+     its poll is rejected ("overlay disconnected"). The dashboard JS rewrites
+     the link to the keyed overlayUrl + &monitor=1. */
+  const dashJs = read('js/pages/overlay-dashboard.js');
+  ok('the dashboard JS points the monitor link at the keyed overlay URL + &monitor=1',
+    /odMonitorLink[\s\S]{0,160}overlayUrl\s*\+\s*['"]&monitor=1['"]/.test(dashJs));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
