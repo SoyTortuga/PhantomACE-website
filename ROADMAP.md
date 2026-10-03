@@ -44,13 +44,13 @@ the broadcaster grants `channel:read:ads`.
 - **Stream interactivity epic (D) — DONE & deployed.** #10 unified stream_now
   pointer, #9 !bingo verified in chat, #11 chat fights the raid boss (!hit), #12
   stream-night modes: Memory Match daily seed, Bone Tithe, Streamer-vs-Chat Mana
-  Clash (!clash), PhamShock Wind Night (!wind) — plus one-click start/stop on the
-  Overlay Dashboard. Deferred (not selected): Dino Stream Safari / Park of the Week.
+  Clash (!clash), PhamShock Wind Night (!wind), and Dino Stream Safari (!catch,
+  raffle/first toggle) — plus one-click start/stop on the Overlay Dashboard.
+  (Park of the Week is covered by Room Crawl's room_of_week.)
 
-## All four roadmap epics are complete. Remaining parked/deferred items:
-- Overlay #2 image/text/threshold alert media (audio slice shipped), Overlay #4
-  ad-break holds (needs the broadcaster's channel:read:ads grant), and the Dino
-  Stream Safari stream-night mode. Pick up any of these whenever.
+## All four roadmap epics are complete. Remaining parked items:
+- Overlay #2 image/text/threshold alert media (audio slice shipped) and Overlay #4
+  ad-break holds (needs the broadcaster's channel:read:ads grant). Pick up whenever.
 
 ---
 
