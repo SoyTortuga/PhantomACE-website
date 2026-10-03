@@ -226,6 +226,17 @@
        in the layout editor. -->
   <div class="ov-hatch-panel" id="ovHatch" hidden></div>
 
+  <!-- Egg-drop video: a short transparent clip (VP9 + alpha) that plays
+       bottom-right whenever the bot drops a dino egg into chat. ONE reused
+       <video> element — never recreated per fire — so a marathon never grows
+       nodes; overlay.js plays it, resets and hides it on `ended`. Fixed corner
+       (not layout-movable): it is a brief flourish, not a standing panel.
+       preload="auto" so the first egg of a stream does not clip while the clip
+       fetches; muted here only so autoplay is never blocked — overlay.js sets
+       the real volume from the master alert slider on the audio leader. -->
+  <video class="ov-egg-video" id="ovEggVideo" src="/assets/alerts/egg-drop.webm"
+         preload="auto" muted playsinline hidden></video>
+
   <!-- Channel point Prediction: a movable standing panel (position it in the
        layout editor). Shows while a prediction is ACTIVE or LOCKED with a live
        bar per outcome and a countdown to lock, reveals the winner briefly on

@@ -2031,6 +2031,28 @@ body.ov-alerting .ov-safari {
 }
 .ov-hatch-panel[hidden] { display: none; }
 
+/* ── Egg-drop video ──────────────────────────────────────────────────────
+   A transparent WebM (VP9 + alpha) that plays bottom-right when the bot drops
+   a dino egg. The alpha channel composites it straight over the live capture,
+   so it carries NO background, border, box-shadow or backdrop-filter — those
+   would frame it in a box the transparency exists to avoid (and the overlay is
+   never themed). A touch larger than the check-in nudge (87x130): ~320px wide
+   at the clip's own 1120x720 (~1.56:1) is ~320x206. The [hidden] guard forces
+   display:none so the element never composites while idle, even though it sets
+   display below. */
+.ov-egg-video[hidden] { display: none; }
+.ov-egg-video {
+  position: absolute;
+  right: 3%;
+  bottom: 5%;
+  width: 320px;
+  height: auto;
+  display: block;
+  background: transparent;
+  z-index: 21;
+  pointer-events: none;
+}
+
 /* The reveal content, standing on its own with NO card background or border —
    it composites straight over the scene. Text carries a shadow so it stays
    legible over any footage (text-shadow, not a box-shadow). */

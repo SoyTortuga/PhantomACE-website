@@ -56,6 +56,7 @@ const TEST_ALERT_SAMPLES = {
     holders: 3, players: 62, treatments: ['Foil', 'Borderless'],
   }),
   'mtgbbb-bingo': () => ({ type: 'mtgbbb-bingo', who: 'TestReaper', pattern: 'Blackout', points: 25 }),
+  'egg-video': () => ({ type: 'egg-video', rarity: 'mythic', mutation: false }),
 };
 
 /** The types the test suite can fire, for the dashboard to build its buttons. */

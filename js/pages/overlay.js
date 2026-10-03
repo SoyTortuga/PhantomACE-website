@@ -792,6 +792,67 @@
     } catch (e) { /* no Audio element — the card still shows */ }
   }
 
+  /* ── Egg-drop video ────────────────────────────────────────────────────
+     A short transparent clip (VP9 + alpha) played bottom-right whenever the
+     bot drops a dino egg — EVERY egg, any rarity or mutation. OFF the alert
+     queue (like the check-in nudge and the hatch panel), so it never blocks or
+     is blocked by a sub/raid card.
+
+     MARATHON-SAFE: ONE reused <video> element (#ovEggVideo in overlay.html),
+     never created or cloned per fire. It is played by rewinding and calling
+     play(); two eggs landing together just restart the one element rather than
+     stacking. On the clip's `ended` event — and a safety timeout, should
+     `ended` never arrive (a decode stall, a codec fallback) — it pauses,
+     resets currentTime to 0 and hides to display:none via the .ov-egg-video
+     [hidden] guard, so the element neither composites nor decodes while idle.
+
+     AUDIO: the clip carries its own audio, driven by the SAME master alert
+     volume + mute + audio-leader plumbing as playAlertSound and the check-in
+     chime — only the leader source plays it, a muted (?muted=1) source plays it
+     silently, and the master alert-volume slider attenuates it. No new slider. */
+  var EGG_VIDEO_MAX_MS = 8000;        // safety ceiling if `ended` never fires
+  var eggVideoTimer = null;
+  function hideEggVideo() {
+    if (eggVideoTimer) { clearTimeout(eggVideoTimer); eggVideoTimer = null; }
+    var v = document.getElementById('ovEggVideo');
+    if (!v) return;
+    try { v.pause(); } catch (e) {}
+    try { v.currentTime = 0; } catch (e) {}
+    v.hidden = true;
+  }
+  function showEggVideo(ev) {
+    var v = document.getElementById('ovEggVideo');
+    if (!v) return;
+    /* Restart the ONE element — a pending safety timer from a previous fire is
+       cleared so a quick second egg does not get torn down by the first. */
+    if (eggVideoTimer) { clearTimeout(eggVideoTimer); eggVideoTimer = null; }
+
+    /* Audio = the master alert volume, on the leader only. A muted or
+       non-leader source plays the clip silently; OBS mixes just the leader's
+       audio onto the stream. */
+    var silent = audioMuted || !isAudioLeader;
+    v.muted = silent;
+    try { v.volume = silent ? 0 : alertVolume; } catch (e) {}
+
+    /* Bind the end-of-clip teardown ONCE to this reused element. */
+    if (!v._eggBound) {
+      v._eggBound = true;
+      v.addEventListener('ended', hideEggVideo);
+    }
+
+    v.hidden = false;
+    try { v.currentTime = 0; } catch (e) {}
+    var p = v.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(function () {
+        /* Unmuted autoplay can be blocked outside OBS (a browser preview). Retry
+           muted so the clip still shows; in OBS the first play succeeds. */
+        try { v.muted = true; v.play().catch(hideEggVideo); } catch (e) { hideEggVideo(); }
+      });
+    }
+    eggVideoTimer = setTimeout(hideEggVideo, EGG_VIDEO_MAX_MS);
+  }
+
   function buildStandardCard(ev, d) {
     var card = document.createElement('div');
     card.className = 'ov-alert';
@@ -1895,6 +1956,9 @@
             /* The hatch has its own movable panel and plays off the queue, so a
                big reveal never blocks a sub/raid card and vice versa. */
             if (ev.type === 'dino-hatch') { showHatch(ev); continue; }
+            /* The egg-drop clip plays in its own reused corner <video>, off the
+               queue, so a 3-second flourish never delays a sub/raid card. */
+            if (ev.type === 'egg-video') { showEggVideo(ev); continue; }
             /* The prediction panel is now driven from the overlay_state snapshot
                (applyOverlayState), not the alert queue — so a reloaded source
                rehydrates it. Any 'prediction' event still in the feed is skipped
@@ -1936,7 +2000,7 @@
   if (Number.isFinite(reloadHoursParam)) RELOAD_AFTER_MS = reloadHoursParam * 3600000;
   var RELOAD_CHECK_MS = 60000;
   var loadedAt = Date.now();
-  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovPrediction', 'ovHype', 'ovAdBreak'];
+  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovEggVideo', 'ovPrediction', 'ovHype', 'ovAdBreak'];
 
   /* A panel is down if its poller hid it OR a layout preset switched it off
      (overlay-apply-layout.js forces style.display = 'none' and leaves the

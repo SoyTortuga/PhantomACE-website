@@ -438,7 +438,24 @@ export async function dropEggAction(env, rarity, actorLabel, opts = {}) {
      code exists but was never announced. Harmless: it is inactive, nobody
      has seen it, and it cannot be redeemed. Said out loud because an unused
      row appearing in item_codes otherwise looks like a leak. */
-  return await dropItemAction(env, record.code, actorLabel);
+  const result = await dropItemAction(env, record.code, actorLabel);
+
+  /* Play the egg-crack clip on the overlay — for EVERY egg drop, any rarity or
+     mutation — but ONLY once the code actually landed in chat. A drop refused
+     by the cooldown must not fire the alert (the viewer saw nothing to redeem).
+     The 'egg-video' type is itself a toggleable alert, so pushOverlayEvent
+     drops it when the broadcaster has switched egg videos off. Best-effort:
+     an overlay hiccup never fails the drop that already succeeded. */
+  if (result && result.success) {
+    try {
+      const { pushOverlayEvent } = await import('../overlay/events.js');
+      await pushOverlayEvent(env, { type: 'egg-video', rarity: r, mutation });
+    } catch (err) {
+      console.error('[send-chat] egg-video overlay push failed:', err.message);
+    }
+  }
+
+  return result;
 }
 
 export async function announceAction(env, message, actorLabel) {

@@ -689,6 +689,7 @@ var OD_TEST_ALERTS = [
   { type: 'bingo-win', label: 'Bingo Win' },
   { type: 'mtgbbb-pull', label: 'MTGBBB Pull' },
   { type: 'mtgbbb-bingo', label: 'MTGBBB Bingo' },
+  { type: 'egg-video', label: 'Egg Drop Video' },
 ];
 
 async function fireTestAlert(type, label, btn) {
@@ -733,6 +734,7 @@ var OD_ALERT_LABELS = {
   'hype-level': 'Hype Level', drop: 'Code/Item Drop', 'dino-hatch': 'Dino Hatch',
   'giveaway-spin': 'Giveaway Reel', prediction: 'Prediction', 'bingo-call': 'Bingo Call',
   'bingo-win': 'Bingo Win', 'mtgbbb-pull': 'MTGBBB Pull', 'mtgbbb-bingo': 'MTGBBB Bingo',
+  'egg-video': 'Egg Drop Video',
 };
 
 function renderAlertToggles(toggles) {
