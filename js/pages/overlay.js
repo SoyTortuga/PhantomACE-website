@@ -2192,9 +2192,18 @@
       /* The click itself grants the page audio activation; priming a media
          element here makes the unlock immediate and certain. */
       try { var a = new Audio(); a.muted = true; var p = a.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+      /* Prime the egg video UNMUTED (at volume 0) inside this click. A <video>
+         with an audio track is only allowed to later play WITH SOUND once it has
+         been played unmuted during a user gesture — priming it muted (as before)
+         left it permanently falling back to muted. Volume 0 keeps the prime
+         itself silent; showEggVideo restores the real volume. */
       try {
         var v = document.getElementById('ovEggVideo');
-        if (v) { v.muted = true; var vp = v.play(); if (vp && vp.then) vp.then(function () { v.pause(); v.currentTime = 0; v.muted = false; }).catch(function () { v.muted = false; }); }
+        if (v) {
+          v.muted = false; v.volume = 0;
+          var vp = v.play();
+          if (vp && vp.then) vp.then(function () { v.pause(); v.currentTime = 0; }).catch(function () {});
+        }
       } catch (e) {}
       gate.removeEventListener('click', unlock);
       if (gate.parentNode) gate.parentNode.removeChild(gate);
