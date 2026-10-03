@@ -1494,6 +1494,86 @@ body.ov-alerting .ov-mc {
 /* A sliding bar is exactly the motion reduced-motion asks to stop. */
 @media (prefers-reduced-motion: reduce) { .ov-pred-bar i { transition: none; } }
 
+/* ══ HYPE TRAIN BAR — standing progress, driven by the state snapshot ══════ */
+.ov-hype[hidden] { display: none; }
+.ov-hype {
+  position: fixed;
+  left: 32px;
+  top: calc(32px + env(safe-area-inset-top, 0px));
+  width: 280px;
+  padding: 12px 14px;
+  background: rgba(10, 10, 10, 0.96);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  font-family: var(--font-system);
+  color: #fff;
+  z-index: 16;
+}
+.ov-hype-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.ov-hype-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+.ov-hype-level {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.ov-hype-track {
+  height: 8px;
+  background: #1c1c1c;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ov-hype-track i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--red);
+  transition: width 0.4s ease;
+}
+@media (prefers-reduced-motion: reduce) { .ov-hype-track i { transition: none; } }
+
+/* ══ AD-BREAK COUNTDOWN — a small corner indicator ════════════════════════ */
+.ov-adbreak[hidden] { display: none; }
+.ov-adbreak {
+  position: fixed;
+  left: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 14px;
+  background: rgba(10, 10, 10, 0.96);
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  font-family: var(--font-system);
+  z-index: 16;
+}
+.ov-adbreak-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+.ov-adbreak-timer {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
 /* ══ DINO HATCH — the gambling minigame's reveal ════════════════════════
    Two phases in one alert card. `.is-hatching` shows the egg-crack strip and
    withholds the reveal; overlay.js steps the strip once, drops the class, and

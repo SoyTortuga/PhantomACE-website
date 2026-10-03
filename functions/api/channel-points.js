@@ -176,6 +176,17 @@ const REWARD_HANDLERS = {
   },
   'spin-the-wheel': async (env, userId, redemption) => {
     await queueRedemption(env, userId, 'spin-the-wheel', redemption);
+    /* Actually spin it on the overlay. Until now this only queued the
+       redemption for the site to pop up; the on-stream wheel reveal is what a
+       viewer paid points for. Same spinWheel the control-panel button calls, so
+       both land the identical reveal. Best-effort and isolated: a wheel that is
+       not configured yet is a no-op, never a webhook failure. */
+    try {
+      const { spinWheel } = await import('./wheel.js');
+      await spinWheel(env);
+    } catch (err) {
+      console.error('[channel-points] wheel spin failed:', err.message);
+    }
   },
   'community-shoutout': async (env, userId, redemption) => {
     await queueRedemption(env, userId, 'community-shoutout', redemption);

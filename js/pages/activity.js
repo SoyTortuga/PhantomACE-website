@@ -28,9 +28,13 @@
   }
 
   var CHIP = {
-    sub: 'Sub', giftsub: 'Gift', raid: 'Raid',
-    hype: 'Hype', redemption: 'Redeem', bot: 'Bot',
+    sub: 'Sub', resub: 'Resub', giftsub: 'Gift', raid: 'Raid', follow: 'Follow',
+    cheer: 'Cheer', hype: 'Hype', redemption: 'Redeem', bot: 'Bot',
   };
+
+  /* Categories whose rows can be re-fired on the overlay (match
+     overlayEventFromActivity in functions/api/activity.js). */
+  var REPLAYABLE = { sub: 1, resub: 1, giftsub: 1, raid: 1, follow: 1, cheer: 1, hype: 1 };
 
   function isLoggedIn() {
     return /(?:^|;\s*)pham_session=/.test(document.cookie || '');
@@ -77,10 +81,14 @@
           '<button class="act-payload-toggle" type="button" data-id="' + escapeHtml(e.id) + '">▸ View payload</button>' +
           '<pre class="act-payload" id="pl-' + escapeHtml(e.id) + '" hidden>' + escapeHtml(pretty) + '</pre>';
       }
+      var replay = REPLAYABLE[e.category]
+        ? '<button class="act-replay" type="button" data-id="' + escapeHtml(e.id) + '" title="Re-fire this alert on the overlay">↺ Replay</button>'
+        : '';
       return '<li class="act-item">' +
         '<div class="act-item-head">' +
           '<span class="act-chip">' + escapeHtml(chip) + '</span>' +
           '<span class="act-summary">' + escapeHtml(e.summary || e.type || 'event') + '</span>' +
+          replay +
           '<span class="act-time" title="' + escapeHtml(new Date(e.at).toLocaleString()) + '">' + escapeHtml(relTime(e.at)) + '</span>' +
         '</div>' +
         payload +
@@ -103,6 +111,29 @@
         render(lastEvents);
       })
       .catch(function () { /* transient — keep the last render, try again next poll */ });
+  }
+
+  function replayAlert(btn) {
+    var id = btn.getAttribute('data-id');
+    if (!id || btn.disabled) return;
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '…';
+    fetch('/api/activity', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'replay', id: id }),
+    })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (d) { return { ok: res.ok, d: d }; }); })
+      .then(function (r) {
+        btn.textContent = r.ok && r.d.success ? '✓ Sent' : '✗ Failed';
+        setTimeout(function () { btn.textContent = original; btn.disabled = false; }, 2000);
+      })
+      .catch(function () {
+        btn.textContent = '✗ Failed';
+        setTimeout(function () { btn.textContent = original; btn.disabled = false; }, 2000);
+      });
   }
 
   function startPolling() {
@@ -130,6 +161,8 @@
     var feed = el('activityFeed');
     if (feed) {
       feed.addEventListener('click', function (ev) {
+        var replayBtn = ev.target.closest('.act-replay');
+        if (replayBtn) { replayAlert(replayBtn); return; }
         var t = ev.target.closest('.act-payload-toggle');
         if (!t) return;
         var pre = document.getElementById('pl-' + t.getAttribute('data-id'));

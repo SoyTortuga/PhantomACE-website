@@ -88,7 +88,7 @@
          dropped (a moderator pressed a button and is watching for it). */
   var MAX_QUEUE = 25;
   var ALERT_TIER = {
-    'giveaway-spin': 3, 'wheel-spin': 3, raid: 3, giftsub: 3, sub: 3, 'hype-level': 3, drop: 3,
+    'giveaway-spin': 3, 'wheel-spin': 3, raid: 3, giftsub: 3, sub: 3, resub: 3, 'hype-level': 3, drop: 3,
     cheer: 2, 'bingo-call': 2, 'bingo-win': 2, 'mtgbbb-pull': 2, 'mtgbbb-bingo': 2,
     follow: 1,
   };
@@ -381,6 +381,21 @@
     }
     if (ev.type === 'sub') {
       return { art: ART.pham, kind: 'New Subscriber', title: esc(ev.who) + ' subscribed!', sub: 'Welcome to the Phamily', rarity: 'rare' };
+    }
+    /* RESUB — a returning subscriber, headlined with their month count. Distinct
+       from a first-time 'sub': the streak/months are the whole point, and the
+       viewer's shared message rides along when there is one. */
+    if (ev.type === 'resub') {
+      var months = Number(ev.months) || 1;
+      var streak = Number(ev.streak) || 0;
+      var streakNote = streak > 1 ? streak + '-month streak' : '';
+      var resubMsg = ev.message ? esc(ev.message) : 'Thanks for sticking around';
+      return {
+        art: ART.love2, kind: 'Resub',
+        title: esc(ev.who) + ' resubscribed — ' + months + ' month' + (months === 1 ? '' : 's') + '!',
+        sub: streakNote ? streakNote + ' • ' + resubMsg : resubMsg,
+        rarity: 'rare',
+      };
     }
     if (ev.type === 'giftsub') {
       var n = ev.count || 1;
@@ -689,6 +704,37 @@
       panel.classList.remove('is-in');       // fade out
       checkinTimers.push(setTimeout(function () { panel.hidden = true; }, 360));
     }, CHECKIN_MS));
+  }
+
+  /* ── Alert sounds ──────────────────────────────────────────────────────
+     The alert box played NO audio before — only the check-in chime did. A
+     single default sting now plays when a celebratory alert shows (sub, resub,
+     giftsub, raid, follow, cheer). Marathon-safe exactly like the check-in and
+     hatch audio: ONE reused Audio element (never `new Audio()` per fire, which
+     is the layering/leak bug that hit the check-in chime), rate-limited so a
+     gift-sub bomb cannot machine-gun it, gated on the audio leader, the mute
+     flag and the shared alert volume so it plays once across however many OBS
+     sources are open and never on a muted one. The file is OPTIONAL: a missing
+     mp3 makes play() reject, which is swallowed, so this stays silent rather
+     than throwing until the sound is in place. Per-alert custom sounds are #2;
+     this is the simple default. */
+  var ALERT_SOUND_SRC = '/assets/audio/alert.mp3';
+  var SOUND_ALERT_TYPES = { sub: true, resub: true, giftsub: true, raid: true, follow: true, cheer: true };
+  var ALERT_SOUND_COOLDOWN_MS = 1500;
+  var lastAlertSoundAt = 0;
+  var alertSound = null;
+  function playAlertSound(type) {
+    if (!SOUND_ALERT_TYPES[type]) return;
+    if (audioMuted || !isAudioLeader) return;
+    var now = Date.now();
+    if (now - lastAlertSoundAt < ALERT_SOUND_COOLDOWN_MS) return;
+    lastAlertSoundAt = now;
+    try {
+      if (!alertSound) alertSound = new Audio(ALERT_SOUND_SRC);   // created once, reused
+      alertSound.volume = alertVolume;
+      alertSound.currentTime = 0;                                 // restart the one element
+      alertSound.play().catch(function () { /* blocked outside OBS, or file absent — silent */ });
+    } catch (e) { /* no Audio element — the card still shows */ }
   }
 
   function buildStandardCard(ev, d) {
@@ -1285,6 +1331,94 @@
     tick();
   }
 
+  /* ── OVERLAY STATE SNAPSHOT (overlay #3) ────────────────────────────────
+     The server returns one `overlayState` record on every poll holding the
+     CURRENT prediction, hype-train progress and ad countdown. The overlay reads
+     all three from HERE — one place — so a reloaded OBS source (it reloads
+     constantly) rehydrates these standing panels instead of losing them when
+     their originating event falls outside the alert replay window.
+
+     FIRST-SIGHTING-WITHOUT-ACTING, the same rule the reload/control tokens use:
+     on the first snapshot this source sees, a RESOLVED prediction is restored as
+     hidden rather than replaying its winner reveal on air. A live resolve (the
+     slice's ver changing while the source is already open) still plays once.
+     Standing state — an active/locked prediction, the hype bar, the ad countdown
+     — is idempotent to apply, so restoring it is never a "replay".
+
+     Each slice carries the `ver` it was written at, so a slice is re-applied
+     only when it actually changed. */
+  var seenOverlayState = false;
+  var predSliceVer = null, hypeSliceVer = null, adSliceVer = null;
+
+  function applyHypeBar(h) {
+    var panel = document.getElementById('ovHype');
+    if (!panel) return;
+    if (!h || h.active === false) { panel.hidden = true; return; }
+    var levelEl = document.getElementById('ovHypeLevel');
+    var bar = document.getElementById('ovHypeBar');
+    if (levelEl) levelEl.textContent = 'Level ' + (Number(h.level) || 1);
+    var total = Number(h.total) || 0, goal = Number(h.goal) || 0;
+    var pct = goal > 0 ? Math.max(0, Math.min(100, Math.round((total / goal) * 100))) : 0;
+    if (bar) bar.style.width = pct + '%';
+    panel.hidden = false;   // no timers: a standing bar is inherently marathon-safe
+  }
+
+  /* The ad countdown is the ONE snapshot panel that ticks. endsAt is absolute
+     (server clock), so it counts down from it and hides itself when it passes —
+     there is no ad_break.end event to clear it. Marathon-safe: one interval,
+     bailed the instant the panel is hidden or the time is up. */
+  var adTimer = null;
+  function clearAdTimer() { if (adTimer) { clearInterval(adTimer); adTimer = null; } }
+  function applyAdBreak(a) {
+    var panel = document.getElementById('ovAdBreak');
+    if (!panel) return;
+    clearAdTimer();
+    var endsAt = a && Number(a.endsAt);
+    if (!endsAt || serverTime() >= endsAt) { panel.hidden = true; return; }
+    var timerEl = document.getElementById('ovAdBreakTimer');
+    function tick() {
+      if (panel.hidden) { clearAdTimer(); return; }           // nothing runs while hidden
+      var ms = endsAt - serverTime();
+      if (ms <= 0) { panel.hidden = true; clearAdTimer(); return; }
+      var secs = Math.ceil(ms / 1000);
+      if (timerEl) timerEl.textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+    }
+    panel.hidden = false;
+    tick();
+    adTimer = setInterval(tick, 1000);
+  }
+
+  function applyOverlayState(st) {
+    var first = !seenOverlayState;
+    seenOverlayState = true;
+    st = st && typeof st === 'object' ? st : {};
+
+    /* PREDICTION — driven from the snapshot (one place), not the alert queue. */
+    var p = st.prediction || null;
+    var pv = p ? Number(p.ver) : 0;
+    if (pv !== predSliceVer) {
+      if (p) {
+        /* On the first sight of an already-resolved prediction, restore to
+           hidden — do not replay the reveal. A live resolve (not first) plays. */
+        if (first && p.state === 'end') clearPrediction();
+        else showPrediction(p);
+      } else if (!first) {
+        clearPrediction();
+      }
+      predSliceVer = pv;
+    }
+
+    /* HYPE BAR — a standing bar, safe to re-apply. */
+    var h = st.hype || null;
+    var hv = h ? Number(h.ver) : 0;
+    if (hv !== hypeSliceVer) { applyHypeBar(h); hypeSliceVer = hv; }
+
+    /* AD COUNTDOWN. */
+    var a = st.ad || null;
+    var av = a ? Number(a.ver) : 0;
+    if (av !== adSliceVer) { applyAdBreak(a); adSliceVer = av; }
+  }
+
   /* ── Customizable wheel card ───────────────────────────────────────────
      A one-shot stage reveal. The wheel is an <svg> whose whole element rotates
      via a SINGLE CSS transform transition (no rAF loop, no interval); a fixed
@@ -1424,6 +1558,10 @@
       : buildStandardCard(ev, d);
     stage.appendChild(card);
 
+    /* The alert sting, for the celebratory types — one reused element, rate
+       limited and leader-gated (see playAlertSound). */
+    playAlertSound(ev.type);
+
     /* PUBLISHED, NOT ENFORCED. The standing panels — Mana Clash, the
        scramble — are things a viewer can look at whenever; an alert is the
        thing they must not miss. Rather than teach this file where each
@@ -1500,6 +1638,17 @@
     clearCheckinTimers();
     var ci = document.getElementById('ovCheckin');
     if (ci) { ci.classList.remove('is-in'); ci.hidden = true; }
+    /* The snapshot panels (hype bar, ad countdown) come down too. Reset the
+       seen flags so the NEXT poll re-applies current standing state from the
+       snapshot — a live hype train or ad break reappears on its own, the same
+       way the standing game panels do, without replaying anything. */
+    clearAdTimer();
+    var hp = document.getElementById('ovHype');
+    if (hp) hp.hidden = true;
+    var ab = document.getElementById('ovAdBreak');
+    if (ab) ab.hidden = true;
+    seenOverlayState = false;
+    predSliceVer = hypeSliceVer = adSliceVer = null;
   }
 
 /* ONE INDICATOR, SEVERAL REPORTERS. The alert stream is not the only thing
@@ -1630,6 +1779,12 @@
           else if (ctl.cmd === 'skip') skipCurrent();
         }
 
+        /* STANDING STATE. Applied every poll, including the first-run path below
+           that returns before any alert is processed — so a freshly opened
+           source rehydrates its prediction/hype/ad panels immediately, without
+           replaying (see applyOverlayState). */
+        applyOverlayState(data.overlayState);
+
         /* No stored position — a genuinely first run. Take the current
            place and show nothing, or every alert since the server started
            would arrive at once. */
@@ -1672,10 +1827,11 @@
             /* The hatch has its own movable panel and plays off the queue, so a
                big reveal never blocks a sub/raid card and vice versa. */
             if (ev.type === 'dino-hatch') { showHatch(ev); continue; }
-            /* The prediction panel is a movable standing panel driven off the
-               queue — begin/progress/lock/end update it in place; it never
-               blocks (or is blocked by) a sub/raid card. */
-            if (ev.type === 'prediction') { showPrediction(ev); continue; }
+            /* The prediction panel is now driven from the overlay_state snapshot
+               (applyOverlayState), not the alert queue — so a reloaded source
+               rehydrates it. Any 'prediction' event still in the feed is skipped
+               here rather than enqueued. */
+            if (ev.type === 'prediction') continue;
             enqueue(ev);
           }
         }
@@ -1712,7 +1868,7 @@
   if (Number.isFinite(reloadHoursParam)) RELOAD_AFTER_MS = reloadHoursParam * 3600000;
   var RELOAD_CHECK_MS = 60000;
   var loadedAt = Date.now();
-  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovPrediction'];
+  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovPrediction', 'ovHype', 'ovAdBreak'];
 
   /* A panel is down if its poller hid it OR a layout preset switched it off
      (overlay-apply-layout.js forces style.display = 'none' and leaves the

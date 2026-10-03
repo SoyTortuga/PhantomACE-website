@@ -147,6 +147,26 @@
     <ol class="ov-pred-outcomes" id="ovPredOutcomes"></ol>
   </div>
 
+  <!-- Hype train progress bar. A standing panel driven by the overlay_state
+       snapshot (not the alert queue) — the one-shot "Level N!" card still pops
+       in the Alerts window; this just tracks live progress toward the next
+       level while a train is running, and hides when it ends. -->
+  <div class="ov-hype" id="ovHype" hidden>
+    <div class="ov-hype-head">
+      <span class="ov-hype-label">Hype Train</span>
+      <span class="ov-hype-level" id="ovHypeLevel"></span>
+    </div>
+    <div class="ov-hype-track"><i id="ovHypeBar"></i></div>
+  </div>
+
+  <!-- Ad-break countdown. Driven by the overlay_state snapshot; counts down from
+       the break's absolute end time and hides itself when it passes (there is no
+       ad_break.end event). -->
+  <div class="ov-adbreak" id="ovAdBreak" hidden>
+    <span class="ov-adbreak-label">Ad Break</span>
+    <span class="ov-adbreak-timer" id="ovAdBreakTimer"></span>
+  </div>
+
   <script src="/js/pages/overlay-samples.js" defer></script>
   <script src="/js/pages/overlay-apply-layout.js" defer></script>
   <!-- The same reel math the Big Prize Giveaway control panel spins, so a

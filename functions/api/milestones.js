@@ -146,6 +146,29 @@ async function handleEvent(env, type, event) {
     return { fired: true, alert: 'cheer' };
   }
 
+  /* RESUB — channel.subscription.message, a viewer re-upping and sharing how
+     long it has been. A PURE ALERT like follow/cheer: it runs through our
+     overlay (so it stops fighting Streamlabs) and records to the feed, but
+     drops no code and is not gated by the milestone-drop toggle. channel.subscribe
+     fires only for NEW subs, so this is the only event a resub produces. */
+  if (type === 'channel.subscription.message') {
+    if (!(await isAlertEnabled(env, 'resub'))) return { fired: false, reason: 'resub alerts disabled' };
+    const who = event.user_name || event.user_login || 'someone';
+    const months = Number(event.cumulative_months) || Number(event.duration_months) || 1;
+    const streak = Number(event.streak_months) || 0;
+    const message = (event.message && event.message.text) ? String(event.message.text).slice(0, 200) : '';
+    await pushOverlayEvent(env, { type: 'resub', who, months, streak, message, tier: event.tier || null });
+    try {
+      const { recordActivity } = await import('./activity.js');
+      await recordActivity(env, {
+        category: 'resub', type,
+        summary: `${who} resubscribed — ${months} month${months === 1 ? '' : 's'}`,
+        payload: event,
+      });
+    } catch (err) { console.error('[milestones] activity record failed:', err.message); }
+    return { fired: true, alert: 'resub' };
+  }
+
   /* TWO SEPARATE CONCERNS for sub/gift/raid: the on-screen ALERT and the code
      DROP. The alert fires whenever the event arrives (subject only to its
      per-alert toggle, enforced inside pushOverlayEvent) — it does NOT depend on

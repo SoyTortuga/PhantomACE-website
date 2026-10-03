@@ -150,11 +150,17 @@ export async function onRequestPost(context) {
        while the overlay is behind. Twitch runs one prediction per channel at a
        time, so "any prediction progress" is "this prediction's progress". */
     try {
-      const { pushOverlayEvent } = await import('./overlay/events.js');
+      const { pushOverlayEvent, writeOverlaySlice } = await import('./overlay/events.js');
       const opts = overlayEvent.state === 'progress'
         ? { replace: (e) => e.type === 'prediction' && e.state === 'progress' }
         : undefined;
       await pushOverlayEvent(env, overlayEvent, opts);
+      /* ALSO write the state snapshot. The pushed event drives the live panel;
+         the snapshot is what a reloaded source rehydrates from, so the panel is
+         never stuck or lost across an OBS source restart. The overlay reads the
+         prediction from the snapshot (one place) and does not replay a resolved
+         one on first sight. */
+      await writeOverlaySlice(env, 'prediction', overlayEvent);
     } catch (err) { console.error('[prediction-events] overlay push failed:', err.message); }
 
     /* The activity feed records begin / lock / end ONLY — never progress. */

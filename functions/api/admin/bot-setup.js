@@ -1318,6 +1318,15 @@ async function createEventSubSubscriptions(env, request) {
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/milestones`,
     },
+    /* Resubs. channel.subscribe fires only for NEW subscriptions, so a viewer
+       re-upping (and sharing their month count in chat) arrives ONLY as
+       channel.subscription.message. Handled in milestones.js as a 'resub' alert. */
+    {
+      type: 'channel.subscription.message',
+      version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/milestones`,
+    },
     {
       type: 'channel.raid',
       version: '1',

@@ -110,6 +110,45 @@ async function loadConfig(env) {
   return rec && Array.isArray(rec.segments) ? rec : null;
 }
 
+/**
+ * Spin the saved wheel: weighted-pick a winner, push a 'wheel-spin' overlay
+ * event (segments with resolved on-palette hex + weights, so the overlay draws
+ * honest arcs and lands on the winner), and store the result for the dashboard.
+ *
+ * Shared by the control-panel POST and the spin-the-wheel channel-point
+ * redemption, so a viewer redemption lands the same on-stream reveal the
+ * moderator button does. Returns { error } rather than throwing, so a
+ * redemption while the wheel is unconfigured is a no-op, not a 500.
+ */
+export async function spinWheel(env) {
+  const config = await loadConfig(env);
+  if (!config || config.segments.length < MIN_SEGMENTS) {
+    return { error: 'Configure the wheel first — it needs at least 2 segments.' };
+  }
+
+  const winnerIndex = pickWeighted(config.segments);
+  if (winnerIndex < 0) return { error: 'The wheel has no valid segments to spin.' };
+  const winner = config.segments[winnerIndex];
+
+  const segments = config.segments.map(s => ({
+    label: s.label,
+    color: WHEEL_PALETTE[s.color] || WHEEL_PALETTE.oxblood,
+    weight: s.weight,
+  }));
+
+  const { pushOverlayEvent } = await import('./overlay/events.js');
+  await pushOverlayEvent(env, {
+    type: 'wheel-spin',
+    segments,
+    winnerIndex,
+    who: winner.label,
+  });
+
+  await env.MARKETPLACE.put(WINNER_KEY, JSON.stringify({ label: winner.label, at: Date.now() }));
+
+  return { success: true, winner: { label: winner.label, index: winnerIndex } };
+}
+
 /* ── GET — the saved wheel + palette, for the dashboard ─────────────────── */
 export async function onRequestGet(context) {
   const { env, request } = context;
@@ -148,35 +187,9 @@ export async function onRequestPost(context) {
   }
 
   if (body.action === 'spin') {
-    const config = await loadConfig(env);
-    if (!config || config.segments.length < MIN_SEGMENTS) {
-      return json({ error: 'Configure the wheel first — it needs at least 2 segments.' }, 400);
-    }
-
-    const winnerIndex = pickWeighted(config.segments);
-    if (winnerIndex < 0) return json({ error: 'The wheel has no valid segments to spin.' }, 400);
-    const winner = config.segments[winnerIndex];
-
-    /* The event carries each segment's resolved on-palette hex and its weight,
-       so the overlay draws arcs ∝ weight (an honest wheel) and lands the
-       pointer in the winner's slice. */
-    const segments = config.segments.map(s => ({
-      label: s.label,
-      color: WHEEL_PALETTE[s.color] || WHEEL_PALETTE.oxblood,
-      weight: s.weight,
-    }));
-
-    const { pushOverlayEvent } = await import('./overlay/events.js');
-    await pushOverlayEvent(env, {
-      type: 'wheel-spin',
-      segments,
-      winnerIndex,
-      who: winner.label,
-    });
-
-    await env.MARKETPLACE.put(WINNER_KEY, JSON.stringify({ label: winner.label, at: Date.now() }));
-
-    return json({ success: true, winner: { label: winner.label, index: winnerIndex } });
+    const result = await spinWheel(env);
+    if (result.error) return json({ error: result.error }, 400);
+    return json(result);
   }
 
   return json({ error: 'Invalid action' }, 400);

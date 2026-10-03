@@ -122,6 +122,16 @@ async function handleHypeTrainProgress(env, event) {
     };
   }, { expirationTtl: STATE_TTL });
 
+  /* The standing hype BAR reads from the state snapshot (overlay #3), separate
+     from the one-shot level ALERT below: the bar tracks live progress on every
+     contribution, the alert fires once per level. Best-effort. */
+  try {
+    const { writeOverlaySlice } = await import('./overlay/events.js');
+    await writeOverlaySlice(env, 'hype', {
+      active: true, id: event.id, level, total: event.total, goal: event.goal,
+    });
+  } catch (err) { console.error('[hype-train] overlay state write failed:', err.message); }
+
   if (newAlert) {
     try {
       const { pushOverlayEvent } = await import('./overlay/events.js');
@@ -257,6 +267,15 @@ async function handleHypeTrainBegin(env, event) {
     });
   } catch (err) { console.error('[hype-train] activity record failed:', err.message); }
 
+  /* Light up the standing hype bar on the overlay from the start of the train
+     (overlay #3 snapshot), so a source that opens mid-train still shows it. */
+  try {
+    const { writeOverlaySlice } = await import('./overlay/events.js');
+    await writeOverlaySlice(env, 'hype', {
+      active: true, id: state.id, level: 1, total: event.total, goal: event.goal,
+    });
+  } catch (err) { console.error('[hype-train] overlay state write failed:', err.message); }
+
   await sendChatMessage(env,
     '🚂 HYPE TRAIN STARTED! Reach higher levels for bonus giveaway codes dropped right here in chat! 🎟️'
   );
@@ -298,6 +317,13 @@ async function handleHypeTrainEnd(env, event) {
      list when the train ended made them vanish from the site while still
      working — the display window contradicting the claim window. The live
      feed now expires each code on its own schedule. */
+
+  /* Clear the standing hype bar from the snapshot — the train is over, so a
+     source that reloads now shows no bar. */
+  try {
+    const { writeOverlaySlice } = await import('./overlay/events.js');
+    await writeOverlaySlice(env, 'hype', null);
+  } catch (err) { console.error('[hype-train] overlay state clear failed:', err.message); }
 
   const droppedCount = (state.droppedLevels || []).length;
   await sendChatMessage(env,

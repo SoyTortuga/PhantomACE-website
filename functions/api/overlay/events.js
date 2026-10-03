@@ -37,6 +37,29 @@ const KEY = 'overlay_events';
 const KEYFILE = 'overlay_key';
 const MAX_EVENTS = 60;
 
+/* ── ONE STATE SNAPSHOT ─────────────────────────────────────────────────────
+   The alert FEED is a stream of one-shot events, counted off by a cursor and
+   dropped once they are older than the replay window. That is right for a sub
+   or a raid, and wrong for a STANDING state — the prediction currently open,
+   how far the hype train has climbed, whether an ad break is running. Those are
+   not "things that happened", they are "how things ARE", and a source that
+   reloaded (OBS does, constantly) must be able to pick them back up without the
+   originating event being replayed on air.
+
+   So prediction-events.js, hype-train.js and ad-break.js each write their slice
+   here, and the overlay reads all three from this one record on every poll. A
+   freshly opened source rehydrates from it — see overlay.js, which applies the
+   same first-sighting-without-acting rule the reload/control tokens use, so a
+   resolved prediction or a finished hype level is restored as hidden rather
+   than replayed. Every slice carries the `ver` it was written at, so the
+   overlay re-renders a slice only when it actually changed.
+
+   Registered in server/lib/registry.js as a 'real'-expiry singleton: a stale
+   snapshot (a prediction that never got its 'end', an abandoned hype train)
+   clears itself rather than lingering on the next reload for ever. */
+const STATE_KEY = 'overlay_state';
+const STATE_TTL_SECONDS = 6 * 60 * 60;
+
 /* ── Per-alert enable/disable ──────────────────────────────────────────────
    The broadcaster can switch any one-shot ALERT type on or off from the Overlay
    Dashboard. Enforcement is CENTRAL, here: a disabled alert type is never even
@@ -47,7 +70,7 @@ const MAX_EVENTS = 60;
    toggleable. */
 const ALERT_TOGGLES_KEY = 'alert_toggles';
 export const TOGGLEABLE_ALERT_TYPES = [
-  'sub', 'giftsub', 'raid', 'hype-level', 'follow', 'cheer', 'drop',
+  'sub', 'resub', 'giftsub', 'raid', 'hype-level', 'follow', 'cheer', 'drop',
   'dino-hatch', 'giveaway-spin', 'prediction', 'bingo-call', 'bingo-win',
   'mtgbbb-pull', 'mtgbbb-bingo',
 ];
@@ -157,6 +180,39 @@ export async function pushOverlayEvent(env, event, opts) {
     });
   } catch (err) {
     console.error('[overlay] could not record event:', err.message);
+  }
+}
+
+/**
+ * Write one slice of the overlay state snapshot. `value` of null clears the
+ * slice (a resolved hype train, a prediction that is gone). Each write bumps a
+ * monotonic `ver` and stamps the written slice with it, so the overlay can tell
+ * a changed slice from an unchanged one.
+ *
+ * Never throws — like pushOverlayEvent, a snapshot write must not take down the
+ * webhook that triggered it. A lost slice is a cosmetic miss on one reload.
+ */
+export async function writeOverlaySlice(env, slice, value) {
+  if (!slice) return;
+  try {
+    await env.MARKETPLACE.mutate(STATE_KEY, (current) => {
+      const rec = current && typeof current === 'object' ? current : {};
+      rec.ver = (Number(rec.ver) || 0) + 1;
+      rec[slice] = value == null ? null : { ...value, ver: rec.ver };
+      return rec;
+    }, { expirationTtl: STATE_TTL_SECONDS });
+  } catch (err) {
+    console.error('[overlay] could not write state slice:', err.message);
+  }
+}
+
+/** The whole snapshot, or null. Read on every poll and returned to the overlay. */
+export async function readOverlayState(env) {
+  try {
+    return await env.MARKETPLACE.get(STATE_KEY, 'json');
+  } catch (err) {
+    console.error('[overlay] could not read state:', err.message);
+    return null;
   }
 }
 
@@ -319,6 +375,10 @@ export async function onRequestGet(context) {
     /* The latest panic command (Clear/Skip), or null. The overlay records its
        first sighting and applies each later change once — see overlay.js. */
     control: await overlayControl(env),
+    /* The standing-state snapshot (current prediction, hype progress, ad
+       countdown). The overlay reads prediction/hype/ad from here — one place —
+       and rehydrates it on a reload without replaying. See writeOverlaySlice. */
+    overlayState: await readOverlayState(env),
     alertVolume: alertVolume,
     audioLeader: audioLeader,
     hatchSound: hatchSound,

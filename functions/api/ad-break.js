@@ -65,7 +65,18 @@ export async function onRequestPost(context) {
     /* Never 500 at Twitch: repeated failures disable the subscription, and
        the message id is already claimed, so a retry could not help. */
     try {
-      await recordBreakBegin(env, body.event);
+      const state = await recordBreakBegin(env, body.event);
+      /* Mirror the running break into the overlay state snapshot (overlay #3),
+         so the on-stream ad countdown has one source and a reloaded source
+         rehydrates it. endsAt is absolute, so the overlay counts down from it
+         and hides itself when it passes — there is no ad_break.end event. */
+      const b = state && state.break;
+      if (b && b.endsAt) {
+        const { writeOverlaySlice } = await import('./overlay/events.js');
+        await writeOverlaySlice(env, 'ad', {
+          endsAt: b.endsAt, startedAt: b.startedAt, durationSeconds: b.durationSeconds,
+        });
+      }
     } catch (err) {
       console.error('[ad-break] could not record the break:', err && err.message);
     }
