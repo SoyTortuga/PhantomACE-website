@@ -44,7 +44,11 @@ export const STREAM_NOW_TTL_SECONDS = 180;
    the room-based game — it rides this one pointer like the others so starting
    it retires whatever game was on stream (one game on stream, last writer
    wins). Its own overlay panel polls its own endpoint for the board. */
-const GAMES = ['bingo', 'mtgbbb', 'maze', 'scramble', 'mana-clash'];
+/* 'phamshock' is the PhamShock Wind Night stream event (pham-wind-night.js),
+   not the room-based artillery game — it rides this one pointer like the others
+   so starting it retires whatever game was on stream (one game on stream, last
+   writer wins). Its own overlay panel polls its own endpoint for the wind. */
+const GAMES = ['bingo', 'mtgbbb', 'maze', 'scramble', 'mana-clash', 'phamshock'];
 
 /**
  * Refresh (or set) the pointer for `info.game`, sliding its TTL forward.

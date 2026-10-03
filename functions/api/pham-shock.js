@@ -271,9 +271,16 @@ function allSubmitted(room) {
   return alive.length > 0 && alive.every(p => p.submitted);
 }
 
-function checkTimers(room) {
+/* `windOverride`, when a Wind Night session is live (pham-wind-night.js), is
+   the SERVER-AUTHORITATIVE wind every room flies with — chat steers it, so it
+   is set here before any resolve and used for the next round instead of the
+   normal gust. null (no session) leaves PhamShock's own per-round wind exactly
+   as it was. */
+function checkTimers(room, windOverride = null) {
   if (room.status !== 'playing') return false;
   let changed = false;
+
+  if (windOverride != null) room.wind = Math.max(-8, Math.min(8, windOverride));
 
   if (room.phase === 'aiming' && room.roundStartedAt && Date.now() - room.roundStartedAt >= ROUND_MS) {
     changed = resolve(room) || changed;
@@ -281,8 +288,12 @@ function checkTimers(room) {
 
   if (room.status === 'playing' && room.phase === 'resolving' && room.resolvedAt && Date.now() - room.resolvedAt >= RESOLVE_MS) {
     room.round++;
-    const gust = roundRng(room, 'wind')();
-    room.wind = Math.max(-8, Math.min(8, room.wind + (gust - 0.5) * 2));
+    if (windOverride != null) {
+      room.wind = Math.max(-8, Math.min(8, windOverride));
+    } else {
+      const gust = roundRng(room, 'wind')();
+      room.wind = Math.max(-8, Math.min(8, room.wind + (gust - 0.5) * 2));
+    }
     room.phase = 'aiming';
     room.roundStartedAt = Date.now();
     room.resolvedAt = null;
@@ -387,15 +398,35 @@ function normCode(v) { return String(v || '').toUpperCase().trim(); }
 
 async function withRoom(env, code, fn) {
   let failed = null;
+  const windOverride = await activeWind(env);
   const room = await env.MARKETPLACE.mutate(roomKey(code), (current) => {
     if (!current) { failed = json({ error: 'Room not found' }, 404); return undefined; }
-    const moved = checkTimers(current);
+    const moved = checkTimers(current, windOverride);
     const err = fn(current);
     if (err) { failed = err; return moved ? current : undefined; }
+    /* Keep chat's wind authoritative even after an fn that sets its own
+       (start-game rolls a random opening wind); a live session overrides it so
+       the first round already blows with chat. */
+    if (windOverride != null && current.status === 'playing') {
+      current.wind = Math.max(-8, Math.min(8, windOverride));
+    }
     return current;
   }, { expirationTtl: ROOM_TTL });
   if (room) await settle(env, code, room);
   return { failed, room };
+}
+
+/* The live Wind Night wind, or null. Read once per request and threaded into
+   the room writes so resolve() flies shells with chat's wind while a session is
+   live, and nothing changes when none is (getActiveWind returns null). */
+async function activeWind(env) {
+  try {
+    const { getActiveWind } = await import('./pham-wind-night.js');
+    return await getActiveWind(env);
+  } catch (err) {
+    console.error('[pham-shock] wind-night read failed:', err && err.message);
+    return null;
+  }
 }
 
 function num(v, fallback) {
@@ -426,15 +457,27 @@ export async function onRequestGet(ctx) {
   if (action === 'get-state') {
     const code = normCode(url.searchParams.get('code'));
     if (!code) return json({ error: 'Missing code' }, 400);
+    /* The live Wind Night wind (or null). It is what resolve() must fly with,
+       and what every client must SEE while aiming, so it is threaded into the
+       timer check and injected into the view below. */
+    const windOverride = await activeWind(env);
     /* Writes only when the clock moved something; every player polls this
        every two seconds. */
     const room = await env.MARKETPLACE.mutate(roomKey(code), (current) => {
       if (!current) return undefined;
-      return checkTimers(current) ? current : undefined;
+      return checkTimers(current, windOverride) ? current : undefined;
     }, { expirationTtl: ROOM_TTL });
     if (!room) return json({ error: 'Room not found' }, 404);
     await settle(env, code, room);
-    return json(publicView(room));
+    const view = publicView(room);
+    /* Show chat's wind during the aiming phase even on a poll that moved no
+       timer (so the aim guide and the replay use the same wind the server will
+       score with). No session => normal per-round wind, untouched. */
+    if (windOverride != null) {
+      view.windNight = true;
+      if (room.status === 'playing') view.wind = Math.max(-8, Math.min(8, windOverride));
+    }
+    return json(view);
   }
 
   return json({ error: 'Invalid action' }, 400);

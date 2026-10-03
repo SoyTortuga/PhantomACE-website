@@ -356,6 +356,28 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* !wind left | !wind right — a chatter nudges the wind during a PhamShock
+     Wind Night session. One step toward that side, clamped to range, one nudge
+     per chatter per cooldown (enforced in pham-wind-night.js — a bounded
+     counts-and-value record, no per-message log). No live session → a quiet
+     no-op. Silent like !hit / !clash: the overlay and the game's own wind gauge
+     are the feedback, and a reply per chatter would bury the channel during the
+     busy minute the wind is swinging. Also accepts l/r and </> as shorthand. */
+  if (parsed.command === '!wind') {
+    try {
+      const { windFromChat } = await import('../pham-wind-night.js');
+      await windFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+        arg: parsed.rest,
+      });
+    } catch (err) {
+      /* A broken wind nudge must not break chat commands. */
+      console.error('[pham-wind-night/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

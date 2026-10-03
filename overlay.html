@@ -170,6 +170,26 @@
     <div class="ov-vsc-note" id="ovVscNote"></div>
   </div>
 
+  <!-- PhamShock Wind Night: its OWN standing panel, driven by pham-wind-night.js.
+       Chat steers the server-authoritative wind with !wind left / !wind right;
+       this draws the current direction and strength. A movable panel like the
+       others; hidden until a session is live, and it yields to an alert the same
+       way the room panel does. -->
+  <div class="ov-wind" id="ovWind" hidden>
+    <div class="ov-wind-head">
+      <span class="ov-wind-title">PHAMSHOCK</span>
+      <span class="ov-wind-sub">Wind Night</span>
+    </div>
+    <div class="ov-wind-body">
+      <span class="ov-wind-arrow" id="ovWindArrow">·</span>
+      <div class="ov-wind-readout">
+        <span class="ov-wind-strength" id="ovWindStrength">0.0</span>
+        <div class="ov-wind-track"><i id="ovWindBar"></i></div>
+      </div>
+    </div>
+    <div class="ov-wind-note">Chat steers the wind — type <b>!wind left</b> / <b>!wind right</b></div>
+  </div>
+
   <!-- Pham Check-In reminder: the reaper raising a sign, shown on a timer
        or the moderator button. A movable panel like the others (position it
        in the layout editor); hidden until it fires. -->
@@ -234,6 +254,7 @@
   <script src="/js/pages/overlay-bone-tithe.js" defer></script>
   <script src="/js/pages/overlay-mana-clash.js" defer></script>
   <script src="/js/pages/overlay-mana-clash-chat.js" defer></script>
+  <script src="/js/pages/overlay-pham-wind.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>
   <script src="/js/pages/overlay-layout.js" defer></script>
 </body>

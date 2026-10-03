@@ -124,6 +124,8 @@
  text-shadow: none; color: var(--text-pri); display: flex; align-items: center; gap: 4px; }
     .wind-display .wind-arrow { color: #44aaff; font-weight: 700; }
     .wind-display .wind-val { color: var(--text-pri); font-weight: 600; }
+    .wind-display .wind-chat { color: var(--red); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .wind-display .wind-chat[hidden] { display: none; }
 
     #fireBtn { padding: 6px 20px; font-size: 17px;
  text-shadow: none; margin-left: auto; }
@@ -254,6 +256,7 @@
     </div>
     <div class="wind-display">
       Wind: <span class="wind-arrow" id="windArrow">←</span> <span class="wind-val" id="windVal">0</span>
+      <span class="wind-chat" id="windChat" hidden>chat</span>
     </div>
     <div class="weapon-bar" id="weaponSelect"></div>
     <button id="fireBtn" class="btn btn-red" onclick="submitTurn()">FIRE</button>
@@ -952,6 +955,8 @@ function updateWind(room) {
   const abs = Math.abs(w).toFixed(1);
   document.getElementById('windArrow').textContent = w > 0.2 ? '→' : w < -0.2 ? '←' : '·';
   document.getElementById('windVal').textContent = abs;
+  /* Wind Night: the server tells the room chat is steering the wind. */
+  document.getElementById('windChat').hidden = !room.windNight;
 }
 
 function buildWeaponUI(me) {
