@@ -268,6 +268,8 @@
     .die.held:hover { transform: translateY(4px); }
     .die.returned { opacity: 0.5; border-color: #444; transform: translateY(-4px); }
     .die.returned:hover { opacity: 0.8; }
+    .die.returned:focus-visible { opacity: 1; }
+    .die.scorable:focus-visible { outline: 3px solid var(--text-pri); outline-offset: 3px; }
     .die.dead { opacity: 0.28; }
 
     /* A short, uneven rattle. Staggered per die so six dice do not move as
@@ -1083,6 +1085,7 @@ let roomCode = null;
 let state = null;
 let held = new Set();        // table dice being KEPT; everything else goes back
 let lastDiceKey = '';        // the roll the tumble animation last played for
+let focusDieIndex = -1;      // die to restore keyboard focus to after a re-render
 let flashUntil = 0;          // hold the intermission back while a flash is up
 let flashTimer = null;       // the pending hide, so a second flash can cancel it
 let pollTimer = null;
@@ -1391,11 +1394,28 @@ function renderDice() {
     }
     if (you.awaitingSelection) {
       if (mask[i]) {
-        /* Held by default; clicking puts it back on the table. */
+        /* Held by default; clicking — or Space/Enter — puts it back on the
+           table. A roving control so a keyboard-only player can pick which
+           dice to keep. */
         el.classList.add('scorable', held.has(i) ? 'held' : 'returned');
-        el.addEventListener('click', () => {
+        el.tabIndex = 0;
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-pressed', held.has(i) ? 'true' : 'false');
+        el.setAttribute('aria-label',
+          face + ' die, worth ' + FACE_VALUE[face] + ' — ' +
+          (held.has(i) ? 'kept, press to return to the table'
+                       : 'on the table, press to keep'));
+        const toggle = () => {
           if (held.has(i)) held.delete(i); else held.add(i);
+          focusDieIndex = i;
           renderDice();
+        };
+        el.addEventListener('click', toggle);
+        el.addEventListener('keydown', (e) => {
+          if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') {
+            e.preventDefault();
+            toggle();
+          }
         });
       } else {
         el.classList.add('dead');
@@ -1455,6 +1475,14 @@ function renderDice() {
   else if (you.awaitingSelection) $('trayLabel').textContent = 'Keeping the highlighted dice — click one to put it back';
   else if (you.kept.length) $('trayLabel').textContent = 'Roll ' + you.remaining + ' again, or bank';
   else $('trayLabel').textContent = 'Roll to begin';
+
+  /* A keyboard toggle rebuilds the tray, which drops focus; put it back on the
+     same die so Space/Enter can keep walking the row. Cleared once consumed. */
+  if (focusDieIndex >= 0) {
+    const el = $('diceTray').children[focusDieIndex];
+    focusDieIndex = -1;
+    if (el && typeof el.focus === 'function') el.focus();
+  }
 }
 
 /* One description of a player's round, used by the strip and the
