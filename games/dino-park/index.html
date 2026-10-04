@@ -5320,6 +5320,24 @@ const YARD_ITEM_TYPES = [
   { id: 'hatchnest', name: 'Hatchling Nest', src: AB+'megapack-sprites/dinosaur-nests-and-eggs/17.png', cost: 145, mood: 8, size: 32, blocks: false, radius: 0, band: 'mid' },
   { id: 'giantfern', name: 'Giant Fern', src: AB+'megapack-sprites/tropical-trees-and-ferns/21.png', cost: 65, mood: 4, size: 34, blocks: false, radius: 0, band: 'large' },
   { id: 'royalpalm', name: 'Royal Palm', src: AB+'megapack-sprites/tropical-trees-and-ferns/00.png', cost: 115, mood: 7, size: 48, blocks: true, radius: 5, band: 'large' },
+  /* -- Halloween: spooky props spliced from sprites already in the pack
+     (no new art). A graveyard kit — crossbones, skulls, headstones, a coffin,
+     a bone-fire — that pairs with the Haunted Grove / Moonlit Hollow
+     backgrounds. */
+  { id: 'crossbones', name: 'Crossbones', src: AB+'megapack-sprites/bones-and-skeleton-decorations/10.png', cost: 40, mood: 3, size: 24, blocks: false, radius: 0, band: 'halloween' },
+  { id: 'hornedskull', name: 'Horned Skull', src: AB+'megapack-sprites/bones-and-skeleton-decorations/03.png', cost: 55, mood: 3, size: 28, blocks: false, radius: 0, band: 'halloween' },
+  { id: 'skullstaff', name: 'Skull Staff', src: AB+'megapack-sprites/bones-and-skeleton-decorations/19.png', cost: 70, mood: 4, size: 30, blocks: false, radius: 0, band: 'halloween' },
+  { id: 'giantskull', name: 'Giant Skull', src: AB+'megapack-sprites/bones-and-skeleton-decorations/06.png', cost: 90, mood: 5, size: 34, blocks: false, radius: 0, band: 'halloween' },
+  { id: 'bonespikes', name: 'Bone Spikes', src: AB+'megapack-sprites/bones-and-skeleton-decorations/22.png', cost: 95, mood: 5, size: 36, blocks: true, radius: 4, band: 'halloween' },
+  { id: 'skulltotem', name: 'Skull Totem', src: AB+'megapack-sprites/bones-and-skeleton-decorations/17.png', cost: 110, mood: 6, size: 34, blocks: false, radius: 0, band: 'halloween' },
+  { id: 'bonebanner', name: 'Bone Banner', src: AB+'megapack-sprites/bones-and-skeleton-decorations/21.png', cost: 120, mood: 6, size: 34, blocks: false, radius: 0, band: 'halloween' },
+  { id: 'skelestake', name: 'Skeleton Stake', src: AB+'megapack-sprites/bones-and-skeleton-decorations/00.png', cost: 150, mood: 8, size: 40, blocks: true, radius: 4.5, band: 'halloween' },
+  { id: 'headstone', name: 'Skull Headstone', src: AB+'megapack-sprites/stone-ruins/07.png', cost: 160, mood: 8, size: 38, blocks: true, radius: 4.5, band: 'halloween' },
+  { id: 'gravestone', name: 'Carved Gravestone', src: AB+'megapack-sprites/stone-ruins/49.png', cost: 180, mood: 9, size: 40, blocks: true, radius: 5, band: 'halloween' },
+  { id: 'tombstone', name: 'Mossy Tombstone', src: AB+'megapack-sprites/stone-ruins/50.png', cost: 200, mood: 9, size: 40, blocks: true, radius: 5, band: 'halloween' },
+  { id: 'bonefire', name: 'Bone Fire', src: AB+'megapack-sprites/torches-and-fire-pits/26.png', cost: 220, mood: 10, size: 36, blocks: true, radius: 4.5, band: 'halloween' },
+  { id: 'coffin', name: 'Open Coffin', src: AB+'megapack-sprites/bones-and-skeleton-decorations/31.png', cost: 280, mood: 12, size: 44, blocks: true, radius: 5, band: 'halloween' },
+  { id: 'ritualaltar', name: 'Ritual Altar', src: AB+'megapack-sprites/stone-ruins/45.png', cost: 340, mood: 13, size: 46, blocks: true, radius: 5.5, band: 'halloween' },
 ];
 /* Display order and labels for the tray. Separate from the item table so
    the catalogue can grow without touching the grouping, and so a band
@@ -5331,6 +5349,7 @@ const YARD_BANDS = [
   { id: 'large',  label: 'Large - blocks pathing' },
   { id: 'camp',   label: 'Camp & Tribal' },
   { id: 'monument', label: 'Ancient Monuments' },
+  { id: 'halloween', label: 'Halloween' },
   { id: 'show',   label: 'Showpieces' },
 ];
 /* Raised with the catalogue: 33 types and 14 slots meant most of them
