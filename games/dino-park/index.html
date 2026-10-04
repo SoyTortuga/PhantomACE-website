@@ -1302,6 +1302,7 @@
 
 <script src="/js/session-read.js"></script>
 <script src="/js/game-nav.js"></script>
+<script src="backgrounds-builtin.js"></script>
 <script>
 const SAVE_KEY = 'pham_dino_park';
 
@@ -4421,6 +4422,17 @@ const PARK_BACKGROUNDS = {
   },
 };
 const DEFAULT_BACKGROUND = 'classic';
+
+/* Extra built-in themes (backgrounds-builtin.js) composed from the park-tiles
+   palette. Merged here so they appear in the Scenery picker with the shared
+   WALK_MASK — same geography as classic, so a theme swap never strands a dino
+   or a decoration. Classic stays the default. */
+if (window.BUILTIN_BG) {
+  for (const id in window.BUILTIN_BG) {
+    const b = window.BUILTIN_BG[id];
+    PARK_BACKGROUNDS[id] = { name: b.name, mask: WALK_MASK, tilemap: b.tilemap };
+  }
+}
 
 /* ── STUDIO BACKGROUNDS ────────────────────────────────────────────────
    Published maps from /api/park-backgrounds: a 32×32 tilemap plus the
