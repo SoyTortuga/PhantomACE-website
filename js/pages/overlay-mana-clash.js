@@ -76,7 +76,10 @@
   function statusFor(p, room) {
     if (room.status === 'finished') return '';
     if ((room.resting || []).indexOf(p.id) !== -1) return 'resting';
-    if (p.event === 'bust') return 'bust';
+    /* The server emits 'burn' for a busted turn (never 'bust'); check it
+       before p.done, or a burned turn (done==='burned') reads as 'banked' —
+       the exact opposite — on stream. */
+    if (p.event === 'burn') return 'bust';
     if (p.done) return 'banked';
     if (p.awaitingSelection) return 'choosing';
     if (p.pending > 0) return 'holding ' + p.pending;
@@ -117,7 +120,7 @@
       var status = statusFor(p, room);
       var dice = diceFor(p);
       html += '<li class="ov-mc-row' + (p.id === room.winner ? ' is-winner' : '') +
-          (p.event === 'bust' ? ' is-bust' : '') + '">' +
+          (p.event === 'burn' ? ' is-bust' : '') + '">' +
         '<span class="ov-mc-name">' + esc(p.name) + '</span>' +
         '<span class="ov-mc-total">' + (Number(p.total) || 0).toLocaleString() + '</span>' +
         (status ? '<span class="ov-mc-status">' + esc(status) + '</span>' : '') +

@@ -2547,6 +2547,13 @@ $('againBtn').addEventListener('click', async () => {
    the page starts navigating away. */
 window.addEventListener('pagehide', () => {
   if (!roomCode || !state || state.status !== 'lobby') return;
+  /* The host must NEVER beacon a lobby leave. pagehide can't tell a reload
+     from a close, and on a reload the server treats leave-room as real: it
+     migrates host to the next player, or — for a solo / hosting-only host —
+     empties and deletes the room. A single refresh would then strip the
+     host of Start/kick, or vaporise a room they just made. A host who truly
+     closes the tab is reaped by ROOM_TTL instead. */
+  if (state.host && state.host === myId()) return;
   /* If this is a reload rather than a close, the next load sees `left` and
      rejoins the lobby it was just removed from. Only a seated player: a
      hosting-only host must never come back as a player. */
@@ -2562,8 +2569,12 @@ window.addEventListener('pagehide', () => {
 /* Restored from the back/forward cache: the beacon above already removed
    us, but the page never reloaded, so resumeRoom never ran. Rejoin here. */
 window.addEventListener('pageshow', (e) => {
-  if (!e.persisted || !roomCode || !state || state.status !== 'lobby' || !state.you) return;
+  if (!e.persisted || !roomCode || !state || state.status !== 'lobby') return;
   const code = roomCode;
+  /* The host was never beaconed out (see pagehide) — nothing to rejoin, just
+     resume polling so the lobby keeps refreshing. */
+  if (state.host && state.host === myId()) { poll(); return; }
+  if (!state.you) return;
   api({ action: 'join-room', code, password: joinedPassword })
     .then(() => { rememberRoom(code, false); poll(); })
     .catch((err) => leaveToSplash(err.message));
