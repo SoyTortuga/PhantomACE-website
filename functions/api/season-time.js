@@ -57,6 +57,13 @@ export function monthKey(d = new Date()) {
   return `${y}-${pad(m)}`;
 }
 
+/** 'YYYY-MM-DD' for the instant, in SEASON_TZ — the key the Daily Challenge
+    rolls on, so a new puzzle appears at local midnight, not UTC. */
+export function dayKey(d = new Date()) {
+  const { y, m, day } = zonedYMD(d);
+  return `${y}-${pad(m)}-${pad(day)}`;
+}
+
 /** Subtract one from a 'YYYY-MM' string (TZ-independent string math). */
 export function prevMonthOf(mk) {
   const [y, m] = String(mk).split('-').map(Number);

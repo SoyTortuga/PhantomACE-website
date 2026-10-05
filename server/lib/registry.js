@@ -355,6 +355,15 @@ export const FAMILIES = [
   { prefix: 'cp_queue_',       table: 'cp_queues',        expiry: 'real' },
   { prefix: 'earnings_',       table: 'earnings',         expiry: 'none' },
   { prefix: 'listing_',        table: 'listings',         expiry: 'real' },
+  /* Daily Challenge: each day's score board (mcd_board_<dayKey>, 'real' so a
+     day's board clears itself after its TTL) and each player's latest daily
+     result (mcd_user_<id>, 'none' — the record that gates a second scoring run
+     that day). Neither overlaps mc_room_. */
+  { prefix: 'mcd_board_',      table: 'singletons',       expiry: 'real' },
+  { prefix: 'mcd_user_',       table: 'singletons',       expiry: 'none' },
+  /* Mana Clash achievements: per-player unlocked milestones + progress. 'none'
+     — earned cosmetics and streaks must never silently expire. */
+  { prefix: 'mc_ach_',         table: 'singletons',       expiry: 'none' },
   { prefix: 'mc_room_',        table: 'mc_rooms',         expiry: 'real' },
   { prefix: 'ps_room_',        table: 'ps_rooms',         expiry: 'real' },
   { prefix: 'bingo_',          table: 'bingo_rooms',      expiry: 'real' },

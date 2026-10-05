@@ -1516,6 +1516,48 @@ async function boards(env) {
   check('leaving a bot room with no human left deletes it', gone.status, 404);
 }
 
+/* ── Daily Challenge ──────────────────────────────────────────────────────
+   A solo seeded score-attack: the same dice for everyone that day, a fixed
+   number of rounds, always unranked, recorded to a per-day board (first
+   completion only). */
+{
+  const env = makeEnv();
+  const s1 = await post(env, 'a', { action: 'start-daily' });
+  check('start-daily returns a started room', s1.status, 200);
+  const code = s1.data.code;
+  check('it is a daily run', s1.data.room.daily, true);
+  check('a daily run is unranked', s1.data.room.ranked, false);
+  check('...for the daily reason', s1.data.room.unrankedReason, 'daily');
+  check('it announces its round count', s1.data.room.maxRounds, 7);
+  check('it starts in round 1, playing', [s1.data.room.status, s1.data.room.round], ['playing', 1]);
+
+  /* Deterministic dice: a second player's run the same day draws the SAME first
+     roll. The daily stream ignores the loaded-dice queue (it is seeded, not
+     Math.random), so this is a real determinism check. */
+  const r1 = await post(env, 'a', { action: 'roll', code });
+  const firstA = [...(r1.data.room.you.dice || []), ...(r1.data.room.you.kept || [])].sort();
+  const env2 = makeEnv();
+  const s2 = await post(env2, 'b', { action: 'start-daily' });
+  const r2 = await post(env2, 'b', { action: 'roll', code: s2.data.code });
+  const firstB = [...(r2.data.room.you.dice || []), ...(r2.data.room.you.kept || [])].sort();
+  check('the daily deals the same dice to everyone that day', firstA, firstB);
+
+  /* Force the run to its last round, banked, then poll: endRoundDaily finishes
+     it, settle records it to the day board. */
+  const key = 'mc_room_' + code;
+  const room = JSON.parse(env._store.get(key));
+  room.round = 7;
+  room.players['101'].total = 4321;
+  room.players['101'].turn = { pending: 0, dice: [], kept: [], remaining: 6, awaitingSelection: false, done: 'banked', gained: 0, event: null, deadline: null };
+  env._store.set(key, JSON.stringify(room));
+  await get(env, 'a', 'action=get-state&code=' + code);
+
+  const daily = await get(env, 'a', 'action=daily');
+  ok('a finished daily run lands on the day board', (daily.data.board || []).some(e => e.score === 4321));
+  check('the player is marked as having played today', daily.data.you.played, true);
+  check('the board scores are exposed without ids', daily.data.board.every(e => e.userId === undefined), true);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 
 console.log('');

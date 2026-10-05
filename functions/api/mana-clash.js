@@ -17,9 +17,10 @@
    ══════════════════════════════════════════════ */
 
 import {
-  rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection, DICE_COUNT, FACE_VALUE,
+  rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection, DICE_COUNT, FACE_VALUE, FACES,
 } from './mana-clash-scoring.js';
 import { isBroadcaster } from './admin/moderators.js';
+import { dayKey as seasonDayKey } from './season-time.js';
 
 const ROOM_TTL = 7200;
 
@@ -124,6 +125,36 @@ const BOT_NAMES = { easy: 'Skeleton Squire', normal: 'Mana Wraith', hard: 'The L
 const BOT_THINK_MIN = 1400;   // ms the bot "thinks" before taking its turn
 const BOT_THINK_MAX = 3200;
 
+/* ── Daily Challenge ──────────────────────────────────────────────────────
+   A solo score-attack: the SAME dice for everyone that day, over a fixed set
+   of rounds. The puzzle is the choices, not the luck — every player draws from
+   one deterministic stream seeded by the Pacific day, so a higher score is a
+   better decision, not a better roll. Always unranked; its own daily board. */
+const DAILY_ROUNDS = 7;
+const DAILY_BOARD_PREFIX = 'mcd_board_';   // mcd_board_<dayKey> → top scores (TTL)
+const DAILY_USER_PREFIX = 'mcd_user_';     // mcd_user_<userId> → their latest daily result
+const DAILY_BOARD_MAX = 50;
+const DAILY_TTL = 172800;                  // 48h — a day board clears itself
+
+/* One fair face from a day's deterministic stream at position i. FNV-1a over
+   the day key mixed with the index, finished with a short avalanche so
+   adjacent positions don't correlate. Pure — the same (day, i) is always the
+   same face, for every player. */
+function streamFace(dayKey, i) {
+  let h = 2166136261 ^ (i >>> 0);
+  for (let k = 0; k < dayKey.length; k++) h = Math.imul(h ^ dayKey.charCodeAt(k), 16777619);
+  h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15;
+  return FACES[(h >>> 0) % FACES.length];
+}
+
+/* Draw `count` dice from the room's daily stream, advancing its position so the
+   next roll continues where this one left off. */
+function rollDaily(room, count) {
+  const out = [];
+  for (let i = 0; i < count; i++) out.push(streamFace(room.dayKey, room.dailyPos++));
+  return out;
+}
+
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/(?:^|;\s*)pham_session=([^;]+)/);
@@ -197,6 +228,16 @@ function touch(room, turn, now) {
    SAME scoring engine as everyone else (bestSelection) — only its nerve, when
    it banks vs pushes, differs by difficulty. A bot game is ALWAYS unranked
    (see isRanked / unrankedReason), so the prize boards can never be farmed. */
+/* Fire a Mana Clash achievement event (best-effort). The engine lives in its
+   own module and never throws into us; the guard here also means a deploy where
+   that file is missing just no-ops rather than failing a game action. */
+async function fireAchievement(env, userId, event) {
+  try {
+    const { recordManaClashAchievement } = await import('./mana-clash-achievements.js');
+    await recordManaClashAchievement(env, userId, event);
+  } catch (err) { /* achievements are a bonus, never a blocker */ }
+}
+
 function botThink() {
   return BOT_THINK_MIN + Math.floor(Math.random() * (BOT_THINK_MAX - BOT_THINK_MIN));
 }
@@ -991,9 +1032,24 @@ function finishVersus(room, winner, now) {
   room.contendersAtFinish = Object.keys(room.players).length;
 }
 
+/* Daily is a fixed-length solo run: no goal race, no final round. Play the set
+   number of rounds, then the total is the score. */
+function endRoundDaily(room, now) {
+  if (room.round >= room.maxRounds) {
+    const id = Object.keys(room.players)[0] || null;
+    finishVersus(room, id, now);
+    return;
+  }
+  room.nextIsFinal = false;
+  room.restingIds = [];
+  room.status = 'intermission';
+  room.intermissionEndsAt = now + INTERMISSION_MS;
+}
+
 function endRound(room, now) {
   /* Co-op has its own resolution — team damage vs one enemy, not a race. */
   if (room.mode === 'coop') return endRoundCoop(room, now);
+  if (room.daily) return endRoundDaily(room, now);
 
   /* Everyone eligible has left or been removed. Ending on whoever is still
      in the room beats looping the round forever with nobody in it. */
@@ -1163,6 +1219,7 @@ function isRanked(room) {
  */
 function unrankedReason(room) {
   if ((room.mode || 'versus') !== 'versus') return 'coop';
+  if (room.daily) return 'daily';
   if (room.vsBot) return 'bot';
   if (room.practice) return 'practice';
   if (room.goal !== RANKED_GOAL) return 'goal';
@@ -1293,6 +1350,8 @@ export function viewFor(room, userId, now, opts = {}) {
     goal: room.goal,
     idleMs: room.idleMs,
     practice: !!room.practice,
+    daily: !!room.daily,
+    maxRounds: room.maxRounds || null,
     mode: room.mode || 'versus',
     coop: room.mode === 'coop' && room.coop ? {
       wave: room.coop.wave,
@@ -1489,7 +1548,44 @@ async function settle(env, code, room) {
     return current;
   }, { expirationTtl: ROOM_TTL });
 
-  if (claimed) await recordResult(env, room);
+  if (claimed) {
+    if (room.daily) await recordDaily(env, room);
+    else await recordResult(env, room);
+
+    /* A real versus win against a real field (not solo/practice/daily/bot):
+       feeds First Blood, the win-streak set and the 20k Marathoner set. */
+    if (!room.daily && room.winner && (room.mode || 'versus') === 'versus'
+        && !room.vsBot && room.contendersAtFinish >= MIN_RANKED_CONTENDERS) {
+      await fireAchievement(env, room.winner, { type: 'win', ranked: isRanked(room), goal: room.goal });
+    }
+  }
+}
+
+/* Record a finished Daily run: the solo player's total goes on that day's board
+   (first completion only — a replay of the same seed cannot beat your own
+   score), and the achievement engine is told they played today. */
+async function recordDaily(env, room) {
+  const id = Object.keys(room.players)[0];
+  if (!id || !room.dayKey) return;
+  const p = room.players[id];
+  const score = p.total || 0;
+
+  let firstToday = false;
+  await env.MARKETPLACE.mutate(DAILY_USER_PREFIX + id, (cur) => {
+    if (cur && cur.dayKey === room.dayKey) return undefined;   // already counted today
+    firstToday = true;
+    return { dayKey: room.dayKey, score, name: p.displayName };
+  });
+  if (!firstToday) return;
+
+  await env.MARKETPLACE.mutate(DAILY_BOARD_PREFIX + room.dayKey, (cur) => {
+    const list = Array.isArray(cur) ? cur.slice() : [];
+    list.push({ userId: id, name: p.displayName, score });
+    list.sort((a, b) => b.score - a.score || String(a.name).localeCompare(b.name));
+    return list.slice(0, DAILY_BOARD_MAX);
+  }, { expirationTtl: DAILY_TTL });
+
+  await fireAchievement(env, id, { type: 'daily', dayKey: room.dayKey });
 }
 
 async function withRoom(env, code, fn) {
@@ -1562,6 +1658,26 @@ export async function onRequestGet(context) {
       });
     }
     return json(rooms);
+  }
+
+  /* ── daily — today's board + whether you've played ────────────────────── */
+  if (action === 'daily') {
+    const dk = seasonDayKey();
+    const board = (await env.MARKETPLACE.get(DAILY_BOARD_PREFIX + dk, 'json')) || [];
+    const player = getPlayer(request);
+    let you = null;
+    if (player) {
+      const u = await env.MARKETPLACE.get(DAILY_USER_PREFIX + player.userId, 'json');
+      const played = !!(u && u.dayKey === dk);
+      const rank = played ? ((board.findIndex(e => e.userId === player.userId) + 1) || null) : null;
+      you = { played, score: played ? u.score : null, rank };
+    }
+    return json({
+      dayKey: dk,
+      rounds: DAILY_ROUNDS,
+      board: board.map(e => ({ name: e.name, score: e.score })),
+      you,
+    });
   }
 
   if (action === 'get-state') {
@@ -1678,10 +1794,49 @@ export async function onRequestPost(context) {
     }
     if (!made) return json({ error: 'Could not generate a room code' }, 500);
     const broadcaster = isBroadcaster(env, { user_id: userId });
+    // (daily rooms are created by the start-daily action below, not here)
     /* When PhantomACE opens a room, drop the join link in chat automatically.
        Best-effort and non-blocking: a chat hiccup must not fail the create. */
     if (broadcaster) await shareManaClashRoom(env, made, displayName);
     return json({ success: true, code: made, practice, mode: coop ? 'coop' : 'versus', broadcaster });
+  }
+
+  /* ── start-daily — today's seeded solo score-attack ───────────────────── */
+  if (body.action === 'start-daily') {
+    const now = Date.now();
+    const dk = seasonDayKey();
+    let made = null;
+    for (let i = 0; i < 10; i++) {
+      const candidate = generateCode();
+      const fresh = {
+        code: candidate,
+        host: userId, hostName: displayName,
+        password: null,
+        practice: false,
+        daily: true, dayKey: dk, dailyPos: 0, maxRounds: DAILY_ROUNDS,
+        mode: 'versus',
+        goal: 0, idleMs: 30000,
+        status: 'lobby',
+        round: 0, roundStartedAt: null,
+        isFinalRound: false, nextIsFinal: false, tiedPlayers: null,
+        intermissionEndsAt: null,
+        winner: null,
+        players: { [userId]: { displayName, profileImage, ready: true, total: 0, turn: null } },
+        createdAt: now,
+      };
+      let claimed = false;
+      await env.MARKETPLACE.mutate('mc_room_' + candidate, (current) => {
+        if (current) return undefined;
+        claimed = true;
+        return fresh;
+      }, { expirationTtl: ROOM_TTL });
+      if (claimed) { made = candidate; break; }
+    }
+    if (!made) return json({ error: 'Could not start the daily run' }, 500);
+    /* Start it straight away — a daily run is solo, there is nobody to wait
+       for, and the lobby would only be a step between the button and the dice. */
+    const { room } = await withRoom(env, made, (r, n) => { startRound(r, n); return null; });
+    return json({ success: true, code: made, room: room ? viewFor(room, userId, Date.now()) : null });
   }
 
   if (!code) return json({ error: 'Missing room code' }, 400);
@@ -1991,6 +2146,7 @@ export async function onRequestPost(context) {
 
   /* ── roll ─────────────────────────────────────────────────────────── */
   if (body.action === 'roll') {
+    let sixOfAKind = false;
     const { failed, room } = await withRoom(env, code, (r, now) => {
       const blocked = activeTurn(r, userId);
       if (blocked) return blocked;
@@ -2002,7 +2158,8 @@ export async function onRequestPost(context) {
          CONSECUTIVE misses, never a lifetime tally. */
       r.players[userId].missedRounds = 0;
 
-      t.dice = rollDice(t.remaining);
+      t.dice = r.daily ? rollDaily(r, t.remaining) : rollDice(t.remaining);
+      if (t.dice.length === 6 && new Set(t.dice).size === 1) sixOfAKind = true;
       t.event = null;
 
       if (!hasAnyScore(t.dice)) {
@@ -2039,6 +2196,7 @@ export async function onRequestPost(context) {
       return null;
     });
     if (failed) return failed;
+    if (sixOfAKind) await fireAchievement(env, userId, { type: 'roll', sixOfAKind: true });
     return json({ success: true, room: viewFor(room, userId, Date.now()) });
   }
 
@@ -2089,6 +2247,7 @@ export async function onRequestPost(context) {
 
   /* ── bank ─────────────────────────────────────────────────────────── */
   if (body.action === 'bank') {
+    let bankedAmount = 0;
     const { failed, room } = await withRoom(env, code, (r, now) => {
       const blocked = activeTurn(r, userId);
       if (blocked) return blocked;
@@ -2098,6 +2257,7 @@ export async function onRequestPost(context) {
 
       r.players[userId].total += t.pending;
       t.gained = t.pending;
+      bankedAmount = t.pending;
       t.done = 'banked';
       t.deadline = null;
       t.dice = [];
@@ -2105,6 +2265,7 @@ export async function onRequestPost(context) {
       return null;
     });
     if (failed) return failed;
+    if (bankedAmount > 0) await fireAchievement(env, userId, { type: 'bank', amount: bankedAmount });
     return json({ success: true, room: viewFor(room, userId, Date.now()) });
   }
 

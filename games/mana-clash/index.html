@@ -187,6 +187,17 @@
                 background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
     .room-code { font-weight: 800; letter-spacing: 2px; color: var(--red); font-size: 21px; }
 
+    .daily-board { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+    .daily-board li { display: flex; align-items: baseline; gap: 10px; font-size: 14px;
+                      padding: 4px 0; border-top: 1px solid var(--line); }
+    .daily-board li .rk { color: var(--dim); width: 22px; font-weight: 700; }
+    .daily-board li .nm { flex: 1; color: var(--text-pri); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .daily-board li .sc { font-weight: 800; color: var(--text-pri); }
+    .daily-board li.you .nm, .daily-board li.you .sc { color: var(--red); }
+    .daily-board li:nth-child(1) .rk { color: var(--medal-gold); }
+    .daily-board li:nth-child(2) .rk { color: var(--medal-silver); }
+    .daily-board li:nth-child(3) .rk { color: var(--medal-bronze); }
+
     /* ════ LOBBY ════ */
     .lobby-code { font-size: 64px; font-weight: 800; letter-spacing: 8px; color: var(--text-pri); cursor: pointer; margin: 6px 0; }
     .lobby-meta { display: flex; gap: 16px; font-size: 17px;
@@ -550,6 +561,61 @@
       .die.set-hollow::before { animation: none; }
     }
 
+    /* ════ ACHIEVEMENT FINISHES ════
+       Earned from Mana Clash milestones. Borders + filters only, inside the
+       black/grey/red/white palette. Marathoner (Long Haul) is the mythic one,
+       so it is the only one that moves — a slow drift, reduced-motion safe. */
+    .die.set-firstblood { border-color: #7a1414; }
+    .die.set-firstblood img { filter: grayscale(1) sepia(1) saturate(4.5) hue-rotate(-20deg) brightness(0.7); }
+
+    .die.set-highroller { border-color: #c0c0c0; }
+    .die.set-highroller img { filter: grayscale(1) brightness(1.5) contrast(1.1); }
+
+    .die.set-warpath { border: 2px solid #5a2020; }
+    .die.set-warpath img { filter: grayscale(0.55) sepia(0.45) saturate(2.4) hue-rotate(-15deg) brightness(0.82); }
+
+    .die.set-sixshooter { border-color: #3a3a40; }
+    .die.set-sixshooter img { filter: grayscale(1) brightness(0.92) contrast(1.35); }
+
+    .die.set-marathon { border-color: #8a1a1a; animation: marathon-pulse 4.5s ease-in-out infinite; }
+    .die.set-marathon img { filter: grayscale(1) sepia(1) saturate(5) hue-rotate(-18deg) brightness(0.92) contrast(1.2); }
+    @keyframes marathon-pulse {
+      0%, 100% { border-color: #8a1a1a; background: #2a0c0c; }
+      50%      { border-color: #d41c1c; background: #140606; }
+    }
+
+    .die.set-devotee { border-color: #9a9a9a; }
+    .die.set-devotee img { filter: grayscale(1) brightness(1.25) contrast(0.9) sepia(0.15); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .die.set-marathon { animation: none; }
+    }
+
+    /* ════ ACHIEVEMENTS PANEL ════ */
+    .ach-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .ach-row { display: flex; align-items: center; gap: 12px; background: var(--gray-mid);
+               border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+    .ach-row.unlocked { border-color: var(--red); }
+    .ach-die { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 6px;
+               border: 2px solid var(--line); display: flex; align-items: center; justify-content: center;
+               background: #141414; overflow: hidden; }
+    .ach-row.unlocked .ach-die { border-color: var(--red); }
+    .ach-die img { width: 26px; height: 26px; }
+    .ach-body { flex: 1; min-width: 0; }
+    .ach-name { font-weight: 700; color: var(--text-pri); font-size: 16px; }
+    .ach-locked-tag { font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+    .ach-unlocked-tag { font-size: 13px; color: var(--red); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+    .ach-desc { font-size: 14px; color: var(--dim); margin: 2px 0 6px; }
+    .ach-reward { font-size: 13px; color: var(--dim); }
+    .ach-reward b { color: var(--text-pri); }
+    .ach-reward .rar-common   { color: var(--rarity-common); }
+    .ach-reward .rar-uncommon { color: var(--rarity-uncommon); }
+    .ach-reward .rar-rare     { color: var(--rarity-rare); }
+    .ach-reward .rar-mythic   { color: var(--rarity-mythic); }
+    .ach-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+    .ach-bar > span { display: block; height: 100%; background: var(--red); }
+    .ach-open-btn { margin: 0 auto 14px; display: block; }
+
     .dice-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
                    margin-bottom: 8px; }
     .dice-picker-label { font-size: 14px;
@@ -716,6 +782,15 @@
   <div id="splashBody" class="splash-body" hidden>
     <button class="btn btn-red btn-lg" id="quickMatchBtn"
             style="width:100%;max-width:620px;margin:0 auto 14px">⚡ Quick Match — find me a game</button>
+
+    <div class="card-box" id="dailyCard" style="width:100%;max-width:620px;margin:0 auto 14px">
+      <div class="section-hdr">🗓️ Daily Challenge <span class="muted" id="dailyMeta" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+      <span class="muted">Everyone gets the <b>same dice</b> today — 7 rounds, best total wins. One scoring run a day, so make your choices count.</span>
+      <button class="btn btn-red" id="dailyBtn" style="margin-top:8px;display:block;width:100%">Play Today's Daily</button>
+      <div class="feedback" id="dailyYou" style="margin-top:4px"></div>
+      <ol class="daily-board" id="dailyBoard"></ol>
+    </div>
+
     <div class="splash-sections">
       <div class="card-box splash-form">
         <div class="section-hdr">Create Room</div>
@@ -773,6 +848,8 @@
     </details>
 
     <div class="feedback" id="splashFeedback"></div>
+
+    <button class="btn btn-dim ach-open-btn" id="achOpenBtn" style="max-width:620px;width:100%">🏆 Achievements &amp; Dice Unlocks</button>
 
     <div class="section-hdr" style="width:100%;max-width:620px">Open Rooms</div>
     <div class="dice-picker" id="dicePicker" hidden></div>
@@ -877,6 +954,15 @@
   <div class="rules-modal-card">
     <button class="rules-close" id="rulesClose" title="Close">&times;</button>
     <div class="rules-body" data-rules-body></div>
+  </div>
+</div>
+
+<div class="rules-modal" id="achModal" hidden>
+  <div class="rules-modal-card">
+    <button class="rules-close" id="achClose" title="Close">&times;</button>
+    <div class="section-hdr" style="margin-bottom:4px">Achievements</div>
+    <p class="muted" id="achSummary" style="margin:0 0 12px">Hit Mana Clash milestones to unlock cosmetic dice sets. Unlocked dice appear in the Dice picker automatically.</p>
+    <div class="ach-grid" id="achGrid"><div class="muted" style="text-align:center">Loading…</div></div>
   </div>
 </div>
 
@@ -1081,6 +1167,45 @@ const DICE_SETS = {
     faces: FACE_IMG,
     cls: 'set-hollow',
     colours: { C:'#232323', W:'#2b2b2b', U:'#202020', B:'#191919', R:'#272020', G:'#212221' },
+  },
+  /* ── Achievement unlocks ─────────────────────────────────────────────
+     Earned by Mana Clash milestones (functions/api/mana-clash-achievements.js),
+     not the pass. Same contract: unique keys, CSS finishes over FACE_IMG,
+     black/grey/red/white only. */
+  firstblood: {
+    name: 'First Blood',
+    faces: FACE_IMG,
+    cls: 'set-firstblood',
+    colours: { C:'#c88', W:'#d99', U:'#b77', B:'#a66', R:'#e88', G:'#c88' },
+  },
+  highroller: {
+    name: 'High Roller',
+    faces: FACE_IMG,
+    cls: 'set-highroller',
+    colours: { C:'#e8e8e8', W:'#f6f6f6', U:'#dedede', B:'#d2d2d2', R:'#ececec', G:'#e0e0e0' },
+  },
+  warpath: {
+    name: 'Warpath',
+    faces: FACE_IMG,
+    cls: 'set-warpath',
+    colours: { C:'#9a4a4a', W:'#a85454', U:'#8e4040', B:'#7a3434', R:'#b45050', G:'#8e4040' },
+  },
+  sixshooter: {
+    name: 'Six Shooter',
+    faces: FACE_IMG,
+    cls: 'set-sixshooter',
+    colours: { C:'#4a4a50', W:'#55555c', U:'#44444a', B:'#38383e', R:'#50444a', G:'#44484a' },
+  },
+  marathon: {
+    name: 'Long Haul',
+    faces: FACE_IMG,
+    cls: 'set-marathon',
+  },
+  devotee: {
+    name: 'Daily Devotee',
+    faces: FACE_IMG,
+    cls: 'set-devotee',
+    colours: { C:'#d9d4c4', W:'#e7e2d2', U:'#d1ccbc', B:'#c4bfaf', R:'#ddd4c4', G:'#cdcbbc' },
   },
 };
 
@@ -1406,7 +1531,72 @@ function initRules() {
   document.getElementById('rulesBtn').addEventListener('click', () => { modal.hidden = false; });
   document.getElementById('rulesClose').addEventListener('click', () => { modal.hidden = true; });
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.hidden = true; });
+
+  const achModal = document.getElementById('achModal');
+  const achBtn = document.getElementById('achOpenBtn');
+  if (achBtn && achModal) {
+    achBtn.addEventListener('click', () => { achModal.hidden = false; loadAchievements(); });
+    document.getElementById('achClose').addEventListener('click', () => { achModal.hidden = true; });
+    achModal.addEventListener('click', (e) => { if (e.target === achModal) achModal.hidden = true; });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    modal.hidden = true;
+    if (achModal) achModal.hidden = true;
+  });
+}
+
+/* ── Achievements ──────────────────────────────────────────────────────────
+   Reads the player's milestone progress and the dice each one grants. Newly
+   unlocked dice are surfaced in the picker by loadDiceSets, not here. */
+async function loadAchievements() {
+  const grid = $('achGrid');
+  if (!grid) return;
+  try {
+    const res = await fetch('/api/mana-clash-achievements', { cache: 'no-store' });
+    if (!res.ok) { grid.innerHTML = '<div class="muted" style="text-align:center">Could not load achievements.</div>'; return; }
+    const data = await res.json();
+    renderAchievements(data);
+  } catch {
+    grid.innerHTML = '<div class="muted" style="text-align:center">Could not load achievements.</div>';
+  }
+}
+
+function renderAchievements(data) {
+  const grid = $('achGrid');
+  const list = (data && data.achievements) || [];
+  const sum = (data && data.summary) || { unlocked: 0, total: list.length };
+  const summaryEl = $('achSummary');
+  if (summaryEl) {
+    summaryEl.textContent = sum.unlocked + ' of ' + sum.total +
+      ' unlocked. Unlocked dice appear in the Dice picker automatically.';
+  }
+  grid.innerHTML = '';
+  for (const a of list) {
+    const row = document.createElement('div');
+    row.className = 'ach-row' + (a.unlocked ? ' unlocked' : '');
+    const face = FACE_IMG.R || 'r.png';
+    const cls = a.reward && a.reward.cls ? ' ' + a.reward.cls : '';
+    const rar = (a.reward && a.reward.rarity) || 'common';
+    const pct = a.progress && a.progress.goal
+      ? Math.max(0, Math.min(100, Math.round((a.progress.cur / a.progress.goal) * 100)))
+      : 0;
+    row.innerHTML =
+      '<span class="ach-die die' + cls + '"><img src="assets/' + face + '" alt=""></span>' +
+      '<div class="ach-body">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
+          '<span class="ach-name">' + esc(a.name) + '</span>' +
+          (a.unlocked ? '<span class="ach-unlocked-tag">Unlocked</span>'
+                      : '<span class="ach-locked-tag">Locked</span>') +
+        '</div>' +
+        '<div class="ach-desc">' + esc(a.desc) + '</div>' +
+        '<div class="ach-reward">Dice: <b>' + esc((a.reward && a.reward.name) || '') +
+          '</b> <span class="rar-' + esc(rar) + '">(' + esc(rar) + ')</span></div>' +
+        (a.unlocked ? '' : '<div class="ach-bar"><span style="width:' + pct + '%"></span></div>') +
+      '</div>';
+    grid.appendChild(row);
+  }
 }
 
 /* ── Rendering ─────────────────────────────────────────────────────────── */
@@ -2158,12 +2348,19 @@ function render() {
   }
 
   show('gameScreen');
-  $('roundNum').textContent = state.round;
   const coop = state.mode === 'coop' && state.coop;
+  if (state.daily) $('roundNum').textContent = state.round + ' / ' + state.maxRounds;
+  else $('roundNum').textContent = state.round;
   if (coop) {
     $('goalNum').textContent = 'Wave ' + state.coop.wave;
     $('finalBanner').hidden = true;
     renderEnemy();
+  } else if (state.daily) {
+    $('goalNum').textContent = 'Daily';
+    $('finalBanner').hidden = true;
+    $('enemyBanner').hidden = true;
+    $('gameScreen').style.backgroundImage = '';
+    animateEnemy(null);
   } else {
     $('goalNum').textContent = state.goal.toLocaleString();
     $('finalBanner').hidden = !state.isFinalRound;
@@ -2406,6 +2603,7 @@ function leaveToSplash(msg) {
   show('splashScreen');
   say('splashFeedback', msg || '');
   loadRooms();
+  loadDaily();
 }
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
@@ -2574,6 +2772,52 @@ async function quickMatch(btn) {
   }
 }
 
+/* Today's Daily board + whether you've already played. */
+async function loadDaily() {
+  try {
+    const res = await fetch(API + '?action=daily');
+    const d = await res.json();
+    const board = $('dailyBoard');
+    board.innerHTML = '';
+    const rows = Array.isArray(d.board) ? d.board.slice(0, 5) : [];
+    for (let i = 0; i < rows.length; i++) {
+      const li = document.createElement('li');
+      const mine = d.you && d.you.played && d.you.rank === i + 1;
+      if (mine) li.className = 'you';
+      li.innerHTML = '<span class="rk">' + (i + 1) + '</span>' +
+                     '<span class="nm">' + esc(rows[i].name) + '</span>' +
+                     '<span class="sc">' + (Number(rows[i].score) || 0).toLocaleString() + '</span>';
+      board.appendChild(li);
+    }
+    if (!rows.length) board.innerHTML = '<li class="muted" style="border:none">No scores yet today — be the first.</li>';
+
+    if (d.you && d.you.played) {
+      $('dailyYou').textContent = 'You played today: ' + (Number(d.you.score) || 0).toLocaleString() +
+        (d.you.rank ? ' (rank ' + d.you.rank + ')' : '') + '. Play again for fun — only your first run counts.';
+      $('dailyBtn').textContent = 'Replay Today (for fun)';
+    } else {
+      $('dailyYou').textContent = '';
+      $('dailyBtn').textContent = "Play Today's Daily";
+    }
+  } catch { /* the daily board is a nice-to-have */ }
+}
+
+/* Start today's seeded solo run — server creates and starts it, we jump in. */
+async function startDaily() {
+  const btn = $('dailyBtn');
+  btn.disabled = true;
+  say('splashFeedback', 'Dealing today’s dice…');
+  try {
+    const data = await api({ action: 'start-daily' });
+    joinedPassword = '';
+    enterRoom(data.code);
+  } catch (err) {
+    say('splashFeedback', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* Solo vs the AI: create an (always-unranked) bot room and start it at once, so
    it drops straight into the game with no lobby wait. */
 async function startBotGame(diff) {
@@ -2633,6 +2877,7 @@ $('quickMatchBtn').addEventListener('click', (e) => quickMatch(e.currentTarget))
 $('createBtn').addEventListener('click', () => createRoom({ hostOnly: $('createHostOnly').checked }));
 $('practiceBtn').addEventListener('click', () => createRoom({ practice: true }));
 $('botBtn').addEventListener('click', () => startBotGame($('botDiff').value));
+$('dailyBtn').addEventListener('click', startDaily);
 $('coopBtn').addEventListener('click', () => createRoom({ coop: true, hostOnly: $('createHostOnly').checked }));
 $('joinBtn').addEventListener('click', joinRoom);
 $('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
@@ -2775,6 +3020,7 @@ if (!session) {
 } else {
   $('splashBody').hidden = false;
   loadRooms();
+  loadDaily();
   resumeRoom();
   /* Once, at boot. The answer cannot change while the tab is open -- a
      reward claimed on another page needs a reload either way -- and a
