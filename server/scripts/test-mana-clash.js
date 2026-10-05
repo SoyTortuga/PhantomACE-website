@@ -1479,6 +1479,43 @@ async function boards(env) {
   ok('page: leaving forgets the room', /function leaveToSplash[\s\S]{0,80}forgetRoom\(\)/.test(game));
 }
 
+/* ── Bot opponent ────────────────────────────────────────────────────────
+   A solo player faces an AI. The bot is seeded into players, counts as the
+   opponent so start-game's two-player versus check passes, plays its own turn
+   on a timer, and the game is ALWAYS unranked so the boards can't be farmed.
+   Leaving with no human left deletes the room. */
+{
+  const env = makeEnv();
+  const made = await post(env, 'a', { action: 'create-room', goal: 10000, idleMs: 30000, vsBot: true, botDifficulty: 'normal' });
+  const code = made.data.code;
+  const room0 = JSON.parse(env._store.get('mc_room_' + code));
+  ok('bot room seeds a bot player', !!room0.players.bot && room0.players.bot.isBot === true);
+  check('the bot carries its difficulty', room0.players.bot.botDifficulty, 'normal');
+
+  const started = await post(env, 'a', { action: 'start-game', code });
+  check('a single human + bot can start a versus game', started.status, 200);
+  check('a bot game is unranked', started.data.room.ranked, false);
+  check('...for the bot reason', started.data.room.unrankedReason, 'bot');
+
+  /* The bot's think timer is set at round start; push it into the past, then
+     poll so the bot resolves its whole turn. */
+  const mid = JSON.parse(env._store.get('mc_room_' + code));
+  ok('bot gets a think timer, not an idle deadline', mid.players.bot.turn.botActAt != null && mid.players.bot.turn.deadline === null);
+  mid.players.bot.turn.botActAt = Date.now() - 1;
+  env._store.set('mc_room_' + code, JSON.stringify(mid));
+
+  const after = await get(env, 'a', 'action=get-state&code=' + code);
+  const botView = (after.data.players || []).find(p => p.isBot);
+  ok('the bot takes its turn on its own', botView && (botView.done === 'banked' || botView.done === 'burned'));
+  ok('a banked bot turn adds to its total', botView.done !== 'banked' || botView.total > 0);
+
+  /* No human left → the room is deleted rather than leaving a bot playing
+     itself to the TTL. */
+  await post(env, 'a', { action: 'leave-room', code });
+  const gone = await get(env, 'a', 'action=get-state&code=' + code);
+  check('leaving a bot room with no human left deletes it', gone.status, 404);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 
 console.log('');

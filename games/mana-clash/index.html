@@ -238,6 +238,8 @@
     .standing .nm { color: var(--text-pri); font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .standing .tot { color: var(--text-pri); font-weight: 800; font-size: 20px; display: block; line-height: 1.2; }
     .standing.me { border-color: var(--red); }
+    .standing .bot-tag { font-size: 10px; letter-spacing: 1px; color: var(--dim);
+      border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; vertical-align: middle; }
     .standing.done-banked { opacity: 0.6; }
     .standing.done-burned { opacity: 0.6; border-color: #5a2a2a; }
     .standing .st { font-size: 14px;
@@ -735,6 +737,14 @@
         </label>
         <button class="btn btn-red" id="createBtn">Create Room</button>
         <button class="btn btn-dim" id="practiceBtn">Solo Practice</button>
+        <div class="row" style="gap:6px;align-items:stretch;margin:2px 0">
+          <select class="select" id="botDiff" style="flex:1;margin:0">
+            <option value="easy">Easy &middot; Skeleton Squire</option>
+            <option value="normal" selected>Normal &middot; Mana Wraith</option>
+            <option value="hard">Hard &middot; The Lich</option>
+          </select>
+          <button class="btn btn-dim" id="botBtn" style="white-space:nowrap">Play vs Bot</button>
+        </div>
         <button class="btn btn-coop" id="coopBtn">Co-op Gauntlet</button>
         <div class="coop-note" id="coopNote">Team up (or go solo) against a gauntlet of enemies, bosses, and a final boss — bank points to damage them and survive on shared Team HP. The <b>colour</b> of the dice you bank matters: a banked trio triggers an effect — ⚪ pierce · ⚪ White heal · 🔵 +round · ⚫ poison · 🔴 burn minions · 🟢 damage buff. The Target above is ignored in co-op.</div>
         <span class="muted">Only open 10,000-point games reach the leaderboards, and only if an opponent is still at the table when it ends. Practice and password rooms never do.</span>
@@ -1593,7 +1603,7 @@ function renderStandings() {
     el.className = 'standing' + (p.id === meId ? ' me' : '') +
                    (p.done ? ' done-' + p.done : '');
     const out = roundOutcome(p);
-    el.innerHTML = '<span class="nm">' + esc(p.name) + '</span>' +
+    el.innerHTML = '<span class="nm">' + esc(p.name) + (p.isBot ? ' <span class="bot-tag">BOT</span>' : '') + '</span>' +
                    '<span class="tot">' + p.total.toLocaleString() + '</span>' +
                    '<span class="st ' + out.cls + '">' + esc(out.text) + '</span>';
     /* Co-op only: what colours this player has banked this round, so the
@@ -1669,6 +1679,7 @@ function myId() {
 function unrankedNote(s) {
   if (s.ranked) return '';
   if (s.unrankedReason === 'solo') return ' — but nobody else was left at the table by the end, so it does not count for the boards';
+  if (s.unrankedReason === 'bot') return ' — a game against the bot, so nothing reached the boards';
   if (s.unrankedReason === 'password') return ' — a password room is a private game, so nothing reached the boards';
   return ' — not a ranked game, so nothing reached the boards';
 }
@@ -2563,6 +2574,26 @@ async function quickMatch(btn) {
   }
 }
 
+/* Solo vs the AI: create an (always-unranked) bot room and start it at once, so
+   it drops straight into the game with no lobby wait. */
+async function startBotGame(diff) {
+  say('splashFeedback', 'Summoning an opponent…');
+  try {
+    const data = await api({
+      action: 'create-room',
+      goal: Number($('createGoal').value) || 10000,
+      idleMs: Number($('createIdle').value) || 30000,
+      password: '', practice: false, mode: 'versus',
+      vsBot: true, botDifficulty: diff,
+    });
+    await api({ action: 'start-game', code: data.code });
+    joinedPassword = '';
+    enterRoom(data.code);
+  } catch (err) {
+    say('splashFeedback', err.message);
+  }
+}
+
 async function createRoom(opts) {
   opts = opts || {};
   say('splashFeedback', '');
@@ -2601,6 +2632,7 @@ async function joinRoom() {
 $('quickMatchBtn').addEventListener('click', (e) => quickMatch(e.currentTarget));
 $('createBtn').addEventListener('click', () => createRoom({ hostOnly: $('createHostOnly').checked }));
 $('practiceBtn').addEventListener('click', () => createRoom({ practice: true }));
+$('botBtn').addEventListener('click', () => startBotGame($('botDiff').value));
 $('coopBtn').addEventListener('click', () => createRoom({ coop: true, hostOnly: $('createHostOnly').checked }));
 $('joinBtn').addEventListener('click', joinRoom);
 $('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });

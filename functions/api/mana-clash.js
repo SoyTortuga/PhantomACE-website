@@ -119,6 +119,10 @@ const IDLE_CHOICES = [10000, 30000, 60000];
 /* Only 10,000-point games reach the boards. A 5,000 game is much quicker and
    a 20,000 game much longer; mixing them would make both boards meaningless. */
 const RANKED_GOAL = 10000;
+const BOT_ID = 'bot';
+const BOT_NAMES = { easy: 'Skeleton Squire', normal: 'Mana Wraith', hard: 'The Lich' };
+const BOT_THINK_MIN = 1400;   // ms the bot "thinks" before taking its turn
+const BOT_THINK_MAX = 3200;
 
 function getSession(request) {
   const cookie = request.headers.get('Cookie') || '';
@@ -186,6 +190,64 @@ function sittingOut() {
 /** Any action by the player resets their idle clock. */
 function touch(room, turn, now) {
   turn.deadline = now + room.idleMs;
+}
+
+/* ══ Bot opponent ═════════════════════════════════════════════════════════
+   A solo player can face an AI instead of only practising. The bot uses the
+   SAME scoring engine as everyone else (bestSelection) — only its nerve, when
+   it banks vs pushes, differs by difficulty. A bot game is ALWAYS unranked
+   (see isRanked / unrankedReason), so the prize boards can never be farmed. */
+function botThink() {
+  return BOT_THINK_MIN + Math.floor(Math.random() * (BOT_THINK_MAX - BOT_THINK_MIN));
+}
+
+/* Whether the bot banks now, given what it holds and how many dice are left to
+   reroll. Farkle bust-risk climbs fast as the pool shrinks; these thresholds
+   turn that into three nerve levels. */
+function shouldBotBank(pending, remaining, diff) {
+  if (pending <= 0) return false;
+  if (diff === 'easy') {
+    if (remaining <= 2) return true;             // spooked by a small pool
+    if (pending >= 350) return true;
+    return Math.random() < 0.25;                 // skittish — banks early at random
+  }
+  if (diff === 'hard') {
+    if (remaining >= 3) return pending >= 2000;   // rides good odds hard
+    if (remaining === 2) return pending >= 500;
+    return true;                                  // one die left — take it
+  }
+  /* normal */
+  if (remaining <= 1) return true;
+  if (remaining === 2) return pending >= 400;
+  return pending >= 800;
+}
+
+/* Play the bot's whole turn at once and write the result into its turn: roll,
+   keep the best-scoring dice, push or bank by its nerve, until it banks or
+   busts. Deterministic only in structure — the dice are fair rolls. */
+function playBotTurn(room, id, turn) {
+  const diff = room.players[id].botDifficulty || 'normal';
+  let pending = 0;
+  let remaining = DICE_COUNT;
+  const keptFaces = [];
+  for (let guard = 0; guard < 40; guard++) {
+    const roll = rollDice(remaining);
+    if (!hasAnyScore(roll)) {
+      turn.pending = 0; turn.gained = 0; turn.done = 'burned'; turn.event = 'burn';
+      turn.dice = roll; turn.kept = keptFaces; turn.remaining = 0; turn.awaitingSelection = false;
+      return;
+    }
+    const sel = bestSelection(roll) || { indices: [], points: 0 };
+    pending += sel.points;
+    for (const i of sel.indices) keptFaces.push(roll[i]);
+    remaining -= sel.indices.length;
+    if (remaining === 0) remaining = DICE_COUNT;   // hot dice — all six score again
+    if (shouldBotBank(pending, remaining, diff)) break;
+  }
+  room.players[id].total += pending;
+  turn.pending = pending; turn.gained = pending; turn.done = 'banked';
+  turn.event = null; turn.dice = []; turn.kept = keptFaces;
+  turn.remaining = remaining; turn.awaitingSelection = false;
 }
 
 /**
@@ -901,6 +963,12 @@ function startRound(room, now) {
   const playing = playersInRound(room);
   for (const [id, p] of Object.entries(room.players)) {
     p.turn = playing.includes(id) ? freshTurn(room, now) : sittingOut();
+    /* A bot has no idle clock; instead it gets a "think" timer, set here so it
+       is persisted with the round rather than on a later poll. */
+    if (p.isBot && playing.includes(id) && p.turn) {
+      p.turn.deadline = null;
+      p.turn.botActAt = now + botThink();
+    }
   }
 }
 
@@ -992,7 +1060,18 @@ function advance(room, now) {
     if (room.status === 'playing') {
       for (const id of playersInRound(room)) {
         const turn = room.players[id].turn;
-        if (!turn || turn.done || turn.deadline === null || now < turn.deadline) continue;
+        if (!turn || turn.done) continue;
+        /* The bot plays itself: no idle clock, a short "think" pause after its
+           turn opens, then its whole turn resolves at once on the next pass. */
+        if (room.players[id].isBot) {
+          turn.deadline = null;
+          /* Normally set in startRound; the `changed` here matters so a
+             fallback assignment is actually persisted by the caller's mutate. */
+          if (turn.botActAt == null) { turn.botActAt = now + botThink(); changed = true; continue; }
+          if (now >= turn.botActAt) { playBotTurn(room, id, turn); changed = true; }
+          continue;
+        }
+        if (turn.deadline === null || now < turn.deadline) continue;
         /* Expiry banks what they are holding rather than taking it. The
            clock exists so one closed tab cannot stall a room, not to punish
            slow play. Anything rolled but never selected is simply not part
@@ -1075,7 +1154,7 @@ const MAX_ENTRIES = 50;
 const MIN_RANKED_CONTENDERS = 2;
 
 function isRanked(room) {
-  return room.goal === RANKED_GOAL && !room.practice && !room.password && (room.mode || 'versus') === 'versus';
+  return room.goal === RANKED_GOAL && !room.practice && !room.password && !room.vsBot && (room.mode || 'versus') === 'versus';
 }
 
 /**
@@ -1084,6 +1163,7 @@ function isRanked(room) {
  */
 function unrankedReason(room) {
   if ((room.mode || 'versus') !== 'versus') return 'coop';
+  if (room.vsBot) return 'bot';
   if (room.practice) return 'practice';
   if (room.goal !== RANKED_GOAL) return 'goal';
   if (room.password) return 'password';
@@ -1146,6 +1226,7 @@ function publicPlayer(id, p, { dice = false } = {}) {
     id,
     name: p.displayName,
     avatar: p.profileImage,
+    isBot: !!p.isBot,
     ready: !!p.ready,
     total: p.total,
     pending: p.turn ? p.turn.pending : 0,
@@ -1535,6 +1616,11 @@ export async function onRequestPost(context) {
     const idleMs = Number(body.idleMs);
     if (!IDLE_CHOICES.includes(idleMs)) return json({ error: 'Pick a 10, 30 or 60 second timer.' }, 400);
     const practice = !coop && !!body.practice;   // co-op is its own multiplayer mode
+    /* Solo vs an AI opponent: a versus game seeded with a bot player. Always
+       unranked (see isRanked / unrankedReason), never a password or host-only
+       or co-op room. The human plays; the bot is the opponent. */
+    const vsBot = !coop && !practice && !!body.vsBot;
+    const botDifficulty = ['easy', 'normal', 'hard'].includes(body.botDifficulty) ? body.botDifficulty : 'normal';
     /* Broadcaster mode: run the room without playing in it. Silently ignored
        for practice -- a solo room nobody is in has no point. `host`/`hostName`
        already live outside `players` (see kick/rematch/start-game, all gated
@@ -1542,7 +1628,7 @@ export async function onRequestPost(context) {
        of players here is the only change hosting-without-playing needed on
        this side; everything that checks "is this the host" already does not
        care whether the host is also a player. */
-    const hostOnly = !!body.hostOnly && !practice;
+    const hostOnly = !!body.hostOnly && !practice && !vsBot;
 
     let made = null;
     for (let i = 0; i < 10; i++) {
@@ -1550,8 +1636,9 @@ export async function onRequestPost(context) {
       const fresh = {
         code: candidate,
         host: userId, hostName: displayName,
-        password: practice ? null : (body.password || null),
+        password: (practice || vsBot) ? null : (body.password || null),
         practice,
+        vsBot,
         mode: coop ? 'coop' : 'versus',
         goal, idleMs,
         status: 'lobby',
@@ -1564,6 +1651,14 @@ export async function onRequestPost(context) {
         },
         createdAt: Date.now(),
       };
+      /* Seed the AI opponent so start-game's two-player versus check is met and
+         the round loop deals it a turn like any other player. */
+      if (vsBot) {
+        fresh.players[BOT_ID] = {
+          displayName: BOT_NAMES[botDifficulty], profileImage: null,
+          isBot: true, botDifficulty, ready: true, total: 0, turn: null,
+        };
+      }
       /* The claim on the code is the write itself — a get-then-put let two
          simultaneous creates pick the same code, and the second replaced the
          first room out from under its host.
@@ -1790,7 +1885,9 @@ export async function onRequestPost(context) {
          delete for them. */
       if (!wasPlayer && r.host !== userId) return null;
       if (wasPlayer) delete r.players[userId];
-      if (Object.keys(r.players).length === 0) { emptied = true; return null; }
+      /* No humans left (truly empty, or only the AI bot remaining) — delete the
+         room rather than leave a bot playing itself until the TTL. */
+      if (Object.keys(r.players).filter(pid => !r.players[pid].isBot).length === 0) { emptied = true; return null; }
       if (r.host === userId) {
         const next = Object.keys(r.players)[0];
         r.host = next;
