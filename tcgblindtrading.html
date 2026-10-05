@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Unlisted: not linked, not in any sitemap, and kept out of search. -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>Blind Trading Tool</title>
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <style>
+    body { background: var(--black, #0a0a0a); color: var(--text-pri, #e8e8e8);
+           font-family: var(--font-ui, Grenze, Georgia, serif); font-size: 14px;
+           min-height: 100vh; margin: 0; }
+
+    /* ── Passphrase gate ── near-solid, never a blur (OBS/perf + design rule) ── */
+    .gate { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center;
+            justify-content: center; padding: 24px; background: var(--black, #0a0a0a); }
+    .gate[hidden] { display: none; }
+    .gate-card { width: 100%; max-width: 420px; background: rgba(12,12,12,0.98);
+                 border: 1px solid var(--border-mid, #333); border-radius: 8px; padding: 28px 24px; text-align: center; }
+    .gate-mark { font-family: var(--font-display, 'GodOfWar', serif); color: var(--red, #ff0000);
+                 font-size: 30px; letter-spacing: 1px; margin: 0 0 4px; }
+    .gate-sub { color: var(--text-sec, #b7b7b7); margin: 0 0 18px; }
+    .gate-input { width: 100%; box-sizing: border-box; background: var(--gray-900, #141414);
+                  border: 1px solid var(--border-mid, #333); border-radius: 5px; color: var(--white, #fff);
+                  font-family: var(--font-ui, Grenze, serif); font-size: 16px; padding: 11px 12px; text-align: center; letter-spacing: 1px; }
+    .gate-input:focus { outline: none; border-color: var(--red, #ff0000); }
+    .gate-btn { margin-top: 12px; width: 100%; background: var(--red, #ff0000); color: #fff; border: 1px solid var(--red, #ff0000);
+                border-radius: 5px; font-family: var(--font-display, 'GodOfWar', serif); font-size: 17px; letter-spacing: 1px;
+                padding: 11px 12px; cursor: pointer; }
+    .gate-btn:hover { filter: brightness(1.15); }
+    .gate-err { color: var(--red, #ff4040); min-height: 18px; margin-top: 10px; font-size: 13px; }
+
+    /* ── Showcase ── */
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px 80px; }
+    .btt-nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border-low, #222); }
+    .btt-nav a { color: var(--text-sec, #b7b7b7); text-decoration: none; }
+    .btt-nav a:hover { color: var(--red, #ff0000); }
+    .btt-tag { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim, #777); }
+
+    .hero { padding: 48px 0 20px; border-bottom: 1px solid var(--border-low, #222); }
+    .hero h1 { font-family: var(--font-display, 'GodOfWar', serif); color: var(--red, #ff0000);
+               font-size: clamp(38px, 8vw, 68px); line-height: 1; margin: 0 0 14px; letter-spacing: 1px; }
+    .hero-pitch { font-size: clamp(17px, 2.6vw, 22px); color: var(--white, #fff); max-width: 720px; margin: 0; }
+    .hero-what { color: var(--text-sec, #b7b7b7); max-width: 720px; margin: 16px 0 0; line-height: 1.6; }
+
+    .sec { padding: 34px 0; border-bottom: 1px solid var(--border-low, #222); }
+    .sec h2 { font-family: var(--font-display, 'GodOfWar', serif); color: var(--white, #fff);
+              font-size: 26px; margin: 0 0 16px; letter-spacing: 1px; }
+
+    .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .feat { background: rgba(16,16,16,0.9); border: 1px solid var(--border-low, #222); border-radius: 7px; padding: 14px 16px; }
+    .feat h3 { margin: 0 0 6px; color: var(--white, #fff); font-size: 16px; }
+    .feat p { margin: 0; color: var(--text-sec, #b7b7b7); font-size: 14px; line-height: 1.55; }
+    .feat .ico { font-size: 20px; }
+
+    .games { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 620px) { .games { grid-template-columns: 1fr; } }
+    .game { background: rgba(16,16,16,0.9); border: 1px solid var(--border-mid, #333); border-radius: 7px; padding: 16px 18px; }
+    .game h3 { margin: 0 0 8px; font-family: var(--font-display, 'GodOfWar', serif); color: var(--red, #ff0000); font-size: 20px; }
+    .game p { margin: 0; color: var(--text-sec, #b7b7b7); line-height: 1.6; }
+
+    .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { background: var(--gray-900, #141414); border: 1px solid var(--border-mid, #333); border-radius: 999px;
+            padding: 6px 13px; font-size: 13px; color: var(--text-pri, #ddd); }
+
+    .status li { color: var(--text-sec, #b7b7b7); line-height: 1.7; }
+    .status b { color: var(--white, #fff); }
+    .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rarity-uncommon, #2ecc71); vertical-align: middle; margin-right: 6px; }
+
+    .cta { padding: 40px 0 0; text-align: center; }
+    .cta p { color: var(--text-sec, #b7b7b7); font-size: 17px; margin: 0 0 6px; }
+    .cta .big { font-family: var(--font-display, 'GodOfWar', serif); color: var(--white, #fff); font-size: 22px; }
+  </style>
+</head>
+<body>
+
+  <div class="gate" id="gate">
+    <div class="gate-card">
+      <p class="gate-mark">Blind Trading Tool</p>
+      <p class="gate-sub">This page is unlisted. Enter the passphrase to continue.</p>
+      <form id="gateForm" autocomplete="off">
+        <input class="gate-input" id="gateInput" type="password" placeholder="Passphrase" aria-label="Passphrase" autofocus>
+        <button class="gate-btn" type="submit">Enter</button>
+        <div class="gate-err" id="gateErr"></div>
+      </form>
+    </div>
+  </div>
+
+  <main class="wrap" id="content" hidden>
+    <nav class="btt-nav">
+      <span class="btt-tag">A SoyTortuga project</span>
+      <a href="/">← PhantomACE</a>
+    </nav>
+
+    <header class="hero">
+      <h1>Blind Trading Tool</h1>
+      <p class="hero-pitch">A real-time, two-player trade-window simulator for Magic &amp; Pokémon TCG — the old-school Rocket League trade UI, rebuilt for streaming.</p>
+      <p class="hero-what">Two people connect with a shared trade code and build up an offer of real cards — pulled live from each game's database with real images and pricing — in a synced trade window. Neither side locks in until <b>both players confirm at once</b>: the "blind" reveal the tool is named for. It's made for on-stream trading content and demos, not a marketplace — no accounts, no payments, nothing actually changes hands.</p>
+    </header>
+
+    <section class="sec">
+      <h2>What it does</h2>
+      <div class="feat-grid">
+        <div class="feat"><div class="ico">🔗</div><h3>Live trade sessions</h3><p>Create a short trade code, share it, your partner joins — both sides see the same state update in real time over WebSocket.</p></div>
+        <div class="feat"><div class="ico">🂠</div><h3>Two games, one trade</h3><p>Each trade is Magic <em>or</em> Pokémon (never mixed), chosen when the trade is created.</p></div>
+        <div class="feat"><div class="ico">📚</div><h3>Personal collections</h3><p>Build named collections of cards you own per game and trade straight from them; quantities track what's already on the table. Stored in your browser — private by design.</p></div>
+        <div class="feat"><div class="ico">📥</div><h3>Collection import</h3><p>Paste or upload a CSV from Moxfield, Deckbox, Archidekt or ManaBox to bulk-fill a Magic collection, matched against real printings.</p></div>
+        <div class="feat"><div class="ico">🧑‍🤝‍🧑</div><h3>Partner profiles</h3><p>An optional display name and avatar shown to whoever you're trading with.</p></div>
+        <div class="feat"><div class="ico">🔍</div><h3>Rich card browsing</h3><p>A responsive, keyboard-navigable card grid with Enter-to-add and a hover zoom preview at higher resolution.</p></div>
+        <div class="feat"><div class="ico">🖥️</div><h3>Desktop app</h3><p>Packaged with Tauri into native Windows installers (MSI + NSIS) with a custom icon — or run it as a plain browser tab.</p></div>
+        <div class="feat"><div class="ico">🛰️</div><h3>Hosted backend</h3><p>The WebSocket server runs on Render with a health check and automatic reconnect, so it rides out the free tier's idle-sleep wake-up.</p></div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>Real card data, both games</h2>
+      <div class="games">
+        <div class="game">
+          <h3>Magic: The Gathering</h3>
+          <p>Card data from the Scryfall API — USD/foil pricing and "special treatment" badges for borderless, showcase and extended-art printings. A local SQLite cache refreshes daily from Scryfall's full bulk snapshot (~113k cards), so search is instant instead of hitting the API on every keystroke.</p>
+        </div>
+        <div class="game">
+          <h3>Pokémon TCG</h3>
+          <p>Card data from TCGdex, with matching treatment badges for holo, reverse holo and 1st-edition printings — the same trade-window flow as Magic.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>Look &amp; feel</h2>
+      <p style="color:var(--text-sec,#b7b7b7); line-height:1.7; margin:0; max-width:720px">A tavern / MTG-fantasy theme — warm wood-grain and leather backgrounds, Cinzel and Spectral type, hand-drawn SVG badges for the card treatments. Built to read well as a streaming overlay or demo, not a generic app UI.</p>
+    </section>
+
+    <section class="sec">
+      <h2>Built with</h2>
+      <div class="stack">
+        <span class="chip">React + TypeScript</span>
+        <span class="chip">Vite</span>
+        <span class="chip">Tauri (Rust)</span>
+        <span class="chip">Node.js + TypeScript</span>
+        <span class="chip">ws (WebSocket)</span>
+        <span class="chip">better-sqlite3</span>
+        <span class="chip">Scryfall API</span>
+        <span class="chip">TCGdex</span>
+        <span class="chip">Render</span>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>Status</h2>
+      <ul class="status">
+        <li>Core trading flow, both games, collections and the desktop build all work end-to-end. Current version <b>0.1.0</b>.</li>
+        <li><span class="live-dot"></span>The session server is <b>live</b> on Render (health check responding).</li>
+        <li>Windows installers are built locally but not yet hosted for public download.</li>
+        <li>Source is a <b>private</b> repository — this page showcases it; it isn't a download or a clone link.</li>
+      </ul>
+    </section>
+
+    <section class="cta">
+      <p class="big">Want a look?</p>
+      <p>Catch it in action on stream, or ask PhantomACE about it directly.</p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var PASS_SHA = 'cb07dc89a97d147a097ec4281e3022927438d2cfca8bd7f681ce26aa0ccf0181';
+      var KEY = 'btt_unlocked';
+      var gate = document.getElementById('gate');
+      var content = document.getElementById('content');
+
+      function reveal() { gate.hidden = true; content.hidden = false; }
+
+      /* Stay unlocked across a refresh this session. */
+      try { if (sessionStorage.getItem(KEY) === '1') reveal(); } catch (e) {}
+
+      async function sha256Hex(s) {
+        var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+        return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      }
+
+      document.getElementById('gateForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var err = document.getElementById('gateErr');
+        var val = document.getElementById('gateInput').value.trim().toLowerCase();
+        err.textContent = '';
+        try {
+          var h = await sha256Hex(val);
+          if (h === PASS_SHA) {
+            try { sessionStorage.setItem(KEY, '1'); } catch (e2) {}
+            reveal();
+          } else {
+            err.textContent = 'Not quite. Try again.';
+            document.getElementById('gateInput').select();
+          }
+        } catch (e3) {
+          err.textContent = 'This browser blocked the check — try a different one.';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
