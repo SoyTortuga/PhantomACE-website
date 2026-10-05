@@ -791,6 +791,13 @@
       <ol class="daily-board" id="dailyBoard"></ol>
     </div>
 
+    <div class="card-box" id="tourneyCard" style="width:100%;max-width:620px;margin:0 auto 14px" hidden>
+      <div class="section-hdr">🏆 Bracket Night <span class="muted" id="tourneyMeta" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+      <div class="muted" id="tourneyBlurb">A single-elimination Mana Clash tournament.</div>
+      <div class="feedback" id="tourneyFeedback" style="margin-top:4px"></div>
+      <div id="tourneyActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+    </div>
+
     <div class="splash-sections">
       <div class="card-box splash-form">
         <div class="section-hdr">Create Room</div>
@@ -2604,6 +2611,7 @@ function leaveToSplash(msg) {
   say('splashFeedback', msg || '');
   loadRooms();
   loadDaily();
+  loadTournament();
 }
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
@@ -2800,6 +2808,65 @@ async function loadDaily() {
       $('dailyBtn').textContent = "Play Today's Daily";
     }
   } catch { /* the daily board is a nice-to-have */ }
+}
+
+/* ── Bracket Night ──────────────────────────────────────────────────────── */
+const API_T = '/api/mana-clash-tournament';
+
+async function tourneyAction(action) {
+  say('tourneyFeedback', '');
+  try {
+    const res = await fetch(API_T, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+    });
+    const d = await res.json();
+    if (!res.ok) { say('tourneyFeedback', d.error || 'That did not work.'); return; }
+    loadTournament();
+  } catch { say('tourneyFeedback', 'Network error.'); }
+}
+
+function loadTournament() {
+  fetch(API_T).then(r => r.json()).then(t => {
+    const card = $('tourneyCard');
+    if (!t || t.status === 'none') { card.hidden = true; return; }
+    card.hidden = false;
+    const actions = $('tourneyActions');
+    const meta = $('tourneyMeta');
+    const blurb = $('tourneyBlurb');
+    actions.innerHTML = '';
+
+    if (t.status === 'signups') {
+      meta.textContent = t.playerCount + ' signed up';
+      blurb.textContent = 'Sign-ups are open — join the single-elimination bracket.';
+      const btn = document.createElement('button');
+      btn.className = 'btn ' + (t.youJoined ? 'btn-dim' : 'btn-red');
+      btn.textContent = t.youJoined ? 'Leave Bracket' : 'Join Bracket';
+      btn.addEventListener('click', () => tourneyAction(t.youJoined ? 'leave' : 'join'));
+      actions.appendChild(btn);
+    } else if (t.status === 'active') {
+      meta.textContent = 'Round ' + (t.round + 1) + ' of ' + t.totalRounds;
+      if (t.yourMatch && t.yourMatch.ready && t.yourMatch.code) {
+        blurb.textContent = 'Your match is ready — vs ' + (t.yourMatch.opponent || 'TBD') + '.';
+        const b = document.createElement('button');
+        b.className = 'btn btn-red';
+        b.textContent = 'Join Your Match';
+        b.addEventListener('click', () => { joinedPassword = ''; enterRoom(t.yourMatch.code); });
+        actions.appendChild(b);
+      } else if (t.yourMatch) {
+        blurb.textContent = "You're up vs " + (t.yourMatch.opponent || 'TBD') + " — waiting for the host to start the round.";
+      } else if (t.youAlive) {
+        blurb.textContent = 'You advanced — waiting for the next round.';
+      } else if (t.youJoined) {
+        blurb.textContent = 'You were knocked out — thanks for playing!';
+      } else {
+        blurb.textContent = 'Bracket in progress — Round ' + (t.round + 1) + ' of ' + t.totalRounds + '.';
+      }
+    } else if (t.status === 'done') {
+      meta.textContent = 'Complete';
+      blurb.textContent = t.champion ? ('🏆 Champion: ' + t.champion.name) : 'Tournament complete.';
+    }
+  }).catch(() => { /* nice-to-have */ });
 }
 
 /* Start today's seeded solo run — server creates and starts it, we jump in. */
@@ -3021,12 +3088,13 @@ if (!session) {
   $('splashBody').hidden = false;
   loadRooms();
   loadDaily();
+  loadTournament();
   resumeRoom();
   /* Once, at boot. The answer cannot change while the tab is open -- a
      reward claimed on another page needs a reload either way -- and a
      cosmetic is not worth a second poll. */
   loadDiceSets();
-  setInterval(() => { if (!roomCode) loadRooms(); }, 8000);
+  setInterval(() => { if (!roomCode) { loadRooms(); loadTournament(); } }, 8000);
 }
 </script>
 </body>

@@ -1419,6 +1419,60 @@ function initStreamNight() {
       e.currentTarget, 'Dino Safari started (' + (rule === 'first' ? 'first catch' : 'raffle') + ') — chat catches wild dinos with !catch.');
   });
   on('odSafariStopBtn', function (e) { nightPost('/api/dino-safari', { action: 'stop' }, e.currentTarget, 'Dino Safari ended.'); });
+
+  /* ── Bracket Night ── */
+  const brAfter = function () { setTimeout(loadBracketAdmin, 300); };
+  on('odBrOpenBtn', function (e) { nightPost('/api/mana-clash-tournament', { action: 'open' }, e.currentTarget, 'Sign-ups open — players join on the Mana Clash page.'); brAfter(); });
+  on('odBrGenBtn', function (e) { nightPost('/api/mana-clash-tournament', { action: 'generate' }, e.currentTarget, 'Bracket generated.'); brAfter(); });
+  on('odBrStartBtn', function (e) { nightPost('/api/mana-clash-tournament', { action: 'start-round' }, e.currentTarget, 'Round started — match rooms created.'); brAfter(); });
+  on('odBrAdvanceBtn', function (e) { nightPost('/api/mana-clash-tournament', { action: 'advance' }, e.currentTarget, 'Advanced to the next round.'); brAfter(); });
+  on('odBrEndBtn', function (e) { nightPost('/api/mana-clash-tournament', { action: 'end' }, e.currentTarget, 'Bracket Night ended.'); brAfter(); });
+  loadBracketAdmin();
+  setInterval(loadBracketAdmin, 10000);
+}
+
+function loadBracketAdmin() {
+  const statusEl = document.getElementById('odBracketStatus');
+  const matchesEl = document.getElementById('odBracketMatches');
+  if (!statusEl || !matchesEl) return;
+  fetch('/api/mana-clash-tournament', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (t) {
+      matchesEl.innerHTML = '';
+      if (!t || t.status === 'none') { statusEl.textContent = 'Not running.'; return; }
+      if (t.status === 'signups') { statusEl.textContent = 'Sign-ups open — ' + t.playerCount + ' joined.'; return; }
+      if (t.status === 'done') { statusEl.textContent = 'Complete. Champion: ' + (t.champion ? t.champion.name : '—'); return; }
+      statusEl.textContent = 'Active — Round ' + (t.round + 1) + ' of ' + t.totalRounds + '.';
+      var rd = (t.rounds && t.rounds[t.round]) || [];
+      for (var j = 0; j < rd.length; j++) {
+        var m = rd[j];
+        if (!m.a || !m.b) continue;
+        var row = document.createElement('div');
+        row.className = 'ovmc-row od-game-row';
+        var label = document.createElement('span');
+        label.className = 'od-game-name';
+        label.textContent = m.a.name + ' vs ' + m.b.name +
+          (m.winnerName ? '  ✓ ' + m.winnerName : (m.live ? '  (playing…)' : '  (not started)'));
+        row.appendChild(label);
+        if (!m.winnerName) {
+          row.appendChild(mkReportBtn(t.round, j, 'a', m.a.name));
+          row.appendChild(mkReportBtn(t.round, j, 'b', m.b.name));
+        }
+        matchesEl.appendChild(row);
+      }
+    })
+    .catch(function () { /* nice-to-have */ });
+}
+
+function mkReportBtn(round, match, side, name) {
+  var b = document.createElement('button');
+  b.className = 'btn-secondary';
+  b.textContent = name + ' wins';
+  b.addEventListener('click', function (e) {
+    nightPost('/api/mana-clash-tournament', { action: 'report', round: round, match: match, side: side }, e.currentTarget, name + ' advances.');
+    setTimeout(loadBracketAdmin, 300);
+  });
+  return b;
 }
 
 function initOverlayDashboard(data) {

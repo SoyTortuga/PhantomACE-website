@@ -45,6 +45,45 @@ async function shareManaClashRoom(env, code, actorLabel) {
   }
 }
 
+/* Create a Mana Clash versus room for a Bracket Night match: both players
+   seeded ready, the first as host, tagged with its {round, match} so settle()
+   reports the winner back to the tournament. Returns the room code, or null if
+   a code could not be claimed. Exported for mana-clash-tournament.js. */
+export async function seedTournamentMatch(env, matchPlayers, tournament) {
+  const a = matchPlayers && matchPlayers[0];
+  const b = matchPlayers && matchPlayers[1];
+  if (!a || !b) return null;
+  for (let i = 0; i < 10; i++) {
+    const code = generateCode();
+    const fresh = {
+      code,
+      host: a.id, hostName: a.name,
+      password: null, practice: false,
+      tournament: { round: tournament.round, match: tournament.match },
+      mode: 'versus',
+      goal: RANKED_GOAL, idleMs: 30000,
+      status: 'lobby',
+      round: 0, roundStartedAt: null,
+      isFinalRound: false, nextIsFinal: false, tiedPlayers: null,
+      intermissionEndsAt: null,
+      winner: null,
+      players: {
+        [a.id]: { displayName: a.name, profileImage: a.avatar || null, ready: true, total: 0, turn: null },
+        [b.id]: { displayName: b.name, profileImage: b.avatar || null, ready: true, total: 0, turn: null },
+      },
+      createdAt: Date.now(),
+    };
+    let claimed = false;
+    await env.MARKETPLACE.mutate('mc_room_' + code, (c) => {
+      if (c) return undefined;
+      claimed = true;
+      return fresh;
+    }, { expirationTtl: ROOM_TTL });
+    if (claimed) return code;
+  }
+  return null;
+}
+
 /* ── Room chat ────────────────────────────────────────────────────────
    Kept IN THE ROOM DOCUMENT rather than beside it. The page already polls
    the room every couple of seconds and every message is a room write
@@ -1210,7 +1249,7 @@ const MAX_ENTRIES = 50;
 const MIN_RANKED_CONTENDERS = 2;
 
 function isRanked(room) {
-  return room.goal === RANKED_GOAL && !room.practice && !room.password && !room.vsBot && (room.mode || 'versus') === 'versus';
+  return room.goal === RANKED_GOAL && !room.practice && !room.password && !room.vsBot && !room.tournament && (room.mode || 'versus') === 'versus';
 }
 
 /**
@@ -1220,6 +1259,7 @@ function isRanked(room) {
 function unrankedReason(room) {
   if ((room.mode || 'versus') !== 'versus') return 'coop';
   if (room.daily) return 'daily';
+  if (room.tournament) return 'tournament';
   if (room.vsBot) return 'bot';
   if (room.practice) return 'practice';
   if (room.goal !== RANKED_GOAL) return 'goal';
@@ -1557,6 +1597,15 @@ async function settle(env, code, room) {
     if (!room.daily && room.winner && (room.mode || 'versus') === 'versus'
         && !room.vsBot && room.contendersAtFinish >= MIN_RANKED_CONTENDERS) {
       await fireAchievement(env, room.winner, { type: 'win', ranked: isRanked(room), goal: room.goal });
+    }
+
+    /* A Bracket Night match just finished — advance the tournament. Best-effort:
+       a tournament hiccup must not fail the room's own settlement. */
+    if (room.tournament && room.winner) {
+      try {
+        const { reportTournamentMatch } = await import('./mana-clash-tournament.js');
+        await reportTournamentMatch(env, room.tournament, room.winner);
+      } catch (err) { /* the host can report the result by hand instead */ }
     }
   }
 }

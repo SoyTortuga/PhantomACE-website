@@ -170,6 +170,20 @@
     <div class="ov-vsc-note" id="ovVscNote"></div>
   </div>
 
+  <!-- Bracket Night: the single-elimination tournament bracket, driven by
+       overlay-tournament.js reading the public /api/mana-clash-tournament. A
+       movable standing panel; hidden until a bracket is active and cleared when
+       it ends. Never themed (OBS legibility), like every overlay panel. -->
+  <div class="ov-bracket" id="ovBracket" hidden>
+    <div class="ov-bracket-head">
+      <span class="ov-bracket-title">MANA CLASH</span>
+      <span class="ov-bracket-sub">Bracket Night</span>
+      <span class="ov-bracket-round" id="ovBracketRound"></span>
+    </div>
+    <div class="ov-bracket-body" id="ovBracketBody"></div>
+    <div class="ov-bracket-champ" id="ovBracketChamp" hidden></div>
+  </div>
+
   <!-- PhamShock Wind Night: its OWN standing panel, driven by pham-wind-night.js.
        Chat steers the server-authoritative wind with !wind left / !wind right;
        this draws the current direction and strength. A movable panel like the
@@ -287,6 +301,7 @@
   <script src="/js/pages/overlay-bone-tithe.js" defer></script>
   <script src="/js/pages/overlay-mana-clash.js" defer></script>
   <script src="/js/pages/overlay-mana-clash-chat.js" defer></script>
+  <script src="/js/pages/overlay-tournament.js" defer></script>
   <script src="/js/pages/overlay-pham-wind.js" defer></script>
   <script src="/js/pages/overlay-dino-safari.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>

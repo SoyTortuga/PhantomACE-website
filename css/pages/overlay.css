@@ -1399,6 +1399,47 @@ body.ov-alerting .ov-mc {
 
 /* The panel sets display:flex below, which would beat the UA
    [hidden]{display:none}, so hiding needs this explicit guard. */
+/* ── Bracket Night ── (never themed; OBS legibility) */
+.ov-bracket[hidden] { display: none; }
+.ov-bracket {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(94vw, 1100px);
+  padding: 16px 20px 14px;
+  background: rgba(8, 8, 8, 0.9);
+  border: 1px solid #2a2a2a;
+  border-top: 3px solid #ff0000;
+  border-radius: 8px;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  z-index: 5;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+body.ov-alerting .ov-bracket {
+  opacity: 0.22;
+  transform: translate(-50%, calc(-50% + 90px)) scale(0.97);
+}
+.ov-bracket-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.ov-bracket-title { font-weight: 800; letter-spacing: 2px; color: #ff2a2a; font-size: 20px; }
+.ov-bracket-sub { font-weight: 700; letter-spacing: 1px; color: #fff; font-size: 15px; text-transform: uppercase; }
+.ov-bracket-round { margin-left: auto; color: #bdbdbd; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+.ov-bracket-body { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; }
+.ov-br-col { display: flex; flex-direction: column; gap: 10px; min-width: 150px; }
+.ov-br-col-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8a8a8a; text-align: center; }
+.ov-br-col.is-current .ov-br-col-title { color: #ff2a2a; }
+.ov-br-match { border: 1px solid #333; border-radius: 6px; overflow: hidden; background: rgba(20,20,20,0.9); }
+.ov-br-match.is-live { border-color: #ff0000; }
+.ov-br-match.is-bye { opacity: 0.5; }
+.ov-br-player { padding: 5px 9px; font-size: 14px; color: #ddd; border-bottom: 1px solid #262626; white-space: nowrap; }
+.ov-br-player:last-child { border-bottom: none; }
+.ov-br-player.is-win { color: #fff; font-weight: 800; background: rgba(255,0,0,0.16); }
+.ov-br-signups { font-size: 18px; color: #fff; padding: 6px 2px; }
+.ov-bracket-champ[hidden] { display: none; }
+.ov-bracket-champ { margin-top: 12px; text-align: center; font-size: 20px; color: #ffcf40; }
+.ov-bracket-champ b { color: #fff; }
+
 .ov-vsc[hidden] { display: none; }
 .ov-vsc {
   position: fixed;
