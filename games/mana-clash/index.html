@@ -335,6 +335,10 @@
     .callout { font-size: 36px; font-weight: 800; letter-spacing: 3px; text-align: center; min-height: 32px; }
     .callout.clash { color: #ffb300; }
     .callout.burn { color: var(--red); }
+    .callout.bank { color: #6ac46a; }
+    .callout.pop { animation: callout-pop 420ms cubic-bezier(.2,1.5,.4,1) both; }
+    @keyframes callout-pop { from { opacity: 0; transform: scale(0.6); } 60% { transform: scale(1.12); } to { opacity: 1; transform: scale(1); } }
+    @media (prefers-reduced-motion: reduce) { .callout.pop { animation: none; } }
 
     /* Full-screen, and ABOVE the intermission. A burn ends the round, and
        when it is the last turn outstanding the intermission used to cover
@@ -708,6 +712,8 @@
   </div>
 
   <div id="splashBody" class="splash-body" hidden>
+    <button class="btn btn-red btn-lg" id="quickMatchBtn"
+            style="width:100%;max-width:620px;margin:0 auto 14px">⚡ Quick Match — find me a game</button>
     <div class="splash-sections">
       <div class="card-box splash-form">
         <div class="section-hdr">Create Room</div>
@@ -1167,6 +1173,40 @@ function playTone(freqs, gain) {
       osc.stop(t0 + i * 0.09 + 0.4);
     });
   } catch { /* as above */ }
+}
+
+/* Banking is the payoff of a push-your-luck turn and had no feedback at all.
+   A short ascending chime, longer the more you locked in, plus a green "+N
+   BANKED" pop — the reward for choosing to stop. */
+let bankCalloutTimer = null;
+function playBank(gained) {
+  if (!soundOn) return;
+  let notes = [523, 784];                         // C5 G5 — a small, clean bank
+  if (gained >= 750)  notes = [523, 659, 784];
+  if (gained >= 1500) notes = [523, 659, 784, 1047];
+  if (gained >= 3000) notes = [523, 659, 784, 1047, 1319];   // a run worth hearing
+  playTone(notes, 0.12);
+}
+function bankJuice(gained) {
+  playBank(gained);
+  const el = $('callout');
+  el.className = 'callout bank pop';
+  el.textContent = '+' + gained.toLocaleString() + ' BANKED';
+  if (bankCalloutTimer) clearTimeout(bankCalloutTimer);
+  bankCalloutTimer = setTimeout(() => {
+    bankCalloutTimer = null;
+    if (el.classList.contains('bank')) { el.textContent = ''; el.className = 'callout'; }
+  }, 1700);
+}
+
+/* A soft tactile click when dice are committed to the keep pile. */
+function playKeep() {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    clack(audioCtx.currentTime, 0.1, 1500);
+  } catch { /* no audio on this device */ }
 }
 
 function setSound(on) {
@@ -2183,6 +2223,15 @@ function applyState(next) {
     held = new Set(next.you && next.you.suggested ? next.you.suggested : []);
   }
 
+  /* The moment you deliberately bank: your turn flips to done:'banked' and your
+     total jumps by what you locked in. Celebrate that choice (not an auto
+     timeout bank, which is the clock deciding for you). */
+  const prevYou = state && state.you;
+  if (prevYou && next.you && next.you.done === 'banked' && prevYou.done !== 'banked') {
+    const gained = Math.max(0, (next.you.total || 0) - (prevYou.total || 0));
+    if (gained > 0) bankJuice(gained);
+  }
+
   state = next;
   render();
   tick();
@@ -2476,6 +2525,44 @@ async function loadRooms() {
   }
 }
 
+/* One button to go from "I want to play" to a table, with no code to swap.
+   Joins the best open public versus room — lobbies first (the game has not
+   started), then the fullest, so players gather instead of scattering across
+   half-empty rooms — and opens a fresh ranked table only when none exist. */
+async function quickMatch(btn) {
+  if (btn) btn.disabled = true;
+  say('splashFeedback', 'Finding a game…');
+  try {
+    const res = await fetch(API + '?action=list-rooms');
+    const rooms = await res.json();
+    const open = (Array.isArray(rooms) ? rooms : []).filter(r =>
+      r.mode === 'versus' && !r.hasPassword && !r.closed && r.playerCount < r.maxPlayers
+    );
+    open.sort((a, b) => {
+      const al = a.status === 'lobby', bl = b.status === 'lobby';
+      if (al !== bl) return al ? -1 : 1;        // lobbies before games already running
+      return (b.playerCount || 0) - (a.playerCount || 0);  // then the fullest, to gather players
+    });
+    if (open[0]) {
+      joinedPassword = '';
+      $('joinCode').value = open[0].code;
+      await joinRoom();
+      return;
+    }
+    say('splashFeedback', 'No open games — starting a fresh table…');
+    const data = await api({
+      action: 'create-room', goal: 10000, idleMs: 30000,
+      password: '', practice: false, mode: 'versus', hostOnly: false,
+    });
+    joinedPassword = '';
+    enterRoom(data.code);
+  } catch (err) {
+    say('splashFeedback', (err && err.message) || 'Could not find a game — try again.');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function createRoom(opts) {
   opts = opts || {};
   say('splashFeedback', '');
@@ -2511,6 +2598,7 @@ async function joinRoom() {
 
 /* ── Wiring ────────────────────────────────────────────────────────────── */
 
+$('quickMatchBtn').addEventListener('click', (e) => quickMatch(e.currentTarget));
 $('createBtn').addEventListener('click', () => createRoom({ hostOnly: $('createHostOnly').checked }));
 $('practiceBtn').addEventListener('click', () => createRoom({ practice: true }));
 $('coopBtn').addEventListener('click', () => createRoom({ coop: true, hostOnly: $('createHostOnly').checked }));
@@ -2536,6 +2624,7 @@ $('ultBtn').addEventListener('click', useUltimate);
 $('keepBtn').addEventListener('click', () => {
   const indices = [...held];
   held.clear();
+  playKeep();
   act({ action: 'keep', code: roomCode, indices }, 'gameFeedback');
 });
 
