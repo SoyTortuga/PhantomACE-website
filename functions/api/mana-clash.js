@@ -19,8 +19,30 @@
 import {
   rollDice, scoreSelection, scorableMask, hasAnyScore, isHotDice, bestSelection, DICE_COUNT, FACE_VALUE,
 } from './mana-clash-scoring.js';
+import { isBroadcaster } from './admin/moderators.js';
 
 const ROOM_TTL = 7200;
+
+/* The canonical shareable deep link for a room. Bare host (no scheme) so the
+   bot's own "contains a phantomace.tv link" allowance covers it — see
+   bot/send-chat.js. The game resumes a room from ?room= (resumeRoom). */
+function roomLink(code) {
+  return 'phantomace.tv/games/mana-clash/?room=' + code;
+}
+
+/* Post a room's join link to Twitch chat via the bot. Best-effort: a chat
+   failure must never take down room creation or the share button. */
+async function shareManaClashRoom(env, code, actorLabel) {
+  try {
+    const { sendChatMessage, logBotAction } = await import('./bot/send-chat.js');
+    const msg = '🎲 PhantomACE opened a Mana Clash room! Join at ' + roomLink(code) + ' — room code ' + code;
+    const sent = await sendChatMessage(env, msg);
+    await logBotAction(env, { type: 'mana-clash-share', message: msg, actor: actorLabel || 'broadcaster', sent });
+    return sent;
+  } catch (e) {
+    return false;
+  }
+}
 
 /* ── Room chat ────────────────────────────────────────────────────────
    Kept IN THE ROOM DOCUMENT rather than beside it. The page already polls
@@ -1276,6 +1298,10 @@ export function viewFor(room, userId, now, opts = {}) {
     resting: (room.restingIds || []).slice(),
     host: room.host,
     hostName: room.hostName,
+    /* Lets the lobby show the broadcaster-only "Share to chat" button. The
+       share action itself is re-checked server-side, so this is a UI hint,
+       not the authorisation. */
+    youAreBroadcaster: !!opts.broadcaster,
     hasPassword: !!room.password,
     maxPlayers: MAX_PLAYERS,
     playerCount: Object.keys(room.players).length,
@@ -1478,7 +1504,9 @@ export async function onRequestGet(context) {
 
     if (!room) return json({ error: 'Room not found' }, 404);
     if (finished) await settle(env, code, room);
-    return json(viewFor(room, player.userId, Date.now()));
+    return json(viewFor(room, player.userId, Date.now(), {
+      broadcaster: isBroadcaster(env, { user_id: player.userId }),
+    }));
   }
 
   return json({ error: 'Invalid action' }, 400);
@@ -1554,10 +1582,27 @@ export async function onRequestPost(context) {
       if (claimed) { made = candidate; break; }
     }
     if (!made) return json({ error: 'Could not generate a room code' }, 500);
-    return json({ success: true, code: made, practice, mode: coop ? 'coop' : 'versus' });
+    const broadcaster = isBroadcaster(env, { user_id: userId });
+    /* When PhantomACE opens a room, drop the join link in chat automatically.
+       Best-effort and non-blocking: a chat hiccup must not fail the create. */
+    if (broadcaster) await shareManaClashRoom(env, made, displayName);
+    return json({ success: true, code: made, practice, mode: coop ? 'coop' : 'versus', broadcaster });
   }
 
   if (!code) return json({ error: 'Missing room code' }, 400);
+
+  /* ── share-room ───────────────────────────────────────────────────────
+     One-click "post the join link to chat", for the broadcaster re-sharing a
+     room they host (the auto-post on create covers the first time). Broadcaster
+     only, and only for a room they actually host. */
+  if (body.action === 'share-room') {
+    if (!isBroadcaster(env, { user_id: userId })) return json({ error: 'Broadcaster only.' }, 403);
+    const room = await env.MARKETPLACE.get('mc_room_' + code, 'json');
+    if (!room) return json({ error: 'Room not found' }, 404);
+    if (room.host !== userId) return json({ error: 'That is not your room.' }, 403);
+    const sent = await shareManaClashRoom(env, code, displayName);
+    return json({ success: true, sent });
+  }
 
   /* ── join-room ────────────────────────────────────────────────────── */
   if (body.action === 'join-room') {

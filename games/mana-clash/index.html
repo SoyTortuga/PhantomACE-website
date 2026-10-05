@@ -782,6 +782,7 @@
   <div class="lobby-actions">
     <button class="btn btn-dim" id="readyBtn">I'm Ready</button>
     <button class="btn btn-red" id="startBtn" hidden>Start Game</button>
+    <button class="btn btn-dim" id="shareChatBtn" hidden>📣 Share to Chat</button>
     <button class="btn btn-dim" id="leaveBtn">Leave</button>
   </div>
 </div>
@@ -1670,6 +1671,9 @@ function renderLobby() {
   $('readyBtn').hidden = !me;
   $('readyBtn').textContent = me && me.ready ? 'Not Ready' : "I'm Ready";
   $('startBtn').hidden = !isHost;
+  /* One-click re-share of the room link to chat — broadcaster only (the server
+     re-checks). The auto-post on create covers the first announcement. */
+  $('shareChatBtn').hidden = !state.youAreBroadcaster;
   $('hostOnlyHint').hidden = !(isHost && !me);
   const everyoneReady = state.players.every(p => p.ready);
   /* Co-op (like practice) can start solo — mirror the server, which exempts
@@ -2536,7 +2540,28 @@ $('keepBtn').addEventListener('click', () => {
 });
 
 $('lobbyCode').addEventListener('click', () => {
-  navigator.clipboard.writeText(state.code).then(() => say('lobbyFeedback', 'Code copied.')).catch(() => {});
+  if (!state || !state.code) return;
+  /* Copy a full, shareable deep link (the game resumes a room from ?room=),
+     not just the four-char code — so it can be pasted straight into chat. */
+  const link = location.origin + '/games/mana-clash/?room=' + state.code;
+  navigator.clipboard.writeText(link)
+    .then(() => say('lobbyFeedback', 'Room link copied — paste it in chat.'))
+    .catch(() => navigator.clipboard.writeText(state.code)
+      .then(() => say('lobbyFeedback', 'Link copy blocked — code copied instead.'))
+      .catch(() => {}));
+});
+
+$('shareChatBtn').addEventListener('click', async () => {
+  const btn = $('shareChatBtn');
+  btn.disabled = true;
+  try {
+    const d = await api({ action: 'share-room', code: roomCode });
+    say('lobbyFeedback', d.sent ? 'Room link posted to chat.' : 'Sent to the bot — Twitch may have held the message.');
+  } catch (err) {
+    say('lobbyFeedback', err.message);
+  } finally {
+    setTimeout(() => { btn.disabled = false; }, 5000);
+  }
 });
 
 $('rematchBtn').addEventListener('click', async () => {
