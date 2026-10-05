@@ -184,41 +184,73 @@
       var frame = document.getElementById('appFrame');
       var about = document.getElementById('about');
 
+      /* Fetch a (CORS-enabled) image and return it as a data URL, or null.
+         Twitch's image CDN (jtvnw) sends permissive CORS, so this works for a
+         viewer's profile picture. Capped so a slow CDN never stalls the app. */
+      async function toDataUrl(url, timeoutMs) {
+        var ctrl = new AbortController();
+        var t = setTimeout(function () { ctrl.abort(); }, timeoutMs || 2500);
+        try {
+          var r = await fetch(url, { mode: 'cors', signal: ctrl.signal });
+          if (!r.ok) return null;
+          var blob = await r.blob();
+          return await new Promise(function (res) {
+            var fr = new FileReader();
+            fr.onload = function () { res(fr.result); };
+            fr.onerror = function () { res(null); };
+            fr.readAsDataURL(blob);
+          });
+        } catch (e) { return null; } finally { clearTimeout(t); }
+      }
+
       /* Link the tool's identity to the site's Twitch login. The iframe is
          same-origin, so it shares this localStorage — seeding the tool's
          profile here (BEFORE the app boots) makes it adopt the logged-in
-         Twitch name + avatar, with no change to the tool's own code. Signed
-         out, the tool keeps its own manual profile and we offer a login link. */
-      function linkIdentity() {
+         Twitch name + avatar, with no change to the tool's own code. The avatar
+         is converted to a data URL and stored as `avatarDataUrl` (the field the
+         tool renders AND sends to the trade partner), once per distinct avatar.
+         Signed out, the tool keeps its own manual profile and we offer login. */
+      async function linkIdentity() {
         var slot = document.getElementById('loginSlot');
         var s = (typeof readPhamSession === 'function') ? readPhamSession() : null;
-        if (s && s.user_id) {
-          try {
-            var raw = localStorage.getItem('blind-trading-tool:profile');
-            var prof = {};
-            try { prof = raw ? JSON.parse(raw) : {}; } catch (e) { prof = {}; }
-            prof.displayName = s.display_name || prof.displayName || '';
-            if (s.profile_image) prof.avatar = s.profile_image;
-            localStorage.setItem('blind-trading-tool:profile', JSON.stringify(prof));
-          } catch (e) { /* private mode — the tool just uses its own profile */ }
-          if (slot) slot.textContent = 'Signed in as ' + (s.display_name || 'you');
-        } else if (slot) {
-          var a = document.createElement('a');
-          a.href = '/api/auth/twitch?return_to=' + encodeURIComponent('/tcgblindtrading');
-          a.textContent = 'Log in with Twitch';
-          a.style.color = 'var(--red, #ff0000)';
-          a.style.textDecoration = 'none';
-          slot.textContent = '';
-          slot.appendChild(a);
+        if (!(s && s.user_id)) {
+          if (slot) {
+            var a = document.createElement('a');
+            a.href = '/api/auth/twitch?return_to=' + encodeURIComponent('/tcgblindtrading');
+            a.textContent = 'Log in with Twitch';
+            a.style.color = 'var(--red, #ff0000)';
+            a.style.textDecoration = 'none';
+            slot.textContent = '';
+            slot.appendChild(a);
+          }
+          return;
         }
+        var prof = {};
+        try {
+          var raw = localStorage.getItem('blind-trading-tool:profile');
+          prof = raw ? JSON.parse(raw) : {};
+        } catch (e) { prof = {}; }
+        prof.displayName = s.display_name || prof.displayName || '';
+        if (s.profile_image) {
+          prof.avatar = s.profile_image;
+          /* Convert once per distinct Twitch avatar; cached via _avatarSrc so a
+             repeat visit is instant and we never re-fetch the same picture. */
+          if (prof._avatarSrc !== s.profile_image) {
+            var dataUrl = await toDataUrl(s.profile_image, 2500);
+            if (dataUrl) { prof.avatarDataUrl = dataUrl; prof._avatarSrc = s.profile_image; }
+          }
+        }
+        try { localStorage.setItem('blind-trading-tool:profile', JSON.stringify(prof)); } catch (e) { /* private mode */ }
+        if (slot) slot.textContent = 'Signed in as ' + (s.display_name || 'you');
       }
 
-      function reveal() {
+      async function reveal() {
         gate.hidden = true;
-        linkIdentity();                 // seed the profile before the app loads
-        /* Load the app only once, on unlock — no WebSocket until you're in. */
-        if (!frame.src) frame.src = APP_SRC;
         app.hidden = false;
+        /* Seed the Twitch identity BEFORE the app boots so it adopts it on
+           first read. Never let it block: the app loads regardless. */
+        try { await linkIdentity(); } catch (e) { /* app still loads */ }
+        if (!frame.src) frame.src = APP_SRC;
       }
 
       try { if (sessionStorage.getItem(KEY) === '1') reveal(); } catch (e) {}
