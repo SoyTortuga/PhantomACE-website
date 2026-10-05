@@ -98,6 +98,7 @@
     <div class="app-bar">
       <span class="ttl">Blind Trading Tool</span>
       <span class="spacer"></span>
+      <span id="loginSlot" style="color:var(--text-sec,#c9c9c9);font-size:13px"></span>
       <button type="button" id="aboutBtn">About</button>
       <a href="/">← PhantomACE</a>
     </div>
@@ -171,6 +172,7 @@
     </div>
   </div>
 
+  <script src="/js/session-read.js"></script>
   <script>
     (function () {
       'use strict';
@@ -182,8 +184,38 @@
       var frame = document.getElementById('appFrame');
       var about = document.getElementById('about');
 
+      /* Link the tool's identity to the site's Twitch login. The iframe is
+         same-origin, so it shares this localStorage — seeding the tool's
+         profile here (BEFORE the app boots) makes it adopt the logged-in
+         Twitch name + avatar, with no change to the tool's own code. Signed
+         out, the tool keeps its own manual profile and we offer a login link. */
+      function linkIdentity() {
+        var slot = document.getElementById('loginSlot');
+        var s = (typeof readPhamSession === 'function') ? readPhamSession() : null;
+        if (s && s.user_id) {
+          try {
+            var raw = localStorage.getItem('blind-trading-tool:profile');
+            var prof = {};
+            try { prof = raw ? JSON.parse(raw) : {}; } catch (e) { prof = {}; }
+            prof.displayName = s.display_name || prof.displayName || '';
+            if (s.profile_image) prof.avatar = s.profile_image;
+            localStorage.setItem('blind-trading-tool:profile', JSON.stringify(prof));
+          } catch (e) { /* private mode — the tool just uses its own profile */ }
+          if (slot) slot.textContent = 'Signed in as ' + (s.display_name || 'you');
+        } else if (slot) {
+          var a = document.createElement('a');
+          a.href = '/api/auth/twitch?return_to=' + encodeURIComponent('/tcgblindtrading');
+          a.textContent = 'Log in with Twitch';
+          a.style.color = 'var(--red, #ff0000)';
+          a.style.textDecoration = 'none';
+          slot.textContent = '';
+          slot.appendChild(a);
+        }
+      }
+
       function reveal() {
         gate.hidden = true;
+        linkIdentity();                 // seed the profile before the app loads
         /* Load the app only once, on unlock — no WebSocket until you're in. */
         if (!frame.src) frame.src = APP_SRC;
         app.hidden = false;
