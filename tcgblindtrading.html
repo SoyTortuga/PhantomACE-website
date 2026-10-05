@@ -101,10 +101,13 @@
       <button type="button" id="aboutBtn">About</button>
       <a href="/">← PhantomACE</a>
     </div>
-    <!-- Same-origin iframe: needs allow-same-origin for its localStorage
-         collections; allow-scripts to run. Nothing else. -->
-    <iframe class="app-frame" id="appFrame" title="Blind Trading Tool"
-            sandbox="allow-scripts allow-same-origin"></iframe>
+    <!-- No sandbox: this is our own first-party, same-origin app that needs
+         full page capabilities — form submits (create collection), the file
+         picker + downloads (CSV import/export), localStorage. A sandbox with
+         allow-same-origin+allow-scripts gives no real isolation here anyway
+         (same origin), so it only broke those features. Framing is still
+         constrained to same-origin by the /games/ frame-ancestors CSP. -->
+    <iframe class="app-frame" id="appFrame" title="Blind Trading Tool"></iframe>
   </div>
 
   <!-- 3 · About overlay (the showcase) -->
