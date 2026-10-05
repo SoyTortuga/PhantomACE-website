@@ -1,8 +1,8 @@
 const TWITCH_CHANNEL = 'phantomace';
 const STATUS_POLL_INTERVAL = 60000;
 
-let pollTimer = null;
 let hypeTimer = null;
+let heartbeatTimer = null;
 const HYPE_POLL_INTERVAL = 15000;
 
 async function fetchTwitchStatus() {
@@ -83,11 +83,16 @@ function setupHeroEmbed() {
   iframe.src = `https://player.twitch.tv/?channel=${channel}&parent=${hostname}&muted=true`;
 }
 
-async function pollTwitchStatus() {
+/* One tick of the live check: refresh the on-page indicators (only worth doing
+   when the tab is actually visible) and ALWAYS fire the Phamily Time heartbeat.
+   The heartbeat must run even on a hidden tab — see startHeartbeatLoop. */
+async function heartbeatTick() {
   const status = await fetchTwitchStatus();
-  updateLiveIndicators(status);
-  if (typeof handleTwitchStatusForNotifications === 'function') {
-    handleTwitchStatusForNotifications(status);
+  if (typeof document === 'undefined' || !document.hidden) {
+    updateLiveIndicators(status);
+    if (typeof handleTwitchStatusForNotifications === 'function') {
+      handleTwitchStatusForNotifications(status);
+    }
   }
   sendPhamilyHeartbeatIfLive(status);
 }
@@ -148,33 +153,47 @@ async function sendPhamilyHeartbeatIfLive(status) {
   }
 }
 
-/* Polling runs only while the tab is visible. A backgrounded tab on a home
-   rig is pure load for nothing anyone is looking at, so we clear the timers on
-   hide and restart them (with one immediate refresh) on show. */
+/* The Phamily Time heartbeat runs on EVERY tab, visible OR hidden, and is never
+   cleared on hide. Viewers watch the stream on Twitch with this site in a
+   BACKGROUND tab, and their watch time must still accrue then — stopping on
+   hide meant the most common way to watch counted for nothing. Browsers
+   throttle background timers to about once a minute, which still lands inside
+   the server's 120s gap tolerance. The indicator refresh inside the tick is
+   skipped while hidden (nothing to see), so a hidden tab's only background work
+   is one cached status read + one heartbeat POST a minute — the load the old
+   gating avoided, now spent only where it means a watcher is actually watching. */
+function startHeartbeatLoop() {
+  if (heartbeatTimer) return;
+  heartbeatTick();
+  heartbeatTimer = setInterval(heartbeatTick, STATUS_POLL_INTERVAL);
+}
+
+/* Cosmetic-only polling (the hype-train banner) still pauses on a hidden tab —
+   nobody is looking at it, and it is not load-bearing like the heartbeat. */
 function startPollTimers() {
   stopPollTimers();
-  pollTwitchStatus();
-  pollTimer = setInterval(pollTwitchStatus, STATUS_POLL_INTERVAL);
   pollHypeTrain();
   hypeTimer = setInterval(pollHypeTrain, HYPE_POLL_INTERVAL);
 }
 
 function stopPollTimers() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   if (hypeTimer) { clearInterval(hypeTimer); hypeTimer = null; }
 }
 
 function startTwitchPolling() {
   setupHeroEmbed();
-  if (typeof document !== 'undefined' && document.hidden) {
-    /* Hidden at load: don't poll yet; the visibility handler starts us. */
-  } else {
+  startHeartbeatLoop();                 // always on — accrues watch time in the background
+  if (typeof document === 'undefined' || !document.hidden) {
     startPollTimers();
   }
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) stopPollTimers();
-      else startPollTimers();
+      if (document.hidden) {
+        stopPollTimers();
+      } else {
+        startPollTimers();
+        heartbeatTick();               // refresh indicators promptly on return
+      }
     });
   }
 }
