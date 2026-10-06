@@ -122,8 +122,13 @@
     }
 
     .mtg-cell.just-marked { animation: cell-flash 0.6s ease-out; }
+    /* The badge that says a square was STAMPED, not pulled — without it a
+       wildcard is indistinguishable from a real mark, and a bingo nobody can
+       verify is a prize dispute on stream. Written as a CSS escape rather
+       than a literal glyph: this rule had rotted to a mojibake "°5" once
+       already, and an escape cannot be mangled by an editor or a re-encode. */
     .mtg-cell.wild::after {
-      content: '°5'; position: absolute; top: 2px; right: 4px;
+      content: '\2605'; position: absolute; top: 2px; right: 4px;
       font-size: 15px;
       text-shadow: none; color: #ffcc44;
     }

@@ -133,17 +133,30 @@ export async function onRequestPost(context) {
   return json({ error: 'Unknown action' }, 400);
 }
 
-/** Re-read and apply under the room's lock; the read above was a preview. */
+/* Re-read and apply under the room's lock; the read above was a preview.
+
+   A THROWN STORE ERROR IS A FAILED WRITE, not a crash to propagate. The item
+   has already been taken by the time this runs, so letting the exception out
+   of here skipped the caller's refund entirely and the player lost a stamp
+   they paid for and got nothing for it — the precise outcome the spend-then-
+   refund design exists to prevent. It only ever covered a mutate that
+   RETURNED without applying; a store that threw sailed straight past it.
+   Reported as a failed apply so the caller refunds and answers 409. */
 async function mutatePlayer(env, key, playerId, fn) {
   let applied = false;
-  await env.MARKETPLACE.mutate(key, (room) => {
-    if (!room || room.status === 'ended') return undefined;
-    const p = room.players.find(x => x.id === playerId);
-    if (!p) return undefined;
-    normalize(p);
-    if (!fn(p, room)) return undefined;
-    applied = true;
-    return room;
-  }, { expirationTtl: GAME_TTL });
+  try {
+    await env.MARKETPLACE.mutate(key, (room) => {
+      if (!room || room.status === 'ended') return undefined;
+      const p = room.players.find(x => x.id === playerId);
+      if (!p) return undefined;
+      normalize(p);
+      if (!fn(p, room)) return undefined;
+      applied = true;
+      return room;
+    }, { expirationTtl: GAME_TTL });
+  } catch (err) {
+    console.error('[mtgbbb/powers] apply failed, refunding:', err.message);
+    return false;
+  }
   return applied;
 }

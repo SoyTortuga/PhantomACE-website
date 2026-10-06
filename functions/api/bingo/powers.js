@@ -149,15 +149,26 @@ export async function onRequestPost(context) {
  */
 async function appendToPlayer(env, key, playerId, fn) {
   let applied = false;
-  await env.MARKETPLACE.mutate(key, (game) => {
-    if (!game || game.status === 'ended') return undefined;
-    const p = game.players.find(x => x.id === playerId);
-    if (!p) return undefined;
-    normalizePlayer(p);
-    if (!fn(p)) return undefined;
-    p.cardIds = p.cards[0];
-    applied = true;
-    return game;
-  }, { expirationTtl: GAME_TTL });
+  /* A THROWN STORE ERROR IS A FAILED WRITE, not a crash to propagate. The
+     item is already spent by the time this runs, so letting the exception
+     out skipped the caller's refund and the player lost a stamp they paid
+     for with nothing to show — the exact outcome the refund exists to
+     prevent. It only ever covered a mutate that RETURNED without applying.
+     Reported as a failed apply so the caller refunds and answers 409. */
+  try {
+    await env.MARKETPLACE.mutate(key, (game) => {
+      if (!game || game.status === 'ended') return undefined;
+      const p = game.players.find(x => x.id === playerId);
+      if (!p) return undefined;
+      normalizePlayer(p);
+      if (!fn(p)) return undefined;
+      p.cardIds = p.cards[0];
+      applied = true;
+      return game;
+    }, { expirationTtl: GAME_TTL });
+  } catch (err) {
+    console.error('[bingo/powers] apply failed, refunding:', err.message);
+    return false;
+  }
   return applied;
 }
