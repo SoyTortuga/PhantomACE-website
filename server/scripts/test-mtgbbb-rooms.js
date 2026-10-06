@@ -436,6 +436,30 @@ const createBody = (code, extra = {}) => ({ code, setCode: FAKE_SET_CODE, boxes:
   ok('and hides the strip when there is no code', /joinEl\.hidden = !code/.test(ovJs));
 }
 
+/* ── A CARD NAME IS DATA, NEVER CODE ─────────────────────────────────────
+   The host's search results carried onclick="selectCard('<name>')" with the
+   name escaped for an ATTRIBUTE. That cannot work: the HTML parser decodes
+   &#39; back to a bare ' before the inline handler is compiled as JS, so
+   "Ajani's Anguish" produced selectCard('Ajani's Anguish') — a syntax error.
+   The handler never compiled and the row did nothing when clicked, so every
+   card with an apostrophe in its name was uncallable. (Enter still worked:
+   that path read dataset.name, which is why it looked like only SOME cards
+   were broken.)
+
+   mark.js gates on an EXACT pool match (`c.name === cardName`), so there is
+   no fuzzy fallback to paper over a name that arrives mangled — the name has
+   to survive the trip intact. */
+{
+  const host = fs.readFileSync(path.join(REPO, 'games/mtgbbb/host.html'), 'utf8');
+  ok('search results carry the card name as data, not in an onclick',
+     /class="search-result" data-name="\$\{escAttr\(c\.name\)\}">/.test(host));
+  ok('and nothing interpolates a card name into a JS string literal',
+     !/onclick="selectCard\('/.test(host));
+  ok('a delegated listener picks the card up off data-name',
+     /getElementById\('searchResults'\)\.addEventListener\('click'/.test(host) &&
+     /selectCard\(row\.dataset\.name\)/.test(host));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

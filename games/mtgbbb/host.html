@@ -623,6 +623,21 @@
       }
     });
 
+    /* CLICKING A RESULT. Delegated, reading the name back out of data-name.
+       The rows used to carry an inline click handler that called selectCard
+       with the name pasted into a JS string literal, escaped for an ATTRIBUTE
+       — which cannot work for a name holding an apostrophe: the HTML parser
+       turns &#39; back into a bare quote before the JS is parsed, so
+       "Ajani's Anguish" closed the string early. The handler never compiled
+       and the row silently did nothing when clicked. No amount
+       of HTML escaping fixes a JS string literal built that way; the name has
+       to travel as data. (Enter already worked, because that path read
+       dataset.name — which is why only SOME cards were uncallable.) */
+    document.getElementById('searchResults').addEventListener('click', (e) => {
+      const row = e.target.closest('.search-result');
+      if (row) selectCard(row.dataset.name);
+    });
+
     function renderSearch() {
       const q = searchInput.value.trim().toLowerCase();
       const results = document.getElementById('searchResults');
@@ -630,7 +645,7 @@
 
       const matches = roomPool.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
       results.innerHTML = matches.map(c => `
-        <div class="search-result" data-name="${escAttr(c.name)}" onclick="selectCard('${escAttr(c.name)}')">
+        <div class="search-result" data-name="${escAttr(c.name)}">
           <span>${escHtml(c.name)}</span>
           <span class="sr-rarity">${c.rarity}</span>
         </div>`).join('');
@@ -819,7 +834,13 @@
       d.textContent = str;
       return d.innerHTML;
     }
-    function escAttr(str) { return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    /* The ampersand has to go FIRST, or it re-escapes the ones the later
+       replacements introduce. Without it a name holding a literal "&amp;"
+       would decode back to "&" and no longer match the pool, which mark.js
+       compares exactly. */
+    function escAttr(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && window.parent !== window) {
