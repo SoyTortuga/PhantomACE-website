@@ -47,6 +47,7 @@
       'Set name & pack progress bar',
       'Player count',
       'Top 3 players by lines',
+      'The join URL & room code, so viewers can join mid-box',
       '(individual pulls appear in the Alerts window)',
     ] },
     { id: 'ovRaid', label: 'Raid Boss', holds: [
@@ -213,6 +214,7 @@
       '<li><span>topPlayer</span><span>4 lines</span></li>' +
       '<li><span>secondPlace</span><span>3 lines</span></li>' +
       '<li><span>thirdPlace</span><span>2 lines</span></li>';
+    show('ovMtgJoin'); set('ovMtgCode', 'BLOOM');
   }
 
   function raidBoss() {

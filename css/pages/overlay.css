@@ -861,6 +861,39 @@ html, body {
   font-style: italic;
 }
 
+/* The join strip. A border-top separates it from the board — a side rail
+   would be the banned accent bar. The code is the loud part: it is what a
+   viewer has to read off a 1080p stream, possibly on a phone, so it gets the
+   size and the white while the URL stays quiet underneath it. */
+.ov-mtg-join[hidden] { display: none; }
+.ov-mtg-join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.ov-mtg-joinurl {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+}
+
+.ov-mtg-code {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  /* The letter-spacing pads the right of the last glyph; this pulls the
+     string back so it reads optically centred rather than shoved left. */
+  text-indent: 0.18em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ══════════════════════════════════════════════
    SKULL CLICKER RAID BOSS — a thin, tall column for the left edge.
    Boss art up top, a vertical health bar that drains downward as the site

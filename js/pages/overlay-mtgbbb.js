@@ -39,6 +39,8 @@
   var barEl = document.getElementById('ovMtgBar');
   var listEl = document.getElementById('ovMtgTop');
   var playersEl = document.getElementById('ovMtgPlayers');
+  var joinEl = document.getElementById('ovMtgJoin');
+  var codeEl = document.getElementById('ovMtgCode');
 
   var timer = null;
 
@@ -90,6 +92,17 @@
 
     var players = Number(g.playerCount) || 0;
     playersEl.textContent = players === 1 ? '1 player' : players + ' players';
+
+    /* The join code, on stream, for as long as the room is up. Joining is open
+       until the host ends the box (functions/api/mtgbbb/join.js only refuses an
+       'ended' room), so someone arriving on pack 20 can still get a card — but
+       only if they can see the code. Blank code = no strip, rather than an
+       empty box prompting people to type nothing. */
+    if (joinEl && codeEl) {
+      var code = g.code ? String(g.code).toUpperCase() : '';
+      codeEl.textContent = code;
+      joinEl.hidden = !code;
+    }
 
     var board = Array.isArray(g.standings) ? g.standings.slice(0, TOP_N) : [];
     if (!board.length) {

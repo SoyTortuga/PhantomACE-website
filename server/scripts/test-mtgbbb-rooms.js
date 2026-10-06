@@ -19,6 +19,10 @@
    which mints real giveaway entries.
    ══════════════════════════════════════════════ */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import * as create from '../../functions/api/mtgbbb/create.js';
 import * as join from '../../functions/api/mtgbbb/join.js';
 import * as mark from '../../functions/api/mtgbbb/mark.js';
@@ -37,6 +41,8 @@ import { SQUARES } from '../../functions/api/mtgbbb-scoring.js';
 globalThis.fetch = async () => {
   throw new Error('test-mtgbbb-rooms: unexpected network call — a set code escaped the KV cache');
 };
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 let passed = 0;
 const failures = [];
@@ -393,6 +399,41 @@ const createBody = (code, extra = {}) => ({ code, setCode: FAKE_SET_CODE, boxes:
   await Promise.all(who.map(w => post(join, env, w, { code: 'RACE', name: w })));
   check('every concurrent joiner is recorded', room(env, 'RACE').players.length, who.length);
   ok('each with a full card', room(env, 'RACE').players.every(p => p.card.length === SQUARES));
+}
+
+/* ── GETTING INTO THE ROOM ───────────────────────────────────────────────
+   A room nobody can find is a room nobody plays. Two things carry the code
+   off the host's screen, and both have been broken before:
+
+   1. The host's "Copy Join Link" built the player URL by string-replacing
+      "host.html". The host page also serves at the clean extensionless URL
+      (/games/mtgbbb/host), where that replace silently no-ops and hands out
+      a link back to the HOST window — a mod opening it would land on the
+      host UI, and a viewer on a 403. Commander Bingo hit this first and
+      fixed it the same way: resolve index.html relatively.
+   2. The overlay never showed the code at all, so anyone tuning in mid-box
+      had to wait for someone to re-post it in chat. Joining stays open until
+      the host ends the room (join.js only refuses 'ended'), so the code
+      belongs on screen the whole time the panel is up. */
+{
+  const host = fs.readFileSync(path.join(REPO, 'games/mtgbbb/host.html'), 'utf8');
+  ok('the join link resolves the player page relatively',
+     /new URL\('index\.html', window\.location\.href\)/.test(host));
+  ok('and no longer string-replaces "host.html"',
+     !/replace\(\/host\\\.html/.test(host));
+
+  const ovHtml = fs.readFileSync(path.join(REPO, 'overlay.html'), 'utf8');
+  ok('the overlay panel has a join strip', /id="ovMtgJoin"/.test(ovHtml) && /id="ovMtgCode"/.test(ovHtml));
+  ok('naming the page a viewer has to reach', /phantomace\.tv\/games\/mtgbbb/.test(ovHtml));
+
+  const ovCss = fs.readFileSync(path.join(REPO, 'css/pages/overlay.css'), 'utf8');
+  /* The strip sets display:flex, which beats the UA [hidden]{display:none} —
+     without this guard a code-less room would leave an empty strip on air. */
+  ok('the strip still reaches display:none when hidden', /\.ov-mtg-join\[hidden\] \{ display: none; \}/.test(ovCss));
+
+  const ovJs = fs.readFileSync(path.join(REPO, 'js/pages/overlay-mtgbbb.js'), 'utf8');
+  ok('the driver fills the code from the room state', /codeEl\.textContent = code/.test(ovJs));
+  ok('and hides the strip when there is no code', /joinEl\.hidden = !code/.test(ovJs));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

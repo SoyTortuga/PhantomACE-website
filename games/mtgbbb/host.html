@@ -706,8 +706,15 @@
       navigator.clipboard.writeText(roomCode).then(() => flashBtn('copyCodeBtn', 'Copied!')).catch(() => {});
     }
     function copyLink() {
-      const base = window.location.href.replace(/host\.html.*/, 'index.html');
-      navigator.clipboard.writeText(base + '?code=' + roomCode).then(() => flashBtn('copyLinkBtn', 'Copied!')).catch(() => {});
+      /* Resolve the PLAYER page relative to this host page's directory, so the
+         join link points at index.html whether this page is served as
+         host.html or at a clean/extensionless URL (.../mtgbbb/host). The old
+         string-replace on "host.html" silently no-op'd on the clean URL and
+         handed out a link straight back to the host window — same bug
+         Commander Bingo already fixed. */
+      const url = new URL('index.html', window.location.href);
+      url.search = '?code=' + roomCode;
+      navigator.clipboard.writeText(url.href).then(() => flashBtn('copyLinkBtn', 'Copied!')).catch(() => {});
     }
     function flashBtn(id, text) {
       const btn = document.getElementById(id);
