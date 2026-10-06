@@ -78,6 +78,38 @@
       'ACTIVE → LOCKED → the winner highlighted, then hides',
       'Driven by Twitch channel-point prediction events',
     ] },
+    /* ── Stream night modes ──────────────────────────────────────────────
+       Each of these is a standing panel that shows while its event runs and
+       clears when it ends. They shipped positioned by their own CSS default
+       and were never listed here, so the editor could not move them — which
+       meant several landed on top of each other mid-stream. */
+    { id: 'ovTithe', label: 'Bone Tithe', holds: [
+      'Goal progress bar & percentage',
+      'Bones tithed against the goal, and time left',
+      'Top contributors',
+      'Shows while a tithe runs, then clears',
+    ] },
+    { id: 'ovVsc', label: 'Streamer vs Chat', holds: [
+      'The streamer’s frozen six-dice hand',
+      'Chat’s best six, drawn from the pooled !clash rolls',
+      'Both scores, the chatter count & a countdown',
+      'Resolves, reveals the winner, then clears',
+    ] },
+    { id: 'ovWind', label: 'Wind Night', holds: [
+      'Current wind direction & strength',
+      'A bar that swings as chat steers it',
+      'Chat drives it with !wind left / !wind right',
+    ] },
+    { id: 'ovSafari', label: 'Dino Safari', holds: [
+      'The wild dino’s portrait, name & rarity',
+      'Catch countdown & how many have typed !catch',
+      'Switches to the winner once caught, then hides',
+    ] },
+    { id: 'ovBracket', label: 'Bracket Night', holds: [
+      'The single-elimination bracket, round by round',
+      'Winners highlighted; the live match outlined',
+      'Champion banner when the final resolves',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -87,7 +119,11 @@
   function alertCard() {
     var stage = $('ovStage');
     if (!stage) return;
-    document.body.classList.add('ov-alerting');
+    /* Deliberately NOT setting `ov-alerting`. The live overlay sets it so the
+       standing panels duck out of a card's way, but in layout mode every panel
+       is up at once to be arranged — the duck would leave the Mana Clash, VS
+       Chat, Wind, Safari and Bracket panels at 22% opacity and shifted off
+       their real spots, which is exactly what you must not be dragging. */
     stage.innerHTML = '';
     var card = document.createElement('div');
     card.className = 'ov-alert';
@@ -289,7 +325,93 @@
       '</li>';
   }
 
-  function fillAll() { alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash(); checkin(); hatch(); prediction(); }
+  function tithe() {
+    show('ovTithe');
+    set('ovTitheTitle', 'Bone Tithe');
+    set('ovTithePct', '68%');
+    var bar = $('ovTitheBar'); if (bar) bar.style.width = '68%';
+    set('ovTitheAmt', '3,400 / 5,000 bones');
+    set('ovTitheSub', '11m left · !tithe <amount>');
+    var top = $('ovTitheTop');
+    if (top) top.innerHTML =
+      '<li>SampleViewer · 900</li>' +
+      '<li>boneHoarder · 640</li>' +
+      '<li>graveDigger · 410</li>';
+  }
+
+  /* Faces are the mana-die letters, and the die markup matches
+     overlay-mana-clash-chat.js exactly (`.ov-vsc-die.d-<F>`, `.is-kept`) so the
+     editor previews the real dice, not a stand-in. */
+  function vsc() {
+    show('ovVsc');
+    set('ovVscTimer', '0:12');
+    function dice(faces, kept) {
+      return faces.map(function (f, i) {
+        return '<i class="ov-vsc-die d-' + f + (kept.indexOf(i) !== -1 ? ' is-kept' : '') + '">' + f + '</i>';
+      }).join('');
+    }
+    var s = $('ovVscStreamerDice');
+    if (s) s.innerHTML = dice(['R', 'R', 'R', 'G', 'U', 'W'], [0, 1, 2]);
+    var c = $('ovVscChatDice');
+    if (c) c.innerHTML = dice(['B', 'B', 'B', 'B', 'C', 'G'], [0, 1, 2, 3]);
+    set('ovVscStreamerScore', '1,200');
+    set('ovVscChatScore', '2,000');
+    set('ovVscChatCount', '(214)');
+    set('ovVscNote', 'Chat is ahead — type !clash to roll');
+  }
+
+  function wind() {
+    show('ovWind');
+    set('ovWindArrow', '→');
+    set('ovWindStrength', '3.4');
+    var bar = $('ovWindBar'); if (bar) bar.style.width = '34%';
+  }
+
+  function safari() {
+    var panel = $('ovSafari');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.classList.remove('is-won');
+    panel.setAttribute('data-rarity', 'epic');
+    var art = $('ovSafariArt');
+    if (art) art.src = '/games/dino-park/assets/portraits/Quetzalcoatlus.png';
+    set('ovSafariName', 'Quetzalcoatlus');
+    set('ovSafariRarity', 'Spectral · Epic');
+    set('ovSafariTimer', '18s');
+    var note = $('ovSafariNote');
+    if (note) note.innerHTML = 'A wild dino appeared — type <b>!catch</b>';
+  }
+
+  /* A mid-tournament bracket: one finished round, the live semifinal outlined,
+     and an empty final — the widest the panel ever gets, which is what you want
+     to be dragging around. */
+  function bracket() {
+    show('ovBracket');
+    set('ovBracketRound', 'Semifinals');
+    function match(a, b, winner, live) {
+      function side(name) {
+        return '<div class="ov-br-player' + (winner && name === winner ? ' is-win' : '') + '">' + name + '</div>';
+      }
+      return '<div class="ov-br-match' + (live ? ' is-live' : '') + '">' + side(a) + side(b) + '</div>';
+    }
+    function col(title, matches, current) {
+      return '<div class="ov-br-col' + (current ? ' is-current' : '') + '">' +
+        '<div class="ov-br-col-title">' + title + '</div>' + matches + '</div>';
+    }
+    var body = $('ovBracketBody');
+    if (body) body.innerHTML =
+      col('Quarterfinals',
+        match('SampleViewer', 'boneHoarder', 'SampleViewer') +
+        match('graveDigger', 'duelistOne', 'duelistOne'), false) +
+      col('Semifinals', match('SampleViewer', 'duelistOne', null, true), true) +
+      col('Final', match('—', '—', null, false), false);
+    var champ = $('ovBracketChamp'); if (champ) champ.hidden = true;
+  }
+
+  function fillAll() {
+    alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
+    checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
+  }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
 })();
