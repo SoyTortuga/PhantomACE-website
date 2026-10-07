@@ -458,6 +458,24 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* Commander Bingo: chat votes where to put its shared card's one wildcard.
+     Silent — the card is on the overlay and a line per vote during a bingo
+     night would bury the channel. */
+  if (parsed.command === '!stamp') {
+    try {
+      const { stampFromChat } = await import('../bingo-chat.js');
+      await stampFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+        text: parsed.rest,
+      });
+    } catch (err) {
+      /* A broken stamp must not break chat commands. */
+      console.error('[bingo-chat/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

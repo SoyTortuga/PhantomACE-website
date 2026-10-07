@@ -253,6 +253,9 @@ export const SINGLETONS = {
      what tells the draft which side is being played. 'real': the TTL clears a
      match nobody closed before the stream ended. */
   r6_match:              { table: 'singletons', expiry: 'real' },
+  /* Commander Bingo's shared chat card (functions/api/bingo-chat.js). 'real':
+     the TTL matches the room's own, so a card cannot outlive its game. */
+  bingo_chat:            { table: 'singletons', expiry: 'real' },
   /* The live chat vote (functions/api/chat-vote.js) — one question, any game.
      'real': the TTL clears a vote nobody closed before the stream ended. */
   chat_vote:             { table: 'singletons', expiry: 'real' },

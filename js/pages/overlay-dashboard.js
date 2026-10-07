@@ -1442,6 +1442,17 @@ async function refreshR6Match() {
   } catch { chip.textContent = 'Unavailable'; }
 }
 
+async function refreshBgcChip() {
+  const chip = document.getElementById('odBgcChip');
+  if (!chip) return;
+  try {
+    const d = await (await fetch('/api/bingo-chat', { cache: 'no-store' })).json();
+    if (d.status !== 'live') { chip.textContent = 'No card'; return; }
+    chip.textContent = (d.bingos ? d.bingos + '× BINGO' : d.marked + '/25') +
+      (d.stamp != null ? ' · stamped' : ' · ' + (d.votes || 0) + ' votes');
+  } catch { chip.textContent = 'Unavailable'; }
+}
+
 function initStreamNight() {
   const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
@@ -1467,6 +1478,15 @@ function initStreamNight() {
       e.currentTarget, 'Dino Safari started (' + (rule === 'first' ? 'first catch' : 'raffle') + ') — chat catches wild dinos with !catch.');
   });
   on('odSafariStopBtn', function (e) { nightPost('/api/dino-safari', { action: 'stop' }, e.currentTarget, 'Dino Safari ended.'); });
+
+  /* ── Commander Bingo: chat's shared card ──
+     Deal takes no code: it uses whichever room is already on the overlay,
+     which is the only room chat can see anyway. */
+  const bgcAfter = function () { setTimeout(refreshBgcChip, 300); };
+  on('odBgcOpenBtn', function (e) { nightPost('/api/bingo-chat', { action: 'open' }, e.currentTarget, 'Chat has a card — they vote the wildcard with !stamp.'); bgcAfter(); });
+  on('odBgcStampBtn', function (e) { nightPost('/api/bingo-chat', { action: 'stamp' }, e.currentTarget, 'Wildcard placed.'); bgcAfter(); });
+  on('odBgcCloseBtn', function (e) { nightPost('/api/bingo-chat', { action: 'close' }, e.currentTarget, "Chat's card closed."); bgcAfter(); });
+  refreshBgcChip();
 
   /* ── Siege operator draft ──
      Two open buttons because attack and defence are separate drafts with

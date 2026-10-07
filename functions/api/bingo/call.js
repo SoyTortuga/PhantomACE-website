@@ -77,6 +77,17 @@ export async function onRequestPost(context) {
 
   if (failure) return failure;
 
+  /* CHAT'S SHARED CARD. A bingo on it can only appear when a square lands, so
+     this is where it is noticed and paid — a moderator-authenticated path,
+     rather than the overlay's public poll. Guarded: chat's card must never
+     cost the host their call. */
+  try {
+    const { onSquareCalled } = await import('../bingo-chat.js');
+    await onSquareCalled(env, code);
+  } catch (err) {
+    console.error('[bingo/call] chat card check failed:', err.message);
+  }
+
   /* HOST ACTIVITY keeps the unified "what's on stream" pointer alive — but only
      while this room is the one on the overlay, so calling squares in a side room
      never steals the stream. Best-effort; a miss just leans on the host poll. */

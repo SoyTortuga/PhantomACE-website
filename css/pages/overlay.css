@@ -2580,3 +2580,110 @@ body.ov-alerting .ov-vote { opacity: 0.22; }
   padding-top: 7px;
 }
 .ov-vote-note b { color: #fff; }
+
+/* ══════════════════════════════════════════════
+   COMMANDER BINGO — CHAT'S SHARED CARD
+   A 5x5 that sits on screen for a whole bingo night, so the grid is built
+   once and only ever has classes toggled on it. Marked squares read by fill
+   and border; the wildcard and the square chat is backing are distinguished
+   from a called square, because confusing the three on stream is a dispute.
+   ══════════════════════════════════════════════ */
+.ov-bgc[hidden] { display: none; }
+.ov-bgc {
+  position: fixed;
+  right: 32px;
+  top: 32px;
+  width: 330px;
+  padding: 12px 14px;
+  background: rgba(8, 8, 8, 0.9);
+  border: 1px solid #2a2a2a;
+  border-top: 3px solid #ff0000;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+}
+body.ov-alerting .ov-bgc { opacity: 0.22; }
+
+.ov-bgc-head { display: flex; align-items: baseline; gap: 8px; }
+.ov-bgc-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff0000;
+}
+.ov-bgc-stat {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: #8a8a8a;
+  font-variant-numeric: tabular-nums;
+}
+.ov-bgc-stat.is-bingo {
+  color: #fff;
+  letter-spacing: 0.12em;
+}
+
+.ov-bgc-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+}
+.ov-bgc-cell {
+  position: relative;
+  min-height: 46px;
+  padding: 3px 4px;
+  background: #121212;
+  border: 1px solid #242424;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+.ov-bgc-n {
+  font-size: 8px;
+  font-weight: 800;
+  color: #4a4a4a;
+  font-variant-numeric: tabular-nums;
+}
+.ov-bgc-t {
+  font-size: 9px;
+  line-height: 1.15;
+  color: #9a9a9a;
+}
+
+/* Called by the host. */
+.ov-bgc-cell.is-marked {
+  background: rgba(152, 9, 10, 0.4);
+  border-color: #7a1a1a;
+}
+.ov-bgc-cell.is-marked .ov-bgc-t { color: #fff; }
+.ov-bgc-cell.is-marked .ov-bgc-n { color: #c98a8a; }
+
+.ov-bgc-cell.is-free { background: #1a1a1a; border-color: #333; }
+.ov-bgc-cell.is-free.is-marked { background: rgba(152, 9, 10, 0.25); }
+
+/* Chat's wildcard: marked, but not by a call — a thicker border rather than a
+   different fill, so it reads as "ours" without looking like a sixth state. */
+.ov-bgc-cell.is-stamped {
+  border: 2px solid var(--exclusive);
+  background: rgba(152, 9, 10, 0.4);
+}
+.ov-bgc-cell.is-stamped .ov-bgc-t { color: #fff; }
+
+/* What chat is currently backing, before it is placed. */
+.ov-bgc-cell.is-leading { border-color: var(--exclusive); }
+.ov-bgc-cell.is-leading .ov-bgc-t { color: #ddd; }
+
+.ov-bgc-note {
+  font-size: 11px;
+  color: #8a8a8a;
+  border-top: 1px solid #2a2a2a;
+  padding-top: 7px;
+}
+.ov-bgc-note b { color: #fff; }

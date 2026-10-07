@@ -129,6 +129,12 @@
       'A live tally, leader first',
       'Then the locked result',
     ] },
+    { id: 'ovBingoChat', label: "Chat's Bingo Card", holds: [
+      'One shared Commander Bingo card for the whole channel',
+      'Marks itself off the host’s calls — no joining, no account',
+      'The square chat is backing for its single wildcard',
+      'Turns to BINGO when a line completes',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -481,10 +487,33 @@
     if (note) note.innerHTML = '50 votes — <b>!vote &lt;number&gt;</b>';
   }
 
+  function bingoChat() {
+    show('ovBingoChat');
+    set('ovBingoChatStat', '11 / 25');
+    var grid = $('ovBingoChatGrid');
+    if (grid) {
+      var words = ['Tutor', 'Board wipe', 'Counterspell', 'Mana rock', 'Combat trick',
+        'Land drop missed', 'Politics', 'Fetch land', 'Token swarm', 'Graveyard hate',
+        'FREE', 'Infinite combo', 'Table scoop', 'Extra turn', 'Rule dispute',
+        'Mill', 'Lifegain', 'Commander tax', 'Stack war', 'Misplay',
+        'Deck shuffle', 'Judge call', 'Big swing', 'Salt', 'Alpha strike'];
+      grid.innerHTML = words.map(function (w, i) {
+        var cls = 'ov-bgc-cell';
+        if (i === 10) cls += ' is-free is-marked';
+        else if ([0, 2, 5, 7, 9, 13, 16, 18, 21, 23].indexOf(i) !== -1) cls += ' is-marked';
+        if (i === 17) cls += ' is-leading';
+        return '<div class="' + cls + '"><span class="ov-bgc-n">' + (i + 1) +
+          '</span><span class="ov-bgc-t">' + w + '</span></div>';
+      }).join('');
+    }
+    var note = $('ovBingoChatNote');
+    if (note) note.innerHTML = '41 votes — <b>!stamp &lt;1-25&gt;</b>';
+  }
+
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
-    mtgGuess(); r6Draft(); chatVote();
+    mtgGuess(); r6Draft(); chatVote(); bingoChat();
   }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };
