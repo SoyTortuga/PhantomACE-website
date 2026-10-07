@@ -246,6 +246,9 @@ export const SINGLETONS = {
      it carries a TTL so a stream that ends mid-pack does not leave a window
      open on the overlay forever. */
   mtgbbb_guess:          { table: 'singletons', expiry: 'real' },
+  /* The live Siege operator draft (functions/api/r6-draft.js). 'real': the TTL
+     is the backstop for a draft nobody closed before the stream ended. */
+  r6_draft:              { table: 'singletons', expiry: 'real' },
   bot_cooldown_drop:     { table: 'singletons', expiry: 'none' },
   bot_cooldown_dropitem: { table: 'singletons', expiry: 'none' },
   bot_cooldown_announce: { table: 'singletons', expiry: 'none' },

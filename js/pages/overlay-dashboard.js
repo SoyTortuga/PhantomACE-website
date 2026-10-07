@@ -1394,6 +1394,27 @@ async function nightPost(url, body, btn, okMsg) {
   if (btn) btn.disabled = false;
 }
 
+/* The draft's own status line. Loaded on demand, never polled — the overlay
+   panel is the live view, and a dashboard left open on another tab should not
+   be hitting this every second all stream. */
+async function refreshR6Chip() {
+  const chip = document.getElementById('odR6Chip');
+  if (!chip) return;
+  try {
+    const res = await fetch('/api/r6-draft', { cache: 'no-store' });
+    const d = await res.json();
+    if (d.status === 'none') {
+      /* An empty roster is the one failure worth naming on the chip — every
+         vote would be rejected and nothing on screen would say why. */
+      chip.textContent = d.rosterReady ? 'Idle' : 'No roster';
+    } else if (d.status === 'locked') {
+      chip.textContent = 'Locked — ' + ((d.winner && d.winner.operator) || '');
+    } else {
+      chip.textContent = (d.side === 'attack' ? 'Attack' : 'Defence') + ' — ' + (d.total || 0) + ' votes';
+    }
+  } catch { chip.textContent = 'Unavailable'; }
+}
+
 function initStreamNight() {
   const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
@@ -1419,6 +1440,17 @@ function initStreamNight() {
       e.currentTarget, 'Dino Safari started (' + (rule === 'first' ? 'first catch' : 'raffle') + ') — chat catches wild dinos with !catch.');
   });
   on('odSafariStopBtn', function (e) { nightPost('/api/dino-safari', { action: 'stop' }, e.currentTarget, 'Dino Safari ended.'); });
+
+  /* ── Siege operator draft ──
+     Two open buttons because attack and defence are separate drafts with
+     disjoint pools. Lock freezes the tally and names the winner, so a vote
+     that slips in afterwards cannot change what is already on screen. */
+  const r6After = function () { setTimeout(refreshR6Chip, 300); };
+  on('odR6AtkBtn', function (e) { nightPost('/api/r6-draft', { action: 'attack' }, e.currentTarget, 'Attack draft open — chat votes with !op.'); r6After(); });
+  on('odR6DefBtn', function (e) { nightPost('/api/r6-draft', { action: 'defence' }, e.currentTarget, 'Defence draft open — chat votes with !op.'); r6After(); });
+  on('odR6LockBtn', function (e) { nightPost('/api/r6-draft', { action: 'lock' }, e.currentTarget, 'Pick locked — it stays up while he loads in.'); r6After(); });
+  on('odR6EndBtn', function (e) { nightPost('/api/r6-draft', { action: 'end' }, e.currentTarget, 'Draft cleared.'); r6After(); });
+  refreshR6Chip();
 
   /* ── Bracket Night ── */
   const brAfter = function () { setTimeout(loadBracketAdmin, 300); };

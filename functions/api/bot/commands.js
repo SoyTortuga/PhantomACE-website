@@ -419,6 +419,27 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* Siege operator draft. One vote per chatter, changeable while the draft is
+     open — unlike !guess, nothing here is hidden, so swinging behind a pick is
+     the game rather than an exploit. Votes resolve against the ACTIVE side's
+     pool only, so a wrong-side operator is simply not a candidate. Silent: a
+     prep phase is forty-five seconds and a line per vote would bury chat
+     exactly when it is trying to coordinate. */
+  if (parsed.command === '!op') {
+    try {
+      const { voteFromChat } = await import('../r6-draft.js');
+      await voteFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+        text: parsed.rest,
+      });
+    } catch (err) {
+      /* A broken draft must not break chat commands. */
+      console.error('[r6-draft/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

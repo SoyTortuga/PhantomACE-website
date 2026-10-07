@@ -197,6 +197,18 @@
               <button class="btn-primary" id="odSafariStartBtn">Start</button>
               <button class="btn-secondary" id="odSafariStopBtn">End</button>
             </div>
+
+            <!-- Siege gives us no readable game state, so the draft IS the
+                 integration. Attack and defence are separate because the
+                 operator pools are disjoint. -->
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Siege Operator Draft</span>
+              <button class="btn-primary" id="odR6AtkBtn">Draft Attack</button>
+              <button class="btn-primary" id="odR6DefBtn">Draft Defence</button>
+              <button class="btn-secondary" id="odR6LockBtn">Lock Pick</button>
+              <button class="btn-secondary" id="odR6EndBtn">End</button>
+              <span class="ovmc-chip" id="odR6Chip">Idle</span>
+            </div>
           </div>
 
           <div class="card bot-section bot-grid-full" id="odBracketSection">

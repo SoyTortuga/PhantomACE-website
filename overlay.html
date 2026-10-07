@@ -89,6 +89,19 @@
     <div class="ov-mtgguess-note" id="ovMtgGuessNote">Type <b>!guess &lt;card&gt;</b></div>
   </div>
 
+  <!-- Siege operator draft: chat votes the operator he has to play. Opens on
+       a mod button for one side, locks when he is ready to pick. Siege gives
+       us no readable state, so this panel IS the integration. -->
+  <div class="ov-r6draft" id="ovR6Draft" hidden>
+    <div class="ov-r6draft-head">
+      <span class="ov-r6draft-title">SIEGE</span>
+      <span class="ov-r6draft-sub">Operator Draft</span>
+      <span class="ov-r6draft-side" id="ovR6DraftSide"></span>
+    </div>
+    <div class="ov-r6draft-body" id="ovR6DraftBody"></div>
+    <div class="ov-r6draft-note" id="ovR6DraftNote">Type <b>!op &lt;operator&gt;</b></div>
+  </div>
+
   <!-- Skull Clicker co-op raid boss: a thin, tall column for the left edge —
        boss art, a vertical health bar that drains as the site clicks it down,
        and the top strikers. Hidden unless a boss is live. -->
@@ -315,6 +328,7 @@
   <script src="/js/pages/overlay-scramble.js" defer></script>
   <script src="/js/pages/overlay-mtgbbb.js" defer></script>
   <script src="/js/pages/overlay-mtgbbb-guess.js" defer></script>
+  <script src="/js/pages/overlay-r6-draft.js" defer></script>
   <!-- The Commander Bingo square texts, so the panel can name called squares.
        One source of truth, shared with the game and its host page. -->
   <script src="/games/commander-bingo/events.js" defer></script>

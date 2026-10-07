@@ -117,6 +117,12 @@
       'Then the rare that landed and who called it',
       'Opens when the host clicks the pack counter forward',
     ] },
+    { id: 'ovR6Draft', label: 'Siege Draft', holds: [
+      'Chat voting the operator he has to play',
+      'A live tally, leader first, bars against the leader',
+      'Then the locked pick while he loads in',
+      'Attack and defence are separate drafts',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -434,10 +440,29 @@
     if (note) note.innerHTML = 'Log in at phantomace.tv to collect entries';
   }
 
+  /* The open tally rather than the locked winner: it is the taller state and
+     the one that is on screen for the whole prep phase. */
+  function r6Draft() {
+    show('ovR6Draft');
+    set('ovR6DraftSide', 'Attack');
+    var panel = $('ovR6Draft');
+    if (panel) panel.setAttribute('data-side', 'attack');
+    var body = $('ovR6DraftBody');
+    if (body) body.innerHTML =
+      '<ol class="ov-r6-tally">' +
+        '<li class="is-lead"><span class="ov-r6-op">Thatcher</span><span class="ov-r6-votes">31</span><i class="ov-r6-bar" style="width:100%"></i></li>' +
+        '<li><span class="ov-r6-op">Ash</span><span class="ov-r6-votes">24</span><i class="ov-r6-bar" style="width:77%"></i></li>' +
+        '<li><span class="ov-r6-op">Thermite</span><span class="ov-r6-votes">12</span><i class="ov-r6-bar" style="width:39%"></i></li>' +
+        '<li><span class="ov-r6-op">Sledge</span><span class="ov-r6-votes">6</span><i class="ov-r6-bar" style="width:19%"></i></li>' +
+      '</ol>';
+    var note = $('ovR6DraftNote');
+    if (note) note.innerHTML = '73 votes — <b>!op &lt;operator&gt;</b>';
+  }
+
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
-    mtgGuess();
+    mtgGuess(); r6Draft();
   }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };

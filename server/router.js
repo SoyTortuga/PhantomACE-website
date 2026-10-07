@@ -46,6 +46,10 @@ const NON_ROUTE_MODULES = new Set([
   /* Live state + which broadcast is on air. Library, no handler. */
   'api/stream-info.js',
 
+  /* The Rainbow Six operator roster. Pure data, no handler — Ubisoft has no
+     public API, so the list is maintained here by hand once a season. */
+  'api/r6-operators.js',
+
   /* The one "what's on stream" pointer (Epic D #10): refresh/read/clear for the
      unified bingo/mtgbbb/maze/scramble overlay pointer. Library, no handler;
      overlay/events.js reads it into the poll payload and each game's writers
