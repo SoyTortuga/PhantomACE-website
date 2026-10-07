@@ -40,6 +40,25 @@ const MAX_CONTRIBUTORS = 500;        /* contributor-map ceiling — the record n
 const NAME_MAX = 25;
 const FRENZY_MS = 5 * 60 * 1000;     /* the community reward when the goal is met */
 
+/* ── CHAT'S SHARE ───────────────────────────────────────────────────────
+   A tithe costs site players real skulls they earned. Chat types a word. If
+   the two were worth the same the tithe would stop meaning anything to the
+   people actually paying for it, so chat is capped at a QUARTER of the goal
+   and can never finish one alone.
+
+   One contribution per chatter per goal, not a rate limit: chat's total then
+   measures how many PEOPLE turned up rather than how fast somebody can type,
+   which is the thing worth showing on stream. It takes CHAT_FULL_AT distinct
+   chatters to reach the cap, so the share scales with any goal.
+
+   They land as ONE aggregate contributor rather than a row each — a top-five
+   list flooded with chatters would bury the players who spent something, and
+   the contributor map stays bounded however big chat gets. */
+const CHAT_ID = 'chat';
+const CHAT_SHARE = 0.25;
+const CHAT_FULL_AT = 200;
+const MAX_CHAT_TITHERS = 5000;
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
@@ -205,6 +224,64 @@ export async function onRequestGet(context) {
      poller resolves the same status without a write. A fresh start overwrites a
      lingering record. */
   return json(publicState(t));
+}
+
+/**
+ * A chatter's tithe. Silent on every rejection — no live goal, already
+ * tithed and chat's share being full all look identical from chat.
+ *
+ * Everything is decided INSIDE the lock, like offer(): two chatters landing
+ * together must not both spend the last of chat's share, and the goal must
+ * not be completed twice.
+ */
+export async function titheFromChat(env, { userId, name }) {
+  if (!userId) return { ok: false, reason: 'empty' };
+  const id = String(userId);
+
+  let credited = 0, justCompleted = false, tithers = 0;
+  await env.MARKETPLACE.mutate(TITHE_KEY, (t) => {
+    if (!t || publicState(t).status !== 'active') return undefined;
+
+    t.chatTithers = (t.chatTithers && typeof t.chatTithers === 'object') ? t.chatTithers : {};
+    if (Object.prototype.hasOwnProperty.call(t.chatTithers, id)) return undefined;   /* once each */
+    const count = Object.keys(t.chatTithers).length;
+    if (count >= MAX_CHAT_TITHERS) return undefined;
+
+    t.contributors = (t.contributors && typeof t.contributors === 'object') ? t.contributors : {};
+    const goal = Math.max(1, Math.floor(Number(t.goal) || 0));
+    const already = Math.max(0, Math.floor((t.contributors[CHAT_ID] && t.contributors[CHAT_ID].amt) || 0));
+
+    const perChatter = Math.max(1, Math.floor((goal * CHAT_SHARE) / CHAT_FULL_AT));
+    const chatRemaining = Math.max(0, Math.floor(goal * CHAT_SHARE) - already);
+    const goalRemaining = Math.max(0, goal - (Number(t.progress) || 0));
+    credited = Math.min(perChatter, chatRemaining, goalRemaining);
+    if (credited <= 0) return undefined;            /* share spent: nothing to record */
+
+    t.chatTithers[id] = 1;
+    tithers = count + 1;
+    /* The name carries the headcount, so the overlay's contributor list shows
+       how many people are behind it without a second field. */
+    t.contributors[CHAT_ID] = { name: `Chat (${tithers})`, amt: already + credited };
+    t.progress = (Number(t.progress) || 0) + credited;
+    if (t.progress >= goal) {
+      t.progress = goal;
+      t.status = 'complete';
+      t.completedAt = Date.now();
+      justCompleted = true;
+    }
+    return t;
+  });
+
+  /* Fired outside the lock, exactly as offer() does — the frenzy is a second
+     key and must not be written while this one is held. */
+  if (justCompleted) {
+    try {
+      const { setSkullEvent } = await import('./skull-clicker.js');
+      await setSkullEvent(env, 'frenzy', FRENZY_MS);
+    } catch (err) { console.error('[bone-tithe] completion frenzy failed:', err.message); }
+  }
+
+  return { ok: credited > 0, credited, tithers, completed: justCompleted };
 }
 
 export async function onRequestPost(context) {

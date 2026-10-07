@@ -476,6 +476,24 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* Bone Tithe: chat adds to the goal site players are paying for in skulls.
+     One per chatter per goal and capped at a quarter of it, so chat helps
+     without making the players' sacrifice meaningless. Silent — the goal bar
+     on the overlay is the feedback. */
+  if (parsed.command === '!tithe') {
+    try {
+      const { titheFromChat } = await import('../bone-tithe.js');
+      await titheFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+      });
+    } catch (err) {
+      /* A broken tithe must not break chat commands. */
+      console.error('[bone-tithe/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

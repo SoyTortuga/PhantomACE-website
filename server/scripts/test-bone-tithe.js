@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { onRequestGet, onRequestPost } from '../../functions/api/bone-tithe.js';
+import { onRequestGet, onRequestPost, titheFromChat } from '../../functions/api/bone-tithe.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -215,6 +215,98 @@ const save = (life) => ({ lifetimeSkulls: String(life), totalSkulls: String(life
   ok('the game can offer toward the tithe', /function offerToTithe/.test(game) && /action: 'offer'/.test(game));
   ok('the game shows a progress affordance', /id="titheBanner"/.test(game) && /function renderTitheBanner/.test(game));
   ok('an in-game login link targets the top frame for OAuth', /target="_top" href="' \+ titheLoginUrl/.test(game));
+}
+
+/* ══ CHAT'S DOOR INTO THE TITHE ════════════════════════════════════════
+   A tithe costs site players skulls they earned; chat types a word. The
+   design question is letting chat matter without making that sacrifice
+   meaningless, so these are balance rules, not conveniences:
+
+     - Chat is capped at a QUARTER of the goal and can never finish one alone.
+     - One contribution per chatter per goal, so the total measures how many
+       PEOPLE turned up rather than how fast somebody can type.
+     - They land as ONE aggregate contributor, or a top-five list fills with
+       chatters and buries the players who actually spent something. */
+{
+  const e = envWith({ bone_tithe: tithe({ goal: 1000 }) });
+
+  const r = await titheFromChat(e, { userId: '1', name: 'Alice' });
+  check('a chatter can tithe', r.ok, true);
+  ok('and it credits something', r.credited > 0);
+
+  let s = await (await GET(e)).json();
+  ok('the goal moves', s.progress > 0);
+  const row = s.top.find(t => /^Chat/.test(t.name));
+  ok('chat shows as one contributor', !!row);
+  ok('carrying its headcount', /Chat \(1\)/.test(row.name));
+
+  check('the same chatter cannot tithe twice', (await titheFromChat(e, { userId: '1', name: 'Alice' })).ok, false);
+  const after = await (await GET(e)).json();
+  check('and the goal did not move again', after.progress, s.progress);
+
+  await titheFromChat(e, { userId: '2', name: 'Bob' });
+  s = await (await GET(e)).json();
+  ok('a second chatter adds more', s.progress > after.progress);
+  ok('and the headcount follows', /Chat \(2\)/.test(s.top.find(t => /^Chat/.test(t.name)).name));
+  check('still exactly one chat row', s.top.filter(t => /^Chat/.test(t.name)).length, 1);
+  check('and one contributor row in the record', Object.keys(e.MARKETPLACE.read('bone_tithe').contributors).length, 1);
+}
+
+/* ══ CHAT CANNOT FINISH A TITHE ALONE ══════════════════════════════════ */
+{
+  const goal = 1000;
+  const e = envWith({ bone_tithe: tithe({ goal }) });
+  for (let i = 0; i < 600; i++) await titheFromChat(e, { userId: 'c' + i, name: 'c' + i });
+
+  const s = await (await GET(e)).json();
+  ok('chat contributed', s.progress > 0);
+  ok('but no more than a quarter of the goal', s.progress <= Math.floor(goal * 0.25));
+  check('so the goal is still open', s.status, 'active');
+  check('and no frenzy fired', e.MARKETPLACE.read('sc_event'), null);
+}
+
+/* ══ A player still finishes it, and chat's help counts ════════════════ */
+{
+  const e = envWith({ bone_tithe: tithe({ goal: 1000 }), sc_save_7: save(1e9) });
+  for (let i = 0; i < 50; i++) await titheFromChat(e, { userId: 'c' + i, name: 'c' + i });
+  const helped = (await (await GET(e)).json()).progress;
+  ok('chat moved it off zero', helped > 0);
+
+  await POST(e, { action: 'offer', amount: 1000 }, cookie('7', 'Reaper7'));
+  const s = await (await GET(e)).json();
+  check('the goal completes', s.status, 'complete');
+  ok('the frenzy fires', !!e.MARKETPLACE.read('sc_event'));
+  ok('and chat is still on the board', s.top.some(t => /^Chat/.test(t.name)));
+}
+
+/* ══ Chat can land the final blow, and it pays out properly ════════════ */
+{
+  /* A goal small enough that chat's quarter-share covers what is left. */
+  const e = envWith({ bone_tithe: tithe({ goal: 1000, progress: 960 }), sc_save_7: save(1e9) });
+  for (let i = 0; i < 100 && (await (await GET(e)).json()).status === 'active'; i++) {
+    await titheFromChat(e, { userId: 'z' + i, name: 'z' + i });
+  }
+  const s = await (await GET(e)).json();
+  check('chat can close out a nearly-met goal', s.status, 'complete');
+  check('progress never overshoots', s.progress, 1000);
+  ok('and the frenzy fires from the chat path too', !!e.MARKETPLACE.read('sc_event'));
+}
+
+/* ══ No live goal, no tithe ════════════════════════════════════════════ */
+{
+  const e = envWith();
+  check('a tithe with no goal is a no-op', (await titheFromChat(e, { userId: '1', name: 'a' })).ok, false);
+
+  const e2 = envWith({ bone_tithe: tithe({ goal: 1000 }) });
+  await POST(e2, { action: 'stop' }, cookie(BC));
+  check('and a stopped goal takes none either', (await titheFromChat(e2, { userId: '1', name: 'a' })).ok, false);
+}
+
+{
+  const cmds = fs.readFileSync(path.join(REPO, 'functions/api/bot/commands.js'), 'utf8');
+  ok('chat dispatches !tithe', /parsed\.command === '!tithe'/.test(cmds));
+  ok('as a PUBLIC command, before the moderator gate',
+     cmds.indexOf("'!tithe'") < cmds.indexOf('if (!isAuthorizedSender(env, event)) return;'));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
