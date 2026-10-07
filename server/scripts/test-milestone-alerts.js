@@ -14,8 +14,14 @@
    (verification exercised too); the fake KV is then inspected.
    ══════════════════════════════════════════════ */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { signEventSub } from '../lib/eventsub.js';
 import * as milestones from '../../functions/api/milestones.js';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 let passed = 0;
 const failures = [];
@@ -173,6 +179,67 @@ const activityRows = (env, category) => {
   check('a follow fires with milestone drops off', overlayEvents(env, 'follow').length, 1);
   await notify(env, 'channel.cheer', { user_id: '5', user_name: 'ivan', bits: 300 });
   check('a cheer fires with milestone drops off', overlayEvents(env, 'cheer').length, 1);
+}
+
+/* ── THE CONTROL THAT DID NOT EXIST ─────────────────────────────────────
+   Automatic drops have always been built, wired to the sub/gift/raid events,
+   and OFF by default — with nothing in any panel that could read or change
+   them. The feature was switchable only by a hand-made API call, which in
+   practice means it was never switchable at all.
+
+   The config lands on /api/bot/dashboard rather than a request of its own,
+   because Bot Control already polls that every 20 seconds. Which makes WHERE
+   it is read the thing worth guarding: a refusal must carry no config. */
+{
+  const env = makeEnv();
+  const { getMilestoneConfig, setMilestoneConfig } = milestones;
+
+  const d = await getMilestoneConfig(env);
+  check('it is off until somebody turns it on', d.enabled, false);
+  check('with a sane sub rarity', d.subRarity, 'common');
+  check('gifts worth more', d.giftRarity, 'uncommon');
+  check('and a raid floor', d.raidMinViewers, 5);
+
+  const on = await setMilestoneConfig(env, { enabled: true });
+  check('it can be turned on', on.config.enabled, true);
+  check('without disturbing the rarities', on.config.giftRarity, 'uncommon');
+
+  const r = await setMilestoneConfig(env, { subRarity: 'rare', raidMinViewers: 20 });
+  check('rarities can be changed', r.config.subRarity, 'rare');
+  check('and the raid floor', r.config.raidMinViewers, 20);
+  check('and it stays on through an edit', r.config.enabled, true);
+
+  check('an unknown rarity is refused', !!(await setMilestoneConfig(env, { subRarity: 'legendary' })).error, true);
+  check('and a raid floor below one', !!(await setMilestoneConfig(env, { raidMinViewers: 0 })).error, true);
+  const after = await getMilestoneConfig(env);
+  check('a refused edit changes nothing', [after.subRarity, after.raidMinViewers], ['rare', 20]);
+}
+
+{
+  /* The config is read AFTER the moderator gate and returned only on success.
+     Read before it, a refusal would hand out channel configuration. */
+  const dash = fs.readFileSync(path.join(REPO, 'functions/api/bot/dashboard.js'), 'utf8');
+  const gate = dash.indexOf('if (!(await isModerator(env, session)))');
+  const refusal = dash.indexOf('}, 403);', gate);
+  const read = dash.indexOf('getMilestoneConfig', gate);
+  ok('the dashboard hands the panel the live config', read !== -1);
+  ok('read only after the moderator gate has passed', read > refusal);
+  ok('and the refusal carries no config',
+     !/return json\(\{[^}]*milestoneDrops[^}]*\}, 403\)/.test(dash));
+
+  const html = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
+  ok('Bot Control has the card', /Automatic Drops/.test(html));
+  ok('with a toggle', /id="msToggle"/.test(html));
+  ok('a rarity per event', /id="msSubRarity"/.test(html) && /id="msGiftRarity"/.test(html) && /id="msRaidRarity"/.test(html));
+  ok('and the raid floor', /id="msRaidMin"/.test(html));
+
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  ok('wired to the config action', /action: 'milestone-config'/.test(js));
+  ok('rendered from the real stored state, not the defaults', /renderMilestoneDrops\(data\.milestoneDrops\)/.test(js));
+  /* Flipping against last-known state, so a stale panel cannot turn it ON
+     when the button it is showing says "Turn Off". */
+  ok('and the toggle flips against what it was last told',
+     /enabled: !\(msConfig && msConfig\.enabled\)/.test(js));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

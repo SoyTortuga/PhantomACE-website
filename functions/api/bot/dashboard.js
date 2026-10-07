@@ -258,7 +258,15 @@ export async function onRequestGet(context) {
 
   const log = await env.MARKETPLACE.get('bot_action_log', 'json') || [];
 
+  /* Automatic drops on subs, gifts and raids. Off by default, and until the
+     panel card existed there was nothing that could read or change it — the
+     feature was switchable only by a hand-made API call. Read AFTER the auth
+     gate and returned only on success: a refusal must carry no config. */
+  const { getMilestoneConfig } = await import('../milestones.js');
+  const milestoneDrops = await getMilestoneConfig(env);
+
   return json({
+    milestoneDrops,
     you: { userId: session.user_id, displayName: session.display_name, role: session.role },
     isBroadcaster: isBroadcaster(env, session),
     pools,

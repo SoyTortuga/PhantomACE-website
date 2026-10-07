@@ -112,6 +112,58 @@
             <div id="botLiveDrops"></div>
           </div>
 
+          <!-- Automatic drops. Built, wired to the sub/gift/raid events, and
+               off by default — with nothing anywhere that could turn it on
+               until this card existed. -->
+          <div class="card bot-section">
+            <h3>Automatic Drops</h3>
+            <p class="bot-section-desc">
+              Drop a code in chat by itself when someone subscribes, gifts subs, or raids.
+              The on-screen alerts for those are separate and always fire.
+            </p>
+            <div class="bot-rotation-row">
+              <span class="bot-rotation-state" id="msState">Off</span>
+              <button class="btn-secondary" id="msToggle">Turn On</button>
+            </div>
+
+            <div class="bot-rotation-row">
+              <label class="bot-rotation-interval">New sub
+                <select id="msSubRarity">
+                  <option value="common">Common · 2</option>
+                  <option value="uncommon">Uncommon · 5</option>
+                  <option value="rare">Rare · 15</option>
+                  <option value="mythic">Mythic · 50</option>
+                </select>
+              </label>
+              <label class="bot-rotation-interval">Gift subs
+                <select id="msGiftRarity">
+                  <option value="common">Common · 2</option>
+                  <option value="uncommon">Uncommon · 5</option>
+                  <option value="rare">Rare · 15</option>
+                  <option value="mythic">Mythic · 50</option>
+                </select>
+              </label>
+              <label class="bot-rotation-interval">Raid
+                <select id="msRaidRarity">
+                  <option value="common">Common · 2</option>
+                  <option value="uncommon">Uncommon · 5</option>
+                  <option value="rare">Rare · 15</option>
+                  <option value="mythic">Mythic · 50</option>
+                </select>
+              </label>
+              <label class="bot-rotation-interval">Raid needs
+                <input type="number" id="msRaidMin" min="1" step="1" title="Below this many raiders, no code drops">
+                raiders
+              </label>
+              <button class="btn-secondary" id="msSave">Save</button>
+            </div>
+
+            <p class="bot-section-desc">
+              A gift bomb drops one code, not one per sub — the shared drop cooldown sees to that.
+              A raid under the floor still alerts, it just does not pay.
+            </p>
+          </div>
+
           <div class="card bot-section" id="checkinSection" hidden>
             <h3>Pham Check-Ins</h3>
             <p class="bot-section-desc">Viewers who redeemed Pham Check-In this stream.</p>

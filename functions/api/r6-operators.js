@@ -32,7 +32,7 @@
 
    Two corrections to the list as supplied, both confirmed:
      Kaplan -> KAPKAN. "Kaplan" is not an operator and Kapkan, a base-game
-       defender, was otherwise missing from an complete list.
+       defender, was otherwise missing from an otherwise complete list.
      Skapos -> SKOPOS. One letter out, and the matcher is exact-or-prefix, so
        anyone typing the real name would have been silently rejected.
    Both are the failure this file exists to prevent: an operator that cannot

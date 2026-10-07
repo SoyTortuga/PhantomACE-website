@@ -293,6 +293,7 @@ async function refreshDashboard() {
     renderLiveDrops(data.activeDrops);
     renderGiveawayStats(data.giveaway);
     renderBotActionFeed(data.recentActions || []);
+    renderMilestoneDrops(data.milestoneDrops);
     return data;
   } catch {
     return null;    /* leave the last good render on screen */
@@ -1079,6 +1080,7 @@ function initBotControlPanel() {
   refreshDashboard();
   initGiveawayPanel();
   initRotationPanel();
+  initMilestoneDrops();
 
   /* Modest poll. Pools drift slowly, but a drop's claim count is the number
      you actually watch while it is live, and its window is only 5 minutes.
@@ -1185,6 +1187,75 @@ async function rotationAction(payload, button) {
   }
   if (button) { button.disabled = false; button.textContent = original; }
   if (payload.action !== 'post-now') await loadRotation();
+}
+
+/* ── Automatic drops on subs, gifts and raids ───────────────────────────
+   The config has always been there and always been off; there was simply
+   nothing that could read or set it. Rendered from the dashboard payload so
+   it shows the REAL stored state, not a guess at the defaults. */
+var msConfig = null;
+
+function renderMilestoneDrops(cfg) {
+  if (!cfg) return;
+  msConfig = cfg;
+  var state = document.getElementById('msState');
+  var toggle = document.getElementById('msToggle');
+  if (state) {
+    state.textContent = cfg.enabled ? 'On' : 'Off';
+    state.classList.toggle('is-on', !!cfg.enabled);
+  }
+  if (toggle) toggle.textContent = cfg.enabled ? 'Turn Off' : 'Turn On';
+
+  var set = function (id, val) { var el = document.getElementById(id); if (el && val) el.value = val; };
+  set('msSubRarity', cfg.subRarity);
+  set('msGiftRarity', cfg.giftRarity);
+  set('msRaidRarity', cfg.raidRarity);
+  var min = document.getElementById('msRaidMin');
+  if (min) min.value = cfg.raidMinViewers || 5;
+}
+
+async function milestonePost(patch, button) {
+  var original = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+  try {
+    var res = await fetch('/api/bot/trigger', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action: 'milestone-config' }, patch)),
+    });
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) { showBotStatus(data.error || 'Could not save that.', true); }
+    else {
+      showBotStatus(data.config && data.config.enabled
+        ? 'Automatic drops are on.'
+        : 'Automatic drops are off.', false);
+      renderMilestoneDrops(data.config);
+    }
+  } catch { showBotStatus('Network error.', true); }
+  if (button) { button.disabled = false; button.textContent = original; }
+}
+
+function initMilestoneDrops() {
+  var toggle = document.getElementById('msToggle');
+  var save = document.getElementById('msSave');
+
+  if (toggle) toggle.addEventListener('click', function () {
+    /* Flipped against the state we were last given, so a stale panel cannot
+       turn it on when it meant to turn it off. */
+    milestonePost({ enabled: !(msConfig && msConfig.enabled) }, toggle);
+  });
+
+  if (save) save.addEventListener('click', function () {
+    var val = function (id) { var el = document.getElementById(id); return el ? el.value : undefined; };
+    var min = parseInt((document.getElementById('msRaidMin') || {}).value, 10);
+    if (!min || min < 1) { showBotStatus('A raid needs at least 1 viewer to count.', true); return; }
+    milestonePost({
+      subRarity: val('msSubRarity'),
+      giftRarity: val('msGiftRarity'),
+      raidRarity: val('msRaidRarity'),
+      raidMinViewers: min,
+    }, save);
+  });
 }
 
 function initRotationPanel() {
