@@ -248,6 +248,11 @@ export async function endMatch(env) {
   return { ok: true };
 }
 
+/** The live match, for anything that wants to title itself after the round. */
+export async function currentMatch(env) {
+  return publicMatch(await read(env));
+}
+
 /** What the draft asks when it wants to open on the right side by itself. */
 export async function activeSide(env) {
   const m = await read(env);

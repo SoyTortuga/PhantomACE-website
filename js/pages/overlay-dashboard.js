@@ -1482,6 +1482,9 @@ function initStreamNight() {
   on('odR6LostBtn', function (e) { nightPost('/api/r6-match', { action: 'lost' }, e.currentTarget, 'Round lost.'); matchAfter(); });
   on('odR6SwapBtn', function (e) { nightPost('/api/r6-match', { action: 'swap' }, e.currentTarget, 'Sides flipped.'); matchAfter(); });
   on('odR6UndoBtn', function (e) { nightPost('/api/r6-match', { action: 'undo' }, e.currentTarget, 'Last round taken back.'); matchAfter(); });
+  /* One button, no typing: the title comes from the round and side the
+     tracker already knows, which is the only reason it is usable mid-match. */
+  on('odR6PredictBtn', function (e) { nightPost('/api/bot/predictions', { action: 'round' }, e.currentTarget, 'Prediction open on this round.'); });
   on('odR6EndMatchBtn', function (e) { nightPost('/api/r6-match', { action: 'end' }, e.currentTarget, 'Match cleared.'); matchAfter(); });
   on('odR6OtAtkBtn', function (e) { nightPost('/api/r6-match', { action: 'overtime', side: 'attack' }, e.currentTarget, 'Overtime starts on attack.'); matchAfter(); });
   on('odR6OtDefBtn', function (e) { nightPost('/api/r6-match', { action: 'overtime', side: 'defence' }, e.currentTarget, 'Overtime starts on defence.'); matchAfter(); });

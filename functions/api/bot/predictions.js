@@ -104,6 +104,50 @@ function validateCreate(body) {
   return { title, outcomes, window };
 }
 
+/* A prediction that titles itself from the tracked Siege match.
+   The whole value is that it is ONE button mid-match: he is about to play a
+   round and has no hands free to type a title, and the round number and side
+   are already known. Composes the same shape validateCreate() returns, so it
+   joins the ordinary create path rather than duplicating it.
+
+   It REFUSES rather than guessing. No match, or overtime that has not been
+   told its side, means the title would be wrong about the thing it exists to
+   state — and a prediction cannot be retitled once it is open. */
+const ROUND_WINDOW_DEFAULT = 90;
+
+async function buildRoundPrediction(env, body) {
+  let match;
+  try {
+    const { currentMatch } = await import('../r6-match.js');
+    match = await currentMatch(env);
+  } catch {
+    return { error: 'Could not read the match tracker.' };
+  }
+  if (!match || match.status !== 'live') {
+    return { error: 'No tracked match — start one on the Overlay Dashboard first.' };
+  }
+  if (!match.side) {
+    return { error: 'Tell the tracker which side overtime starts on first.' };
+  }
+
+  const side = match.side === 'attack' ? 'ATK' : 'DEF';
+  const title = `${match.overtime ? 'OT ' : ''}Round ${match.round} (${side}) — win it?`;
+  /* Well inside TITLE_MAX at every round number, but asserted rather than
+     assumed: Twitch rejects the whole create on a long title. */
+  if (title.length > TITLE_MAX) return { error: 'Generated title is too long.' };
+
+  let window = ROUND_WINDOW_DEFAULT;
+  if (body && body.window !== undefined && body.window !== null && body.window !== '') {
+    const w = Number(body.window);
+    if (!Number.isInteger(w) || w < WINDOW_MIN || w > WINDOW_MAX) {
+      return { error: `Prediction window must be a whole number of seconds between ${WINDOW_MIN} and ${WINDOW_MAX}.` };
+    }
+    window = w;
+  }
+
+  return { title, outcomes: [{ title: 'Win' }, { title: 'Lose' }], window };
+}
+
 /* Turns a non-OK Helix response into a clean panel error. A missing scope
    (401/403) is reported as "not authorized yet", not as a failure, so the
    card degrades to inert instead of looking broken. Everything else — most
@@ -159,6 +203,13 @@ async function handle(env, session, action, body) {
   if (action === 'create') {
     create = validateCreate(body);
     if (create.error) return json({ error: create.error }, 400);
+  }
+  if (action === 'round') {
+    create = await buildRoundPrediction(env, body);
+    if (create.error) return json({ error: create.error }, 400);
+    /* From here it IS a create — one path to Twitch, one place to get the
+       error handling and the action log right. */
+    action = 'create';
   }
 
   if (action === 'lock' || action === 'resolve' || action === 'cancel') {

@@ -16,7 +16,13 @@
    lock / resolve / cancel payloads can be inspected rather than sent.
    ══════════════════════════════════════════════ */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import * as predictions from '../../functions/api/bot/predictions.js';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 let passed = 0;
 const failures = [];
@@ -327,6 +333,116 @@ const reset = () => { helixCalls = []; FAIL_STATUS = 0; FAIL_MESSAGE = ''; STATU
   reset();
   const env = makeEnv();
   check('an unknown action is refused', (await post(env, { action: 'nope' })).status, 400);
+}
+
+/* ── ROUND PREDICTIONS, titled from the Siege match tracker ─────────────
+   One button mid-match is the whole value: he has no hands free to type a
+   title, and the round and side are already known. A prediction cannot be
+   retitled once open, so everything here is about refusing rather than
+   guessing when the title would be wrong about the thing it states. */
+async function startMatch(env, side) {
+  const m = await import('../../functions/api/r6-match.js');
+  await m.startMatch(env, side);
+  return m;
+}
+
+{
+  reset();
+  const env = makeEnv();
+  const r = await post(env, { action: 'round' });
+  check('with no match it refuses', r.status, 400);
+  ok('naming where to start one', /No tracked match/.test((await r.json()).error));
+  check('and never reaches Twitch', helixCalls.length, 0);
+}
+
+{
+  reset();
+  const env = makeEnv();
+  await startMatch(env, 'attack');
+  const r = await post(env, { action: 'round' });
+  check('round 1 on attack opens', r.status, 200);
+  const sent = helixCalls.find(c => c.method === 'POST');
+  check('titled after the round and side', sent.body.title, 'Round 1 (ATK) — win it?');
+  check('with a win/lose pair', sent.body.outcomes.map(o => o.title), ['Win', 'Lose']);
+  check('and a window suited to a round', sent.body.prediction_window, 90);
+}
+
+{
+  reset();
+  const env = makeEnv();
+  const m = await startMatch(env, 'attack');
+  /* Past the swap: the title has to follow the side, not the start. */
+  for (const x of ['won', 'lost', 'won']) await m.scoreRound(env, x);
+  await post(env, { action: 'round' });
+  const sent = helixCalls.find(c => c.method === 'POST');
+  check('round 4 is titled as defence', sent.body.title, 'Round 4 (DEF) — win it?');
+}
+
+{
+  reset();
+  const env = makeEnv();
+  const m = await startMatch(env, 'attack');
+  for (const x of ['won', 'lost', 'won', 'lost', 'won', 'lost']) await m.scoreRound(env, x);
+  /* 3-3: overtime has not been told its side, so the title cannot be right. */
+  const refused = await post(env, { action: 'round' });
+  check('overtime without a side refuses', refused.status, 400);
+  ok('saying what is missing', /overtime starts on/.test((await refused.json()).error));
+  check('and spends no Twitch request', helixCalls.length, 0);
+
+  await m.setOvertimeSide(env, 'defence');
+  await post(env, { action: 'round' });
+  const sent = helixCalls.find(c => c.method === 'POST');
+  check('once answered it marks the round as overtime', sent.body.title, 'OT Round 7 (DEF) — win it?');
+}
+
+{
+  reset();
+  const env = makeEnv();
+  await startMatch(env, 'defence');
+  await post(env, { action: 'round', window: 45 });
+  check('the window can be overridden', helixCalls.find(c => c.method === 'POST').body.prediction_window, 45);
+
+  reset();
+  const bad = await post(env, { action: 'round', window: 5 });
+  check('but not out of range', bad.status, 400);
+  check('without reaching Twitch', helixCalls.length, 0);
+}
+
+{
+  reset();
+  const env = makeEnv();
+  await startMatch(env, 'attack');
+  /* Every round number must fit Twitch's 45-character title limit. */
+  const m = await import('../../functions/api/r6-match.js');
+  for (let round = 1; round <= 9; round++) {
+    const t = `OT Round ${round} (DEF) — win it?`;
+    ok(`a round ${round} title fits the limit`, t.length <= 45);
+  }
+}
+
+{
+  reset();
+  const env = makeEnv({ token: false });
+  await startMatch(env, 'attack');
+  const r = await post(env, { action: 'round' });
+  check('unauthorized degrades the same as a manual create', r.status, 400);
+  check('reported as not authorized, not broken', (await r.json()).authorized, false);
+}
+
+{
+  reset();
+  const env = makeEnv();
+  await startMatch(env, 'attack');
+  const r = await post(env, { action: 'round' }, 'nobody');
+  check('a non-staff caller is refused', r.status, 403);
+  check('and never reaches Twitch', helixCalls.length, 0);
+}
+
+{
+  const dashHtml = fs.readFileSync(path.join(REPO, 'overlay-dashboard.html'), 'utf8');
+  ok('the dashboard has the one-button control', /id="odR6PredictBtn"/.test(dashHtml));
+  const dashJs = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  ok('wired to the round action', /action: 'round'/.test(dashJs));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
