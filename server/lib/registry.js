@@ -237,6 +237,11 @@ export const SINGLETONS = {
 
   // group (b): value.checkedAt / value.at are the real rules
   twitch_live_cache:     { table: 'singletons', expiry: 'none' },
+  /* What the channel is set to right now, pushed by channel.update (see
+     functions/api/channel-update.js). 'none': the last known category is still
+     the right answer between streams, and an expiring row would make every
+     first event of a broadcast look like a change from nothing. */
+  stream_category:       { table: 'singletons', expiry: 'none' },
   bot_cooldown_drop:     { table: 'singletons', expiry: 'none' },
   bot_cooldown_dropitem: { table: 'singletons', expiry: 'none' },
   bot_cooldown_announce: { table: 'singletons', expiry: 'none' },

@@ -1350,6 +1350,16 @@ async function createEventSubSubscriptions(env, request) {
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/milestones`,
     },
+    /* CATEGORY / TITLE CHANGES. channel.update is v2 and needs NO SCOPE at
+       all — the only push on this list that does not depend on the Step 2
+       grant, so it registers for every channel unconditionally. It fires on
+       title and language edits too; the handler diffs the category itself. */
+    {
+      type: 'channel.update',
+      version: '2',
+      condition: { broadcaster_user_id: broadcasterId },
+      callback: `${origin}/api/channel-update`,
+    },
   ];
 
   if (botUserId) {

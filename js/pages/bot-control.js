@@ -173,6 +173,7 @@ function renderSubs(subs) {
     ['Predictions', subs.predictions, revokedRows.predictions],
     ['Ad breaks', subs.adBreak, revokedRows.adBreak],
     ['Bits / Power-ups', subs.bits, revokedRows.bits],
+    ['Category changes', subs.category, revokedRows.category],
   ];
   grid.innerHTML = rows.map(function (r) {
     /* Registered is a snapshot taken when the subscriptions were created;

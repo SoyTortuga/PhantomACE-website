@@ -202,6 +202,9 @@ export async function onRequestGet(context) {
     predictions: subTypes.some(t => t.startsWith('channel.prediction')),
     adBreak: subTypes.includes('channel.ad_break.begin'),
     bits: subTypes.includes('channel.bits.use'),
+    /* Needs no scope at all, so a missing row here means the subscription was
+       never created, never that a permission is lacking. */
+    category: subTypes.includes('channel.update'),
     total: subTypes.length,
     /* Per-row: a snapshot "registered" can still be dead at Twitch. */
     revokedRows: {
@@ -216,6 +219,7 @@ export async function onRequestGet(context) {
       predictions: isRevoked(t => t.startsWith('channel.prediction')),
       adBreak: isRevoked(t => t === 'channel.ad_break.begin'),
       bits: isRevoked(t => t === 'channel.bits.use'),
+      category: isRevoked(t => t === 'channel.update'),
     },
     revoked,
   };

@@ -193,6 +193,7 @@ export const EVENTSUB_PATHS = new Set([
   '/api/bot/giveaway-entry',
   '/api/ad-break',
   '/api/bits',
+  '/api/channel-update',
 ]);
 
 /** Which bucket class a request draws from, or null when it is exempt. */

@@ -51,6 +51,10 @@ const ROUTES = [
   ['chat commands', '../../functions/api/bot/commands.js', 'functions/api/bot/commands.js'],
   ['giveaway entry', '../../functions/api/bot/giveaway-entry.js', 'functions/api/bot/giveaway-entry.js'],
   ['milestones', '../../functions/api/milestones.js', 'functions/api/milestones.js'],
+  ['predictions', '../../functions/api/prediction-events.js', 'functions/api/prediction-events.js'],
+  ['ad break', '../../functions/api/ad-break.js', 'functions/api/ad-break.js'],
+  ['bits', '../../functions/api/bits.js', 'functions/api/bits.js'],
+  ['channel update', '../../functions/api/channel-update.js', 'functions/api/channel-update.js'],
 ];
 
 /** A Twitch-shaped request. `sign` false leaves the headers off entirely. */
@@ -236,12 +240,11 @@ for (const [name, spec, rel] of ROUTES) {
   console.error = console.log = console.warn = () => {};
 
   const DUP = /Duplicate EventSub message/;
-  const ALL_ROUTES = [
-    ...ROUTES.map(([name, spec]) => [name, spec]),
-    ['ad break', '../../functions/api/ad-break.js'],
-    ['bits', '../../functions/api/bits.js'],
-    ['prediction events', '../../functions/api/prediction-events.js'],
-  ];
+  /* ROUTES is the single list — it used to carry only five, with ad break,
+     bits and prediction events bolted on here, so those three were never put
+     through the checks above. Listing a route twice also replays one message
+     id through the dedupe cache and reads as a false failure. */
+  const ALL_ROUTES = ROUTES.map(([name, spec]) => [name, spec]);
 
   for (const [name, spec] of ALL_ROUTES) {
     const mod = await import(spec);

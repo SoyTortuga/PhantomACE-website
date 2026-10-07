@@ -35,7 +35,7 @@ const LAST_LIVE_GRACE_MS = 15 * 60 * 1000;
    newest logged broadcast, if it began recently enough to still be running. */
 const LOG_FALLBACK_MS = 12 * 60 * 60 * 1000;
 
-const OFFLINE = { live: false, streamId: null, startedAt: null, viewerCount: 0 };
+const OFFLINE = { live: false, streamId: null, startedAt: null, viewerCount: 0, category: null, categoryId: null };
 
 /**
  * The stream a FAILED lookup should still attribute things to.
@@ -90,6 +90,8 @@ export async function getStreamInfo(env) {
     return {
       live: !!cached.live, streamId: cached.streamId || null, startedAt: cached.startedAt || null,
       viewerCount: cached.viewerCount || 0,
+      category: cached.category || null,
+      categoryId: cached.categoryId || null,
     };
   }
 
@@ -119,6 +121,12 @@ export async function getStreamInfo(env) {
       streamId: stream ? String(stream.id) : null,
       startedAt: stream ? stream.started_at : null,
       viewerCount: stream ? stream.viewer_count : 0,
+      /* The Twitch category, carried here so a feature that branches on what he
+         is playing does not open a second poll. Authoritative but only while
+         live and up to the cache age stale; channel-update.js is the immediate
+         push version and works offline too. */
+      category: stream ? (stream.game_name || null) : null,
+      categoryId: stream ? (stream.game_id ? String(stream.game_id) : null) : null,
     };
 
     /* The last live sighting rides in the same row, carried across offline
