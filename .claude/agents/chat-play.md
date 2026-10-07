@@ -126,7 +126,12 @@ Thin or absent, in rough order of value:
 - **Commander Bingo** — chat can only *claim*. It cannot mark, call, or react.
 - **Skull Clicker** — `!hit` only exists during a raid; the rest of the time chat cannot touch it.
 - **Dino Park** — `!catch` only during a Safari.
-- **Blind Trading** — nothing.
+
+**Out of scope — do not propose chat integration for it:**
+- **Blind Trading** (`/tcgblindtrading`, `games/blind-trading/`) — a two-player trade-window
+  simulator for **off-stream content creation**. It is deliberately unlisted and passphrase-gated,
+  it is not a stream game, and it gets no chat commands and no overlay panel. Decided by the
+  broadcaster, not an oversight.
 
 Before building any of these, check the game's own agent for how its state and scoring work, and
 do not change them. A chat layer reads a game; it does not fork it.
