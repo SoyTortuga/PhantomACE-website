@@ -242,6 +242,10 @@ export const SINGLETONS = {
      the right answer between streams, and an expiring row would make every
      first event of a broadcast look like a change from nothing. */
   stream_category:       { table: 'singletons', expiry: 'none' },
+  /* MTGBBB's chat guess-the-rare round (functions/api/mtgbbb-chat.js). 'real':
+     it carries a TTL so a stream that ends mid-pack does not leave a window
+     open on the overlay forever. */
+  mtgbbb_guess:          { table: 'singletons', expiry: 'real' },
   bot_cooldown_drop:     { table: 'singletons', expiry: 'none' },
   bot_cooldown_dropitem: { table: 'singletons', expiry: 'none' },
   bot_cooldown_announce: { table: 'singletons', expiry: 'none' },

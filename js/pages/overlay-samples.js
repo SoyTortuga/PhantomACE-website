@@ -111,6 +111,12 @@
       'Winners highlighted; the live match outlined',
       'Champion banner when the final resolves',
     ] },
+    { id: 'ovMtgGuess', label: 'Guess the Rare', holds: [
+      'Chat’s guess window during an MTGBBB box crack',
+      'The pack number, a countdown, and how many have called it',
+      'Then the rare that landed and who called it',
+      'Opens when the host clicks the pack counter forward',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -410,9 +416,28 @@
     var champ = $('ovBracketChamp'); if (champ) champ.hidden = true;
   }
 
+  /* The resolved state, not the open one: it is the taller of the two, so a
+     panel positioned against it never overflows once a pack resolves. */
+  function mtgGuess() {
+    show('ovMtgGuess');
+    set('ovMtgGuessTimer', '');
+    var body = $('ovMtgGuessBody');
+    if (body) body.innerHTML =
+      '<div class="ov-mtgguess-card">Sheoldred, the Apocalypse</div>' +
+      '<ol class="ov-mtgguess-winners">' +
+        '<li>SampleViewer<span class="ov-mtgguess-paid">+2</span></li>' +
+        '<li>boneHoarder<span class="ov-mtgguess-paid">+2</span></li>' +
+        '<li class="is-unpaid">graveDigger</li>' +
+      '</ol>' +
+      '<div class="ov-mtgguess-more">+4 more called it</div>';
+    var note = $('ovMtgGuessNote');
+    if (note) note.innerHTML = 'Log in at phantomace.tv to collect entries';
+  }
+
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
+    mtgGuess();
   }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };

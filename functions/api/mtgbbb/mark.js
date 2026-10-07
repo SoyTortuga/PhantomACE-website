@@ -90,6 +90,8 @@ export async function onRequestPost(context) {
   let response = null;
   const overlayJobs = [];
   const shotWins = []; // { playerId, tier }
+  let openGuessFor = null;   // pack number, when the counter moved forward
+  let resolveGuessWith = null; // the rare/mythic card name this pull landed
 
   await env.MARKETPLACE.mutate(`mtgbbb_${code}`, (room) => {
     if (!room) { failure = json({ error: 'Game not found' }, 404); return undefined; }
@@ -99,6 +101,10 @@ export async function onRequestPost(context) {
       const delta = body.delta === -1 ? -1 : 1;
       room.packsOpened = Math.max(0, (room.packsOpened || 0) + delta);
       response = { packsOpened: room.packsOpened };
+      /* Clicking the counter forward is the only moment in this flow that
+         means "new pack", so it is what opens chat's guess window. Dispatched
+         after the lock, like the overlay pushes below. */
+      if (delta === 1) openGuessFor = room.packsOpened;
       return room;
     }
 
@@ -140,6 +146,11 @@ export async function onRequestPost(context) {
        the pool — the pool tells you how many squares exist, this tells you
        how many people are about to feel something. */
     const poolCard = room.pool.find(c => c.name === cardName);
+    /* Chat only ever guesses the rare slot, so only a rare or mythic closes
+       their window — a marked common is not the card they called. */
+    if (poolCard && (poolCard.rarity === 'rare' || poolCard.rarity === 'mythic')) {
+      resolveGuessWith = cardName;
+    }
     overlayJobs.push({
       type: 'mtgbbb-pull',
       card: cardName,
@@ -202,6 +213,20 @@ export async function onRequestPost(context) {
     }
   } catch (err) {
     console.error('[mtgbbb/mark] could not refresh stream_now:', err.message);
+  }
+
+  /* CHAT'S GUESS ROUND. Both sides run after the room's lock is released:
+     opening writes a second key and resolving pays giveaway entries, neither
+     of which may hold a lock the next !guess is waiting on. Guarded — a broken
+     guess round must never cost the host their mark. */
+  if (openGuessFor !== null || resolveGuessWith !== null) {
+    try {
+      const chat = await import('../mtgbbb-chat.js');
+      if (resolveGuessWith !== null) await chat.resolveGuessRound(env, { code, card: resolveGuessWith });
+      if (openGuessFor !== null) await chat.openGuessRound(env, { code, pack: openGuessFor });
+    } catch (err) {
+      console.error('[mtgbbb/mark] guess round failed:', err.message);
+    }
   }
 
   if (overlayJobs.length) {

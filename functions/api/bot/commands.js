@@ -400,6 +400,25 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* MTGBBB guess-the-rare. One call per chatter per pack, first one locks, an
+     unknown or ambiguous card dropped. Silent like !hit / !clash / !wind /
+     !catch — a box is thirty packs, and a line per guess would bury the
+     channel. The overlay panel is the feedback. */
+  if (parsed.command === '!guess') {
+    try {
+      const { guessFromChat } = await import('../mtgbbb-chat.js');
+      await guessFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+        text: parsed.rest,
+      });
+    } catch (err) {
+      /* A broken guess must not break chat commands. */
+      console.error('[mtgbbb-guess/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 
