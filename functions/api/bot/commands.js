@@ -509,6 +509,24 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* Twitch-plays Memory Match: chat votes the next card to turn over. One
+     vote per chatter per window, changeable while it is open. Silent — the
+     board is on the overlay and a line per vote would bury the channel. */
+  if (parsed.command === '!flip') {
+    try {
+      const { flipFromChat } = await import('../memory-match-chat.js');
+      await flipFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+        text: parsed.rest,
+      });
+    } catch (err) {
+      /* A broken board must not break chat commands. */
+      console.error('[memory-match-chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

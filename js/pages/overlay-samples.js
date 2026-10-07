@@ -135,6 +135,12 @@
       'The square chat is backing for its single wildcard',
       'Turns to BINGO when a line completes',
     ] },
+    { id: 'ovMemChat', label: 'Twitch Plays Memory', holds: [
+      'One Memory Match board the whole channel plays',
+      'Chat votes the next card with !flip <n>',
+      'A non-match stays face up for a beat before turning back',
+      'Moves taken, and chat’s best for that board size',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -510,10 +516,38 @@
     if (note) note.innerHTML = '41 votes — <b>!stamp &lt;1-25&gt;</b>';
   }
 
+  /* Mid-move with a miss showing: the state that has the most on screen at
+     once, so a panel positioned against it fits every other. */
+  function memChat() {
+    show('ovMemChat');
+    set('ovMemChatStat', '3/10 · 9 moves');
+    var panel = $('ovMemChat');
+    if (panel) { panel.classList.add('is-reveal', 'is-miss'); panel.classList.remove('is-hit'); }
+    var grid = $('ovMemChatGrid');
+    if (grid) {
+      grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+      var faces = { 0: 2, 1: 2, 4: 7, 7: 7, 11: 4, 14: 4, 6: 9, 13: 9 };
+      var matched = [0, 1, 4, 7, 11, 14];
+      var html = '';
+      for (var i = 0; i < 20; i++) {
+        var cls = 'ov-mmc-card';
+        if (matched.indexOf(i) !== -1) cls += ' is-matched';
+        else if (i === 6 || i === 13) cls += ' is-up';
+        if (i === 17) cls += ' is-leading';
+        var face = faces[i] != null ? faces[i] : '';
+        html += '<div class="' + cls + '"><span class="ov-mmc-n">' + (i + 1) +
+          '</span><span class="ov-mmc-f">' + face + '</span></div>';
+      }
+      grid.innerHTML = html;
+    }
+    var note = $('ovMemChatNote');
+    if (note) note.innerHTML = 'No match';
+  }
+
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
-    mtgGuess(); r6Draft(); chatVote(); bingoChat();
+    mtgGuess(); r6Draft(); chatVote(); bingoChat(); memChat();
   }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };

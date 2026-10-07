@@ -235,6 +235,18 @@
             </div>
 
             <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Twitch Plays Memory</span>
+              <select id="odMemPairs" class="od-night-input" title="Board size">
+                <option value="10">10 pairs</option>
+                <option value="15">15 pairs</option>
+                <option value="20">20 pairs</option>
+              </select>
+              <button class="btn-primary" id="odMemStartBtn">Start</button>
+              <button class="btn-secondary" id="odMemStopBtn">Stop</button>
+              <span class="ovmc-chip" id="odMemChip">Idle</span>
+            </div>
+
+            <div class="ovmc-row od-game-row">
               <span class="od-game-name">Siege Operator Draft</span>
               <button class="btn-primary" id="odR6AutoBtn" title="Opens on whichever side the tracked match is playing">Open Draft</button>
               <button class="btn-secondary" id="odR6AtkBtn">Draft Attack</button>

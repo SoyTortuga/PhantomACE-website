@@ -256,6 +256,13 @@ export const SINGLETONS = {
   /* Commander Bingo's shared chat card (functions/api/bingo-chat.js). 'real':
      the TTL matches the room's own, so a card cannot outlive its game. */
   bingo_chat:            { table: 'singletons', expiry: 'real' },
+  /* Twitch-plays Memory Match: the live shared board. 'real' — a game nobody
+     stopped clears itself rather than sitting on the overlay next stream. */
+  mm_chat:               { table: 'singletons', expiry: 'real' },
+  /* Chat's own best moves per board size. 'none': a record that expires is
+     not a record. Kept apart from the real Memory Match boards, which carry a
+     monthly prize and are not comparable to a collective score. */
+  mm_chat_best:          { table: 'singletons', expiry: 'none' },
   /* The live chat vote (functions/api/chat-vote.js) — one question, any game.
      'real': the TTL clears a vote nobody closed before the stream ended. */
   chat_vote:             { table: 'singletons', expiry: 'real' },

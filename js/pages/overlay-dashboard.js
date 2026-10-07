@@ -1453,6 +1453,17 @@ async function refreshBgcChip() {
   } catch { chip.textContent = 'Unavailable'; }
 }
 
+async function refreshMemChip() {
+  const chip = document.getElementById('odMemChip');
+  if (!chip) return;
+  try {
+    const d = await (await fetch('/api/memory-match-chat', { cache: 'no-store' })).json();
+    if (d.status === 'none') { chip.textContent = 'Idle'; return; }
+    if (d.status === 'done') { chip.textContent = 'Cleared in ' + d.moves; return; }
+    chip.textContent = d.pairsFound + '/' + d.pairs + ' · ' + d.moves + ' moves';
+  } catch { chip.textContent = 'Unavailable'; }
+}
+
 function initStreamNight() {
   const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
@@ -1492,6 +1503,17 @@ function initStreamNight() {
      Two open buttons because attack and defence are separate drafts with
      disjoint pools. Lock freezes the tally and names the winner, so a vote
      that slips in afterwards cannot change what is already on screen. */
+  /* ── Twitch-plays Memory Match ── */
+  const memAfter = function () { setTimeout(refreshMemChip, 300); };
+  on('odMemStartBtn', function (e) {
+    const pairs = parseInt((document.getElementById('odMemPairs') || {}).value, 10) || 10;
+    nightPost('/api/memory-match-chat', { action: 'start', pairs }, e.currentTarget,
+      'Memory Match started — chat votes with !flip <n>.');
+    memAfter();
+  });
+  on('odMemStopBtn', function (e) { nightPost('/api/memory-match-chat', { action: 'stop' }, e.currentTarget, 'Memory Match stopped.'); memAfter(); });
+  refreshMemChip();
+
   /* ── Siege match tracker ──
      Every button refreshes both chips: scoring a round can change the side the
      draft would open on, and the overtime row appears off the same read. */

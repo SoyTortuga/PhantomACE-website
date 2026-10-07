@@ -126,6 +126,19 @@
     <div class="ov-bgc-note" id="ovBingoChatNote">Pick the wildcard — <b>!stamp &lt;1-25&gt;</b></div>
   </div>
 
+  <!-- Memory Match, Twitch plays. Chat votes the next card to turn over; a
+       non-match stays up for a beat before flipping back, which is the whole
+       mechanic. Face-down cards carry no face in the payload. -->
+  <div class="ov-mmc" id="ovMemChat" hidden>
+    <div class="ov-mmc-head">
+      <span class="ov-mmc-title">TWITCH PLAYS</span>
+      <span class="ov-mmc-sub">Memory Match</span>
+      <span class="ov-mmc-stat" id="ovMemChatStat"></span>
+    </div>
+    <div class="ov-mmc-grid" id="ovMemChatGrid"></div>
+    <div class="ov-mmc-note" id="ovMemChatNote">Type <b>!flip &lt;n&gt;</b></div>
+  </div>
+
   <!-- Skull Clicker co-op raid boss: a thin, tall column for the left edge —
        boss art, a vertical health bar that drains as the site clicks it down,
        and the top strikers. Hidden unless a boss is live. -->
@@ -356,6 +369,7 @@
   <script src="/js/pages/overlay-r6-draft.js" defer></script>
   <script src="/js/pages/overlay-chat-vote.js" defer></script>
   <script src="/js/pages/overlay-bingo-chat.js" defer></script>
+  <script src="/js/pages/overlay-memory-chat.js" defer></script>
   <!-- The Commander Bingo square texts, so the panel can name called squares.
        One source of truth, shared with the game and its host page. -->
   <script src="/games/commander-bingo/events.js" defer></script>

@@ -33,7 +33,7 @@ const PANEL_IDS = [
   'ovMc', 'ovCheckin', 'ovPrediction',
   // stream night modes
   'ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket',
-  'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat',
+  'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat',
 ];
 
 function json(data, status = 200) {
