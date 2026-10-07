@@ -2687,3 +2687,13 @@ body.ov-alerting .ov-bgc { opacity: 0.22; }
   padding-top: 7px;
 }
 .ov-bgc-note b { color: #fff; }
+
+/* What chat's tracking bought: extra rolls on the rarity table. Gold, because
+   it is the one thing on this panel chat earned rather than was given. */
+.ov-safari-rolls {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--exclusive);
+}
+.ov-safari-rolls:empty { display: none; }

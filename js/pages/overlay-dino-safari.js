@@ -35,6 +35,7 @@
   var rarityEl = document.getElementById('ovSafariRarity');
   var timerEl = document.getElementById('ovSafariTimer');
   var noteEl = document.getElementById('ovSafariNote');
+  var rollsEl = document.getElementById('ovSafariRolls');
 
   var timer = null;
   var key = new URLSearchParams(location.search).get('key') || '';
@@ -76,6 +77,11 @@
       noteEl.innerHTML = catchers
         ? 'Type <b>!catch</b> — ' + catchers + (catchers === 1 ? ' hunter' : ' hunters')
         : 'A wild dino appeared — type <b>!catch</b>';
+      /* What the gap's tracking bought, shown on the dino it bought — the
+         payoff is only meaningful next to the result. */
+      rollsEl.textContent = (Number(d.rolls) || 1) > 1
+        ? (d.rolls + '× roll from ' + d.trackedBy + ' tracking')
+        : '';
       return;
     }
 
@@ -87,6 +93,7 @@
       nameEl.textContent = win.name || '';
       rarityEl.textContent = (win.mutation ? cap(win.mutation) + ' · ' : '') + cap(win.rarity);
       timerEl.textContent = '';
+      rollsEl.textContent = '';
       if (win.caught && win.winnerName) {
         noteEl.innerHTML = esc(win.winnerName) + ' caught the ' + esc(win.name) + '!';
       } else if (win.caught) {
@@ -99,11 +106,19 @@
 
     panel.classList.remove('is-won');
     panel.removeAttribute('data-rarity');
-    nameEl.textContent = 'Next dino incoming';
+    nameEl.textContent = 'Tracking…';
     rarityEl.textContent = '';
     timerEl.textContent = '';
     setArt(FALLBACK);
-    noteEl.innerHTML = 'Get ready — type <b>!catch</b> when it appears';
+
+    /* The gap is most of a Safari, so this is the line chat looks at longest.
+       It shows what the turnout has already earned, not just an instruction. */
+    var trackers = Number(d.trackers) || 0;
+    var rolls = Number(d.rolls) || 1;
+    rollsEl.textContent = rolls > 1 ? rolls + '× roll' : '';
+    noteEl.innerHTML = trackers
+      ? trackers + (trackers === 1 ? ' tracker' : ' trackers') + ' — <b>!track</b> for better odds'
+      : 'Type <b>!track</b> to improve the next dino';
   }
 
   function esc(s) {

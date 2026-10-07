@@ -11,13 +11,19 @@
    gate on start, and the session self-clearing when idle/ended.
    ══════════════════════════════════════════════ */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import {
   rollWildDino, pickWinner, resolveSpawn, advanceSafari, publicSafari, isLive,
-  catchFromChat, onRequestGet, onRequestPost,
+  catchFromChat, trackFromChat, rollsForTrackers, onRequestGet, onRequestPost,
   SAFARI_KEY, CATCH_WINDOW_MS, IDLE_MS, DEFAULT_INTERVAL_SEC,
 } from '../../functions/api/dino-safari.js';
 import { grantEgg } from '../../functions/api/dino-park.js';
 import { SPECIES, RARITIES } from '../../functions/api/dino-species.js';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 let passed = 0;
 const failures = [];
@@ -282,6 +288,95 @@ function postReq(session, bodyObj) {
   check('an explicit stop succeeds', body.success, true);
   check('and the Safari reads as none afterward', body.safari.status, 'none');
   check('the stored row is tombstoned', e.MARKETPLACE.read(SAFARI_KEY).status, 'ended');
+}
+
+/* ══ TRACKING: the part of a Safari chat actually plays ════════════════
+   The catch window is 25 seconds; the gap is a minute. For most of a Safari
+   there is nothing to do but wait, so !track turns the gap into the game.
+
+   It buys EXTRA ROLLS on the same weighted table, best rarity wins. It must
+   never shift the weights or touch the species pool — the Safari deliberately
+   shares the hatch minigame's odds, and bending them here would quietly make
+   it a different game. */
+{
+  check('no trackers is one roll', rollsForTrackers(0), 1);
+  check('a few is still one', rollsForTrackers(14), 1);
+  check('fifteen buys the second', rollsForTrackers(15), 2);
+  check('thirty buys a third', rollsForTrackers(30), 3);
+  check('and it is capped', rollsForTrackers(100000), 5);
+}
+
+{
+  /* Best-of-N on a rigged roller: the sequence is common, legendary, common.
+     One roll takes the common; three take the legendary. */
+  const seq = ['common', 'legendary', 'common'];
+  let i = 0;
+  const roll = { rarity: () => seq[i++ % seq.length], species: (r) => Object.keys(SPECIES).find(k => SPECIES[k].rarity === r), mutation: () => null };
+
+  i = 0;
+  check('one roll takes what it is given', rollWildDino(roll, 1).rarity, 'common');
+  i = 0;
+  check('three rolls keep the best', rollWildDino(roll, 3).rarity, 'legendary');
+  i = 0;
+  const w = rollWildDino(roll, 3);
+  check('and the species still comes from that rarity tier', SPECIES[w.speciesId].rarity, 'legendary');
+}
+
+{
+  /* Tracking only happens in the gap. */
+  const e = envWith({ [SAFARI_KEY]: liveSession({ spawn: spawnObj({ catchers: [] }) }) });
+  check('a dino on screen means catch, not track', (await trackFromChat(e, { userId: '1' })).reason, 'catching');
+
+  const gap = envWith({ [SAFARI_KEY]: liveSession({ nextSpawnAt: Date.now() + 60000 }) });
+  check('tracking lands in the gap', (await trackFromChat(gap, { userId: '1' })).ok, true);
+  check('once each', (await trackFromChat(gap, { userId: '1' })).reason, 'already');
+  check('and a second person adds one', (await trackFromChat(gap, { userId: '2' })).trackers, 2);
+
+  const st = publicSafari(gap.MARKETPLACE.read(SAFARI_KEY));
+  check('the panel shows the turnout', st.trackers, 2);
+  check('with what it has earned so far', st.rolls, 1);
+}
+
+{
+  const e = envWith({});
+  check('no Safari, no tracking', (await trackFromChat(e, { userId: '1' })).ok, false);
+}
+
+{
+  /* Tracking is activity: a Safari chat is working on must not idle out. */
+  const stale = Date.now() - (IDLE_MS - 30000);
+  const e = envWith({ [SAFARI_KEY]: liveSession({ lastActiveAt: stale, nextSpawnAt: Date.now() + 1000 }) });
+  await trackFromChat(e, { userId: '1' });
+  const after = e.MARKETPLACE.read(SAFARI_KEY);
+  ok('tracking keeps the session alive', after.lastActiveAt > stale);
+}
+
+{
+  /* The turnout pays for the NEXT dino, then resets. */
+  const s = liveSession({ nextSpawnAt: Date.now() - 1 });
+  s.tracking = {};
+  for (let i = 0; i < 30; i++) s.tracking['u' + i] = 1;
+
+  advanceSafari(s, Date.now(), { roll: { rarity: () => 'common', species: () => 'trike', mutation: () => null } });
+  ok('the next dino rolled', !!s.spawn);
+  check('the spawn records who paid for it', s.spawn.trackedBy, 30);
+  check('and how many rolls that bought', s.spawn.rolls, 3);
+  check('the gap starts from nothing again', Object.keys(s.tracking || {}).length, 0);
+
+  const st = publicSafari(s);
+  check('the catch view carries it, so the payoff shows on the dino', st.trackedBy, 30);
+  check('with the roll count', st.rolls, 3);
+}
+
+{
+  const cmds = fs.readFileSync(path.join(REPO, 'functions/api/bot/commands.js'), 'utf8');
+  ok('chat dispatches !track', /parsed\.command === '!track'/.test(cmds));
+  ok('as a PUBLIC command, before the moderator gate',
+     cmds.indexOf("'!track'") < cmds.indexOf('if (!isAuthorizedSender(env, event)) return;'));
+
+  const driver = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dino-safari.js'), 'utf8');
+  ok('the panel asks for tracking during the gap', /!track<\/b>/.test(driver));
+  ok('and shows what it bought on the dino', /ovSafariRolls/.test(driver));
 }
 
 /* ══ Report ════════════════════════════════════════════════════════════ */

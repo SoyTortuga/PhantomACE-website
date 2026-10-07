@@ -494,6 +494,21 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* Dino Safari: track during the gap between spawns. Buys extra rolls on the
+     same rarity table for the next wild dino — the catch window is 25s and
+     the gap is a minute, so this is the part of a Safari chat actually plays.
+     Silent, like !catch. */
+  if (parsed.command === '!track') {
+    try {
+      const { trackFromChat } = await import('../dino-safari.js');
+      await trackFromChat(env, { userId: event.chatter_user_id });
+    } catch (err) {
+      /* A broken track must not break chat commands. */
+      console.error('[dino-safari/track]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

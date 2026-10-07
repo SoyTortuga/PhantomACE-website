@@ -83,6 +83,30 @@ const SESSION_TTL_SECONDS = 1000;
    the doc. Only ever reached by a chat far larger than any real catch needs. */
 const MAX_CATCHERS = 2000;
 
+/* ── TRACKING ───────────────────────────────────────────────────────────
+   The catch window is 25 seconds; the gap between spawns is a minute by
+   default. For most of a Safari there is nothing for chat to do but wait, so
+   `!track` turns the gap into the part they play.
+
+   Tracking does not pick the dino — it buys EXTRA ROLLS on the same weighted
+   table, and the best rarity wins. A chat that turns out in numbers is more
+   likely to turn up something good, but nothing is ever guaranteed and the
+   species pool is untouched: a legendary stays a legendary. Shifting the
+   weights instead would quietly make the Safari a different game from the
+   hatch minigame it deliberately shares odds with. */
+const TRACKERS_PER_ROLL = 15;
+const MAX_BONUS_ROLLS = 4;
+const MAX_TRACKERS = 2000;
+
+/* Worst to best. Used only to pick the best of several rolls. */
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+/** How many rolls a given turnout buys, including the base one. */
+export function rollsForTrackers(trackers) {
+  const bonus = Math.min(MAX_BONUS_ROLLS, Math.floor(Math.max(0, trackers) / TRACKERS_PER_ROLL));
+  return 1 + bonus;
+}
+
 /* The unified "what's on stream" pointer id. stream-now.js must list 'dino-park'
    in its GAMES whitelist or the refresh is a silent no-op. */
 const STREAM_NOW_GAME = 'dino-park';
@@ -121,12 +145,18 @@ function normalizeRule(rule) {
  * defaults to the real dino-species rollers (Math.random); a test injects its
  * own so a spawn is deterministic.
  */
-export function rollWildDino(roll = {}) {
+export function rollWildDino(roll = {}, rolls = 1) {
   const rollRarity = roll.rarity || rollHatchRarity;
   const rollSpecies = roll.species || rollSpeciesId;
   const rollMut = roll.mutation !== undefined ? roll.mutation : rollDinoMutation;
 
-  const rarity = rollRarity();
+  /* Chat's tracking buys extra rolls on the SAME table; the best one wins.
+     The species pool is then drawn for that rarity exactly as always. */
+  let rarity = rollRarity();
+  for (let i = 1; i < Math.max(1, rolls); i++) {
+    const next = rollRarity();
+    if (RARITY_ORDER.indexOf(next) > RARITY_ORDER.indexOf(rarity)) rarity = next;
+  }
   const speciesId = rollSpecies(rarity);
   const meta = speciesMeta(speciesId) || {};
   const mutation = typeof rollMut === 'function' ? rollMut() : (rollMut || null);
@@ -213,8 +243,14 @@ function newSession(now, by, rule, intervalSec) {
 }
 
 function makeSpawn(session, now, roll) {
-  const wild = rollWildDino(roll);
+  /* Read before it is cleared: the turnout during THIS gap is what paid for
+     the roll, and the next gap starts from nothing. */
+  const trackers = Object.keys(session.tracking || {}).length;
+  const wild = rollWildDino(roll, rollsForTrackers(trackers));
+  session.tracking = {};
   return {
+    trackedBy: trackers,
+    rolls: rollsForTrackers(trackers),
     id: (now + '_' + Math.random().toString(36).slice(2, 8)),
     ...wild,
     rule: session.rule,
@@ -301,6 +337,10 @@ export function publicSafari(s, now = Date.now()) {
       spawn: revealOf(s.spawn),
       msLeft: Math.max(0, s.spawn.catchUntil - now),
       catchers: s.spawn.count || 0,
+      /* What chat's tracking bought for THIS dino, so the payoff is visible
+         at the moment it matters rather than only before the roll. */
+      trackedBy: s.spawn.trackedBy || 0,
+      rolls: s.spawn.rolls || 1,
     };
   }
 
@@ -309,6 +349,8 @@ export function publicSafari(s, now = Date.now()) {
   return {
     ...base,
     phase: 'waiting',
+    trackers: Object.keys(s.tracking || {}).length,
+    rolls: rollsForTrackers(Object.keys(s.tracking || {}).length),
     spawn: null,
     nextInMs: Math.max(0, (Number(s.nextSpawnAt) || now) - now),
   };
@@ -391,6 +433,40 @@ async function clearPointer(env) {
    overlay is the feedback, and a reply per chatter would bury the channel
    during exactly the busy seconds the window is open. Resolves the clock first
    (a window that just closed under this message is settled + granted). */
+/**
+ * One chatter tracking during the gap between spawns.
+ *
+ * Silent on every rejection — no live Safari, a dino already on screen and
+ * having tracked this gap already all look identical from chat. One per
+ * chatter per gap, so the turnout measures how many PEOPLE are hunting rather
+ * than how fast anyone can type, and it resets with every spawn.
+ */
+export async function trackFromChat(env, { userId } = {}) {
+  if (!env || !env.MARKETPLACE || !userId) return { ok: false, reason: 'empty' };
+  const uid = String(userId);
+
+  let outcome = { ok: false, reason: 'closed' };
+  await env.MARKETPLACE.mutate(SAFARI_KEY, (s) => {
+    const now = Date.now();
+    if (!isLive(s, now)) return undefined;
+    /* Only in the gap. While a dino is on screen the command to use is
+       !catch, and tracking a dino that already exists would do nothing. */
+    if (s.spawn && now < s.spawn.catchUntil) { outcome = { ok: false, reason: 'catching' }; return undefined; }
+
+    s.tracking = (s.tracking && typeof s.tracking === 'object') ? s.tracking : {};
+    if (Object.prototype.hasOwnProperty.call(s.tracking, uid)) { outcome = { ok: false, reason: 'already' }; return undefined; }
+    if (Object.keys(s.tracking).length >= MAX_TRACKERS) { outcome = { ok: false, reason: 'full' }; return undefined; }
+
+    s.tracking[uid] = 1;
+    /* Tracking is activity: a Safari chat is working on must not idle out. */
+    s.lastActiveAt = now;
+    outcome = { ok: true, trackers: Object.keys(s.tracking).length };
+    return s;
+  }, { expirationTtl: SESSION_TTL_SECONDS });
+
+  return outcome;
+}
+
 export async function catchFromChat(env, { userId, name } = {}) {
   if (!env || !env.MARKETPLACE || !userId) return { ok: false, status: 'none' };
   const uid = String(userId);
