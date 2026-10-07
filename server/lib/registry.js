@@ -249,9 +249,9 @@ export const SINGLETONS = {
   /* The live Siege operator draft (functions/api/r6-draft.js). 'real': the TTL
      is the backstop for a draft nobody closed before the stream ended. */
   r6_draft:              { table: 'singletons', expiry: 'real' },
-  /* The live Cult of the Lamb naming round (functions/api/cotl-cult.js).
-     'real': the TTL clears a round nobody closed before the stream ended. */
-  cotl_naming:           { table: 'singletons', expiry: 'real' },
+  /* The live chat vote (functions/api/chat-vote.js) — one question, any game.
+     'real': the TTL clears a vote nobody closed before the stream ended. */
+  chat_vote:             { table: 'singletons', expiry: 'real' },
   bot_cooldown_drop:     { table: 'singletons', expiry: 'none' },
   bot_cooldown_dropitem: { table: 'singletons', expiry: 'none' },
   bot_cooldown_announce: { table: 'singletons', expiry: 'none' },
@@ -322,10 +322,6 @@ export const FAMILIES = [
      `loginidx_` is deliberately NOT `profile_login_`, which would sit inside
      the `profile_` family and need longest-prefix care to stay out of it. */
   { prefix: 'profile_',        table: 'profiles',         expiry: 'none' },
-  /* One row per named Cult of the Lamb follower. 'none' and never trimmed:
-     this IS the memorial, and the whole reason the site keeps it is that the
-     game's own Twitch integration forgets everything when the stream ends. */
-  { prefix: 'cotl_follower_',  table: 'singletons',       expiry: 'none' },
   { prefix: 'loginidx_',       table: 'profiles',         expiry: 'none' },
   /* rooms_{userId} — everything one person built in My Room. 'none': it is
      their work. `rooms_` is nobody's prefix — mc_room_ and ps_room_ start

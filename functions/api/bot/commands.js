@@ -440,20 +440,20 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
-  /* Cult of the Lamb: chat names the next follower. One suggestion per
-     chatter, changeable while the round is open — moving behind a name that
-     is winning is the point. Silent; the overlay carries the candidates. */
-  if (parsed.command === '!name') {
+  /* The generic chat vote — any game, any question, fixed options or free
+     text. One vote per chatter, changeable while it is open. Silent; the
+     overlay carries the question and the tally. */
+  if (parsed.command === '!vote') {
     try {
-      const { nameFromChat } = await import('../cotl-cult.js');
-      await nameFromChat(env, {
+      const { voteFromChat } = await import('../chat-vote.js');
+      await voteFromChat(env, {
         userId: event.chatter_user_id,
         name: event.chatter_user_name || event.chatter_user_login,
         text: parsed.rest,
       });
     } catch (err) {
-      /* A broken naming round must not break chat commands. */
-      console.error('[cotl-cult/chat]', err.message);
+      /* A broken vote must not break chat commands. */
+      console.error('[chat-vote/chat]', err.message);
     }
     return;
   }

@@ -102,16 +102,16 @@
     <div class="ov-r6draft-note" id="ovR6DraftNote">Type <b>!op &lt;operator&gt;</b></div>
   </div>
 
-  <!-- Cult of the Lamb naming round: chat names the next follower, and the
-       name becomes a permanent record on the site. The game's own Twitch
-       integration cannot tell us anything, so the vote IS the data entry. -->
-  <div class="ov-cotl" id="ovCotl" hidden>
-    <div class="ov-cotl-head">
-      <span class="ov-cotl-title">THE FLOCK</span>
-      <span class="ov-cotl-sub">Name the Follower</span>
+  <!-- Chat vote: one question, any game. Fixed options or free text, decided
+       by whether the mod supplied any. Most of what he plays has no
+       integration and never will; this works for all of it. -->
+  <div class="ov-vote" id="ovVote" hidden>
+    <div class="ov-vote-head">
+      <span class="ov-vote-title">CHAT VOTE</span>
+      <span class="ov-vote-question" id="ovVoteQuestion"></span>
     </div>
-    <div class="ov-cotl-body" id="ovCotlBody"></div>
-    <div class="ov-cotl-note" id="ovCotlNote">Type <b>!name &lt;name&gt;</b></div>
+    <div class="ov-vote-body" id="ovVoteBody"></div>
+    <div class="ov-vote-note" id="ovVoteNote">Type <b>!vote</b></div>
   </div>
 
   <!-- Skull Clicker co-op raid boss: a thin, tall column for the left edge —
@@ -341,7 +341,7 @@
   <script src="/js/pages/overlay-mtgbbb.js" defer></script>
   <script src="/js/pages/overlay-mtgbbb-guess.js" defer></script>
   <script src="/js/pages/overlay-r6-draft.js" defer></script>
-  <script src="/js/pages/overlay-cotl-cult.js" defer></script>
+  <script src="/js/pages/overlay-chat-vote.js" defer></script>
   <!-- The Commander Bingo square texts, so the panel can name called squares.
        One source of truth, shared with the game and its host page. -->
   <script src="/games/commander-bingo/events.js" defer></script>

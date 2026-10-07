@@ -1415,14 +1415,14 @@ async function refreshR6Chip() {
   } catch { chip.textContent = 'Unavailable'; }
 }
 
-async function refreshCotlChip() {
-  const chip = document.getElementById('odCotlChip');
+async function refreshVoteChip() {
+  const chip = document.getElementById('odVoteChip');
   if (!chip) return;
   try {
-    const d = await (await fetch('/api/cotl-cult', { cache: 'no-store' })).json();
+    const d = await (await fetch('/api/chat-vote', { cache: 'no-store' })).json();
     if (d.status === 'none') chip.textContent = 'Idle';
-    else if (d.status === 'locked') chip.textContent = 'Named — ' + ((d.winner && d.winner.name) || '');
-    else chip.textContent = (d.total || 0) + ' names in';
+    else if (d.status === 'locked') chip.textContent = 'Locked — ' + ((d.winner && d.winner.answer) || '');
+    else chip.textContent = (d.mode === 'fixed' ? 'Options' : 'Free text') + ' — ' + (d.total || 0) + ' votes';
   } catch { chip.textContent = 'Unavailable'; }
 }
 
@@ -1463,14 +1463,24 @@ function initStreamNight() {
   on('odR6EndBtn', function (e) { nightPost('/api/r6-draft', { action: 'end' }, e.currentTarget, 'Draft cleared.'); r6After(); });
   refreshR6Chip();
 
-  /* ── Cult of the Lamb: name the follower ──
-     Lock writes the winner into the permanent roster and credits whoever
-     suggested it first, so it is the one button that has a lasting effect. */
-  const cotlAfter = function () { setTimeout(refreshCotlChip, 300); };
-  on('odCotlOpenBtn', function (e) { nightPost('/api/cotl-cult', { action: 'open' }, e.currentTarget, 'Naming open — chat suggests with !name.'); cotlAfter(); });
-  on('odCotlLockBtn', function (e) { nightPost('/api/cotl-cult', { action: 'lock' }, e.currentTarget, 'Name locked — the follower is on the site for good.'); cotlAfter(); });
-  on('odCotlCancelBtn', function (e) { nightPost('/api/cotl-cult', { action: 'cancel' }, e.currentTarget, 'Naming cancelled — nobody was named.'); cotlAfter(); });
-  refreshCotlChip();
+  /* ── Chat vote ──
+     Blank options means free text, which is the riskier mode — so the control
+     defaults to empty and the toast says which mode it actually opened in. */
+  const voteAfter = function () { setTimeout(refreshVoteChip, 300); };
+  on('odVoteOpenBtn', function (e) {
+    const q = (document.getElementById('odVoteQuestion') || {}).value || '';
+    if (!q.trim()) { showBotStatus('Give the vote a question first.', true); return; }
+    const raw = (document.getElementById('odVoteOptions') || {}).value || '';
+    const options = raw.split(',').map(function (o) { return o.trim(); }).filter(Boolean);
+    nightPost('/api/chat-vote', { action: 'open', question: q, options: options }, e.currentTarget,
+      options.length
+        ? 'Vote open — chat votes by number with !vote.'
+        : 'Vote open (free text) — chat types anything with !vote.');
+    voteAfter();
+  });
+  on('odVoteLockBtn', function (e) { nightPost('/api/chat-vote', { action: 'lock' }, e.currentTarget, 'Result locked.'); voteAfter(); });
+  on('odVoteCancelBtn', function (e) { nightPost('/api/chat-vote', { action: 'cancel' }, e.currentTarget, 'Vote cancelled.'); voteAfter(); });
+  refreshVoteChip();
 
   /* ── Bracket Night ── */
   const brAfter = function () { setTimeout(loadBracketAdmin, 300); };

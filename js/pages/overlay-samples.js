@@ -123,11 +123,11 @@
       'Then the locked pick while he loads in',
       'Attack and defence are separate drafts',
     ] },
-    { id: 'ovCotl', label: 'Name the Follower', holds: [
-      'Chat naming the next Cult of the Lamb follower',
-      'Candidate names, most-backed first',
-      'Then the winning name and who suggested it',
-      'The named follower is kept on the site permanently',
+    { id: 'ovVote', label: 'Chat Vote', holds: [
+      'Any question you put to chat, in any game',
+      'The options you set, or anything chat types',
+      'A live tally, leader first',
+      'Then the locked result',
     ] },
   ];
 
@@ -465,23 +465,26 @@
     if (note) note.innerHTML = '73 votes — <b>!op &lt;operator&gt;</b>';
   }
 
-  function cotl() {
-    show('ovCotl');
-    var body = $('ovCotlBody');
+  /* The fixed-option shape, numbered: it is the taller of the two and the one
+     with the extra column, so a panel placed against it fits either. */
+  function chatVote() {
+    show('ovVote');
+    set('ovVoteQuestion', 'Which bishop next?');
+    var body = $('ovVoteBody');
     if (body) body.innerHTML =
-      '<ol class="ov-cotl-tally">' +
-        '<li class="is-lead"><span class="ov-cotl-name">Bleaty Crocker</span><span class="ov-cotl-votes">18</span><i class="ov-cotl-bar" style="width:100%"></i></li>' +
-        '<li><span class="ov-cotl-name">Sir Woolington</span><span class="ov-cotl-votes">11</span><i class="ov-cotl-bar" style="width:61%"></i></li>' +
-        '<li><span class="ov-cotl-name">Mutton Chop</span><span class="ov-cotl-votes">7</span><i class="ov-cotl-bar" style="width:39%"></i></li>' +
+      '<ol class="ov-vote-tally">' +
+        '<li class="is-lead"><span class="ov-vote-n">1</span><span class="ov-vote-answer">Leshy</span><span class="ov-vote-votes">24</span><i class="ov-vote-bar" style="width:100%"></i></li>' +
+        '<li><span class="ov-vote-n">2</span><span class="ov-vote-answer">Heket</span><span class="ov-vote-votes">17</span><i class="ov-vote-bar" style="width:71%"></i></li>' +
+        '<li><span class="ov-vote-n">3</span><span class="ov-vote-answer">Kallamar</span><span class="ov-vote-votes">9</span><i class="ov-vote-bar" style="width:38%"></i></li>' +
       '</ol>';
-    var note = $('ovCotlNote');
-    if (note) note.innerHTML = '36 names in — <b>!name &lt;name&gt;</b>';
+    var note = $('ovVoteNote');
+    if (note) note.innerHTML = '50 votes — <b>!vote &lt;number&gt;</b>';
   }
 
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
-    mtgGuess(); r6Draft(); cotl();
+    mtgGuess(); r6Draft(); chatVote();
   }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };

@@ -210,15 +210,17 @@
               <span class="ovmc-chip" id="odR6Chip">Idle</span>
             </div>
 
-            <!-- Cult of the Lamb. The official extension handles followers and
-                 devotion in-game; this is the half it cannot do — the name,
-                 and a permanent record of who gave it. -->
+            <!-- Chat vote. Works for any game, including every one with no
+                 integration at all. Leave the options blank and chat can type
+                 anything; fill them in and only those count. -->
             <div class="ovmc-row od-game-row">
-              <span class="od-game-name">Name the Follower</span>
-              <button class="btn-primary" id="odCotlOpenBtn">Open Naming</button>
-              <button class="btn-secondary" id="odCotlLockBtn">Lock Name</button>
-              <button class="btn-secondary" id="odCotlCancelBtn">Cancel</button>
-              <span class="ovmc-chip" id="odCotlChip">Idle</span>
+              <span class="od-game-name">Chat Vote</span>
+              <input type="text" id="odVoteQuestion" class="od-night-input" maxlength="70" placeholder="Question">
+              <input type="text" id="odVoteOptions" class="od-night-input" placeholder="Options, comma separated (blank = free text)">
+              <button class="btn-primary" id="odVoteOpenBtn">Open Vote</button>
+              <button class="btn-secondary" id="odVoteLockBtn">Lock Result</button>
+              <button class="btn-secondary" id="odVoteCancelBtn">Cancel</button>
+              <span class="ovmc-chip" id="odVoteChip">Idle</span>
             </div>
           </div>
 

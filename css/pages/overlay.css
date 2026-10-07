@@ -2469,13 +2469,13 @@ body.ov-alerting .ov-r6draft { opacity: 0.22; }
 .ov-r6draft-note b { color: #fff; }
 
 /* ══════════════════════════════════════════════
-   CULT OF THE LAMB — NAME THE FOLLOWER
+   CHAT VOTE — one question, any game.
    Same tally shape as the Siege draft, deliberately: two chat votes that read
    the same way are two the audience only has to learn once. [hidden] guard,
    borders for depth, no shadows, no blur.
    ══════════════════════════════════════════════ */
-.ov-cotl[hidden] { display: none; }
-.ov-cotl {
+.ov-vote[hidden] { display: none; }
+.ov-vote {
   position: fixed;
   right: 32px;
   bottom: calc(32px + env(safe-area-inset-bottom, 0px));
@@ -2492,24 +2492,24 @@ body.ov-alerting .ov-r6draft { opacity: 0.22; }
   gap: 8px;
   z-index: 5;
 }
-body.ov-alerting .ov-cotl { opacity: 0.22; }
+body.ov-alerting .ov-vote { opacity: 0.22; }
 
-.ov-cotl-head { display: flex; align-items: baseline; gap: 8px; }
-.ov-cotl-title {
+.ov-vote-head { display: flex; align-items: baseline; gap: 8px; }
+.ov-vote-title {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #ff0000;
 }
-.ov-cotl-sub {
+.ov-vote-sub {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #8a8a8a;
 }
 
-.ov-cotl-tally {
+.ov-vote-tally {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -2517,7 +2517,7 @@ body.ov-alerting .ov-cotl { opacity: 0.22; }
   flex-direction: column;
   gap: 5px;
 }
-.ov-cotl-tally li {
+.ov-vote-tally li {
   position: relative;
   display: flex;
   align-items: baseline;
@@ -2530,8 +2530,21 @@ body.ov-alerting .ov-cotl { opacity: 0.22; }
   color: #ddd;
   overflow: hidden;
 }
-.ov-cotl-tally li.is-lead { border-color: #5a1414; color: #fff; }
-.ov-cotl-name {
+.ov-vote-tally li.is-lead { border-color: #5a1414; color: #fff; }
+/* The number chat types. Fixed votes only — faster than a name and it cannot
+   be misspelled, so it earns the leading column. */
+.ov-vote-n {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  min-width: 15px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #8a8a8a;
+  font-variant-numeric: tabular-nums;
+}
+.ov-vote-tally li.is-lead .ov-vote-n { color: #fff; }
+.ov-vote-answer {
   position: relative;
   z-index: 1;
   flex: 1;
@@ -2539,13 +2552,13 @@ body.ov-alerting .ov-cotl { opacity: 0.22; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ov-cotl-votes {
+.ov-vote-votes {
   position: relative;
   z-index: 1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.ov-cotl-bar {
+.ov-vote-bar {
   position: absolute;
   left: 0;
   top: 0;
@@ -2554,16 +2567,16 @@ body.ov-alerting .ov-cotl { opacity: 0.22; }
   background: rgba(152, 9, 10, 0.35);
   transition: width 0.3s ease;
 }
-.ov-cotl-tally li.is-lead .ov-cotl-bar { background: rgba(255, 0, 0, 0.3); }
+.ov-vote-tally li.is-lead .ov-vote-bar { background: rgba(255, 0, 0, 0.3); }
 
-.ov-cotl-empty { font-size: 12px; color: #6f6f6f; font-style: italic; }
-.ov-cotl-winner { font-size: 22px; font-weight: 800; color: #fff; }
-.ov-cotl-winner-sub { font-size: 12px; color: #8a8a8a; }
+.ov-vote-empty { font-size: 12px; color: #6f6f6f; font-style: italic; }
+.ov-vote-winner { font-size: 22px; font-weight: 800; color: #fff; }
+.ov-vote-winner-sub { font-size: 12px; color: #8a8a8a; }
 
-.ov-cotl-note {
+.ov-vote-note {
   font-size: 11px;
   color: #8a8a8a;
   border-top: 1px solid #2a2a2a;
   padding-top: 7px;
 }
-.ov-cotl-note b { color: #fff; }
+.ov-vote-note b { color: #fff; }
