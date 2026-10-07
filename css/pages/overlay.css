@@ -2467,3 +2467,103 @@ body.ov-alerting .ov-r6draft { opacity: 0.22; }
   padding-top: 7px;
 }
 .ov-r6draft-note b { color: #fff; }
+
+/* ══════════════════════════════════════════════
+   CULT OF THE LAMB — NAME THE FOLLOWER
+   Same tally shape as the Siege draft, deliberately: two chat votes that read
+   the same way are two the audience only has to learn once. [hidden] guard,
+   borders for depth, no shadows, no blur.
+   ══════════════════════════════════════════════ */
+.ov-cotl[hidden] { display: none; }
+.ov-cotl {
+  position: fixed;
+  right: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  width: 290px;
+  padding: 12px 16px;
+  background: rgba(8, 8, 8, 0.9);
+  border: 1px solid #2a2a2a;
+  border-top: 3px solid #ff0000;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+}
+body.ov-alerting .ov-cotl { opacity: 0.22; }
+
+.ov-cotl-head { display: flex; align-items: baseline; gap: 8px; }
+.ov-cotl-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff0000;
+}
+.ov-cotl-sub {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+}
+
+.ov-cotl-tally {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ov-cotl-tally li {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 6px;
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 3px;
+  font-size: 13px;
+  color: #ddd;
+  overflow: hidden;
+}
+.ov-cotl-tally li.is-lead { border-color: #5a1414; color: #fff; }
+.ov-cotl-name {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ov-cotl-votes {
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ov-cotl-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: rgba(152, 9, 10, 0.35);
+  transition: width 0.3s ease;
+}
+.ov-cotl-tally li.is-lead .ov-cotl-bar { background: rgba(255, 0, 0, 0.3); }
+
+.ov-cotl-empty { font-size: 12px; color: #6f6f6f; font-style: italic; }
+.ov-cotl-winner { font-size: 22px; font-weight: 800; color: #fff; }
+.ov-cotl-winner-sub { font-size: 12px; color: #8a8a8a; }
+
+.ov-cotl-note {
+  font-size: 11px;
+  color: #8a8a8a;
+  border-top: 1px solid #2a2a2a;
+  padding-top: 7px;
+}
+.ov-cotl-note b { color: #fff; }

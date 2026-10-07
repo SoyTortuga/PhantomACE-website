@@ -123,6 +123,12 @@
       'Then the locked pick while he loads in',
       'Attack and defence are separate drafts',
     ] },
+    { id: 'ovCotl', label: 'Name the Follower', holds: [
+      'Chat naming the next Cult of the Lamb follower',
+      'Candidate names, most-backed first',
+      'Then the winning name and who suggested it',
+      'The named follower is kept on the site permanently',
+    ] },
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -459,10 +465,23 @@
     if (note) note.innerHTML = '73 votes — <b>!op &lt;operator&gt;</b>';
   }
 
+  function cotl() {
+    show('ovCotl');
+    var body = $('ovCotlBody');
+    if (body) body.innerHTML =
+      '<ol class="ov-cotl-tally">' +
+        '<li class="is-lead"><span class="ov-cotl-name">Bleaty Crocker</span><span class="ov-cotl-votes">18</span><i class="ov-cotl-bar" style="width:100%"></i></li>' +
+        '<li><span class="ov-cotl-name">Sir Woolington</span><span class="ov-cotl-votes">11</span><i class="ov-cotl-bar" style="width:61%"></i></li>' +
+        '<li><span class="ov-cotl-name">Mutton Chop</span><span class="ov-cotl-votes">7</span><i class="ov-cotl-bar" style="width:39%"></i></li>' +
+      '</ol>';
+    var note = $('ovCotlNote');
+    if (note) note.innerHTML = '36 names in — <b>!name &lt;name&gt;</b>';
+  }
+
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
-    mtgGuess(); r6Draft();
+    mtgGuess(); r6Draft(); cotl();
   }
 
   window.OverlaySamples = { PANELS: PANELS, fillAll: fillAll };

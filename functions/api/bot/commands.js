@@ -440,6 +440,24 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* Cult of the Lamb: chat names the next follower. One suggestion per
+     chatter, changeable while the round is open — moving behind a name that
+     is winning is the point. Silent; the overlay carries the candidates. */
+  if (parsed.command === '!name') {
+    try {
+      const { nameFromChat } = await import('../cotl-cult.js');
+      await nameFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+        text: parsed.rest,
+      });
+    } catch (err) {
+      /* A broken naming round must not break chat commands. */
+      console.error('[cotl-cult/chat]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

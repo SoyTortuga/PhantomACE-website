@@ -102,6 +102,18 @@
     <div class="ov-r6draft-note" id="ovR6DraftNote">Type <b>!op &lt;operator&gt;</b></div>
   </div>
 
+  <!-- Cult of the Lamb naming round: chat names the next follower, and the
+       name becomes a permanent record on the site. The game's own Twitch
+       integration cannot tell us anything, so the vote IS the data entry. -->
+  <div class="ov-cotl" id="ovCotl" hidden>
+    <div class="ov-cotl-head">
+      <span class="ov-cotl-title">THE FLOCK</span>
+      <span class="ov-cotl-sub">Name the Follower</span>
+    </div>
+    <div class="ov-cotl-body" id="ovCotlBody"></div>
+    <div class="ov-cotl-note" id="ovCotlNote">Type <b>!name &lt;name&gt;</b></div>
+  </div>
+
   <!-- Skull Clicker co-op raid boss: a thin, tall column for the left edge —
        boss art, a vertical health bar that drains as the site clicks it down,
        and the top strikers. Hidden unless a boss is live. -->
@@ -329,6 +341,7 @@
   <script src="/js/pages/overlay-mtgbbb.js" defer></script>
   <script src="/js/pages/overlay-mtgbbb-guess.js" defer></script>
   <script src="/js/pages/overlay-r6-draft.js" defer></script>
+  <script src="/js/pages/overlay-cotl-cult.js" defer></script>
   <!-- The Commander Bingo square texts, so the panel can name called squares.
        One source of truth, shared with the game and its host page. -->
   <script src="/games/commander-bingo/events.js" defer></script>

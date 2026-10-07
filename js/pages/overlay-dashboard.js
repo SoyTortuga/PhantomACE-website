@@ -1415,6 +1415,17 @@ async function refreshR6Chip() {
   } catch { chip.textContent = 'Unavailable'; }
 }
 
+async function refreshCotlChip() {
+  const chip = document.getElementById('odCotlChip');
+  if (!chip) return;
+  try {
+    const d = await (await fetch('/api/cotl-cult', { cache: 'no-store' })).json();
+    if (d.status === 'none') chip.textContent = 'Idle';
+    else if (d.status === 'locked') chip.textContent = 'Named — ' + ((d.winner && d.winner.name) || '');
+    else chip.textContent = (d.total || 0) + ' names in';
+  } catch { chip.textContent = 'Unavailable'; }
+}
+
 function initStreamNight() {
   const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
@@ -1451,6 +1462,15 @@ function initStreamNight() {
   on('odR6LockBtn', function (e) { nightPost('/api/r6-draft', { action: 'lock' }, e.currentTarget, 'Pick locked — it stays up while he loads in.'); r6After(); });
   on('odR6EndBtn', function (e) { nightPost('/api/r6-draft', { action: 'end' }, e.currentTarget, 'Draft cleared.'); r6After(); });
   refreshR6Chip();
+
+  /* ── Cult of the Lamb: name the follower ──
+     Lock writes the winner into the permanent roster and credits whoever
+     suggested it first, so it is the one button that has a lasting effect. */
+  const cotlAfter = function () { setTimeout(refreshCotlChip, 300); };
+  on('odCotlOpenBtn', function (e) { nightPost('/api/cotl-cult', { action: 'open' }, e.currentTarget, 'Naming open — chat suggests with !name.'); cotlAfter(); });
+  on('odCotlLockBtn', function (e) { nightPost('/api/cotl-cult', { action: 'lock' }, e.currentTarget, 'Name locked — the follower is on the site for good.'); cotlAfter(); });
+  on('odCotlCancelBtn', function (e) { nightPost('/api/cotl-cult', { action: 'cancel' }, e.currentTarget, 'Naming cancelled — nobody was named.'); cotlAfter(); });
+  refreshCotlChip();
 
   /* ── Bracket Night ── */
   const brAfter = function () { setTimeout(loadBracketAdmin, 300); };
