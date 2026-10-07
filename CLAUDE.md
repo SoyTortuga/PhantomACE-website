@@ -186,6 +186,9 @@ This project uses specialized sub-agents. The manager agent handles coordination
 - **game-memory-match** — Memory Match game
 - **asset-manager** — Itch.io asset pack browsing, extraction, and integration
 - **twitch-bot** — Chat bot: posting drops/announcements to chat, inbound chat commands, streamer trigger panel
+- **chat-play** — Playing the games FROM chat: the chat-driven modes (maze, scramble, Streamer
+  vs Chat, Wind Night, Safari, Bone Tithe, raid boss `!hit`) and their overlay panels. twitch-bot
+  owns talking to chat; this owns what chat can do.
 - **chat-system** — Community forums & chat
 - **phamily-giveaway** — Phamily Time watch pass & Giveaway system
 - **cosmetics** — Profile cosmetics, inventory, channel points
