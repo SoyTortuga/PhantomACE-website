@@ -30,10 +30,13 @@
    strips them anyway — nobody should have to type "ø" into a chat box, and a
    plain spelling here is one less thing to get wrong when adding an operator.
 
-   One correction to the list as supplied: it carried "Kaplan", which is not an
-   operator, while KAPKAN — a base-game defender present in every roster — was
-   missing. Treated as a typo, since leaving it would silently reject anyone
-   typing the real name. Say the word if that was wrong. */
+   Two corrections to the list as supplied, both confirmed:
+     Kaplan -> KAPKAN. "Kaplan" is not an operator and Kapkan, a base-game
+       defender, was otherwise missing from an complete list.
+     Skapos -> SKOPOS. One letter out, and the matcher is exact-or-prefix, so
+       anyone typing the real name would have been silently rejected.
+   Both are the failure this file exists to prevent: an operator that cannot
+   be picked, discovered mid-stream. */
 export const ATTACKERS = [
   'Solid Snake', 'Rauora', 'Striker', 'Deimos', 'Ram', 'Brava', 'Grim',
   'Sens', 'Osa', 'Flores', 'Zero', 'Ace', 'Iana', 'Kali', 'Amaru', 'Nokk',
@@ -44,7 +47,7 @@ export const ATTACKERS = [
 ];
 
 export const DEFENDERS = [
-  'Noor', 'Denari', 'Skapos', 'Sentry', 'Tubarao', 'Fenrir', 'Solis',
+  'Noor', 'Denari', 'Skopos', 'Sentry', 'Tubarao', 'Fenrir', 'Solis',
   'Azami', 'Thorn', 'Thunderbird', 'Aruni', 'Melusi', 'Oryx', 'Wamai',
   'Goyo', 'Warden', 'Mozzie', 'Kaid', 'Clash', 'Maestro', 'Alibi', 'Vigil',
   'Ela', 'Lesion', 'Mira', 'Echo', 'Caveira', 'Valkyrie', 'Frost', 'Mute',
