@@ -295,6 +295,54 @@ const vote = (env, id, text, name) => draft.voteFromChat(env, { userId: id, name
   check('an anonymous caller cannot open a draft', res.status, 403);
 }
 
+/* ── THE REAL ROSTER ─────────────────────────────────────────────────────
+   Everything above runs on a fixture so it tests the mechanism. This tests
+   the data, because the data is the half that goes stale: a season adds an
+   operator, and a missing one is silently unpickable mid-stream. */
+{
+  emptyRoster();
+  const { ATTACKERS, DEFENDERS, normalise, matchOperator } = roster;
+  /* Re-import is unnecessary — the fixture only ever mutated the arrays in
+     place, so reading the module's own file is the honest check. */
+  const src = fs.readFileSync(path.join(REPO, 'functions/api/r6-operators.js'), 'utf8');
+  /* Sliced rather than regexed: the point is to read what the FILE says, and
+     a parser bug here would quietly pass an empty roster. */
+  const grab = (name) => {
+    const head = src.indexOf('export const ' + name + ' = [');
+    if (head === -1) return [];
+    const body = src.slice(head, src.indexOf('];', head));
+    return [...body.matchAll(/'([^']+)'/g)].map(x => x[1]);
+  };
+  const atk = grab('ATTACKERS');
+  const def = grab('DEFENDERS');
+
+  check('39 attackers', atk.length, 39);
+  check('39 defenders', def.length, 39);
+
+  const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const all = [...atk, ...def].map(fold);
+  check('no duplicates anywhere', all.filter((v, i) => all.indexOf(v) !== i), []);
+  check('and nobody on both sides',
+    atk.filter(a => def.some(d => fold(d) === fold(a))), []);
+
+  /* Every name must survive the matcher it will be looked up through — an
+     entry that cannot match itself is unpickable. */
+  roster.ATTACKERS.push(...atk);
+  roster.DEFENDERS.push(...def);
+  check('every attacker matches its own name',
+    atk.filter(n => matchOperator('attack', n) !== n), []);
+  check('every defender matches its own name',
+    def.filter(n => matchOperator('defence', n) !== n), []);
+  /* Base-game operators are the ones a typo in a long list tends to drop. */
+  for (const n of ['Kapkan', 'Tachanka', 'Jager', 'Smoke', 'Mute']) {
+    ok(`${n} is on the defence roster`, matchOperator('defence', n) === n);
+  }
+  for (const n of ['Sledge', 'Thatcher', 'Ash', 'Thermite', 'Glaz']) {
+    ok(`${n} is on the attack roster`, matchOperator('attack', n) === n);
+  }
+  seedRoster();
+}
+
 /* ── The wiring that fails silently when missed ──────────────────────────── */
 {
   const router = fs.readFileSync(path.join(REPO, 'server/router.js'), 'utf8');

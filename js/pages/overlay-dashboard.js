@@ -1426,6 +1426,22 @@ async function refreshVoteChip() {
   } catch { chip.textContent = 'Unavailable'; }
 }
 
+/* The match chip, and the overtime row it reveals. Loaded on demand like the
+   rest — the overlay panel is the live view, not this. */
+async function refreshR6Match() {
+  const chip = document.getElementById('odR6MatchChip');
+  const otRow = document.getElementById('odR6OtRow');
+  if (!chip) return;
+  try {
+    const d = await (await fetch('/api/r6-match', { cache: 'no-store' })).json();
+    if (otRow) otRow.hidden = !d.needsOvertimeSide;
+    if (d.status !== 'live') { chip.textContent = 'No match'; return; }
+    const side = d.side ? (d.side === 'attack' ? 'ATK' : 'DEF') : '???';
+    chip.textContent = 'R' + d.round + (d.overtime ? ' OT' : '') +
+      ' · ' + side + ' · ' + d.us + '-' + d.them;
+  } catch { chip.textContent = 'Unavailable'; }
+}
+
 function initStreamNight() {
   const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
@@ -1456,6 +1472,22 @@ function initStreamNight() {
      Two open buttons because attack and defence are separate drafts with
      disjoint pools. Lock freezes the tally and names the winner, so a vote
      that slips in afterwards cannot change what is already on screen. */
+  /* ── Siege match tracker ──
+     Every button refreshes both chips: scoring a round can change the side the
+     draft would open on, and the overtime row appears off the same read. */
+  const matchAfter = function () { setTimeout(function () { refreshR6Match(); refreshR6Chip(); }, 300); };
+  on('odR6StartAtkBtn', function (e) { nightPost('/api/r6-match', { action: 'start', side: 'attack' }, e.currentTarget, 'Match started on attack.'); matchAfter(); });
+  on('odR6StartDefBtn', function (e) { nightPost('/api/r6-match', { action: 'start', side: 'defence' }, e.currentTarget, 'Match started on defence.'); matchAfter(); });
+  on('odR6WonBtn', function (e) { nightPost('/api/r6-match', { action: 'won' }, e.currentTarget, 'Round won.'); matchAfter(); });
+  on('odR6LostBtn', function (e) { nightPost('/api/r6-match', { action: 'lost' }, e.currentTarget, 'Round lost.'); matchAfter(); });
+  on('odR6SwapBtn', function (e) { nightPost('/api/r6-match', { action: 'swap' }, e.currentTarget, 'Sides flipped.'); matchAfter(); });
+  on('odR6UndoBtn', function (e) { nightPost('/api/r6-match', { action: 'undo' }, e.currentTarget, 'Last round taken back.'); matchAfter(); });
+  on('odR6EndMatchBtn', function (e) { nightPost('/api/r6-match', { action: 'end' }, e.currentTarget, 'Match cleared.'); matchAfter(); });
+  on('odR6OtAtkBtn', function (e) { nightPost('/api/r6-match', { action: 'overtime', side: 'attack' }, e.currentTarget, 'Overtime starts on attack.'); matchAfter(); });
+  on('odR6OtDefBtn', function (e) { nightPost('/api/r6-match', { action: 'overtime', side: 'defence' }, e.currentTarget, 'Overtime starts on defence.'); matchAfter(); });
+  on('odR6AutoBtn', function (e) { nightPost('/api/r6-draft', { action: 'auto' }, e.currentTarget, 'Draft open on the side being played.'); matchAfter(); });
+  refreshR6Match();
+
   const r6After = function () { setTimeout(refreshR6Chip, 300); };
   on('odR6AtkBtn', function (e) { nightPost('/api/r6-draft', { action: 'attack' }, e.currentTarget, 'Attack draft open — chat votes with !op.'); r6After(); });
   on('odR6DefBtn', function (e) { nightPost('/api/r6-draft', { action: 'defence' }, e.currentTarget, 'Defence draft open — chat votes with !op.'); r6After(); });

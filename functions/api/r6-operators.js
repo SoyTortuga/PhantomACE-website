@@ -18,17 +18,39 @@
    defence draft, "Thatcher" is not a near-miss to be fuzzy-matched, it is
    simply not a candidate.
 
-   Codenames only, as they appear in game. Accents are kept (Jäger, Capitão) —
-   matching strips them, so chat never has to type one.
+   Codenames only. Matching strips accents, case, spacing and punctuation, so
+   chat never has to produce a character it cannot easily type.
    ══════════════════════════════════════════════ */
 
-/* ── PASTE THE ROSTER HERE ────────────────────────────────────────────────
-   Empty until the real lists land. The draft reports itself as unconfigured
-   rather than silently accepting nothing, and the dashboard button says so —
-   a draft that opens and rejects every vote is the worst way to find out. */
-export const ATTACKERS = [];
+/* ── THE ROSTER ───────────────────────────────────────────────────────────
+   39 and 39, as of Y11S3. A new season adds one: put the codename in the
+   right list and nothing else changes.
 
-export const DEFENDERS = [];
+   Accents are written out (Nokk, Capitao, Jager, Tubarao) because matching
+   strips them anyway — nobody should have to type "ø" into a chat box, and a
+   plain spelling here is one less thing to get wrong when adding an operator.
+
+   One correction to the list as supplied: it carried "Kaplan", which is not an
+   operator, while KAPKAN — a base-game defender present in every roster — was
+   missing. Treated as a typo, since leaving it would silently reject anyone
+   typing the real name. Say the word if that was wrong. */
+export const ATTACKERS = [
+  'Solid Snake', 'Rauora', 'Striker', 'Deimos', 'Ram', 'Brava', 'Grim',
+  'Sens', 'Osa', 'Flores', 'Zero', 'Ace', 'Iana', 'Kali', 'Amaru', 'Nokk',
+  'Gridlock', 'Nomad', 'Maverick', 'Lion', 'Finka', 'Dokkaebi', 'Zofia',
+  'Ying', 'Jackal', 'Hibana', 'Capitao', 'Blackbeard', 'Buck', 'Sledge',
+  'Thatcher', 'Ash', 'Thermite', 'Montagne', 'Twitch', 'Blitz', 'IQ', 'Fuze',
+  'Glaz',
+];
+
+export const DEFENDERS = [
+  'Noor', 'Denari', 'Skapos', 'Sentry', 'Tubarao', 'Fenrir', 'Solis',
+  'Azami', 'Thorn', 'Thunderbird', 'Aruni', 'Melusi', 'Oryx', 'Wamai',
+  'Goyo', 'Warden', 'Mozzie', 'Kaid', 'Clash', 'Maestro', 'Alibi', 'Vigil',
+  'Ela', 'Lesion', 'Mira', 'Echo', 'Caveira', 'Valkyrie', 'Frost', 'Mute',
+  'Smoke', 'Castle', 'Pulse', 'Doc', 'Rook', 'Jager', 'Bandit', 'Tachanka',
+  'Kapkan',
+];
 
 /** The two sides a draft can run for. */
 export const SIDES = ['attack', 'defence'];

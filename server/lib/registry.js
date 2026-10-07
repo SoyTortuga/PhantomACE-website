@@ -249,6 +249,10 @@ export const SINGLETONS = {
   /* The live Siege operator draft (functions/api/r6-draft.js). 'real': the TTL
      is the backstop for a draft nobody closed before the stream ended. */
   r6_draft:              { table: 'singletons', expiry: 'real' },
+  /* The live Siege match being tracked (functions/api/r6-match.js), which is
+     what tells the draft which side is being played. 'real': the TTL clears a
+     match nobody closed before the stream ended. */
+  r6_match:              { table: 'singletons', expiry: 'real' },
   /* The live chat vote (functions/api/chat-vote.js) — one question, any game.
      'real': the TTL clears a vote nobody closed before the stream ended. */
   chat_vote:             { table: 'singletons', expiry: 'real' },
@@ -321,6 +325,9 @@ export const FAMILIES = [
      login. 'none' — losing it makes every profile anonymous.
      `loginidx_` is deliberately NOT `profile_login_`, which would sit inside
      the `profile_` family and need longest-prefix care to stay out of it. */
+  /* One row per month of Siege results, a by-product of tracking rounds to
+     derive the side. 'none' — a season record that expires is not a record. */
+  { prefix: 'r6_season_',      table: 'singletons',       expiry: 'none' },
   { prefix: 'profile_',        table: 'profiles',         expiry: 'none' },
   { prefix: 'loginidx_',       table: 'profiles',         expiry: 'none' },
   /* rooms_{userId} — everything one person built in My Room. 'none': it is

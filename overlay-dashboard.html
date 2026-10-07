@@ -201,10 +201,34 @@
             <!-- Siege gives us no readable game state, so the draft IS the
                  integration. Attack and defence are separate because the
                  operator pools are disjoint. -->
+            <!-- The match tracker. Ranked's side rotation is deterministic, so
+                 one answer at the start lets the draft open on the right pool
+                 by itself. It predicts; Swap corrects it in one click. -->
+            <div class="ovmc-row od-game-row">
+              <span class="od-game-name">Siege Match</span>
+              <button class="btn-primary" id="odR6StartAtkBtn">Start on Attack</button>
+              <button class="btn-primary" id="odR6StartDefBtn">Start on Defence</button>
+              <button class="btn-secondary" id="odR6WonBtn">Round Won</button>
+              <button class="btn-secondary" id="odR6LostBtn">Round Lost</button>
+              <button class="btn-secondary" id="odR6SwapBtn" title="The side shown is wrong — flip it">Swap</button>
+              <button class="btn-secondary" id="odR6UndoBtn">Undo</button>
+              <button class="btn-secondary" id="odR6EndMatchBtn">End Match</button>
+              <span class="ovmc-chip" id="odR6MatchChip">No match</span>
+            </div>
+
+            <!-- Shown only at 3-3: ranked resets sides for overtime and we do
+                 not guess which, because he can see it and it is one click. -->
+            <div class="ovmc-row od-game-row" id="odR6OtRow" hidden>
+              <span class="od-game-name">Overtime starts on</span>
+              <button class="btn-primary" id="odR6OtAtkBtn">Attack</button>
+              <button class="btn-primary" id="odR6OtDefBtn">Defence</button>
+            </div>
+
             <div class="ovmc-row od-game-row">
               <span class="od-game-name">Siege Operator Draft</span>
-              <button class="btn-primary" id="odR6AtkBtn">Draft Attack</button>
-              <button class="btn-primary" id="odR6DefBtn">Draft Defence</button>
+              <button class="btn-primary" id="odR6AutoBtn" title="Opens on whichever side the tracked match is playing">Open Draft</button>
+              <button class="btn-secondary" id="odR6AtkBtn">Draft Attack</button>
+              <button class="btn-secondary" id="odR6DefBtn">Draft Defence</button>
               <button class="btn-secondary" id="odR6LockBtn">Lock Pick</button>
               <button class="btn-secondary" id="odR6EndBtn">End</button>
               <span class="ovmc-chip" id="odR6Chip">Idle</span>

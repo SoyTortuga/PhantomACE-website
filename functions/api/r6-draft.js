@@ -203,6 +203,17 @@ export async function onRequestPost(context) {
     const r = await openDraft(env, action);
     return r.ok ? json({ success: true, side: r.side }) : json({ error: r.error }, 400);
   }
+  /* Open on whichever side the tracked match says is being played, so he does
+     not pick a side by hand every round. Refuses rather than guessing when
+     there is no match, or when overtime has not been told which side it is —
+     a draft opened on the wrong pool is worse than one that did not open. */
+  if (action === 'auto') {
+    const { activeSide } = await import('./r6-match.js');
+    const side = await activeSide(env);
+    if (!side) return json({ error: 'No tracked match — start one, or pick a side by hand.' }, 400);
+    const r = await openDraft(env, side);
+    return r.ok ? json({ success: true, side: r.side }) : json({ error: r.error }, 400);
+  }
   if (action === 'lock') {
     const r = await lockDraft(env);
     return r.ok ? json({ success: true, winner: r.winner }) : json({ error: r.error }, 400);
