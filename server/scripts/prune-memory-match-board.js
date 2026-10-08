@@ -64,8 +64,12 @@ async function main() {
   if (!nonEmpty.length) { line('All Memory Match boards are already empty. Nothing to do.'); await pool.end(); return; }
   if (!confirm) { line('DRY RUN — nothing written. Re-run with --confirm.'); await pool.end(); return; }
 
-  /* Re-checked inside the lock so a score landing right now is not clobbered
-     by the copy read above — mutate() replaces only what it reads. */
+  /* Written through mutate() for the lock, not to preserve anything: the
+     mutator returns [] regardless, so a score landing between the count above
+     and this write IS discarded. That is the intent — the whole point is that
+     nothing written before the reset survives it — but it is worth saying
+     plainly rather than implying a safety that is not there. Anyone caught by
+     it can simply play again; the month has weeks left. */
   for (const key of nonEmpty) {
     await kv.mutate(key, () => []);
     line(`cleared ${key}`);
