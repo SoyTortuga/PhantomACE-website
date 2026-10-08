@@ -172,12 +172,25 @@ export async function onRequestPost(context) {
       } catch (err) { console.error('[prediction-events] activity record failed:', err.message); }
     }
 
+    /* A notification arriving is proof the subscription is alive, so it
+       clears any recorded revocation. Without this the red banner stayed up
+       until somebody re-ran Create Subscriptions, even though predictions
+       were plainly working again — the only route here that behaved that way.
+       There are four prediction types and one banner, so whichever delivers
+       first clears it. */
+    try {
+      const { clearEventSubRevocation } = await import('./bot/dashboard.js');
+      await clearEventSubRevocation(env, subType);
+    } catch (err) {
+      console.error('[prediction-events] could not clear revocation:', err.message);
+    }
     return json({ ok: true });
   }
 
   if (messageType === 'revocation') {
-    /* Recorded for Bot Control's revoked banner. Cleared there once Create
-       Subscriptions re-registers the type. */
+    /* Recorded for Bot Control's revoked banner. Cleared either by Create
+       Subscriptions re-registering the type, or by the notification branch
+       above the moment predictions start delivering again. */
     const { recordEventSubRevocation } = await import('./bot/dashboard.js');
     await recordEventSubRevocation(env, body, 'prediction-events');
     return json({ ok: true });

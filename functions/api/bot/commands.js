@@ -527,6 +527,29 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* The one chat command that is MEANT to reply. Thirteen viewer commands
+     exist and nothing told anybody; a command chat cannot discover is a
+     feature that does not run. It names only what is playable this second,
+     so the answer is two or three things rather than an unreadable wall.
+     Per-asker cooldown like !entries: one spammer silences only themselves. */
+  if (parsed.command === '!commands' || parsed.command === '!help') {
+    try {
+      const { helpLine, HELP_COOLDOWN_MS } = await import('./chat-help.js');
+      const key = `bot_cooldown_help_${event.chatter_user_id}`;
+      const last = await env.MARKETPLACE.get(key);
+      if (last && Date.now() - Number(last) < HELP_COOLDOWN_MS) return;
+      await env.MARKETPLACE.put(key, String(Date.now()), { expirationTtl: 60 });
+      /* Deferred like every other reply: the line is composed now, but it
+         goes out after Twitch has its 200. */
+      const line = await helpLine(env);
+      outbox.push(() => sendChatMessage(env, line));
+    } catch (err) {
+      /* A broken help line must not break chat commands. */
+      console.error('[chat-help]', err.message);
+    }
+    return;
+  }
+
   /* Everything past here is broadcaster/moderator only. */
   if (!isAuthorizedSender(env, event)) return;
 

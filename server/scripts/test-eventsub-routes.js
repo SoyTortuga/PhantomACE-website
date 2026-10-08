@@ -57,6 +57,18 @@ const ROUTES = [
   ['channel update', '../../functions/api/channel-update.js', 'functions/api/channel-update.js'],
 ];
 
+/* EVERY route must surface a revocation. Twitch revokes and then simply stops
+   sending, so a route that swallows one goes quiet with nothing anywhere
+   saying why and the Step 4 snapshot still reading green. giveaway-entry was
+   the one that did exactly that. */
+const REVOCATION_ROUTES = [
+  'functions/api/hype-train.js', 'functions/api/channel-points.js',
+  'functions/api/prediction-events.js', 'functions/api/milestones.js',
+  'functions/api/ad-break.js', 'functions/api/bits.js',
+  'functions/api/channel-update.js', 'functions/api/bot/commands.js',
+  'functions/api/bot/giveaway-entry.js',
+];
+
 /** A Twitch-shaped request. `sign` false leaves the headers off entirely. */
 async function makeRequest(body, { sign = true, secret = SECRET, type = 'webhook_callback_verification', timestamp = null } = {}) {
   const raw = JSON.stringify(body);
@@ -282,6 +294,15 @@ for (const [name, spec, rel] of ROUTES) {
   Object.assign(console, quiet);
   check('three concurrent deliveries of one id: exactly one is handled',
     racers.filter(r => !DUP.test(r.text)).length, 1);
+}
+
+{
+  for (const rel of REVOCATION_ROUTES) {
+    const src = fs.readFileSync(path.join(REPO, rel), 'utf8');
+    const name = rel.replace('functions/api/', '');
+    ok(`${name} records a revocation`, /recordEventSubRevocation/.test(src));
+    ok(`${name} clears one when it delivers again`, /clearEventSubRevocation/.test(src));
+  }
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

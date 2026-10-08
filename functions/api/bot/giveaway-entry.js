@@ -183,10 +183,30 @@ export async function onRequestPost(context) {
       await addEntrant(env, event.user_id, event.user_name || event.user_login || 'unknown',
         rarity === false ? null : rarity);
     }
+
+    /* Clears a recorded revocation for this type: a notification arriving is
+       proof the subscription is alive again, which is how every other
+       EventSub route here answers the Bot Control grid. */
+    try {
+      const { clearEventSubRevocation } = await import('./dashboard.js');
+      await clearEventSubRevocation(env, body.subscription && body.subscription.type);
+    } catch (err) {
+      console.error('[giveaway-entry] could not clear revocation:', err.message);
+    }
     return json({ ok: true });
   }
 
   if (messageType === 'revocation') {
+    /* This was the ONE webhook that swallowed a revocation. Twitch revokes
+       and then simply stops sending, so without this the Big Prize giveaway
+       would quietly stop taking entries with nothing anywhere saying why —
+       the Step 4 snapshot would still read green. */
+    try {
+      const { recordEventSubRevocation } = await import('./dashboard.js');
+      await recordEventSubRevocation(env, body, 'giveaway-entry');
+    } catch (err) {
+      console.error('[giveaway-entry] could not record revocation:', err.message);
+    }
     return json({ ok: true });
   }
 

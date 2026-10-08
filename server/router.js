@@ -30,6 +30,10 @@ import { pathToFileURL } from 'node:url';
 /** Files under functions/ that are libraries, not routes. */
 const NON_ROUTE_MODULES = new Set([
   'api/bot/send-chat.js',
+
+  /* What chat can type right now. Library, no handler — the only caller is
+     the !commands dispatch in bot/commands.js. */
+  'api/bot/chat-help.js',
   /* Session signing/verification helpers. Publishing this as a route would
      expose nothing secret — it holds no key — but it is a library and the
      boot assertion below demands every file be declared one way or the
