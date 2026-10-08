@@ -193,9 +193,28 @@ async function showSetupPage(env, url, isBroadcasterUser = false) {
   /* THE FULL GRANT. Josh authorizes ONCE for everything the site could ever
      use, so no future feature has to send him back for a newly-needed scope.
      Twitch consent is all-or-nothing, so a successful authorize grants this
-     whole set. The core five the site relies on today (channel:manage:redemptions,
-     channel:read:hype_train, channel:read:subscriptions, channel:read:ads,
-     bits:read) are in here alongside the rest.
+     whole set.
+
+     DO NOT TRIM THIS LIST. Most of it is unused today and an audit will say
+     so — 83 requested against the ten below. The breadth is deliberate and has
+     been reviewed: Twitch re-prompts for the ENTIRE set every time a scope is
+     added, so a short list buys a cleaner consent screen once and then costs
+     the broadcaster a fresh authorize for every feature after it. This mirrors
+     how the same role is run for a larger channel. Cutting it back is not a
+     tidy-up, it is a decision to reverse, and it is not ours to make.
+
+     The ten that are load-bearing today, so a reader knows which failures
+     point where:
+       channel:read:hype_train      hard-gates Create Subscriptions entirely
+       channel:read:subscriptions   sub / gift / resub events
+       channel:read:redemptions     channel point redemptions
+       channel:manage:redemptions   creating rewards, refunding a redemption
+       channel:read:predictions     the overlay's prediction panel
+       channel:manage:predictions   opening / locking / resolving predictions
+       channel:read:ads             the ad break countdown
+       bits:read                    cheer alerts, the 300-bit Power-up hatch
+       moderator:read:followers     follow alerts
+       channel:bot                  the bot acting in the channel
 
      Two things stay true: adding a scope still does NOT upgrade an
      already-issued token — a new scope means re-running the authorize step once
