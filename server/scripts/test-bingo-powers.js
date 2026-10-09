@@ -35,8 +35,7 @@ import { fileURLToPath } from 'node:url';
 import * as bingoPowers from '../../functions/api/bingo/powers.js';
 import * as bingoJoin from '../../functions/api/bingo/join.js';
 import * as bingoState from '../../functions/api/bingo/state.js';
-import * as mtgPowers from '../../functions/api/mtgbbb/powers.js';
-import { buildCard, scoreCard, bestOf, standings } from '../../functions/api/mtgbbb-scoring.js';
+import { buildCard, scoreCard, standings } from '../../functions/api/mtgbbb-scoring.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -152,66 +151,37 @@ function bingoRoom(over = {}) {
   ok('and keep cardIds mirrored to cards[0] for the host page', me.cardIds.join() === me.cards[0].join());
 }
 
-/* ══ MTGBBB ════════════════════════════════════════════════════════════ */
-
-const POOL = Array.from({ length: 30 }, (_, i) => ({ name: 'Card ' + i, rarity: i % 7 === 0 ? 'rare' : 'common', image: '' }));
-function mtgRoom(over = {}) {
-  const card = buildCard(POOL.map(c => c.name), 'ROOM:u1');
-  return {
-    code: 'BBBB', status: 'active', pool: POOL, pulls: [],
-    players: [{ id: 'u_1', name: 'P1', card }],
-    ...over,
-  };
-}
+/* ══ MTGBBB HAS NO POWERS ══════════════════════════════════════════════
+   Extra cards and wildcard stamps were removed from MTGBBB. The items are
+   NOT gone — they are the shared commander-bingo pool, still spendable in
+   Commander Bingo above — so the thing worth pinning is that MTGBBB no
+   longer offers a way to spend them, and that its scoring cannot mark a
+   square any way but a pull. A half-removal that left the route reachable
+   would be worse than either state: items spent, nothing to show. */
+const POOL = Array.from({ length: 30 }, (_, i) =>
+  ({ name: 'Card ' + i, rarity: i % 7 === 0 ? 'rare' : 'common', image: '' }));
 
 {
-  /* Scoring: a wildcard completes lines but mints no treatment points. */
+  ok('the mtgbbb powers route is gone',
+     !fs.existsSync(path.join(REPO, 'functions/api/mtgbbb/powers.js')));
+
   const card = buildCard(POOL.map(c => c.name), 'x');
   const pulls = [0, 1, 2, 3].map(i => ({ card: card[i], treatments: [] }));
-  const without = scoreCard(card, pulls);
-  const withWild = scoreCard(card, pulls, [4]);
-  check('four pulls plus a stamp complete the top row', withWild.lines.length >= 1, true);
-  ok('which the un-stamped card had not', without.lines.length === 0);
-  check('stamps add marks', withWild.marks, without.marks + 1);
-  check('but never treatments', withWild.treatments, without.treatments);
+  const scored = scoreCard(card, pulls);
+  check('four pulls mark four squares', scored.marks, 4);
+  check('and complete no line on their own', scored.lines.length, 0);
 
-  /* bestOf: the better card wins, not the sum. */
-  const p = { cards: [card, buildCard(POOL.map(c => c.name), 'y')], wildcards: [{ cardIndex: 0, squareIndex: 4 }] };
-  const best = bestOf(p, pulls);
-  check('the stamped card is the best card', best.cardIndex, 0);
-  const board = standings([{ id: 'u_1', name: 'P1', ...p }], pulls);
-  check('standings carry the card count for the host', board[0].cardCount, 2);
-  check('and the stamps used', board[0].wildcardsUsed, 1);
+  /* The old shape, fed in deliberately: a room that was live when powers
+     existed must still score, and must score the ONE card. */
+  const legacy = { id: 'u_1', name: 'P1', card,
+                   cards: [card, buildCard(POOL.map(c => c.name), 'y')],
+                   wildcards: [{ cardIndex: 0, squareIndex: 4 }] };
+  const board = standings([legacy], pulls);
+  check('a record left over from powers still scores', board[0].marks, 4);
+  ok('the leftover stamp marks nothing', !board[0].marked[4]);
+  ok('and no card count rides along any more', board[0].cardCount === undefined);
 }
 
-{
-  /* Extra card: deterministic — the same seed deals the same card. */
-  const env = { MARKETPLACE: fakeKV({ mtgbbb_BBBB: mtgRoom(), inv_1: { items: [bcItem(1)] } }) };
-  const res = await POST(mtgPowers, env, { action: 'extra-card', code: 'BBBB' }, as('1'));
-  check('mtgbbb extra card is accepted', res.status, 200);
-  const room = env.MARKETPLACE.read('mtgbbb_BBBB');
-  check('the player holds two cards', room.players[0].cards.length, 2);
-  check('dealt exactly as the seed dictates — no reroll by re-buying',
-        room.players[0].cards[1], buildCard(POOL.map(c => c.name), 'BBBB:1:extra1'));
-  check('one item spent', countOf(env, '1', 'bonus-card'), 0);
-}
-
-{
-  /* Wildcard: positional, refused when the pulls already marked it. */
-  const room = mtgRoom();
-  const pulledName = room.players[0].card[3];
-  room.pulls = [{ card: pulledName, treatments: [] }];
-  const env = { MARKETPLACE: fakeKV({ mtgbbb_BBBB: room, inv_1: { items: [wcItem(1)] } }) };
-
-  const already = await POST(mtgPowers, env, { action: 'wildcard', code: 'BBBB', cardIndex: 0, squareIndex: 3 }, as('1'));
-  check('a square the pulls marked is refused', already.status, 400);
-  check('for free', countOf(env, '1', 'wildcard'), 1);
-
-  const good = await POST(mtgPowers, env, { action: 'wildcard', code: 'BBBB', cardIndex: 0, squareIndex: 8 }, as('1'));
-  check('an unmarked square takes the stamp', good.status, 200);
-  check('recorded positionally', env.MARKETPLACE.read('mtgbbb_BBBB').players[0].wildcards, [{ cardIndex: 0, squareIndex: 8 }]);
-  check('and the item is gone', countOf(env, '1', 'wildcard'), 0);
-}
 
 /* ══ The clients hold up their half ════════════════════════════════════ */
 {
@@ -233,10 +203,11 @@ function mtgRoom(over = {}) {
   ok('and the row says how a score was reached', /r\.cardCount \+ ' cards'/.test(host));
 
   const mb = fs.readFileSync(path.join(REPO, 'games/mtgbbb/index.html'), 'utf8').replace(/\r\n/g, '\n');
-  ok('mtgbbb renders the active card from you.cards', /you\.cards\[activeCardIdx\]\) \? you\.cards\[activeCardIdx\]\.card : you\.card/.test(mb));
-  ok('its wildcard goes through powers', /\/api\/mtgbbb\/powers/.test(mb));
-  ok('items come from the shared commander-bingo pool', /\/api\/inventory\?game=commander-bingo/.test(mb));
-  ok('stamped cells are badged', /\.mtg-cell\.wild::after/.test(mb));
+  ok('mtgbbb renders the one card it deals', /const view = you\.card;/.test(mb));
+  ok('with no powers route left to call', !/\/api\/mtgbbb\/powers/.test(mb));
+  ok('no inventory bar', !/mtgInvBar/.test(mb));
+  ok('no card tabs', !/cardTabs/.test(mb));
+  ok('and no stamp badge', !/mtg-cell\.wild/.test(mb));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

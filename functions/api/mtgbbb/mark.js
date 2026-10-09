@@ -44,7 +44,7 @@
      afterward, same reasoning as the overlay push.
    ══════════════════════════════════════════════ */
 
-import { scoreCard, cardCounts, bestOf } from '../mtgbbb-scoring.js';
+import { scoreCard, cardCounts } from '../mtgbbb-scoring.js';
 
 const GAME_TTL = 14400;
 
@@ -169,8 +169,8 @@ export async function onRequestPost(context) {
        than a flag that has to be remembered and could go stale across an
        undo. */
     for (const p of room.players) {
-      const before = bestOf(p, pullsBefore).scored;
-      const after = bestOf(p, pullsAfter).scored;
+      const before = scoreCard(p.card, pullsBefore);
+      const after = scoreCard(p.card, pullsAfter);
 
       if (after.blackout && !before.blackout) {
         overlayJobs.push({ type: 'mtgbbb-bingo', who: p.name, pattern: 'Blackout', points: after.points });
