@@ -206,7 +206,10 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
       ],
       /* Debris records carry a client-written src, so they are not
          projected at all rather than being filtered. */
-      debris: [{ id: 'x', x: 3, y: 3, src: 'https://evil.example/debris.png' }],
+      /* One legitimate piece, and one carrying a URL a doctored save would
+         like the visitor's browser to fetch. */
+      debris: [{ id: 'd1', type: 'rock', x: 40, y: 55 },
+               { id: 'x', x: 3, y: 3, src: 'https://evil.example/debris.png' }],
     },
   });
   const env = envWith({ 'dino_park_500': laid, 'parkpub_500': JSON.stringify({ name: 'Decorator' }) });
@@ -226,7 +229,17 @@ const OPEN = JSON.stringify({ name: 'Keeper Two', since: 1 });
   ok('every position is inside 0..100', p.yardItems.every(i => i.y >= 0 && i.y <= 100));
 
   ok('an out-of-charset type is dropped', !p.yardItems.some(i => i.type.includes('<')));
-  ok('debris is not projected at all', !('debris' in p));
+  /* Rubbish IS projected now — a visitor cannot clear what they cannot
+     see. The hazard the fixture above was written for is unchanged and
+     still closed: the hostile `src` is dropped, because a piece of
+     rubbish travels as a type and a place and the visitor's own client
+     resolves the image from its own table. Same rule as decorations. */
+  ok('rubbish is projected so a visitor can clear it', Array.isArray(p.debris));
+  check('the typed piece comes through, the untyped one is dropped', p.debris.length, 1);
+  const debrisKeys = [...new Set(p.debris.flatMap(d => Object.keys(d)))].sort();
+  check('and is only a type and a place', debrisKeys, ['type', 'x', 'y']);
+  ok('a save cannot name an image for the visitor to fetch',
+     !JSON.stringify(p.debris).includes('evil.example'));
 
   const wire = JSON.stringify(body);
   ok('no client-authored image URL crosses the wire', !wire.includes('evil.example'));

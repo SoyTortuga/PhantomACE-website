@@ -363,6 +363,10 @@ export const FAMILIES = [
      'none': a consent record that quietly expired would re-hide a park
      with nothing to explain it. */
   { prefix: 'parkpub_',        table: 'dino_parks',       expiry: 'none' },
+  /* A park's guest book, and a visitor's own daily action tally (which
+     self-resets by a stored day index rather than by TTL). */
+  { prefix: 'parkbook_',       table: 'dino_parks',       expiry: 'none' },
+  { prefix: 'parkact_',        table: 'dino_parks',       expiry: 'none' },
   /* Studio-made park backgrounds: a 32x32 tilemap plus its derived
      walkability mask, one row per background. DATA, not a deploy -- saving
      in the studio is the whole release. 'none': a background that expired

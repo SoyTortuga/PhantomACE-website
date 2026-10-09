@@ -17,7 +17,9 @@ function getSession(request) {
   try { return JSON.parse(decodeURIComponent(match[1])); } catch { return null; }
 }
 
-function saveKey(userId) {
+/* Exported for park-visit.js, which writes ops onto a park its visitor
+   does not own — see pushParkOp. */
+export function saveKey(userId) {
   return `dino_park_${userId}`;
 }
 
@@ -401,6 +403,20 @@ export function escrowDino(state, uid) {
   return found.dino;
 }
 
+/**
+ * Queue an op on a park for its owner's client to apply.
+ *
+ * Exported because VISITORS now change a park they do not own — tidying
+ * somebody's yard — and the only safe way to do that is the mechanism the
+ * marketplace already uses: the server records what happened, the owner's
+ * own client applies it exactly once, and the owner's save stays the one
+ * thing their browser writes. A visitor editing another player's document
+ * directly would be overwritten by that player's very next sync.
+ */
+export function pushParkOp(state, op) {
+  pushMarketOp(state, { id: crypto.randomUUID(), at: Date.now(), ...op });
+}
+
 /** Debit or credit coins. Callers check affordability first. */
 export function applyCoins(state, delta, note) {
   state.coins = Math.floor(Number(state.coins) || 0) + delta;
@@ -507,6 +523,11 @@ async function visitPark(env, session, target) {
   return json({
     visiting: true,
     ownerName: String(pass.name || 'A keeper').slice(0, VISIT_NAME_MAX),
+    /* The id the visitor needs to act on this park — to tidy it or sign
+       its guest book. Required for the random visit above especially,
+       where the caller never learns whose park it landed on. It is the
+       same public id the profile pages already expose. */
+    ownerId: String(userId),
     park: projectPark(record.state),
   });
 }
@@ -630,6 +651,9 @@ const VISIT_PARK_MAX = 40;
    a legitimate park is never truncated, and exists only to bound what a
    doctored save can ask a visitor's browser to draw. */
 const VISIT_YARD_MAX = 40;
+/* Same reasoning as the yard cap: a legitimate park's rubbish always
+   arrives whole, a doctored save cannot ask a visitor to draw thousands. */
+const VISIT_DEBRIS_MAX = 40;
 
 /**
  * The public view of one dino. Whitelist, not cleanup.
@@ -688,6 +712,16 @@ function projectDino(d) {
  * reason debris is not projected at all: its records carry a client-authored
  * `src`, which is a URL somebody else's browser would fetch.
  */
+/* Rubbish, for visitors to clear. Position only — the id is the owner's
+   and is never needed, because a tidy op says HOW MANY were cleared rather
+   than which, so a stale visit snapshot can never delete the wrong thing. */
+function projectDebris(d) {
+  if (!d || typeof d !== 'object') return null;
+  const type = String(d.type || '');
+  if (!FAV_ID.test(type)) return null;
+  return { type, x: pct(d.x), y: pct(d.y) };
+}
+
 function projectYardItem(it) {
   if (!it || typeof it !== 'object') return null;
   const type = String(it.type || '');
@@ -714,6 +748,8 @@ export function projectPark(state) {
        so a legitimate park always arrives whole while a doctored save still
        cannot ask the visitor to draw ten thousand sprites. */
     yardItems: yard.slice(0, VISIT_YARD_MAX).map(projectYardItem).filter(Boolean),
+    debris: (Array.isArray(s.debris) ? s.debris : [])
+      .slice(0, VISIT_DEBRIS_MAX).map(projectDebris).filter(Boolean),
     /* The BACKGROUND ID, never a URL. Backgrounds are unlockable
        cosmetics and each one carries its own walkability mask, so a
        visitor must draw the owner's scenery or the dinos appear on the

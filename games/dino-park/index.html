@@ -1227,6 +1227,24 @@
 
     /* The broker's rarity buttons. Rarity colours come from the shared
        tokens and are used ONLY to signal rarity, never as UI accents. */
+    .visit-debris { position: absolute; transform: translate(-50%, -50%); cursor: pointer; }
+    .visit-debris img { image-rendering: pixelated; display: block; }
+    .visit-debris:hover img { filter: drop-shadow(0 0 4px rgba(255, 170, 0, 0.9)); }
+    .visit-hint { font-size: 13px; color: var(--text-sec); margin-top: 6px; text-align: center; }
+
+    .visit-book { margin-top: 12px; border-top: 1px solid var(--border-low); padding-top: 10px; text-align: left; }
+    .visit-sign { display: flex; gap: 6px; margin-bottom: 8px; }
+    .visit-note {
+      flex: 1; min-width: 0; padding: 6px 9px; background: var(--gray-hi); color: var(--text-pri);
+      border: 1px solid var(--border-mid); border-radius: 4px; font-family: var(--font-ui); font-size: 14px;
+    }
+    .visit-entry { border-top: 1px solid var(--border-low); padding: 6px 0; }
+    .visit-entry-name { font-size: 13px; color: var(--text-sec); }
+    .visit-entry-text { font-size: 14px; color: var(--text-pri); line-height: 1.45; }
+
+    .breed-summary { font-size: 14px; color: var(--text-sec); line-height: 1.5; margin-bottom: 8px; }
+    .breed-summary b { color: var(--text-pri); }
+
     .broker-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .broker-btn {
       display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -1333,6 +1351,10 @@
 <!-- Eggs Tab -->
 <div class="tab-content scrollable" id="tab-eggs">
   <div id="eventBannerArea"></div>
+  <div class="eggs-section">
+    <div class="section-title">Breeding Pen</div>
+    <div id="breedPen"></div>
+  </div>
   <div class="eggs-section">
     <div class="section-title">Incubator</div>
     <div id="incubatorStatusBanner"></div>
@@ -4019,6 +4041,17 @@ function adoptServerGrants(serverState) {
       const d = Math.floor(Number(op.d) || 0);
       state.coins = (state.coins || 0) + d;
       added.coins += d;
+    } else if (op.t === 'tidy') {
+      /* A visitor cleared rubbish. Removing `n` pieces of whatever is
+         actually there, rather than the ones they saw: their view was a
+         snapshot and the yard has moved on. Removing more than exist is a
+         no-op, which is the correct outcome for a park already clean. */
+      const take = Math.max(0, Math.min(Math.floor(Number(op.n) || 0), (state.debris || []).length));
+      if (take > 0) {
+        state.debris.splice(0, take);
+        added.tidied = (added.tidied || 0) + take;
+        if (op.by) added.tidiedBy = String(op.by).slice(0, 40);
+      }
     } else if (op.t === 'out') {
       if (op.grantId) markGrantsConsumed([op.grantId]);
       const pi = state.park.findIndex(x => x && x.uid === op.uid);
@@ -6192,7 +6225,7 @@ function redeemCode() {
     : `Code redeemed! Found a ${rarity} egg! 🎁`);
 }
 
-function renderEggsTab() { renderEventBanner(); renderIncubator(); renderEggSources(); }
+function renderEggsTab() { renderEventBanner(); renderBreeding(); renderIncubator(); renderEggSources(); }
 
 function renderEventBanner() {
   const area = document.getElementById('eventBannerArea');
@@ -6479,6 +6512,71 @@ async function visitRandomPark() {
 /* Deep-link from Room Crawl: ?visit=<numericId> opens that specific park in
    the same looking-only overlay. Reuses the exact consent + projection path
    of a random visit, so a closed park is refused the same way. */
+/* ── Visiting: the things you can do in someone else's park ───────────
+   The park being viewed, and the guest book that goes with it. Held here
+   rather than in the save because none of it is this player's park. */
+let _visitOwner = null;
+let _visitBook = [];
+
+async function loadGuestBook(ownerId) {
+  try {
+    const res = await fetch('/api/park-visit?owner=' + encodeURIComponent(ownerId));
+    if (!res.ok) return;
+    _visitBook = (await res.json()).entries || [];
+    renderGuestBook();
+  } catch { /* a book that will not load is not worth an error on a visit */ }
+}
+
+function renderGuestBook() {
+  const host = document.getElementById('visitBook');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="section-title">Guest Book</div>
+    <div class="visit-sign">
+      <input id="visitNote" class="visit-note" maxlength="140" placeholder="Leave a note for the keeper...">
+      <button class="expo-btn" onclick="onSignBook()">Sign</button>
+    </div>
+    ${_visitBook.length
+      ? _visitBook.map(e => `
+        <div class="visit-entry">
+          <div class="visit-entry-name">${escapeHtml(e.name || 'A visitor')}</div>
+          <div class="visit-entry-text">${escapeHtml(e.text || '')}</div>
+        </div>`).join('')
+      : '<div class="expo-empty">Nobody has signed this one yet.</div>'}`;
+}
+
+async function onSignBook() {
+  const input = document.getElementById('visitNote');
+  const text = (input && input.value || '').trim();
+  if (!text) { showToast('Write something first.'); return; }
+  try {
+    const res = await fetch('/api/park-visit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sign', owner: _visitOwner, text }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Could not sign.'); return; }
+    if (input) input.value = '';
+    showToast('Signed the guest book.');
+    loadGuestBook(_visitOwner);
+  } catch { showToast('Could not reach the park.'); }
+}
+
+async function onTidyVisit(el) {
+  try {
+    const res = await fetch('/api/park-visit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tidy', owner: _visitOwner }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Could not tidy that.'); return; }
+    /* Removed from the view immediately. The owner's copy changes when
+       their own client applies the op, which is the only writer it has. */
+    if (el) el.remove();
+    showToast(`Tidied — +${data.reward} coins. Thanks from the keeper.`);
+  } catch { showToast('Could not reach the park.'); }
+}
+
 async function visitParkById(id) {
   if (!/^[0-9]{1,20}$/.test(String(id))) return;
   try {
@@ -6513,6 +6611,19 @@ function showVisitedPark(data) {
     </div>`;
   }).join('');
 
+  /* Rubbish the visitor can clear. Same rule as the decorations: the
+     image comes from OUR debris table by type id, never from the
+     response, so a doctored save cannot name an image to fetch. */
+  const debris = Array.isArray(p.debris) ? p.debris : [];
+  const debrisHtml = debris.map((d, i) => {
+    const t = DEBRIS_TYPES.find(x => x.type === d.type);
+    if (!t) return '';
+    return `<div class="visit-debris" style="left:${d.x}%;top:${d.y}%;z-index:${4 + Math.round(d.y / 10)}"
+                 title="Clear this for the keeper" onclick="onTidyVisit(this)">
+      <img src="${t.src}" width="22" alt="">
+    </div>`;
+  }).join('');
+
   const dinoHtml = dinos.map(d => {
     const spec = getRosterById(d.speciesId);
     if (!spec) return '';
@@ -6541,10 +6652,12 @@ function showVisitedPark(data) {
   overlay.innerHTML = `
     <div class="visit-dialog">
       <div class="visit-head">👀 ${escapeHtml(data.ownerName || 'A keeper')}'s Park</div>
-      <div class="visit-sub">Day ${p.parkDay || 1} · ${dinos.length} in the park · ${yard.length} decorations · ${p.speciesDiscovered || 0} species discovered · looking only</div>
-      <div class="visit-world" id="visitWorld">${yardHtml}${dinoHtml}</div>
+      <div class="visit-sub">Day ${p.parkDay || 1} · ${dinos.length} in the park · ${yard.length} decorations · ${p.speciesDiscovered || 0} species discovered${debris.length ? ` · <b>${debris.length} to tidy</b>` : ''}</div>
+      <div class="visit-world" id="visitWorld">${yardHtml}${debrisHtml}${dinoHtml}</div>
+      ${debris.length ? '<div class="visit-hint">Tap the rubbish to clear it — the keeper keeps the tidier yard, you keep the coins.</div>' : ''}
       ${dinos.length ? '' : '<div class="visit-empty">This keeper has no dinosaurs in their park right now.</div>'}
       ${muts ? `<div class="visit-legend">${muts}</div>` : ''}
+      <div id="visitBook" class="visit-book"></div>
       <div class="visit-btns">
         <button onclick="closeVisit();visitRandomPark();">Visit another</button>
         <button onclick="closeVisit()">Close</button>
@@ -6552,6 +6665,14 @@ function showVisitedPark(data) {
     </div>`;
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeVisit(); });
   document.body.appendChild(overlay);
+
+  _visitOwner = data.ownerId || _visitOwner;
+  _visitBook = [];
+  /* Drawn BEFORE the fetch, not after it. Rendering only on success meant
+     a book that failed to load took the sign box down with it, so a
+     visitor could not leave a note because the notes would not load. */
+  renderGuestBook();
+  if (_visitOwner) loadGuestBook(_visitOwner);
 
   /* THEIR scenery, resolved from OUR catalogue by id — never a URL from
      the response. A built-in background is one image; a studio one is
@@ -7605,6 +7726,264 @@ function expoPaceMult() {
 function eggSpeedMult() {
   if (!state.expo) return 1;
   return Math.pow(1 + expoUpgById('hatch').step / 100, expoUpgLevel('hatch'));
+}
+
+/* ══════════════════════════════════════════════
+   THE BREEDING PEN
+
+   Pair two adults, pay, and get an egg on the spot.
+
+   NO THIRD TIMER. The park already waits on two clocks — incubation runs
+   on live stream time, expeditions on wall time with a live boost — and a
+   third would be one wait too many. So breeding itself is INSTANT and the
+   egg it produces goes into the incubator, where the existing wait already
+   lives. What it costs instead is coins and both parents, who go on a
+   day's cooldown.
+
+   IT ASKS SOMETHING OF THE PLAYER, which is the whole point. Both parents
+   must be ADULTS — careCount 60, which is real care given one animal at a
+   time on a one-live-hour cooldown. Nothing about this ticks along on its
+   own: a pair has to be chosen, raised, and paid for, and the egg has to
+   be collected.
+
+   THE FLOOR IS THE LOWER PARENT, not the higher. Pairing a legendary with
+   a fresh common would otherwise be a free legendary every day, and the
+   vault would become a lottery ticket rather than a roster. Starting from
+   the lower parent means the way to breed up is to raise BOTH, which is
+   the behaviour worth rewarding — and it finally gives the 200-dino vault
+   a job beyond being an expedition bench.
+   ══════════════════════════════════════════════ */
+
+/* A day, wall time, per parent. Wall rather than live seconds (which is
+   what care cooldowns use) so breeding is a daily decision like the Daily
+   Dig and the broker, rather than something that stalls between streams. */
+const BREED_COOLDOWN_MS = 24 * 3600 * 1000;
+
+/* Priced off the FLOOR rarity — what the pairing is guaranteed to produce
+   — so the premium is for the animals you raised, not the gamble. */
+const BREED_COST = { common: 300, uncommon: 700, rare: 1600, epic: 4000, legendary: 10000 };
+
+/* Step-up odds. A pair of raised adults of the same species is the best
+   chance in the game at a tier above what you own; two barely-grown
+   strangers is mostly what you already had. */
+const BREED_UP_BASE = 0.12;
+/* The most that care alone can add. */
+const BREED_UP_CARE_CAP = 0.33;
+const BREED_UP_SAME_SPECIES = 0.10;
+/* A second tier above the floor is this much as likely as the first. */
+const BREED_UP_SECOND_STEP = 0.35;
+
+/* Mutation inheritance. Two carriers of the SAME mutation is the reliable
+   route; one carrier is a real but minority chance. */
+const BREED_MUT_ONE = 0.25;
+const BREED_MUT_BOTH = 0.6;
+
+function rarityIndex(r) {
+  const i = RARITY_ORDER.indexOf(r);
+  return i === -1 ? 0 : i;
+}
+
+function breedCooldownLeft(d, now = Date.now()) {
+  if (!d || !d.bredAt) return 0;
+  return Math.max(0, BREED_COOLDOWN_MS - (now - d.bredAt));
+}
+
+/** Why this animal cannot breed right now, or null if it can. */
+function breedBlocker(d, now = Date.now()) {
+  if (!d) return 'gone';
+  if (d.busy) return 'away';
+  if (getStage(d) !== 'adult') return 'young';
+  if (breedCooldownLeft(d, now) > 0) return 'resting';
+  return null;
+}
+
+function breedEligible(now = Date.now()) {
+  return allDinos().filter(d => breedBlocker(d, now) === null);
+}
+
+/** The rarity a pairing is guaranteed to produce, before any step up. */
+function breedFloorRarity(a, b) {
+  const ra = (getRosterById(a.speciesId) || {}).rarity || 'common';
+  const rb = (getRosterById(b.speciesId) || {}).rarity || 'common';
+  return RARITY_ORDER[Math.min(rarityIndex(ra), rarityIndex(rb))];
+}
+
+function breedCost(a, b) {
+  return BREED_COST[breedFloorRarity(a, b)] || BREED_COST.common;
+}
+
+/** Chance of one step above the floor, 0-1. Shown to the player before they pay. */
+function breedUpChance(a, b) {
+  const avgCare = ((a.careCount || 0) + (b.careCount || 0)) / 2;
+  const care = Math.min(BREED_UP_CARE_CAP, avgCare / 1200);
+  const same = a.speciesId === b.speciesId ? BREED_UP_SAME_SPECIES : 0;
+  return Math.min(0.85, BREED_UP_BASE + care + same);
+}
+
+/**
+ * Roll the child's rarity. At most two tiers above the floor, the second
+ * far less likely than the first — a ceiling, so a perfect pair of
+ * commons cannot shortcut all the way to legendary.
+ */
+function breedRollRarity(a, b, rnd = Math.random) {
+  const floor = rarityIndex(breedFloorRarity(a, b));
+  const p = breedUpChance(a, b);
+  let idx = floor;
+  if (rnd() < p) idx++;
+  if (idx > floor && rnd() < p * BREED_UP_SECOND_STEP) idx++;
+  return RARITY_ORDER[Math.min(RARITY_ORDER.length - 1, idx)];
+}
+
+/** Chance the child carries a mutation, 0-1. */
+function breedMutChance(a, b) {
+  const ma = a.mutation || null, mb = b.mutation || null;
+  if (ma && mb) return ma === mb ? BREED_MUT_BOTH : BREED_MUT_ONE;
+  if (ma || mb) return BREED_MUT_ONE;
+  return 0;
+}
+
+/**
+ * Which species the child is.
+ *
+ * A parent's own species whenever the rolled rarity matches one, so
+ * pairing two Stegosaurus reliably produces Stegosaurus — the predictable
+ * result is the reason to keep a matched pair. A step up lands outside
+ * both parents' tier by definition, so that rolls fresh.
+ */
+function breedChildSpecies(a, b, rarity, rnd = Math.random) {
+  const candidates = [a, b]
+    .map(d => getRosterById(d.speciesId))
+    .filter(sp => sp && sp.rarity === rarity);
+  if (candidates.length) return candidates[Math.floor(rnd() * candidates.length)];
+  return rollSpecies(rarity);
+}
+
+/**
+ * Pair them. Returns {ok:true, ...} or {ok:false, error}.
+ *
+ * Every refusal is checked BEFORE anything is spent or stamped, so a
+ * rejected pairing costs nothing and leaves neither parent on cooldown.
+ */
+function breedPair(uidA, uidB, now = Date.now()) {
+  if (!uidA || !uidB || uidA === uidB) return { ok: false, error: 'Pick two different animals.' };
+  const a = findDinoByUidLocal(uidA);
+  const b = findDinoByUidLocal(uidB);
+  if (!a || !b) return { ok: false, error: 'One of them is no longer in your park.' };
+
+  const why = { away: 'One of them is out with an expedition.',
+                young: 'Both need to be fully grown adults.',
+                resting: 'One of them bred recently and needs a day.',
+                gone: 'One of them is no longer in your park.' };
+  for (const d of [a, b]) {
+    const blocked = breedBlocker(d, now);
+    if (blocked) return { ok: false, error: why[blocked] };
+  }
+
+  const cost = breedCost(a, b);
+  if ((state.coins || 0) < cost) return { ok: false, error: `Not enough coins (need ${cost}).` };
+
+  const floor = breedFloorRarity(a, b);
+  const rarity = breedRollRarity(a, b);
+  const species = breedChildSpecies(a, b, rarity);
+  if (!species) return { ok: false, error: 'No such animal could come of that pairing.' };
+
+  state.coins -= cost;
+  a.bredAt = now;
+  b.bredAt = now;
+
+  const mutated = Math.random() < breedMutChance(a, b);
+  const where = acquireEgg(species.id, rarity, mutated ? { guaranteedMutation: true } : {});
+
+  save();
+  return {
+    ok: true, cost, rarity, floor, species, where, mutated,
+    steppedUp: rarityIndex(rarity) > rarityIndex(floor),
+  };
+}
+
+/* ── The pen's UI ─────────────────────────────────────────────────────
+   The chosen pair lives here and not in the save: a half-made choice is
+   not park state, and persisting it would mean a stale pick surviving a
+   reload and naming an animal that has since been sold. */
+let breedPicks = [];
+
+function breedDinoLabel(d) {
+  return d.nickname || (getRosterById(d.speciesId) || {}).name || 'Dino';
+}
+
+function onBreedPick(uid) {
+  const at = breedPicks.indexOf(uid);
+  if (at >= 0) breedPicks.splice(at, 1);
+  else if (breedPicks.length < 2) breedPicks.push(uid);
+  else { showToast('A pairing is two animals.'); return; }
+  renderBreeding();
+}
+
+function onBreedPair() {
+  const res = breedPair(breedPicks[0], breedPicks[1]);
+  if (!res.ok) { showToast(res.error); return; }
+  breedPicks = [];
+  renderEggsTab();
+  updateTopBar();
+
+  const base = res.where === 'storage'
+    ? `${res.species.name} egg \u2014 incubator full, sent to Egg Storage.`
+    : `${res.species.name} egg, incubating now.`;
+  showToast(res.steppedUp ? `A ${res.rarity}! ${base}` : base);
+  if (res.mutated) setTimeout(() => showToast('It carries a mutation. \u2728'), 2600);
+}
+
+function renderBreeding() {
+  const host = document.getElementById('breedPen');
+  if (!host) return;
+  const now = Date.now();
+  const eligible = breedEligible(now);
+  breedPicks = breedPicks.filter(uid => eligible.some(d => d.uid === uid));
+
+  const a = findDinoByUidLocal(breedPicks[0]);
+  const b = findDinoByUidLocal(breedPicks[1]);
+  const pair = a && b;
+
+  /* Everything the pairing will do, stated BEFORE the coins are spent.
+     A gamble you cannot see the odds of is just a slot machine. */
+  let summary;
+  if (pair) {
+    const floor = breedFloorRarity(a, b);
+    const up = Math.round(breedUpChance(a, b) * 100);
+    const mut = Math.round(breedMutChance(a, b) * 100);
+    summary = `Guaranteed <b>${escapeHtml(floor)}</b> &middot; <b>${up}%</b> chance of better`
+      + (mut ? ` &middot; <b>${mut}%</b> chance of a mutation` : '')
+      + (a.speciesId === b.speciesId ? ' &middot; same species, so the egg breeds true' : '');
+  } else {
+    summary = 'Pick two grown adults. The guaranteed rarity is the LOWER of the pair, so raising both is what breeds upward.';
+  }
+
+  const cost = pair ? breedCost(a, b) : 0;
+  const afford = (state.coins || 0) >= cost;
+
+  const resting = allDinos().filter(d => breedCooldownLeft(d, now) > 0).length;
+
+  host.innerHTML = `
+    <div class="breed-summary">${summary}</div>
+    <div class="expo-party">
+      ${eligible.length
+        ? eligible.map(d => {
+            const chosen = breedPicks.includes(d.uid);
+            const sp = getRosterById(d.speciesId) || {};
+            return `<div class="expo-pick ${chosen ? 'chosen' : ''}" onclick="onBreedPick('${d.uid}')">
+              ${sp.icon ? `<img src="${escapeHtml(sp.icon)}" alt="" onerror="this.remove()">` : ''}
+              <span>${escapeHtml(breedDinoLabel(d))}</span>
+              <span class="expo-pick-stat">${escapeHtml(sp.rarity || '')}</span>
+            </div>`;
+          }).join('')
+        : `<div class="expo-empty">No one is ready to pair. Adults only (60 care), not out on an expedition, and a day between pairings.${resting ? ` ${resting} resting.` : ''}</div>`}
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+      <button class="expo-btn" ${pair && afford ? '' : 'disabled'} onclick="onBreedPair()">
+        ${pair ? `Pair them &middot; ${cost}` : 'Pair them'}
+      </button>
+      ${pair && !afford ? '<span class="expo-sub">Not enough coins</span>' : ''}
+    </div>`;
 }
 
 /* ══════════════════════════════════════════════
