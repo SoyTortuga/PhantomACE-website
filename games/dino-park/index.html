@@ -1225,6 +1225,16 @@
     .expo-pick img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
     .expo-pick .expo-pick-stat { color: var(--text-sec); font-size: 13px; }
 
+    .expo-kits { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
+    .expo-kit {
+      border: 1px solid var(--border-mid); border-radius: 4px; background: var(--gray-hi);
+      padding: 8px 10px; cursor: pointer; font-size: 14px; color: var(--text-pri);
+    }
+    .expo-kit.chosen { border-color: var(--red); color: #ffaaaa; }
+    .expo-kit.poor { opacity: 0.45; }
+    .expo-kit-top { display: flex; justify-content: space-between; gap: 8px; }
+    .expo-kit-desc { font-size: 13px; color: var(--text-sec); margin-top: 3px; line-height: 1.4; }
+
     .expo-note { display: flex; align-items: center; justify-content: space-between; gap: 10px;
       border: 1px solid var(--border-mid); border-radius: 6px; background: var(--gray-mid);
       padding: 10px 12px; margin-bottom: 8px; }
@@ -1350,6 +1360,13 @@
       <div class="expo-sub" id="expoRotation"></div>
     </div>
     <div id="expoBoard"></div>
+  </div>
+  <div class="expo-section">
+    <div class="expo-head">
+      <div class="section-title">Upgrades</div>
+      <div class="expo-sub">Permanent</div>
+    </div>
+    <div id="expoUpgrades"></div>
   </div>
   <div class="expo-section">
     <div class="expo-head">
@@ -4267,7 +4284,7 @@ async function applyEggCatchup(sinceMs) {
     let credited = false;
     state.eggs.forEach(e => {
       if (e.elapsed < e.hatchTime) {
-        e.elapsed = Math.min(e.hatchTime, e.elapsed + liveSeconds);
+        e.elapsed = Math.min(e.hatchTime, e.elapsed + liveSeconds * eggSpeedMult());
         credited = true;
       }
     });
@@ -5492,7 +5509,10 @@ const YARD_BANDS = [
 /* Raised with the catalogue: 33 types and 14 slots meant most of them
    could never be seen together. Still a real constraint -- a park is a
    choice, not an inventory. */
-const MAX_YARD_ITEMS = 20;
+/* BASE capacity. The live cap is getMaxYardItems(), which adds what the
+   Groundskeeping upgrade has bought — the twenty-item ceiling is what
+   closed the decor catalog as a coin sink in the first place. */
+const MAX_YARD_ITEMS_BASE = 20;
 const YARD_REFUND_PCT = 0.6;
 
 let decorateMode = false;
@@ -5532,7 +5552,7 @@ function toggleDecorateMode() {
 function renderYardTray() {
   const wrap = document.getElementById('yardTrayItems');
   const count = (state.yardItems || []).length;
-  const full = count >= MAX_YARD_ITEMS;
+  const full = count >= getMaxYardItems();
   /* GROUPED, because 33 items in one horizontal strip is a scroll nobody
      finishes — the catalogue may as well not have been expanded if half of
      it is never seen. Bands are an explicit field rather than inferred
@@ -5570,10 +5590,10 @@ function renderYardTray() {
   }).join('');
   const hint = document.getElementById('yardTrayHint');
   hint.textContent = full
-    ? `Yard full (${count}/${MAX_YARD_ITEMS}) — tap an item to sell it.`
+    ? `Yard full (${count}/${getMaxYardItems()}) — tap an item to sell it.`
     : selectedYardType
       ? `Tap the ground to place. Tap a placed item to sell it.`
-      : `${count}/${MAX_YARD_ITEMS} placed · Pick an item, then tap the ground.`;
+      : `${count}/${getMaxYardItems()} placed · Pick an item, then tap the ground.`;
 }
 
 function selectYardType(id) {
@@ -5586,7 +5606,7 @@ function placeYardItem(x, y) {
   const t = getYardType(selectedYardType);
   if (!t) return;
   if (!state.yardItems) state.yardItems = [];
-  if (state.yardItems.length >= MAX_YARD_ITEMS) { showToast(`Yard is full (${MAX_YARD_ITEMS} items).`); return; }
+  if (state.yardItems.length >= getMaxYardItems()) { showToast(`Yard is full (${getMaxYardItems()} items).`); return; }
   if (state.coins < t.cost) { showToast(`Not enough coins (need ${t.cost}).`); return; }
   if (!yardZoneTest(t)(x, y)) {
     showToast(t.zone === 'water' ? 'Place that in the water.' : 'Place items on dry land.');
@@ -7128,8 +7148,8 @@ const EXPO_LIVE_BOOST = 3;
    from the window index — two devices on one save must not disagree about
    what is on offer, and a board that rerolled per device would let a player
    shop for the site they wanted by opening a second tab. */
-const EXPO_BOARD_PERIOD_MS = 12 * 3600 * 1000;
-const EXPO_BOARD_SIZE = 3;
+const EXPO_BOARD_PERIOD_MS = 8 * 3600 * 1000;
+const EXPO_BOARD_SIZE = 4;
 const EXPO_QUEST_PERIOD_MS = 24 * 3600 * 1000;
 const EXPO_QUEST_COUNT = 3;
 
@@ -7144,48 +7164,123 @@ const EXPO_HYGIENE_COST = 12;
 
 /* Sites. `w` weights the three attributes, `target` is the party score that
    counts as a full-strength showing, `slots` is the party size, `dur` is
-   WALL seconds (divide by EXPO_LIVE_BOOST for the all-live case).
+   WALL seconds (divide by EXPO_LIVE_BOOST for the all-live case), and `req`
+   is how many expeditions must have come home before it appears.
 
-   Every site is a real place in the park's world with its own reason to go
-   — none of them is "Expedition 4". The weights are what make the choice a
-   choice: a boneyard wants muscle, a causeway wants speed, and a roster of
-   one kind of dino will leave money on the table somewhere. */
+   TWENTY-FOUR, GATED IN FIVE BANDS. Four are on the board at a time and the
+   board turns over every 8 hours, so a player sees twelve a day and the far
+   end of the map is something they open up rather than something they scroll
+   past on day one. A site with no `req` is open from the first run.
+
+   Every site is a real place with its own reason to go — none of them is
+   "Expedition 17". The weights are what make the choice a choice: a boneyard
+   wants muscle, a causeway wants speed, and a roster of one kind of animal
+   will leave money on the table somewhere.
+
+   PAY RISES WITH THE BAND, not just with the clock. Inside a band a longer
+   run pays more; across bands the rate per hour climbs, which is what makes
+   pushing deeper worth the unlock rather than just worth the wait. */
 const EXPO_SITES = [
-  { id: 'tarseeps', name: 'The Tar Seeps', slots: 1, dur: 2 * 3600, target: 70,
+  /* ── Open from the start ─────────────────────────────────────────── */
+  { id: 'tarseeps', name: 'The Tar Seeps', req: 0, slots: 1, dur: 2 * 3600, target: 70,
     w: { p: 0.3, g: 0.6, s: 0.1 }, coins: 70, eggChance: 0.08, eggWeights: { common: 70, uncommon: 25, rare: 5 },
     blurb: 'Something enormous went in and never came out. Send one careful animal.' },
 
-  { id: 'causeway', name: 'The Drowned Causeway', slots: 1, dur: 2 * 3600, target: 65,
+  { id: 'causeway', name: 'The Drowned Causeway', req: 0, slots: 1, dur: 2 * 3600, target: 65,
     w: { p: 0.1, g: 0.2, s: 0.7 }, coins: 65, eggChance: 0.08, eggWeights: { common: 65, uncommon: 30, rare: 5 },
     blurb: 'Passable for about an hour either side of low tide. Anything slow gets wet.' },
 
-  { id: 'ashfall', name: 'Ashfall Beds', slots: 2, dur: 3 * 3600, target: 150,
-    w: { p: 0.6, g: 0.3, s: 0.1 }, coins: 130, eggChance: 0.14, eggWeights: { common: 55, uncommon: 32, rare: 11, epic: 2 },
+  { id: 'shalebank', name: 'The Shale Bank', req: 0, slots: 1, dur: 3 * 3600, target: 95,
+    w: { p: 0.5, g: 0.4, s: 0.1 }, coins: 100, eggChance: 0.1, eggWeights: { common: 62, uncommon: 30, rare: 8 },
+    blurb: 'It comes away in sheets. Patient work, and the layers are in order.' },
+
+  { id: 'ashfall', name: 'Ashfall Beds', req: 0, slots: 2, dur: 3 * 3600, target: 150,
+    w: { p: 0.6, g: 0.3, s: 0.1 }, coins: 105, eggChance: 0.14, eggWeights: { common: 55, uncommon: 32, rare: 11, epic: 2 },
     blurb: 'Half a metre of grey ash over everything. Whatever is under it is intact.' },
 
-  { id: 'thornwood', name: 'Thornwood Hollow', slots: 2, dur: 3 * 3600, target: 140,
-    w: { p: 0.2, g: 0.4, s: 0.4 }, coins: 125, eggChance: 0.14, eggWeights: { common: 55, uncommon: 32, rare: 11, epic: 2 },
+  { id: 'thornwood', name: 'Thornwood Hollow', req: 0, slots: 2, dur: 4 * 3600, target: 185,
+    w: { p: 0.2, g: 0.4, s: 0.4 }, coins: 135, eggChance: 0.15, eggWeights: { common: 55, uncommon: 32, rare: 11, epic: 2 },
     blurb: 'The undergrowth closes behind you. Nothing large has been through in years.' },
 
-  { id: 'saltflats', name: 'The Salt Flats', slots: 2, dur: 4 * 3600, target: 160,
+  { id: 'saltflats', name: 'The Salt Flats', req: 0, slots: 2, dur: 5 * 3600, target: 215,
     w: { p: 0.2, g: 0.2, s: 0.6 }, coins: 170, eggChance: 0.16, eggWeights: { common: 50, uncommon: 33, rare: 14, epic: 3 },
     blurb: 'Flat, bright and utterly exposed. Easy walking, nowhere to shelter.' },
 
-  { id: 'sunkencavern', name: 'Sunken Cavern', slots: 2, dur: 4 * 3600, target: 175,
-    w: { p: 0.35, g: 0.55, s: 0.1 }, coins: 180, eggChance: 0.16, eggWeights: { common: 48, uncommon: 33, rare: 16, epic: 3 },
+  /* ── After three runs ────────────────────────────────────────────── */
+  { id: 'sunkencavern', name: 'Sunken Cavern', req: 3, slots: 2, dur: 3 * 3600, target: 160,
+    w: { p: 0.35, g: 0.55, s: 0.1 }, coins: 130, eggChance: 0.17, eggWeights: { common: 48, uncommon: 33, rare: 16, epic: 3 },
     blurb: 'The roof came down a long time ago and sealed the whole gallery.' },
 
-  { id: 'stormbreak', name: 'Stormbreak Ridge', slots: 3, dur: 6 * 3600, target: 300,
-    w: { p: 0.45, g: 0.15, s: 0.4 }, coins: 300, eggChance: 0.24, eggWeights: { common: 38, uncommon: 34, rare: 22, epic: 5, legendary: 1 },
+  { id: 'glasswash', name: 'The Glass Wash', req: 3, slots: 2, dur: 4 * 3600, target: 200,
+    w: { p: 0.15, g: 0.3, s: 0.55 }, coins: 175, eggChance: 0.18, eggWeights: { common: 46, uncommon: 34, rare: 17, epic: 3 },
+    blurb: 'Lightning struck this sand so often it fused. Beautiful, and it cuts.' },
+
+  { id: 'rookery', name: 'The Old Rookery', req: 3, slots: 2, dur: 5 * 3600, target: 230,
+    w: { p: 0.25, g: 0.35, s: 0.4 }, coins: 215, eggChance: 0.26, eggWeights: { common: 40, uncommon: 35, rare: 20, epic: 4, legendary: 1 },
+    blurb: 'Nesting ground, abandoned in a hurry. The best odds on the map for eggs.' },
+
+  { id: 'stormbreak', name: 'Stormbreak Ridge', req: 3, slots: 3, dur: 6 * 3600, target: 320,
+    w: { p: 0.45, g: 0.15, s: 0.4 }, coins: 255, eggChance: 0.22, eggWeights: { common: 40, uncommon: 34, rare: 21, epic: 4, legendary: 1 },
     blurb: 'Weather comes over the top with no warning. Go in threes or not at all.' },
 
-  { id: 'boneyard', name: 'The Boneyard', slots: 3, dur: 6 * 3600, target: 315,
-    w: { p: 0.34, g: 0.33, s: 0.33 }, coins: 310, eggChance: 0.24, eggWeights: { common: 38, uncommon: 34, rare: 22, epic: 5, legendary: 1 },
+  { id: 'boneyard', name: 'The Boneyard', req: 3, slots: 3, dur: 7 * 3600, target: 350,
+    w: { p: 0.34, g: 0.33, s: 0.33 }, coins: 295, eggChance: 0.22, eggWeights: { common: 40, uncommon: 34, rare: 21, epic: 4, legendary: 1 },
     blurb: 'Every animal in the valley has died here for a very long time.' },
 
-  { id: 'blackmire', name: 'The Black Mire', slots: 3, dur: 8 * 3600, target: 400,
-    w: { p: 0.4, g: 0.45, s: 0.15 }, coins: 430, eggChance: 0.3, eggWeights: { common: 30, uncommon: 33, rare: 26, epic: 9, legendary: 2 },
+  /* ── After eight runs ────────────────────────────────────────────── */
+  { id: 'blackmire', name: 'The Black Mire', req: 8, slots: 3, dur: 4 * 3600, target: 265,
+    w: { p: 0.4, g: 0.45, s: 0.15 }, coins: 210, eggChance: 0.24, eggWeights: { common: 36, uncommon: 34, rare: 23, epic: 6, legendary: 1 },
     blurb: 'The far side of the park, and the only place the old maps leave blank.' },
+
+  { id: 'cinderfields', name: 'The Cinder Fields', req: 8, slots: 2, dur: 5 * 3600, target: 245,
+    w: { p: 0.65, g: 0.25, s: 0.1 }, coins: 265, eggChance: 0.2, eggWeights: { common: 36, uncommon: 34, rare: 23, epic: 6, legendary: 1 },
+    blurb: 'Still warm underfoot after all this time. Nobody has worked out why.' },
+
+  { id: 'sinkhole', name: 'The Blue Sinkhole', req: 8, slots: 2, dur: 6 * 3600, target: 285,
+    w: { p: 0.2, g: 0.5, s: 0.3 }, coins: 320, eggChance: 0.22, eggWeights: { common: 34, uncommon: 34, rare: 24, epic: 7, legendary: 1 },
+    blurb: 'Clear to about thirty metres, then it simply keeps going.' },
+
+  { id: 'graveterrace', name: 'The Grave Terraces', req: 8, slots: 3, dur: 7 * 3600, target: 390,
+    w: { p: 0.3, g: 0.45, s: 0.25 }, coins: 375, eggChance: 0.24, eggWeights: { common: 32, uncommon: 34, rare: 25, epic: 8, legendary: 1 },
+    blurb: 'Cut into the hillside in steps, and every step is a different century.' },
+
+  { id: 'ironmarsh', name: 'The Iron Marsh', req: 8, slots: 3, dur: 8 * 3600, target: 430,
+    w: { p: 0.45, g: 0.4, s: 0.15 }, coins: 430, eggChance: 0.25, eggWeights: { common: 32, uncommon: 34, rare: 25, epic: 8, legendary: 1 },
+    blurb: 'The water stains everything orange. Bones come out heavier than they went in.' },
+
+  /* ── After fifteen runs ──────────────────────────────────────────── */
+  { id: 'nightreach', name: 'Nightreach', req: 15, slots: 2, dur: 5 * 3600, target: 300,
+    w: { p: 0.25, g: 0.25, s: 0.5 }, coins: 325, eggChance: 0.24, eggWeights: { common: 28, uncommon: 33, rare: 27, epic: 10, legendary: 2 },
+    blurb: 'A full day out and back, and the last stretch has to be done in the dark.' },
+
+  { id: 'bonecathedral', name: 'The Bone Cathedral', req: 15, slots: 3, dur: 6 * 3600, target: 410,
+    w: { p: 0.35, g: 0.5, s: 0.15 }, coins: 400, eggChance: 0.26, eggWeights: { common: 28, uncommon: 33, rare: 27, epic: 10, legendary: 2 },
+    blurb: 'Ribs the height of trees, meeting overhead. Nobody speaks much in there.' },
+
+  { id: 'driftline', name: 'The Drift Line', req: 15, slots: 3, dur: 7 * 3600, target: 455,
+    w: { p: 0.2, g: 0.35, s: 0.45 }, coins: 475, eggChance: 0.27, eggWeights: { common: 26, uncommon: 33, rare: 28, epic: 11, legendary: 2 },
+    blurb: 'Whatever the sea is finished with ends up along this one stretch of shingle.' },
+
+  { id: 'hollowkings', name: 'The Hollow Kings', req: 15, slots: 3, dur: 9 * 3600, target: 540,
+    w: { p: 0.55, g: 0.3, s: 0.15 }, coins: 615, eggChance: 0.28, eggWeights: { common: 24, uncommon: 32, rare: 29, epic: 12, legendary: 3 },
+    blurb: 'Four of them, upright, facing the same way. Something arranged this.' },
+
+  /* ── After twenty-five runs ──────────────────────────────────────── */
+  { id: 'lastvalley', name: 'The Last Valley', req: 25, slots: 3, dur: 6 * 3600, target: 465,
+    w: { p: 0.33, g: 0.34, s: 0.33 }, coins: 500, eggChance: 0.3, eggWeights: { common: 20, uncommon: 30, rare: 31, epic: 15, legendary: 4 },
+    blurb: 'Green all the way down, and nothing in it has ever seen a person.' },
+
+  { id: 'coldcrown', name: 'Coldcrown', req: 25, slots: 3, dur: 8 * 3600, target: 580,
+    w: { p: 0.45, g: 0.4, s: 0.15 }, coins: 690, eggChance: 0.31, eggWeights: { common: 20, uncommon: 29, rare: 31, epic: 16, legendary: 4 },
+    blurb: 'Above the ice line. Everything up there is perfectly preserved and badly lit.' },
+
+  { id: 'longdark', name: 'The Long Dark', req: 25, slots: 3, dur: 10 * 3600, target: 650,
+    w: { p: 0.3, g: 0.55, s: 0.15 }, coins: 880, eggChance: 0.33, eggWeights: { common: 18, uncommon: 28, rare: 32, epic: 17, legendary: 5 },
+    blurb: 'Ten hours in, ten hours back, and no daylight at any point between.' },
+
+  { id: 'firstshore', name: 'The First Shore', req: 25, slots: 3, dur: 12 * 3600, target: 740,
+    w: { p: 0.4, g: 0.35, s: 0.25 }, coins: 1100, eggChance: 0.35, eggWeights: { common: 15, uncommon: 26, rare: 33, epic: 20, legendary: 6 },
+    blurb: 'The oldest ground in the park. Everything else in the valley came from here.' },
 ];
 
 /* Outcome bands. The floor matters more than the ceiling: an under-strength
@@ -7223,10 +7318,22 @@ function expoRand(seed) {
   };
 }
 
-/** The sites on offer for a board period. Deterministic, never repeats within a board. */
-function expoBoardFor(period) {
+/** Sites the player has opened up, by expeditions completed. */
+function expoUnlockedSites(completed) {
+  const done = Math.max(0, Number(completed) || 0);
+  return EXPO_SITES.filter(s => (s.req || 0) <= done);
+}
+
+/**
+ * The sites on offer for a board period. Deterministic, never repeats
+ * within a board.
+ *
+ * `completed` is part of the input because the deep sites unlock with
+ * experience. It still agrees across devices: the count lives in the save,
+ * so two tabs on one park compute the same board. */
+function expoBoardFor(period, completed) {
   const rnd = expoRand(period * 2654435761);
-  const pool = EXPO_SITES.slice();
+  const pool = expoUnlockedSites(completed);
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
     const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
@@ -7343,10 +7450,134 @@ function expoQuestById(id) {
   return EXPO_QUESTS.find(q => q.id === id) || null;
 }
 
+/* ══════════════════════════════════════════════
+   WHERE THE GOLD GOES
+
+   The park used to have almost nothing to spend on. Decor caps at twenty
+   PLACED items out of an eighty-item catalog, so the entire lifetime sink
+   was about 5,900 coins and 60% of that came back as a refund when an item
+   was picked up. Against care, stage bonuses, Field Notes and now
+   expeditions, a steady player ran out of things to buy in a fortnight and
+   then simply accumulated forever.
+
+   So the two sinks below are the shapes that do not run out:
+
+     OUTFITTING is per run and priced off the site, so it stays expensive
+     exactly as far as the player gets. Maps and rations buy no coins back
+     at all — they buy a better result and a party that can go again — and
+     crates only beat their own price on a strong showing, so kitting out a
+     weak party is a choice to spend, not an arbitrage.
+
+     UPGRADES are permanent and escalate steeply, and the first of them
+     reopens the decor catalog that the twenty-item cap had closed.
+
+   WHAT IS DELIBERATELY NOT FOR SALE: park slots, vault size and incubator
+   slots. All three are mirrored server-side in functions/api/dino-park.js,
+   so a client-bought increase would half-work — the server would still
+   divert a granted dino to the vault believing the park was full. Incubator
+   slots are also what a subscription buys, and selling them for coins would
+   undercut it. Raising those properly means changing the server's copy too,
+   which is its own job.
+   ══════════════════════════════════════════════ */
+
+/* Priced as a fraction of the site's base payout, so a kit is never
+   trivially cheap at the deep end nor unaffordable at the shallow one.
+   Fully kitting a run costs slightly more than the base payout. */
+const EXPO_KITS = [
+  { id: 'maps', name: 'Survey Maps', pct: 0.5,
+    desc: '+18% party strength — the cheapest way into a better result band.' },
+  { id: 'rations', name: 'Field Rations', pct: 0.3,
+    desc: 'They come home rested. No stamina cost, so the same party can go again.' },
+  { id: 'crates', name: 'Reinforced Crates', pct: 0.25,
+    desc: '+35% coins on return. Worth it on a strong party, a loss on a weak one.' },
+];
+
+const EXPO_KIT_STRENGTH = 0.18;
+const EXPO_KIT_COINS = 0.35;
+
+function expoKitById(id) { return EXPO_KITS.find(k => k.id === id) || null; }
+
+/** What a kit costs at a given site. */
+function expoKitCost(site, kitId) {
+  const kit = expoKitById(kitId);
+  if (!site || !kit) return 0;
+  return Math.max(1, Math.round(site.coins * kit.pct));
+}
+
+function expoKitTotal(site, kitIds) {
+  return (kitIds || []).reduce((sum, id) => sum + expoKitCost(site, id), 0);
+}
+
+/* Permanent upgrades. Costs climb steeply on purpose: the point is a sink
+   that is still meaningful to a player earning thousands a day, not a
+   shopping list that empties.
+
+   Each of these changes a number the CLIENT alone owns. Nothing here is a
+   cap the server also enforces — see the header. */
+const EXPO_UPGRADES = [
+  { id: 'yard', name: 'Groundskeeping', max: 4, costs: [600, 1800, 5000, 12000], step: 6,
+    desc: 'Room for 6 more yard items. The decor catalog has 80 entries and the yard holds 20 — this is what opens the rest of it up.' },
+  { id: 'pace', name: 'Pack Animals', max: 3, costs: [1500, 5000, 15000], step: 8,
+    desc: 'Every expedition runs 8% faster, live or offline.' },
+  { id: 'slots', name: 'Outfitter’s Yard', max: 3, costs: [2500, 8000, 22000], step: 1,
+    desc: 'One more party out at a time.' },
+  { id: 'hatch', name: 'Hatchery Lamps', max: 3, costs: [2000, 6500, 18000], step: 10,
+    desc: 'Eggs incubate 10% faster while the stream is live.' },
+];
+
+function expoUpgById(id) { return EXPO_UPGRADES.find(u => u.id === id) || null; }
+
+/** Current level of an upgrade, 0 if never bought. */
+function expoUpgLevel(id) {
+  const u = (state.expo && state.expo.upg) || {};
+  const n = Number(u[id]) || 0;
+  const def = expoUpgById(id);
+  return Math.max(0, Math.min(def ? def.max : 0, Math.floor(n)));
+}
+
+/** What the NEXT level costs, or null when maxed. */
+function expoUpgNextCost(id) {
+  const def = expoUpgById(id);
+  if (!def) return null;
+  const lv = expoUpgLevel(id);
+  return lv >= def.max ? null : def.costs[lv];
+}
+
+function expoBuyUpgrade(id) {
+  expoEnsure();
+  const def = expoUpgById(id);
+  if (!def) return { ok: false, error: 'No such upgrade.' };
+  const cost = expoUpgNextCost(id);
+  if (cost === null) return { ok: false, error: 'Already at the top.' };
+  if ((state.coins || 0) < cost) return { ok: false, error: `Not enough coins (need ${cost}).` };
+  state.coins -= cost;
+  state.expo.upg[id] = expoUpgLevel(id) + 1;
+  save();
+  return { ok: true, level: state.expo.upg[id], cost };
+}
+
+/* ── What the upgrades actually change ───────────────────────────────── */
+
+/** Yard capacity, base plus what Groundskeeping has bought. */
+function getMaxYardItems() {
+  return MAX_YARD_ITEMS_BASE + expoUpgLevel('yard') * expoUpgById('yard').step;
+}
+
+/** Expedition duration multiplier — Pack Animals, compounding per level. */
+function expoPaceMult() {
+  return Math.pow(1 - expoUpgById('pace').step / 100, expoUpgLevel('pace'));
+}
+
+/** Incubation speed multiplier — Hatchery Lamps, compounding per level. */
+function eggSpeedMult() {
+  if (!state.expo) return 1;
+  return Math.pow(1 + expoUpgById('hatch').step / 100, expoUpgLevel('hatch'));
+}
+
 /* ── State, dispatch and return ───────────────────────────────────────── */
 
 function expoMaxSlots() {
-  return EXPO_BASE_SLOTS + (state.subTier || 0);
+  return EXPO_BASE_SLOTS + (state.subTier || 0) + expoUpgLevel('slots');
 }
 
 /**
@@ -7373,6 +7604,9 @@ function expoEnsure(now = Date.now()) {
     if (typeof e.counters[k] !== 'number') e.counters[k] = 0;
   }
   if (typeof e.completed !== 'number') e.completed = 0;
+  /* Permanent, so it survives every rotation below — a purchased upgrade
+     that vanished at midnight would be theft. */
+  if (!e.upg || typeof e.upg !== 'object') e.upg = {};
   if (typeof e.lastTick !== 'number') e.lastTick = now;
 
   /* A new board period clears what was dispatched from the old one. */
@@ -7413,12 +7647,12 @@ function expoAvailableDinos() {
  * claim needs (the site, the party, the score) is frozen at the same
  * moment, so a dino sold or raised mid-run cannot change what the run pays.
  */
-function expoDispatch(siteId, uids, now = Date.now()) {
+function expoDispatch(siteId, uids, now = Date.now(), kitIds = []) {
   expoEnsure(now);
   const e = state.expo;
   const site = expoSiteById(siteId);
   if (!site) return { ok: false, error: 'No such site.' };
-  if (!expoBoardFor(e.period).some(s => s.id === siteId)) return { ok: false, error: 'That site is not on the board.' };
+  if (!expoBoardFor(e.period, e.completed).some(s => s.id === siteId)) return { ok: false, error: 'That site is not on the board.' };
   if (e.used.includes(siteId)) return { ok: false, error: 'Already sent a party there this rotation.' };
   if (e.active.length >= expoMaxSlots()) return { ok: false, error: 'Both parties are already out.' };
 
@@ -7434,18 +7668,29 @@ function expoDispatch(siteId, uids, now = Date.now()) {
     return { ok: false, error: `${site.name} needs ${site.slots} ${site.slots === 1 ? 'animal' : 'animals'}.` };
   }
 
+  /* Kits are paid for HERE and their effect frozen onto the run, for the
+     same reason the roll is: what the player committed to is what the
+     claim pays, whatever they buy or sell in the meantime. */
+  const kits = [...new Set((kitIds || []).filter(id => expoKitById(id)))];
+  const kitCost = expoKitTotal(site, kits);
+  if (kitCost > (state.coins || 0)) return { ok: false, error: `Not enough coins to outfit them (need ${kitCost}).` };
+  state.coins = (state.coins || 0) - kitCost;
+
   const rid = 'r' + now.toString(36) + Math.floor(Math.random() * 1e6).toString(36);
   const run = {
     rid,
     siteId,
+    kits,
     party: party.map(d => d.uid),
     /* The names are copied because the results screen must still be able to
        say who went even if one of them was sold before it was read. */
     names: party.map(d => d.nickname || (getRosterById(d.speciesId) || {}).name || 'Dino'),
     startedAt: now,
-    durationSec: site.dur,
+    /* Pack Animals shortens the run, and the shortened figure is stored so
+       a later purchase cannot retroactively pull a party home early. */
+    durationSec: Math.max(60, Math.round(site.dur * expoPaceMult())),
     progressSec: 0,
-    score: Math.round(expoPartyScore(party, site)),
+    score: Math.round(expoPartyScore(party, site) * (kits.includes('maps') ? 1 + EXPO_KIT_STRENGTH : 1)),
     roll: Math.random(),
   };
   e.active.push(run);
@@ -7553,7 +7798,9 @@ function expoClaim(rid, now = Date.now()) {
   }
 
   const tier = expoTierFor(run.score, site.target, run.roll);
+  const kits = Array.isArray(run.kits) ? run.kits : [];
   const reward = expoRewardsFor(site, tier, run.party.length);
+  if (kits.includes('crates')) reward.coins = Math.round(reward.coins * (1 + EXPO_KIT_COINS));
 
   state.coins = (state.coins || 0) + reward.coins;
 
@@ -7563,8 +7810,12 @@ function expoClaim(rid, now = Date.now()) {
     if (!d) return;
     delete d.busy;
     ensureDinoStats(d);
-    d.stamina = Math.max(0, d.stamina - EXPO_STAMINA_COST);
-    d.hygiene = Math.max(0, d.hygiene - EXPO_HYGIENE_COST);
+    /* Rations are the whole point of rations: the party is fit to turn
+       straight around instead of needing a care cycle first. */
+    if (!kits.includes('rations')) {
+      d.stamina = Math.max(0, d.stamina - EXPO_STAMINA_COST);
+      d.hygiene = Math.max(0, d.hygiene - EXPO_HYGIENE_COST);
+    }
     const lv = awardDinoXp(d, reward.xp);
     if (lv) levelled.push({ name: run.names[n] || 'Dino', level: lv });
   });
@@ -7582,7 +7833,7 @@ function expoClaim(rid, now = Date.now()) {
   e.counters.runs = (e.counters.runs || 0) + 1;
 
   save();
-  return { ok: true, run, site, tier, reward, egg, levelled };
+  return { ok: true, run, site, tier, reward, egg, levelled, kits };
 }
 
 /** Count a park action toward the Field Notes. */
@@ -7623,6 +7874,7 @@ function expoClaimQuest(id) {
    choice is not park state, and persisting it would mean a stale pick
    surviving a reload and pointing at a dino that has since been sold. */
 let expoPicks = {};
+let expoKitPicks = {};
 let expoOpenSite = null;
 
 function expoFmtWall(sec) {
@@ -7651,6 +7903,7 @@ function renderExpeditions() {
   renderExpoActive(now);
   renderExpoBoard(now);
   renderExpoNotes(now);
+  renderExpoUpgrades();
 
   document.getElementById('expoSlots').textContent =
     e.active.length + ' / ' + expoMaxSlots() + ' parties out';
@@ -7697,7 +7950,7 @@ function renderExpoActive(now) {
 function renderExpoBoard(now) {
   const host = document.getElementById('expoBoard');
   const e = state.expo;
-  const board = expoBoardFor(e.period);
+  const board = expoBoardFor(e.period, e.completed);
   const available = expoAvailableDinos();
   const full = e.active.length >= expoMaxSlots();
 
@@ -7706,7 +7959,10 @@ function renderExpoBoard(now) {
     const open = expoOpenSite === site.id;
     const picks = expoPicks[site.id] || [];
     const party = picks.map(findDinoByUidLocal).filter(Boolean);
-    const score = Math.round(expoPartyScore(party, site));
+    const kitIds = expoKitPicks[site.id] || [];
+    const kitCost = expoKitTotal(site, kitIds);
+    const canAfford = (state.coins || 0) >= kitCost;
+    const score = Math.round(expoPartyScore(party, site) * (kitIds.includes('maps') ? 1 + EXPO_KIT_STRENGTH : 1));
     const ready = picks.length === site.slots;
 
     const odds = ready
@@ -7747,12 +8003,53 @@ function renderExpoBoard(now) {
                      }).join('')
                    : '<div class="expo-empty">Everyone is either out already or too tired to go. Care for them to bring their stamina back up.</div>'}
                </div>
-               <div style="margin-top:10px; display:flex; gap:8px">
-                 <button class="expo-btn" ${ready ? '' : 'disabled'} onclick="onExpoSend('${site.id}')">Send them out</button>
+               <div class="expo-kits">
+                 ${EXPO_KITS.map(k => {
+                   const on = (expoKitPicks[site.id] || []).includes(k.id);
+                   const cost = expoKitCost(site, k.id);
+                   const afford = (state.coins || 0) >= cost || on;
+                   return `<div class="expo-kit ${on ? 'chosen' : ''} ${afford ? '' : 'poor'}" onclick="onExpoKit('${site.id}','${k.id}')">
+                     <div class="expo-kit-top"><b>${escapeHtml(k.name)}</b><span>${cost}</span></div>
+                     <div class="expo-kit-desc">${escapeHtml(k.desc)}</div>
+                   </div>`;
+                 }).join('')}
+               </div>
+               <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                 <button class="expo-btn" ${ready && canAfford ? '' : 'disabled'} onclick="onExpoSend('${site.id}')">Send them out</button>
                  <button class="expo-btn ghost" onclick="onExpoOpen(null)">Cancel</button>
+                 ${kitCost ? `<span class="expo-sub">Outfitting costs <b>${kitCost}</b>${canAfford ? '' : ' — not enough coins'}</span>` : ''}
                </div>` : ''}`}
       </div>`;
   }).join('');
+}
+
+function renderExpoUpgrades() {
+  const host = document.getElementById('expoUpgrades');
+  host.innerHTML = EXPO_UPGRADES.map(u => {
+    const lv = expoUpgLevel(u.id);
+    const cost = expoUpgNextCost(u.id);
+    const maxed = cost === null;
+    const afford = !maxed && (state.coins || 0) >= cost;
+    return `
+      <div class="expo-note ${maxed ? 'claimed' : ''}">
+        <div>
+          <div class="expo-note-label">${escapeHtml(u.name)} &middot; ${lv} / ${u.max}</div>
+          <div class="expo-note-prog">${escapeHtml(u.desc)}</div>
+        </div>
+        <div>${maxed
+          ? '<span class="expo-note-prog">Maxed</span>'
+          : `<button class="expo-btn" ${afford ? '' : 'disabled'} onclick="onExpoBuyUpgrade('${u.id}')">${cost}</button>`}</div>
+      </div>`;
+  }).join('');
+}
+
+function onExpoBuyUpgrade(id) {
+  const res = expoBuyUpgrade(id);
+  if (!res.ok) { showToast(res.error); return; }
+  renderExpeditions();
+  updateTopBar();
+  if (document.getElementById('tab-park')?.classList.contains('active')) renderParkWorld();
+  showToast(`${expoUpgById(id).name} is now level ${res.level}.`);
 }
 
 function renderExpoNotes(now) {
@@ -7793,10 +8090,25 @@ function onExpoPick(siteId, uid) {
   renderExpeditions();
 }
 
+function onExpoKit(siteId, kitId) {
+  const chosen = expoKitPicks[siteId] || [];
+  const at = chosen.indexOf(kitId);
+  if (at >= 0) chosen.splice(at, 1);
+  else {
+    const site = expoSiteById(siteId);
+    const cost = expoKitCost(site, kitId);
+    if ((state.coins || 0) < expoKitTotal(site, chosen) + cost) { showToast(`Not enough coins (need ${cost}).`); return; }
+    chosen.push(kitId);
+  }
+  expoKitPicks[siteId] = chosen;
+  renderExpeditions();
+}
+
 function onExpoSend(siteId) {
-  const res = expoDispatch(siteId, expoPicks[siteId] || []);
+  const res = expoDispatch(siteId, expoPicks[siteId] || [], Date.now(), expoKitPicks[siteId] || []);
   if (!res.ok) { showToast(res.error); return; }
   expoPicks[siteId] = [];
+  expoKitPicks[siteId] = [];
   expoOpenSite = null;
   renderExpeditions();
   updateTopBar();
@@ -7871,7 +8183,8 @@ function gameTick() {
   }
 
   if (isStreamLive) {
-    state.eggs.forEach(e => { e.elapsed = Math.min(e.hatchTime, e.elapsed + deltaSec); });
+    const eggMult = eggSpeedMult();
+    state.eggs.forEach(e => { e.elapsed = Math.min(e.hatchTime, e.elapsed + deltaSec * eggMult); });
   }
   const happy = state.park.filter(d => d.hunger>40 && d.thirst>40 && d.happiness>40 && (d.hygiene||80)>40 && (d.stamina||80)>40).length;
   if (happy > 0 && Math.random() < 0.1) state.coins += happy;

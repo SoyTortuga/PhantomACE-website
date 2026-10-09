@@ -187,7 +187,12 @@ const liveLog = (env) => env.read('dino_live_log');
 
   const game = fs.readFileSync(path.join(REPO, 'games/dino-park/index.html'), 'utf8');
   ok('applyOfflineDecay calls the catch-up', /applyEggCatchup\(state\.lastTick\)/.test(game));
-  ok('the catch-up credit is additive, never a replace', /e\.elapsed = Math\.min\(e\.hatchTime, e\.elapsed \+ liveSeconds\)/.test(game));
+  /* Still additive - the credit is added to whatever gameTick has already
+     ticked forward, so a slow reply can never roll incubation backwards.
+     The seconds are now scaled by the Hatchery Lamps upgrade before they
+     are added; the shape of the write is the thing under test. */
+  ok('the catch-up credit is additive, never a replace',
+     /e\.elapsed = Math\.min\(e\.hatchTime, e\.elapsed \+ liveSeconds \* eggSpeedMult\(\)\)/.test(game));
 
   const idx = fs.readFileSync(path.join(REPO, 'server/index.js'), 'utf8');
   ok('the rig minute tick records live intervals', /recordLiveTick\(env, !!s\.live/.test(idx));

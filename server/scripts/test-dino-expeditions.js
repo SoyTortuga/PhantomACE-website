@@ -77,7 +77,13 @@ const sandbox = [
   lift('EXPO_XP_PER_WALL_HOUR', 'const'), lift('EXPO_QUESTS', 'const'),
   lift('RARITY_ATTR_BONUS', 'const'),
   lift('dinoAttrs'),
-  lift('expoPeriod'), lift('expoRand'), lift('expoBoardFor'), lift('expoSiteById'),
+  lift('EXPO_KITS', 'const'), lift('EXPO_KIT_STRENGTH', 'const'),
+  lift('EXPO_KIT_COINS', 'const'), lift('EXPO_UPGRADES', 'const'),
+  lift('MAX_YARD_ITEMS_BASE', 'const'),
+  lift('expoKitById'), lift('expoKitCost'), lift('expoKitTotal'),
+  lift('expoUpgById'), lift('expoUpgLevel'), lift('expoUpgNextCost'),
+  lift('expoBuyUpgrade'), lift('getMaxYardItems'), lift('expoPaceMult'), lift('eggSpeedMult'),
+  lift('expoPeriod'), lift('expoRand'), lift('expoUnlockedSites'), lift('expoBoardFor'), lift('expoSiteById'),
   lift('expoPartyScore'), lift('expoTierFor'), lift('expoCreditSec'),
   lift('expoIsDone'), lift('expoRemainingWallSec'), lift('expoRewardsFor'),
   lift('expoQuestsFor'), lift('expoQuestById'),
@@ -113,11 +119,14 @@ const harness = `
 const api = new Function(harness + sandbox + `
   return {
     EXPO_SITES, EXPO_TIERS, EXPO_LIVE_BOOST, EXPO_BOARD_PERIOD_MS, EXPO_QUEST_PERIOD_MS,
-    EXPO_BASE_SLOTS, EXPO_STAMINA_COST, EXPO_QUESTS, EXPO_QUEST_COUNT,
+    EXPO_BASE_SLOTS, EXPO_STAMINA_COST, EXPO_QUESTS, EXPO_QUEST_COUNT, EXPO_BOARD_SIZE,
     dinoAttrs, expoPeriod, expoBoardFor, expoSiteById, expoPartyScore, expoTierFor,
     expoCreditSec, expoIsDone, expoRemainingWallSec, expoRewardsFor, expoQuestsFor,
     expoMaxSlots, expoEnsure, expoAvailableDinos, expoDispatch, expoCredit, expoTick,
     expoClaim, expoCount, expoQuestState, expoClaimQuest, expoQuestById,
+    EXPO_KITS, EXPO_KIT_STRENGTH, EXPO_KIT_COINS, EXPO_UPGRADES, MAX_YARD_ITEMS_BASE,
+    expoKitCost, expoKitTotal, expoUpgLevel, expoUpgNextCost, expoBuyUpgrade,
+    getMaxYardItems, expoPaceMult, eggSpeedMult, expoUnlockedSites,
     setState: (s) => { state = s; },
     getState: () => state,
     setLive: (v) => { isStreamLive = v; },
@@ -127,12 +136,18 @@ const api = new Function(harness + sandbox + `
 
 const {
   EXPO_SITES, EXPO_TIERS, EXPO_LIVE_BOOST, EXPO_BOARD_PERIOD_MS, EXPO_QUEST_PERIOD_MS,
-  EXPO_BASE_SLOTS, EXPO_STAMINA_COST, EXPO_QUEST_COUNT,
+  EXPO_BASE_SLOTS, EXPO_STAMINA_COST, EXPO_QUEST_COUNT, EXPO_BOARD_SIZE,
   dinoAttrs, expoPeriod, expoBoardFor, expoSiteById, expoPartyScore, expoTierFor,
   expoCreditSec, expoIsDone, expoRemainingWallSec, expoRewardsFor, expoQuestsFor,
   expoMaxSlots, expoEnsure, expoAvailableDinos, expoDispatch, expoCredit, expoTick,
   expoClaim, expoQuestState, expoClaimQuest, expoQuestById, setState, getState, setLive,
+  EXPO_KITS, EXPO_KIT_STRENGTH, EXPO_KIT_COINS, EXPO_UPGRADES, MAX_YARD_ITEMS_BASE,
+  expoKitCost, expoKitTotal, expoUpgLevel, expoUpgNextCost, expoBuyUpgrade,
+  getMaxYardItems, expoPaceMult, eggSpeedMult, expoUnlockedSites,
 } = api;
+
+/* Everything unlocked, which is what most blocks below want. */
+const ALL_DONE = 9999;
 
 let uidN = 0;
 const dino = (over = {}) => ({
@@ -146,6 +161,12 @@ function freshState(over = {}) {
   return s;
 }
 
+/** Set up state.expo with everything unlocked, as most blocks want. */
+function ready(now) {
+  expoEnsure(now);
+  getState().expo.completed = ALL_DONE;
+}
+
 /* A site big enough to need a real party, picked from the shipped table
    rather than invented, so the suite tracks the catalog. */
 const THREE = EXPO_SITES.find(s => s.slots === 3);
@@ -154,7 +175,7 @@ const ONE = EXPO_SITES.find(s => s.slots === 1);
 /** Put `siteId` on the board by finding a period whose board contains it. */
 function periodShowing(siteId) {
   for (let p = 0; p < 5000; p++) {
-    if (expoBoardFor(p).some(s => s.id === siteId)) return p;
+    if (expoBoardFor(p, ALL_DONE).some(s => s.id === siteId)) return p;
   }
   throw new Error('no period shows ' + siteId);
 }
@@ -178,25 +199,38 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   /* Pairwise, because two sites can share a duration and differ slightly
      in pay — what must hold is that a STRICTLY longer run is worth
      strictly more, or the long sites are a trap. */
-  ok('a strictly longer run always pays strictly more',
-    EXPO_SITES.every(a => EXPO_SITES.every(b => !(a.dur < b.dur) || a.coins < b.coins)));
+  /* Within a band, a strictly longer run pays strictly more. Across
+     bands the rate climbs instead, which is what makes an unlock worth
+     having rather than just a longer wait. */
+  for (const req of [...new Set(EXPO_SITES.map(s => s.req || 0))]) {
+    const band = EXPO_SITES.filter(s => (s.req || 0) === req);
+    ok(`in band ${req}, longer always pays more`,
+      band.every(a => band.every(b => !(a.dur < b.dur) || a.coins < b.coins)));
+  }
+  const rate = (req) => {
+    const band = EXPO_SITES.filter(s => (s.req || 0) === req);
+    return band.reduce((t, s) => t + s.coins / (s.dur / 3600), 0) / band.length;
+  };
+  const bands = [...new Set(EXPO_SITES.map(s => s.req || 0))].sort((a, b) => a - b);
+  ok('and a deeper band pays better per hour',
+    bands.every((r, i) => i === 0 || rate(r) > rate(bands[i - 1])));
 }
 
 /* ── The board is the same everywhere, and it rotates ────────────────── */
 {
   const p = 1234;
   check('the board is deterministic for a period',
-    expoBoardFor(p).map(s => s.id), expoBoardFor(p).map(s => s.id));
+    expoBoardFor(p, ALL_DONE).map(s => s.id), expoBoardFor(p, ALL_DONE).map(s => s.id));
   ok('and a different period is a different board',
-    expoBoardFor(p).map(s => s.id).join() !== expoBoardFor(p + 1).map(s => s.id).join());
+    expoBoardFor(p, ALL_DONE).map(s => s.id).join() !== expoBoardFor(p + 1, ALL_DONE).map(s => s.id).join());
   ok('a board never offers the same site twice',
-    new Set(expoBoardFor(p).map(s => s.id)).size === expoBoardFor(p).length);
-  check('three sites on offer', expoBoardFor(p).length, 3);
+    new Set(expoBoardFor(p, ALL_DONE).map(s => s.id)).size === expoBoardFor(p, ALL_DONE).length);
+  check('four sites on offer', expoBoardFor(p, ALL_DONE).length, EXPO_BOARD_SIZE);
 
   /* Over many rotations every site must actually come up, or a site in the
      table is one nobody can ever visit. */
   const seen = new Set();
-  for (let i = 0; i < 400; i++) expoBoardFor(i).forEach(s => seen.add(s.id));
+  for (let i = 0; i < 400; i++) expoBoardFor(i, ALL_DONE).forEach(s => seen.add(s.id));
   check('every site in the catalog reaches the board', seen.size, EXPO_SITES.length);
 }
 
@@ -270,12 +304,12 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const a = dino(), b = dino(), c = dino();
   s.park.push(a, b);
   s.vault.push(c);                              // the vault counts as roster
-  expoEnsure(now);
+  ready(now);
 
   check('too few animals is refused',
     expoDispatch(THREE.id, [a.uid], now).ok, false);
   check('a site not on the board is refused',
-    expoDispatch(EXPO_SITES.find(x => !expoBoardFor(period).some(y => y.id === x.id)).id, [a.uid, b.uid, c.uid], now).ok, false);
+    expoDispatch(EXPO_SITES.find(x => !expoBoardFor(period, ALL_DONE).some(y => y.id === x.id)).id, [a.uid, b.uid, c.uid], now).ok, false);
 
   const res = expoDispatch(THREE.id, [a.uid, b.uid, c.uid], now);
   ok('a full party from park and vault is accepted', res.ok);
@@ -298,7 +332,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino();
   s.park.push(a);
-  expoEnsure(now);
+  ready(now);
   check('the same animal twice in one party is refused',
     expoDispatch(ONE.id, [a.uid, a.uid], now).ok, false);
 }
@@ -330,7 +364,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino();
   s.park.push(a);
-  expoEnsure(start);
+  ready(start);
   const run = expoDispatch(ONE.id, [a.uid], start).run;
 
   setLive(false);
@@ -349,7 +383,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino();
   s.park.push(a);
-  expoEnsure(start);
+  ready(start);
   const run = expoDispatch(ONE.id, [a.uid], start).run;
 
   setLive(true);
@@ -365,7 +399,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino({ careCount: 55 });
   s.park.push(a);
-  expoEnsure(start);
+  ready(start);
   const run = expoDispatch(ONE.id, [a.uid], start).run;
   const site = expoSiteById(ONE.id);
   const first = expoTierFor(run.score, site.target, run.roll).id;
@@ -389,7 +423,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino(), b = dino(), c = dino();
   s.park.push(a, b, c);
-  expoEnsure(start);
+  ready(start);
   const run = expoDispatch(THREE.id, [a.uid, b.uid, c.uid], start).run;
 
   check('a party still out cannot be claimed', expoClaim(run.rid, start).ok, false);
@@ -421,7 +455,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino(), b = dino(), c = dino();
   s.park.push(a, b, c);
-  expoEnsure(start);
+  ready(start);
   const run = expoDispatch(THREE.id, [a.uid, b.uid, c.uid], start).run;
   expoTick(start + (THREE.dur + 10) * 1000);
 
@@ -457,9 +491,9 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   const s = freshState();
   const a = dino();
   s.park.push(a);
-  expoEnsure(now);
+  ready(now);
   expoDispatch(ONE.id, [a.uid], now);
-  expoEnsure(now);
+  ready(now);
   ok('a flag with a live run survives the repair', !!a.busy);
 }
 
@@ -532,8 +566,183 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   check('and nothing stays claimed', getState().expo.questDone, []);
 }
 
+/* -- Unlocks ---------------------------------------------------------
+   The deep sites are the long tail. If the gate leaked, the whole map
+   would be on offer on day one; if it never opened, most of the catalog
+   would be unreachable. */
+{
+  ok('a new park sees only the opening sites',
+    expoUnlockedSites(0).every(s => (s.req || 0) === 0));
+  ok('and there are enough of them to fill a board',
+    expoUnlockedSites(0).length >= EXPO_BOARD_SIZE);
+  ok('experience opens more', expoUnlockedSites(50).length > expoUnlockedSites(0).length);
+  check('and eventually all of them', expoUnlockedSites(ALL_DONE).length, EXPO_SITES.length);
+
+  ok('a locked site never reaches the board',
+    [...Array(200)].every((_, i) => expoBoardFor(i, 0).every(s => (s.req || 0) === 0)));
+
+  /* Every band must be reachable, or a site is written and never seen. */
+  const seen = new Set();
+  for (let i = 0; i < 600; i++) expoBoardFor(i, ALL_DONE).forEach(s => seen.add(s.id));
+  check('every site in the catalog reaches the board eventually', seen.size, EXPO_SITES.length);
+}
+
+/* -- Outfitting: the repeatable sink ---------------------------------
+   The park's entire lifetime sink used to be roughly 5,900 coins of
+   decor, 60% refundable, against income that never stops. Kits have to
+   stay expensive at every income level, which is why they are priced off
+   the site rather than flat. */
+{
+  const cheap = EXPO_SITES.find(s => (s.req || 0) === 0);
+  const deep = EXPO_SITES[EXPO_SITES.length - 1];
+  ok('a kit costs more at a richer site',
+    expoKitCost(deep, 'maps') > expoKitCost(cheap, 'maps'));
+  ok('kitting out fully is a real fraction of the payout',
+    expoKitTotal(deep, EXPO_KITS.map(k => k.id)) >= deep.coins);
+
+  /* Crates must beat their price on a strong showing and lose on a weak
+     one, or they are either a no-brainer or a trap. */
+  const best = EXPO_TIERS[0], worst = EXPO_TIERS[EXPO_TIERS.length - 1];
+  const gainAt = (t) => expoRewardsFor(deep, t, 3).coins * EXPO_KIT_COINS;
+  ok('crates pay for themselves on a great run', gainAt(best) > expoKitCost(deep, 'crates'));
+  ok('and do not on a poor one', gainAt(worst) < expoKitCost(deep, 'crates'));
+}
+{
+  const period = periodShowing(THREE.id);
+  const start = nowFor(period);
+  const site = expoSiteById(THREE.id);
+
+  const party = () => {
+    const st = freshState({ coins: 1000000 });
+    const x = dino(), y = dino(), z = dino();
+    st.park.push(x, y, z);
+    ready(start);
+    return { st, uids: [x.uid, y.uid, z.uid], dinos: [x, y, z] };
+  };
+
+  const plain = party();
+  const bare = expoDispatch(THREE.id, plain.uids, start).run;
+
+  const kit = party();
+  const before = kit.st.coins;
+  const kitted = expoDispatch(THREE.id, kit.uids, start, ['maps']).run;
+  check('the kit is paid for at dispatch', kit.st.coins, before - expoKitCost(site, 'maps'));
+  ok('maps raise the party score', kitted.score > bare.score);
+  check('and the kit is frozen onto the run', kitted.kits, ['maps']);
+
+  const rat = party();
+  const run3 = expoDispatch(THREE.id, rat.uids, start, ['rations']).run;
+  expoTick(start + (run3.durationSec + 10) * 1000);
+  const stamBefore = rat.dinos[0].stamina;
+  expoClaim(run3.rid, start + (run3.durationSec + 10) * 1000);
+  check('rations mean no stamina cost', rat.dinos[0].stamina, stamBefore);
+
+  const payout = (kits) => {
+    const g = party();
+    const r = expoDispatch(THREE.id, g.uids, start, kits).run;
+    r.roll = 0.5;
+    expoTick(start + (r.durationSec + 10) * 1000);
+    return expoClaim(r.rid, start + (r.durationSec + 10) * 1000).reward.coins;
+  };
+  ok('crates pay more coins than the same run without them', payout(['crates']) > payout([]));
+
+  /* The obvious exploit: a kit you cannot afford. */
+  const broke = freshState({ coins: 1 });
+  const m = dino(), n2 = dino(), o = dino();
+  broke.park.push(m, n2, o);
+  ready(start);
+  const refused = expoDispatch(THREE.id, [m.uid, n2.uid, o.uid], start, ['maps', 'rations', 'crates']);
+  check('an unaffordable kit is refused', refused.ok, false);
+  check('and the coin is still there', broke.coins, 1);
+  ok('and nobody is flagged out', ![m.busy, n2.busy, o.busy].some(Boolean));
+}
+
+/* -- Upgrades: the escalating sink ------------------------------------ */
+{
+  ok('every upgrade costs more at each level',
+    EXPO_UPGRADES.every(u => u.costs.every((c, i) => i === 0 || c > u.costs[i - 1])));
+  ok('and has a price for every level', EXPO_UPGRADES.every(u => u.costs.length === u.max));
+
+  /* The ladder has to dwarf the old decor sink, or it closes again in a
+     fortnight. */
+  const ladder = EXPO_UPGRADES.reduce((t, u) => t + u.costs.reduce((a, b) => a + b, 0), 0);
+  ok('the ladder is a far bigger sink than the old decor cap', ladder > 50000);
+
+  const s = freshState({ coins: 1000000 });
+  expoEnsure();
+  check('nothing is owned to begin with', expoUpgLevel('yard'), 0);
+  check('the yard starts at its base capacity', getMaxYardItems(), MAX_YARD_ITEMS_BASE);
+
+  const cost = expoUpgNextCost('yard');
+  const res = expoBuyUpgrade('yard');
+  ok('an upgrade can be bought', res.ok);
+  check('the coins are taken', s.coins, 1000000 - cost);
+  check('the level went up', expoUpgLevel('yard'), 1);
+  ok('and the yard actually holds more', getMaxYardItems() > MAX_YARD_ITEMS_BASE);
+  ok('the next level costs more', expoUpgNextCost('yard') > cost);
+
+  while (expoUpgNextCost('yard') !== null) expoBuyUpgrade('yard');
+  check('a maxed upgrade has no next price', expoUpgNextCost('yard'), null);
+  check('and refuses to be bought again', expoBuyUpgrade('yard').ok, false);
+
+  const poor = freshState({ coins: 0 });
+  expoEnsure();
+  check('an upgrade you cannot afford is refused', expoBuyUpgrade('pace').ok, false);
+  check('and takes nothing', poor.coins, 0);
+}
+{
+  const s = freshState({ coins: 1000000 });
+  expoEnsure();
+  check('slots start at the base', expoMaxSlots(), EXPO_BASE_SLOTS);
+  expoBuyUpgrade('slots');
+  check('and one more can be bought', expoMaxSlots(), EXPO_BASE_SLOTS + 1);
+
+  check('runs are full length to begin with', expoPaceMult(), 1);
+  expoBuyUpgrade('pace');
+  ok('and shorter once Pack Animals is bought', expoPaceMult() < 1);
+
+  check('eggs run at normal speed to begin with', eggSpeedMult(), 1);
+  expoBuyUpgrade('hatch');
+  ok('and faster with the lamps', eggSpeedMult() > 1);
+}
+{
+  /* A shorter run is shorter for real, and the length is frozen so a
+     later purchase cannot pull a party already out back early. */
+  const period = periodShowing(ONE.id);
+  const start = nowFor(period);
+  const s = freshState({ coins: 1000000 });
+  const a = dino();
+  s.park.push(a);
+  ready(start);
+  expoBuyUpgrade('pace');
+  const run = expoDispatch(ONE.id, [a.uid], start).run;
+  ok('Pack Animals shortens the run', run.durationSec < ONE.dur);
+
+  const locked = run.durationSec;
+  expoBuyUpgrade('pace');
+  check('and a later purchase does not shorten one already out', run.durationSec, locked);
+}
+{
+  /* Upgrades are permanent. A rotation must not wipe them. */
+  const s = freshState({ coins: 1000000 });
+  const p0 = 900;
+  expoEnsure(p0 * EXPO_BOARD_PERIOD_MS + 1);
+  expoBuyUpgrade('yard');
+  expoEnsure((p0 + 40) * EXPO_BOARD_PERIOD_MS + 1);
+  check('an upgrade survives every rotation', expoUpgLevel('yard'), 1);
+}
+
 /* ── The page actually wires it up ───────────────────────────────────── */
 {
+  /* The yard cap has to be READ through the upgrade everywhere, or
+     Groundskeeping is bought and nothing changes. */
+  check('only the definition mentions the base cap',
+    (src.match(/MAX_YARD_ITEMS_BASE/g) || []).length, 2);
+  ok('the yard checks the upgraded cap', /state\.yardItems\.length >= getMaxYardItems\(\)/.test(src));
+  ok('and incubation reads the lamps', /deltaSec \* eggMult/.test(src));
+  ok('the kit picker is wired to dispatch', /onExpoKit\(/.test(src));
+  ok('and the upgrade panel to the buy', /onExpoBuyUpgrade\(/.test(src));
+
   ok('the tab is in the tab order', /TAB_ORDER = \[[^\]]*'expeditions'/.test(src));
   ok('and has a panel to render into', /id="tab-expeditions"/.test(src));
   ok('and a button that reaches it', /switchTab\('expeditions'\)/.test(src));
