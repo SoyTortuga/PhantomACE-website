@@ -81,6 +81,13 @@ const sandbox = [
   lift('EXPO_KIT_COINS', 'const'), lift('EXPO_UPGRADES', 'const'),
   lift('MAX_YARD_ITEMS_BASE', 'const'),
   lift('expoKitById'), lift('expoKitCost'), lift('expoKitTotal'),
+  lift('EXPO_RUSH_PER_HOUR', 'const'), lift('EXPO_REROLL_BASE', 'const'),
+  lift('BROKER_PRICES', 'const'), lift('BROKER_STEP', 'const'),
+  lift('RENOWN_BASE', 'const'), lift('RENOWN_STEP', 'const'),
+  lift('RENOWN_PCT_PER_LEVEL', 'const'),
+  lift('expoRushCost'), lift('expoRush'), lift('expoRerollCost'), lift('expoReroll'),
+  lift('brokerCost'), lift('brokerBuy'),
+  lift('renownLevel'), lift('renownCost'), lift('renownMult'), lift('buyRenown'),
   lift('expoUpgById'), lift('expoUpgLevel'), lift('expoUpgNextCost'),
   lift('expoBuyUpgrade'), lift('getMaxYardItems'), lift('expoPaceMult'), lift('eggSpeedMult'),
   lift('expoPeriod'), lift('expoRand'), lift('expoUnlockedSites'), lift('expoBoardFor'), lift('expoSiteById'),
@@ -127,6 +134,9 @@ const api = new Function(harness + sandbox + `
     EXPO_KITS, EXPO_KIT_STRENGTH, EXPO_KIT_COINS, EXPO_UPGRADES, MAX_YARD_ITEMS_BASE,
     expoKitCost, expoKitTotal, expoUpgLevel, expoUpgNextCost, expoBuyUpgrade,
     getMaxYardItems, expoPaceMult, eggSpeedMult, expoUnlockedSites,
+    EXPO_RUSH_PER_HOUR, EXPO_REROLL_BASE, BROKER_PRICES, RENOWN_BASE, RENOWN_PCT_PER_LEVEL,
+    expoRushCost, expoRush, expoRerollCost, expoReroll, brokerCost, brokerBuy,
+    renownLevel, renownCost, renownMult, buyRenown,
     setState: (s) => { state = s; },
     getState: () => state,
     setLive: (v) => { isStreamLive = v; },
@@ -144,6 +154,9 @@ const {
   EXPO_KITS, EXPO_KIT_STRENGTH, EXPO_KIT_COINS, EXPO_UPGRADES, MAX_YARD_ITEMS_BASE,
   expoKitCost, expoKitTotal, expoUpgLevel, expoUpgNextCost, expoBuyUpgrade,
   getMaxYardItems, expoPaceMult, eggSpeedMult, expoUnlockedSites,
+  EXPO_RUSH_PER_HOUR, EXPO_REROLL_BASE, BROKER_PRICES, RENOWN_BASE, RENOWN_PCT_PER_LEVEL,
+  expoRushCost, expoRush, expoRerollCost, expoReroll, brokerCost, brokerBuy,
+  renownLevel, renownCost, renownMult, buyRenown,
 } = api;
 
 /* Everything unlocked, which is what most blocks below want. */
@@ -175,7 +188,7 @@ const ONE = EXPO_SITES.find(s => s.slots === 1);
 /** Put `siteId` on the board by finding a period whose board contains it. */
 function periodShowing(siteId) {
   for (let p = 0; p < 5000; p++) {
-    if (expoBoardFor(p, ALL_DONE).some(s => s.id === siteId)) return p;
+    if (expoBoardFor(p, ALL_DONE, 0).some(s => s.id === siteId)) return p;
   }
   throw new Error('no period shows ' + siteId);
 }
@@ -220,17 +233,17 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
 {
   const p = 1234;
   check('the board is deterministic for a period',
-    expoBoardFor(p, ALL_DONE).map(s => s.id), expoBoardFor(p, ALL_DONE).map(s => s.id));
+    expoBoardFor(p, ALL_DONE, 0).map(s => s.id), expoBoardFor(p, ALL_DONE, 0).map(s => s.id));
   ok('and a different period is a different board',
-    expoBoardFor(p, ALL_DONE).map(s => s.id).join() !== expoBoardFor(p + 1, ALL_DONE).map(s => s.id).join());
+    expoBoardFor(p, ALL_DONE, 0).map(s => s.id).join() !== expoBoardFor(p + 1, ALL_DONE, 0).map(s => s.id).join());
   ok('a board never offers the same site twice',
-    new Set(expoBoardFor(p, ALL_DONE).map(s => s.id)).size === expoBoardFor(p, ALL_DONE).length);
-  check('four sites on offer', expoBoardFor(p, ALL_DONE).length, EXPO_BOARD_SIZE);
+    new Set(expoBoardFor(p, ALL_DONE, 0).map(s => s.id)).size === expoBoardFor(p, ALL_DONE, 0).length);
+  check('four sites on offer', expoBoardFor(p, ALL_DONE, 0).length, EXPO_BOARD_SIZE);
 
   /* Over many rotations every site must actually come up, or a site in the
      table is one nobody can ever visit. */
   const seen = new Set();
-  for (let i = 0; i < 400; i++) expoBoardFor(i, ALL_DONE).forEach(s => seen.add(s.id));
+  for (let i = 0; i < 400; i++) expoBoardFor(i, ALL_DONE, 0).forEach(s => seen.add(s.id));
   check('every site in the catalog reaches the board', seen.size, EXPO_SITES.length);
 }
 
@@ -309,7 +322,7 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   check('too few animals is refused',
     expoDispatch(THREE.id, [a.uid], now).ok, false);
   check('a site not on the board is refused',
-    expoDispatch(EXPO_SITES.find(x => !expoBoardFor(period, ALL_DONE).some(y => y.id === x.id)).id, [a.uid, b.uid, c.uid], now).ok, false);
+    expoDispatch(EXPO_SITES.find(x => !expoBoardFor(period, ALL_DONE, 0).some(y => y.id === x.id)).id, [a.uid, b.uid, c.uid], now).ok, false);
 
   const res = expoDispatch(THREE.id, [a.uid, b.uid, c.uid], now);
   ok('a full party from park and vault is accepted', res.ok);
@@ -579,11 +592,11 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   check('and eventually all of them', expoUnlockedSites(ALL_DONE).length, EXPO_SITES.length);
 
   ok('a locked site never reaches the board',
-    [...Array(200)].every((_, i) => expoBoardFor(i, 0).every(s => (s.req || 0) === 0)));
+    [...Array(200)].every((_, i) => expoBoardFor(i, 0, 0).every(s => (s.req || 0) === 0)));
 
   /* Every band must be reachable, or a site is written and never seen. */
   const seen = new Set();
-  for (let i = 0; i < 600; i++) expoBoardFor(i, ALL_DONE).forEach(s => seen.add(s.id));
+  for (let i = 0; i < 600; i++) expoBoardFor(i, ALL_DONE, 0).forEach(s => seen.add(s.id));
   check('every site in the catalog reaches the board eventually', seen.size, EXPO_SITES.length);
 }
 
@@ -732,6 +745,185 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   check('an upgrade survives every rotation', expoUpgLevel('yard'), 1);
 }
 
+/* -- Recurring sinks -------------------------------------------------
+   The upgrade ladder is finite and outfitting is only spent by someone
+   running expeditions, so neither is a floor under a maxed-out park.
+   These four recur on four different clocks, and the one that matters
+   most is Renown, which has no ceiling at all. */
+
+/* Rush: priced off time left, and deliberately bad value. */
+{
+  const period = periodShowing(ONE.id);
+  const start = nowFor(period);
+  const s = freshState({ coins: 1000000 });
+  const a = dino();
+  s.park.push(a);
+  ready(start);
+  const run = expoDispatch(ONE.id, [a.uid], start).run;
+
+  const full = expoRushCost(run);
+  ok('a fresh run costs something to call in', full > 0);
+
+  expoTick(start + (run.durationSec / 2) * 1000);
+  ok('and less once it is half done', expoRushCost(run) < full);
+
+  const before = s.coins;
+  const res = expoRush(run.rid);
+  ok('the party can be called in', res.ok);
+  check('the coins are taken', s.coins, before - res.cost);
+  ok('and they are at the gate', expoIsDone(run));
+  check('a party already back cannot be rushed', expoRush(run.rid).ok, false);
+
+  /* Rushing must not become the cheap way to farm: calling in a long run
+     should cost more than the run itself is likely to pay. */
+  const s2 = freshState({ coins: 1000000 });
+  const b = dino(), c = dino(), d = dino();
+  s2.park.push(b, c, d);
+  const longPeriod = periodShowing('firstshore');
+  const longStart = nowFor(longPeriod);
+  ready(longStart);
+  const big = expoDispatch('firstshore', [b.uid, c.uid, d.uid], longStart).run;
+  const site = expoSiteById('firstshore');
+  ok('calling in a long run costs more than a good result pays',
+    expoRushCost(big) > expoRewardsFor(site, EXPO_TIERS[0], 3).coins * 0.5);
+}
+
+/* Reroll: doubles within a rotation, resets with it. */
+{
+  const s = freshState({ coins: 1000000 });
+  const p0 = 700;
+  expoEnsure(p0 * EXPO_BOARD_PERIOD_MS + 1);
+  getState().expo.completed = ALL_DONE;
+
+  const first = expoRerollCost();
+  check('the first reroll is the base price', first, EXPO_REROLL_BASE);
+  const before = getState().expo.salt;
+  const res = expoReroll();
+  ok('it can be bought', res.ok);
+  check('the coins are taken', s.coins, 1000000 - first);
+  ok('the salt moved, so the board changes', getState().expo.salt !== before);
+
+  const e = getState().expo;
+  ok('and the board really is different',
+    expoBoardFor(e.period, e.completed, before).map(x => x.id).join() !==
+    expoBoardFor(e.period, e.completed, e.salt).map(x => x.id).join());
+  ok('but still the same on every device',
+    expoBoardFor(e.period, e.completed, e.salt).map(x => x.id).join() ===
+    expoBoardFor(e.period, e.completed, e.salt).map(x => x.id).join());
+
+  check('chasing a site doubles the price', expoRerollCost(), EXPO_REROLL_BASE * 2);
+  expoReroll();
+  check('and doubles again', expoRerollCost(), EXPO_REROLL_BASE * 4);
+
+  /* A site already run stays run — a reroll must not be a way to farm the
+     same site twice in one rotation. */
+  getState().expo.used.push('tarseeps');
+  expoReroll();
+  ok('a site already visited stays spent', getState().expo.used.includes('tarseeps'));
+
+  expoEnsure((p0 + 1) * EXPO_BOARD_PERIOD_MS + 1);
+  check('a new rotation resets the price', expoRerollCost(), EXPO_REROLL_BASE);
+  ok('but not the salt, so the board does not jump back',
+    typeof getState().expo.salt === 'number');
+
+  const poor = freshState({ coins: 10 });
+  expoEnsure();
+  check('a reroll you cannot afford is refused', expoReroll().ok, false);
+  check('and takes nothing', poor.coins, 10);
+}
+
+/* The Bone Broker: climbs with each egg that day, resets with the day. */
+{
+  const day = 800;
+  const s = freshState({ coins: 1000000 });
+  expoEnsure(day * EXPO_QUEST_PERIOD_MS + 1);
+
+  check('the first egg is the list price', brokerCost('common'), BROKER_PRICES.common);
+  ok('a rarer egg costs more', brokerCost('legendary') > brokerCost('common'));
+
+  /* It must never be the efficient way to fill a park, or hatching and
+     expeditions stop mattering. */
+  const cheapSite = EXPO_SITES.find(x => (x.req || 0) === 0);
+  ok('even the cheapest egg costs more than an early run pays',
+    brokerCost('common') > cheapSite.coins);
+
+  const before = s.coins;
+  const res = brokerBuy('common');
+  ok('an egg can be bought', res.ok);
+  check('the coins are taken', s.coins, before - res.cost);
+  ok('and an egg arrives', api.eggs().length >= 1);
+
+  ok('the next one costs more', brokerCost('common') > BROKER_PRICES.common);
+  ok('and the rise applies across the whole shelf',
+    brokerCost('rare') > BROKER_PRICES.rare);
+
+  check('the broker does not sell nonsense', brokerBuy('mythic').ok, false);
+
+  expoEnsure((day + 1) * EXPO_QUEST_PERIOD_MS + 1);
+  check('a new day resets the price', brokerCost('common'), BROKER_PRICES.common);
+
+  const poor = freshState({ coins: 5 });
+  expoEnsure();
+  check('an egg you cannot afford is refused', brokerBuy('legendary').ok, false);
+  check('and takes nothing', poor.coins, 5);
+}
+
+/* Park Renown: the endless one, and it must never pay for itself. */
+{
+  const s = freshState({ coins: 10000000 });
+  expoEnsure();
+  check('a new park has none', renownLevel(), 0);
+  check('and no multiplier', renownMult(), 1);
+  check('the first level is the base price', renownCost(), RENOWN_BASE);
+
+  const before = s.coins;
+  const res = buyRenown();
+  ok('it can be bought', res.ok);
+  check('the coins are taken', s.coins, before - res.cost);
+  check('the level went up', renownLevel(), 1);
+  ok('and so did the multiplier', renownMult() > 1);
+  ok('the next level costs more', renownCost() > RENOWN_BASE);
+
+  /* NO CEILING. This is the only sink that cannot be finished, which is
+     the whole reason it exists. */
+  for (let i = 0; i < 30; i++) buyRenown();
+  ok('there is always another level', renownCost() > 0 && renownLevel() >= 10);
+
+  /* AND IT MUST DRAIN. A sink that pays itself back is a faucet. The
+     price compounds while the payout is linear, so the gap only widens:
+     one level must cost far more than the extra coins it will ever
+     plausibly return. */
+  const lv = renownLevel();
+  const nextCost = renownCost();
+  const extraPerRun = EXPO_SITES[EXPO_SITES.length - 1].coins * RENOWN_PCT_PER_LEVEL;
+  ok('a level costs far more than the coins it adds to a run',
+    nextCost > extraPerRun * 100);
+  ok('and the price outgrows the payout as it climbs',
+    renownCost() / (lv + 1) > RENOWN_BASE / 1);
+
+  const poor = freshState({ coins: 0 });
+  expoEnsure();
+  check('renown you cannot afford is refused', buyRenown().ok, false);
+}
+{
+  /* Renown actually reaches the coins it advertises. */
+  const period = periodShowing(THREE.id);
+  const start = nowFor(period);
+
+  const payout = (renown) => {
+    const st = freshState({ coins: 10000000 });
+    const x = dino({ careCount: 200 }), y = dino({ careCount: 200 }), z = dino({ careCount: 200 });
+    st.park.push(x, y, z);
+    ready(start);
+    st.expo.renown = renown;
+    const r = expoDispatch(THREE.id, [x.uid, y.uid, z.uid], start).run;
+    r.roll = 0.5;
+    expoTick(start + (r.durationSec + 10) * 1000);
+    return expoClaim(r.rid, start + (r.durationSec + 10) * 1000).reward.coins;
+  };
+  ok('renown raises what an expedition pays', payout(50) > payout(0));
+}
+
 /* ── The page actually wires it up ───────────────────────────────────── */
 {
   /* The yard cap has to be READ through the upgrade everywhere, or
@@ -741,6 +933,14 @@ const nowFor = (period) => period * EXPO_BOARD_PERIOD_MS + 1000;
   ok('the yard checks the upgraded cap', /state\.yardItems\.length >= getMaxYardItems\(\)/.test(src));
   ok('and incubation reads the lamps', /deltaSec \* eggMult/.test(src));
   ok('the kit picker is wired to dispatch', /onExpoKit\(/.test(src));
+  ok('rushing is reachable', /onExpoRush\(/.test(src));
+  ok('so is rerolling', /onExpoReroll\(/.test(src));
+  ok('so is the broker', /onBrokerBuy\(/.test(src));
+  ok('and renown', /onBuyRenown\(/.test(src));
+  ok('renown reaches the care payout', /2 \* renownMult\(\)/.test(src));
+  /* Rarity colours come from the shared tokens and only ever signal
+     rarity - never a hardcoded hex, never a UI accent. */
+  ok('the broker uses the rarity tokens', /var\(--rarity-legendary\)/.test(src));
   ok('and the upgrade panel to the buy', /onExpoBuyUpgrade\(/.test(src));
 
   ok('the tab is in the tab order', /TAB_ORDER = \[[^\]]*'expeditions'/.test(src));

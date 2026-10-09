@@ -1225,6 +1225,23 @@
     .expo-pick img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
     .expo-pick .expo-pick-stat { color: var(--text-sec); font-size: 13px; }
 
+    /* The broker's rarity buttons. Rarity colours come from the shared
+       tokens and are used ONLY to signal rarity, never as UI accents. */
+    .broker-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .broker-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      padding: 5px 10px; cursor: pointer; background: var(--gray-hi);
+      border: 1px solid var(--border-mid); border-radius: 4px;
+      font-family: var(--font-ui); font-size: 13px; color: var(--text-pri);
+    }
+    .broker-btn:disabled { opacity: 0.35; cursor: default; }
+    .broker-rarity { text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    .broker-cost { font-weight: 700; }
+    .broker-btn.r-uncommon .broker-rarity { color: var(--rarity-uncommon); }
+    .broker-btn.r-rare .broker-rarity { color: var(--rarity-rare); }
+    .broker-btn.r-epic .broker-rarity { color: var(--rarity-epic); }
+    .broker-btn.r-legendary .broker-rarity { color: var(--rarity-legendary); }
+
     .expo-kits { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
     .expo-kit {
       border: 1px solid var(--border-mid); border-radius: 4px; background: var(--gray-hi);
@@ -5265,7 +5282,7 @@ function careAction(idx, type) {
   dino.careCount++;
   expoCount('care');
   const newStage = getStage(dino);
-  state.coins += 2;
+  state.coins += Math.max(1, Math.round(2 * renownMult()));
 
   const name = () => dino.nickname || getRosterById(dino.speciesId).name;
   let leveled = awardDinoXp(dino, DINO_XP.care);
@@ -6229,6 +6246,22 @@ function renderEggSources() {
         ${!dailyReady ? `<div class="egg-source-timer">Next dig in ${dailyH}h ${dailyM}m</div>` : ''}
       </div>
       <span class="egg-source-badge ${dailyReady ? 'esbadge-ready' : 'esbadge-claimed'}">${dailyReady ? 'Ready' : 'Done'}</span>
+    </div>
+
+    <div class="egg-source broker">
+      <div class="egg-source-icon"><img src="${IC}fossils_bones/amber_fossil.png" width="28" height="28" style="image-rendering:pixelated;" alt="" onerror="this.remove()"></div>
+      <div class="egg-source-info">
+        <div class="egg-source-name">The Bone Broker</div>
+        <div class="egg-source-desc">Buys eggs in, sells them on, and puts his prices up every time you come back. Resets daily.</div>
+        <div class="broker-row">
+          ${['common','uncommon','rare','epic','legendary'].map(r => {
+            const cost = brokerCost(r);
+            const afford = (state.coins || 0) >= cost;
+            return `<button class="broker-btn r-${r}" ${afford ? '' : 'disabled'} onclick="onBrokerBuy('${r}')">
+              <span class="broker-rarity">${r}</span><span class="broker-cost">${cost}</span></button>`;
+          }).join('')}
+        </div>
+      </div>
     </div>
 
     <div class="egg-source ${eventStatus === 'available' ? 'available' : (eventStatus === 'claimed' ? 'claimed' : '')}">
@@ -7331,8 +7364,8 @@ function expoUnlockedSites(completed) {
  * `completed` is part of the input because the deep sites unlock with
  * experience. It still agrees across devices: the count lives in the save,
  * so two tabs on one park compute the same board. */
-function expoBoardFor(period, completed) {
-  const rnd = expoRand(period * 2654435761);
+function expoBoardFor(period, completed, salt = 0) {
+  const rnd = expoRand(period * 2654435761 + (Number(salt) || 0) * 7919);
   const pool = expoUnlockedSites(completed);
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
@@ -7574,6 +7607,152 @@ function eggSpeedMult() {
   return Math.pow(1 + expoUpgById('hatch').step / 100, expoUpgLevel('hatch'));
 }
 
+/* ══════════════════════════════════════════════
+   RECURRING GOLD SINKS
+
+   The upgrade ladder is finite — 99,900 coins and then it is bought out.
+   Outfitting is only spent by someone running expeditions. Neither of
+   those is a floor under a player who has everything, which is the state
+   every long-running park ends up in.
+
+   So these four are shaped so they cannot be finished. Each recurs on a
+   different clock, on purpose: a sink that only resets daily is a trivial
+   daily chore, and one that only scales with spending is a tax on the
+   rich. Between them something is always worth buying.
+
+     RUSH       per expedition, priced off the time actually left
+     REROLL     per board rotation, doubling within the rotation
+     BROKER     per day, escalating with each egg bought that day
+     RENOWN     endless, cost compounding forever
+
+   RENOWN IS THE BACKSTOP and the only one with no ceiling. Its payout
+   rises linearly (+1% per level) while its price compounds at 45%, so it
+   is sharply net-negative the further it goes — a prestige number that
+   drains, not an investment that pays. That asymmetry is the whole point:
+   an endless sink that paid for itself would be an endless FAUCET.
+   ══════════════════════════════════════════════ */
+
+/* ── Rush a party home ───────────────────────────────────────────────
+   Priced off remaining progress rather than the site, because what is
+   being bought is time. Deliberately poor value against simply waiting —
+   it is impatience, not a strategy. */
+const EXPO_RUSH_PER_HOUR = 90;
+
+/** What it costs to bring a run home right now, or 0 when it is already back. */
+function expoRushCost(run) {
+  const left = expoRemainingWallSec(run);
+  if (left === null || left <= 0) return 0;
+  return Math.max(10, Math.round((left / 3600) * EXPO_RUSH_PER_HOUR));
+}
+
+function expoRush(rid) {
+  expoEnsure();
+  const run = state.expo.active.find(r => r.rid === rid);
+  if (!run) return { ok: false, error: 'No such party.' };
+  if (expoIsDone(run)) return { ok: false, error: 'They are already back.' };
+  const cost = expoRushCost(run);
+  if ((state.coins || 0) < cost) return { ok: false, error: `Not enough coins (need ${cost}).` };
+  state.coins -= cost;
+  run.progressSec = run.durationSec;
+  save();
+  return { ok: true, cost };
+}
+
+/* ── Reroll the board ────────────────────────────────────────────────
+   DOUBLING WITHIN A ROTATION, and reset by the rotation. One reroll to
+   escape a bad draw is cheap; chasing a specific site all afternoon is
+   not, which is the behaviour worth pricing.
+
+   The salt is stored, so the board stays deterministic: every device on
+   this save computes the same rerolled board rather than each tab
+   shuffling its own. */
+const EXPO_REROLL_BASE = 250;
+
+function expoRerollCost() {
+  const n = (state.expo && state.expo.rerolls) || 0;
+  return EXPO_REROLL_BASE * Math.pow(2, n);
+}
+
+function expoReroll() {
+  expoEnsure();
+  const cost = expoRerollCost();
+  if ((state.coins || 0) < cost) return { ok: false, error: `Not enough coins (need ${cost}).` };
+  state.coins -= cost;
+  state.expo.rerolls = (state.expo.rerolls || 0) + 1;
+  state.expo.salt = (state.expo.salt || 0) + 1;
+  /* A site already run this rotation stays run — otherwise a reroll is a
+     way to farm the same site repeatedly, which is the one thing the
+     once-per-rotation rule exists to stop. */
+  save();
+  return { ok: true, cost };
+}
+
+/* ── The Bone Broker ─────────────────────────────────────────────────
+   Buys an egg outright, at a price that climbs with every egg bought
+   that day and resets with the day. Distinct from the Daily Dig, which
+   is free, once, and mostly common: this is the sink for a player who
+   has coins and wants another roll now.
+
+   Priced well above what an egg is worth so it never becomes the
+   efficient route to a roster — hatching and expeditions stay the way
+   you actually fill a park. */
+const BROKER_PRICES = { common: 400, uncommon: 900, rare: 2200, epic: 6000, legendary: 18000 };
+const BROKER_STEP = 1.6;
+
+function brokerCost(rarity) {
+  const base = BROKER_PRICES[rarity];
+  if (!base) return 0;
+  const bought = (state.expo && state.expo.brokerBought) || 0;
+  return Math.round(base * Math.pow(BROKER_STEP, bought));
+}
+
+function brokerBuy(rarity) {
+  expoEnsure();
+  if (!BROKER_PRICES[rarity]) return { ok: false, error: 'The broker has nothing like that.' };
+  const cost = brokerCost(rarity);
+  if ((state.coins || 0) < cost) return { ok: false, error: `Not enough coins (need ${cost}).` };
+  const species = rollSpecies(rarity);
+  if (!species) return { ok: false, error: 'Nothing of that kind on the shelf today.' };
+  state.coins -= cost;
+  state.expo.brokerBought = ((state.expo && state.expo.brokerBought) || 0) + 1;
+  const where = acquireEgg(species.id, rarity);
+  save();
+  return { ok: true, cost, rarity, name: species.name, where };
+}
+
+/* ── Park Renown ─────────────────────────────────────────────────────
+   The endless one. +1% to coins earned from expeditions and care per
+   level, with the price compounding 45% a level — so level 20 costs
+   roughly 1.6 million for +20%, and no amount of it ever pays itself
+   back. It exists so a maxed-out park still has somewhere to put money,
+   and so the number on the HUD means something. */
+const RENOWN_BASE = 5000;
+const RENOWN_STEP = 1.45;
+const RENOWN_PCT_PER_LEVEL = 0.01;
+
+function renownLevel() {
+  return Math.max(0, Math.floor((state.expo && state.expo.renown) || 0));
+}
+
+function renownCost() {
+  return Math.round(RENOWN_BASE * Math.pow(RENOWN_STEP, renownLevel()));
+}
+
+/** The multiplier renown applies to coins earned. 1 at level 0. */
+function renownMult() {
+  return 1 + renownLevel() * RENOWN_PCT_PER_LEVEL;
+}
+
+function buyRenown() {
+  expoEnsure();
+  const cost = renownCost();
+  if ((state.coins || 0) < cost) return { ok: false, error: `Not enough coins (need ${cost}).` };
+  state.coins -= cost;
+  state.expo.renown = renownLevel() + 1;
+  save();
+  return { ok: true, level: state.expo.renown, cost };
+}
+
 /* ── State, dispatch and return ───────────────────────────────────────── */
 
 function expoMaxSlots() {
@@ -7604,14 +7783,25 @@ function expoEnsure(now = Date.now()) {
     if (typeof e.counters[k] !== 'number') e.counters[k] = 0;
   }
   if (typeof e.completed !== 'number') e.completed = 0;
+  if (typeof e.brokerBought !== 'number') e.brokerBought = 0;
   /* Permanent, so it survives every rotation below — a purchased upgrade
      that vanished at midnight would be theft. */
   if (!e.upg || typeof e.upg !== 'object') e.upg = {};
+  if (typeof e.renown !== 'number') e.renown = 0;
+  if (typeof e.salt !== 'number') e.salt = 0;
   if (typeof e.lastTick !== 'number') e.lastTick = now;
 
   /* A new board period clears what was dispatched from the old one. */
   const period = expoPeriod(now, EXPO_BOARD_PERIOD_MS);
-  if (e.period !== period) { e.period = period; e.used = []; }
+  if (e.period !== period) {
+    e.period = period;
+    e.used = [];
+    /* The reroll price resets with the board it was rerolling. Carrying a
+       doubled price into a fresh rotation would punish a player for a
+       draw that is already gone. */
+    e.rerolls = 0;
+  }
+  if (typeof e.rerolls !== 'number') e.rerolls = 0;
 
   /* A new quest period is a clean sheet: nothing claimed, nothing counted.
      Counters reset too, or yesterday's chores would finish today's list. */
@@ -7619,6 +7809,9 @@ function expoEnsure(now = Date.now()) {
   if (e.questPeriod !== qPeriod) {
     e.questPeriod = qPeriod;
     e.questDone = [];
+    /* The broker's price ladder is a DAILY one, so it resets on the same
+       clock as the notes rather than on the board rotation. */
+    e.brokerBought = 0;
     e.counters = { care: 0, debris: 0, runs: 0, hatch: 0 };
   }
 
@@ -7652,7 +7845,7 @@ function expoDispatch(siteId, uids, now = Date.now(), kitIds = []) {
   const e = state.expo;
   const site = expoSiteById(siteId);
   if (!site) return { ok: false, error: 'No such site.' };
-  if (!expoBoardFor(e.period, e.completed).some(s => s.id === siteId)) return { ok: false, error: 'That site is not on the board.' };
+  if (!expoBoardFor(e.period, e.completed, e.salt).some(s => s.id === siteId)) return { ok: false, error: 'That site is not on the board.' };
   if (e.used.includes(siteId)) return { ok: false, error: 'Already sent a party there this rotation.' };
   if (e.active.length >= expoMaxSlots()) return { ok: false, error: 'Both parties are already out.' };
 
@@ -7801,6 +7994,7 @@ function expoClaim(rid, now = Date.now()) {
   const kits = Array.isArray(run.kits) ? run.kits : [];
   const reward = expoRewardsFor(site, tier, run.party.length);
   if (kits.includes('crates')) reward.coins = Math.round(reward.coins * (1 + EXPO_KIT_COINS));
+  reward.coins = Math.round(reward.coins * renownMult());
 
   state.coins = (state.coins || 0) + reward.coins;
 
@@ -7909,7 +8103,9 @@ function renderExpeditions() {
     e.active.length + ' / ' + expoMaxSlots() + ' parties out';
 
   const nextBoard = (e.period + 1) * EXPO_BOARD_PERIOD_MS - now;
-  document.getElementById('expoRotation').textContent = 'New sites in ' + expoFmtWall(nextBoard / 1000);
+  document.getElementById('expoRotation').innerHTML =
+    'New sites in ' + escapeHtml(expoFmtWall(nextBoard / 1000))
+    + ` <button class="expo-btn ghost" style="margin-left:8px" ${(state.coins || 0) >= expoRerollCost() ? '' : 'disabled'} onclick="onExpoReroll()">Reroll &middot; ${expoRerollCost()}</button>`;
 
   const nextNotes = (e.questPeriod + 1) * EXPO_QUEST_PERIOD_MS - now;
   document.getElementById('expoNotesReset').textContent = 'Resets in ' + expoFmtWall(nextNotes / 1000);
@@ -7942,7 +8138,11 @@ function renderExpoActive(now) {
             : `<span>${pct}% &mdash; <b>${expoFmtWall(left)}</b> at this pace</span>
                <span>${isStreamLive ? 'Moving ' + EXPO_LIVE_BOOST + '&times; &mdash; stream is live' : 'Faster while the stream is live'}</span>`}
         </div>
-        ${done ? `<div style="margin-top:10px"><button class="expo-btn" onclick="onExpoClaim('${run.rid}')">Welcome them back</button></div>` : ''}
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+          ${done
+            ? `<button class="expo-btn" onclick="onExpoClaim('${run.rid}')">Welcome them back</button>`
+            : `<button class="expo-btn ghost" ${(state.coins || 0) >= expoRushCost(run) ? '' : 'disabled'} onclick="onExpoRush('${run.rid}')">Call them in &middot; ${expoRushCost(run)}</button>`}
+        </div>
       </div>`;
   }).join('');
 }
@@ -7950,7 +8150,7 @@ function renderExpoActive(now) {
 function renderExpoBoard(now) {
   const host = document.getElementById('expoBoard');
   const e = state.expo;
-  const board = expoBoardFor(e.period, e.completed);
+  const board = expoBoardFor(e.period, e.completed, e.salt);
   const available = expoAvailableDinos();
   const full = e.active.length >= expoMaxSlots();
 
@@ -8025,7 +8225,16 @@ function renderExpoBoard(now) {
 
 function renderExpoUpgrades() {
   const host = document.getElementById('expoUpgrades');
-  host.innerHTML = EXPO_UPGRADES.map(u => {
+  const renownAfford = (state.coins || 0) >= renownCost();
+  const renownRow = `
+    <div class="expo-note">
+      <div>
+        <div class="expo-note-label">Park Renown &middot; ${renownLevel()}</div>
+        <div class="expo-note-prog">+1% coins from expeditions and care, every level. No ceiling, and the price climbs faster than the payout &mdash; this is somewhere to put money, not an investment.</div>
+      </div>
+      <div><button class="expo-btn" ${renownAfford ? '' : 'disabled'} onclick="onBuyRenown()">${renownCost()}</button></div>
+    </div>`;
+  host.innerHTML = renownRow + EXPO_UPGRADES.map(u => {
     const lv = expoUpgLevel(u.id);
     const cost = expoUpgNextCost(u.id);
     const maxed = cost === null;
@@ -8132,6 +8341,41 @@ function onExpoClaim(rid) {
   levelled.forEach((l, i) => {
     setTimeout(() => showToast(`${l.name} reached level ${l.level}! ⭐`), 2600 * (i + (egg ? 2 : 1)));
   });
+}
+
+function onExpoRush(rid) {
+  const res = expoRush(rid);
+  if (!res.ok) { showToast(res.error); return; }
+  renderExpeditions();
+  updateTopBar();
+  showToast(`Called in for ${res.cost} coins — they are at the gate.`);
+}
+
+function onExpoReroll() {
+  const res = expoReroll();
+  if (!res.ok) { showToast(res.error); return; }
+  expoOpenSite = null;
+  renderExpeditions();
+  updateTopBar();
+  showToast(`New sites posted — ${res.cost} coins.`);
+}
+
+function onBuyRenown() {
+  const res = buyRenown();
+  if (!res.ok) { showToast(res.error); return; }
+  renderExpeditions();
+  updateTopBar();
+  showToast(`Park Renown is now ${res.level}.`);
+}
+
+function onBrokerBuy(rarity) {
+  const res = brokerBuy(rarity);
+  if (!res.ok) { showToast(res.error); return; }
+  renderEggsTab();
+  updateTopBar();
+  showToast(res.where === 'storage'
+    ? `The broker hands over a ${res.rarity} egg — incubator full, sent to Egg Storage.`
+    : `The broker hands over a ${res.rarity} egg.`);
 }
 
 function onExpoClaimNote(id) {
