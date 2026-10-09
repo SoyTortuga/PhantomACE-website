@@ -211,6 +211,12 @@ function loadProfileCosmetics() {
            everywhere else that renders a badge. */
         var badgeImg = badge && badge.meta && (badge.meta.image || badge.meta.imageUrl2x || badge.meta.imageUrl1x);
         if (badgeImg) {
+          /* A badge can name art that is not on disk yet — the grimoire set
+             badge points into assets/badges/grimoire/, which does not exist,
+             so the first player to complete a set would wear a broken image
+             in the header on every page. Hide it instead: no badge looks
+             deliberate, a broken one looks like the site is broken. */
+          badgeEl.onerror = function () { this.hidden = true; };
           badgeEl.src = badgeImg;
           badgeEl.alt = badge.name;
           badgeEl.title = badge.name;

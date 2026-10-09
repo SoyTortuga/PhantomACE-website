@@ -135,7 +135,21 @@ function bindContainer(container) {
 
   container.addEventListener('error', (e) => {
     const img = e.target;
-    if (!img || img.tagName !== 'IMG' || !img.closest('.item-banner-thumb, .equipped-banner-thumb')) return;
+    if (!img || img.tagName !== 'IMG') return;
+
+    /* Badge art that is not on disk yet. The grimoire set badge points
+       into assets/badges/grimoire/, which does not exist, so the tile
+       would draw a broken image where the slot emoji used to be. Put the
+       emoji back — that is what a badge with no art already shows. */
+    const swatch = img.closest('.item-icon-swatch');
+    if (swatch) {
+      img.remove();
+      swatch.classList.remove('has-art');
+      swatch.textContent = swatch.dataset.fallback || BADGE_SLOT.icon;
+      return;
+    }
+
+    if (!img.closest('.item-banner-thumb, .equipped-banner-thumb')) return;
     const box = img.parentElement;
     img.remove();
     box.classList.add('no-art');
@@ -425,7 +439,9 @@ function itemFace(item, slot) {
   if (s.type === 'name-effect') return '';
   const art = itemArtwork(item);
   if (!art) return `<div class="item-icon-swatch">${s.icon}</div>`;
-  return `<div class="item-icon-swatch has-art"><img src="${escAttr(art)}" alt="" loading="lazy"></div>`;
+  /* The slot emoji rides along so the error handler can put back THIS
+     item’s icon rather than guessing at the badge one. */
+  return `<div class="item-icon-swatch has-art" data-fallback="${escAttr(s.icon)}"><img src="${escAttr(art)}" alt="" loading="lazy"></div>`;
 }
 
 /* Name effects animate through the shared applier; managed mode caps how

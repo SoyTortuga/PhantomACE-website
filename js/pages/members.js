@@ -11,6 +11,21 @@
   'use strict';
 
   var grid = document.getElementById('memGrid');
+
+  /* Badge art that is not there yet falls back to the same diamond a
+     badge with no art gets. Delegated and capture-phase, because `error`
+     does not bubble and the rows are rewritten on every search and page
+     turn. Mirrors what profile.js does for the same badges. */
+  if (grid) {
+    grid.addEventListener('error', function (e) {
+      var img = e.target;
+      if (!img || img.tagName !== 'IMG' || !img.classList.contains('mem-badge-art')) return;
+      var span = document.createElement('span');
+      span.className = 'mem-badge-glyph';
+      span.textContent = '◆';
+      if (img.parentNode) img.parentNode.replaceChild(span, img);
+    }, true);
+  }
   var countEl = document.getElementById('memCount');
   var searchEl = document.getElementById('memSearch');
   var pager = document.getElementById('memPager');
@@ -56,6 +71,9 @@
     var glyph = img
       ? '<img class="mem-badge-art" src="' + esc(img) + '" alt="">'
       : '<span class="mem-badge-glyph">◆</span>';
+    /* The 404 case is handled by the delegated listener on the grid — see
+       below. A badge whose file is missing falls back to this same glyph
+       rather than drawing a broken image in somebody's row. */
     return '<span class="mem-badge mem-badge-' + rarity + '" title="' + esc(b.name) + '">' +
       glyph + '</span>';
   }

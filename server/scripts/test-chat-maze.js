@@ -49,6 +49,22 @@ const ok = (label, cond) => check(label, !!cond, true);
    reached from here — the routes swallow its failure by design. */
 globalThis.fetch = async () => { throw new Error('unexpected network call'); };
 
+/* WHY THIS TRAP EXISTS. This suite exited non-zero once during a full
+   sweep and printed no FAIL line — just the drop-path log noise above it
+   — and then passed 100 consecutive runs, so there was nothing to debug
+   from. An async rejection nobody awaited kills the process with an exit
+   code and no assertion, which looks exactly like that. If it happens
+   again, this names it and the file and line instead of leaving a bare 1. */
+for (const signal of ['unhandledRejection', 'uncaughtException']) {
+  process.on(signal, (err) => {
+    console.log('');
+    console.log(`[chat-maze] ${signal.toUpperCase()} — this is the flake, caught:`);
+    console.log(err && err.stack ? err.stack : String(err));
+    console.log('');
+    process.exit(1);
+  });
+}
+
 function fakeKV(seed = {}) {
   const store = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
   return {
@@ -58,6 +74,14 @@ function fakeKV(seed = {}) {
     async put(k, v) { store.set(k, String(v)); },
     async delete(k) { store.delete(k); },
     async list() { return { keys: [] }; },
+    /* The real DAL has these; without pullGiveawayCode, clearing a maze
+       threw inside the drop's own try/catch and the whole drop path went
+       untested while printing "[maze] clear drop failed" on every clear.
+       Returning null is the empty-pool case, which dropCodeAction handles
+       by returning an error BEFORE it tries to talk to Twitch — so the
+       path runs for real and still makes no network call. */
+    async pullGiveawayCode() { return null; },
+    async claim(k) { const v = store.get(k); store.delete(k); return v === undefined ? null : JSON.parse(v); },
     async mutate(k, fn) {
       const cur = store.has(k) ? JSON.parse(store.get(k)) : null;
       const out = await fn(cur);
