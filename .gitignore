@@ -21,6 +21,14 @@ _private/
 # directory to Cloudflare Pages directly rather than building from git.
 # Regenerate derived sprites with games/dino-park/_build-*.js.
 games/dino-park/assets/dino-assets/
+
+# Egg sprites. These were tracked until an asset audit found all four were
+# byte-identical to purchased jurassic-dino-320 art, and egg-hatch.png comes
+# from the same library — purchased packs in a public repo, which is what the
+# block above exists to stop. Untracked now and manual-copied to the rig with
+# the other pack art. The overlay and the Phamily pass both read this path;
+# without the copy they render the alt text rather than breaking.
+assets/images/eggs/
 # Skull Clicker building sprites, spliced from the same purchased packs.
 games/skull-clicker/assets/buildings/
 # Raid-boss source art (aseprite + raw sheets). The flattened strips the game

@@ -229,16 +229,32 @@
      mirrors. */
   var FALLBACK = '/assets/images/phantomace-logo.png';
 
-  /* Egg drops show the actual egg, matched to its rarity. Local files:
-     copied into the repo rather than referenced inside
-     games/dino-park/assets/dino-assets/, which is gitignored and shipped to
-     the server out of band — an overlay should not depend on a tree that is
-     not version controlled. */
+  /* Egg drops show the actual egg, matched to its rarity.
+
+     EPIC AND LEGENDARY WERE MISSING, and the fallback below is
+     `EGGS[rarity] || EGGS.common` — so the two RAREST dino drops rendered
+     the COMMON egg on stream, with no 404 and no console error, while the
+     audio map further down played the correct legendary sting over it.
+     Silently wrong, and wrong precisely on the drops worth seeing.
+
+     `mythic` stays: it is not a dino rarity, but it IS a real Phamily pass
+     rarity (phamily-rewards.js), and pass rewards reach this same map.
+
+     THESE FILES ARE NO LONGER TRACKED IN GIT. They were committed on the
+     reasoning that an overlay should not depend on an untracked tree —
+     true, but they are byte-identical copies of purchased pack art and
+     this repo is public, which is exactly what .gitignore lines 17-34
+     exist to prevent. Licensing wins over the convenience. The whole
+     directory is now gitignored and manual-copied to the rig like
+     dino-assets/**, so a fresh clone has no egg art until that copy
+     happens — the overlay degrades to the alt text, it does not break. */
   var EGGS = {
-    common:   '/assets/images/eggs/egg-common.png',
-    uncommon: '/assets/images/eggs/egg-uncommon.png',
-    rare:     '/assets/images/eggs/egg-rare.png',
-    mythic:   '/assets/images/eggs/egg-mythic.png',
+    common:    '/assets/images/eggs/egg-common.png',
+    uncommon:  '/assets/images/eggs/egg-uncommon.png',
+    rare:      '/assets/images/eggs/egg-rare.png',
+    epic:      '/assets/images/eggs/egg-epic.png',
+    legendary: '/assets/images/eggs/egg-legendary.png',
+    mythic:    '/assets/images/eggs/egg-mythic.png',
   };
 
   /* ── Dino hatch minigame ───────────────────────────────────────────────

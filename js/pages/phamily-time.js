@@ -48,11 +48,18 @@
 
   /* Eggs are the one reward whose art already exists per rarity, so a
      mythic egg looks like a mythic egg rather than like a common one. */
+  /* The pass track uses common/uncommon/rare/mythic; epic and legendary
+     are listed too because this map is keyed by whatever rarity a reward
+     carries, and the two now exist. Same files as the overlay, and the
+     same note applies: the directory is gitignored and manual-copied to
+     the rig, because these are purchased pack art in a public repo. */
   const EGG_ART = {
-    common:   '/assets/images/eggs/egg-common.png',
-    uncommon: '/assets/images/eggs/egg-uncommon.png',
-    rare:     '/assets/images/eggs/egg-rare.png',
-    mythic:   '/assets/images/eggs/egg-mythic.png',
+    common:    '/assets/images/eggs/egg-common.png',
+    uncommon:  '/assets/images/eggs/egg-uncommon.png',
+    rare:      '/assets/images/eggs/egg-rare.png',
+    epic:      '/assets/images/eggs/egg-epic.png',
+    legendary: '/assets/images/eggs/egg-legendary.png',
+    mythic:    '/assets/images/eggs/egg-mythic.png',
   };
 
   function rewardArt(reward) {
