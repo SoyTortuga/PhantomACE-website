@@ -80,8 +80,13 @@ async function run(scopes) {
   return { status: res.status, body: await res.json(), created: [...created] };
 }
 
-/* Everything a fully-granted channel has. */
-const ALL = ['channel:read:hype_train', 'channel:read:ads', 'bits:read', 'channel:read:redemptions'];
+/* Every scope any subscription on the list depends on. If a new gated type
+   is added and this is not updated, the "fully granted" block below fails
+   with that type's own row — which is the intended way to find out. */
+const ALL = [
+  'channel:read:hype_train', 'channel:read:ads', 'bits:read',
+  'channel:read:redemptions', 'channel:read:predictions', 'moderator:read:followers',
+];
 
 /* ── With every scope, everything goes up ────────────────────────────────── */
 {
@@ -91,7 +96,36 @@ const ALL = ['channel:read:hype_train', 'channel:read:ads', 'bits:read', 'channe
     .every(p => r.created.includes(`channel.hype_train.${p}`)));
   ok('ad breaks subscribe', r.created.includes('channel.ad_break.begin'));
   ok('bits subscribe', r.created.includes('channel.bits.use'));
+  ok('predictions subscribe', r.created.includes('channel.prediction.begin'));
+  ok('follows subscribe', r.created.includes('channel.follow'));
+  ok('cheers subscribe', r.created.includes('channel.cheer'));
   ok('nothing is reported as failed', r.body.results.every(x => x.ok));
+
+  /* The gate is per subscription, not per handler: every entry that depends
+     on a channel permission must declare it, or it gets posted anyway and
+     comes back as Twitch's unactionable "subscription missing proper
+     authorization". That is exactly how predictions, follows and cheers
+     produced six bare red crosses naming neither a scope nor a button. */
+  const ungated = await run([]);
+  for (const type of [
+    'channel.prediction.begin', 'channel.prediction.progress',
+    'channel.prediction.lock', 'channel.prediction.end',
+    'channel.follow', 'channel.cheer', 'channel.ad_break.begin',
+    'channel.bits.use', 'channel.hype_train.begin',
+    'channel.channel_points_custom_reward_redemption.add',
+  ]) {
+    ok(`${type} declares the scope it needs`, !ungated.created.includes(type));
+  }
+  ok('and with nothing granted, only the unscoped types are posted',
+    ungated.created.every(t => ['channel.update', 'channel.chat.message', 'channel.subscribe',
+      'channel.subscription.gift', 'channel.subscription.message', 'channel.raid'].includes(t)));
+
+  /* Grouped: four prediction types are one problem and one button press. */
+  const predRow = ungated.body.results.filter(x => /prediction/.test(x.type));
+  check('four prediction types make ONE row', predRow.length, 1);
+  ok('naming all four', ['begin', 'progress', 'lock', 'end']
+    .every(ph => predRow[0].type.includes(ph)));
+  ok('and saying what it costs', /overlay prediction panel/.test(predRow[0].error));
 }
 
 /* ── THE REGRESSION: no hype train scope must not block the rest ─────────── */
@@ -123,6 +157,9 @@ for (const [scope, type] of [
   ['channel:read:hype_train', 'channel.hype_train.begin'],
   ['channel:read:ads', 'channel.ad_break.begin'],
   ['bits:read', 'channel.bits.use'],
+  ['channel:read:predictions', 'channel.prediction.begin'],
+  ['moderator:read:followers', 'channel.follow'],
+  ['channel:read:redemptions', 'channel.channel_points_custom_reward_redemption.add'],
 ]) {
   const r = await run(ALL.filter(s => s !== scope));
   ok(`without ${scope}, its own type is skipped`, !r.created.includes(type));
@@ -139,7 +176,7 @@ for (const [scope, type] of [
   check('an unreadable token still succeeds', r.status, 200);
   ok('channel.update still subscribes', r.created.includes('channel.update'));
   ok('no scope-gated type is attempted',
-    !r.created.some(t => /hype_train|ad_break|bits\.use/.test(t)));
+    !r.created.some(t => /hype_train|ad_break|bits\.use|prediction|follow|cheer|redemption/.test(t)));
   ok('and a row names the token, not a scope',
     r.body.results.some(x => x.ok === false && /broadcaster token/i.test(x.type)));
 }

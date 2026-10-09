@@ -580,7 +580,16 @@ async function createSubs() {
     const data = await res.json();
     el.style.display = 'block';
     if (data.success) {
-      el.innerHTML = '<b>✅ Created!</b><br>' + data.results.map(r =>
+      /* A green "Created!" over ten red crosses is a lie by headline. The
+         summary counts, and the failures sort to the TOP — they are the only
+         rows that need acting on, and they were previously buried under a
+         wall of ticks. */
+      const bad = data.results.filter(r => !r.ok);
+      const good = data.results.filter(r => r.ok);
+      const head = bad.length
+        ? '<b>⚠️ ' + good.length + ' created, ' + bad.length + ' need a permission</b>'
+        : '<b>✅ All ' + good.length + ' created.</b>';
+      el.innerHTML = head + '<br>' + bad.concat(good).map(r =>
         (r.ok ? '✅' : '❌') + ' ' + r.type + (r.error ? ': ' + r.error : '')
       ).join('<br>');
     } else {
@@ -1271,6 +1280,7 @@ export async function createEventSubSubscriptions(env, request) {
        reads. */
     {
       type: 'channel.channel_points_custom_reward_redemption.add',
+      scope: 'channel:read:redemptions',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/channel-points`,
@@ -1283,24 +1293,28 @@ export async function createEventSubSubscriptions(env, request) {
        the overlay — it never records to the activity feed (see the handler). */
     {
       type: 'channel.prediction.begin',
+      scope: 'channel:read:predictions',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/prediction-events`,
     },
     {
       type: 'channel.prediction.progress',
+      scope: 'channel:read:predictions',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/prediction-events`,
     },
     {
       type: 'channel.prediction.lock',
+      scope: 'channel:read:predictions',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/prediction-events`,
     },
     {
       type: 'channel.prediction.end',
+      scope: 'channel:read:predictions',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/prediction-events`,
@@ -1344,12 +1358,14 @@ export async function createEventSubSubscriptions(env, request) {
        already requested). channel.cheer is v1 (bits:read, already requested). */
     {
       type: 'channel.follow',
+      scope: 'moderator:read:followers',
       version: '2',
       condition: { broadcaster_user_id: broadcasterId, moderator_user_id: broadcasterId },
       callback: `${origin}/api/milestones`,
     },
     {
       type: 'channel.cheer',
+      scope: 'bits:read',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId },
       callback: `${origin}/api/milestones`,
@@ -1378,51 +1394,39 @@ export async function createEventSubSubscriptions(env, request) {
   if (giveawayRewardId) {
     subscriptions.push({
       type: 'channel.channel_points_custom_reward_redemption.add',
+      scope: 'channel:read:redemptions',
       version: '1',
       condition: { broadcaster_user_id: broadcasterId, reward_id: giveawayRewardId },
       callback: `${origin}/api/bot/giveaway-entry`,
     });
   }
 
-  /* CONDITIONAL, not part of the hard gate above. channel:read:ads was added
-     after this channel was first authorised, so requiring it would refuse to
-     create ANY subscription for a broadcaster who has not re-consented —
-     breaking a working setup to add an optional feature. Absent scope is
-     reported as one failed row instead. */
-  if (scopes.includes('channel:read:ads')) {
+  subscriptions.push({
+    type: 'channel.ad_break.begin',
+    scope: 'channel:read:ads',
+    version: '1',
+    condition: { broadcaster_user_id: broadcasterId },
+    callback: `${origin}/api/ad-break`,
+  });
+
+  for (const phase of ['begin', 'progress', 'end']) {
     subscriptions.push({
-      type: 'channel.ad_break.begin',
-      version: '1',
+      type: `channel.hype_train.${phase}`,
+      scope: 'channel:read:hype_train',
+      version: '2',
       condition: { broadcaster_user_id: broadcasterId },
-      callback: `${origin}/api/ad-break`,
+      callback: `${origin}/api/hype-train`,
     });
   }
 
-  /* Bits Power-ups — the 300-bit Power-up hatch trigger. Conditional on
-     bits:read for the same reason as ads: requiring it in the hard gate would
-     refuse to create ANY subscription for a broadcaster who has not re-consented
-     since this scope was added, breaking a working setup to add one feature.
-     Absent scope is one failed row below instead. */
-  /* HYPE TRAIN, all three, on channel:read:hype_train. */
-  if (scopes.includes('channel:read:hype_train')) {
-    for (const phase of ['begin', 'progress', 'end']) {
-      subscriptions.push({
-        type: `channel.hype_train.${phase}`,
-        version: '2',
-        condition: { broadcaster_user_id: broadcasterId },
-        callback: `${origin}/api/hype-train`,
-      });
-    }
-  }
-
-  if (scopes.includes('bits:read')) {
-    subscriptions.push({
-      type: 'channel.bits.use',
-      version: '1',
-      condition: { broadcaster_user_id: broadcasterId },
-      callback: `${origin}/api/bits`,
-    });
-  }
+  /* Bits Power-ups — the 300-bit Power-up hatch trigger. */
+  subscriptions.push({
+    type: 'channel.bits.use',
+    scope: 'bits:read',
+    version: '1',
+    condition: { broadcaster_user_id: broadcasterId },
+    callback: `${origin}/api/bits`,
+  });
 
   const results = [];
   if (!botUserId) {
@@ -1448,34 +1452,47 @@ export async function createEventSubSubscriptions(env, request) {
            + 'click "Authorize Channel Points".',
     });
   }
-  if (!scopes.includes('channel:read:hype_train')) {
+  /* ── SKIP WHAT IS NOT GRANTED, AND SAY WHAT IT COSTS ───────────────────
+     Each entry above carries the scope it needs, so this is ONE filter
+     rather than a conditional per type. Written the other way, each new
+     subscription had to remember to gate itself, and the ones that forgot
+     were posted anyway and came back as Twitch's "subscription missing
+     proper authorization" — four identical red crosses for predictions,
+     one for follows, one for cheers, none of them naming a scope or a
+     button. The broadcaster cannot act on that.
+
+     Scopes are grouped so four prediction types produce one row, not four.
+     A type with no `scope` needs none and always goes up. */
+  const WHAT_IT_COSTS = {
+    'channel:read:hype_train': 'hype train drops',
+    'channel:read:ads': 'the ad-break countdown on the overlay',
+    'bits:read': 'the 300-bit Power-up dino hatch and cheer alerts',
+    'channel:read:predictions': 'the overlay prediction panel and the activity feed',
+    'moderator:read:followers': 'follow alerts in the overlay queue',
+    'channel:read:redemptions': 'every channel point redemption, including giveaway entries',
+  };
+
+  const skipped = new Map();
+  const toCreate = subscriptions.filter(sub => {
+    if (!sub.scope || scopes.includes(sub.scope)) return true;
+    if (!skipped.has(sub.scope)) skipped.set(sub.scope, []);
+    skipped.get(sub.scope).push(sub.type);
+    return false;
+  });
+
+  for (const [scope, types] of skipped) {
     results.push({
-      type: 'channel.hype_train.begin / .progress / .end',
+      type: [...new Set(types)].join(' / '),
       ok: false,
-      error: 'Needs channel:read:hype_train for hype train drops. Go back to Step 2 and click '
-           + '"Authorize Channel Points" again — Twitch will ask you to approve a new permission — '
-           + 'then run this step again. Everything else on this page works without it.',
+      error: `Needs ${scope}`
+           + (WHAT_IT_COSTS[scope] ? ` for ${WHAT_IT_COSTS[scope]}` : '')
+           + '. Go back to Step 2 and click "Authorize Channel Points" again — Twitch will ask '
+           + 'you to approve a new permission — then run this step again. Everything else on '
+           + 'this page works without it.',
     });
   }
-  if (!scopes.includes('channel:read:ads')) {
-    results.push({
-      type: 'channel.ad_break.begin',
-      ok: false,
-      error: 'Needs channel:read:ads. Go back to Step 2 and click "Authorize Channel Points" '
-           + 'again — Twitch will ask you to approve a new permission — then run this step again. '
-           + 'Everything else on this page works without it.',
-    });
-  }
-  if (!scopes.includes('bits:read')) {
-    results.push({
-      type: 'channel.bits.use',
-      ok: false,
-      error: 'Needs bits:read for the 300-bit Power-up dino hatch. Go back to Step 2 and click '
-           + '"Authorize Channel Points" again — Twitch will ask you to approve a new permission — '
-           + 'then run this step again. The gift-sub and channel-point hatch triggers work without it.',
-    });
-  }
-  for (const sub of subscriptions) {
+
+  for (const sub of toCreate) {
     /* One 401 means the token is dead for ALL of them, so mint a fresh one
        once and carry on rather than reporting six identical failures and
        making the broadcaster guess which of their own actions broke it. */

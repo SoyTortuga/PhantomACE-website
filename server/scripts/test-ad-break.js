@@ -381,11 +381,16 @@ const T0 = Date.parse('2026-09-19T12:00:00Z');
   /* CONDITIONAL, deliberately. Folding it into the hard scope gate would
      refuse to create ANY subscription for a broadcaster who has not
      re-consented — breaking a working setup to add an optional feature. */
-  /* Scanned here only as a cheap locality check; that a missing scope skips
-     its own type and nothing else is proved by EXECUTION in
-     test-bot-setup-scopes.js, which is where the real guarantee lives. */
-  ok('the subscription is conditional on the scope',
-     /if \(scopes\.includes\('channel:read:ads'\)\) \{/.test(setup));
+  /* The subscription DECLARES the scope it needs and one filter skips every
+     entry whose scope is missing — rather than a hand-written conditional per
+     type, which is what let predictions, follows and cheers get posted
+     ungated. Scanned here only as a cheap locality check; that a missing
+     scope skips its own type and nothing else is proved by EXECUTION in
+     test-bot-setup-scopes.js, where the real guarantee lives. */
+  ok('the subscription declares the scope it needs',
+     /type: 'channel\.ad_break\.begin',[\s\S]{0,40}?scope: 'channel:read:ads',/.test(setup));
+  ok('and one filter skips whatever is not granted',
+     /if \(!sub\.scope \|\| scopes\.includes\(sub\.scope\)\) return true;/.test(setup));
 
   ok('the consent URL asks for read:ads', requiredScopes.includes('channel:read:ads'));
 
