@@ -21,14 +21,6 @@
    ══════════════════════════════════════════════ */
 
 @font-face {
-  font-family: 'PhantomACE';
-  src: url('/assets/fonts/PHANTOMACE.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: block;   /* an alert flashing in a fallback face looks broken */
-}
-
-@font-face {
   font-family: 'GodOfWar';
   src: url('/assets/fonts/GODOFWAR.TTF') format('truetype');
   font-weight: normal;

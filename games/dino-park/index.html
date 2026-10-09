@@ -5113,7 +5113,11 @@ function renderParkWorld() {
       const el = document.createElement('div');
       el.className = 'park-debris';
       el.dataset.debris = d.id;
-      el.innerHTML = `<img src="${d.src || IC+'environment_terrain/boulder.png'}" width="28" height="28" style="image-rendering:pixelated;" alt="">`;
+      /* The fallback is for a debris entry with no src: an old save, or one
+         that came back from a visited park. It named boulder.png, which has
+         never existed in the pack, so the fallback WAS the broken image.
+         rock_formation.png is what DEBRIS_TYPES itself uses. */
+      el.innerHTML = `<img src="${d.src || IC+'environment_terrain/rock_formation.png'}" width="28" height="28" style="image-rendering:pixelated;" alt="" onerror="this.remove()">`;
       el.style.cssText = `left:${d.x}%;top:${d.y}%;`;
       el.onclick = (e) => { e.stopPropagation(); clearDebris(d.id); };
       world.appendChild(el);
@@ -6282,7 +6286,7 @@ function renderEggSources() {
     </div>
 
     <div class="egg-source broker">
-      <div class="egg-source-icon"><img src="${IC}fossils_bones/amber_fossil.png" width="28" height="28" style="image-rendering:pixelated;" alt="" onerror="this.remove()"></div>
+      <div class="egg-source-icon"><img src="${IC}fossils_bones/ammonite_fossil.png" width="28" height="28" style="image-rendering:pixelated;" alt="" onerror="this.remove()"></div>
       <div class="egg-source-info">
         <div class="egg-source-name">The Bone Broker</div>
         <div class="egg-source-desc">Buys eggs in, sells them on, and puts his prices up every time you come back. Resets daily.</div>
