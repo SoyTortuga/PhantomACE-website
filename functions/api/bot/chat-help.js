@@ -36,6 +36,18 @@ async function get(env, key) {
   try { return await env.MARKETPLACE.get(key, 'json'); } catch { return null; }
 }
 
+/* The keys read below, in the order they destructure.
+   EXPORTED SO A TEST CAN PIN THEM. Every read here is wrapped in a try/catch
+   that returns null, which means a key that is misspelled or unregistered does
+   not fail — it quietly reports "not running" forever. That is how !clash went
+   un-offered: this read 'mana_clash_chat' while the game stores
+   'mana_clash_vs_chat', and nothing anywhere could notice. */
+export const HELP_KEYS = [
+  'bingo_current', 'bingo_chat', 'sc_raid', 'bone_tithe', 'mana_clash_vs_chat',
+  'pham_wind_night', 'dino_safari', 'mtgbbb_guess', 'r6_draft', 'chat_vote',
+  'mm_chat', 'maze_current', 'chat_scramble',
+];
+
 /**
  * What is playable this second.
  *
@@ -48,20 +60,17 @@ export async function playableNow(env, now = Date.now()) {
   const out = [];
 
   const [bingoPtr, bingoCard, raid, tithe, clash, wind, safari, guess, draft, vote, mem, maze, scramble] =
-    await Promise.all([
-      get(env, 'bingo_current'), get(env, 'bingo_chat'), get(env, 'sc_raid'),
-      get(env, 'bone_tithe'), get(env, 'mana_clash_chat'), get(env, 'pham_wind_night'),
-      get(env, 'dino_safari'), get(env, 'mtgbbb_guess'), get(env, 'r6_draft'),
-      get(env, 'chat_vote'), get(env, 'mm_chat'), get(env, 'maze_current'), get(env, 'chat_scramble'),
-    ]);
+    await Promise.all(HELP_KEYS.map(k => get(env, k)));
 
   if (bingoPtr && bingoPtr.code) out.push('!bingo');
   if (bingoCard && bingoCard.stamp == null) out.push('!stamp <1-25>');
   if (raid && raid.status === 'active') out.push('!hit');
   if (tithe && tithe.status === 'active') out.push('!tithe');
   /* 'collecting' is the only phase !clash does anything in — 'resolved' is
-     the reveal, when a vote would be refused. */
-  if (clash && clash.status === 'collecting') out.push('!clash');
+     the reveal, when a vote would be refused. The window matters too: the
+     record sits at 'collecting' until something advances it, so without this
+     the line would keep offering a vote that has already closed. */
+  if (clash && clash.status === 'collecting' && now < clash.collectUntil) out.push('!clash');
   if (wind && wind.status === 'active') out.push('!wind left/right');
 
   /* The Safari's two commands are mutually exclusive, and naming the wrong

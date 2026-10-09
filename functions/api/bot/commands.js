@@ -534,7 +534,15 @@ async function handleChatMessage(env, event, outbox = []) {
      Per-asker cooldown like !entries: one spammer silences only themselves. */
   if (parsed.command === '!commands' || parsed.command === '!help') {
     try {
-      const { helpLine, HELP_COOLDOWN_MS } = await import('./chat-help.js');
+      /* sendChatMessage is NOT a module-level import in this file — every
+         other caller pulls it in first, and referencing it without that is a
+         ReferenceError thrown when the OUTBOX FLUSHES, which is after this
+         try/catch has returned. That is how !commands shipped silent twice:
+         nothing replied and nothing logged. */
+      const [{ helpLine, HELP_COOLDOWN_MS }, { sendChatMessage }] = await Promise.all([
+        import('./chat-help.js'),
+        import('./send-chat.js'),
+      ]);
       const key = `bot_cooldown_help_${event.chatter_user_id}`;
       const last = await env.MARKETPLACE.get(key);
       if (last && Date.now() - Number(last) < HELP_COOLDOWN_MS) return;
