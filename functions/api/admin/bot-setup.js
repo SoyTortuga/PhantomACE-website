@@ -529,7 +529,7 @@ PhantomACE's own channel and only they can approve those, so they are shown here
   inbound chat messages (so mods/broadcaster can trigger drops with <code>!drop</code> and
   <code>!announce</code> in chat), giveaway reward entries (once Step 3 is done), subs, gift subs
   and raids, and — when their scopes are granted in Step 2 — ad breaks and Bits Power-ups (the
-  300-bit hatch trigger). Twitch will send events to your Cloudflare functions automatically.
+  300-bit hatch trigger). Twitch will send events to the site automatically.
   Complete Step 1 first — the chat message subscription needs the bot's authorized user ID.</p>
   <button class="btn btn-red" onclick="createSubs()">Create Subscriptions</button>
   <div id="result"></div>
@@ -1214,7 +1214,7 @@ async function getAppAccessToken(env, { forceRefresh = false } = {}) {
 }
 
 
-async function createEventSubSubscriptions(env, request) {
+export async function createEventSubSubscriptions(env, request) {
   let appToken = await getAppAccessToken(env);
   if (!appToken) return json({ error: 'Could not get app access token. Check TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET.' }, 500);
 
@@ -1228,13 +1228,18 @@ async function createEventSubSubscriptions(env, request) {
   const botUserId = env.TWITCH_BOT_USER_ID || await env.MARKETPLACE.get('twitch_bot_user_id');
   const giveawayRewardId = await env.MARKETPLACE.get('giveaway_reward_id');
 
-  /* Refuse rather than produce three identical 403s. Twitch rejects a hype
-     train subscription with "subscription missing proper authorization" when
-     the broadcaster has not granted channel:read:hype_train — a message that
-     says nothing about which step to go back to. Checking first turns three
-     red crosses into one sentence naming the button to press. */
-  /* Hoisted, because the ad-break subscription below is added only when its
-     scope is present and re-validating would be a second round trip. */
+  /* WHICH SCOPES THE BROADCASTER ACTUALLY GRANTED, read once up front.
+     Twitch rejects a scope-gated subscription with "subscription missing
+     proper authorization", which says nothing about which step to go back
+     to, so each gated type below is skipped with a row naming the button to
+     press instead of producing an identical cryptic 403.
+
+     SKIPPED, NEVER REFUSED. This used to return 409 for the whole request
+     when channel:read:hype_train was missing, which meant one ungranted
+     scope blocked every unrelated subscription — including channel.update,
+     which needs no scope at all. Nothing was created and the page reported
+     only the pre-existing count. A missing scope costs its own feature and
+     nothing else. */
   let granted = null;
   {
     const stored = await env.MARKETPLACE.get('twitch_broadcaster_token', 'json');
@@ -1246,14 +1251,12 @@ async function createEventSubSubscriptions(env, request) {
       if (vr.ok) granted = (await vr.json()).scopes || [];
     } catch { /* handled below */ }
 
-    if (granted === null || !granted.includes('channel:read:hype_train')) {
-      return json({
-        error: 'Hype train events need channel:read:hype_train, which this channel has not granted.',
-        fix: 'Go back to Step 2 and click "Authorize Channel Points" again. Twitch will ask you to approve a NEW permission — approve it, then return here.',
-        grantedScopes: granted,
-      }, 409);
-    }
   }
+
+  /* null means the broadcaster token is missing or no longer valid — not that
+     no scopes were granted. Every scope-gated type is then reported as such
+     below, and the ones needing no broadcaster scope still go up. */
+  const scopes = granted || [];
 
   const subscriptions = [
     /* HYPE TRAIN IS VERSION 2, not 1.
@@ -1266,24 +1269,6 @@ async function createEventSubSubscriptions(env, request) {
        Payload-compatible with this handler: v2 still carries id, level,
        total, goal and top_contributions, which is everything hype-train.js
        reads. */
-    {
-      type: 'channel.hype_train.begin',
-      version: '2',
-      condition: { broadcaster_user_id: broadcasterId },
-      callback: `${origin}/api/hype-train`,
-    },
-    {
-      type: 'channel.hype_train.progress',
-      version: '2',
-      condition: { broadcaster_user_id: broadcasterId },
-      callback: `${origin}/api/hype-train`,
-    },
-    {
-      type: 'channel.hype_train.end',
-      version: '2',
-      condition: { broadcaster_user_id: broadcasterId },
-      callback: `${origin}/api/hype-train`,
-    },
     {
       type: 'channel.channel_points_custom_reward_redemption.add',
       version: '1',
@@ -1404,7 +1389,7 @@ async function createEventSubSubscriptions(env, request) {
      create ANY subscription for a broadcaster who has not re-consented —
      breaking a working setup to add an optional feature. Absent scope is
      reported as one failed row instead. */
-  if (granted.includes('channel:read:ads')) {
+  if (scopes.includes('channel:read:ads')) {
     subscriptions.push({
       type: 'channel.ad_break.begin',
       version: '1',
@@ -1418,7 +1403,19 @@ async function createEventSubSubscriptions(env, request) {
      refuse to create ANY subscription for a broadcaster who has not re-consented
      since this scope was added, breaking a working setup to add one feature.
      Absent scope is one failed row below instead. */
-  if (granted.includes('bits:read')) {
+  /* HYPE TRAIN, all three, on channel:read:hype_train. */
+  if (scopes.includes('channel:read:hype_train')) {
+    for (const phase of ['begin', 'progress', 'end']) {
+      subscriptions.push({
+        type: `channel.hype_train.${phase}`,
+        version: '2',
+        condition: { broadcaster_user_id: broadcasterId },
+        callback: `${origin}/api/hype-train`,
+      });
+    }
+  }
+
+  if (scopes.includes('bits:read')) {
     subscriptions.push({
       type: 'channel.bits.use',
       version: '1',
@@ -1442,7 +1439,25 @@ async function createEventSubSubscriptions(env, request) {
       error: 'No giveaway reward created yet — complete Step 3 first.',
     });
   }
-  if (!granted.includes('channel:read:ads')) {
+  if (granted === null) {
+    results.push({
+      type: 'broadcaster token',
+      ok: false,
+      error: 'Could not read the granted scopes — the broadcaster token is missing or '
+           + 'expired. Anything needing a channel permission is skipped below. Go to Step 2 and '
+           + 'click "Authorize Channel Points".',
+    });
+  }
+  if (!scopes.includes('channel:read:hype_train')) {
+    results.push({
+      type: 'channel.hype_train.begin / .progress / .end',
+      ok: false,
+      error: 'Needs channel:read:hype_train for hype train drops. Go back to Step 2 and click '
+           + '"Authorize Channel Points" again — Twitch will ask you to approve a new permission — '
+           + 'then run this step again. Everything else on this page works without it.',
+    });
+  }
+  if (!scopes.includes('channel:read:ads')) {
     results.push({
       type: 'channel.ad_break.begin',
       ok: false,
@@ -1451,7 +1466,7 @@ async function createEventSubSubscriptions(env, request) {
            + 'Everything else on this page works without it.',
     });
   }
-  if (!granted.includes('bits:read')) {
+  if (!scopes.includes('bits:read')) {
     results.push({
       type: 'channel.bits.use',
       ok: false,
