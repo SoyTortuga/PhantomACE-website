@@ -411,6 +411,10 @@ export const FAMILIES = [
   /* Per-asker cooldown for !entries. Group (a): the TTL IS the rule, so the
      row disappearing is what lets someone ask again. */
   { prefix: 'bot_cooldown_entries_', table: 'cp_queues',  expiry: 'real' },
+  /* Per-asker cooldown for !commands, same shape and lifetime as the one
+     above. A new prefix needs a line here or every read throws — which is
+     exactly how !commands shipped silent. */
+  { prefix: 'bot_cooldown_help_',    table: 'cp_queues',  expiry: 'real' },
 
   /* Short-lived dedupe markers. Both 'real': the row's presence IS the
      "already seen" answer, so it must stop being visible when the window

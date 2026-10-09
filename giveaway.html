@@ -291,6 +291,16 @@
       if (src.startsWith('maze:')) return 'Chat maze';
       if (src.startsWith('checkin:')) return 'Stream check-in';
       if (src.startsWith('mtgbbb:')) return 'MTGBBB';
+      /* The chat-played layers. Checked before nothing, but spelled out
+         separately from their site counterparts because "where did this
+         entry come from" is the whole question this list answers — and
+         "MTGBBB" would not distinguish winning a prize from calling a rare
+         in chat. mtgbbb-guess uses a hyphen, so it never matched the colon
+         prefix above and read as a bare "Entry". */
+      if (src.startsWith('mtgbbb-guess:')) return 'Called the rare';
+      if (src === 'bingo-chat') return "Chat's bingo card";
+      if (src === 'memory-match-chat') return 'Twitch Plays Memory';
+      if (src === 'chat-vote') return 'Chat vote';
       if (src.startsWith('quest:')) return 'Weekly quest';
       if (src === 'chat-scramble') return 'Chat scramble';
       if (src === 'amoe') return 'Free entry';
