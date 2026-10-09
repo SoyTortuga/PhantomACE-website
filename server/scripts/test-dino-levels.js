@@ -266,7 +266,13 @@ const dino = (over = {}) => ({ speciesId: 'rex', careCount: 0, xp: 0, ...over })
      roster comes back at level 1. */
   ok('the vault is backfilled too', /\(state\.vault \|\| \[\]\)\.forEach\(ensureDinoStats\)/.test(src));
   ok('but the passive award only touches the park',
-     /state\.park\.forEach\(d => \{ ensureDinoStats\(d\); awardDinoXp\(d, DINO_XP\.parkHour/.test(src));
+     /state\.park\.forEach\(d => \{ if \(d\.busy\) return; ensureDinoStats\(d\); awardDinoXp\(d, DINO_XP\.parkHour/.test(src));
+  /* And not one away with an expedition: it earns its XP in the field
+     instead, and paying both would make sending a party strictly free.
+     The exclusion is asserted above; the overnight stamina bonus has to
+     skip them for the same reason. See test-dino-expeditions.js. */
+  ok('nor does the overnight rest bonus reach them',
+     /if \(d\.busy\) return; ensureDinoStats\(d\); d\.stamina = Math\.min\(100/.test(src));
 
   ok('new dinos start with an explicit zero', (src.match(/xp: 0 \}/g) || []).length >= 2);
 }

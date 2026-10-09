@@ -49,6 +49,16 @@
     .tab-btn .tab-icon { font-size: 18px;
  text-shadow: none; display: block; margin-bottom: 1px; }
 
+    /* Six tabs do not fit a phone at the desktop size — "Expeditions" and
+       "Collection" ran into their neighbours the moment the sixth was
+       added. The labels stay (an icon row with no words is a guessing
+       game), so the type tightens instead and a long one wraps rather
+       than overlapping. */
+    @media (max-width: 480px) {
+      .tab-btn { font-size: 10px; padding: 7px 1px 8px; line-height: 1.15; overflow-wrap: anywhere; }
+      .tab-btn .tab-icon { font-size: 16px; }
+    }
+
     /* Tab Content */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -1173,6 +1183,57 @@
       transition: transform 0.3s ease; white-space: nowrap;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
+    /* ── Expeditions ──────────────────────────────────────────────────
+       Borders only, per the project's CSS rules: no box-shadow anywhere,
+       and no coloured left/right rail on any card. State is signalled by
+       the full border colour and by text, never by a stripe. */
+    .expo-section { padding: 14px 12px; border-bottom: 1px solid var(--border-low); }
+    .expo-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .expo-sub { font-size: 14px; color: var(--text-sec); }
+
+    .expo-card {
+      border: 1px solid var(--border-mid); border-radius: 6px;
+      background: var(--gray-mid); padding: 12px; margin-bottom: 10px;
+    }
+    .expo-card.is-running { border-color: #ffaa00; }
+    .expo-card.is-ready { border-color: var(--red); }
+    .expo-card.is-spent { opacity: 0.45; }
+
+    .expo-name { font-family: var(--font-display); font-size: 20px; color: var(--text-pri); }
+    .expo-blurb { font-size: 14px; color: var(--text-sec); margin: 4px 0 8px; line-height: 1.45; }
+    .expo-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 14px; color: var(--text-sec); }
+    .expo-meta b { color: var(--text-pri); font-weight: 700; }
+
+    .expo-bar { height: 6px; background: var(--gray-hi); border-radius: 3px; overflow: hidden; margin: 8px 0 6px; }
+    .expo-bar-fill { height: 100%; background: #ffaa00; border-radius: 3px; transition: width 0.4s; }
+    .expo-card.is-ready .expo-bar-fill { background: var(--red); }
+
+    .expo-btn {
+      padding: 7px 16px; background: var(--red); color: #fff; border: none; border-radius: 4px;
+      font-size: 15px; font-weight: 700; cursor: pointer; text-shadow: none;
+    }
+    .expo-btn.ghost { background: var(--gray-hi); color: var(--text-pri); border: 1px solid var(--border-mid); }
+    .expo-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .expo-party { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .expo-pick {
+      display: flex; align-items: center; gap: 6px; padding: 5px 9px; cursor: pointer;
+      background: var(--gray-hi); border: 1px solid var(--border-mid); border-radius: 4px;
+      font-size: 14px; color: var(--text-pri);
+    }
+    .expo-pick.chosen { border-color: var(--red); color: #ffaaaa; }
+    .expo-pick img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
+    .expo-pick .expo-pick-stat { color: var(--text-sec); font-size: 13px; }
+
+    .expo-note { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      border: 1px solid var(--border-mid); border-radius: 6px; background: var(--gray-mid);
+      padding: 10px 12px; margin-bottom: 8px; }
+    .expo-note.done { border-color: var(--red); }
+    .expo-note.claimed { opacity: 0.45; }
+    .expo-note-label { font-size: 15px; color: var(--text-pri); }
+    .expo-note-prog { font-size: 14px; color: var(--text-sec); }
+
+    .expo-empty { font-size: 14px; color: var(--text-sec); padding: 6px 0 2px; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -1190,6 +1251,7 @@
   <button class="tab-btn active" onclick="switchTab('park')"><span class="tab-icon">🏕️</span>Park</button>
   <button class="tab-btn" onclick="switchTab('eggs')"><span class="tab-icon">🥚</span>Eggs</button>
   <button class="tab-btn" onclick="switchTab('collection')"><span class="tab-icon">🦕</span>Collection</button>
+  <button class="tab-btn" onclick="switchTab('expeditions')"><span class="tab-icon">🧭</span>Expeditions</button>
   <button class="tab-btn" onclick="switchTab('market')"><span class="tab-icon">🏪</span>Market</button>
   <button class="tab-btn" onclick="switchTab('dinodex')"><span class="tab-icon">📖</span>Dinodex</button>
 </div>
@@ -1274,6 +1336,30 @@
 </div>
 
 <!-- Market Tab -->
+<div class="tab-content scrollable" id="tab-expeditions">
+  <div class="expo-section">
+    <div class="expo-head">
+      <div class="section-title">Out in the field</div>
+      <div class="expo-sub" id="expoSlots"></div>
+    </div>
+    <div id="expoActive"></div>
+  </div>
+  <div class="expo-section">
+    <div class="expo-head">
+      <div class="section-title">Where to send them</div>
+      <div class="expo-sub" id="expoRotation"></div>
+    </div>
+    <div id="expoBoard"></div>
+  </div>
+  <div class="expo-section">
+    <div class="expo-head">
+      <div class="section-title">Field Notes</div>
+      <div class="expo-sub" id="expoNotesReset"></div>
+    </div>
+    <div id="expoNotes"></div>
+  </div>
+</div>
+
 <div class="tab-content scrollable" id="tab-market">
   <div id="marketContent"></div>
 </div>
@@ -3784,6 +3870,7 @@ function load() {
     if (isStaleSave(parsed)) { discardLocalSave(); return; }
     state = { ...state, ...parsed };
     ensureDinoUids();
+    expoEnsure();
     applyOfflineDecay();
   } catch(e) {}
 }
@@ -4081,6 +4168,10 @@ async function syncCloudSave() {
     if (data && data.hasSave && data.state) {
       state = { ...state, ...data.state };
       ensureDinoUids();
+      /* A cloud save is the other path that can arrive without state.expo,
+         or with a `busy` flag whose run this device has already claimed —
+         expoEnsure repairs both before anything reads them. */
+      expoEnsure();
       applySubTierFromSession(session);
       applyOfflineDecay();
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {}
@@ -4096,6 +4187,25 @@ async function syncCloudSave() {
       });
     }
   } catch(e) {}
+}
+
+/* PWR / GRD / SPD — ONE definition, read by the collection card AND by
+   expedition parties. These were three inline expressions inside the card
+   renderer until expeditions needed them, and a second copy is how the
+   numbers on the card stop matching the numbers that decide a run. Care is
+   the main driver, so a raised dino genuinely outperforms a hoarded one;
+   rarity is a floor, not a substitute for raising it. */
+const RARITY_ATTR_BONUS = { legendary: 50, epic: 35, rare: 25, uncommon: 15, common: 5 };
+
+function dinoAttrs(dino) {
+  const spec = getRosterById(dino.speciesId);
+  const bonus = RARITY_ATTR_BONUS[spec && spec.rarity] || RARITY_ATTR_BONUS.common;
+  const care = dino.careCount || 0;
+  return {
+    power: Math.floor(care * 0.8 + bonus),
+    guard: Math.floor(care * 0.7 + bonus * 0.9),
+    speed: Math.floor(care * 0.6 + bonus * 0.85),
+  };
 }
 
 function ensureDinoStats(d) {
@@ -4180,9 +4290,16 @@ function applyOfflineDecay() {
      longer means lost incubation. Fire-and-forget — it patches state.eggs
      in place once it resolves and must never block the rest of load(). */
   applyEggCatchup(state.lastTick);
+  /* Expeditions run on their own clock: real time always, faster while the
+     stream is live. This credits the stretch the game was closed across,
+     and must be called before lastTick moves on below. */
+  expoCatchup(state.lastTick);
   const restTicks = Math.floor(elapsedSec / 600);
   if (restTicks > 0) {
-    state.park.forEach(d => { ensureDinoStats(d); d.stamina = Math.min(100, d.stamina + restTicks * NIGHT_STAMINA_REGEN); });
+    /* Not the ones in the field — they are working, not sleeping in. A
+       rest bonus while away would cancel out the stamina an expedition
+       costs, which is the only thing making a party a real decision. */
+    state.park.forEach(d => { if (d.busy) return; ensureDinoStats(d); d.stamina = Math.min(100, d.stamina + restTicks * NIGHT_STAMINA_REGEN); });
   }
   /* Vault dinos too. They earn nothing while stored, but they still need
      the XP backfill — otherwise a roster put away before levelling comes
@@ -4281,7 +4398,7 @@ function updateTopBar() { state.level = getLevel(); document.getElementById('coi
 
 let marketPollInterval = null;
 
-const TAB_ORDER = ['park', 'eggs', 'collection', 'market', 'dinodex'];
+const TAB_ORDER = ['park', 'eggs', 'collection', 'expeditions', 'market', 'dinodex'];
 
 function switchTab(tab) {
   /* RESOLVE BEFORE TEARING DOWN — the order here is the whole fix.
@@ -4306,6 +4423,7 @@ function switchTab(tab) {
   if (tab === 'park') initParkView();
   if (tab === 'eggs') renderEggsTab();
   if (tab === 'collection') renderCollection();
+  if (tab === 'expeditions') renderExpeditions();
   if (tab === 'market') renderMarketplace();
   if (tab === 'dinodex') renderDinodex();
 
@@ -5109,6 +5227,11 @@ function getCareCooldown(idx, type) {
 
 function careAction(idx, type) {
   const dino = state.park[idx];
+  /* An animal out with an expedition cannot be topped up from the park.
+     That IS the cost of sending it: it comes home tired and you have to
+     put the stamina back afterwards. Letting it be cared for while away
+     would make a party free. */
+  if (dino && dino.busy) { showToast('They are out with an expedition.'); return; }
   const cdKey = type + '_' + idx;
   const liveNow = state.liveSecAccum || 0;
   const lastUse = state.cooldowns[cdKey];
@@ -5123,6 +5246,7 @@ function careAction(idx, type) {
 
   const prevStage = getStage(dino);
   dino.careCount++;
+  expoCount('care');
   const newStage = getStage(dino);
   state.coins += 2;
 
@@ -5574,6 +5698,7 @@ function clearDebris(debrisId) {
   state.debris.splice(idx, 1);
   state.energy--;
   state.coins += 2;
+  expoCount('debris');
   save();
   updateTopBar();
   updateEnergyBar();
@@ -6186,6 +6311,7 @@ function hatchEgg(idx) {
   const mut = egg.guaranteedMutation ? rollMutationGuaranteed(spec.id) : rollMutation(spec.id);
   const newDino = { speciesId: spec.id, nickname:'', hunger:80, thirst:80, happiness:80, hygiene:80, stamina:80, careCount:0, mutation: mut, xp: 0 };
   const dest = addNewDino(newDino);
+  expoCount('hatch');
   if (!state.discovered.includes(spec.id)) state.discovered.push(spec.id);
   if (mut) { const mk=spec.id+'_'+mut; if(!state.discoveredMutations)state.discoveredMutations=[]; if(!state.discoveredMutations.includes(mk))state.discoveredMutations.push(mk); }
   state.eggs.splice(idx, 1);
@@ -6683,10 +6809,7 @@ function renderCollDetail() {
   const hygieneDots = makeDots(dino.hygiene, 'hygiene');
   const staminaDots = makeDots(dino.stamina, 'stamina');
 
-  const rarityBonus = spec.rarity === 'legendary' ? 50 : spec.rarity === 'epic' ? 35 : spec.rarity === 'rare' ? 25 : spec.rarity === 'uncommon' ? 15 : 5;
-  const power = Math.floor(dino.careCount * 0.8 + rarityBonus);
-  const guard = Math.floor(dino.careCount * 0.7 + rarityBonus * 0.9);
-  const speed = Math.floor(dino.careCount * 0.6 + rarityBonus * 0.85);
+  const { power, guard, speed } = dinoAttrs(dino);
 
   detail.innerHTML = `
     <button class="coll-sell-btn" onclick="sellDino(${idx},'${collViewMode}')" title="List for ${getSellPrice(dino)} coins on the marketplace">💰 Sell · ${getSellPrice(dino)}</button>
@@ -6958,6 +7081,755 @@ function renderDinodex() {
   }).join('');
 }
 
+/* ══════════════════════════════════════════════
+   EXPEDITIONS & FIELD NOTES
+
+   Send a party out to a site, wait, bring back what they found.
+
+   NOT THE DAILY DIG. That is one click, one egg, a 24-hour wall cooldown,
+   and it lives on the Eggs tab. This is the opposite shape: you choose who
+   goes, their PWR/GRD/SPD decide how well it goes, and they are unavailable
+   while away. The word "dig" is deliberately absent from everything below
+   so the two never read as the same feature.
+
+   THE CLOCK RUNS AT BOTH SPEEDS. A run advances in real time whether the
+   game is open or not, and counts EXPO_LIVE_BOOST-times faster while
+   PhantomACE is live. So a run always finishes eventually — nobody is
+   stranded by a quiet week — but watching the stream is the fast way
+   through. The park's other timers are live-only (care cooldowns, decay,
+   incubation); this one is deliberately not, because a party you cannot
+   recall is worse than a slow one.
+
+   Progress is CREDITED, never recomputed from a start time: a run carries
+   `progressSec`, and both the tick and the catch-up add to it. Recomputing
+   would need the whole live history of the run on every frame, and the
+   catch-up endpoint answers for one window at a time.
+
+   WHY THE OUTCOME IS DECIDED AT DISPATCH. The roll is stored when the party
+   leaves and only revealed on return. Rolling at claim time would make the
+   claim button a slot machine — reload, claim again, different answer —
+   and the whole save is client-held, so the only honest place for the
+   randomness is the moment the player commits a party they cannot change.
+
+   DINOS STAY IN THE ROSTER WHILE AWAY, flagged `busy` with the run id,
+   rather than being moved into the run. A dino held inside a run record is
+   a dino that a bad merge, a stale tab or a dropped save can delete
+   outright; a flag can only ever be wrong, and expoRepair() below clears
+   flags whose run has gone. Losing a raised animal to a sync is not a bug
+   worth risking for tidier bookkeeping.
+   ══════════════════════════════════════════════ */
+
+/* Live time counts triple. Chosen so the longest site (8 wall hours) comes
+   home inside a single long stream, while an offline-only player still
+   sees it finish overnight. */
+const EXPO_LIVE_BOOST = 3;
+
+/* The board is the same for everyone in a 12-hour window, and deterministic
+   from the window index — two devices on one save must not disagree about
+   what is on offer, and a board that rerolled per device would let a player
+   shop for the site they wanted by opening a second tab. */
+const EXPO_BOARD_PERIOD_MS = 12 * 3600 * 1000;
+const EXPO_BOARD_SIZE = 3;
+const EXPO_QUEST_PERIOD_MS = 24 * 3600 * 1000;
+const EXPO_QUEST_COUNT = 3;
+
+/* Two parties at once, plus one per subscriber tier — the same shape as
+   incubator slots, which is the precedent for what a sub gets here. */
+const EXPO_BASE_SLOTS = 2;
+
+/* A returning party is tired, not broken: stamina and hygiene take the hit
+   because those are the two the care loop can put back. */
+const EXPO_STAMINA_COST = 18;
+const EXPO_HYGIENE_COST = 12;
+
+/* Sites. `w` weights the three attributes, `target` is the party score that
+   counts as a full-strength showing, `slots` is the party size, `dur` is
+   WALL seconds (divide by EXPO_LIVE_BOOST for the all-live case).
+
+   Every site is a real place in the park's world with its own reason to go
+   — none of them is "Expedition 4". The weights are what make the choice a
+   choice: a boneyard wants muscle, a causeway wants speed, and a roster of
+   one kind of dino will leave money on the table somewhere. */
+const EXPO_SITES = [
+  { id: 'tarseeps', name: 'The Tar Seeps', slots: 1, dur: 2 * 3600, target: 70,
+    w: { p: 0.3, g: 0.6, s: 0.1 }, coins: 70, eggChance: 0.08, eggWeights: { common: 70, uncommon: 25, rare: 5 },
+    blurb: 'Something enormous went in and never came out. Send one careful animal.' },
+
+  { id: 'causeway', name: 'The Drowned Causeway', slots: 1, dur: 2 * 3600, target: 65,
+    w: { p: 0.1, g: 0.2, s: 0.7 }, coins: 65, eggChance: 0.08, eggWeights: { common: 65, uncommon: 30, rare: 5 },
+    blurb: 'Passable for about an hour either side of low tide. Anything slow gets wet.' },
+
+  { id: 'ashfall', name: 'Ashfall Beds', slots: 2, dur: 3 * 3600, target: 150,
+    w: { p: 0.6, g: 0.3, s: 0.1 }, coins: 130, eggChance: 0.14, eggWeights: { common: 55, uncommon: 32, rare: 11, epic: 2 },
+    blurb: 'Half a metre of grey ash over everything. Whatever is under it is intact.' },
+
+  { id: 'thornwood', name: 'Thornwood Hollow', slots: 2, dur: 3 * 3600, target: 140,
+    w: { p: 0.2, g: 0.4, s: 0.4 }, coins: 125, eggChance: 0.14, eggWeights: { common: 55, uncommon: 32, rare: 11, epic: 2 },
+    blurb: 'The undergrowth closes behind you. Nothing large has been through in years.' },
+
+  { id: 'saltflats', name: 'The Salt Flats', slots: 2, dur: 4 * 3600, target: 160,
+    w: { p: 0.2, g: 0.2, s: 0.6 }, coins: 170, eggChance: 0.16, eggWeights: { common: 50, uncommon: 33, rare: 14, epic: 3 },
+    blurb: 'Flat, bright and utterly exposed. Easy walking, nowhere to shelter.' },
+
+  { id: 'sunkencavern', name: 'Sunken Cavern', slots: 2, dur: 4 * 3600, target: 175,
+    w: { p: 0.35, g: 0.55, s: 0.1 }, coins: 180, eggChance: 0.16, eggWeights: { common: 48, uncommon: 33, rare: 16, epic: 3 },
+    blurb: 'The roof came down a long time ago and sealed the whole gallery.' },
+
+  { id: 'stormbreak', name: 'Stormbreak Ridge', slots: 3, dur: 6 * 3600, target: 300,
+    w: { p: 0.45, g: 0.15, s: 0.4 }, coins: 300, eggChance: 0.24, eggWeights: { common: 38, uncommon: 34, rare: 22, epic: 5, legendary: 1 },
+    blurb: 'Weather comes over the top with no warning. Go in threes or not at all.' },
+
+  { id: 'boneyard', name: 'The Boneyard', slots: 3, dur: 6 * 3600, target: 315,
+    w: { p: 0.34, g: 0.33, s: 0.33 }, coins: 310, eggChance: 0.24, eggWeights: { common: 38, uncommon: 34, rare: 22, epic: 5, legendary: 1 },
+    blurb: 'Every animal in the valley has died here for a very long time.' },
+
+  { id: 'blackmire', name: 'The Black Mire', slots: 3, dur: 8 * 3600, target: 400,
+    w: { p: 0.4, g: 0.45, s: 0.15 }, coins: 430, eggChance: 0.3, eggWeights: { common: 30, uncommon: 33, rare: 26, epic: 9, legendary: 2 },
+    blurb: 'The far side of the park, and the only place the old maps leave blank.' },
+];
+
+/* Outcome bands. The floor matters more than the ceiling: an under-strength
+   party still comes home with something, because a run costs hours of a
+   clock the player does not control, and paying nothing for that is how a
+   feature gets abandoned after one bad result. Underpowered is a worse
+   deal, never a wasted day. */
+const EXPO_TIERS = [
+  { id: 'great', min: 1.25, label: 'Exceptional', coins: 1.5, xp: 1.5, eggMult: 2 },
+  { id: 'good',  min: 0.9,  label: 'Successful',  coins: 1.0, xp: 1.0, eggMult: 1 },
+  { id: 'fair',  min: 0.55, label: 'Scraped by',  coins: 0.65, xp: 0.7, eggMult: 0.5 },
+  { id: 'poor',  min: 0,    label: 'Rough going', coins: 0.35, xp: 0.45, eggMult: 0.2 },
+];
+
+/* XP per party member, by run length. Pitched against DINO_XP.parkHour (10
+   per live hour) so that sending a dino out is comparable to leaving it
+   home for the same live time, not strictly better — the reward for going
+   is the coins and the chance at an egg, not a faster road to level 9. */
+const EXPO_XP_PER_WALL_HOUR = 11;
+
+/* ── Pure helpers (no DOM, no state) ──────────────────────────────────── */
+
+function expoPeriod(now, periodMs) {
+  return Math.floor(now / periodMs);
+}
+
+/* xorshift32 — deterministic, seeded, and the same on every device. */
+function expoRand(seed) {
+  let s = (seed >>> 0) || 0x9e3779b9;
+  return function () {
+    s ^= s << 13; s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5;  s >>>= 0;
+    return s / 4294967296;
+  };
+}
+
+/** The sites on offer for a board period. Deterministic, never repeats within a board. */
+function expoBoardFor(period) {
+  const rnd = expoRand(period * 2654435761);
+  const pool = EXPO_SITES.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  return pool.slice(0, EXPO_BOARD_SIZE);
+}
+
+function expoSiteById(id) {
+  return EXPO_SITES.find(s => s.id === id) || null;
+}
+
+/**
+ * What a party is worth at a site.
+ *
+ * Weighted by the site, so the SAME party scores differently in the mire
+ * and on the causeway. Summed rather than averaged: a site asking for three
+ * animals is asking for three, and letting one superb dino cover an empty
+ * slot would delete the only reason to raise a bench.
+ */
+function expoPartyScore(dinos, site) {
+  if (!site) return 0;
+  return (dinos || []).reduce((sum, d) => {
+    if (!d) return sum;
+    const a = dinoAttrs(d);
+    return sum + a.power * site.w.p + a.guard * site.w.g + a.speed * site.w.s;
+  }, 0);
+}
+
+/**
+ * Ratio to tier. `roll` is the 0-1 number stored at dispatch; it nudges the
+ * result by up to ±0.12 so a party sitting exactly on a band edge is not a
+ * foregone conclusion, while a comfortably strong party still cannot land
+ * in the bottom band.
+ */
+function expoTierFor(score, target, roll) {
+  const jitter = ((Number(roll) || 0) - 0.5) * 0.24;
+  const ratio = (target > 0 ? score / target : 0) + jitter;
+  return EXPO_TIERS.find(t => ratio >= t.min) || EXPO_TIERS[EXPO_TIERS.length - 1];
+}
+
+/** Seconds of progress earned by a stretch of wall time containing `liveSec` live seconds. */
+function expoCreditSec(wallSec, liveSec) {
+  const wall = Math.max(0, Number(wallSec) || 0);
+  const live = Math.max(0, Math.min(wall, Number(liveSec) || 0));
+  return wall + live * (EXPO_LIVE_BOOST - 1);
+}
+
+function expoIsDone(run) {
+  return !!run && (run.progressSec || 0) >= (run.durationSec || 0);
+}
+
+/** Wall seconds still to run if the stream stays offline; null once done. */
+function expoRemainingWallSec(run) {
+  if (!run || expoIsDone(run)) return null;
+  return Math.max(0, (run.durationSec || 0) - (run.progressSec || 0));
+}
+
+/**
+ * What a finished run pays.
+ *
+ * Pure, and takes the tier rather than deriving it, so the results screen
+ * and the payout cannot disagree about what was earned.
+ */
+function expoRewardsFor(site, tier, partySize) {
+  const hours = (site.dur || 0) / 3600;
+  return {
+    coins: Math.max(1, Math.round(site.coins * tier.coins)),
+    xp: Math.max(1, Math.round(hours * EXPO_XP_PER_WALL_HOUR * tier.xp)),
+    eggChance: Math.max(0, Math.min(1, site.eggChance * tier.eggMult)),
+    partySize,
+  };
+}
+
+/* ── Field Notes (the park's own objectives) ──────────────────────────
+
+   NOT the Phamily Quests on the main site. Those are weekly, server-side,
+   and pay giveaway entries; these are park-local, read from counters in
+   the save, and pay coins. Keeping the two apart in name and in namespace
+   is deliberate — a "quest" that pays a real entry and a "quest" that pays
+   40 park coins must never be mistaken for one another. */
+const EXPO_QUESTS = [
+  { id: 'care5',    label: 'Care for your animals 5 times', counter: 'care',   goal: 5,  coins: 40 },
+  { id: 'care12',   label: 'Care for your animals 12 times', counter: 'care',  goal: 12, coins: 90 },
+  { id: 'tidy8',    label: 'Clear 8 patches of overgrowth',  counter: 'debris', goal: 8,  coins: 45 },
+  { id: 'tidy20',   label: 'Clear 20 patches of overgrowth', counter: 'debris', goal: 20, coins: 100 },
+  { id: 'run1',     label: 'Bring one expedition home',      counter: 'runs',  goal: 1,  coins: 60 },
+  { id: 'run3',     label: 'Bring three expeditions home',   counter: 'runs',  goal: 3,  coins: 150 },
+  { id: 'hatch1',   label: 'Hatch an egg',                   counter: 'hatch', goal: 1,  coins: 55 },
+  { id: 'hatch3',   label: 'Hatch three eggs',               counter: 'hatch', goal: 3,  coins: 140 },
+];
+
+function expoQuestsFor(period) {
+  const rnd = expoRand(period * 40503 + 7);
+  const pool = EXPO_QUESTS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  /* One per counter at most: three variations on "care for your animals"
+     is one objective wearing three hats, and completing it three times
+     over is not three things to do. */
+  const seen = new Set();
+  const out = [];
+  for (const q of pool) {
+    if (seen.has(q.counter)) continue;
+    seen.add(q.counter);
+    out.push(q);
+    if (out.length === EXPO_QUEST_COUNT) break;
+  }
+  return out;
+}
+
+function expoQuestById(id) {
+  return EXPO_QUESTS.find(q => q.id === id) || null;
+}
+
+/* ── State, dispatch and return ───────────────────────────────────────── */
+
+function expoMaxSlots() {
+  return EXPO_BASE_SLOTS + (state.subTier || 0);
+}
+
+/**
+ * Bring state.expo into existence and into agreement with itself.
+ *
+ * Called from load(), from the tick, and before every render, because all
+ * three can be the first thing to touch a save written by an older build
+ * or merged from another device.
+ *
+ * THE REPAIR THAT MATTERS is the last one: a dino flagged `busy` for a run
+ * that no longer exists. A save fork, a cloud merge or an interrupted claim
+ * can leave the flag behind, and a dino nobody can care for, send out or
+ * sell is lost in a way the player cannot fix or even explain. So the flag
+ * is only ever believed when a run agrees with it.
+ */
+function expoEnsure(now = Date.now()) {
+  if (!state.expo || typeof state.expo !== 'object') state.expo = {};
+  const e = state.expo;
+  if (!Array.isArray(e.active)) e.active = [];
+  if (!Array.isArray(e.used)) e.used = [];
+  if (!Array.isArray(e.questDone)) e.questDone = [];
+  if (!e.counters || typeof e.counters !== 'object') e.counters = {};
+  for (const k of ['care', 'debris', 'runs', 'hatch']) {
+    if (typeof e.counters[k] !== 'number') e.counters[k] = 0;
+  }
+  if (typeof e.completed !== 'number') e.completed = 0;
+  if (typeof e.lastTick !== 'number') e.lastTick = now;
+
+  /* A new board period clears what was dispatched from the old one. */
+  const period = expoPeriod(now, EXPO_BOARD_PERIOD_MS);
+  if (e.period !== period) { e.period = period; e.used = []; }
+
+  /* A new quest period is a clean sheet: nothing claimed, nothing counted.
+     Counters reset too, or yesterday's chores would finish today's list. */
+  const qPeriod = expoPeriod(now, EXPO_QUEST_PERIOD_MS);
+  if (e.questPeriod !== qPeriod) {
+    e.questPeriod = qPeriod;
+    e.questDone = [];
+    e.counters = { care: 0, debris: 0, runs: 0, hatch: 0 };
+  }
+
+  const live = new Set(e.active.map(r => r.rid));
+  allDinos().forEach(d => { if (d.busy && !live.has(d.busy)) delete d.busy; });
+}
+
+/** Every dino the player holds, park and vault alike. */
+function allDinos() {
+  return [...(state.park || []), ...(state.vault || [])];
+}
+
+function findDinoByUidLocal(uid) {
+  return allDinos().find(d => d.uid === uid) || null;
+}
+
+/** Dinos that can be sent right now: not already out, and not exhausted. */
+function expoAvailableDinos() {
+  return allDinos().filter(d => !d.busy && (d.stamina === undefined || d.stamina > EXPO_STAMINA_COST));
+}
+
+/**
+ * Send a party. Returns {ok:true, run} or {ok:false, error}.
+ *
+ * The roll is taken HERE and stored — see the header. Everything else the
+ * claim needs (the site, the party, the score) is frozen at the same
+ * moment, so a dino sold or raised mid-run cannot change what the run pays.
+ */
+function expoDispatch(siteId, uids, now = Date.now()) {
+  expoEnsure(now);
+  const e = state.expo;
+  const site = expoSiteById(siteId);
+  if (!site) return { ok: false, error: 'No such site.' };
+  if (!expoBoardFor(e.period).some(s => s.id === siteId)) return { ok: false, error: 'That site is not on the board.' };
+  if (e.used.includes(siteId)) return { ok: false, error: 'Already sent a party there this rotation.' };
+  if (e.active.length >= expoMaxSlots()) return { ok: false, error: 'Both parties are already out.' };
+
+  const party = [];
+  for (const uid of (uids || [])) {
+    const d = findDinoByUidLocal(uid);
+    if (!d) return { ok: false, error: 'One of those animals is no longer in your park.' };
+    if (d.busy) return { ok: false, error: 'One of those animals is already out.' };
+    if (party.some(x => x.uid === uid)) return { ok: false, error: 'An animal cannot go twice.' };
+    party.push(d);
+  }
+  if (party.length !== site.slots) {
+    return { ok: false, error: `${site.name} needs ${site.slots} ${site.slots === 1 ? 'animal' : 'animals'}.` };
+  }
+
+  const rid = 'r' + now.toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+  const run = {
+    rid,
+    siteId,
+    party: party.map(d => d.uid),
+    /* The names are copied because the results screen must still be able to
+       say who went even if one of them was sold before it was read. */
+    names: party.map(d => d.nickname || (getRosterById(d.speciesId) || {}).name || 'Dino'),
+    startedAt: now,
+    durationSec: site.dur,
+    progressSec: 0,
+    score: Math.round(expoPartyScore(party, site)),
+    roll: Math.random(),
+  };
+  e.active.push(run);
+  e.used.push(siteId);
+  party.forEach(d => { d.busy = rid; });
+
+  save();
+  return { ok: true, run };
+}
+
+/**
+ * Credit elapsed time to every running party.
+ *
+ * `liveSec` is how much of that wall stretch the stream was live for. The
+ * tick passes what it observed; the catch-up passes what the server
+ * reported for a gap the game was closed across. Both only ever add.
+ */
+function expoCredit(wallSec, liveSec) {
+  const e = state.expo;
+  if (!e || !e.active.length) return false;
+  const credit = expoCreditSec(wallSec, liveSec);
+  if (credit <= 0) return false;
+  let changed = false;
+  e.active.forEach(run => {
+    if (expoIsDone(run)) return;
+    run.progressSec = Math.min(run.durationSec, (run.progressSec || 0) + credit);
+    changed = true;
+  });
+  return changed;
+}
+
+/** The tick's share: wall time since the last credit, live if the stream is up. */
+function expoTick(now = Date.now()) {
+  expoEnsure(now);
+  const e = state.expo;
+  const wallSec = Math.max(0, (now - e.lastTick) / 1000);
+  e.lastTick = now;
+  if (!e.active.length || wallSec <= 0) return false;
+  return expoCredit(wallSec, isStreamLive ? wallSec : 0);
+}
+
+/**
+ * Credit a gap the game was closed across.
+ *
+ * Reuses /api/dino-park-catchup, the same endpoint the incubator uses to
+ * recover offline live time — it answers "how many of these seconds was the
+ * channel live", which is exactly the second half of this clock. No session
+ * needed, so guests get it too.
+ *
+ * Fire-and-forget, additive, and it moves e.lastTick forward FIRST so the
+ * tick cannot also credit the same stretch while the request is in flight.
+ */
+async function expoCatchup(sinceMs, now = Date.now()) {
+  expoEnsure(now);
+  const e = state.expo;
+  if (!e.active.length) return;
+  const wallSec = (now - sinceMs) / 1000;
+  if (wallSec < 60) return;
+
+  /* The wall half is owed regardless of what the server says, so it is
+     credited immediately; only the boost waits on the answer. */
+  expoCredit(wallSec, 0);
+  e.lastTick = now;
+  save();
+
+  try {
+    const res = await fetch('/api/dino-park-catchup?since=' + Math.floor(sinceMs));
+    if (!res.ok) return;
+    const liveSec = Number((await res.json()).liveSeconds) || 0;
+    if (liveSec <= 0) return;
+    /* Only the EXTRA that live time buys — the wall seconds are already in. */
+    const bonus = Math.min(wallSec, liveSec) * (EXPO_LIVE_BOOST - 1);
+    e.active.forEach(run => {
+      if (expoIsDone(run)) return;
+      run.progressSec = Math.min(run.durationSec, (run.progressSec || 0) + bonus);
+    });
+    save();
+    if (document.getElementById('tab-expeditions')?.classList.contains('active')) renderExpeditions();
+  } catch (err) { /* no catch-up this time; nothing already credited is lost */ }
+}
+
+/**
+ * Bring a finished party home and pay out.
+ *
+ * Tolerant of a missing dino by design: one of the party may have been
+ * sold on the market while away, and a claim that threw would strand the
+ * whole run — and with it anyone else who went.
+ */
+function expoClaim(rid, now = Date.now()) {
+  expoEnsure(now);
+  const e = state.expo;
+  const i = e.active.findIndex(r => r.rid === rid);
+  if (i < 0) return { ok: false, error: 'That party has already come home.' };
+  const run = e.active[i];
+  if (!expoIsDone(run)) return { ok: false, error: 'They are still out there.' };
+
+  const site = expoSiteById(run.siteId);
+  if (!site) {
+    /* The site was removed from the catalog under a live run. Release the
+       animals rather than holding them hostage to a table edit. */
+    e.active.splice(i, 1);
+    run.party.forEach(uid => { const d = findDinoByUidLocal(uid); if (d) delete d.busy; });
+    save();
+    return { ok: false, error: 'That site is no longer on the map. Your party is back.' };
+  }
+
+  const tier = expoTierFor(run.score, site.target, run.roll);
+  const reward = expoRewardsFor(site, tier, run.party.length);
+
+  state.coins = (state.coins || 0) + reward.coins;
+
+  const levelled = [];
+  run.party.forEach((uid, n) => {
+    const d = findDinoByUidLocal(uid);
+    if (!d) return;
+    delete d.busy;
+    ensureDinoStats(d);
+    d.stamina = Math.max(0, d.stamina - EXPO_STAMINA_COST);
+    d.hygiene = Math.max(0, d.hygiene - EXPO_HYGIENE_COST);
+    const lv = awardDinoXp(d, reward.xp);
+    if (lv) levelled.push({ name: run.names[n] || 'Dino', level: lv });
+  });
+
+  let egg = null;
+  if (Math.random() < reward.eggChance) {
+    const rarity = rollRarity(site.eggWeights);
+    const species = rollSpecies(rarity);
+    const where = acquireEgg(species.id, rarity);
+    egg = { rarity, name: species.name, where };
+  }
+
+  e.active.splice(i, 1);
+  e.completed = (e.completed || 0) + 1;
+  e.counters.runs = (e.counters.runs || 0) + 1;
+
+  save();
+  return { ok: true, run, site, tier, reward, egg, levelled };
+}
+
+/** Count a park action toward the Field Notes. */
+function expoCount(counter, n = 1) {
+  /* expoEnsure, not an early return on a missing state.expo: caring and
+     tidying happen on saves that have never opened the tab, and a note
+     that only starts counting once you look at it is a note that reads as
+     broken. */
+  expoEnsure();
+  state.expo.counters[counter] = (state.expo.counters[counter] || 0) + n;
+}
+
+function expoQuestState(q) {
+  const have = (state.expo.counters[q.counter] || 0);
+  return {
+    have: Math.min(have, q.goal),
+    goal: q.goal,
+    done: have >= q.goal,
+    claimed: state.expo.questDone.includes(q.id),
+  };
+}
+
+function expoClaimQuest(id) {
+  expoEnsure();
+  const q = expoQuestById(id);
+  if (!q) return { ok: false, error: 'No such note.' };
+  const st = expoQuestState(q);
+  if (st.claimed) return { ok: false, error: 'Already claimed.' };
+  if (!st.done) return { ok: false, error: 'Not finished yet.' };
+  state.expo.questDone.push(id);
+  state.coins = (state.coins || 0) + q.coins;
+  save();
+  return { ok: true, coins: q.coins };
+}
+
+/* ── Rendering ────────────────────────────────────────────────────────
+   The party picker's selection lives here and NOT in the save: a half-made
+   choice is not park state, and persisting it would mean a stale pick
+   surviving a reload and pointing at a dino that has since been sold. */
+let expoPicks = {};
+let expoOpenSite = null;
+
+function expoFmtWall(sec) {
+  const s = Math.max(0, Math.round(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h >= 1) return h + 'h ' + m + 'm';
+  if (m >= 1) return m + 'm';
+  return s + 's';
+}
+
+function expoDinoIcon(d) {
+  const spec = getRosterById(d.speciesId);
+  return (spec && spec.icon) ? spec.icon : '';
+}
+
+function expoDinoName(d) {
+  return d.nickname || (getRosterById(d.speciesId) || {}).name || 'Dino';
+}
+
+function renderExpeditions() {
+  const now = Date.now();
+  expoEnsure(now);
+  const e = state.expo;
+
+  renderExpoActive(now);
+  renderExpoBoard(now);
+  renderExpoNotes(now);
+
+  document.getElementById('expoSlots').textContent =
+    e.active.length + ' / ' + expoMaxSlots() + ' parties out';
+
+  const nextBoard = (e.period + 1) * EXPO_BOARD_PERIOD_MS - now;
+  document.getElementById('expoRotation').textContent = 'New sites in ' + expoFmtWall(nextBoard / 1000);
+
+  const nextNotes = (e.questPeriod + 1) * EXPO_QUEST_PERIOD_MS - now;
+  document.getElementById('expoNotesReset').textContent = 'Resets in ' + expoFmtWall(nextNotes / 1000);
+}
+
+function renderExpoActive(now) {
+  const host = document.getElementById('expoActive');
+  const e = state.expo;
+
+  if (!e.active.length) {
+    host.innerHTML = '<div class="expo-empty">Nobody is out at the moment. Pick a site below and choose who goes '
+      + '&mdash; a party travels in real time, and <b>' + EXPO_LIVE_BOOST + '&times; faster while the stream is live</b>.</div>';
+    return;
+  }
+
+  host.innerHTML = e.active.map(run => {
+    const site = expoSiteById(run.siteId);
+    if (!site) return '';
+    const done = expoIsDone(run);
+    const pct = Math.min(100, Math.round(((run.progressSec || 0) / run.durationSec) * 100));
+    const left = expoRemainingWallSec(run);
+    return `
+      <div class="expo-card ${done ? 'is-ready' : 'is-running'}">
+        <div class="expo-name">${escapeHtml(site.name)}</div>
+        <div class="expo-blurb">${escapeHtml(run.names.join(', '))}</div>
+        <div class="expo-bar"><div class="expo-bar-fill" style="width:${pct}%"></div></div>
+        <div class="expo-meta">
+          ${done
+            ? '<span><b>Back at the gate</b></span>'
+            : `<span>${pct}% &mdash; <b>${expoFmtWall(left)}</b> at this pace</span>
+               <span>${isStreamLive ? 'Moving ' + EXPO_LIVE_BOOST + '&times; &mdash; stream is live' : 'Faster while the stream is live'}</span>`}
+        </div>
+        ${done ? `<div style="margin-top:10px"><button class="expo-btn" onclick="onExpoClaim('${run.rid}')">Welcome them back</button></div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderExpoBoard(now) {
+  const host = document.getElementById('expoBoard');
+  const e = state.expo;
+  const board = expoBoardFor(e.period);
+  const available = expoAvailableDinos();
+  const full = e.active.length >= expoMaxSlots();
+
+  host.innerHTML = board.map(site => {
+    const spent = e.used.includes(site.id);
+    const open = expoOpenSite === site.id;
+    const picks = expoPicks[site.id] || [];
+    const party = picks.map(findDinoByUidLocal).filter(Boolean);
+    const score = Math.round(expoPartyScore(party, site));
+    const ready = picks.length === site.slots;
+
+    const odds = ready
+      ? `<span>Party strength <b>${score}</b> against <b>${site.target}</b> &mdash; ${escapeHtml(expoTierFor(score, site.target, 0.5).label.toLowerCase())} on current form</span>`
+      : `<span>Needs <b>${site.slots}</b> ${site.slots === 1 ? 'animal' : 'animals'} &mdash; target strength <b>${site.target}</b></span>`;
+
+    const focus = [
+      ['PWR', site.w.p], ['GRD', site.w.g], ['SPD', site.w.s],
+    ].sort((a, b) => b[1] - a[1]).filter(x => x[1] >= 0.3).map(x => x[0]).join(' / ');
+
+    return `
+      <div class="expo-card ${spent ? 'is-spent' : ''}">
+        <div class="expo-name">${escapeHtml(site.name)}</div>
+        <div class="expo-blurb">${escapeHtml(site.blurb)}</div>
+        <div class="expo-meta">
+          <span>Favours <b>${focus}</b></span>
+          <span><b>${expoFmtWall(site.dur)}</b> &middot; ${expoFmtWall(site.dur / EXPO_LIVE_BOOST)} if fully live</span>
+          <span>About <b>${site.coins}</b> coins</span>
+        </div>
+        ${spent
+          ? '<div class="expo-empty">A party has already been out here this rotation.</div>'
+          : `<div style="margin-top:10px">
+               ${open ? '' : `<button class="expo-btn ghost" ${full ? 'disabled' : ''} onclick="onExpoOpen('${site.id}')">${full ? 'No free party' : 'Choose a party'}</button>`}
+             </div>
+             ${open ? `
+               <div class="expo-meta" style="margin-top:8px">${odds}</div>
+               <div class="expo-party">
+                 ${available.length
+                   ? available.map(d => {
+                       const chosen = picks.includes(d.uid);
+                       const a = dinoAttrs(d);
+                       const icon = expoDinoIcon(d);
+                       return `<div class="expo-pick ${chosen ? 'chosen' : ''}" onclick="onExpoPick('${site.id}','${d.uid}')">
+                         ${icon ? `<img src="${escapeHtml(icon)}" alt="" onerror="this.remove()">` : ''}
+                         <span>${escapeHtml(expoDinoName(d))}</span>
+                         <span class="expo-pick-stat">${a.power}/${a.guard}/${a.speed}</span>
+                       </div>`;
+                     }).join('')
+                   : '<div class="expo-empty">Everyone is either out already or too tired to go. Care for them to bring their stamina back up.</div>'}
+               </div>
+               <div style="margin-top:10px; display:flex; gap:8px">
+                 <button class="expo-btn" ${ready ? '' : 'disabled'} onclick="onExpoSend('${site.id}')">Send them out</button>
+                 <button class="expo-btn ghost" onclick="onExpoOpen(null)">Cancel</button>
+               </div>` : ''}`}
+      </div>`;
+  }).join('');
+}
+
+function renderExpoNotes(now) {
+  const host = document.getElementById('expoNotes');
+  const notes = expoQuestsFor(state.expo.questPeriod);
+
+  host.innerHTML = notes.map(q => {
+    const st = expoQuestState(q);
+    return `
+      <div class="expo-note ${st.claimed ? 'claimed' : st.done ? 'done' : ''}">
+        <div>
+          <div class="expo-note-label">${escapeHtml(q.label)}</div>
+          <div class="expo-note-prog">${st.have} / ${st.goal} &middot; ${q.coins} coins</div>
+        </div>
+        <div>${st.claimed
+          ? '<span class="expo-note-prog">Claimed</span>'
+          : `<button class="expo-btn" ${st.done ? '' : 'disabled'} onclick="onExpoClaimNote('${q.id}')">Claim</button>`}</div>
+      </div>`;
+  }).join('');
+}
+
+/* ── Handlers ─────────────────────────────────────────────────────────── */
+
+function onExpoOpen(siteId) {
+  expoOpenSite = siteId;
+  renderExpeditions();
+}
+
+function onExpoPick(siteId, uid) {
+  const site = expoSiteById(siteId);
+  if (!site) return;
+  const picks = expoPicks[siteId] || [];
+  const at = picks.indexOf(uid);
+  if (at >= 0) picks.splice(at, 1);
+  else if (picks.length < site.slots) picks.push(uid);
+  else { showToast(`${site.name} only takes ${site.slots}.`); return; }
+  expoPicks[siteId] = picks;
+  renderExpeditions();
+}
+
+function onExpoSend(siteId) {
+  const res = expoDispatch(siteId, expoPicks[siteId] || []);
+  if (!res.ok) { showToast(res.error); return; }
+  expoPicks[siteId] = [];
+  expoOpenSite = null;
+  renderExpeditions();
+  updateTopBar();
+  showToast('Party away. They travel faster while the stream is live.');
+}
+
+function onExpoClaim(rid) {
+  const res = expoClaim(rid);
+  if (!res.ok) { showToast(res.error); renderExpeditions(); return; }
+
+  const { site, tier, reward, egg, levelled } = res;
+  renderExpeditions();
+  updateTopBar();
+
+  showToast(`${site.name}: ${tier.label.toLowerCase()} — +${reward.coins} coins, +${reward.xp} XP each`);
+  if (egg) {
+    setTimeout(() => showToast(egg.where === 'storage'
+      ? `They brought back a ${egg.rarity} egg — incubator full, sent to Egg Storage! 🥚`
+      : `They brought back a ${egg.rarity} egg! 🥚`), 2600);
+  }
+  levelled.forEach((l, i) => {
+    setTimeout(() => showToast(`${l.name} reached level ${l.level}! ⭐`), 2600 * (i + (egg ? 2 : 1)));
+  });
+}
+
+function onExpoClaimNote(id) {
+  const res = expoClaimQuest(id);
+  if (!res.ok) { showToast(res.error); return; }
+  renderExpeditions();
+  updateTopBar();
+  showToast(`Field note settled — +${res.coins} coins`);
+}
+
 /* ======================== GAME LOOP ======================== */
 function gameTick() {
   const now = Date.now();
@@ -6965,6 +7837,13 @@ function gameTick() {
   state.lastTick = now;
 
   if (isStreamLive) state.liveSecAccum = (state.liveSecAccum || 0) + deltaSec;
+
+  /* Expeditions advance on wall time, EXPO_LIVE_BOOST-times faster while
+     live — the one timer in the park that is not live-gated, so a party is
+     never stranded between streams. */
+  if (expoTick(now) && document.getElementById('tab-expeditions')?.classList.contains('active')) {
+    renderExpeditions();
+  }
   const liveTicks = Math.floor(((state.liveSecAccum || 0) - (state.lastDecayLiveSec || 0)) / DECAY_INTERVAL_LIVE_SEC);
   if (liveTicks > 0) {
     const yardBonus = getYardMoodBonus();
@@ -6987,7 +7866,7 @@ function gameTick() {
      an hour cannot be paid twice. */
   const xpHours = Math.floor(((state.liveSecAccum || 0) - (state.lastXpLiveSec || 0)) / 3600);
   if (xpHours > 0) {
-    state.park.forEach(d => { ensureDinoStats(d); awardDinoXp(d, DINO_XP.parkHour * xpHours); });
+    state.park.forEach(d => { if (d.busy) return; ensureDinoStats(d); awardDinoXp(d, DINO_XP.parkHour * xpHours); });
     state.lastXpLiveSec = (state.lastXpLiveSec || 0) + xpHours * 3600;
   }
 
