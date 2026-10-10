@@ -73,15 +73,24 @@ function env(seed = {}) {
   };
 }
 const as = (id, name = 'Someone') => ({ Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: id, display_name: name })) });
+/* The cookie's `role` is what the subscriber gate reads; the moderator
+   LIST is separate and outranks it, which is why staff are still `as`. */
+const asRole = (id, role) => ({ Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: id, display_name: 'Member ' + id, role })) });
 const GET = (e, qs = '', h) => onRequestGet({ env: e, request: new Request('https://phantomace.tv/api/park-backgrounds' + qs, { headers: h }) });
 const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https://phantomace.tv/api/park-backgrounds', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify(body) }) });
 
 const row = (c) => Array(GRID).fill(c);
+/* THE MASK MUST NOW MATCH THE TILES — the server derives it from
+   park-zones.js and refuses a submission that disagrees, because authors
+   are no longer all staff. So the fixture paints water where it claims
+   water: grass on top, pond underneath. Before this it painted grass
+   everywhere and declared the bottom third ocean, which is precisely the
+   forgery the check exists to catch. */
 const good = (over = {}) => ({
   action: 'save',
   name: 'Moonlit Lagoon',
-  tilemap: Array.from({ length: GRID }, () => row('moonlit/03')),
+  tilemap: Array.from({ length: GRID }, (_, y) => row(y < 24 ? 'moonlit/03' : 'water/00')),
   mask: Array.from({ length: GRID }, (_, y) => (y < 24 ? 'L' : 'O').repeat(GRID)),
   ...over,
 });
@@ -111,13 +120,26 @@ const good = (over = {}) => ({
     ok(`${label} is refused`, 'error' in validateBackground(good(over)));
   }
   ok('a well-formed background is accepted', !('error' in validateBackground(good())));
-  ok('empty cells are allowed as null',
-     !('error' in validateBackground(good({ tilemap: Array.from({ length: GRID }, () => row(null)) }))));
+  /* Null is a valid cell. A WHOLLY empty map is refused now for having no
+     walkable land, which it always should have been — so this paints a
+     real map with a hole in it and masks the hole X, which is what an
+     unpainted cell means. */
+  ok('empty cells are allowed as null', !('error' in validateBackground(good({
+    tilemap: Array.from({ length: GRID }, (_, y) =>
+      row(y < 24 ? 'moonlit/03' : 'water/00').map((c, x) => (y === 0 && x === 0 ? null : c))),
+    mask: Array.from({ length: GRID }, (_, y) =>
+      (y < 24 ? 'L' : 'O').repeat(GRID)).map((r, y) => (y === 0 ? 'X' + r.slice(1) : r)),
+  }))));
 
   /* All-water strands every land dino at apply time; refuse it while the
      author is still in the editor. */
+  /* Tiles and mask agree here, so this is refused for the reason it is
+     meant to be — no walkable land — rather than for disagreeing. */
   ok('an all-ocean map is refused',
-     'error' in validateBackground(good({ mask: Array.from({ length: GRID }, () => 'O'.repeat(GRID)) })));
+     'error' in validateBackground(good({
+       tilemap: Array.from({ length: GRID }, () => row('water/00')),
+       mask: Array.from({ length: GRID }, () => 'O'.repeat(GRID)),
+     })));
 }
 
 /* ══ Ids: derived once, immutable, never the built-in ══════════════════ */
@@ -196,8 +218,18 @@ const good = (over = {}) => ({
   ok('refs are charset-bound to the palette tree',
      /TILE_RE = \/\^\[a-z0-9\]\{1,20\}\\\/\\d\{2\}\(r\(\?:90\|180\|270\)\)\?\$\//.test(API));
   ok('the reserved list covers the built-in', /RESERVED_IDS = new Set\(\['classic', 'default'\]\)/.test(API));
-  ok('the zone-check limitation is written down where the code is',
-     /If backgrounds ever open to\s+non-staff, cross-checking mask against palette zones/.test(API));
+  /* The limitation this used to pin is GONE: the mask is derived
+     server-side from park-zones.js and a disagreeing submission is
+     refused. What is worth pinning now is that the check is actually
+     wired, because a forged mask is the whole risk of letting non-staff
+     author. */
+  ok('the mask is checked against the tiles, not trusted',
+     /The mask does not match the tiles at/.test(API));
+  ok('and it uses the server-side zone table', /from '\.\/park-zones\.js'/.test(API));
+  /* Authoring is gated; USE is not. A lapsed subscriber keeps what they
+     made, so no tier check may appear in the GET path. */
+  ok('authoring is subscriber-gated', /canAuthor\(env, session\)/.test(API));
+  ok('publishing to everyone stays staff-only', /publishing to everyone is staff only/.test(API));
 
   const reg = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
   ok('the prefix is registered', /prefix: 'park_bg_'/.test(reg));
@@ -205,6 +237,112 @@ const good = (over = {}) => ({
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
+
+/* ══ Authoring is a sub perk; USE is not ═══════════════════════════════
+   The rule that is easiest to break later: a subscription buys the
+   STUDIO, not the backgrounds made in it. Someone whose sub lapses keeps
+   every one they made and keeps picking them in-game. So the tier check
+   belongs on POST alone, and a GET must never ask about it. */
+{
+  const e = env();
+
+  check('a visitor cannot author', (await POST(e, good(), as('999'))).status, 403);
+  check('a follower cannot either',
+        (await POST(e, good(), asRole('998', 'follower'))).status, 403);
+
+  const made = await POST(e, good(), asRole('777', 'sub_tier1'));
+  check('a tier 1 subscriber can', made.status, 200);
+  const rec = (await made.json()).background;
+
+  /* Namespaced, so two members naming a background the same thing are not
+     the same row. */
+  ok('a member id is namespaced to them', rec.id.startsWith('u777-'));
+  check('and it is theirs', rec.createdBy, '777');
+  check('and personal, not published', rec.published, false);
+
+  /* THE LAPSE. Same person, now a plain viewer. */
+  const list = await (await GET(e, '', as('777'))).json();
+  ok('a lapsed subscriber still sees their own background',
+     (list.backgrounds || []).some(b => b.id === rec.id));
+  check('and can still resolve it by id',
+        (await GET(e, '?id=' + rec.id, as('777'))).status, 200);
+  check('but can no longer author', (await POST(e, good({ name: 'Another' }), as('777'))).status, 403);
+}
+
+/* ══ Personal means personal ═══════════════════════════════════════════ */
+{
+  const e = env();
+  const mine = (await (await POST(e, good(), asRole('777', 'sub_tier1'))).json()).background;
+
+  const theirList = await (await GET(e, '', asRole('888', 'sub_tier1'))).json();
+  ok('somebody else does not get it in their picker',
+     !(theirList.backgrounds || []).some(b => b.id === mine.id));
+
+  /* But a visitor standing in that park has to render it, and the park
+     save already names the id — so by-id resolution is open. */
+  check('though they can resolve it by id, to render a visit',
+        (await GET(e, '?id=' + mine.id, as('888'))).status, 200);
+
+  check('and they cannot edit it',
+        (await POST(e, good({ id: mine.id, name: 'Hijack' }), asRole('888', 'sub_tier1'))).status, 403);
+  check('nor delete it',
+        (await POST(e, { action: 'delete', id: mine.id }, asRole('888', 'sub_tier1'))).status, 403);
+  check('but the owner can delete it',
+        (await POST(e, { action: 'delete', id: mine.id }, asRole('777', 'sub_tier1'))).status, 200);
+}
+
+/* ══ A member cannot publish to everyone ═══════════════════════════════ */
+{
+  const e = env();
+  check('publishing is refused for a member',
+        (await POST(e, good({ publish: true }), asRole('777', 'sub_tier1'))).status, 403);
+
+  const saved = (await (await POST(e, good(), asRole('777', 'sub_tier1'))).json()).background;
+  check('and a saved one is never published', saved.published, false);
+
+  /* Staff keep the shared catalogue. */
+  const staff = await POST(e, good({ name: 'Staff Map', publish: true }), as('222'));
+  check('staff can publish', (await staff.json()).background.published, true);
+}
+
+/* ══ A FORGED MASK IS REFUSED ══════════════════════════════════════════
+   The whole reason non-staff authoring needed the zone check: without it
+   a member paints solid rock and declares all of it swimmable. */
+{
+  const forged = good({
+    mask: Array.from({ length: GRID }, (_, y) => (y < 24 ? 'L' : 'L').repeat(GRID)),
+  });
+  ok('a mask that disagrees with the tiles is refused',
+     'error' in validateBackground(forged));
+
+  const swimRock = good({
+    tilemap: Array.from({ length: GRID }, () => row('stone/00')),
+    mask: Array.from({ length: GRID }, () => 'O'.repeat(GRID)),
+  });
+  ok('solid rock cannot be declared swimmable', 'error' in validateBackground(swimRock));
+
+  /* A fence is X whatever is painted under it. */
+  const fenced = good();
+  fenced.fences = Array.from({ length: GRID }, () => row(null));
+  fenced.fences[1][1] = 'fencewood/00';
+  ok('a fenced cell claimed walkable is refused', 'error' in validateBackground(fenced));
+  fenced.mask = fenced.mask.map((r, y) => (y === 1 ? r.slice(0, 1) + 'X' + r.slice(2) : r));
+  ok('and accepted once the mask marks it impassable',
+     !('error' in validateBackground(fenced)));
+}
+
+/* ══ The quota ═════════════════════════════════════════════════════════ */
+{
+  const e = env();
+  let last = null;
+  for (let i = 0; i < 10; i++) {
+    last = await POST(e, good({ name: 'Map ' + i }), asRole('777', 'sub_tier1'));
+  }
+  check('a member runs out of slots', last.status, 409);
+  const mine = await (await GET(e, '', as('777'))).json();
+  ok('and keeps the ones they made', (mine.backgrounds || []).length >= 8);
+}
+
 console.log('');
 if (failures.length) {
   console.log(`[park-backgrounds] ${passed} passed, ${failures.length} FAILED`);

@@ -93,6 +93,11 @@ const NON_ROUTE_MODULES = new Set([
 
   /* MTGBBB scoring rules. Pure functions, no handler. Covered by
      server/scripts/test-mtgbbb.js. */
+  /* The server's copy of which tile set means which walkability zone, so
+     a submitted background mask can be CHECKED rather than trusted. The
+     real table is park-tiles/palette.json, which is gitignored pack art
+     the server cannot import. Library, no handler. */
+  'api/park-zones.js',
   'api/mtgbbb-scoring.js',
 
   /* MTGBBB set data — the Scryfall fetch, the permanent cache, the pool

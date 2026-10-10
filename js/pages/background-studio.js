@@ -92,6 +92,17 @@
       bindRotate();
       render();
 
+      /* AUTHORING IS THE SUB PERK, not the backgrounds. Someone who has
+         lapsed keeps every background they made and keeps using them
+         in-game; what they lose is this page. Saying so here beats
+         letting them paint for ten minutes and meet a 403. */
+      if (!data.canAuthor) {
+        notice.innerHTML = 'The Background Studio is a <b>subscriber</b> perk. ' +
+          'Any backgrounds you have already made are still yours — they stay in your ' +
+          'park and in your scenery picker.';
+        return;
+      }
+
       notice.style.display = 'none';
       $('bgsStudio').style.display = '';
     } catch (e) {

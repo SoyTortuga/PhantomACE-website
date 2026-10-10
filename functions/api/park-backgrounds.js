@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════
    PARK BACKGROUNDS
-   GET  — the catalogue: published backgrounds, tilemap and mask included
-   POST — save / publish / delete, broadcaster & moderators only
+   GET  — the catalogue: published backgrounds, plus the caller's own
+   POST — save / publish / delete; authoring needs a subscription
 
    A background made in the studio is DATA, not a deploy. The studio paints
    a 32×32 grid of palette tiles; the game and the visit view compose the
@@ -9,18 +9,44 @@
    from the tiles at paint time. Saving here is the whole release process —
    no git, no restart, no file copy.
 
-   THE MASK IS STRUCTURALLY VALIDATED, NOT ZONE-CHECKED. Its correctness
-   against the tilemap (water tiles marking O, land marking L) is the
-   studio's job at derivation, and every author who can reach this endpoint
-   is a moderator — someone already trusted with the bot panel. A wrong
-   mask is a gameplay bug on one background, not a security hole: nothing
-   here executes, and the tile REFS are charset-bound so the client only
-   ever loads files from its own palette tree. If backgrounds ever open to
-   non-staff, cross-checking mask against palette zones server-side is the
-   first thing to add, and this comment is the reminder.
+   THE MASK IS NOW ZONE-CHECKED, because authors are no longer all
+   moderators. It used to be validated for shape only — 32 rows of LROX —
+   on the reasoning that everyone who could reach this endpoint was
+   already trusted with the bot panel. That reasoning expired the moment
+   subscribers could author, so the server derives the mask itself from
+   park-zones.js and refuses a submission that disagrees. Without it a
+   member could paint solid rock and mark it all swimmable.
+
+   AUTHORING IS GATED, USE IS NOT. A subscription buys the studio, not the
+   backgrounds made in it: someone whose sub lapses keeps every background
+   they made and keeps using them. So the tier check sits on POST alone,
+   and nothing in GET asks about it.
+
+   PERSONAL BY DEFAULT. A member's background is theirs — it is served to
+   them, and to anyone visiting their park, but it never enters the shared
+   catalogue. `published` stays staff-only and is what "everyone can pick
+   this" means. Sharing between members would be a third state and the
+   ownership this adds is what it would build on.
    ══════════════════════════════════════════════ */
 
 import { isModerator, isBroadcaster } from './admin/moderators.js';
+import { zoneOfRef, isOverlaySet } from './park-zones.js';
+
+/* Rank order of the cookie's role field. The moderator LIST outranks the
+   cookie, which is why it is checked separately — see media/index.js. */
+const ROLE_RANK = ['visitor', 'follower', 'sub_tier1', 'sub_tier2', 'sub_tier3', 'moderator', 'broadcaster'];
+
+/** Authoring needs tier 1 or better, or staff. */
+async function canAuthor(env, session) {
+  if (!session || !session.user_id) return false;
+  if (isBroadcaster(env, session)) return true;
+  if (await isModerator(env, session)) return true;
+  return ROLE_RANK.indexOf(String(session.role || 'visitor')) >= ROLE_RANK.indexOf('sub_tier1');
+}
+
+/* Enough to build a park out of, few enough that one member cannot fill
+   the table. Staff are not counted against it. */
+const PERSONAL_MAX = 8;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -120,6 +146,29 @@ export function validateBackground(body) {
      background is applied — re-placement would spin its attempts and give
      up at (50,50) on unwalkable ground. Refused here, where the author is
      still looking at the editor, rather than discovered in a stranded park. */
+  /* THE MASK MUST MATCH THE TILES. Derived here from the same rules the
+     studio uses — a fence or decoration cell is X whatever is under it,
+     otherwise the ground tile's zone decides, and an empty cell is X.
+     Checked rather than trusted because an author is no longer
+     necessarily staff: a forged mask would let someone paint solid rock
+     and declare all of it swimmable. */
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const over = fences && fences[y] ? fences[y][x] : null;
+      let want;
+      if (over) {
+        want = isOverlaySet(String(over).split('/')[0]) && zoneOfRef(over) !== 'X'
+          ? zoneOfRef(over) : 'X';
+      } else {
+        const z = tilemap[y][x] ? zoneOfRef(tilemap[y][x]) : 'X';
+        want = (z === 'L' || z === 'R' || z === 'O') ? z : 'X';
+      }
+      if (mask[y][x] !== want) {
+        return { error: `The mask does not match the tiles at ${x},${y}. Reload the studio and save again.` };
+      }
+    }
+  }
+
   const flat = mask.join('');
   if (!/[LR]/.test(flat)) return { error: 'A background needs some walkable land (L or R).' };
 
@@ -139,9 +188,19 @@ export async function onRequestGet(context) {
     const rec = await env.MARKETPLACE.get(bgKey(one), 'json');
     if (!rec) return json({ error: 'Unknown background' }, 404);
     if (!rec.published) {
-      const session = getSession(request);
-      if (!isBroadcaster(env, session) && !(await isModerator(env, session))) {
-        return json({ error: 'Unknown background' }, 404);
+      /* An unpublished record is either a staff draft or a member's
+         personal background. A personal one is NOT secret — a visitor
+         standing in that member's park has to render it, and the park
+         save already names the id — so by-id resolution is open. What
+         stays closed is the LIST: personal backgrounds never appear in
+         anyone else's picker. Staff drafts remain staff-only, because a
+         draft is unfinished rather than personal. */
+      const personal = !!rec.createdBy && String(rec.id || '').startsWith(`u${rec.createdBy}-`);
+      if (!personal) {
+        const session = getSession(request);
+        if (!isBroadcaster(env, session) && !(await isModerator(env, session))) {
+          return json({ error: 'Unknown background' }, 404);
+        }
       }
     }
     return json({ background: rec });
@@ -155,6 +214,19 @@ export async function onRequestGet(context) {
     if (rec && rec.published) out.push(rec);
   }
 
+  /* YOUR OWN RIDE ALONG, whatever your tier is now. A subscription buys
+     the studio, not the backgrounds made in it — someone whose sub has
+     lapsed keeps every one they made and keeps picking them in-game. So
+     this asks who you are and never what you pay. */
+  const seen = new Set(out.map(r => r.id));
+  const me = getSession(request);
+  if (me && me.user_id) {
+    for (const { value: rec } of rows) {
+      if (!rec || rec.published || seen.has(rec.id)) continue;
+      if (String(rec.createdBy) === String(me.user_id)) { out.push(rec); seen.add(rec.id); }
+    }
+  }
+
   /* Drafts ride along only for staff, and only when asked — the game's
      ordinary catalogue fetch should never grow because someone is midway
      through painting. */
@@ -162,13 +234,19 @@ export async function onRequestGet(context) {
     const session = getSession(request);
     if (isBroadcaster(env, session) || await isModerator(env, session)) {
       for (const { value: rec } of rows) {
-        if (rec && !rec.published) out.push(rec);
+        /* `seen` spans both passes. A staff member's OWN draft is already
+           in the list from the pass above, and pushing it again put it in
+           their picker twice. */
+        if (rec && !rec.published && !seen.has(rec.id)) { out.push(rec); seen.add(rec.id); }
       }
     }
   }
 
   out.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  return json({ backgrounds: out, grid: GRID });
+  /* So the studio can say WHY rather than letting someone paint for ten
+     minutes and meet a 403 on save. It is a capability of the caller, not
+     a gate on this response — the list above is open to everyone. */
+  return json({ backgrounds: out, grid: GRID, canAuthor: await canAuthor(env, getSession(request)) });
 }
 
 export async function onRequestPost(context) {
@@ -176,16 +254,25 @@ export async function onRequestPost(context) {
   const session = getSession(request);
   if (!session || !session.user_id) return json({ error: 'Not logged in' }, 401);
 
-  if (!isBroadcaster(env, session) && !(await isModerator(env, session))) {
-    return json({ error: 'The background studio is for the broadcaster and moderators.' }, 403);
+  if (!(await canAuthor(env, session))) {
+    return json({ error: 'The background studio is a subscriber perk. Backgrounds you have already made stay yours.' }, 403);
   }
 
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
+  const staff = isBroadcaster(env, session) || await isModerator(env, session);
+
   if (body.action === 'delete') {
     const id = String(body.id || '');
     if (!ID_RE.test(id)) return json({ error: 'Unknown background' }, 404);
+    /* Yours, or you are staff. Without this a subscriber could delete any
+       background by id, the broadcaster's published ones included. */
+    const rec = await env.MARKETPLACE.get(bgKey(id), 'json');
+    if (!rec) return json({ error: 'Unknown background' }, 404);
+    if (!staff && String(rec.createdBy) !== String(session.user_id)) {
+      return json({ error: 'That background is not yours.' }, 403);
+    }
     await env.MARKETPLACE.delete(bgKey(id));
     return json({ success: true });
   }
@@ -201,7 +288,12 @@ export async function onRequestPost(context) {
   let id = String(body.id || '');
   const creating = !id;
   if (creating) {
-    id = checked.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+    const slug = checked.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    /* A member's ids live under their own prefix. Two members naming a
+       background "my park" would otherwise be the same row, and the
+       second save would be told the name was taken by a background they
+       cannot see. The prefix is also what makes "list mine" one scan. */
+    id = staff ? slug.slice(0, 40) : (`u${session.user_id}-` + slug).slice(0, 40);
   }
   if (!ID_RE.test(id) || RESERVED_IDS.has(id)) {
     return json({ error: 'That name does not make a usable id.' }, 400);
@@ -211,19 +303,44 @@ export async function onRequestPost(context) {
   if (creating && existing) return json({ error: 'A background with that name already exists.' }, 409);
   if (!creating && !existing) return json({ error: 'Unknown background' }, 404);
 
+  if (existing && !staff && String(existing.createdBy) !== String(session.user_id)) {
+    return json({ error: 'That background is not yours.' }, 403);
+  }
+
+  /* PUBLISHING IS THE SHARED CATALOGUE, so it stays staff-only. A member's
+     background is personal: theirs to use and visible to anyone visiting
+     their park, but it does not go into everyone's picker. Sharing between
+     members would be a third state built on this ownership, not a flag a
+     member can set for themselves. */
+  if (!staff && body.publish === true) {
+    return json({ error: 'Your backgrounds are yours to use — publishing to everyone is staff only.' }, 403);
+  }
+
+  /* The quota is on new rows only, so editing never trips it. */
+  if (creating && !staff) {
+    const mine = await env.MARKETPLACE.listValues({ prefix: `${KEY_PREFIX}u${session.user_id}-` });
+    if ((mine || []).length >= PERSONAL_MAX) {
+      return json({ error: `You can keep ${PERSONAL_MAX} backgrounds. Delete one to make another.` }, 409);
+    }
+  }
+
   const record = {
     id,
     name: checked.name,
     tilemap: checked.tilemap,
+    /* Null when the author painted no fences, which is also every record
+       written before the overlay existed. */
+    fences: checked.fences,
+    bgColor: checked.bgColor,
     mask: checked.mask,
     /* ABSENT means UNCHANGED. Save-with-edits used to send publish:false,
        which silently pulled a live background out of every player's
        picker -- the author thought they were saving progress and was
        actually unpublishing. Only an explicit true or false moves the
        flag now; a new background starts as a draft. */
-    published: body.publish === undefined
-      ? (existing ? !!existing.published : false)
-      : !!body.publish,
+    published: staff
+      ? (body.publish === undefined ? (existing ? !!existing.published : false) : !!body.publish)
+      : false,
     paletteVersion: 1,
     createdAt: existing ? existing.createdAt : Date.now(),
     /* The author comes from the session, never the request — same rule as
