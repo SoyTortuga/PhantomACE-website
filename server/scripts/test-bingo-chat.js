@@ -206,6 +206,55 @@ function callSquares(env, code, idxs) {
   check('and pays again', entries(env, '1'), 4);
 }
 
+/* ── A busy card: more voters than one batch, and one that fails ─────
+   The payout runs five voters at a time now rather than one after another,
+   because a profile read plus a ledger write per voter, strictly in series,
+   meant the moderator's call waited on eighty queries for a forty-voter card
+   and the overlay alert held off until the last of them.
+
+   Batching makes two previously trivial things worth pinning: that a card
+   with more voters than one batch pays every one exactly once (an off-by-one
+   in the chunk walk would skip or repeat a slice), and that a voter who
+   cannot be credited costs only their own entries -- the try/catch has to
+   stay one per VOTER, not one per batch, or one failure would take the other
+   four of its batch with it. */
+{
+  const ids = Array.from({ length: 13 }, (_, i) => String(100 + i));
+  /* Everyone has an account except one, who is the ordinary skip. */
+  const withAccounts = ids.filter(id => id !== '105');
+  const env = makeEnv({ profiles: withAccounts });
+
+  /* And one whose ledger write blows up, in the middle of a batch. */
+  const realMutate = env.MARKETPLACE.mutate;
+  env.MARKETPLACE.mutate = async (k, fn, o) => {
+    if (k.includes('109')) throw new Error('ledger unavailable');
+    return realMutate.call(env.MARKETPLACE, k, fn, o);
+  };
+
+  await bgc.openChatCard(env, 'ABCD');
+  for (const id of ids) await stamp(env, id, 1, 'Voter' + id);
+  await bgc.placeStamp(env);
+  callSquares(env, 'ABCD', [1, 2, 3, 4]);
+
+  const fired = await bgc.onSquareCalled(env, 'ABCD');
+  check('the line fires', fired.fired, true);
+
+  /* 13 voters, minus the one with no account, minus the one that threw. */
+  const expected = ids.filter(id => id !== '105' && id !== '109');
+  check('every creditable voter is paid, across all three batches',
+    expected.filter(id => entries(env, id) !== 2), []);
+  check('and each exactly once, none doubled by the batch walk',
+    expected.map(id => entries(env, id)), expected.map(() => 2));
+  check('the account-less voter is skipped', entries(env, '105'), 0);
+  check('the failing voter gets nothing', entries(env, '109'), 0);
+  check('and the count reports who was actually paid', fired.paid, expected.length);
+
+  /* One failure must not have cost the rest of its batch: 109 sits in the
+     third batch alongside 110, 111 and 112. */
+  check('the rest of the failing voter\u2019s batch is still paid',
+    ['110', '111', '112'].map(id => entries(env, id)), [2, 2, 2]);
+}
+
 /* ── A card belongs to ONE room ──────────────────────────────────────────── */
 {
   const env = makeEnv({ profiles: ['1'] });

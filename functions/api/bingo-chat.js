@@ -212,18 +212,38 @@ export async function onSquareCalled(env, code) {
 
   /* Entries only for an account that exists. profile_<id> is written on every
      login; crediting an id that never signed in would seed the monthly draw
-     with an entrant it cannot pay. Same rule as every other chat reward. */
+     with an entrant it cannot pay. Same rule as every other chat reward.
+
+     IN PARALLEL, FIVE AT A TIME. This was a profile read and then a ledger
+     write per voter, awaited one after the other, so a forty-voter card meant
+     eighty serialised queries while the moderator's call waited and the
+     overlay alert held off -- the bigger the chat, the slower its own win
+     appeared. The voters are independent (`votes` is keyed by user id, so each
+     appears once, and each ledger row is their own), so nothing here has to
+     wait on anything else.
+
+     Bounded rather than all at once: the pool holds ten connections and this
+     runs during a live game, so a hundred-voter card firing a hundred queries
+     would put every other request on the site behind it. */
+  const { addEntries } = await import('./giveaway-entries.js');
+  const PAY_CONCURRENCY = 5;
   let paid = 0;
-  for (const v of voters) {
+
+  const payOne = async (v) => {
     try {
       const profile = await env.MARKETPLACE.get(`profile_${v.userId}`, 'json');
-      if (!profile) continue;
-      const { addEntries } = await import('./giveaway-entries.js');
+      if (!profile) return;
       await addEntries(env, v.userId, v.name, WIN_ENTRIES, 'bingo-chat');
       paid++;
     } catch (err) {
+      /* One voter who cannot be credited must not cost the rest their
+         entries, nor swallow the alert below. */
       console.error('[bingo-chat] could not credit a voter:', err.message);
     }
+  };
+
+  for (let i = 0; i < voters.length; i += PAY_CONCURRENCY) {
+    await Promise.all(voters.slice(i, i + PAY_CONCURRENCY).map(payOne));
   }
 
   await pushBingoAlert(env, scored.bingos, paid);
