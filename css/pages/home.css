@@ -1,48 +1,65 @@
 /* Hero */
 .hero {
-  /* No longer a full screen of branding. It is as tall as the live
-     status, the buttons and the stream need, which puts the rest of the
-     page within reach of the first scroll instead of below a 100vh wall. */
+  /* No longer a full screen of branding, and it draws no background of
+     its own — the page's fixed backdrop is behind it. */
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  z-index: 1;
   padding: clamp(40px, 9vw, 96px) 24px clamp(32px, 6vw, 64px);
 }
 
-/* The branding, behind everything. Centred on the same point the radial
-   gradient is, so the glow sits under the wordmark rather than beside it. */
-.hero-brand {
-  position: absolute;
+/* ── The page's backdrop ──────────────────────────────────────────────
+   Pinned to the viewport so the content scrolls over it and the mark is
+   behind the page all the way down. Everything else on the page sits in
+   a layer above it; nothing here takes pointer events. */
+.site-backdrop {
+  position: fixed;
   inset: 0;
   z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.backdrop-ground {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 35%, #98090a 0%, #6d0909 15%, #470809 30%, #1a0304 50%, #000000 70%);
+}
+
+.backdrop-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.backdrop-brand {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 0 24px;
-  pointer-events: none;
-  /* Held back so the foreground reads over it. Not a blur — see the
-     project's CSS rules; this is opacity, which costs nothing per frame. */
-  opacity: 0.5;
+  /* Held back so text reads over it the whole way down the page, not just
+     in the hero. Opacity, not a blur: blur is banned here and costs
+     per-frame GPU work for something opacity gives free. */
+  opacity: 0.4;
 }
 
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 50% 35%, #98090a 0%, #6d0909 15%, #470809 30%, #1a0304 50%, #000000 70%);
-  z-index: 0;
+/* Everything that is not the backdrop sits above it. */
+.home-section,
+.section-divider,
+#site-header,
+#site-footer {
+  position: relative;
+  z-index: 1;
 }
 
-.hero-vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 0.5) 100%);
-  z-index: 0;
-}
+
 
 .hero-content {
   text-align: center;
@@ -81,11 +98,11 @@
 /* Light mode: the hero goes to aged paper. The wordmark (black letters + red
    outline) reads crisply on parchment, so we drop the multiply blend that was
    tuned for the dark ground; the skull badge and red glows work as-is. */
-:root[data-theme="light"] .hero-bg {
+:root[data-theme="light"] .backdrop-ground {
   background:
     radial-gradient(circle at 50% 35%, #f2ead6 0%, #e7ddc5 38%, #d8ccae 68%, #c9bb96 100%);
 }
-:root[data-theme="light"] .hero-vignette {
+:root[data-theme="light"] .backdrop-vignette {
   background: radial-gradient(ellipse at center, transparent 32%, rgba(92, 64, 26, 0.14) 100%);
 }
 :root[data-theme="light"] .hero-title-img {

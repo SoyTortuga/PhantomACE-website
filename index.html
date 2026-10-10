@@ -24,24 +24,29 @@
 
   <div id="site-header"></div>
 
-  <!-- Hero -->
-  <section class="hero">
-    <div class="hero-bg"></div>
+  <!-- THE PAGE'S BACKDROP, pinned to the viewport. The content scrolls
+       over it, so the mark sits behind the page the whole way down rather
+       than scrolling away with the hero.
 
-    <!-- THE BRANDING IS THE BACKDROP. It used to be stacked as content
-         above the fold, so the first screen was the logo and the wordmark
-         and everything the page is actually for started below them. Still
-         <img> rather than a background-image: the wordmark's look is its
-         drop-shadow glow and its multiply blend against the red, and a
-         background-image gets neither. -->
-    <div class="hero-brand" aria-hidden="true">
+       The red ground is part of it: it used to be .hero-bg, which would
+       have painted straight over a fixed mark underneath. Gradient,
+       vignette and branding are one layer now and the hero draws nothing.
+
+       Still <img> rather than a background-image — the wordmark's look is
+       its drop-shadow glow and its multiply blend against the red, and a
+       background image gets neither. -->
+  <div class="site-backdrop" aria-hidden="true">
+    <div class="backdrop-ground"></div>
+    <div class="backdrop-brand">
       <img src="/assets/images/phantomace-logo.png" alt="" class="hero-logo">
       <img src="/assets/images/hero-title.png" alt="" class="hero-title-img">
       <p class="hero-subtitle">Digital Chaos &amp; Drum Fills</p>
     </div>
+    <div class="backdrop-vignette"></div>
+  </div>
 
-    <div class="hero-vignette"></div>
-
+  <!-- Hero -->
+  <section class="hero">
     <div class="hero-content">
       <h1 class="sr-only">PhantomACE — Digital Chaos &amp; Drum Fills</h1>
 
