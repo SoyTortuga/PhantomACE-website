@@ -94,6 +94,32 @@ const envWith = (seed) => ({ MARKETPLACE: fakeKV(seed), TWITCH_BROADCASTER_ID: B
   ok('the hype train starts a frenzy, best-effort',
      /setSkullEvent/.test(hype) && /try \{[\s\S]*setSkullEvent[\s\S]*catch/.test(hype));
 
+  /* A MODERATOR CAN REACH IT. trigger-event is gated, clamped and tested on
+     the server, and its own comment says it is driven "from Bot Control" --
+     which had no button, so for every frenzy anyone wanted to start on
+     purpose, curl was the only way. Everything else that starts one is
+     automatic (hype train, raid-boss kill, finished Bone Tithe). */
+  const botHtml = fs.readFileSync(path.join(REPO, 'bot-control.html'), 'utf8');
+  ok('Bot Control has a frenzy card', /id="skullFrenzySection"/.test(botHtml));
+  ok('with a button and a duration', /id="botFrenzyBtn"/.test(botHtml) &&
+     /id="botFrenzyMins"/.test(botHtml));
+
+  /* Only durations the server will honour: it clamps to 1-30, so an option
+     outside that silently becomes something else and the toast would lie
+     about how long the frenzy runs. */
+  const sel = (botHtml.match(/id="botFrenzyMins"[\s\S]*?<\/select>/) || [''])[0];
+  const mins = [...sel.matchAll(/value="(\d+)"/g)].map(m => Number(m[1]));
+  ok('the duration choices are a real list', mins.length >= 2);
+  check('and every one is inside the server clamp',
+    mins.filter(v => v < 1 || v > 30), []);
+
+  const botJs = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  ok('the button posts trigger-event to the game route',
+     /botFrenzyBtn/.test(botJs) && /'trigger-event'/.test(botJs) &&
+     /\/api\/skull-clicker/.test(botJs));
+  ok('and reports a refusal rather than claiming success',
+     /data\.error \|\| 'Could not start the frenzy\.'/.test(botJs));
+
   const game = fs.readFileSync(path.join(REPO, 'games/skull-clicker/index.html'), 'utf8');
   ok('the game polls the event', /skull-clicker\?event=1/.test(game) && /function pollSkullEvent/.test(game));
   ok('and a frenzy speeds up cursed skulls', /__streamFrenzy/.test(game) && /function cursedFreqMult/.test(game));

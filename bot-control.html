@@ -164,6 +164,28 @@
             </p>
           </div>
 
+          <!-- Skull Clicker frenzy. The action has been there since the game
+               shipped, moderator-gated and capped at 30 minutes server-side,
+               and its own comment says it is driven "from Bot Control" — which
+               had no button, so curl was the only way to start one by hand.
+               Every other frenzy is automatic (hype train, raid boss, Bone
+               Tithe), so there was no way to simply reward a quiet chat. -->
+          <div class="card bot-section" id="skullFrenzySection">
+            <h3>Skull Clicker Frenzy</h3>
+            <p class="bot-section-desc">Doubles every click for everyone playing Skull Clicker, right now. Hype trains, raid-boss kills and finished Bone Tithes start one on their own — this is for starting one because you feel like it.</p>
+            <label class="bot-drop-count">For
+              <select id="botFrenzyMins">
+                <option value="5" selected>5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+              </select>
+            </label>
+            <div class="bot-tier-buttons">
+              <button class="btn-primary" id="botFrenzyBtn" type="button">Start Frenzy</button>
+            </div>
+          </div>
+
           <div class="card bot-section" id="checkinSection" hidden>
             <h3>Pham Check-Ins</h3>
             <p class="bot-section-desc">Viewers who redeemed Pham Check-In this stream.</p>

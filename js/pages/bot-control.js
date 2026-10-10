@@ -1077,6 +1077,39 @@ function initBotControlPanel() {
   }
 
 
+  /* Posts to /api/skull-clicker, not /api/bot/trigger, so it does not go
+     through fireBotAction. The server clamps the minutes to 1-30 whatever is
+     sent; the select only offers what it will accept. */
+  const frenzyBtn = document.getElementById('botFrenzyBtn');
+  if (frenzyBtn) {
+    frenzyBtn.addEventListener('click', async function () {
+      const sel = document.getElementById('botFrenzyMins');
+      const minutes = Number(sel && sel.value) || 5;
+      const original = frenzyBtn.textContent;
+      frenzyBtn.disabled = true;
+      frenzyBtn.textContent = 'Starting...';
+      try {
+        const res = await fetch('/api/skull-clicker', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'trigger-event', minutes: minutes }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showBotStatus('Frenzy running for ' + minutes + ' minutes \u2014 every click counts double.', false);
+        } else {
+          showBotStatus(data.error || 'Could not start the frenzy.', true);
+        }
+      } catch (err) {
+        showBotStatus('Could not reach the server.', true);
+      } finally {
+        frenzyBtn.disabled = false;
+        frenzyBtn.textContent = original;
+      }
+    });
+  }
+
   refreshDashboard();
   initGiveawayPanel();
   initRotationPanel();
