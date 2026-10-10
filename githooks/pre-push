@@ -1,0 +1,56 @@
+#!/bin/sh
+# ══════════════════════════════════════════════
+#  DON'T PUSH SOMETHING THAT TAKES THE RIG DOWN
+#
+#  Enable once, per clone:
+#      git config core.hooksPath githooks
+#
+#  WHAT IT CHECKS, AND WHAT IT DELIBERATELY DOES NOT.
+#
+#  The rig IS production. A push is followed by a pull and a restart there,
+#  and two mistakes in this codebase do not fail on a laptop at all — they
+#  fail at BOOT, on the rig, which means SERVICE_PAUSED and phantomace.tv
+#  offline until somebody notices:
+#
+#    a file under functions/ that is neither a route nor declared a library
+#    a storage key with no table mapped to it in server/lib/registry.js
+#
+#  Both have happened. Both are caught by one of the two suites below, and
+#  the pair runs in about a second — which is the point. A hook that takes a
+#  minute gets bypassed, and a bypassed hook protects nothing.
+#
+#  So this is NOT the full suite. It is the subset that answers one
+#  question: will the thing on the other end of this push still boot. Run
+#  the rest yourself before committing:
+#
+#      node server/scripts/run-all-tests.js
+#
+#  or set PHAM_FULL=1 to have this hook run it too.
+# ══════════════════════════════════════════════
+
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -n "$PHAM_FULL" ]; then
+  echo "pre-push: full suite (PHAM_FULL set)"
+  exec node server/scripts/run-all-tests.js
+fi
+
+fail=0
+for suite in test-router-boot test-kv-registry; do
+  if ! out=$(node "server/scripts/$suite.js" 2>&1); then
+    echo ""
+    echo "pre-push: $suite FAILED — this would not boot on the rig."
+    echo "$out" | sed 's/^/  /'
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Push refused. Fix the above, or --no-verify if you know better."
+  exit 1
+fi
+
+echo "pre-push: boot guards ok (not the full suite — run-all-tests.js for that)"

@@ -175,6 +175,47 @@ const CLIENT_PARK = 'games/dino-park/index.html';
   check('dino park: the client knows every species the server can roll', missing, []);
 }
 
+/* ── deploy.ps1 against install-services.ps1 ─────────────────────────
+   The deploy script restarts a service, polls a port and, when something
+   goes wrong, tells the operator which log holds the reason. All three are
+   decided by the installer. Get one wrong and the failure is nasty: the
+   health poll times out against a port nothing is listening on, so a
+   deploy that worked perfectly is reported as an outage — and the log it
+   names has nothing in it. */
+{
+  const installer = read('server/scripts/install-services.ps1');
+  const deploy = read('server/scripts/deploy.ps1');
+
+  /* Literal patterns, not built strings: a regex assembled out of a JS
+     string needs its backslashes doubled, and getting that wrong gives a
+     pattern that matches nothing and a test that passes for the wrong
+     reason. */
+  const svc = (/\$ServiceName\s*=\s*'([^']+)'/.exec(installer) || [])[1];
+  const port = (/\$Port\s*=\s*(\d+)/.exec(installer) || [])[1];
+
+  check('deploy: the installer names a service', typeof svc, 'string');
+  ok('and deploy.ps1 defaults to it', !!svc && deploy.includes("$Service = '" + svc + "'"));
+
+  check('deploy: the installer names a port', typeof port, 'string');
+  ok('and deploy.ps1 polls it', !!port && deploy.includes('$Port = ' + port));
+  ok('on the health endpoint, which is what reports the commit',
+    /\$Port\/api\/health/.test(deploy));
+
+  /* The log file the installer configures, by shape: <ServiceName>.out.log
+     in server/logs. deploy.ps1 must point at that one and not at a glob
+     that also matches the rotated copies. */
+  ok('the installer logs stdout to <service>.out.log',
+    /AppStdout\s+\(Join-Path \$logDir "\$ServiceName\.out\.log"\)/.test(installer));
+  ok('and deploy.ps1 tells the operator to read that file',
+    /\$Service\.out\.log/.test(deploy));
+
+  /* The restart only happens for code the process loaded at boot. Static
+     files are read per request, so restarting for them drops live game
+     state — Mana Clash timers, the scramble clock — for nothing. */
+  ok('deploy.ps1 restarts only for server/ or functions/ changes',
+    /'server\/\*'[\s\S]{0,40}'functions\/\*'/.test(deploy));
+}
+
 /* ── Report ─────────────────────────────────────────────────────────── */
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

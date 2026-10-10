@@ -27,8 +27,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-/** Files under functions/ that are libraries, not routes. */
-const NON_ROUTE_MODULES = new Set([
+/** Files under functions/ that are libraries, not routes.
+    Exported so server/scripts/test-router-boot.js can check the list itself:
+    a stale entry, or one that has since grown a handler, makes a route
+    silently unreachable rather than failing anything. */
+export const NON_ROUTE_MODULES = new Set([
   'api/bot/send-chat.js',
 
   /* Storage reads that are allowed to fail, but not to fail silently.
