@@ -92,6 +92,8 @@ export async function getStreamInfo(env) {
       viewerCount: cached.viewerCount || 0,
       category: cached.category || null,
       categoryId: cached.categoryId || null,
+      title: cached.title || null,
+      thumbnail: cached.thumbnail || null,
     };
   }
 
@@ -127,6 +129,11 @@ export async function getStreamInfo(env) {
          push version and works offline too. */
       category: stream ? (stream.game_name || null) : null,
       categoryId: stream ? (stream.game_id ? String(stream.game_id) : null) : null,
+      /* For the header's LIVE dot (twitch-status.js), which used to make its
+         own Helix call on every page load by every visitor rather than read
+         this row. Same single writer, two more fields. */
+      title: stream ? (stream.title || null) : null,
+      thumbnail: stream ? (stream.thumbnail_url || null) : null,
     };
 
     /* The last live sighting rides in the same row, carried across offline
