@@ -9,14 +9,30 @@ const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => (
    reports so the live player count lands on the right card. */
 function collectGames() {
   return Array.from(document.querySelectorAll('.game-card[data-game]')).map((card) => {
+    const id = card.dataset.game;
+    const titleEl = card.querySelector('.game-card-title');
+    const thumbEl = card.querySelector('.game-card-thumb img');
     const playBtn = card.querySelector('.game-play-btn:not(.role-moderator)');
+
+    /* Renaming any of these in the grid would otherwise drop the game from
+       the carousel without a trace -- say so instead of failing quietly. */
+    const missing = [
+      !titleEl && '.game-card-title',
+      !thumbEl && '.game-card-thumb img',
+      !playBtn && '.game-play-btn:not(.role-moderator)',
+    ].filter(Boolean);
+    if (missing.length) {
+      console.warn(`games: card data-game="${id}" is missing ${missing.join(', ')} — leaving it out of the Being Played Now carousel.`);
+      return null;
+    }
+
     return {
-      id: card.dataset.game,
-      title: card.querySelector('.game-card-title').textContent.trim(),
-      thumb: card.querySelector('.game-card-thumb img').getAttribute('src'),
+      id,
+      title: titleEl.textContent.trim(),
+      thumb: thumbEl.getAttribute('src'),
       play: () => playBtn.click(),
     };
-  });
+  }).filter(Boolean);
 }
 
 function launchGame(title, src) {
