@@ -551,6 +551,19 @@
     .panel-action.release-action:hover { color: var(--red); }
 
     /* ======================== MARKETPLACE ======================== */
+    /* Your sales. Borders only, no shadow and no coloured rail. */
+    .market-section { margin-top: 18px; }
+    .sale-total { font-size: 13px; color: var(--text-sec); margin-bottom: 8px; }
+    .sale-list { display: flex; flex-direction: column; gap: 4px; }
+    .sale-row {
+      display: grid; grid-template-columns: 1fr auto auto 56px; gap: 8px; align-items: baseline;
+      padding: 6px 9px; background: var(--gray-mid);
+      border: 1px solid var(--border-low); border-radius: 4px; font-size: 13px;
+    }
+    .sale-dino { color: var(--text-pri); font-weight: 700; }
+    .sale-buyer, .sale-when { color: var(--text-sec); font-size: 12px; }
+    .sale-price { color: #ffaa00; text-align: right; font-weight: 700; }
+
     .market-login { text-align: center; padding: 40px 20px; color: var(--text-pri); }
     .market-login-btn {
       display: inline-block; margin-top: 12px; padding: 10px 24px;
@@ -5970,9 +5983,14 @@ async function claimEarnings() {
     const added = adoptServerGrants(data.state);
     save();
     refreshAfterAdopt(added);
-    const sales = Array.isArray(data.sales) ? data.sales : [];
-    if (sales.length) {
-      showToast(`Marketplace: sold ${sales.length} dino${sales.length === 1 ? '' : 's'} for ${data.earned || 0} coins!`);
+    /* `fresh` is what has sold since the last look. The full history now
+       survives the read — it used to be destroyed along with the balance —
+       so toasting off `sales` would re-announce the same sales on every
+       park load. */
+    const fresh = Array.isArray(data.fresh) ? data.fresh : [];
+    if (Array.isArray(data.sales)) salesHistory = data.sales;
+    if (fresh.length) {
+      showToast(`Marketplace: sold ${fresh.length} dino${fresh.length === 1 ? '' : 's'} for ${data.earned || 0} coins!`);
     } else if (added.coins > 0) {
       showToast(`Marketplace earnings: +${added.coins} coins!`);
     }
@@ -6052,6 +6070,35 @@ async function fetchMyListings() {
   } catch { /* network hiccup — keep showing the last-known-good list */ }
 }
 
+/* What this park has sold, newest first. Kept from the earnings read
+   rather than fetched separately — it rides along on a call the game
+   already makes on every load. */
+let salesHistory = [];
+
+function renderSalesHistory() {
+  if (!salesHistory.length) return '';
+  const rows = salesHistory.slice().reverse().slice(0, 12).map(s => {
+    const spec = getRosterById(s.dino);
+    const when = new Date(Number(s.at) || 0);
+    const ago = isNaN(when) ? '' : when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `<div class="sale-row">
+      <span class="sale-dino">${escapeHtml((spec && spec.name) || s.dino || 'Dino')}</span>
+      <span class="sale-buyer">to ${escapeHtml(s.buyer || 'someone')}</span>
+      <span class="sale-when">${escapeHtml(ago)}</span>
+      <span class="sale-price">${Number(s.price) || 0}</span>
+    </div>`;
+  }).join('');
+
+  /* The number that makes the next listing price a decision rather than a
+     guess: what this species actually went for. */
+  const total = salesHistory.reduce((n, s) => n + (Number(s.price) || 0), 0);
+  return `<div class="market-section">
+    <div class="section-title">Your sales</div>
+    <div class="sale-total">${salesHistory.length} sold &middot; ${total} coins all time</div>
+    <div class="sale-list">${rows}</div>
+  </div>`;
+}
+
 async function renderMarketplace() {
   const container = document.getElementById('marketContent');
   const session = getPlayerSession();
@@ -6125,6 +6172,11 @@ async function renderMarketplace() {
     });
     html += '</div>';
   }
+
+  /* Below the listings: what this park has actually sold. The history
+     only became worth showing once the earnings read stopped destroying
+     it, and it is the input to pricing the next listing. */
+  html += renderSalesHistory();
 
   container.innerHTML = html;
 }

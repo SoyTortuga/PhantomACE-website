@@ -356,6 +356,51 @@ async function listed(seedExtra = {}) {
   check('a second claim pays nothing', [again.data.coins, s.coins], [0, 125]);
 }
 
+/* ══ THE SALES HISTORY SURVIVES THE READ ═══════════════════════════════
+   It used to not. The earnings GET took the row with claim(), which is
+   DELETE ... RETURNING, so the money and the history went together and
+   SALES_KEPT = 100 was dead config — the list never held more than the
+   sales since the seller's last park load. The money must still be taken
+   exactly once; the history must not be taken at all. */
+{
+  const { env } = await listed();
+  const now = Date.now();
+  env.MARKETPLACE.store.set('earnings_1', JSON.stringify({
+    amount: 40,
+    sales: [
+      { buyer: 'Ann', dino: 'compy', price: 10, at: now - 3000, credited: true },
+      { buyer: 'Bo',  dino: 'rex',   price: 30, at: now - 2000, credited: true },
+    ],
+  }));
+
+  const first = await mktGet(env, '?action=earnings', '1');
+  check('the balance is paid out', first.data.coins, 40);
+  check('both sales are reported as new', first.data.fresh.length, 2);
+  check('and earned covers only those', first.data.earned, 40);
+  check('the history comes back too', first.data.sales.length, 2);
+
+  /* The row is still there afterwards — that is the whole fix. */
+  const row = env.MARKETPLACE.read('earnings_1');
+  ok('the row was not destroyed', !!row);
+  check('the money is gone', row.amount, 0);
+  check('the history is not', row.sales.length, 2);
+
+  const second = await mktGet(env, '?action=earnings', '1');
+  check('a second read pays nothing again', second.data.coins, 0);
+  check('and announces nothing as new', second.data.fresh.length, 0);
+  check('but still returns the history', second.data.sales.length, 2);
+
+  /* A sale arriving after that look is new again, and does not resurrect
+     the older two. */
+  const after = env.MARKETPLACE.read('earnings_1');
+  after.sales.push({ buyer: 'Cy', dino: 'stego', price: 55, at: Date.now() + 1000, credited: true });
+  env.MARKETPLACE.store.set('earnings_1', JSON.stringify(after));
+  const third = await mktGet(env, '?action=earnings', '1');
+  check('only the new sale is announced', third.data.fresh.length, 1);
+  check('priced correctly', third.data.earned, 55);
+  check('and the history has all three', third.data.sales.length, 3);
+}
+
 /* ══ Stale saves cannot undo a settlement ═══════════════════════════ */
 {
   const { env, id } = await listed();

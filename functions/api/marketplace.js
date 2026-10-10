@@ -158,7 +158,18 @@ export async function onRequestGet(context) {
     /* Claim, not read: two loads arriving together must not both see the
        same balance. Only a fallback or pre-settlement balance is ever left
        in `amount`; it is moved into the save here, server-side. */
-    const data = await env.MARKETPLACE.claim('earnings_' + userId);
+    /* mutate, not claim. claim() is DELETE ... RETURNING, which took the
+       sales history with the money and made SALES_KEPT dead config. This
+       takes the balance in the same one-shot way — the next caller sees
+       zero — and leaves the history behind. A sale landing between the
+       read and the write is inside the lock, so it is not lost either. */
+    let data = null;
+    const seenAt = Date.now();
+    await env.MARKETPLACE.mutate('earnings_' + userId, (current) => {
+      if (!current) return undefined;
+      data = current;
+      return { amount: 0, sales: current.sales || [], seenAt };
+    });
     const owed = data && data.amount > 0 ? Math.floor(data.amount) : 0;
     if (owed > 0) {
       try {
@@ -168,7 +179,14 @@ export async function onRequestGet(context) {
           return sealMarketState(userId, prep.state, prep.nextSeq);
         });
       } catch (err) {
-        await env.MARKETPLACE.put('earnings_' + userId, JSON.stringify(data));
+        /* Put the money back without flattening whatever has happened
+           since — a put of the stale `data` would drop a sale that landed
+           in between, which is the bug this whole block is about. */
+        await env.MARKETPLACE.mutate('earnings_' + userId, (current) => ({
+          amount: ((current && current.amount) || 0) + owed,
+          sales: (current && current.sales) || (data && data.sales) || [],
+          seenAt: (current && current.seenAt) || 0,
+        }));
         throw err;
       }
     }
@@ -180,12 +198,19 @@ export async function onRequestGet(context) {
       r.value && r.value.seller && sameUser(r.value.seller.userId, userId) && isExpired(r.value)));
 
     const sales = data && Array.isArray(data.sales) ? data.sales : [];
-    const earned = sales.reduce((n, s) => n + (Number(s.price) || 0), 0);
+
+    /* `fresh` is what the toast is for; `sales` is the history the market
+       panel reads. Keeping them apart is what lets the history survive a
+       load without announcing itself again every time. */
+    const lastSeen = (data && Number(data.seenAt)) || 0;
+    const fresh = sales.filter(x => (Number(x.at) || 0) > lastSeen);
+    const earned = fresh.reduce((n, x) => n + (Number(x.price) || 0), 0);
+
     let state = null;
-    if (owed > 0 || returned > 0 || sales.length) {
+    if (owed > 0 || returned > 0 || fresh.length) {
       state = usableState(await env.MARKETPLACE.get(parkKey(userId), 'json'));
     }
-    return json({ coins: owed, earned, sales, returned, state });
+    return json({ coins: owed, earned, fresh, sales, returned, state });
   }
 
   const rows = await env.MARKETPLACE.listValues({ prefix: 'listing_' });
