@@ -519,23 +519,6 @@
   color: var(--text-pri);
 }
 
-.account-menu-item-disabled {
-  color: var(--text-dim);
-  cursor: default;
-  pointer-events: none;
-}
-
-.account-menu-soon {
-  font-family: var(--font-system);
-  font-size: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
 .account-menu-item-staff {
   color: var(--red);
   font-weight: 700;

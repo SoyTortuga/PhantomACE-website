@@ -118,33 +118,58 @@ const ROLE_LABELS = {
   visitor:     'Visitor',
 };
 
+/* THE CONTROL IS NOT THE HEADER'S ANY MORE. The settings page shows the
+   same badge, the same Re-check button and the same message, so each part
+   is addressed by CLASS and every copy is written at once.
+
+   Two reasons it is not a second implementation. A refresh started from
+   Settings has to leave the account menu showing the NEW role, not the one
+   it was built with. And the message below is a careful piece of honesty
+   about what Twitch did and did not confirm — a copy of it would be the
+   copy that stops matching. */
+function roleParts() {
+  return {
+    badges: document.querySelectorAll('.account-role-badge'),
+    msgs: document.querySelectorAll('.account-role-msg'),
+    btns: document.querySelectorAll('.account-role-refresh'),
+  };
+}
+
 function renderRoleBadge(role) {
-  const badge = document.getElementById('accountRoleBadge');
-  if (!badge) return;
   const key = ROLE_LABELS[role] ? role : 'visitor';
-  badge.textContent = ROLE_LABELS[key];
-  /* data-role, NOT a role-* class: roles.css owns that namespace for
-     showing/hiding content by role, and a .role-sub_tier1 class here made
-     the badge hide itself. */
-  badge.setAttribute('data-role', key);
+  roleParts().badges.forEach((badge) => {
+    badge.textContent = ROLE_LABELS[key];
+    /* data-role, NOT a role-* class: roles.css owns that namespace for
+       showing/hiding content by role, and a .role-sub_tier1 class here made
+       the badge hide itself. */
+    badge.setAttribute('data-role', key);
+  });
+}
+
+/** One outcome, in every copy of the control. */
+function setRoleMsg(msgs, text, state) {
+  msgs.forEach((el) => {
+    /* classList rather than className: the settings page's copy carries a
+       layout class of its own, and overwriting className threw it away. */
+    el.classList.remove('ok', 'warn', 'err');
+    if (state) el.classList.add(state);
+    el.textContent = text;
+  });
 }
 
 async function refreshMyRole() {
-  const msg = document.getElementById('accountRoleMsg');
-  const btn = document.getElementById('accountRoleRefresh');
-  if (!msg) return;
+  const { msgs, btns } = roleParts();
+  if (!msgs.length) return;
 
-  if (btn) btn.disabled = true;
-  msg.className = 'account-role-msg';
-  msg.textContent = 'Checking with Twitch…';
+  btns.forEach((b) => { b.disabled = true; });
+  setRoleMsg(msgs, 'Checking with Twitch…', '');
 
   try {
     const res = await fetch('/api/auth/recheck-roles', { credentials: 'same-origin' });
     const d = await res.json();
 
     if (!res.ok) {
-      msg.className = 'account-role-msg err';
-      msg.textContent = d.error || 'Could not check right now.';
+      setRoleMsg(msgs, d.error || 'Could not check right now.', 'err');
       return;
     }
 
@@ -168,17 +193,14 @@ async function refreshMyRole() {
        would be a lie, and a viewer chasing a missing perk deserves to know
        the check did not actually happen. */
     if (d.verified === false) {
-      msg.className = 'account-role-msg warn';
-      msg.textContent = 'Twitch check unavailable — showing your role as of last login. Log out and back in to refresh it.';
+      setRoleMsg(msgs, 'Twitch check unavailable — showing your role as of last login. Log out and back in to refresh it.', 'warn');
     } else {
-      msg.className = 'account-role-msg ok';
-      msg.textContent = 'Up to date.';
+      setRoleMsg(msgs, 'Up to date.', 'ok');
     }
   } catch (e) {
-    msg.className = 'account-role-msg err';
-    msg.textContent = 'Network error — try again.';
+    setRoleMsg(msgs, 'Network error — try again.', 'err');
   } finally {
-    if (btn) btn.disabled = false;
+    btns.forEach((b) => { b.disabled = false; });
   }
 }
 

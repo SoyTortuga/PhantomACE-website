@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <a href="/profile" class="account-menu-item" id="accountMenuProfile">Profile</a>
                 <a href="/redeem.html" class="account-menu-item">Redeems</a>
                 <a href="/inventory.html" class="account-menu-item">Inventory</a>
-                <a href="#" class="account-menu-item account-menu-item-disabled" aria-disabled="true">Settings <span class="account-menu-soon">Soon</span></a>
+                <a href="/settings" class="account-menu-item" id="accountMenuSettings">Settings</a>
                 <button class="account-menu-item account-menu-item-danger" onclick="logout()">Logout</button>
               </div>
             </div>
@@ -179,13 +179,21 @@ function applyThemeGlyph() {
   btn.setAttribute('aria-pressed', light ? 'true' : 'false');
 }
 
-function toggleTheme() {
-  const light = document.documentElement.getAttribute('data-theme') === 'light';
-  const next = light ? 'dark' : 'light';
-  if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+/* Set it outright, rather than flip it.
+   The settings page offers Dark and Gothic light as two named choices, so it
+   needs to ASK for one — and it must not carry its own copy of the three
+   things a theme change is (the attribute, the stored key, the glyph), or a
+   change to one of them would only land in half the site. */
+function setTheme(next) {
+  const light = next === 'light';
+  if (light) document.documentElement.setAttribute('data-theme', 'light');
   else document.documentElement.removeAttribute('data-theme');
-  try { localStorage.setItem('pham-theme', next); } catch (e) { /* private mode */ }
+  try { localStorage.setItem('pham-theme', light ? 'light' : 'dark'); } catch (e) { /* private mode */ }
   applyThemeGlyph();
+}
+
+function toggleTheme() {
+  setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
 }
 
 function initAccountMenu() {

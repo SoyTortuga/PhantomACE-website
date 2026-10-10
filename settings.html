@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Your PhantomACE account settings - theme, profile privacy, park visitors and browser alerts.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Settings | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/settings.css">
+</head>
+<body data-page="settings">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Settings</h1>
+    <p class="page-hero-subtitle">Your theme, your privacy, and what this browser is keeping</p>
+  </section>
+
+  <section class="page-container set-page">
+
+    <div class="set-note" id="setLoading">Reading your settings&hellip;</div>
+
+    <div class="card set-card" id="setGuest" hidden>
+      <h2 class="set-card-title">Log in first</h2>
+      <p class="set-card-intro">Settings are tied to your Twitch account, not to this browser &mdash; so there is nothing to show until you sign in. The theme switch in the header works either way.</p>
+      <button class="btn-primary" type="button" onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <div class="set-body" id="setBody" hidden>
+
+      <section class="card set-card set-role">
+        <h2 class="set-card-title">Account</h2>
+        <div class="set-ident">
+          <img class="set-avatar" id="setAvatar" src="" alt="" width="56" height="56" hidden>
+          <div>
+            <div class="set-ident-name" id="setName"></div>
+            <div class="set-hint" id="setSince"></div>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="set-row-text">
+            <span class="set-label">Role</span>
+            <span class="set-hint">What the site thinks you are. Sub perks, incubator slots and role-gated pages all read this, so if it looks wrong, re-check it here first.</span>
+          </span>
+          <span class="set-control">
+            <span class="account-role-badge">&mdash;</span>
+            <button class="account-role-refresh" type="button" onclick="refreshMyRole()" title="Re-check with Twitch">Re-check</button>
+          </span>
+        </div>
+        <div class="account-role-msg"></div>
+
+        <div class="set-links">
+          <a href="/profile" id="setProfileLink">Your profile</a>
+          <a href="/inventory">Inventory</a>
+          <a href="/redeem">Redeems</a>
+        </div>
+
+        <button class="set-logout" type="button" onclick="logout()">Log out</button>
+      </section>
+
+      <section class="card set-card">
+        <h2 class="set-card-title">Appearance</h2>
+        <div class="set-row">
+          <span class="set-row-text">
+            <span class="set-label">Theme</span>
+            <span class="set-hint">Kept in this browser, so your phone and your desktop each remember their own. Gothic light is parchment and oxblood, not a white page.</span>
+          </span>
+          <span class="set-control set-seg" role="group" aria-label="Theme">
+            <button type="button" class="set-seg-btn" data-theme-set="dark" aria-pressed="false">Dark</button>
+            <button type="button" class="set-seg-btn" data-theme-set="light" aria-pressed="false">Gothic light</button>
+          </span>
+        </div>
+      </section>
+
+      <section class="card set-card">
+        <h2 class="set-card-title">Privacy</h2>
+        <p class="set-card-intro">Three switches that used to live in three different places. They save the moment you flip them.</p>
+
+        <div class="set-note set-inline-note" id="setProfileNote" hidden>Your profile record has not been written yet &mdash; log out and back in once, and these two will save.</div>
+
+        <label class="set-row set-switch">
+          <span class="set-row-text">
+            <span class="set-label">Comments on my profile</span>
+            <span class="set-hint">Turning this off refuses new comments and leaves the ones already on your wall readable.</span>
+          </span>
+          <input type="checkbox" data-switch="comments">
+        </label>
+
+        <label class="set-row set-switch">
+          <span class="set-row-text">
+            <span class="set-label">Let people @mention me</span>
+            <span class="set-hint">Off means a forum post that types your name does not notify you. The post still says it.</span>
+          </span>
+          <input type="checkbox" data-switch="mentions">
+        </label>
+
+        <label class="set-row set-switch">
+          <span class="set-row-text">
+            <span class="set-label">Open my park to visitors</span>
+            <span class="set-hint">Lets other keepers walk your Dino Park, tidy it and sign the guest book. Off removes you from the list immediately.</span>
+          </span>
+          <input type="checkbox" data-switch="park">
+        </label>
+        <div class="set-note set-inline-note" id="setParkNote" hidden>Nothing to visit yet &mdash; hatch your first dino in <a href="/games/dino-park/">Dino Park</a> and this opens up.</div>
+
+        <div class="set-status"></div>
+      </section>
+
+      <section class="card set-card">
+        <h2 class="set-card-title">Alerts</h2>
+
+        <div class="set-row">
+          <span class="set-row-text">
+            <span class="set-label">Desktop alerts</span>
+            <span class="set-hint" id="setNotifState"></span>
+          </span>
+          <span class="set-control">
+            <button class="pill-btn" type="button" id="setNotifEnable" hidden>Enable</button>
+          </span>
+        </div>
+
+        <div class="set-row">
+          <span class="set-row-text">
+            <span class="set-label">Stored notifications</span>
+            <span class="set-hint" id="setNotifCount"></span>
+          </span>
+          <span class="set-control">
+            <button class="pill-btn" type="button" id="setNotifClear">Clear</button>
+          </span>
+        </div>
+
+        <div class="set-status"></div>
+      </section>
+
+      <section class="card set-card">
+        <h2 class="set-card-title">What is stored</h2>
+        <ul class="set-list">
+          <li><strong>pham_session</strong> &mdash; one signed cookie holding your Twitch id, name, avatar and role. It is what keeps you signed in, and it expires after 24 hours.</li>
+          <li><strong>In this browser</strong> &mdash; your theme, the notifications above, and per-game things like a guest name or whether a game's sound is muted. Clearing site data resets those and nothing else.</li>
+          <li><strong>On the server</strong> &mdash; your profile, inventory, saves and scores, keyed to your Twitch id. Logging out does not delete them; ask in the <a href="https://discord.gg/PhantomAce" target="_blank" rel="noopener">Discord</a> if you want them gone.</li>
+        </ul>
+        <div class="set-links">
+          <a href="/privacy">Privacy Notice</a>
+          <a href="/cookies">Cookies</a>
+          <a href="/terms">Terms</a>
+        </div>
+      </section>
+
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/settings.js" defer></script>
+</body>
+</html>

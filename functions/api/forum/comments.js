@@ -50,6 +50,27 @@ function parseUserId(raw) {
   return /^[0-9]{1,20}$/.test(s) ? s : null;
 }
 
+/**
+ * The two switches as the site reads them, from a profile record or from
+ * nothing at all.
+ *
+ * ABSENT MEANS ON. Every profile that predates either field has neither,
+ * and defaulting the other way would silently opt out everyone who signed
+ * in before the switch existed.
+ *
+ * Exported because /api/settings shows the same two booleans on the
+ * settings page. It reads the record directly rather than asking this
+ * route — a wall query for two flags, and a 503 for the settings page
+ * whenever the forum database is unhappy — but it must not re-decide the
+ * default, or the page would disagree with the rule enforced below.
+ */
+export function profileSwitches(p) {
+  return {
+    commentsEnabled: !p || p.commentsEnabled !== false,
+    mentionsEnabled: !p || p.mentionsEnabled !== false,
+  };
+}
+
 async function ownerOf(env, id) {
   const p = await env.MARKETPLACE.get(`profile_${id}`, 'json');
   if (!p) return null;
@@ -57,8 +78,7 @@ async function ownerOf(env, id) {
     userId: id,
     login: p.login || '',
     displayName: p.displayName || p.login || '',
-    commentsEnabled: p.commentsEnabled !== false,
-    mentionsEnabled: p.mentionsEnabled !== false,
+    ...profileSwitches(p),
   };
 }
 

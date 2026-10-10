@@ -1,0 +1,270 @@
+/* ── Settings ────────────────────────────────────────────────────────────
+   A column of bordered cards, one per group of switches. House style: depth
+   from borders only (no box-shadow), hairline separators between rows, no
+   side-edge colour rails, every colour from a token so both themes work.
+
+   The role badge, its Re-check button and the message under it are NOT
+   restyled here — they are the account menu's own classes, reused. Only the
+   menu-specific padding on the message is undone. */
+
+.set-page {
+  max-width: 820px;
+  padding-bottom: 80px;
+}
+
+.set-note {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.set-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.set-card {
+  padding: 20px 22px;
+}
+
+/* No hover lift on a settings card — it is a form, not a link. */
+.set-card:hover { border-color: var(--border-mid); }
+
+.set-card-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  margin: 0 0 4px;
+}
+
+.set-card-intro {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-dim);
+  margin: 0 0 6px;
+}
+
+/* ── Rows ────────────────────────────────────────────────────────────── */
+
+.set-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.set-row-text {
+  display: block;
+  min-width: 0;
+}
+
+.set-label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  color: var(--text-pri);
+}
+
+.set-hint {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.set-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* The whole row is the label, so the hit target is the row and not a 14px
+   square. */
+.set-switch { cursor: pointer; }
+
+.set-switch input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  accent-color: var(--red);
+  cursor: pointer;
+}
+
+.set-switch input[type="checkbox"]:disabled { cursor: default; opacity: 0.4; }
+.set-switch:has(input:disabled) { cursor: default; }
+.set-switch:has(input:disabled) .set-label { color: var(--text-dim); }
+
+/* ── Theme picker ────────────────────────────────────────────────────── */
+
+/* Two separately bordered buttons rather than one segmented control with a
+   divider: a border-left between the halves would be a side-edge rail, and
+   the house rules ban those outright, neutral grey included. */
+.set-seg { gap: 8px; }
+
+.set-seg-btn {
+  font-family: var(--font-system);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--text-sec);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.set-seg-btn:hover { color: var(--white); border-color: var(--red); background: var(--red-glow); }
+
+/* #fff rather than a token: the fill is dark red in BOTH themes, so the
+   label on it must stay white in both. */
+.set-seg-btn.is-on {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+/* ── Account ─────────────────────────────────────────────────────────── */
+
+.set-ident {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0 14px;
+}
+
+.set-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--border-mid);
+  object-fit: cover;
+}
+
+.set-ident-name {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.02em;
+  color: var(--white);
+}
+
+/* Undo the account menu's own framing: in the dropdown the message is a
+   16px-inset strip with a divider under it, which inside a card reads as a
+   stray line. */
+.set-role .account-role-msg:not(:empty) {
+  padding: 8px 0 0;
+  border-bottom: none;
+}
+
+.set-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.set-links a {
+  font-family: var(--font-gothic);
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: var(--text-sec);
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.set-links a:hover { color: var(--red); border-bottom-color: var(--red); }
+
+.set-logout {
+  margin-top: 16px;
+  padding: 8px 18px;
+  font-family: var(--font-system);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red-dim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.set-logout:hover { border-color: var(--red); background: var(--red-glow); }
+
+/* ── Notes, status, lists ────────────────────────────────────────────── */
+
+.set-inline-note {
+  text-align: left;
+  padding: 10px 12px;
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--gray-lo);
+}
+
+.set-inline-note a { color: var(--red); }
+
+.set-status:not(:empty) {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  padding: 12px 0 0;
+}
+
+.set-status.ok  { color: var(--green); }
+.set-status.err { color: var(--red); }
+
+.set-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.set-list li {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.set-list strong { color: var(--text-pri); font-weight: 600; }
+.set-list a { color: var(--red); }
+
+/* ── Narrow ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .set-card { padding: 16px; }
+  .set-card-title { font-size: 22px; }
+
+  /* The control drops under its own label rather than squeezing the hint
+     into a two-word column. A switch stays on the right of its row, which
+     is where a checkbox belongs. */
+  .set-row { flex-direction: column; gap: 8px; }
+  .set-row .set-control { padding-top: 0; }
+
+  .set-switch {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .set-seg { width: 100%; }
+  .set-seg-btn { flex: 1; }
+}
