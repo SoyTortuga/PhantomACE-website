@@ -4,7 +4,7 @@
      Match boards likewise live inside the Memory Match tab. */
   var BOARDS = ['skull-clicker', 'memory-match', 'memory-match-15', 'memory-match-10',
                 'commander-bingo',
-                'mana-clash', 'mana-clash-wins', 'pham-shock'];
+                'mana-clash', 'mana-clash-wins', 'pham-shock', 'mtgbbb'];
 
   function esc(s) {
     var d = document.createElement('div');
