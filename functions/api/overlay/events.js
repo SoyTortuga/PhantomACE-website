@@ -249,18 +249,43 @@ async function overlayControl(env) {
    Only that source plays the chime; the rest stay silent. A muted source
    (?muted=1) sends no id, so it never competes and never plays. */
 const INSTANCE_STALE_MS = 6000;
+/* How old our own stamp may get before the heartbeat is rewritten. This used
+   to take an advisory lock and rewrite the registry on EVERY tick of EVERY
+   source -- locked transactions on one row, once a second each, contending
+   with one another to restamp a heartbeat that is allowed to be six seconds
+   stale. Refreshing every two seconds against that six-second window leaves
+   three writes of margin before an instance could wrongly drop out. */
+const INSTANCE_BEAT_MS = 2000;
+
 async function electAudioLeader(env, iid) {
   if (!iid) return null;
   const now = Date.now();
-  let reg = {};
-  await env.MARKETPLACE.mutate('overlay_instances', (cur) => {
-    reg = (cur && typeof cur === 'object') ? { ...cur } : {};
-    for (const k of Object.keys(reg)) {
-      if (now - (Number(reg[k]) || 0) > INSTANCE_STALE_MS) delete reg[k];
-    }
-    reg[iid] = now;
-    return reg;
-  }, { expirationTtl: 30 });
+
+  /* The election must be current, so the registry is READ every tick. Reads
+     are cheap and uncontended; it is the write that was expensive. */
+  let reg = await env.MARKETPLACE.get('overlay_instances', 'json');
+  if (!reg || typeof reg !== 'object') reg = {};
+
+  const mine = Number(reg[iid]) || 0;
+  const hasDead = Object.keys(reg).some(k => now - (Number(reg[k]) || 0) > INSTANCE_STALE_MS);
+
+  /* Only when the write would change something: our stamp is ageing, we are
+     not registered at all, or there is a dead entry to sweep. */
+  if (now - mine >= INSTANCE_BEAT_MS || hasDead) {
+    await env.MARKETPLACE.mutate('overlay_instances', (cur) => {
+      const next = (cur && typeof cur === 'object') ? { ...cur } : {};
+      for (const k of Object.keys(next)) {
+        if (now - (Number(next[k]) || 0) > INSTANCE_STALE_MS) delete next[k];
+      }
+      next[iid] = now;
+      reg = next;
+      return next;
+    }, { expirationTtl: 30 });
+  }
+  /* No else: on a skipped tick `reg` is the row we just read, and our own
+     stamp is already in it -- `mine` came out of it. (A missing stamp reads
+     as 0, which cannot reach this branch: it always writes.) */
+
   const live = Object.keys(reg).filter(k => now - (Number(reg[k]) || 0) <= INSTANCE_STALE_MS).sort();
   return live.length ? live[0] : iid;
 }
@@ -337,37 +362,52 @@ export async function onRequestGet(context) {
     });
   }
 
-  const rec = await env.MARKETPLACE.get(KEY, 'json');
+  /* EVERYTHING THIS POLL NEEDS, AT ONCE.
+
+     These were nine awaits in a row and not one of them depends on another,
+     so an OBS source, the desktop monitor and an open dashboard meant about
+     thirty serialised queries a second, all day. Same reads, same answers,
+     one round trip's latency instead of nine.
+
+     electAudioLeader is in here too: it writes, but it reads nothing the
+     others produce, so it has no reason to wait for them. */
+  const { readAlertSounds } = await import('../alert-sounds.js');
+  const { readStreamNow } = await import('../stream-now.js');
+
+  const [
+    rec, volRec, audioLeader, hcfg, alertSounds, whatsOn,
+    reloadTok, control, overlayState,
+  ] = await Promise.all([
+    env.MARKETPLACE.get(KEY, 'json'),
+    /* Alert volume (0-100), set from the control panel and applied by the
+       overlay to its audio. Defaults until the broadcaster sets it. */
+    env.MARKETPLACE.get('overlay_alert_volume'),
+    /* Which single open overlay may play the check-in chime — see
+       electAudioLeader. */
+    electAudioLeader(env, url.searchParams.get('iid')),
+    /* Whether the dino-hatch stings are on. Muted by default (dino-hatch.js),
+       so the overlay stays silent for hatches until the broadcaster flips it —
+       read each poll, so it changes live with no reload. */
+    env.MARKETPLACE.get('dino_hatch_config', 'json'),
+    /* Per-alert custom sounds, read each poll so an upload or change reaches
+       the open overlay within a second with no reload — same as alertVolume.
+       The overlay falls back to its default sting for any type not listed. */
+    readAlertSounds(env),
+    /* WHAT'S ON STREAM. The one pointer that replaced the four per-game panel
+       polls (bingo/mtgbbb/maze/scramble). Read-only here — the public overlay
+       poll must NEVER refresh it, or a game would stay on stream for as long
+       as any viewer's OBS is open. Only writers (a game's start/activity and
+       the host's own poll) keep it alive; see functions/api/stream-now.js. */
+    readStreamNow(env),
+    reloadToken(env),
+    overlayControl(env),
+    readOverlayState(env),
+  ]);
+
   const events = rec && Array.isArray(rec.events) ? rec.events : [];
   const latestSeq = Number(rec && rec.seq) || 0;
-
-  /* Alert volume (0-100), set from the control panel and applied by the
-     overlay to its audio. Defaults to 100 until the broadcaster sets it. */
-  const volRec = await env.MARKETPLACE.get('overlay_alert_volume');
   const alertVolume = volRec == null ? 35 : Math.max(0, Math.min(100, parseInt(volRec, 10) || 0));
-
-  /* Which single open overlay may play the check-in chime — see electAudioLeader. */
-  const audioLeader = await electAudioLeader(env, url.searchParams.get('iid'));
-
-  /* Whether the dino-hatch stings are on. Muted by default (dino-hatch.js), so
-     the overlay stays silent for hatches until the broadcaster flips it — read
-     each poll, so it changes live with no reload. */
-  const hcfg = await env.MARKETPLACE.get('dino_hatch_config', 'json');
   const hatchSound = !!(hcfg && hcfg.sound === true);
-
-  /* Per-alert custom sounds, read each poll so an upload or change reaches the
-     open overlay within a second with no reload — same as alertVolume. The
-     overlay falls back to its default sting for any type not listed here. */
-  const { readAlertSounds } = await import('../alert-sounds.js');
-  const alertSounds = await readAlertSounds(env);
-
-  /* WHAT'S ON STREAM. The one pointer that replaced the four per-game panel
-     polls (bingo/mtgbbb/maze/scramble). Read-only here — the public overlay
-     poll must NEVER refresh it, or a game would stay on stream for as long as
-     any viewer's OBS is open. Only writers (a game's start/activity and the
-     host's own poll) keep it alive; see functions/api/stream-now.js. */
-  const { readStreamNow } = await import('../stream-now.js');
-  const whatsOn = await readStreamNow(env);
 
   const sinceRaw = url.searchParams.get('since');
   /* No cursor means "just tell me where we are". See the header: a reloaded
@@ -385,14 +425,14 @@ export async function onRequestGet(context) {
        on load and reloads only when this differs — so pressing the button
        once reloads every open overlay exactly once, and a page opened
        afterwards does not reload on its first poll. */
-    reloadToken: await reloadToken(env),
+    reloadToken: reloadTok,
     /* The latest panic command (Clear/Skip), or null. The overlay records its
        first sighting and applies each later change once — see overlay.js. */
-    control: await overlayControl(env),
+    control: control,
     /* The standing-state snapshot (current prediction, hype progress, ad
        countdown). The overlay reads prediction/hype/ad from here — one place —
        and rehydrates it on a reload without replaying. See writeOverlaySlice. */
-    overlayState: await readOverlayState(env),
+    overlayState: overlayState,
     /* The single "what's on stream" pointer, or null. The four game panels
        (bingo/mtgbbb/maze/scramble) read THIS to decide whether to show and
        which game is live, instead of each polling its own key — see
