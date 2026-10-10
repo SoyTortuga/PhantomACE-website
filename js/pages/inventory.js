@@ -934,4 +934,96 @@ async function importTwitchBadges() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadInventory);
+/* ── Achievements ────────────────────────────────────────────────────────
+   The forward-looking half of this page: the grid above is what you hold,
+   this is what you are part-way toward. /api/achievements had no reader
+   before, so a badge you had not finished earning looked like one that did
+   not exist.
+
+   Rendered even when the collection is empty — a new player's inventory says
+   "no cosmetics yet", and this is the answer to the obvious next question. */
+
+function achBar(cur, goal) {
+  const pct = goal > 0 ? Math.max(0, Math.min(100, Math.round((cur / goal) * 100))) : 0;
+  return '<div class="inv-ach-bar" role="img" aria-label="' + cur + ' of ' + goal + '">' +
+    '<i style="width:' + pct + '%"></i></div>';
+}
+
+function renderAchievements(games) {
+  const box = document.getElementById('achievementProgress');
+  if (!box) return;
+
+  const withAny = (games || []).filter(g => g && Array.isArray(g.achievements) && g.achievements.length);
+  if (!withAny.length) { box.hidden = true; return; }
+
+  const done = withAny.reduce((n, g) => n + g.achievements.filter(a => a.unlocked).length, 0);
+  const total = withAny.reduce((n, g) => n + g.achievements.length, 0);
+
+  const sections = withAny.map(function (g) {
+    const rows = g.achievements.map(function (a) {
+      const p = a.progress || { cur: 0, goal: 1 };
+      /* An unlocked row shows the badge it paid; an unfinished one shows how
+         far along it is. Both name the badge, so it is clear what is at
+         stake before you start. */
+      const art = a.reward && a.reward.image
+        ? '<div class="inv-ach-art" data-fallback="\u{1F3C5}"><img src="' + escAttr(a.reward.image) +
+          '" alt="" loading="lazy"></div>'
+        : '<div class="inv-ach-art">\u{1F3C5}</div>';
+      return '<li class="inv-ach-row' + (a.unlocked ? ' is-done' : '') +
+        '" data-rarity="' + escAttr((a.reward && a.reward.rarity) || 'common') + '">' +
+        art +
+        '<div class="inv-ach-body">' +
+          '<div class="inv-ach-name">' + escName(a.name) +
+            (a.unlocked ? '<span class="inv-ach-earned">earned</span>' : '') + '</div>' +
+          '<div class="inv-ach-desc">' + escName(a.desc) + '</div>' +
+          (a.unlocked ? '' : achBar(p.cur, p.goal) +
+            '<div class="inv-ach-count">' + p.cur + ' / ' + p.goal + '</div>') +
+        '</div></li>';
+    }).join('');
+
+    const gdone = g.achievements.filter(a => a.unlocked).length;
+    return '<div class="inv-ach-game">' +
+      '<h3 class="inv-ach-game-title">' + escName(g.label) +
+        ' <span class="collection-count">' + gdone + ' / ' + g.achievements.length + '</span></h3>' +
+      '<ul class="inv-ach-list">' + rows + '</ul></div>';
+  }).join('');
+
+  box.innerHTML =
+    '<h2 class="inv-ach-title">Achievements <span class="collection-count">' +
+      done + ' / ' + total + '</span></h2>' +
+    '<p class="inv-ach-note">Badges you earn by playing. They land in the collection above and show on your profile.</p>' +
+    sections;
+  box.hidden = false;
+}
+
+async function loadAchievements() {
+  const box = document.getElementById('achievementProgress');
+  if (!box) return;
+  if (!getSession()) { box.hidden = true; return; }
+  try {
+    const res = await fetch('/api/achievements', { credentials: 'same-origin' });
+    if (!res.ok) { box.hidden = true; return; }
+    const data = await res.json();
+    renderAchievements(data.games);
+  } catch {
+    /* Silent: this is the secondary half of the page and must never cost the
+       collection its render. */
+    box.hidden = true;
+  }
+}
+
+/* A badge whose artwork has not been drawn yet falls back to a glyph rather
+   than a broken image — the same contract the collection grid keeps, and the
+   reason the achievement system could ship before the art. */
+document.addEventListener('error', function (e) {
+  const img = e.target;
+  if (!img || img.tagName !== 'IMG') return;
+  const holder = img.closest('.inv-ach-art[data-fallback]');
+  if (!holder) return;
+  holder.textContent = holder.dataset.fallback || '\u{1F3C5}';
+}, true);
+
+document.addEventListener('DOMContentLoaded', function () {
+  loadInventory();
+  loadAchievements();
+});

@@ -743,3 +743,133 @@
   margin: 0 auto;
   line-height: 1.6;
 }
+
+/* ── Achievements ─────────────────────────────
+   What you are part-way toward, under what you already hold. Rarity tints
+   an EARNED row's border; an unfinished one stays neutral so the list reads
+   as things to do rather than a wall of colour. Full borders only. */
+
+.inv-ach {
+  margin-top: 20px;
+}
+
+.inv-ach-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--red);
+  margin: 0 0 4px;
+}
+
+.inv-ach-note {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.inv-ach-game { margin-bottom: 22px; }
+.inv-ach-game:last-child { margin-bottom: 0; }
+
+.inv-ach-game-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--text-pri);
+  margin: 0 0 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 5px;
+}
+
+.inv-ach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.inv-ach-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--gray-lo);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+  min-width: 0;
+}
+
+/* Earned rows take their rarity, the same tokens the collection grid uses.
+   The ONE sanctioned use of these colours. */
+.inv-ach-row.is-done[data-rarity="common"]    { border-color: var(--rarity-common); }
+.inv-ach-row.is-done[data-rarity="uncommon"]  { border-color: var(--rarity-uncommon); }
+.inv-ach-row.is-done[data-rarity="rare"]      { border-color: var(--rarity-rare); }
+.inv-ach-row.is-done[data-rarity="epic"]      { border-color: var(--rarity-epic); }
+.inv-ach-row.is-done[data-rarity="legendary"] { border-color: var(--rarity-legendary); }
+.inv-ach-row.is-done[data-rarity="mythic"]    { border-color: var(--rarity-mythic); }
+.inv-ach-row.is-done[data-rarity="exclusive"] { border-color: var(--exclusive); }
+
+.inv-ach-art {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--gray-mid);
+}
+.inv-ach-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* Not yet earned: the art is a preview of the prize, not a trophy. */
+.inv-ach-row:not(.is-done) .inv-ach-art { opacity: 0.45; }
+
+.inv-ach-body { min-width: 0; flex: 1 1 auto; }
+
+.inv-ach-name {
+  font-weight: 700;
+  color: var(--text-pri);
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.inv-ach-earned {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rarity-uncommon);
+}
+
+.inv-ach-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.inv-ach-bar {
+  margin-top: 7px;
+  height: 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--black);
+}
+.inv-ach-bar i {
+  display: block;
+  height: 100%;
+  background: var(--red);
+}
+
+.inv-ach-count {
+  margin-top: 3px;
+  font-size: 11px;
+  font-family: var(--font-system);
+  color: var(--text-dim);
+}

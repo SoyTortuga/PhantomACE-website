@@ -76,7 +76,7 @@
 .bgs-cat.open .bgs-cat-caret { transform: rotate(90deg); }
 .bgs-cat-label { flex: 1; }
 .bgs-cat-count { color: var(--text-sec); font-weight: 400; font-size: 13px; }
-.bgs-cat-body { display: none; padding: 8px 10px 10px; border-top: 1px solid var(--border-low); }
+.bgs-cat-body { display: none; padding: 8px 10px 10px; border-top: 1px solid var(--border); }
 .bgs-cat.open > .bgs-cat-body { display: block; }
 .bgs-kind-hint { font-size: 13px; color: var(--text-sec); margin-bottom: 7px; }
 

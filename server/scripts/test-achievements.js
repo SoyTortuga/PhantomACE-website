@@ -316,6 +316,51 @@ const UID = '7';
   check('and nothing unlocked', data.achievements.filter(a => a.unlocked), []);
 }
 
+/* ── A page actually shows the progress ──────────────────────────────── */
+{
+  /* Badges reach players whether or not anything reads this endpoint — they
+     land in the inventory and on the profile on their own. What needed a
+     reader was PROGRESS: without it, an achievement you are part-way through
+     looks exactly like one that does not exist. */
+  const html = read('inventory.html');
+  ok('the inventory page has somewhere to put it', /id="achievementProgress"/.test(html));
+
+  const js = read('js/pages/inventory.js');
+  ok('and asks the endpoint for it', /\/api\/achievements/.test(js));
+  ok('rendering each game', /renderAchievements/.test(js));
+  ok('with a progress bar for the unfinished ones', /inv-ach-bar/.test(js));
+  ok('and marking the earned ones', /is-done/.test(js));
+
+  /* It must not be able to take the collection down with it: the grid is
+     what the page is for. */
+  ok('it loads separately from the collection',
+     /loadInventory\(\);\s*\n\s*loadAchievements\(\);/.test(js));
+  ok('and hides itself rather than erroring', /box\.hidden = true/.test(js));
+
+  /* THE ART CONTRACT. Twelve badges have no PNG yet; a row must show a glyph
+     rather than a broken image, which is what let the engine ship first. */
+  ok('a missing badge image falls back to a glyph', /data-fallback/.test(js));
+
+  const css = read('css/pages/inventory.css');
+  ok('the panel is styled', /\.inv-ach-row \{/.test(css));
+
+  /* House rules, over the block this change added. */
+  const block = css.slice(css.indexOf('/* ── Achievements ─'));
+  ok('the achievements block is found', block.length > 200);
+  check('no box-shadow', block.match(/box-shadow/g) || [], []);
+  check('no backdrop-filter', block.match(/backdrop-filter/g) || [], []);
+  check('no coloured side rail', block.match(/border-(left|right):/g) || [], []);
+  ok('rarity comes from the tokens', /var\(--rarity-/.test(block));
+  check('and no rarity hex is hardcoded', block.match(/#[0-9a-fA-F]{3,6}\b/g) || [], []);
+
+  /* --border-low was never defined in variables.css, so every rule using it
+     fell back to currentColor. It had spread to three stylesheets. */
+  check('no stylesheet uses an undefined border token',
+    [...read('css/pages/inventory.css').matchAll(/var\(--border-low\)/g)].length +
+    [...read('css/pages/home.css').matchAll(/var\(--border-low\)/g)].length +
+    [...read('css/pages/background-studio.css').matchAll(/var\(--border-low\)/g)].length, 0);
+}
+
 /* ── Report ─────────────────────────────────────────────────────────── */
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);
