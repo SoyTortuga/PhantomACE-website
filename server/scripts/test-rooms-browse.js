@@ -41,10 +41,16 @@ const ok = (label, cond) => check(label, !!cond, true);
 function fakeKV(seed = {}) {
   const store = new Map(Object.entries(seed));
   const counts = { get: 0, put: 0, list: 0, listValues: 0, mutate: 0 };
+  /* Every key read, so a test can assert what was NOT read -- which is the
+     only way to see that the gallery stopped loading park documents it was
+     about to throw away. */
+  const reads = [];
+  const scans = [];
   return {
-    store, counts,
+    store, counts, reads, scans,
     async get(key, type) {
       counts.get++;
+      reads.push(key);
       const raw = store.get(key);
       if (raw === undefined) return null;
       return type === 'json' ? JSON.parse(raw) : raw;
@@ -57,6 +63,7 @@ function fakeKV(seed = {}) {
     },
     async listValues({ prefix } = {}) {
       counts.listValues++;
+      scans.push(prefix || '');
       const out = [];
       for (const [name, raw] of store) {
         if (!prefix || name.startsWith(prefix)) out.push({ name, value: raw === undefined ? null : JSON.parse(raw) });
@@ -117,8 +124,21 @@ const consent = (name, avatar = '') => JSON.stringify({ name, avatar, since: 1 }
   ok('a light summary rides along', body.rooms[0].summary && body.rooms[0].summary.species === 2);
   ok('the favourite card rides along', body.rooms[0].favorite && body.rooms[0].favorite.specId === 'rex');
 
-  ok('the gallery scanned with listValues', e.MARKETPLACE.counts.listValues >= 2);
+  /* ONE scan, of the CONSENT rows, which are small by design. The saves used
+     to be scanned the same way, and listValues selects the whole jsonb value
+     -- so it loaded a complete park document for every player who has ever
+     opened Dino Park, then discarded every one without a consent row. */
+  check('the gallery scans once, for consent', e.MARKETPLACE.counts.listValues, 1);
+  check('and it is the consent prefix, not the saves',
+    e.MARKETPLACE.scans, ['parkpub_']);
   check('and never fell back to list()-then-get-per-key', e.MARKETPLACE.counts.list, 0);
+
+  /* The point of the change: a park that is not on the wall is never loaded.
+     This is what a scan could not do, however the rows were filtered after. */
+  check('the private park’s save is never read',
+    e.MARKETPLACE.reads.includes('dino_park_900'), false);
+  ok('while both public saves are, by key',
+    e.MARKETPLACE.reads.includes('dino_park_200') && e.MARKETPLACE.reads.includes('dino_park_300'));
 
   /* No private field escapes onto a card. */
   ok('no coin balance reaches the gallery', !JSON.stringify(body).includes('99999'));

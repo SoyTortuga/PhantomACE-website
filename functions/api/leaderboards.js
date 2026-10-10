@@ -357,13 +357,25 @@ export async function onRequestGet(context) {
     });
 
   if (game === 'all') {
+    /* Ten independent reads, in PARALLEL. They ran strictly in series -- ten
+       sequential round trips to Postgres before the page could render -- for
+       no reason: no board depends on another, and resolveEquippedCosmetics
+       below already learnt this lesson for the inventory reads.
+
+       Failure semantics are deliberately unchanged: an unreadable board still
+       rejects the whole route rather than quietly returning nine boards and an
+       empty tenth, which is how an unregistered key stays loud. */
+    const names = Object.keys(BOARDS);
+    const datas = await Promise.all(
+      names.map(n => env.MARKETPLACE.get(BOARDS[n].key, 'json')
+        .then(v => (v || []).slice(0, 10)))
+    );
     const boards = {};
     const ids = new Set();
-    for (const [name, board] of Object.entries(BOARDS)) {
-      const data = (await env.MARKETPLACE.get(board.key, 'json') || []).slice(0, 10);
-      boards[name] = data;
-      for (const e of data) if (e && e.id) ids.add(String(e.id));
-    }
+    names.forEach((name, i) => {
+      boards[name] = datas[i];
+      for (const e of datas[i]) if (e && e.id) ids.add(String(e.id));
+    });
     const cosmetics = await resolveEquippedCosmetics(env, [...ids]);
     const result = {};
     for (const [name, data] of Object.entries(boards)) result[name] = enrich(data, cosmetics);

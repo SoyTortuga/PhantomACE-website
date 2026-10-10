@@ -168,17 +168,24 @@ export async function onRequestGet(context) {
 /**
  * The gallery.
  *
- * TWO prefix scans, both listValues (never list()-then-get-per-key): the
- * `parkpub_` consent rows say WHICH parks are public and carry the owner's
- * name and avatar; the `dino_park_` saves carry the summaries. Consent lives
- * in its own row rather than inside a save precisely so this listing can be a
- * cheap scan and nobody's opt-in rides inside a document the client rewrites
- * wholesale. Public by design: a logged-out viewer browses the same wall.
+ * ONE prefix scan, then a keyed read per park that is actually on the wall.
+ * The `parkpub_` consent rows say WHICH parks are public and carry the
+ * owner's name and avatar; they stay a listValues scan because they are small
+ * by design, which is the whole reason consent lives outside the save
+ * document rather than inside one the client rewrites wholesale.
+ *
+ * The SAVES used to be scanned the same way, and that was the expensive
+ * mistake: listValues selects the whole jsonb value, so it loaded a complete
+ * park document -- tilemaps, decor arrays, rosters -- for every player who
+ * has ever opened Dino Park, and the loop then discarded every one without a
+ * consent row. The wall is opt-in, so nearly all of it was read to be thrown
+ * away. Consent is known first, so only those saves are fetched, in parallel.
+ *
+ * Public by design: a logged-out viewer browses the same wall.
  */
 async function gallery(env, session) {
-  const [consentRows, saveRows, featured, mk] = await Promise.all([
+  const [consentRows, featured, mk] = await Promise.all([
     env.MARKETPLACE.listValues({ prefix: VISIT_KEY_PREFIX }),
-    env.MARKETPLACE.listValues({ prefix: SAVE_PREFIX }),
     readFeatured(env),
     Promise.resolve(monthKey()),
   ]);
@@ -194,15 +201,22 @@ async function gallery(env, session) {
     });
   }
 
-  const haunted = await readHaunted(env, mk);
+  /* Only the parks on the wall, by key. One unreadable save drops that one
+     card rather than the whole gallery — the same tolerance the single-park
+     route already shows with its .catch(() => null). */
+  const ids = [...consent.keys()];
+  const [haunted, saves] = await Promise.all([
+    readHaunted(env, mk),
+    Promise.all(ids.map(id =>
+      env.MARKETPLACE.get(`${SAVE_PREFIX}${id}`, 'json').catch(() => null))),
+  ]);
 
   const rooms = [];
-  for (const { name, value } of saveRows) {
-    const id = name.slice(SAVE_PREFIX.length);
-    if (!NUMERIC_ID.test(id)) continue;          /* skips the parkpub_/park_bg_ family were they ever in-table */
+  ids.forEach((id, i) => {
+    const value = saves[i];
+    if (!value) return;                          /* opted in, nothing saved yet */
     const meta = consent.get(id);
-    if (!meta) continue;                         /* not opted in — not on the wall */
-    const state = value && value.state;
+    const state = value.state;
     rooms.push({
       id,
       owner: meta.name,
@@ -210,9 +224,9 @@ async function gallery(env, session) {
       summary: summarize(state),
       favorite: favoriteCard(state && state.favorite),
       haunted: haunted.has(id),
-      savedAt: Number(value && value.savedAt) || 0,
+      savedAt: Number(value.savedAt) || 0,
     });
-  }
+  });
 
   /* Active first: a park someone still tends is a better visit than one left
      a year ago. Ties fall back to the save id for a stable order. */
