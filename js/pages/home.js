@@ -37,24 +37,37 @@
 
   /* ── Upcoming events ─────────────────────────────────────────────── */
 
+  function timeOf(d) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  /* THE REAL SCHEDULE HAS EMPTY TITLES AND NULL CATEGORIES. The recurring
+     slots carry a start, an end and a recurrence flag and nothing else,
+     so a card that leads with the title prints "Untitled stream" three
+     times. The useful facts on this payload are WHEN and HOW LONG, so
+     those lead and the title is only used when there is one. */
   function eventCard(seg) {
     var start = new Date(seg.start_time);
     if (isNaN(start)) return '';
+    var end = seg.end_time ? new Date(seg.end_time) : null;
+    if (end && isNaN(end)) end = null;
 
-    var when = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-      + ' · ' + start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    var day = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    var span = timeOf(start) + (end ? ' – ' + timeOf(end) : '');
 
-    /* The category is the useful second line — "Just Chatting" or the game
-       being played says more about whether to turn up than a repeat of the
-       title would. */
+    var title = String(seg.title || '').trim();
+    if (!title) title = seg.is_recurring ? 'Regular stream' : 'Stream';
+
     var desc = seg.category
       ? esc(seg.category)
-      : 'On the PhantomACE channel.';
+      : (seg.is_recurring
+          ? 'Part of the weekly schedule.'
+          : 'On the PhantomACE channel.');
 
     return '<div class="card event-card">'
-      + '<div class="event-card-date">' + esc(when.toUpperCase()) + '</div>'
-      + '<div class="event-card-title">' + esc(seg.title || 'Untitled stream') + '</div>'
-      + '<div class="event-card-desc">' + desc + '</div>'
+      + '<div class="event-card-date">' + esc(day.toUpperCase()) + '</div>'
+      + '<div class="event-card-title">' + esc(title) + '</div>'
+      + '<div class="event-card-desc">' + esc(span) + ' · ' + desc + '</div>'
       + '</div>';
   }
 
