@@ -195,9 +195,13 @@ const game = (env, code) => JSON.parse(env._store.get('bingo_' + code));
 }
 
 {
-  /* Every rarity the host can pick, at the same values the chat drops use. */
+  /* Every rarity the host can pick, at the same values the chat drops use —
+     read from the real table rather than a copy of it, so this checks that a
+     bingo prize goes through the shared economy and not merely that two
+     identical literals are identical. */
   const env = makeEnv({ moderators: ['101'] });
-  const expected = { common: 2, uncommon: 5, rare: 15, mythic: 50 };
+  const { ENTRIES_BY_RARITY: expected } =
+    await import('../../functions/api/giveaway-entries.js');
   for (const [rarity, entries] of Object.entries(expected)) {
     const code = 'R' + rarity.slice(0, 3).toUpperCase();
     await post(create, env, 'mod', { code });

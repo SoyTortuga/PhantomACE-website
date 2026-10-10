@@ -61,8 +61,10 @@ function arg(name, fallback = null) {
 export const isDeadEntryCode = (item) =>
   !!(item && item.type === 'entry-code' && item.meta && item.meta.code && !item.meta.creditedAt);
 
-/* Same table the rewards were minted from. */
-const RARITY_ENTRIES = { common: 2, uncommon: 5, rare: 15, mythic: 50 };
+/* The same table the rewards were minted from — imported, not restated. A
+   migration that credited different numbers than the live economy would pay
+   people the wrong amount, and nothing would have flagged the drift. */
+import { ENTRIES_BY_RARITY as RARITY_ENTRIES } from '../../functions/api/giveaway-entries.js';
 
 /**
  * What one item is worth.

@@ -504,7 +504,10 @@ async function handleHeartbeat(env, session, mk, now) {
   });
 }
 
-const GIVEAWAY_ENTRIES_BY_RARITY = { common: 2, uncommon: 5, rare: 15, mythic: 50 };
+/* From giveaway-entries.js, not a copy of it. This was its own table, and a
+   drop's worth was written out separately in bot/send-chat.js — the two
+   agreed by luck rather than by construction. */
+import { ENTRIES_BY_RARITY as GIVEAWAY_ENTRIES_BY_RARITY } from './giveaway-entries.js';
 
 /* 'giveaway' is deliberately absent from this map — see grantReward below.
    It is the one reward type that is not an inventory item. */

@@ -40,6 +40,9 @@
    same per-month builder; test-phamily-rewards.js compares the two for every
    themed month plus an unthemed one. */
 import { monthKey } from './season-time.js';
+/* What a giveaway reward is WORTH comes from the ledger's own table —
+   this file used to carry two copies of it, one per reward track. */
+import { ENTRIES_BY_RARITY } from './giveaway-entries.js';
 
 const REWARD_ICONS = {
     giveaway: '🎫',
@@ -221,7 +224,7 @@ function defineFollowerRewards(mk) {
     [80,'rare'],[90,'rare'],[100,'rare'],
     [110,'mythic'],[125,'mythic'],[140,'mythic'],
   ];
-  const entries = { common:2, uncommon:5, rare:15, mythic:50 };
+  const entries = ENTRIES_BY_RARITY;
   for (const [lvl, rarity] of giveawayLevels) {
     r.push({ level:lvl, rarity, type:'giveaway', icon:REWARD_ICONS.giveaway,
       name:`Giveaway Entries`, desc:`+${entries[rarity]} entries into the monthly giveaway, added automatically` });
@@ -276,7 +279,7 @@ function definePhamilyRewards(mk) {
     [80,'mythic'],[90,'mythic'],[100,'mythic'],
     [110,'mythic'],[125,'mythic'],[140,'mythic'],
   ];
-  const entries = { common:2, uncommon:5, rare:15, mythic:50 };
+  const entries = ENTRIES_BY_RARITY;
   for (const [lvl, rarity] of giveawayLevels) {
     r.push({ level:lvl, rarity, type:'giveaway', icon:REWARD_ICONS.giveaway,
       name:`Giveaway Entries`, desc:`+${entries[rarity]} entries into the monthly giveaway, added automatically` });

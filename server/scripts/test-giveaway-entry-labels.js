@@ -121,6 +121,81 @@ for (const src of [...sources].sort()) {
      label && label !== 'Entry');
 }
 
+/* ══ What a rarity is worth is written down ONCE ═══════════════════════
+   It used to be written four times — bot/send-chat.js's TIER_INFO for drops
+   and bingo prizes, a private const in phamily-time.js for the pass, and two
+   more in scripts. All four agreed, by luck rather than by construction:
+   change one and a rare from a chat drop is worth a different number of
+   entries than a rare from the pass, with nothing anywhere to say so. */
+{
+  const { ENTRIES_BY_RARITY, entriesForRarity } =
+    await import('../../functions/api/giveaway-entries.js');
+  const { TIER_INFO } = await import('../../functions/api/bot/send-chat.js');
+
+  check('the table covers every rarity a drop can be',
+    Object.keys(ENTRIES_BY_RARITY).sort(), ['common', 'mythic', 'rare', 'uncommon']);
+  ok('and every value is a positive number',
+    Object.values(ENTRIES_BY_RARITY).every(n => Number.isInteger(n) && n > 0));
+  ok('rarer is worth more',
+    ENTRIES_BY_RARITY.common < ENTRIES_BY_RARITY.uncommon &&
+    ENTRIES_BY_RARITY.uncommon < ENTRIES_BY_RARITY.rare &&
+    ENTRIES_BY_RARITY.rare < ENTRIES_BY_RARITY.mythic);
+
+  /* Frozen, so a caller cannot edit the shared table by accident. */
+  const before = ENTRIES_BY_RARITY.rare;
+  try { ENTRIES_BY_RARITY.rare = 9999; } catch { /* strict mode throws */ }
+  check('the table cannot be edited in place', ENTRIES_BY_RARITY.rare, before);
+
+  check('an unknown rarity falls back to common',
+    entriesForRarity('not-a-rarity'), ENTRIES_BY_RARITY.common);
+
+  /* The chat tiers DERIVE their entries rather than carrying a copy. */
+  check('TIER_INFO covers the same rarities',
+    Object.keys(TIER_INFO).sort(), Object.keys(ENTRIES_BY_RARITY).sort());
+  check('and takes every value from the table',
+    Object.entries(TIER_INFO).filter(([r, v]) => v.entries !== ENTRIES_BY_RARITY[r]), []);
+  ok('while keeping its own emoji, which is a chat concern',
+    Object.values(TIER_INFO).every(v => typeof v.emoji === 'string' && v.emoji));
+
+  /* THE COUNT. A fifth copy would agree on the day it was written and drift
+     afterwards, which is exactly how this started. */
+  const roots = ['functions', 'js', 'server'];
+  const files = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(path.join(REPO, dir), { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const rel = dir + '/' + e.name;
+      if (e.isDirectory()) walk(rel);
+      else if (/\.(js|html)$/.test(e.name)) files.push(rel);
+    }
+  };
+  for (const r of roots) walk(r);
+  files.push('inventory.html', 'giveaway.html');
+
+  /* The shape of the literal, however it is spaced or ordered. */
+  const LITERAL = /common:\s*\d+\s*,\s*uncommon:\s*\d+\s*,\s*rare:\s*\d+\s*,\s*mythic:\s*\d+/;
+  /* A rarity ORDER map has the same shape and a different meaning. Declared,
+     not silently skipped — and the declaration is checked, so it cannot come
+     to cover a real entries table by accident. */
+  const NOT_ENTRIES = {
+    'server/scripts/test-sub-badges.js': 'a rarity ordering (0..3), for checking a badge never gets worse',
+  };
+  for (const [f, why] of Object.entries(NOT_ENTRIES)) {
+    const m = LITERAL.exec(fs.readFileSync(path.join(REPO, f), 'utf8'));
+    ok(`${f}: the exempted literal is still there (${why})`, !!m);
+    const nums = (m ? m[0].match(/\d+/g) : []).map(Number);
+    ok(`${f}: and really is an ordering, not entries`,
+      nums.length === 4 && nums[0] === 0 && nums[nums.length - 1] < 10);
+  }
+
+  const copies = files.filter((f) => {
+    if (f in NOT_ENTRIES) return false;
+    try { return LITERAL.test(fs.readFileSync(path.join(REPO, f), 'utf8')); } catch { return false; }
+  });
+  check('the entries table is written down in exactly one file',
+    copies, ['functions/api/giveaway-entries.js']);
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

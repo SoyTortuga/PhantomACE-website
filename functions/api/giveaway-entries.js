@@ -106,6 +106,27 @@ export async function addEntries(env, userId, username, count, source) {
 }
 
 /** The free alternate method of entry grants exactly this many entries. */
+/* WHAT A RARITY IS WORTH, once. This was written out twice in production —
+   TIER_INFO in bot/send-chat.js for drops and bingo prizes, and a private
+   const in phamily-time.js for the pass — plus twice more in scripts. They
+   agreed, but nothing made them: changing one would have split the prize
+   economy in two, a rare from chat being worth a different number of entries
+   than a rare from the pass, silently.
+
+   It lives here because this file owns addEntries and the ledger the numbers
+   land in. Frozen, so a caller cannot edit the shared table by accident. */
+export const ENTRIES_BY_RARITY = Object.freeze({
+  common: 2,
+  uncommon: 5,
+  rare: 15,
+  mythic: 50,
+});
+
+/** Entries for a rarity, falling back to common for anything unrecognised. */
+export function entriesForRarity(rarity) {
+  return ENTRIES_BY_RARITY[rarity] || ENTRIES_BY_RARITY.common;
+}
+
 export const AMOE_ENTRIES = 1;
 
 /**

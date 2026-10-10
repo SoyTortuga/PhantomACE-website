@@ -7,13 +7,23 @@
    ══════════════════════════════════════════════ */
 
 import { activateItemCode, activateNextItemCode } from '../item-codes.js';
+import { ENTRIES_BY_RARITY } from '../giveaway-entries.js';
 
-export const TIER_INFO = {
-  common:   { entries: 2,  emoji: '🎟️' },
-  uncommon: { entries: 5,  emoji: '🎫' },
-  rare:     { entries: 15, emoji: '💎' },
-  mythic:   { entries: 50, emoji: '🔥' },
+/* The emoji is a chat-formatting concern and belongs here; what a rarity is
+   WORTH is not, and is taken from giveaway-entries.js, which owns the ledger
+   those entries land in. This table used to carry its own copy of the
+   numbers, and phamily-time.js carried another — agreeing by luck. */
+const TIER_EMOJI = {
+  common: '🎟️',
+  uncommon: '🎫',
+  rare: '💎',
+  mythic: '🔥',
 };
+
+export const TIER_INFO = Object.freeze(Object.fromEntries(
+  Object.entries(TIER_EMOJI).map(([rarity, emoji]) =>
+    [rarity, { entries: ENTRIES_BY_RARITY[rarity], emoji }])
+));
 
 const CODE_EXPIRY_SECONDS = 300;
 const ITEM_CODE_DURATION_SECONDS = 300; // 5 min — same window as a giveaway code drop

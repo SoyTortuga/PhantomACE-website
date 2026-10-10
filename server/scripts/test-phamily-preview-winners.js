@@ -208,7 +208,9 @@ check('nextMonthOf rolls a December into the next year', nextMonthOf('2026-12'),
 
 /* ══ PART 4 — duplicate cosmetic → +N entries (exactly once) ═══════════════ */
 
-const ENTRIES_BY_RARITY = { common: 2, uncommon: 5, rare: 15, mythic: 50 };
+/* The real table, not a copy: a pass reward and a chat drop pay from the
+   same economy, and that is the thing worth checking. */
+const { ENTRIES_BY_RARITY } = await import('../../functions/api/giveaway-entries.js');
 
 /* The follower level-10 card back: a non-giveaway cosmetic, common (2 entries),
    keyed by the item NAME it is granted under. */
