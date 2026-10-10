@@ -2,6 +2,7 @@
    ITEM CODE API
    Create, activate, and redeem item drop codes
    ══════════════════════════════════════════════ */
+import { softRead } from './soft-read.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -205,7 +206,8 @@ export async function onRequestGet(context) {
 
     /* In parallel: the queue is short, but these are independent reads and
        there is no reason for a staff panel to wait on them one at a time. */
-    const queued = await Promise.all(queue.map(c => getCodeRecord(env, c).catch(() => null)));
+    const queued = await Promise.all(
+      queue.map(c => softRead(getCodeRecord(env, c), `item_code_${c}`)));
     for (const record of queued) {
       if (record) pending.push({ code: record.code, item: record.item });
     }
@@ -240,7 +242,7 @@ export async function onRequestGet(context) {
     const ids = [...new Set(active.flatMap(a => a.restrictedTo || []))];
     if (ids.length) {
       const profiles = await Promise.all(
-        ids.map(id => env.MARKETPLACE.get(`profile_${id}`, 'json').catch(() => null))
+        ids.map(id => softRead(env.MARKETPLACE.get(`profile_${id}`, 'json'), `profile_${id}`))
       );
       const nameOf = {};
       ids.forEach((id, i) => {

@@ -16,6 +16,7 @@
    ══════════════════════════════════════════════ */
 
 import { nameEffectVariant } from '../cosmetics.js';
+import { softRead } from '../soft-read.js';
 
 const MAX_AUTHORS = 80;
 
@@ -42,7 +43,7 @@ async function identity(env, id) {
   if (String(id).startsWith('guest_')) return UNKNOWN(id);
   const [p, inv] = await Promise.all([
     env.MARKETPLACE.get(`profile_${id}`, 'json'),
-    env.MARKETPLACE.get(`inv_${id}`, 'json').catch(() => null),
+    softRead(env.MARKETPLACE.get(`inv_${id}`, 'json'), `inv_${id}`),
   ]);
   if (!p) return UNKNOWN(id);
   const items = inv && Array.isArray(inv.items) ? inv.items : [];

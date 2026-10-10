@@ -31,6 +31,10 @@ import { pathToFileURL } from 'node:url';
 const NON_ROUTE_MODULES = new Set([
   'api/bot/send-chat.js',
 
+  /* Storage reads that are allowed to fail, but not to fail silently.
+     Library, no handler. See functions/api/soft-read.js. */
+  'api/soft-read.js',
+
   /* What chat can type right now. Library, no handler — the only caller is
      the !commands dispatch in bot/commands.js. */
   'api/bot/chat-help.js',

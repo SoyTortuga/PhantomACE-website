@@ -25,6 +25,7 @@ import { setForMonth, collectionForMonth, setBadgeId } from './season-manifest.j
 import { THEMED_MONTHS, ROOM_DRIP_MONTHS, themeKeyFor } from './phamily-rewards.js';
 import { bannerVariant, bannerPath } from './cosmetics.js';
 import { monthKey } from './season-time.js';
+import { softRead } from './soft-read.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -163,7 +164,7 @@ export async function onRequestGet(context) {
     return json({ error: 'No such profile' }, 404);
   }
 
-  const inv = await env.MARKETPLACE.get(`inv_${userId}`, 'json').catch(() => null);
+  const inv = await softRead(env.MARKETPLACE.get(`inv_${userId}`, 'json'), `inv_${userId}`);
   const items = inv && Array.isArray(inv.items) ? inv.items : [];
 
   /* Granting happens only when the viewer IS the person being viewed. A session

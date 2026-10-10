@@ -25,6 +25,7 @@
 import { isBroadcaster } from './admin/moderators.js';
 import { projectPark, VISIT_KEY_PREFIX, visitKey } from './dino-park.js';
 import { weekKey, monthKey } from './season-time.js';
+import { softRead } from './soft-read.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -132,7 +133,7 @@ function summarize(state) {
 /* Where the Room of the Week record is read, and shaped the same whether it
    came back as the stored singleton or is absent. */
 async function readFeatured(env) {
-  const rec = await env.MARKETPLACE.get(ROTW_KEY, 'json').catch(() => null);
+  const rec = await softRead(env.MARKETPLACE.get(ROTW_KEY, 'json'), ROTW_KEY);
   if (!rec || !rec.ownerId) return null;
   return {
     ownerId: String(rec.ownerId),
@@ -146,7 +147,7 @@ async function readFeatured(env) {
 
 /* The set of owner ids tagged into this month's haunted contest. */
 async function readHaunted(env, mk) {
-  const rec = await env.MARKETPLACE.get(hauntedKey(mk), 'json').catch(() => null);
+  const rec = await softRead(env.MARKETPLACE.get(hauntedKey(mk), 'json'), hauntedKey(mk));
   const ids = Array.isArray(rec && rec.owners) ? rec.owners.map(String) : [];
   return new Set(ids);
 }
@@ -203,12 +204,12 @@ async function gallery(env, session) {
 
   /* Only the parks on the wall, by key. One unreadable save drops that one
      card rather than the whole gallery — the same tolerance the single-park
-     route already shows with its .catch(() => null). */
+     route shows, and softRead says in the log which save it was. */
   const ids = [...consent.keys()];
   const [haunted, saves] = await Promise.all([
     readHaunted(env, mk),
     Promise.all(ids.map(id =>
-      env.MARKETPLACE.get(`${SAVE_PREFIX}${id}`, 'json').catch(() => null))),
+      softRead(env.MARKETPLACE.get(`${SAVE_PREFIX}${id}`, 'json'), `${SAVE_PREFIX}${id}`))),
   ]);
 
   const rooms = [];
@@ -253,15 +254,15 @@ async function viewRoom(env, session, idParam, uParam) {
   const userId = await resolveUserId(env, idParam, uParam);
   if (!userId) return json({ error: 'No such room' }, 404);
 
-  const pass = await env.MARKETPLACE.get(visitKey(userId), 'json').catch(() => null);
+  const pass = await softRead(env.MARKETPLACE.get(visitKey(userId), 'json'), visitKey(userId));
   if (!pass) return json({ error: 'That park is not open to visitors.' }, 403);
 
-  const record = await env.MARKETPLACE.get(`${SAVE_PREFIX}${userId}`, 'json').catch(() => null);
+  const record = await softRead(env.MARKETPLACE.get(`${SAVE_PREFIX}${userId}`, 'json'), `${SAVE_PREFIX}${userId}`);
   if (!record || !record.state) return json({ error: 'That park is empty.' }, 404);
 
   const mk = monthKey();
   const [guestbookRec, haunted] = await Promise.all([
-    env.MARKETPLACE.get(guestbookKey(userId), 'json').catch(() => null),
+    softRead(env.MARKETPLACE.get(guestbookKey(userId), 'json'), guestbookKey(userId)),
     readHaunted(env, mk),
   ]);
 
@@ -339,7 +340,7 @@ async function stampGuestbook(env, session, body) {
   const ownerId = await resolveUserId(env, body.ownerId, body.u);
   if (!ownerId) return json({ error: 'No such room' }, 404);
 
-  const pass = await env.MARKETPLACE.get(visitKey(ownerId), 'json').catch(() => null);
+  const pass = await softRead(env.MARKETPLACE.get(visitKey(ownerId), 'json'), visitKey(ownerId));
   if (!pass) return json({ error: 'That park is not open to visitors.' }, 403);
 
   const stamp = String(body.stamp || '');
@@ -379,7 +380,7 @@ async function setHaunted(env, session, body) {
   if (!session || !session.user_id) return json({ error: 'Log in to enter.' }, 401);
   const me = String(session.user_id);
 
-  const pass = await env.MARKETPLACE.get(visitKey(me), 'json').catch(() => null);
+  const pass = await softRead(env.MARKETPLACE.get(visitKey(me), 'json'), visitKey(me));
   if (!pass) return json({ error: 'Open your park to visitors before entering the contest.' }, 403);
 
   const mk = monthKey();
@@ -411,7 +412,7 @@ async function setRoomOfWeek(env, session, body) {
   const ownerId = await resolveUserId(env, body.ownerId, body.u);
   if (!ownerId) return json({ error: 'No such room' }, 404);
 
-  const pass = await env.MARKETPLACE.get(visitKey(ownerId), 'json').catch(() => null);
+  const pass = await softRead(env.MARKETPLACE.get(visitKey(ownerId), 'json'), visitKey(ownerId));
   if (!pass) return json({ error: 'That park is not open to visitors.' }, 403);
 
   const record = {

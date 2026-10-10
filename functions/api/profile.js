@@ -21,6 +21,7 @@
 
 import { knownTheme } from './cosmetics.js';
 import { monthKey } from './giveaway-entries.js';
+import { softRead } from './soft-read.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -212,11 +213,11 @@ export async function onRequestGet(context) {
      record never costs the rest of the profile. */
   const mk = monthKey();
   const [inv0, subSeen, pt, park, ...boardRows] = await Promise.all([
-    env.MARKETPLACE.get(`inv_${userId}`, 'json').catch(() => null),
-    env.MARKETPLACE.get(`sub_months_${userId}`, 'json').catch(() => null),
-    env.MARKETPLACE.get(`pt_${userId}_${mk}`, 'json').catch(() => null),
-    env.MARKETPLACE.get(`dino_park_${userId}`, 'json').catch(() => null),
-    ...BOARDS.map(b => env.MARKETPLACE.get(b.key, 'json').catch(() => null)),
+    softRead(env.MARKETPLACE.get(`inv_${userId}`, 'json'), `inv_${userId}`),
+    softRead(env.MARKETPLACE.get(`sub_months_${userId}`, 'json'), `sub_months_${userId}`),
+    softRead(env.MARKETPLACE.get(`pt_${userId}_${mk}`, 'json'), `pt_${userId}_${mk}`),
+    softRead(env.MARKETPLACE.get(`dino_park_${userId}`, 'json'), `dino_park_${userId}`),
+    ...BOARDS.map(b => softRead(env.MARKETPLACE.get(b.key, 'json'), b.key)),
   ]);
 
   const inv = inv0 || { items: [], equips: {} };
