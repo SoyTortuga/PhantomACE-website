@@ -292,6 +292,12 @@
       border-bottom: 1px solid var(--border); padding-bottom: 2px;
     }
     .yard-item-btn.scenery-btn { width: auto; min-width: 62px; padding: 6px 10px; }
+    /* The way out to the studio. Styled as one of the scenery chips so it
+       reads as part of the row, with a red border because it leaves. */
+    .yard-item-btn.scenery-studio {
+      border-color: var(--red); color: #ffaaaa; text-decoration: none;
+      display: inline-flex; align-items: center;
+    }
     .yard-item-btn.scenery-btn .yard-item-name { font-size: 14px;
  text-shadow: none; }
     .yard-item-btn {
@@ -5713,8 +5719,21 @@ function renderYardTray() {
       <span class="yard-item-name">${escapeHtml(e.name)}</span>
     </button>`).join('');
 
+  /* A way out to the studio, at the end of the scenery you already have.
+     target="_top" because the games run in an iframe — without it the
+     studio would open inside the park's own frame.
+
+     Shown to everyone, not just subscribers: the studio page itself says
+     whether you can author, and duplicating the tier rule here would be a
+     second copy to keep in step with the first. Someone who cannot author
+     gets an explanation rather than a button that is not there. */
+  const studioLink = `<a class="yard-item-btn scenery-btn scenery-studio"
+      href="/background-studio" target="_top" title="Paint your own park background">
+    <span class="yard-item-name">+ Paint your own</span>
+  </a>`;
+
   wrap.innerHTML = '<div class="yard-band-label">Scenery</div>'
-    + `<div class="yard-band">${scenery}</div>`
+    + `<div class="yard-band">${scenery}${studioLink}</div>`
     + YARD_BANDS.map(b => {
     const items = YARD_ITEM_TYPES.filter(t => t.band === b.id);
     if (!items.length) return '';
