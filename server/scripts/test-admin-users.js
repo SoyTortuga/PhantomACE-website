@@ -119,7 +119,10 @@ function world() {
   ok('and hides the controls a moderator cannot use', /if \(!canEdit\)/.test(page));
 
   const tb = fs.readFileSync(path.join(REPO, 'functions/api/admin/toolbox.js'), 'utf8');
-  ok('the toolbox links the users page', /\/users\.html/.test(tb));
+  /* Extension-agnostic: the toolbox uses the canonical extensionless form
+     now (the resolver 308s /users.html to /users), and what matters here is
+     that the page is linked at all. */
+  ok('the toolbox links the users page', /href: '\/users(\.html)?'/.test(tb));
   ok('the page exists', fs.existsSync(path.join(REPO, 'users.html')));
 }
 

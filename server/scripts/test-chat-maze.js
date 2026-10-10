@@ -311,7 +311,9 @@ const GET = (e, h) => onRequestGet({ env: e, request: new Request('https://x/api
   ok('maze_current is registered', /maze_current:\s*\{ table: 'singletons', expiry: 'none' \}/.test(reg));
 
   const tb = fs.readFileSync(path.join(REPO, 'functions/api/admin/toolbox.js'), 'utf8');
-  ok('the toolbox maps the test page', /\/maze-test\.html/.test(tb));
+  /* Extension-agnostic: the toolbox uses the canonical extensionless form
+     now (the resolver 308s /maze-test.html to /maze-test). */
+  ok('the toolbox maps the test page', /href: '\/maze-test(\.html)?'/.test(tb));
   ok('the test page exists', fs.existsSync(path.join(REPO, 'maze-test.html')));
   const page = fs.readFileSync(path.join(REPO, 'maze-test.html'), 'utf8');
   ok('the page loads its script', /js\/pages\/maze-test\.js/.test(page));
