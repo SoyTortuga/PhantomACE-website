@@ -218,6 +218,12 @@
   color: var(--text-dim);
   min-width: 96px;
 }
+/* A row with no uploaded sound is in one of two different states: the six
+   celebratory alerts fall back to the default sting, the rest make no noise
+   at all until given one. Dimmer for silent, so the two read apart at a
+   glance without another column. */
+.od-sound-state.is-silent { color: var(--text-dim); opacity: 0.6; font-style: italic; }
+.od-sound-state.is-default { color: var(--text-sec); }
 .od-sound-volwrap {
   display: inline-flex;
   align-items: center;
@@ -229,6 +235,16 @@
   flex: 1 1 auto;
   min-width: 90px;
   vertical-align: middle;
+  accent-color: var(--red);
+}
+
+/* EVERY slider on this page, not only the sound rows. Left unstyled they are
+   browser blue, which is not a colour this site has — tolerable when there
+   were seven of them, less so now the sound list alone has sixteen. Same
+   idiom the profile page already uses for its checkboxes. */
+.od-sound-vol,
+#ovAlertVolume {
+  accent-color: var(--red);
 }
 .od-sound-volval {
   flex: none;

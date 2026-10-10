@@ -18,9 +18,29 @@
 
 const KEY = 'alert_sounds';
 
-/* The six celebratory alerts the overlay plays a sound for — must match
-   SOUND_ALERT_TYPES in js/pages/overlay.js. */
-export const ALERT_SOUND_TYPES = ['sub', 'resub', 'giftsub', 'raid', 'follow', 'cheer'];
+/* EVERY ALERT THE OVERLAY SHOWS may have a sound — this used to be only the
+   six celebratory ones, which left a mythic MTGBBB pull silent while a follow
+   chimed.
+
+   Two different sets, and the difference matters:
+
+     these                      — may have an UPLOADED sound
+     SOUND_ALERT_TYPES (overlay.js) — play the DEFAULT sting when none is set
+
+   The six remain the only ones that make a noise out of the box. The eleven
+   added here are silent until the broadcaster uploads something for them,
+   because defaulting them to the sting would mean a bingo night firing the
+   same sound on every call the moment this shipped.
+
+   egg-video is deliberately absent: that clip carries its own audio, on the
+   same volume and mute plumbing, so a sting would play over it. */
+export const ALERT_SOUND_TYPES = [
+  /* The celebratory six, which also have a default sting. */
+  'sub', 'resub', 'giftsub', 'raid', 'follow', 'cheer',
+  /* Opt-in: silent until given a sound. */
+  'hype-level', 'drop', 'dino-hatch', 'giveaway-spin', 'prediction',
+  'bingo-call', 'bingo-win', 'bingo-claim', 'mtgbbb-pull', 'mtgbbb-bingo',
+];
 
 /* Exactly a stored audio file from the media store: the 13-digit timestamp and
    10-char suffix it generates, with an audio extension. Rejects image/video

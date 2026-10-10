@@ -792,13 +792,27 @@ function initAlertToggles() {
    upload endpoint, which now accepts audio), set a volume, Test it, or Clear it
    back to the overlay's default. The config lives at /api/alert-sounds and the
    overlay reads it on its poll. */
+/* Order matters: the six that sting by default come first and are marked as
+   such, because the rest behave differently — they are SILENT until given a
+   sound, rather than falling back to the default. Mixing them without saying
+   so would make Clear look broken on half the rows. */
 var OD_SOUND_TYPES = [
-  { type: 'sub', label: 'New Sub' },
-  { type: 'resub', label: 'Resub' },
-  { type: 'giftsub', label: 'Gift Subs' },
-  { type: 'raid', label: 'Raid' },
-  { type: 'follow', label: 'Follow' },
-  { type: 'cheer', label: 'Cheer' },
+  { type: 'sub', label: 'New Sub', stings: true },
+  { type: 'resub', label: 'Resub', stings: true },
+  { type: 'giftsub', label: 'Gift Subs', stings: true },
+  { type: 'raid', label: 'Raid', stings: true },
+  { type: 'follow', label: 'Follow', stings: true },
+  { type: 'cheer', label: 'Cheer', stings: true },
+  { type: 'hype-level', label: 'Hype Level-Up' },
+  { type: 'drop', label: 'Code Drop' },
+  { type: 'dino-hatch', label: 'Dino Hatch' },
+  { type: 'giveaway-spin', label: 'Giveaway Reel' },
+  { type: 'prediction', label: 'Prediction' },
+  { type: 'bingo-call', label: 'Bingo Call' },
+  { type: 'bingo-win', label: 'Bingo Win' },
+  { type: 'bingo-claim', label: 'Bingo Claim' },
+  { type: 'mtgbbb-pull', label: 'MTGBBB Rare Pull' },
+  { type: 'mtgbbb-bingo', label: 'MTGBBB Bingo' },
 ];
 var OD_SOUND_DEFAULT = '/assets/audio/alert.mp3';
 /* One reused element for previews — never new Audio() per press. */
@@ -832,7 +846,12 @@ function renderAlertSounds() {
 
     const state = document.createElement('span');
     state.className = 'od-sound-state';
-    state.textContent = cfg && cfg.url ? 'Custom sound' : 'Default';
+    /* "Default" and "Silent" are genuinely different states, and saying
+       "Default" for both would make Clear look broken on the eleven that have
+       no default sting to fall back to. */
+    state.textContent = cfg && cfg.url ? 'Custom sound'
+      : (a.stings ? 'Default sting' : 'Silent');
+    if (!cfg || !cfg.url) state.classList.add(a.stings ? 'is-default' : 'is-silent');
 
     const vwrap = document.createElement('span');
     vwrap.className = 'od-sound-volwrap';
@@ -853,6 +872,8 @@ function renderAlertSounds() {
 
     const test = document.createElement('button');
     test.className = 'btn-secondary od-sound-test'; test.type = 'button'; test.textContent = 'Test';
+    /* Nothing to preview on a silent row with no upload. */
+    test.disabled = !a.stings && !(cfg && cfg.url);
 
     const clear = document.createElement('button');
     clear.className = 'btn-secondary od-sound-clear'; clear.type = 'button'; clear.textContent = 'Clear';

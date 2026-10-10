@@ -813,6 +813,11 @@
      than throwing until the sound is in place. Per-alert custom sounds are #2;
      this is the simple default. */
   var ALERT_SOUND_SRC = '/assets/audio/alert.mp3';
+  /* The alerts that make a noise with NO configuration: the default sting
+     plays for these and only these. Every other alert type can be given an
+     uploaded sound from the dashboard (see ALERT_SOUND_TYPES in
+     functions/api/alert-sounds.js) and is silent until it is — adding them
+     here instead would have started a sting on every bingo call. */
   var SOUND_ALERT_TYPES = { sub: true, resub: true, giftsub: true, raid: true, follow: true, cheer: true };
   var ALERT_SOUND_COOLDOWN_MS = 1500;
   var lastAlertSoundAt = 0;
@@ -823,16 +828,23 @@
      to the default sting. */
   var alertSoundCfg = {};
   function playAlertSound(type) {
-    if (!SOUND_ALERT_TYPES[type]) return;
+    var cfg = alertSoundCfg[type];
+    var hasOwnSound = !!(cfg && typeof cfg.url === 'string' && cfg.url);
+    /* One of the six that sting by default, OR any alert the broadcaster has
+       given a sound of its own. An alert with neither stays silent — which is
+       what keeps a bingo night quiet unless somebody chose otherwise. */
+    if (!SOUND_ALERT_TYPES[type] && !hasOwnSound) return;
     if (audioMuted || !isAudioLeader) return;
     var now = Date.now();
+    /* One cooldown across every type, as before. It can mean a bingo call
+       swallows a sub landing just after it — but the alternative is a queue of
+       stings, which is worse on a stream. */
     if (now - lastAlertSoundAt < ALERT_SOUND_COOLDOWN_MS) return;
     lastAlertSoundAt = now;
     /* Per-type uploaded sound → default sting → silence. The per-type volume is
        relative to the shared alert volume, so the master slider still attenuates
        and muting still silences everything. */
-    var cfg = alertSoundCfg[type];
-    var src = (cfg && typeof cfg.url === 'string' && cfg.url) ? cfg.url : ALERT_SOUND_SRC;
+    var src = hasOwnSound ? cfg.url : ALERT_SOUND_SRC;
     var perVol = (cfg && typeof cfg.volume === 'number') ? Math.max(0, Math.min(1, cfg.volume)) : 1;
     try {
       if (!alertSound) alertSound = new Audio();                  // created once, reused

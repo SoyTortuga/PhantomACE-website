@@ -32,6 +32,10 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
+import { fileURLToPath } from 'node:url';
+/* The repo root, for the source-level checks further down. */
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'pham-alert-'));
 
 function makeEnv({ moderators = [] } = {}) {
@@ -207,6 +211,78 @@ async function getSounds(env) {
   check('and its configured volume', pick(cfg, 'sub').perVol, 0.5);
   check('an unset type falls back to the default sting', pick(cfg, 'raid').src, DEFAULT);
   check('and full relative volume when unset', pick(cfg, 'raid').perVol, 1);
+}
+
+/* ── Every alert may have a sound; only six make one unasked ─────────── */
+{
+  const overlay = fs.readFileSync(path.join(REPO, 'js/pages/overlay.js'), 'utf8');
+  const api = fs.readFileSync(path.join(REPO, 'functions/api/alert-sounds.js'), 'utf8');
+  const events = fs.readFileSync(path.join(REPO, 'functions/api/overlay/events.js'), 'utf8');
+
+  /* What the broadcaster may configure. */
+  const cfgBlock = /export const ALERT_SOUND_TYPES = \[([\s\S]*?)\];/.exec(api);
+  ok('the API declares the configurable types', !!cfgBlock);
+  const configurable = [...cfgBlock[1].matchAll(/'([a-z-]+)'/g)].map(m => m[1]);
+
+  /* What the overlay can show at all. */
+  const allBlock = /export const TOGGLEABLE_ALERT_TYPES = \[([\s\S]*?)\];/.exec(events);
+  ok('the overlay declares every alert type', !!allBlock);
+  const all = [...allBlock[1].matchAll(/'([a-z-]+)'/g)].map(m => m[1]);
+
+  /* Which make a noise with no configuration at all. */
+  const stingBlock = /var SOUND_ALERT_TYPES = \{([^}]*)\}/.exec(overlay);
+  ok('the overlay declares its default-sting types', !!stingBlock);
+  /* Keys with a hyphen must be QUOTED in an object literal, so the pattern
+     has to allow quotes — without that, the one regression this test exists
+     to catch ('bingo-call': true) would slip straight past it. */
+  const stings = [...stingBlock[1].matchAll(/'?([a-z-]+)'?\s*:\s*true/g)].map(m => m[1]);
+
+  check('the six celebratory alerts still sting by default',
+    stings.slice().sort(), ['cheer', 'follow', 'giftsub', 'raid', 'resub', 'sub']);
+  check('and every one of them is configurable too',
+    stings.filter(t => !configurable.includes(t)), []);
+
+  /* egg-video carries its own audio on the same volume and mute plumbing, so
+     a sting would play over it. Everything else should be offerable. */
+  const missing = all.filter(t => t !== 'egg-video' && !configurable.includes(t));
+  check('every other alert the overlay shows can be given a sound', missing, []);
+  check('except the egg clip, which brings its own', configurable.includes('egg-video'), false);
+  ok('which is a real gain over the original six', configurable.length >= 16);
+
+  /* THE SAFETY PROPERTY. Evaluate the shipped gate rather than restating it:
+     a type with no default sting and no uploaded sound must not play. */
+  const gate = /if \(!SOUND_ALERT_TYPES\[type\] && !hasOwnSound\) return;/.test(overlay);
+  ok('the overlay refuses to play an unconfigured, non-stinging alert', gate);
+
+  const plays = (type, cfg) => {
+    const SOUND = Object.fromEntries(stings.map(t => [t, true]));
+    const c = cfg && cfg[type];
+    const hasOwnSound = !!(c && typeof c.url === 'string' && c.url);
+    return !(!SOUND[type] && !hasOwnSound);
+  };
+  const uploaded = { 'bingo-call': { url: '/cdn/media/1700000000000_abcdef0123.mp3', volume: 1 } };
+
+  check('a bingo call is silent out of the box', plays('bingo-call', {}), false);
+  check('an MTGBBB pull is silent out of the box', plays('mtgbbb-pull', {}), false);
+  check('a dino hatch is silent out of the box', plays('dino-hatch', {}), false);
+  check('but a bingo call with an uploaded sound plays', plays('bingo-call', uploaded), true);
+  check('and a sub still plays with nothing configured', plays('sub', {}), true);
+
+  /* The dashboard offers exactly what the API accepts, and marks which rows
+     fall back to a sting — "Default" on a silent row would make Clear look
+     broken. */
+  const dash = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  const odBlock = /var OD_SOUND_TYPES = \[([\s\S]*?)\n\];/.exec(dash);
+  ok('the dashboard declares its rows', !!odBlock);
+  const offered = [...odBlock[1].matchAll(/type: '([a-z-]+)'/g)].map(m => m[1]);
+  check('the dashboard offers every configurable type',
+    configurable.filter(t => !offered.includes(t)), []);
+  check('and offers nothing the API would reject',
+    offered.filter(t => !configurable.includes(t)), []);
+
+  const flagged = [...odBlock[1].matchAll(/type: '([a-z-]+)'[^}]*stings: true/g)].map(m => m[1]);
+  check('and marks exactly the stinging rows as such', flagged.slice().sort(), stings.slice().sort());
+  ok('a silent row says Silent rather than Default', /'Silent'/.test(dash));
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
