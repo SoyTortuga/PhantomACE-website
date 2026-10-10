@@ -27,7 +27,7 @@ import {
   shouldLogRequest, createWarnLimiter,
 } from './adapter.js';
 import { gateSessionCookie } from '../functions/api/auth/session-crypto.js';
-import { createStatic } from './static.js';
+import { createStatic, staticCacheControl } from './static.js';
 import { buildRoutes, matchRoute } from './router.js';
 import { createPool, waitForDatabase } from './lib/db.js';
 import { createKVStore } from './lib/kv.js';
@@ -548,6 +548,14 @@ async function main() {
       const extra = { ...SECURITY_HEADERS };
       if (url.pathname.startsWith('/games/')) {
         extra['Content-Security-Policy'] = "frame-ancestors 'self'";
+      }
+      /* Keyed off the RESOLVED file, not the request path, so /games/dino-park
+         (which resolves to that directory's index.html) is treated as the HTML
+         it is and stays uncached. */
+      if (!/\.html?$/i.test(decision.relPath)) {
+        const cc = staticCacheControl(url.pathname);
+        /* send only sets Cache-Control when nothing else has, so this wins. */
+        if (cc) extra['Cache-Control'] = cc;
       }
       for (const [k, v] of Object.entries(extra)) res.setHeader(k, v);
       // `send` handles HEAD, conditional GETs and Range on its own, and

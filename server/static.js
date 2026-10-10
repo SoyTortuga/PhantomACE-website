@@ -56,6 +56,44 @@ const MUST_BE_UNREACHABLE = [
   '/.git/config',
 ];
 
+/* STATIC CACHING. `send` defaults every file to `public, max-age=0`, so a
+   repeat visitor revalidates every asset it already holds and the rig answers
+   all of it through the tunnel. There is no fingerprinting -- deploy is
+   `git pull` and filenames are stable -- so a long BROWSER max-age on css/js
+   would serve a stale site after a deploy. Hence the same split the API uses:
+   browsers revalidate (max-age=0), the shared cache absorbs the bytes
+   (s-maxage), except for fonts, which really are immutable.
+
+   HTML is deliberately absent: a deploy has to be visible immediately, and
+   overlay.html carries its own reload token precisely because stale HTML has
+   bitten this site before.
+
+   NB: as with PUBLIC_CACHE_PATHS in index.js, s-maxage only does something if
+   Cloudflare's cache rules respect origin headers on these paths. The font
+   entry does not depend on that -- it is the browser's own cache.
+
+   Lives here rather than in index.js so it is the static module's policy, and
+   so a test can exercise it against the real `send`. */
+export function staticCacheControl(pathname) {
+  /* The owned, self-hosted faces. Replaced by adding a file, never by
+     overwriting one, so a year is honest. */
+  if (pathname.startsWith('/assets/fonts/')) {
+    return 'public, max-age=31536000, immutable';
+  }
+  /* Art, sprites and audio. A replaced file is picked up on the next load
+     because the browser still revalidates; the edge is what stops the rig
+     serving the same sprite sheet to every viewer. */
+  if (pathname.startsWith('/assets/')) {
+    return 'public, max-age=0, s-maxage=86400, stale-while-revalidate=604800';
+  }
+  /* Code. Short, because this is what changes on a deploy. */
+  if (pathname.startsWith('/css/') || pathname.startsWith('/js/') ||
+      pathname.startsWith('/games/')) {
+    return 'public, max-age=0, s-maxage=300';
+  }
+  return null;            // HTML and everything else: send's own default
+}
+
 export function createStatic(root) {
   /* Enumerated once at boot: the root-level pages that may be served.
      Enumerating beats a wildcard because a new non-.html file dropped at
