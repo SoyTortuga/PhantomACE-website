@@ -55,8 +55,25 @@
         </div>
 
         <div class="bgs-palette-col">
-          <div id="bgsSets" class="bgs-sets"></div>
+          <!-- Four collapsible categories; each builds its own theme list. -->
+          <div id="bgsKinds" class="bgs-kinds"></div>
           <div id="bgsTiles" class="bgs-tiles"></div>
+
+          <!-- Painted cells are the features; this is everything else.
+               Without it an unpainted cell is a transparent hole, which
+               is why a background used to mean painting all 1,024. -->
+          <!-- The fence sheets ship one orientation per piece, so without
+               this a corner only turns one way and a paddock cannot close. -->
+          <div class="bgs-rotate">
+            <button type="button" id="bgsRotate" class="bgs-btn">Rotate ↻</button>
+            <span id="bgsRotateVal" class="bgs-rotate-val">0°</span>
+            <span class="bgs-rotate-hint">or press R</span>
+          </div>
+
+          <div class="bgs-bgcolor">
+            <label for="bgsColor">Background behind the tiles</label>
+            <input type="color" id="bgsColor" value="#0a0a0a">
+          </div>
         </div>
       </div>
     </div>

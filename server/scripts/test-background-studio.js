@@ -38,8 +38,9 @@ function check(label, actual, expected) {
 }
 const ok = (label, cond) => check(label, !!cond, true);
 
-/* Lift the real deriveMask out of the page. */
-const lifted = /function deriveMask\(map, zones\) \{[\s\S]*?\n  \}/.exec(PAGE_JS);
+/* Lift the real deriveMask out of the page. It gained a third argument
+   when fences moved onto their own layer. */
+const lifted = /function deriveMask\(map, zones, fenceLayer\) \{[\s\S]*?\n  \}/.exec(PAGE_JS);
 ok('deriveMask can be lifted from the page', !!lifted);
 const deriveMask = new Function('GRID', `return ${lifted[0].replace(/^function deriveMask/, 'function')}`)(GRID);
 
@@ -131,6 +132,30 @@ const ZONES = { jungle: 'L', water: 'O', shallows: 'R' };
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
+/* ── A FENCE MAKES ITS CELL IMPASSABLE ───────────────────────────────
+   Fences live on their own layer above the ground, so a fenced cell has
+   grass under it and must still be X — that is the entire point of a
+   fence. The derivation checks the overlay first and only falls through
+   to the ground tile when the cell is clear. */
+{
+  const ground = fill('jungle/00');
+  const none = deriveMask(ground, ZONES, null);
+  check('with no overlay the ground decides', none[0][0], 'L');
+
+  const overlay = Array.from({ length: GRID }, () => Array(GRID).fill(null));
+  overlay[3][4] = 'fencewire/02';
+  const withFence = deriveMask(ground, ZONES, overlay);
+  check('a fenced cell is impassable', withFence[3][4], 'X');
+  check('its neighbour is untouched', withFence[3][5], 'L');
+
+  /* And over water, for the same reason — a fence across a pond is still
+     a fence, not a swimmable cell. */
+  const pond = fill('water/00');
+  const fenced = deriveMask(pond, ZONES, overlay);
+  check('a fence beats water too', fenced[3][4], 'X');
+  check('the rest of the pond still swims', fenced[0][0], 'O');
+}
+
 console.log('');
 if (failures.length) {
   console.log(`[background-studio] ${passed} passed, ${failures.length} FAILED`);
@@ -159,8 +184,19 @@ console.log('');
   ok('picker names are escaped', /scenery-btn[\s\S]{0,200}\$\{escapeHtml\(e\.name\)\}/.test(GAME));
   ok('the selection gate admits studio ids',
      /const known = PARK_BACKGROUNDS\[id\] \|\| \(studioBackgrounds && studioBackgrounds\[id\]\);/.test(GAME));
+  /* Unchanged guarantee, new shape: the ref is split by bgTileRef now, so
+     a rotation suffix never reaches the path. Only the set and the index
+     are concatenated, which is what keeps a save from naming a file
+     outside the palette tree. */
   ok('tile refs resolve inside the palette tree only',
-     /img\.src = AB \+ 'park-tiles\/' \+ parts\[0\] \+ '\/' \+ parts\[1\] \+ '\.png';/.test(GAME));
+     /img\.src = AB \+ 'park-tiles\/' \+ set \+ '\/' \+ idx \+ '\.png';/.test(GAME));
+  ok('and the rotation is parsed off before the path is built',
+     /const \{ set, idx \} = bgTileRef\(ref\);/.test(GAME));
+  /* Fences draw above the ground, or a fenced cell has no grass in it. */
+  ok('the overlay is drawn after the ground',
+     /const layers = \[entry\.tilemap, entry\.fences\];/.test(GAME));
+  ok('and the colour goes down before either',
+     /ctx\.fillStyle = \(typeof entry\.bgColor === 'string'/.test(GAME));
 
   console.log('');
   if (failures.length) {

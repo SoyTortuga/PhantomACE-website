@@ -4666,12 +4666,19 @@ function getParkBackground(id) {
    palette to show one background is the wrong trade. Each arrival
    invalidates the cache once; images fire onload once. */
 const bgTileImgs = {};
+/** Split a painted ref into its file and its rotation. */
+function bgTileRef(ref) {
+  const parts = String(ref).split('/');
+  const m = /^(\d{2})(?:r(90|180|270))?$/.exec(parts[1] || '');
+  return { set: parts[0], idx: m ? m[1] : parts[1], rot: m && m[2] ? Number(m[2]) : 0 };
+}
+
 function bgTileImg(ref, onload) {
   if (bgTileImgs[ref]) return bgTileImgs[ref];
   const img = new Image();
   img.onload = onload;
-  const parts = ref.split('/');
-  img.src = AB + 'park-tiles/' + parts[0] + '/' + parts[1] + '.png';
+  const { set, idx } = bgTileRef(ref);
+  img.src = AB + 'park-tiles/' + set + '/' + idx + '.png';
   bgTileImgs[ref] = img;
   return img;
 }
@@ -4687,14 +4694,42 @@ function composeTilemap(entry, cellPx, onTileLoad) {
   c.width = c.height = n * cellPx;
   const ctx = c.getContext('2d');
   ctx.imageSmoothingEnabled = true;
-  for (let y = 0; y < n; y++) {
-    const row = (entry.tilemap && entry.tilemap[y]) || [];
-    for (let x = 0; x < n; x++) {
-      const ref = row[x];
-      if (!ref) continue;
-      const img = bgTileImg(ref, onTileLoad);
-      if (img.complete && img.naturalWidth) {
-        ctx.drawImage(img, x * cellPx, y * cellPx, cellPx, cellPx);
+
+  /* THE COLOUR GOES DOWN FIRST. An unpainted cell is skipped below, and
+     before this it left a transparent hole — so a background was only
+     usable if every one of the 1,024 cells had been painted. The colour
+     is what the gaps show, which is what makes painting just the features
+     a reasonable way to work. Older records have no colour; they were
+     painted edge to edge under the old rule, so black is right for them. */
+  ctx.fillStyle = (typeof entry.bgColor === 'string' && /^#[0-9a-f]{6}$/i.test(entry.bgColor))
+    ? entry.bgColor : '#0a0a0a';
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  /* Ground, then fences on top. A fence stands ON something, so the two
+     are separate layers — one ref per cell would mean a fenced cell had
+     no grass inside its own posts. */
+  const layers = [entry.tilemap, entry.fences];
+  for (const layer of layers) {
+    if (!Array.isArray(layer)) continue;
+    for (let y = 0; y < n; y++) {
+      const row = layer[y] || [];
+      for (let x = 0; x < n; x++) {
+        const ref = row[x];
+        if (!ref) continue;
+        const img = bgTileImg(ref, onTileLoad);
+        if (!img.complete || !img.naturalWidth) continue;
+        const rot = bgTileRef(ref).rot;
+        if (rot) {
+          /* Rotate about the cell's own centre so the piece stays in its
+             cell whatever the angle. */
+          ctx.save();
+          ctx.translate(x * cellPx + cellPx / 2, y * cellPx + cellPx / 2);
+          ctx.rotate(rot * Math.PI / 180);
+          ctx.drawImage(img, -cellPx / 2, -cellPx / 2, cellPx, cellPx);
+          ctx.restore();
+        } else {
+          ctx.drawImage(img, x * cellPx, y * cellPx, cellPx, cellPx);
+        }
       }
     }
   }

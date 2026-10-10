@@ -27,6 +27,9 @@
   var tilemap = blankMap();    /* GRID×GRID of "set/NN" or null */
   var currentId = '';          /* '' while unsaved */
   var brush = null;            /* {set, tile:'set/NN'} or {set, random:true} */
+  var brushRot = 0;            /* 0/90/180/270, applied to whatever is painted */
+  var fences = null;           /* the layer above the ground; same shape, nullable cells */
+  var brushKind = 'ground';    /* which layer the current brush paints into */
   var painting = 0;            /* 1 = paint, 2 = erase, 0 = idle */
   var showZones = false;
 
@@ -44,11 +47,15 @@
    * suite re-checks the property that matters: the mask can never disagree
    * with the tiles, because it has no independent existence.
    */
-  function deriveMask(map, zones) {
+  function deriveMask(map, zones, fenceLayer) {
     var rows = [];
     for (var y = 0; y < GRID; y++) {
       var row = '';
       for (var x = 0; x < GRID; x++) {
+        /* A FENCE WINS. The cell may have grass painted under it, but a
+           fence is there to stop things crossing, so it is X whatever the
+           ground says. Checking the fence first is the whole rule. */
+        if (fenceLayer && fenceLayer[y] && fenceLayer[y][x]) { row += 'X'; continue; }
         var cell = map[y][x];
         var zone = cell ? zones[cell.split('/')[0]] : null;
         row += (zone === 'L' || zone === 'R' || zone === 'O') ? zone : 'X';
@@ -73,12 +80,16 @@
       var pal = await fetch(PALETTE_URL + 'palette.json', { cache: 'no-store' });
       if (!pal.ok) { notice.textContent = 'The tile palette is not on this server yet — copy park-tiles/ to the rig first.'; return; }
       palette = await pal.json();
-      palette.sets.forEach(function (s) { zoneOf[s.id] = s.zone; });
+      palette.sets.forEach(function (s) {
+        zoneOf[s.id] = s.zone;
+        kindOfSet[s.id] = s.kind || 'ground';
+      });
 
       buildPalette();
       populateLoadList(data.backgrounds || []);
       bindGrid();
       bindToolbar();
+      bindRotate();
       render();
 
       notice.style.display = 'none';
@@ -90,21 +101,100 @@
 
   /* ── palette UI ── */
 
+  /* GROUND, WATER, FENCES. Twenty-nine flat sets is a lot to hand someone
+     who has never opened this; three choices is not. The grouping is by
+     the `kind` each set carries in palette.json, which is derived from its
+     zone — so this is a label on the existing walkability contract, not a
+     second source of truth about it. */
+  /* set id -> kind, so a brush knows which layer it paints into. */
+  var kindOfSet = {};
+
+  var KINDS = [
+    { id: 'ground',     label: 'Ground Tiles', hint: 'Land dinosaurs walk here' },
+    { id: 'water',      label: 'Water Tiles',  hint: 'Only aquatic dinosaurs swim here' },
+    { id: 'fence',      label: 'Fences',       hint: 'Sits above the ground, and nothing crosses it' },
+    { id: 'decoration', label: 'Decorations',  hint: 'Sits above the ground, and does not block' },
+  ];
+
+  var openKind = 'ground';
+
+  /**
+   * Build the picker.
+   *
+   * One category open at a time. Thirty-four themes in a flat list is
+   * unusable and three tabs still showed every theme of the selected kind
+   * at once; collapsing to a single open section is what keeps the panel
+   * readable as more packs are sliced in.
+   */
   function buildPalette() {
-    var setsEl = $('bgsSets');
-    palette.sets.forEach(function (s, i) {
-      var b = document.createElement('button');
-      b.className = 'bgs-set-btn' + (i === 0 ? ' active' : '');
-      b.innerHTML = escapeHtml(s.name) +
-        (s.zone !== 'L' ? ' <span class="zone-tag">' + s.zone + '</span>' : '');
-      b.onclick = function () {
-        setsEl.querySelectorAll('.bgs-set-btn').forEach(function (x) { x.classList.remove('active'); });
-        b.classList.add('active');
-        showTiles(s);
+    var root = $('bgsKinds');
+    root.innerHTML = '';
+
+    KINDS.forEach(function (k) {
+      var sets = palette.sets.filter(function (x) { return (x.kind || 'ground') === k.id; });
+      if (!sets.length) return;
+
+      var sec = document.createElement('div');
+      sec.className = 'bgs-cat';
+      sec.dataset.kind = k.id;
+
+      var head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'bgs-cat-head';
+      head.innerHTML = '<span class="bgs-cat-caret"></span>' +
+        '<span class="bgs-cat-label">' + escapeHtml(k.label) + '</span>' +
+        '<span class="bgs-cat-count">' + sets.length + '</span>';
+      head.onclick = function () {
+        openKind = (openKind === k.id) ? null : k.id;
+        paintOpenState();
       };
-      setsEl.appendChild(b);
+
+      var body = document.createElement('div');
+      body.className = 'bgs-cat-body';
+      var hint = document.createElement('div');
+      hint.className = 'bgs-kind-hint';
+      hint.textContent = k.hint;
+      body.appendChild(hint);
+
+      var setsEl = document.createElement('div');
+      setsEl.className = 'bgs-sets';
+      sets.forEach(function (st) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'bgs-set-btn';
+        b.dataset.set = st.id;
+        b.textContent = st.name;
+        b.onclick = function () {
+          root.querySelectorAll('.bgs-set-btn').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          showTiles(st);
+        };
+        setsEl.appendChild(b);
+      });
+      body.appendChild(setsEl);
+
+      sec.appendChild(head);
+      sec.appendChild(body);
+      root.appendChild(sec);
     });
-    showTiles(palette.sets[0]);
+
+    paintOpenState();
+
+    /* Start on the first theme of the open category, so the tile strip is
+       never empty on load. */
+    var first = palette.sets.filter(function (x) { return (x.kind || 'ground') === openKind; })[0];
+    if (first) {
+      var btn = root.querySelector('.bgs-set-btn[data-set="' + first.id + '"]');
+      if (btn) btn.classList.add('active');
+      showTiles(first);
+    }
+  }
+
+  function paintOpenState() {
+    var root = $('bgsKinds');
+    root.querySelectorAll('.bgs-cat').forEach(function (sec) {
+      sec.classList.toggle('open', sec.dataset.kind === openKind);
+    });
   }
 
   function showTiles(set) {
@@ -135,6 +225,8 @@
       wrap.querySelectorAll('.bgs-tile-btn').forEach(function (x) { x.classList.remove('selected'); });
       el.classList.add('selected');
       brush = br;
+      brushKind = (kindOfSet[br.set] || 'ground');
+      applyRot();
     }
     select(rnd, { set: set.id, random: true });
   }
@@ -160,19 +252,25 @@
     var at = cellAt(ev);
     if (!at) return;
     if (painting === 2) {
-      tilemap[at.y][at.x] = null;
+      /* Top down: a right-click clears the fence or decoration standing on
+         the cell, and only takes the ground once the cell is bare. Erasing
+         the ground out from under a fence would leave the fence hanging
+         over the background colour. */
+      if (fences && fences[at.y][at.x]) fences[at.y][at.x] = null;
+      else tilemap[at.y][at.x] = null;
     } else if (brush) {
       var vary = $('bgsVary').checked;
       /* Re-rolling under a drag repaints the same cell with a new random
          tile every mousemove, which shimmers. Only roll when the cell is
          empty or holds a different set. */
-      var cur = tilemap[at.y][at.x];
+      var layer = layerFor(brushKind);
+      var cur = layer[at.y][at.x];
       var want = brush.random
-        ? ((vary || !cur || cur.split('/')[0] !== brush.set) ? pick(brush.set) : cur)
-        : brush.tile;
+        ? ((vary || !cur || cur.split('/')[0] !== brush.set) ? withRot(pick(brush.set)) : cur)
+        : withRot(brush.tile);
       if (brush.random && cur && cur.split('/')[0] === brush.set && !vary) want = cur;
       if (cur === want) return;
-      tilemap[at.y][at.x] = want;
+      layer[at.y][at.x] = want;
     }
     render();
   }
@@ -192,8 +290,9 @@
     $('bgsZones').addEventListener('change', function (e) { showZones = e.target.checked; render(); });
     $('bgsFill').addEventListener('click', function () {
       if (!brush) return;
+      var layer = layerFor(brushKind);
       for (var y = 0; y < GRID; y++) for (var x = 0; x < GRID; x++) {
-        if (!tilemap[y][x]) tilemap[y][x] = brush.random ? pick(brush.set) : brush.tile;
+        if (!layer[y][x]) layer[y][x] = withRot(brush.random ? pick(brush.set) : brush.tile);
       }
       render();
     });
@@ -204,12 +303,65 @@
   var ZONE_TINT = { L: 'rgba(60,200,60,0.35)', R: 'rgba(80,160,255,0.35)',
                     O: 'rgba(20,60,220,0.45)', X: 'rgba(200,40,40,0.45)' };
 
+  /* `fencewire/03` or `fencewire/03r90` — see the server's TILE_RE. */
+  /* Fences and decorations share the overlay; ground and water are the
+     base. `brushKind` is set when a tile is selected, from the set's own
+     kind, so the brush always knows which array it writes into. */
+  function blankLayer() {
+    var rows = [];
+    for (var y = 0; y < GRID; y++) {
+      var row = [];
+      for (var x = 0; x < GRID; x++) row.push(null);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function isOverlay(kind) { return kind === 'fence' || kind === 'decoration'; }
+
+  function layerFor(kind) {
+    if (!isOverlay(kind)) return tilemap;
+    if (!fences) fences = blankLayer();
+    return fences;
+  }
+
+  function refParts(ref) {
+    var parts = String(ref).split('/');
+    var m = /^(\d{2})(?:r(90|180|270))?$/.exec(parts[1] || '');
+    return { set: parts[0], idx: m ? m[1] : parts[1], rot: m && m[2] ? Number(m[2]) : 0 };
+  }
+
+
+  /* Rotation rides on the ref — `fencewire/03r90` — so a painted cell
+     remembers its own angle and nothing else has to track it. */
+  function withRot(ref) {
+    if (!ref || !brushRot) return ref;
+    return String(ref).replace(/r(?:90|180|270)$/, '') + 'r' + brushRot;
+  }
+
+  function applyRot() {
+    var v = document.getElementById('bgsRotateVal');
+    if (v) v.textContent = brushRot + '\u00b0';
+  }
+
+  function bindRotate() {
+    var b = document.getElementById('bgsRotate');
+    function turn() { brushRot = (brushRot + 90) % 360; applyRot(); }
+    if (b) b.onclick = turn;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'r' && e.key !== 'R') return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      turn();
+    });
+  }
+
   function imgFor(ref) {
     if (tileImgs[ref]) return tileImgs[ref];
-    var parts = ref.split('/');
+    var p = refParts(ref);
     var img = new Image();
     img.onload = render;
-    img.src = PALETTE_URL + parts[0] + '/' + parts[1] + '.png';
+    img.src = PALETTE_URL + p.set + '/' + p.idx + '.png';
     tileImgs[ref] = img;
     return img;
   }
@@ -220,8 +372,14 @@
     var cell = c.width / GRID;
     ctx.clearRect(0, 0, c.width, c.height);
 
-    var mask = deriveMask(tilemap, zoneOf);
+    var mask = deriveMask(tilemap, zoneOf, fences);
     var empty = 0;
+
+    /* The colour the gaps will show once this is published — the editor
+       has to paint it too, or it lies about the result. */
+    var colEl = $('bgsColor');
+    ctx.fillStyle = (colEl && /^#[0-9a-f]{6}$/i.test(colEl.value)) ? colEl.value : '#0a0a0a';
+    ctx.fillRect(0, 0, c.width, c.height);
 
     for (var y = 0; y < GRID; y++) {
       for (var x = 0; x < GRID; x++) {
@@ -229,12 +387,37 @@
         if (ref) {
           var img = imgFor(ref);
           if (img.complete && img.naturalWidth) {
-            ctx.drawImage(img, x * cell, y * cell, cell, cell);
+            var rot = refParts(ref).rot;
+            if (rot) {
+              ctx.save();
+              ctx.translate(x * cell + cell / 2, y * cell + cell / 2);
+              ctx.rotate(rot * Math.PI / 180);
+              ctx.drawImage(img, -cell / 2, -cell / 2, cell, cell);
+              ctx.restore();
+            } else {
+              ctx.drawImage(img, x * cell, y * cell, cell, cell);
+            }
           }
         } else {
           empty++;
           ctx.fillStyle = '#141414';
           ctx.fillRect(x * cell, y * cell, cell, cell);
+        }
+        var over = fences && fences[y][x];
+        if (over) {
+          var oimg = imgFor(over);
+          if (oimg.complete && oimg.naturalWidth) {
+            var orot = refParts(over).rot;
+            if (orot) {
+              ctx.save();
+              ctx.translate(x * cell + cell / 2, y * cell + cell / 2);
+              ctx.rotate(orot * Math.PI / 180);
+              ctx.drawImage(oimg, -cell / 2, -cell / 2, cell, cell);
+              ctx.restore();
+            } else {
+              ctx.drawImage(oimg, x * cell, y * cell, cell, cell);
+            }
+          }
         }
         if (showZones) {
           ctx.fillStyle = ZONE_TINT[mask[y][x]];
@@ -272,7 +455,7 @@
 
   async function save(publish) {
     var status = $('bgsStatus');
-    var mask = deriveMask(tilemap, zoneOf);
+    var mask = deriveMask(tilemap, zoneOf, fences);
 
     if (publish && tilemap.some(function (r) { return r.some(function (c) { return !c; }); })) {
       if (!confirm('There are unpainted cells — they will be unwalkable ground. Publish anyway?')) return;
@@ -284,9 +467,11 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save',
+          bgColor: ($('bgsColor') && $('bgsColor').value) || '#0a0a0a',
           id: currentId || undefined,
           name: $('bgsName').value,
           tilemap: tilemap,
+          fences: fences,
           mask: mask,
           publish: publish,
         }),
@@ -321,6 +506,7 @@
     }
     currentId = '';
     tilemap = blankMap();
+    fences = null;
     $('bgsName').value = '';
     $('bgsDelete').style.display = 'none';
     $('bgsStatus').textContent = 'Deleted';
@@ -349,7 +535,7 @@
   async function loadSelected() {
     var id = $('bgsLoad').value;
     if (!id) {
-      currentId = ''; tilemap = blankMap(); $('bgsName').value = '';
+      currentId = ''; tilemap = blankMap(); fences = null; $('bgsName').value = '';
       $('bgsDelete').style.display = 'none';
       render(); return;
     }
@@ -359,6 +545,11 @@
     currentId = data.background.id;
     $('bgsName').value = data.background.name;
     tilemap = data.background.tilemap;
+    /* Absent on anything saved before fences existed, which reads the same
+       as an empty overlay. */
+    fences = data.background.fences || null;
+    var col = $('bgsColor');
+    if (col) col.value = data.background.bgColor || '#0a0a0a';
     $('bgsDelete').style.display = '';
     render();
   }

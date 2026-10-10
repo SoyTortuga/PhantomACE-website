@@ -189,7 +189,12 @@ const good = (over = {}) => ({
 /* ══ The lines the route promises ══════════════════════════════════════ */
 {
   ok('the grid matches the game', GRID === 32);
-  ok('refs are charset-bound to the palette tree', /TILE_RE = \/\^\[a-z0-9\]\{1,20\}\\\/\\d\{2\}\$\//.test(API));
+  /* Still charset-bound; the ref now carries an optional right-angle
+     rotation, because the fence sheets ship one orientation per piece.
+     Only the part before `r` ever becomes a file path, so the guarantee
+     this line exists for is unchanged. */
+  ok('refs are charset-bound to the palette tree',
+     /TILE_RE = \/\^\[a-z0-9\]\{1,20\}\\\/\\d\{2\}\(r\(\?:90\|180\|270\)\)\?\$\//.test(API));
   ok('the reserved list covers the built-in', /RESERVED_IDS = new Set\(\['classic', 'default'\]\)/.test(API));
   ok('the zone-check limitation is written down where the code is',
      /If backgrounds ever open to\s+non-staff, cross-checking mask against palette zones/.test(API));

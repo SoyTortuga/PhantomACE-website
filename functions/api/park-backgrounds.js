@@ -41,9 +41,20 @@ const bgKey = (id) => `${KEY_PREFIX}${id}`;
 
 export const GRID = 32;                    /* must match PARK_GRID in the game */
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
-const TILE_RE = /^[a-z0-9]{1,20}\/\d{2}$/; /* set/index into the palette tree */
+/* set/index into the palette tree, with an optional right-angle
+   rotation: `fencewire/03` or `fencewire/03r90`. The fence sheets ship
+   one orientation per piece, so without this a corner only turns one
+   way. Only the part before `r` ever becomes a file path, so the
+   charset guarantee is unchanged. */
+const TILE_RE = /^[a-z0-9]{1,20}\/\d{2}(r(?:90|180|270))?$/;
 const MASK_RE = new RegExp(`^[LROX]{${GRID}}$`);
 const NAME_MAX = 40;
+/* The canvas behind the tiles. Unpainted cells show it, which is what
+   lets an author paint features instead of all 1,024 cells. Strict
+   six-digit hex: it is written straight into a style, so the charset
+   is the guarantee that it can only ever be a colour. */
+const COLOR_RE = /^#[0-9a-f]{6}$/;
+const DEFAULT_BG_COLOR = '#0a0a0a';
 
 /* 'classic' is the built-in and every id the client falls back to must
    stay the client's own. A studio background shadowing it would change
@@ -77,6 +88,29 @@ export function validateBackground(body) {
     }
   }
 
+  /* The fence layer. Optional, because every record written before
+     fences existed has none, and absent must keep meaning "no fences"
+     rather than failing validation. Same shape and same charset as the
+     ground layer — it is the same kind of data one layer up. */
+  let fences = null;
+  if (body.fences != null) {
+    const f = body.fences;
+    if (!Array.isArray(f) || f.length !== GRID) {
+      return { error: `The fence layer must be ${GRID} rows.` };
+    }
+    for (const row of f) {
+      if (!Array.isArray(row) || row.length !== GRID) {
+        return { error: `Every fence row must be ${GRID} cells.` };
+      }
+      for (const cell of row) {
+        if (cell !== null && !(typeof cell === 'string' && TILE_RE.test(cell))) {
+          return { error: 'Fence cells must be palette refs, or null.' };
+        }
+      }
+    }
+    fences = f;
+  }
+
   const mask = body.mask;
   if (!Array.isArray(mask) || mask.length !== GRID || !mask.every(r => typeof r === 'string' && MASK_RE.test(r))) {
     return { error: `The mask must be ${GRID} rows of ${GRID} L/R/O/X characters.` };
@@ -89,7 +123,10 @@ export function validateBackground(body) {
   const flat = mask.join('');
   if (!/[LR]/.test(flat)) return { error: 'A background needs some walkable land (L or R).' };
 
-  return { name, tilemap, mask };
+  const raw = String(body.bgColor || '').trim().toLowerCase();
+  const bgColor = COLOR_RE.test(raw) ? raw : DEFAULT_BG_COLOR;
+
+  return { name, tilemap, fences, mask, bgColor };
 }
 
 export async function onRequestGet(context) {
