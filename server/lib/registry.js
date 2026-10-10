@@ -448,6 +448,12 @@ export const FAMILIES = [
      (quest_<userId>_<weekKey>), read by exact key, so the generic singletons
      table is the right home; the handler sets a week-scoped TTL. */
   { prefix: 'quest_',          table: 'singletons',       expiry: 'real' },
+  /* Achievement progress, per player per game (ach_<game>_<userId>) — see
+     functions/api/achievements.js. No TTL: an achievement is permanent, and
+     the row is the only record of how far someone got toward the ones they
+     have not unlocked yet. Bounded by construction — every field is a scalar
+     or a list capped at its own requirement. */
+  { prefix: 'ach_',            table: 'singletons',       expiry: 'none' },
   /* Memory Match, per player per week (mmweek_<userId>_<weekKey>): how many
      ranked games and the fewest moves among them. Quest state lives HERE and
      not on lb_memory_match, which is capped at 50 rows -- a player outside

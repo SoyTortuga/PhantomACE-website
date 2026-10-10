@@ -357,6 +357,18 @@ async function recordWin(env, room) {
     console.error('[pham-shock] monthly award settle failed:', err && err.message);
   }
 
+  /* Achievements for EVERY player in the settled match, not only the winner:
+     a streak needs to know about the losses too, or one would never break.
+     Best-effort — a badge must not break a win being recorded. */
+  try {
+    const { recordAchievement } = await import('./achievements.js');
+    for (const id of Object.keys(room.players || {})) {
+      await recordAchievement(env, 'pham-shock', id, { type: 'match', won: id === room.winner });
+    }
+  } catch (err) {
+    console.error('[pham-shock] achievement record failed:', err && err.message);
+  }
+
   const winner = room.players[room.winner];
   await env.MARKETPLACE.mutate(WIN_BOARD, (current) => {
     const lb = Array.isArray(current) ? current : [];

@@ -176,6 +176,20 @@ export async function onRequestPost(context) {
       } catch (err) {
         console.error('[bingo/end] could not update lb_bingo:', err.message);
       }
+      /* Achievements, from the standings this file just computed. Same 'u_'
+         test writeBoard uses: a guest has no inventory to grant into. Inside
+         the just-ended block, so re-ending a finished room counts nothing
+         twice. Best-effort — a badge must not break the end of a game. */
+      try {
+        const { recordAchievement } = await import('../achievements.js');
+        for (const r of board) {
+          if (!String(r.id).startsWith('u_')) continue;
+          await recordAchievement(env, 'commander-bingo', String(r.id).slice(2),
+            { type: 'game', bingos: r.bingos, marked: r.marked });
+        }
+      } catch (err) {
+        console.error('[bingo/end] achievement record failed:', err.message);
+      }
     }
   }
 

@@ -121,6 +121,20 @@ export async function onRequestPost(context) {
     } catch (err) {
       console.error('[mtgbbb/end] could not update lb_mtgbbb:', err.message);
     }
+
+    /* Achievements, from the scores this file just computed. Every player,
+       scoring or not — Box Fiend counts cracks played, which is the one a
+       quiet night still earns. Best-effort: a badge must not break the end
+       of a game. */
+    try {
+      const { recordAchievement } = await import('../achievements.js');
+      for (const p of board) {
+        await recordAchievement(env, 'mtgbbb', p.id,
+          { type: 'box', points: p.points, blackout: !!p.blackout });
+      }
+    } catch (err) {
+      console.error('[mtgbbb/end] achievement record failed:', err.message);
+    }
   }
 
   return json({ success: true, standings: board });

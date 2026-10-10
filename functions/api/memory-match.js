@@ -263,6 +263,17 @@ async function recordResult(env, player, game) {
     lb.sort((a, b) => (a.score - b.score) || ((a.updatedAt || 0) - (b.updatedAt || 0)));
     return lb.slice(0, MAX_ENTRIES);
   });
+  /* Achievements. Fed the game that just finished, not a board read: every
+     board here is truncated, so a player off the end of one would silently
+     stop progressing. Best-effort — a badge must not break a score write. */
+  try {
+    const { recordAchievement } = await import('./achievements.js');
+    await recordAchievement(env, 'memory-match', player.userId,
+      { type: 'game', pairs: game.pairs, moves: game.moves });
+  } catch (err) {
+    console.error('[memory-match] achievement record failed:', err && err.message);
+  }
+
   return { recorded: true, best, improved, board: board.game };
 }
 
@@ -399,6 +410,18 @@ async function recordDailyResult(env, player, finished) {
     total = board.results.length;
     return board;
   }, { expirationTtl: DAILY_TTL });
+
+  /* Only a genuinely new completion counts toward the daily achievement —
+     `already` means this is a replay of one the board has, and the engine
+     dedupes by day anyway, so this is belt and braces. */
+  if (!already) {
+    try {
+      const { recordAchievement } = await import('./achievements.js');
+      await recordAchievement(env, 'memory-match', player.userId, { type: 'daily', dayKey: dk });
+    } catch (err) {
+      console.error('[memory-match] daily achievement record failed:', err && err.message);
+    }
+  }
 
   const stored = await env.MARKETPLACE.get(key, 'json');
   const results = (stored && Array.isArray(stored.results)) ? stored.results : [];
