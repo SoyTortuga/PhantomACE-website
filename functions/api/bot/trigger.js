@@ -202,9 +202,12 @@ export async function onRequestPost(context) {
   if (body.action === 'checkin-reminder-config') {
     const enabled = !!body.enabled;
     const intervalMin = Math.min(120, Math.max(1, Math.floor(Number(body.intervalMin) || 15)));
+    /* No TTL: the key is a singleton in the registry, which pins expiry to
+       'none', so a passed TTL was silently ignored. Leaving it there reads as
+       if the broadcaster's timer setting lapses after a day. It does not. */
     await env.MARKETPLACE.mutate('checkin_reminder', (c) => ({
       ...(c || {}), enabled, intervalMin,
-    }), { expirationTtl: 86400 });
+    }));
     return json({ success: true, enabled, intervalMin });
   }
 

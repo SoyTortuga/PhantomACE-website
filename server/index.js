@@ -287,21 +287,40 @@ async function main() {
      button — a periodic reminder must not loop audio. lastFiredAt is stamped
      on the config so the cadence survives restarts and isn't tied to this
      process's uptime. */
+  /* THE STAMP IS A CLAIM, NOT A RECEIPT. It used to be committed inside the
+     mutate and the overlay push run afterwards, so a push that threw left
+     the reminder stamped as fired and suppressed for the whole interval
+     without anything having been shown. It is now rolled back on failure, so
+     the next minute's tick retries — and only if the stamp is still the one
+     this call wrote, so a reminder that genuinely fired in between is not
+     resurrected. */
   async function fireCheckinReminder(env) {
     const cfg = await env.MARKETPLACE.get('checkin_reminder', 'json');
     if (!cfg || !cfg.enabled) return;
     const intervalMs = Math.max(1, Number(cfg.intervalMin) || 15) * 60 * 1000;
     if (cfg.lastFiredAt && Date.now() - cfg.lastFiredAt < intervalMs) return;
+
+    const claimedAt = Date.now();
+    const previous = cfg.lastFiredAt || null;
     let fire = false;
     await env.MARKETPLACE.mutate('checkin_reminder', (c) => {
       if (!c || !c.enabled) return undefined;
-      if (c.lastFiredAt && Date.now() - c.lastFiredAt < intervalMs) return undefined;
+      if (c.lastFiredAt && claimedAt - c.lastFiredAt < intervalMs) return undefined;
       fire = true;
-      return { ...c, lastFiredAt: Date.now() };
+      return { ...c, lastFiredAt: claimedAt };
     });
     if (!fire) return;
-    const { pushOverlayEvent } = await import('../functions/api/overlay/events.js');
-    await pushOverlayEvent(env, { type: 'pham-checkin', sound: false });
+
+    try {
+      const { pushOverlayEvent } = await import('../functions/api/overlay/events.js');
+      await pushOverlayEvent(env, { type: 'pham-checkin', sound: false });
+    } catch (err) {
+      await env.MARKETPLACE.mutate('checkin_reminder', (c) => {
+        if (!c || c.lastFiredAt !== claimedAt) return undefined;   // someone else fired
+        return { ...c, lastFiredAt: previous };
+      }).catch(() => { /* the throw below is the thing worth reporting */ });
+      throw err;
+    }
   }
 
   /* ── Broadcast log ──────────────────────────────────────────────────────
@@ -324,7 +343,15 @@ async function main() {
            every live tick, not just on a new broadcast, so it captures how
            LONG the stream stayed up. */
         await catchup.recordLiveTick(env, !!s.live, Date.now());
-        if (s.live) await fireCheckinReminder(env).catch(() => {});
+        /* Isolated from the broadcast log either side of it — a broken
+           reminder must not stop a stream being recorded — but NOT silent.
+           This swallowed everything, so a reminder that had quietly stopped
+           working looked exactly like one that was working. */
+        if (s.live) {
+          await fireCheckinReminder(env).catch(err => {
+            console.error('[checkin-reminder] fire failed:', err && err.message);
+          });
+        }
         return s.live && s.streamId ? rewards.recordStream(env, s.streamId, s.startedAt) : false;
       }))
       .then(added => { if (added) console.log('[stream] new broadcast recorded'); })

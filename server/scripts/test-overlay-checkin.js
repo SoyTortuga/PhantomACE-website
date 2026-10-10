@@ -149,9 +149,16 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
 /* ── Timer: server-side, silent, while live ───────────────────────────── */
 {
   const idx = read('server/index.js');
-  ok('the rig tick fires the reminder while live', /if \(s\.live\) await fireCheckinReminder/.test(idx));
+  ok('the rig tick fires the reminder while live', /if \(s\.live\) \{\s*await fireCheckinReminder/.test(idx));
   ok('the timer nudge is silent', /pushOverlayEvent\(env, \{ type: 'pham-checkin', sound: false \}\)/.test(idx));
   ok('it honours the configured interval', /intervalMin[\s\S]*60 \* 1000/.test(idx) && /lastFiredAt/.test(idx));
+  /* The stamp used to be committed before the push ran, so a push that threw
+     suppressed the reminder for the whole interval with nothing shown -- and
+     the call site swallowed the throw, so a reminder that had quietly stopped
+     working looked like one that was working. */
+  ok('a failed push rolls the stamp back', /lastFiredAt !== claimedAt/.test(idx) && /lastFiredAt: previous/.test(idx));
+  ok('and the failure is logged, not swallowed', /\[checkin-reminder\] fire failed/.test(idx));
+  ok('the reminder no longer fails silently', !/fireCheckinReminder\(env\)\.catch\(\(\) => \{\}\)/.test(idx));
 
   const reg = read('server/lib/registry.js');
   ok('the reminder config is a registered singleton', /checkin_reminder:\s*\{ table: 'singletons'/.test(reg));
