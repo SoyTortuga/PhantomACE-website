@@ -43,7 +43,16 @@ function renderEventCard(segment) {
     ? '<span class="event-recurring-badge">Recurring</span>'
     : '';
 
-  const calUrl = buildCalendarUrl(segment.title, start, end);
+  /* MOST SLOTS HAVE NO TITLE. The live schedule returns `title: ""` and
+     `category: null` for the recurring ones — they carry a start, an end
+     and a recurrence flag and nothing else — so the heading rendered as
+     an empty line and the Add to Cal link made an event with no name.
+     The time, the category and the Recurring badge all have their own
+     slots in the meta row below, so the fallback only has to be a name. */
+  const title = String(segment.title || '').trim()
+    || (segment.is_recurring ? 'Regular stream' : 'Stream');
+
+  const calUrl = buildCalendarUrl(title, start, end);
 
   return `
     <div class="card event-full-card">
@@ -53,7 +62,7 @@ function renderEventCard(segment) {
         <div class="event-date-weekday">${weekday}</div>
       </div>
       <div class="event-info">
-        <div class="event-info-title">${escapeHtml(segment.title)}</div>
+        <div class="event-info-title">${escapeHtml(title)}</div>
         <div class="event-info-meta">
           <span class="event-info-time">${time}${endTime ? ' – ' + endTime : ''}</span>
           ${categoryHtml}
