@@ -1,48 +1,54 @@
-# Achievement badge art — what to make
+# Achievement badge art
 
-Twelve badges, one per achievement. **The system already works without
-them**: a badge whose PNG is missing falls back to the slot glyph on both
-surfaces that draw badges (the inventory grid and the profile), so these
-can land one file at a time, in any order, with no deploy beyond copying
-the file to the rig.
+Twelve badges. **The frames already exist** in `assets/badges/` — a 144x144
+roundel ringed in the badge's rarity colour, generated from the same
+`--rarity-*` tokens the rest of the site uses, so all twelve match and each
+ring agrees with the colour the UI draws around that badge.
 
-**Spec:** 144x144 PNG, transparent background — the convention every
-existing badge follows except the raid ladder (512, an outlier). Drop them
-in `assets/badges/` named exactly as below.
+**Draw the glyph into the middle.** The clear area is 96x96 centred on the
+canvas (24px in from every edge); stay inside it and the ring stays clean.
+Save over the same filename. They can land one at a time, in any order.
+
+Regenerate a frame by deleting the file and running:
+`node server/scripts/make-badge-frames.js --write` — it never overwrites a
+file that is already there, so it cannot wipe art you have drawn.
 
 ## Memory Match
 
-| File | Badge | Rarity | Earned by |
-|---|---|---|---|
-| `mm-flawless.png` | Flawless | rare | Clear a 20-pair board in 20 moves — every single flip a match. |
-| `mm-fifty.png` | Card Counter | uncommon | Finish 50 ranked games. |
-| `mm-daily-five.png` | Daily Devotion | uncommon | Play the daily puzzle on 5 different days. |
+| File | Badge | Rarity | Ring | Earned by |
+|---|---|---|---|---|
+| `mm-flawless.png` | Flawless | rare | `#cc88ff` | Clear a 20-pair board in 20 moves — every single flip a match. |
+| `mm-fifty.png` | Card Counter | uncommon | `#00cc66` | Finish 50 ranked games. |
+| `mm-daily-five.png` | Daily Devotion | uncommon | `#00cc66` | Play the daily puzzle on 5 different days. |
 
 ## Commander Bingo
 
-| File | Badge | Rarity | Earned by |
-|---|---|---|---|
-| `cb-first.png` | Called | common | Hit your first bingo. |
-| `cb-blackout.png` | Blackout | rare | Fill every square on a card. |
-| `cb-ten.png` | Regular | uncommon | Play 10 games through to the end. |
+| File | Badge | Rarity | Ring | Earned by |
+|---|---|---|---|---|
+| `cb-first.png` | Called | common | `#FFFFFF` | Hit your first bingo. |
+| `cb-blackout.png` | Blackout | rare | `#cc88ff` | Fill every square on a card. |
+| `cb-ten.png` | Regular | uncommon | `#00cc66` | Play 10 games through to the end. |
 
 ## PhamShock
 
-| File | Badge | Rarity | Earned by |
-|---|---|---|---|
-| `ps-first.png` | First Shot | common | Win your first match. |
-| `ps-streak.png` | Dialled In | rare | Win 3 matches in a row. |
-| `ps-ten.png` | Veteran | uncommon | Win 10 matches. |
+| File | Badge | Rarity | Ring | Earned by |
+|---|---|---|---|---|
+| `ps-first.png` | First Shot | common | `#FFFFFF` | Win your first match. |
+| `ps-streak.png` | Dialled In | rare | `#cc88ff` | Win 3 matches in a row. |
+| `ps-ten.png` | Veteran | uncommon | `#00cc66` | Win 10 matches. |
 
 ## MTGBBB
 
-| File | Badge | Rarity | Earned by |
-|---|---|---|---|
-| `bbb-first.png` | Cracked | common | Score a point in a box crack. |
-| `bbb-five.png` | Box Fiend | uncommon | Play through 5 box cracks. |
-| `bbb-blackout.png` | Full Box | mythic | Black out a card in a box crack. |
+| File | Badge | Rarity | Ring | Earned by |
+|---|---|---|---|---|
+| `bbb-first.png` | Cracked | common | `#FFFFFF` | Score a point in a box crack. |
+| `bbb-five.png` | Box Fiend | uncommon | `#00cc66` | Play through 5 box cracks. |
+| `bbb-blackout.png` | Full Box | mythic | `#ff6600` | Black out a card in a box crack. |
 
-Rarity is written into the item at grant time and is never read back from
-the catalogue, so changing one after somebody has earned it means a repair
-script over every inventory holding it. Cheap to change now, expensive
-later — same rule as the event badges.
+Two are called **Blackout** (`cb-blackout`, `bbb-blackout`) and three are
+a *first* something — they sit side by side on a profile, so they want to
+read apart at a glance.
+
+Rarity is written into the item when somebody earns it and never read back,
+so changing one afterwards means a repair script over every inventory holding
+it. Cheap to change now, expensive later.
