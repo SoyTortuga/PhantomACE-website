@@ -31,6 +31,9 @@ const NAME_MAX = 40;
 const PANEL_IDS = [
   'ovStage', 'ovHatch', 'ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo',
   'ovMc', 'ovCheckin', 'ovPrediction',
+  /* Twitch-driven, so they arrive mid-anything and are the likeliest to
+     collide with another panel. */
+  'ovHype', 'ovAdBreak',
   // stream night modes
   'ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket',
   'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat',

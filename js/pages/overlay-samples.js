@@ -79,6 +79,20 @@
       'ACTIVE → LOCKED → the winner highlighted, then hides',
       'Driven by Twitch channel-point prediction events',
     ] },
+    /* THESE TWO ARRIVE ON TWITCH'S SCHEDULE, not the broadcaster's, so they
+       are the likeliest of any panel to land on top of something. They were
+       the only top-level panels the editor could not place. */
+    { id: 'ovHype', label: 'Hype Train', holds: [
+      'A standing bar for the whole of a hype train',
+      'Current level & progress to the next one',
+      'Shows when one starts, hides when it ends',
+      'The LEVEL-UP celebration is an alert — that shows in Alerts',
+    ] },
+    { id: 'ovAdBreak', label: 'Ad Break', holds: [
+      'A countdown for the length of an ad break',
+      'Counts from the break\u2019s end time, then hides itself',
+      'Needs channel:read:ads — inert until the broadcaster grants it',
+    ] },
     /* ── Stream night modes ──────────────────────────────────────────────
        Each of these is a standing panel that shows while its event runs and
        clears when it ends. They shipped positioned by their own CSS default
@@ -338,6 +352,19 @@
       '</div>';
   }
 
+  /* A train mid-climb: the state a broadcaster is positioning against. */
+  function hype() {
+    show('ovHype');
+    set('ovHypeLevel', 'Level 3');
+    var bar = $('ovHypeBar');
+    if (bar) bar.style.width = '64%';
+  }
+
+  function adBreak() {
+    show('ovAdBreak');
+    set('ovAdBreakTimer', '1:30');
+  }
+
   function prediction() {
     show('ovPrediction');
     var p = $('ovPrediction'); if (p) p.dataset.state = 'active';
@@ -546,7 +573,8 @@
 
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
-    checkin(); hatch(); prediction(); tithe(); vsc(); wind(); safari(); bracket();
+    checkin(); hatch(); prediction(); hype(); adBreak();
+    tithe(); vsc(); wind(); safari(); bracket();
     mtgGuess(); r6Draft(); chatVote(); bingoChat(); memChat();
   }
 

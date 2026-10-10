@@ -18,6 +18,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { onRequestGet, onRequestPost, validatePanels } from '../../functions/api/overlay/layout.js';
 
@@ -289,6 +290,91 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   const storedIds = idsMatch ? [...idsMatch[1].matchAll(/'(ov\w+)'/g)].map(m => m[1]).sort() : [];
   ok('the sample panel ids are exactly the ids the route stores',
      ids.length > 0 && JSON.stringify(ids) === JSON.stringify(storedIds));
+
+  /* BOTH LISTS AGREEING IS NOT ENOUGH IF BOTH ARE MISSING THE SAME PANEL.
+     That is how the hype bar and the ad countdown stayed unplaceable: real
+     top-level panels on the overlay, tracked by the idle check, draggable by
+     nobody, and a saved layout naming either was dropped on the way in with
+     nothing anywhere to say so. The MARKUP is the source of truth here. */
+  const markup = fs.readFileSync(path.join(REPO, 'overlay.html'), 'utf8');
+  const topLevel = [...markup.matchAll(/^  <\w+[^>]*\sid="(ov[A-Za-z]+)"/gm)].map(m => m[1]);
+  ok('the overlay markup yields its top-level panels', topLevel.length > 10);
+
+  /* The two that are deliberately not placeable, each with its reason. */
+  const NOT_PLACEABLE = {
+    ovFault: 'the disconnected indicator — a fixed corner warning, not scenery',
+    ovEggVideo: 'a full-bleed video cue with its own fixed placement',
+  };
+  const unplaceable = topLevel.filter(id => !ids.includes(id) && !(id in NOT_PLACEABLE));
+  check('every top-level panel is either placeable or declared unplaceable', unplaceable, []);
+
+  const staleExemptions = Object.keys(NOT_PLACEABLE).filter(id => !topLevel.includes(id));
+  check('and nothing is exempted that no longer exists', staleExemptions, []);
+
+  /* A panel the editor can drag but cannot DRAW is an invisible box to
+     position against. So fillAll is RUN, against a fake DOM, and every
+     placeable panel has to come out revealed.
+
+     Running it rather than matching names on purpose: the filler for ovRaid
+     is raidBoss(), for ovMc it is manaClash(), for ovVote it is chatVote(),
+     and some reveal their panel with show(id) while others set hidden
+     directly. Any naming rule is wrong for three of them today and wrong
+     again for the next panel named sensibly rather than mechanically. */
+  {
+    /* Each panel starts as the MARKUP has it. ovStage carries no `hidden`
+       attribute -- it is always present and alertCard injects a card into it
+       -- so defaulting everything to hidden would fail it for being correct. */
+    const startsHidden = new Set(
+      [...markup.matchAll(/^  <\w+[^>]*\sid="(ov[A-Za-z]+)"[^>]*>/gm)]
+        .filter(m => /\shidden[\s>]/.test(m[0]))
+        .map(m => m[1])
+    );
+    ok('most panels start hidden in the markup', startsHidden.size > 10);
+    ok('and the alert stage does not', !startsHidden.has('ovStage'));
+
+    const nodes = new Map();
+    const el = (id) => {
+      if (nodes.has(id)) return nodes.get(id);
+      const n = {
+        id, hidden: startsHidden.has(id), textContent: '', innerHTML: '', src: '', value: '',
+        style: {}, dataset: {},
+        classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        setAttribute() {}, removeAttribute() {}, getAttribute: () => null,
+        appendChild() {}, replaceChildren() {}, addEventListener() {},
+        querySelector: () => null, querySelectorAll: () => [],
+      };
+      nodes.set(id, n);
+      return n;
+    };
+    const sandbox = {
+      document: {
+        getElementById: el,
+        createElement: (t) => el('new-' + t + '-' + nodes.size),
+        querySelector: () => null, querySelectorAll: () => [],
+        addEventListener() {}, body: el('body'),
+      },
+      console: { log() {}, warn() {}, error() {} },
+      Date, Math, JSON, Number, String, Array, Object, isNaN,
+      setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
+    };
+    sandbox.window = sandbox;
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(samples, sandbox, { filename: 'js/pages/overlay-samples.js' });
+
+    ok('overlay-samples publishes its API', !!(sandbox.window.OverlaySamples &&
+      typeof sandbox.window.OverlaySamples.fillAll === 'function'));
+    sandbox.window.OverlaySamples.fillAll();
+
+    const notDrawn = ids.filter(id => el(id).hidden);
+    check('fillAll reveals every panel the editor can place', notDrawn, []);
+
+    /* Whether each panel also has CONTENT is deliberately not checked here:
+       the fillers write into child elements (ovHypeLevel, ovPredTitle,
+       ovMcBar) and this fake DOM has no parent/child link, so a panel node
+       always reads empty however well it was drawn. Revealing is the part
+       that actually breaks and the part this can state honestly. */
+  }
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
