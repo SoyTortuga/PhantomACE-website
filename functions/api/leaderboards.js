@@ -84,9 +84,6 @@ const BOARDS = {
    winner, is also minted and whispered. ── */
 
 const MONTHLY_GAME_LABELS = {
-  /* Skull Clicker is intentionally absent: its board here (sc_leaderboard) is
-     the ALL-TIME board and must never be wiped. Its monthly race and prize
-     live on the season board (sc_season), handled in skull-clicker.js. */
   'memory-match':    'Memory Match',
   'memory-match-15': 'Memory Match (15 pairs)',
   'memory-match-10': 'Memory Match (10 pairs)',
@@ -95,6 +92,27 @@ const MONTHLY_GAME_LABELS = {
   'mana-clash-wins': 'Mana Clash Wins',
   'pham-shock':      'PhamShock',
   'mtgbbb':          'MTGBBB',
+};
+
+/* THE BOARDS THAT DELIBERATELY PAY NOTHING, and why.
+
+   The settle loop skips any board with no label. That used to be a silent
+   `continue`, so a board added to BOARDS without a label here carried no
+   monthly prize and said nothing about it -- wrong for however long it took
+   somebody to notice, which is the same shape as an unregistered KV key.
+
+   Omission is a declaration now: every board is in this table or in
+   MONTHLY_GAME_LABELS, a board in neither is logged by name on every settle,
+   and test-monthly-awards.js fails if one is missing from both. */
+const MONTHLY_NO_AWARD = {
+  /* sc_leaderboard is the ALL-TIME board and must never be wiped. Skull
+     Clicker's monthly race and prize live on the season board (sc_season),
+     settled in skull-clicker.js. */
+  'skull-clicker': 'all-time board; the monthly race is on sc_season',
+  /* Nothing writes lb_phamily_time -- Watch Time is read straight off the pt_
+     rows by community-leaderboard.js -- so there is nothing to snapshot, wipe
+     or award. The pass has its own monthly cycle. */
+  'phamily-time':  'derived view, never written; the pass settles its own month',
 };
 
 const MONTHLY_PLACEMENTS = [
@@ -187,7 +205,17 @@ export async function maybeRunMonthlyAwards(env, now = new Date()) {
 
   for (const [game, board] of Object.entries(BOARDS)) {
     const gameLabel = MONTHLY_GAME_LABELS[game];
-    if (!gameLabel) continue;
+    if (!gameLabel) {
+      /* Declared exempt is fine and quiet. Undeclared is a board nobody gave
+         a prize to, which is worth a line in the log every month until
+         somebody picks a side. */
+      if (!MONTHLY_NO_AWARD[game]) {
+        console.error(`[leaderboards] monthly ${key}: board '${game}' has no label in ` +
+          'MONTHLY_GAME_LABELS and is not declared in MONTHLY_NO_AWARD, so it was ' +
+          'NOT awarded or wiped. Add it to one of them.');
+      }
+      continue;
+    }
 
     let snapshot;
     try {

@@ -103,8 +103,17 @@ const thisMonth = monthKey();   /* the season calendar (SEASON_TZ), same as the 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */
 {
   const lb = fs.readFileSync(path.join(REPO, 'functions/api/leaderboards.js'), 'utf8');
-  const labels = lb.slice(lb.indexOf('MONTHLY_GAME_LABELS'), lb.indexOf('MONTHLY_PLACEMENTS'));
+  /* Sliced to the LABEL table alone. It used to run to MONTHLY_PLACEMENTS,
+     which now also spans MONTHLY_NO_AWARD -- where skull-clicker is named on
+     purpose, as the board that deliberately pays nothing here. */
+  const labels = lb.slice(lb.indexOf('MONTHLY_GAME_LABELS'), lb.indexOf('const MONTHLY_NO_AWARD'));
   ok('leaderboards no longer monthly-wipes the all-time skull board', !/'skull-clicker':/.test(labels));
+  /* And it says so, rather than falling through the loop unnamed: an
+     undeclared board is skipped silently, which is how a board ends up with
+     no prize and nobody knowing. */
+  const exempt = lb.slice(lb.indexOf('const MONTHLY_NO_AWARD'), lb.indexOf('const MONTHLY_PLACEMENTS'));
+  ok('and declares why, naming sc_season as where the monthly race lives',
+     /'skull-clicker':/.test(exempt) && /sc_season/.test(exempt));
 
   const reg = fs.readFileSync(path.join(REPO, 'server/lib/registry.js'), 'utf8');
   ok('sc_season is a registered singleton', /sc_season:\s*\{ table: 'singletons'/.test(reg));

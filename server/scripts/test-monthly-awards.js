@@ -320,6 +320,52 @@ async function get(env, q = 'game=all') {
   ok('the whisper gives it as the way to claim', w && /redeem code/.test(w.message));
 }
 
+/* ── Every board has decided whether it pays ───────────────────────
+   The settle loop skips a board with no label in MONTHLY_GAME_LABELS. That
+   was a bare `continue`, so a board added to BOARDS without a label carried
+   no monthly prize and said nothing — wrong for however long it took somebody
+   to notice. Omission is a declaration now: a board belongs to the label
+   table or to MONTHLY_NO_AWARD, with a reason, and never to neither.
+
+   Read from the source because the tables are module-private, and the point
+   is to fail HERE rather than in a log line after a month has settled. */
+{
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const src = readFileSync(join(repo, 'functions/api/leaderboards.js'), 'utf8');
+
+  const keysOf = (declaration) => {
+    const block = new RegExp(`const ${declaration} = \\{([\\s\\S]*?)\\n\\};`).exec(src);
+    if (!block) return null;
+    return [...block[1].matchAll(/^\s*'([a-z0-9-]+)'\s*:/gm)].map(m => m[1]);
+  };
+
+  const boards = keysOf('BOARDS');
+  const labelled = keysOf('MONTHLY_GAME_LABELS');
+  const exempt = keysOf('MONTHLY_NO_AWARD');
+  ok('all three tables parse out of the source', !!boards && !!labelled && !!exempt);
+  ok('and there is more than one board to check', boards.length > 1);
+
+  const undeclared = boards.filter(g => !labelled.includes(g) && !exempt.includes(g));
+  check('every board either pays a prize or declares why it does not', undeclared, []);
+
+  const both = boards.filter(g => labelled.includes(g) && exempt.includes(g));
+  check('and none is in both tables', both, []);
+
+  const strays = [...labelled, ...exempt].filter(g => !boards.includes(g));
+  check('neither table names a board that does not exist', strays, []);
+
+  /* The two that pay nothing today, named so a change to either is a visible
+     diff rather than a silent one. */
+  check('the exempt boards are the two that have their own cycle',
+    exempt.slice().sort(), ['phamily-time', 'skull-clicker']);
+
+  /* And an undeclared board is loud, not skipped, if one ever gets through. */
+  ok('an undeclared board is logged by name', /not declared in MONTHLY_NO_AWARD/.test(src));
+}
+
 console.error = realError;
 globalThis.Date = RealDate;
 
