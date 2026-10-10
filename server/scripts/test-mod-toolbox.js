@@ -125,16 +125,30 @@ async function GET(e, h) {
   ok('the map has a healthy number of tools', hrefs.length >= 5);
 
   const { routes } = await buildRoutes(path.join(REPO, 'functions'));
+
+  /* THE REAL RESOLVER, not a reimplementation of it. This used to require the
+     href to be a file on disk, which fails any card written in the canonical
+     extensionless form -- /activity is served from activity.html, and the
+     resolver 308s /activity.html back to /activity, so writing the extension
+     would send staff through a redirect. createStatic is what actually
+     answers the request, so a path it resolves to a file is a path that
+     works. */
+  const { createStatic } = await import('../static.js');
+  const statik = createStatic(REPO);
+
   const dead = [];
   for (const h of hrefs) {
     if (h.startsWith('/api/')) {
       if (!routes.has(h)) dead.push(h);
-    } else {
-      /* Strip any #fragment / ?query before checking the file exists — a card
-         may deep-link into a page section (e.g. overlay-dashboard.html#...). */
-      const file = h.replace(/^\//, '').replace(/[#?].*$/, '');
-      if (!fs.existsSync(path.join(REPO, file))) dead.push(h);
+      continue;
     }
+    /* Strip any #fragment / ?query first — a card may deep-link into a page
+       section (e.g. overlay-dashboard.html#...). */
+    const pathname = h.replace(/[#?].*$/, '');
+    const decision = statik.resolve(pathname, '');
+    /* A redirect is fine in principle but not worth shipping in a card, so
+       only a direct file counts. */
+    if (decision.kind !== 'file') dead.push(`${h} (${decision.kind})`);
   }
   check('no link points at a missing page or route', dead, []);
 
