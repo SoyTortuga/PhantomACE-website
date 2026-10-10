@@ -2,14 +2,22 @@ const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
-const GAMES = [
-  { id: 'memory-match', title: 'Memory Match', thumb: '/assets/images/game-memory-match.webp', play: () => launchGame('Memory Match', '/games/memory-match/') },
-  { id: 'skull-clicker', title: 'Skull Clicker', thumb: '/assets/images/game-skull-clicker.webp', play: () => launchGame('Skull Clicker', '/games/skull-clicker/') },
-  { id: 'commander-bingo', title: 'Commander Bingo', thumb: '/assets/images/game-commander-bingo.webp', play: () => launchGame('Commander Bingo', '/games/commander-bingo/'), live: true },
-  { id: 'dino-park', title: 'Dino Park', thumb: '/assets/images/game-dino-park.webp', play: () => launchGame('Dino Park', '/games/dino-park/') },
-  { id: 'mana-clash', title: 'Mana Clash', thumb: '/assets/images/game-mana-clash.webp', play: () => launchGame('Mana Clash', '/games/mana-clash/'), live: true },
-  { id: 'pham-shock', title: 'PhamShock', thumb: '/assets/images/game-phamshock.webp', play: () => launchGame('PhamShock', '/games/phamshock/'), live: true },
-];
+/* The "Being Played Now" carousel is derived from the "Play Now" cards in
+   games.html, so the two can't drift apart: a card opts in with
+   data-game="<id>" and the carousel picks up its title, thumb and launch
+   path from the card itself. The id must match the key /api/game-activity
+   reports so the live player count lands on the right card. */
+function collectGames() {
+  return Array.from(document.querySelectorAll('.game-card[data-game]')).map((card) => {
+    const playBtn = card.querySelector('.game-play-btn:not(.role-moderator)');
+    return {
+      id: card.dataset.game,
+      title: card.querySelector('.game-card-title').textContent.trim(),
+      thumb: card.querySelector('.game-card-thumb img').getAttribute('src'),
+      play: () => playBtn.click(),
+    };
+  });
+}
 
 function launchGame(title, src) {
   const launcher = document.getElementById('gameLauncher');
@@ -44,16 +52,17 @@ function renderGameScroller() {
   const track = document.getElementById('gamesScrollerTrack');
   if (!track) return;
 
-  track.innerHTML = GAMES.map(g => `
-    <button class="game-mini-card" data-game="${g.id}" type="button">
-      <img src="${g.thumb}" alt="${g.title}" loading="lazy">
-      <span class="game-mini-title">${g.title}</span>
-      <span class="game-mini-live" data-live="${g.id}" hidden></span>
+  const games = collectGames();
+  track.innerHTML = games.map(g => `
+    <button class="game-mini-card" data-game="${escHtml(g.id)}" type="button">
+      <img src="${escHtml(g.thumb)}" alt="${escHtml(g.title)}" loading="lazy">
+      <span class="game-mini-title">${escHtml(g.title)}</span>
+      <span class="game-mini-live" data-live="${escHtml(g.id)}" hidden></span>
     </button>
   `).join('');
 
   track.querySelectorAll('.game-mini-card').forEach((btn, i) => {
-    btn.addEventListener('click', GAMES[i].play);
+    btn.addEventListener('click', games[i].play);
   });
 }
 
