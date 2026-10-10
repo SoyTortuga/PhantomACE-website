@@ -59,18 +59,37 @@
       .tab-btn .tab-icon { font-size: 16px; }
     }
 
+    /* HOW TALL THE PLAY AREA IS, in one place.
+
+       `--park-chrome` is the site header plus the game's own tab bar;
+       `--park-gutter` is breathing room UNDER the play area, which did
+       not exist — the park ran flush to the bottom edge of the window
+       and looked cut off rather than framed. Four rules were each
+       hardcoding `calc(100vh - 80px)`; they read these now, so the gutter
+       is one number rather than four to keep in step. */
+    :root {
+      /* A starting value only — measureParkChrome() replaces it with what
+         the header and tab bar actually come to. 80px was the old guess
+         and it was wrong by 64: the real chrome is nearer 144, so the
+         play area overflowed and the whole page scrolled. Nobody noticed
+         because a scrollbar is a quiet way to be wrong. */
+      --park-chrome: 144px;
+      --park-gutter: 16px;
+      --park-fit: calc(100vh - var(--park-chrome) - var(--park-gutter));
+    }
+
     /* Tab Content */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .tab-content.scrollable { padding: 12px; height: calc(100vh - 80px); overflow-y: auto; }
+    .tab-content.scrollable { padding: 12px; height: var(--park-fit); overflow-y: auto; }
 
     /* ======================== VISUAL PARK ======================== */
     .park-viewport {
       position: relative;
       aspect-ratio: 1 / 1;
-      width: min(100%, calc(100vh - 80px));
-      max-height: calc(100vh - 80px);
-      margin: 0 auto;
+      width: min(100%, var(--park-fit));
+      max-height: var(--park-fit);
+      margin: 0 auto var(--park-gutter);
       overflow: hidden;
       background: #2d5a1e;
     }
@@ -255,7 +274,7 @@
       flex: 0 0 300px; display: none;
       background: var(--gray-mid); border: 1px solid #FF000040;
       border-radius: 8px; padding: 8px 10px;
-      max-height: calc(100vh - 96px); overflow: hidden;
+      max-height: var(--park-fit); overflow: hidden;
     }
     .yard-tray.open { display: block; }
     .yard-tray-close {
@@ -767,8 +786,9 @@
     /* ======================== COLLECTION ======================== */
     .coll-layout {
       display: flex;
-      height: calc(100vh - 80px);
+      height: var(--park-fit);
       overflow: hidden;
+      margin-bottom: var(--park-gutter);
     }
     .coll-list {
       width: 140px;
@@ -4953,6 +4973,9 @@ function pickNewTarget(dino) {
 }
 
 function initParkView() {
+  /* Before anything sizes itself off --park-fit. Cheap, and it has to run
+     again on resize because the bars wrap at narrow widths. */
+  measureParkChrome();
   loadBackgroundCatalog();   /* idempotent; first call fetches, rest return */
   state.park.forEach(d => { if (d.px === undefined) initDinoPosition(d); });
   if (state.debris && state.debris.length > 0) wasStreamLive = true;
@@ -8866,6 +8889,31 @@ function onExpoClaimNote(id) {
   updateTopBar();
   showToast(`Field note settled — +${res.coins} coins`);
 }
+
+/**
+ * Measure the chrome above the play area and publish it as --park-chrome.
+ *
+ * The site header is injected at runtime and the game's own bars wrap at
+ * narrow widths, so the height above the viewport is not a number this
+ * file can know — hardcoding it is what left the park overflowing by 64px
+ * into a scrollbar. The viewport's own top is exactly that height, and it
+ * does not depend on the viewport's height, so reading it back is stable
+ * rather than circular.
+ */
+function measureParkChrome() {
+  const vp = document.querySelector('.park-viewport');
+  if (!vp) return;
+  const top = Math.round(vp.getBoundingClientRect().top + window.scrollY);
+  if (top > 0 && top < window.innerHeight) {
+    document.documentElement.style.setProperty('--park-chrome', top + 'px');
+  }
+}
+
+let parkChromeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(parkChromeTimer);
+  parkChromeTimer = setTimeout(measureParkChrome, 120);
+});
 
 /* ======================== GAME LOOP ======================== */
 function gameTick() {

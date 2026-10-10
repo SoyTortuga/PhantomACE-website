@@ -174,7 +174,13 @@ console.log('');
   const GAME = fs.readFileSync(path.join(REPO, 'games/dino-park/index.html'), 'utf8').replace(/\r\n/g, '\n');
 
   ok('the game fetches the catalogue', /fetch\('\/api\/park-backgrounds', \{ cache: 'no-store' \}\)/.test(GAME));
-  ok('at park boot', /function initParkView\(\) \{\n  loadBackgroundCatalog\(\);/.test(GAME));
+  /* Still the first thing the park does, though measureParkChrome now
+     runs ahead of it — the play area has to know how tall it can be
+     before anything sizes itself off --park-fit. Matched loosely so a
+     line added at the top of the boot does not read as the catalogue
+     fetch having gone missing. */
+  ok('at park boot',
+     /function initParkView\(\)[\s\S]{0,400}?loadBackgroundCatalog\(\);/.test(GAME));
   ok('the ground cache composes studio tilemaps',
      /if \(entry\.tilemap\) \{[\s\S]{0,400}composeTilemap\(entry, TSIZE/.test(GAME));
   ok('late tiles invalidate the cache, not the world',
