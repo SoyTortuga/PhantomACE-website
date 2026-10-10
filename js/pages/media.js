@@ -458,6 +458,7 @@ async function handleAddClip(event) {
   if (!url.trim()) { clipStatus('Paste a clip link first.', 'error'); return; }
 
   const label = btn ? btn.textContent : '';
+  let added = null;
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
   clipStatus('Checking the clip with Twitch…', '');
 
@@ -476,13 +477,29 @@ async function handleAddClip(event) {
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(data.error || 'Could not add the clip.');
 
+    /* THE ADD IS DONE. Everything below is the page catching up, so it is
+       reported first and kept out of the try — a refresh that threw used to
+       surface as "could not add the clip" for a clip that was already on the
+       wall, which is the most misleading thing this could say. */
     clipStatus(data.replaced ? 'Updated — it was already on the wall.' : 'Added.', 'success');
-    await loadMedia();
-    setTimeout(closeUploadModal, 900);
+    added = data.item;
   } catch (err) {
     clipStatus(err.message || 'Could not add the clip.', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
+
+  /* Same refresh the file upload does: put it at the front of the data the
+     page already has and re-render, rather than re-fetching the whole wall. */
+  if (added) {
+    /* Drop any copy already on the page first. The server replaces rather
+       than doubling (the id is the slug), so re-adding a clip must not leave
+       two tiles behind until the next reload. */
+    const dupe = GALLERY_DATA.findIndex(i => i && i.id === added.id);
+    if (dupe !== -1) GALLERY_DATA.splice(dupe, 1);
+    GALLERY_DATA.unshift(added);
+    renderGallery();
+    setTimeout(closeUploadModal, 900);
   }
 }
 

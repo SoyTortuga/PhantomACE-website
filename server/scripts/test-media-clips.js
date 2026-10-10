@@ -256,6 +256,45 @@ const index = (env) => {
   check('nor top navigation', (tag.match(/allow-top-navigation/g) || []), []);
   ok('it sets a referrer policy', /referrerpolicy=/.test(tag));
 
+  /* EVERY FUNCTION THE CLIP PATH CALLS MUST EXIST. The first version called
+     loadMedia(), which this file does not have — so a clip was added
+     successfully and the page then reported "loadMedia is not defined",
+     telling the moderator the add had failed when it had not. A missing
+     global is invisible until the line runs, which is why it is checked. */
+  const defined = new Set(
+    [...js.matchAll(/^\s*(?:async\s+)?function\s+([A-Za-z0-9_$]+)/gm)].map(m => m[1]));
+  ok('the file\u2019s own functions parse out', defined.size > 10);
+
+  const bodyOf = (name) => {
+    const re = new RegExp('(?:async )?function ' + name + '\\([\\s\\S]*?\\n\\}');
+    const m = re.exec(js);
+    return m ? m[0] : '';
+  };
+  /* Comments stripped first: the prose in this codebase is long and full of
+     ordinary sentences, and a bare scan finds words like "doubling(" in it. */
+  const stripComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  const clipBodies = stripComments(
+    bodyOf('handleAddClip') + '\n' + bodyOf('loadRecentClips') + '\n' + bodyOf('setUploadMode'));
+  ok('the clip handlers were found', clipBodies.length > 200);
+
+  /* Calls in those bodies, minus built-ins and method calls, which are not
+     this file's to define. */
+  const BUILTIN = new Set(['fetch', 'JSON', 'String', 'Number', 'Boolean', 'Array', 'Object',
+    'setTimeout', 'clearTimeout', 'encodeURIComponent', 'parseInt', 'parseFloat', 'Set', 'Map',
+    'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function', 'await', 'new']);
+  const called = [...new Set([...clipBodies.matchAll(/(^|[^.\w$])([a-z][A-Za-z0-9_$]*)\s*\(/g)]
+    .map(m => m[2]))];
+  const missing = called.filter(n => !defined.has(n) && !BUILTIN.has(n));
+  check('every function the clip path calls is defined in this file', missing, []);
+
+  /* And the add must not report a failure for a clip that landed: the
+     success is shown before the page catches up, and the refresh is outside
+     the try. */
+  ok('the success is reported before the page catches up',
+    /'Added\.'[\s\S]{0,160}added = data\.item/.test(js));
+  ok('and a re-add replaces the tile rather than doubling it',
+    /GALLERY_DATA\.findIndex\(i => i && i\.id === added\.id\)/.test(js));
+
   const html = read('media.html');
   ok('the modal offers both ways in', /id="modeClipBtn"/.test(html) && /id="modeFileBtn"/.test(html));
   ok('with a link field', /id="clipUrl"/.test(html));
