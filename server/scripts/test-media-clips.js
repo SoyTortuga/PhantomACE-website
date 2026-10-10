@@ -433,6 +433,46 @@ const index = (env) => {
   ok('and the heading reports the window', /data\.window === 'all'/.test(js));
 }
 
+/* ── Every field the page reads survives /api/media ──────────────────── */
+{
+  /* THIS IS THE ONE THAT SHIPPED. /api/media returns a whitelist — rightly,
+     since the stored record also holds the storage filename and the
+     uploader's id. But a field the page needs and the whitelist forgets just
+     disappears, and only after a RELOAD: the client holds the whole item in
+     memory right after adding it, so a clip looked perfect until you
+     navigated away and came back to a broken thumbnail and a dead embed.
+
+     Derived from what the renderer actually reads, not a list kept by hand —
+     a hand-kept list is what the whitelist already is. */
+  const js = read('js/pages/media.js');
+  const indexSrc = read('functions/api/media/index.js');
+
+  const readsRaw = [...new Set([...js.matchAll(/\bitem\.([a-zA-Z][A-Za-z0-9_]*)/g)].map(m => m[1]))];
+  ok('the page reads a healthy number of fields', readsRaw.length > 5);
+
+  const mapBlock = /\.map\(m => \(\{([\s\S]*?)\}\)\);/.exec(indexSrc);
+  ok('the media response shape is found', !!mapBlock);
+  const returned = new Set(
+    [...(mapBlock ? mapBlock[1] : '').matchAll(/^\s*([a-zA-Z][A-Za-z0-9_]*)\s*:/gm)].map(m => m[1]));
+  ok('and lists its fields', returned.size > 5);
+
+  const dropped = readsRaw.filter(f => !returned.has(f));
+  check('every field the page reads is returned by the API', dropped, []);
+
+  /* The clip-specific ones by name, because they are the ones that broke and
+     a derived check can only catch what the renderer still mentions. */
+  for (const f of ['slug', 'thumbnail', 'duration', 'clipCreator']) {
+    ok(`${f} survives the API`, returned.has(f));
+  }
+
+  /* And the whitelist is still a whitelist: the storage filename and the
+     uploader's id must NOT come back. Replacing it with a spread would fix
+     the bug above and leak these. */
+  for (const f of ['file', 'uploadedById', 'contentType']) {
+    ok(`${f} is still withheld`, !returned.has(f));
+  }
+}
+
 /* ── Report ─────────────────────────────────────────────────────────── */
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

@@ -53,6 +53,14 @@ export async function onRequestGet(context) {
       const need = ROLES.indexOf(m.role);
       return need !== -1 && rank >= need;
     })
+    /* A WHITELIST, deliberately: the stored record also holds the storage
+       filename and the uploader's id, and neither belongs in a public
+       response. But it means a field the page needs and this forgets simply
+       vanishes, and only after a reload — the page has the whole item in
+       memory right after it is added, so a clip looked perfect until you
+       navigated away and came back to a broken thumbnail and a dead embed.
+       Anything renderItem or the lightbox reads has to be listed here;
+       test-media-clips checks that it is. */
     .map(m => ({
       id: m.id,
       url: m.url,
@@ -62,6 +70,12 @@ export async function onRequestGet(context) {
       role: m.role || null,
       uploadedBy: m.uploadedBy,
       uploadedAt: m.uploadedAt,
+      /* Twitch clips: a reference rather than a file, so the tile and the
+         embed are built from these rather than from `url`. */
+      slug: m.slug,
+      thumbnail: m.thumbnail,
+      duration: m.duration,
+      clipCreator: m.clipCreator,
     }));
 
   /* canManage decides whether the page offers Upload and Remove. It is a
