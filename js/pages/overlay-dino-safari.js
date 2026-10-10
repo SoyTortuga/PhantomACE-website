@@ -127,6 +127,35 @@
     return div.innerHTML;
   }
 
+  /* ── WHAT'S ON STREAM GATE ──────────────────────────────────────────────
+     Fetches only while the one `whatsOn` pointer (js/pages/overlay.js) names
+     this event; otherwise it hides and does no network at all. functions/api/dino-safari.js
+     already refreshes and clears that pointer for Safari, so the pointer's
+     lifetime is exactly the event's -- the server half was wired and this half
+     was not, so the panel asked every 8 seconds, for the whole of a
+     marathon stream, to be told "nothing on" again.
+
+     mine() is undefined until the bus has answered, and there is no bus at all
+     without overlay.js. Both fall through to polling as before, so a panel
+     opened standalone is unaffected. */
+  var MY_GAME = 'dino-park';
+  var bus = (typeof window !== 'undefined' && window.PhamWhatsOn) ? window.PhamWhatsOn : null;
+  function mine() {
+    if (!bus) return undefined;
+    var w = bus.get();
+    if (w === undefined) return undefined;
+    return !!(w && w.game === MY_GAME);
+  }
+  var lastVerdict;
+  function onBus() {
+    var v = mine();
+    if (v === lastVerdict) return;
+    lastVerdict = v;
+    /* The pointer just changed: look now rather than waiting out the idle
+       backoff, so the panel appears the moment the event starts. */
+    schedule(0);
+  }
+
   function schedule(ms) {
     clearTimeout(timer);
     timer = setTimeout(poll, ms);
@@ -152,6 +181,8 @@
   }
 
   function poll() {
+    /* Not our event, and the bus has said so: stay hidden, no fetch. */
+    if (mine() === false) { hide(); schedule(IDLE_POLL_MS); return; }
     fetch('/api/dino-safari?key=' + encodeURIComponent(key), { cache: 'no-store' })
       .then(function (r) {
         if (r.ok) { clearFault(); return r.json(); }
@@ -176,5 +207,6 @@
       });
   }
 
+  if (bus) bus.subscribe(onBus);
   poll();
 })();
