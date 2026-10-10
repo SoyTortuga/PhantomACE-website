@@ -1110,6 +1110,23 @@
     }
     .dex-filter:hover { color: var(--text-pri); border-color: var(--text-dim); }
     .dex-filter.active { color: var(--red); border-color: var(--red); }
+    /* Sits with the filter buttons rather than on its own row: it is the
+       same kind of control and a second row pushes the grid down. */
+    .dex-sort { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+    .dex-sort > span {
+      font-size: 12px; color: var(--text-dim); text-transform: uppercase;
+      letter-spacing: 0.04em; font-weight: 600;
+    }
+    .dex-sort select {
+      padding: 5px 8px; background: var(--gray-mid); border: 1px solid var(--border-mid);
+      border-radius: 3px; color: var(--text-pri); font-family: inherit; font-size: 14px;
+      cursor: pointer;
+    }
+    .dex-sort select:hover { border-color: var(--text-dim); }
+    @media (max-width: 560px) {
+      .dex-sort { margin-left: 0; width: 100%; }
+      .dex-sort select { flex: 1 1 auto; }
+    }
     .dex-counter { font-size: 15px;
  text-shadow: none; color: var(--text-dim); margin-bottom: 8px; }
     .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
@@ -7272,6 +7289,57 @@ function makeDots(val, cls) {
 /* ======================== DINODEX ======================== */
 let dexFilter = 'all';
 let dexSelectedSpec = null;
+/* Resets on reload, like dexFilter — one convention for both controls. */
+let dexSort = 'default';
+
+/* AN UNDISCOVERED SPECIES MUST NOT BE SORTED BY ITS NAME. The card shows
+   "???" precisely because the player has not found it, and slotting it
+   alphabetically between two known names tells them what letter it starts
+   with. The name orders therefore rank discovered species only, and leave
+   the rest behind them in roster order.
+
+   Rarity is not secret — the undiscovered card already prints it as its
+   subtitle — so those orders can place every entry, with the readable ones
+   first inside each band. */
+const DEX_SORTS = {
+  default:    { label: 'Dex order' },
+  'name-asc': { label: 'Name A \u2013 Z' },
+  'name-desc':{ label: 'Name Z \u2013 A' },
+  'rare-asc': { label: 'Rarity \u2191' },
+  'rare-desc':{ label: 'Rarity \u2193' },
+};
+
+function sortDex(list, how) {
+  if (how === 'default' || !DEX_SORTS[how]) return list;
+  const known = (r) => state.discovered.includes(r.id);
+  const pos = new Map(ROSTER.map((r, i) => [r.id, i]));
+  const byRoster = (a, b) => pos.get(a.id) - pos.get(b.id);
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const rank = (r) => RARITY_ORDER.indexOf(r.rarity);
+
+  const out = list.slice();
+  if (how === 'name-asc' || how === 'name-desc') {
+    const dir = how === 'name-asc' ? 1 : -1;
+    out.sort((a, b) => {
+      /* Unknowns last in both directions: they are not sorted, they are
+         set aside, so reversing the order must not bring them to the top. */
+      if (known(a) !== known(b)) return known(a) ? -1 : 1;
+      if (!known(a)) return byRoster(a, b);
+      return dir * byName(a, b);
+    });
+    return out;
+  }
+
+  const dir = how === 'rare-asc' ? 1 : -1;
+  out.sort((a, b) => {
+    const d = dir * (rank(a) - rank(b));
+    if (d) return d;
+    /* Inside a rarity: the ones you can read first, alphabetically. */
+    if (known(a) !== known(b)) return known(a) ? -1 : 1;
+    return known(a) ? byName(a, b) : byRoster(a, b);
+  });
+  return out;
+}
 
 /* SPECIES progress, despite what the old name said. byRarity has always
    counted species discovered per rarity -- which is what the chips under
@@ -7406,13 +7474,20 @@ function renderDinodex() {
   const filterOpts = ['all', ...RARITY_ORDER, 'mutated', 'owned'];
   document.getElementById('dexFilters').innerHTML = filterOpts.map(f =>
     `<button class="dex-filter ${f===dexFilter?'active':''}" onclick="dexFilter='${f}';renderDinodex();">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`
-  ).join('');
+  ).join('') +
+    `<label class="dex-sort"><span>Sort</span>
+      <select id="dexSortSel" onchange="dexSort=this.value;renderDinodex();">
+        ${Object.entries(DEX_SORTS).map(([v, o]) =>
+          `<option value="${v}"${v===dexSort?' selected':''}>${o.label}</option>`).join('')}
+      </select></label>`;
 
   let filtered;
   if (dexFilter === 'all') filtered = ROSTER;
   else if (dexFilter === 'mutated') filtered = ROSTER.filter(r => state.discoveredMutations.some(m => m.startsWith(r.id + '_')));
   else if (dexFilter === 'owned') filtered = ROSTER.filter(r => state.park.some(d => d.speciesId === r.id));
   else filtered = ROSTER.filter(r => r.rarity === dexFilter);
+
+  filtered = sortDex(filtered, dexSort);
 
   const filterLabel = dexFilter === 'all' ? '' : ` (${dexFilter})`;
   document.getElementById('dexCounter').textContent = `Showing ${filtered.length} species${filterLabel}`;
