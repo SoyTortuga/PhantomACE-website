@@ -50,10 +50,17 @@
   opacity: 0.4;
 }
 
-/* Everything that is not the backdrop sits above it. */
+/* Everything that is not the backdrop sits above it.
+
+   #site-header IS DELIBERATELY NOT IN THIS LIST. The header inside that
+   wrapper is position: fixed with z-index 1000, so it is already above the
+   backdrop without help — and giving the wrapper its own z-index made it a
+   stacking context, which TRAPPED the header's 1000 and the account menu's
+   1200 inside a layer of 1. The hero is also z-index 1 and comes later in
+   the document, so it won the tie and swallowed every click on the open
+   account menu. The menu looked fine and did nothing. */
 .home-section,
 .section-divider,
-#site-header,
 #site-footer {
   position: relative;
   z-index: 1;
