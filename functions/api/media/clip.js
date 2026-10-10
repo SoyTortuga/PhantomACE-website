@@ -1,5 +1,8 @@
 /* ══════════════════════════════════════════════
-   TWITCH CLIPS ON THE MEDIA WALL
+   LINKED MEDIA ON THE WALL — Twitch clips and YouTube videos
+
+   (The route is still /api/media/clip, which is where it started. Renaming
+   it would mean changing the client again for no behavioural gain.)
 
    Adding a clip used to mean downloading it off Twitch and uploading the
    file — which costs the rig the storage and the bandwidth, splits the
@@ -20,8 +23,16 @@
    An app token is enough — this needs nothing from the broadcaster's OAuth
    grant, so it works today.
 
-   GET  ?recent=1   the channel's recent clips, for the picker
-   POST {url|slug}  add one to the wall
+   YOUTUBE works the same way and needs no key either: oEmbed returns the
+   title, the author and a stable thumbnail, and refuses an id that does not
+   exist, so the same verify-then-store flow applies — including declining a
+   video from somebody else's channel. A Short is 9:16 and is remembered as
+   such, because playing one in the clips' 16:9 box pillarboxes it.
+
+   GET  ?recent=1   the channel's recent CLIPS, for the picker. There is no
+                    YouTube equivalent: listing a channel's uploads needs a
+                    Data API key, which oEmbed does not.
+   POST {url}       add a Twitch clip or a YouTube video to the wall
    ══════════════════════════════════════════════ */
 
 const INDEX_KEY = 'media_index';
@@ -83,6 +94,48 @@ export function clipSlug(input) {
   return null;
 
   function valid(s) { return /^[A-Za-z0-9_-]{4,100}$/.test(s) ? s : null; }
+}
+
+/* The channel a YouTube link must belong to. Mirrors the handle in
+   js/components.js and about.html — test-mirrors keeps the three in step. */
+const YT_CHANNEL = '@PhantomACE';
+
+/**
+ * The video out of a YouTube link, and whether it is a Short.
+ *
+ *   https://www.youtube.com/shorts/<id>      a Short: 9:16
+ *   https://www.youtube.com/watch?v=<id>     a normal video
+ *   https://youtu.be/<id>
+ *   https://www.youtube.com/embed/<id>
+ *
+ * Orientation comes from the URL rather than from oEmbed, whose width and
+ * height are the size you asked for and say nothing about the video's shape.
+ * Returns null for anything that is not a YouTube video link — a bare id is
+ * NOT accepted here, unlike a Twitch slug, because an 11-character string
+ * could just as easily be a clip slug and guessing between them is worse
+ * than asking for the link.
+ */
+export function youtubeRef(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+
+  let u;
+  try { u = new URL(raw); } catch { return null; }
+  const host = u.hostname.replace(/^www\./, '');
+  const ok = (id, short) => (/^[A-Za-z0-9_-]{11}$/.test(id) ? { id, short } : null);
+
+  if (host === 'youtu.be') {
+    return ok(u.pathname.split('/').filter(Boolean)[0] || '', false);
+  }
+  if (host !== 'youtube.com' && host !== 'youtube-nocookie.com' && host !== 'm.youtube.com') {
+    return null;
+  }
+
+  const parts = u.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'shorts' && parts[1]) return ok(parts[1], true);
+  if (parts[0] === 'embed' && parts[1]) return ok(parts[1], false);
+  if (parts[0] === 'watch') return ok(u.searchParams.get('v') || '', false);
+  return null;
 }
 
 /** Twitch's thumbnail template carries %{width}/%{height} placeholders. */
@@ -176,11 +229,18 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
-  const slug = clipSlug(body.url || body.slug);
-  if (!slug) return json({ error: "That does not look like a Twitch clip link." }, 400);
-
   const category = CATEGORIES.includes(body.category) ? body.category : 'clip';
   const role = ROLES.includes(body.role) ? body.role : '';
+
+  /* YouTube first: its links are unambiguous, where a bare string could be a
+     Twitch slug. */
+  const yt = youtubeRef(body.url);
+  if (yt) return addYouTube(env, session, body, yt, category, role);
+
+  const slug = clipSlug(body.url || body.slug);
+  if (!slug) {
+    return json({ error: 'That does not look like a Twitch clip or a YouTube link.' }, 400);
+  }
 
   if (!env.TWITCH_CLIENT_ID) return json({ error: 'Twitch is not configured on this server.' }, 503);
 
@@ -233,4 +293,69 @@ export async function onRequestPost(context) {
   });
 
   return json({ success: true, item: meta, replaced: duplicate });
+}
+
+/* ── YouTube ──────────────────────────────────────────────────────────────
+   oEmbed needs no key and gives everything the wall wants: the title, the
+   author (so a video from another channel can be refused, exactly as a clip
+   from another channel is) and a stable, hotlinkable thumbnail. It answers
+   400 for an id that does not exist, which is the verification. */
+async function addYouTube(env, session, body, ref, category, role) {
+  const watch = `https://www.youtube.com/watch?v=${ref.id}`;
+  let meta;
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(watch)}&format=json`,
+      { headers: { Accept: 'application/json' } });
+    if (res.status === 404 || res.status === 400) {
+      return json({ error: 'YouTube does not have a video with that link.' }, 404);
+    }
+    if (!res.ok) throw new Error(`YouTube returned ${res.status}`);
+    meta = await res.json();
+  } catch (err) {
+    return json({ error: err.message || 'Could not reach YouTube.' }, 502);
+  }
+
+  /* Another channel's video, refused by name — the same rule the Twitch side
+     applies, and the reason a paste cannot put anyone's content on this wall.
+     Compared on the handle, because author_url carries it in full. */
+  const author = String(meta.author_name || '');
+  const authorUrl = String(meta.author_url || '');
+  const handle = YT_CHANNEL.toLowerCase();
+  if (!authorUrl.toLowerCase().includes(handle)) {
+    return json({ error: `That video is from another channel (${author || 'unknown'}).` }, 400);
+  }
+
+  const title = String(body.title || meta.title || 'Video').trim().slice(0, 120);
+  const id = `yt_${ref.id}`;
+
+  const item = {
+    id,
+    videoId: ref.id,
+    /* 9:16 rather than 16:9. The embed box reads this; without it a Short
+       plays between two black pillars. */
+    short: !!ref.short,
+    url: ref.short
+      ? `https://www.youtube.com/shorts/${ref.id}`
+      : watch,
+    title,
+    category,
+    role: role || null,
+    type: 'youtube',
+    thumbnail: String(meta.thumbnail_url || `https://i.ytimg.com/vi/${ref.id}/hqdefault.jpg`),
+    clipCreator: author,
+    uploadedBy: session.display_name,
+    uploadedById: String(session.user_id),
+    uploadedAt: Date.now(),
+  };
+
+  let duplicate = false;
+  await env.MARKETPLACE.mutate(INDEX_KEY, (current) => {
+    const index = Array.isArray(current) ? current : [];
+    const without = index.filter(i => !(i && i.id === id));
+    duplicate = without.length !== index.length;
+    return [item, ...without].slice(0, MAX_INDEX);
+  });
+
+  return json({ success: true, item, replaced: duplicate });
 }

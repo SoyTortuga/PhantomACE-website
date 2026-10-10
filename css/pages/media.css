@@ -659,3 +659,22 @@
   display: block;
   background: #000;
 }
+
+/* A Short is 9:16. In the landscape box above it plays between two black
+   pillars, which is most of the screen. */
+.lightbox-clip.is-short {
+  width: auto;
+  height: min(80vh, 900px);
+  aspect-ratio: 9 / 16;
+  max-width: 92vw;
+  margin: 0 auto;
+}
+
+/* The corner chip marking a vertical video, beside the duration. */
+.gallery-item-dur.is-short {
+  right: auto;
+  left: 6px;
+  letter-spacing: 0.06em;
+  color: var(--red);
+  border-color: var(--red);
+}

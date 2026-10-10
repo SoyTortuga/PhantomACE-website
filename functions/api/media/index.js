@@ -70,9 +70,13 @@ export async function onRequestGet(context) {
       role: m.role || null,
       uploadedBy: m.uploadedBy,
       uploadedAt: m.uploadedAt,
-      /* Twitch clips: a reference rather than a file, so the tile and the
-         embed are built from these rather than from `url`. */
+      /* Linked media — Twitch clips and YouTube videos — are references
+         rather than files, so the tile and the embed are built from these
+         rather than from `url`. Forgetting one here is invisible until a
+         reload, which is exactly how the clip fields got missed. */
       slug: m.slug,
+      videoId: m.videoId,
+      short: m.short,
       thumbnail: m.thumbnail,
       duration: m.duration,
       clipCreator: m.clipCreator,

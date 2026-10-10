@@ -73,8 +73,8 @@ function renderItem(item, index) {
   /* Driven by the item's own type rather than by its category. A clip filed
      under Highlights is still a video, and an image filed under Clips is
      still an image — the old check read the category and got both wrong. */
-  /* A Twitch clip plays too, so it gets the same affordance. */
-  const playHtml = (item.type === 'video' || item.type === 'twitch-clip')
+  /* Anything that plays gets the same affordance. */
+  const playHtml = (item.type === 'video' || item.type === 'twitch-clip' || item.type === 'youtube')
     ? '<div class="gallery-item-play"></div>' : '';
   /* No role-<role> class on the tile. /api/media already left out
      everything this viewer may not see, judged with the moderator list;
@@ -93,9 +93,10 @@ function renderItem(item, index) {
   /* A Twitch clip is a REFERENCE — nothing of it is stored here. The tile
      is Twitch's own thumbnail, so the grid costs one image rather than an
      embedded player per tile; the player appears when it is opened. */
-  const mediaHtml = item.type === 'twitch-clip'
+  const mediaHtml = (item.type === 'twitch-clip' || item.type === 'youtube')
     ? `<img src="${escapeAttr(item.thumbnail || '')}" alt="${escapeAttr(item.title)}" loading="lazy">` +
-      (item.duration ? `<span class="gallery-item-dur">${escapeHtml(item.duration)}</span>` : '')
+      (item.duration ? `<span class="gallery-item-dur">${escapeHtml(item.duration)}</span>` : '') +
+      (item.short ? '<span class="gallery-item-dur is-short">SHORT</span>' : '')
     : item.type === 'video'
       ? `<video src="${escapeAttr(item.url)}" preload="metadata" muted playsinline></video>`
       : item.type === 'audio'
@@ -259,7 +260,17 @@ function updateLightboxContent(item) {
      `parent` must name the host serving this page or Twitch refuses to
      frame at all, so it comes from location.hostname. Hardcoding
      phantomace.tv would work there and nowhere else, previews included. */
-  content.innerHTML = item.type === 'twitch-clip'
+  /* YOUTUBE, on the privacy-enhanced domain: youtube-nocookie.com sets no
+     cookies until somebody actually presses play. A Short is 9:16 and gets a
+     portrait box — in the clips' 16:9 frame it plays between two black
+     pillars. */
+  content.innerHTML = item.type === 'youtube'
+    ? `<iframe class="lightbox-clip${item.short ? ' is-short' : ''}"
+        src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.videoId)}?autoplay=1&rel=0"
+        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+        referrerpolicy="strict-origin-when-cross-origin"
+        title="${escapeAttr(item.title)}"></iframe>`
+    : item.type === 'twitch-clip'
     ? `<iframe class="lightbox-clip" src="https://clips.twitch.tv/embed?clip=${
         encodeURIComponent(item.slug)}&parent=${encodeURIComponent(location.hostname)}&autoplay=true"
         allow="fullscreen" referrerpolicy="strict-origin-when-cross-origin"
@@ -273,8 +284,11 @@ function updateLightboxContent(item) {
   title.textContent = item.title;
   /* A clip was made by someone, and that is a different fact from who put
      it on the wall. Both are worth saying. */
-  meta.textContent = `${item.category} · ${formatDate(item.uploadedAt)}` +
-    (item.clipCreator ? ` · clipped by ${item.clipCreator}` : '') +
+  /* "clipped by" is a Twitch word; a YouTube video has a channel. */
+  const credit = item.clipCreator
+    ? (item.type === 'youtube' ? ` · ${item.clipCreator}` : ` · clipped by ${item.clipCreator}`)
+    : '';
+  meta.textContent = `${item.category} · ${formatDate(item.uploadedAt)}` + credit +
     (item.uploadedBy ? ` · added by ${item.uploadedBy}` : '');
 
   prevBtn.style.display = lightboxIndex > 0 ? '' : 'none';

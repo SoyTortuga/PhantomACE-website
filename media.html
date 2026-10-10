@@ -58,7 +58,7 @@
         <button type="button" class="upload-mode active" id="modeFileBtn" role="tab"
                 aria-selected="true" onclick="setUploadMode('file')">Upload a file</button>
         <button type="button" class="upload-mode" id="modeClipBtn" role="tab"
-                aria-selected="false" onclick="setUploadMode('clip')">Twitch clip</button>
+                aria-selected="false" onclick="setUploadMode('clip')">Paste a link</button>
       </div>
 
       <form id="uploadForm" onsubmit="handleUpload(event)">
@@ -109,11 +109,11 @@
            URL. -->
       <form id="clipForm" onsubmit="handleAddClip(event)" hidden>
         <div class="upload-field">
-          <label for="clipUrl">Clip link</label>
+          <label for="clipUrl">Twitch clip or YouTube link</label>
           <input type="text" id="clipUrl" required
-                 placeholder="https://www.twitch.tv/phantomace/clip/...">
-          <small class="upload-hint">Any Twitch clip link, or just the slug. The title and
-            thumbnail come from Twitch.</small>
+                 placeholder="twitch.tv/phantomace/clip/… or youtube.com/shorts/…">
+          <small class="upload-hint">A Twitch clip (link or slug), or a YouTube video or
+            Short. The title and thumbnail come from them; nothing is uploaded here.</small>
         </div>
         <div class="upload-field">
           <label for="clipTitle">Title <span class="upload-optional">(optional)</span></label>
@@ -141,7 +141,7 @@
 
         <div class="upload-field">
           <div class="clip-recent-head">
-            <label>Recent clips</label>
+            <label>Recent Twitch clips</label>
             <button type="button" class="btn-secondary clip-refresh" id="clipRefreshBtn"
                     onclick="loadRecentClips()">Load</button>
           </div>

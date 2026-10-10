@@ -473,6 +473,152 @@ const index = (env) => {
   }
 }
 
+/* ── YouTube links, and Shorts ───────────────────────────────────────── */
+{
+  const { youtubeRef } = await import('../../functions/api/media/clip.js');
+  const ID = 'aqz-KE-bpKQ';
+
+  /* The URL says whether it is a Short. oEmbed's width/height is the size
+     you ASKED for, not the video's shape, so it cannot answer this. */
+  check('a Shorts link is a Short', youtubeRef(`https://www.youtube.com/shorts/${ID}`), { id: ID, short: true });
+  check('mobile Shorts too', youtubeRef(`https://m.youtube.com/shorts/${ID}`), { id: ID, short: true });
+  check('a watch link is not', youtubeRef(`https://www.youtube.com/watch?v=${ID}`), { id: ID, short: false });
+  check('with extra params', youtubeRef(`https://www.youtube.com/watch?v=${ID}&t=30s`), { id: ID, short: false });
+  check('the short domain', youtubeRef(`https://youtu.be/${ID}`), { id: ID, short: false });
+  check('and an embed url', youtubeRef(`https://www.youtube.com/embed/${ID}`), { id: ID, short: false });
+
+  check('a lookalike host is refused', youtubeRef(`https://youtube.com.evil.example/shorts/${ID}`), null);
+  check('another site is refused', youtubeRef(`https://evil.example/shorts/${ID}`), null);
+  check('a channel page is not a video', youtubeRef('https://www.youtube.com/@PhantomACE'), null);
+  /* A bare id is NOT taken: eleven characters could equally be a Twitch
+     slug, and guessing between them is worse than wanting the link. */
+  check('a bare id is not guessed at', youtubeRef(ID), null);
+  check('a malformed id is refused', youtubeRef('https://www.youtube.com/shorts/short'), null);
+
+  /* ── through the route ── */
+  const OEMBED = {
+    title: 'Insane 1v5', author_name: 'PhantomACE',
+    author_url: 'https://www.youtube.com/@PhantomACE',
+    thumbnail_url: `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`,
+  };
+
+  function ytEnv({ oembed = OEMBED, status = 200 } = {}) {
+    const store = new Map();
+    store.set('site_moderators', JSON.stringify({ entries: [{ userId: '9' }] }));
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('youtube.com/oembed')) {
+        if (status !== 200) return new Response('{}', { status });
+        return new Response(JSON.stringify(oembed), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    };
+    return {
+      TWITCH_CLIENT_ID: 'c', TWITCH_CLIENT_SECRET: 's', TWITCH_BROADCASTER_ID: BROADCASTER,
+      MARKETPLACE: {
+        async get(k, t) { if (!store.has(k)) return null; const r = store.get(k); return t === 'json' ? JSON.parse(r) : r; },
+        async put(k, v) { store.set(k, typeof v === 'string' ? v : JSON.stringify(v)); },
+        async delete(k) { store.delete(k); },
+        async mutate(k, fn) {
+          const cur = store.has(k) ? JSON.parse(store.get(k)) : null;
+          const next = await fn(cur);
+          if (next === undefined) return cur;
+          store.set(k, JSON.stringify(next)); return next;
+        },
+        async listValues() { return []; },
+      },
+      store,
+    };
+  }
+  const idx = (env) => { const r = env.store.get('media_index'); return r ? JSON.parse(r) : []; };
+
+  {
+    const env = ytEnv();
+    const r = await post(env, { url: `https://www.youtube.com/shorts/${ID}` }, as('9'));
+    check('a Short is accepted', r.status, 200);
+    const it = idx(env)[0];
+    check('typed as youtube', it.type, 'youtube');
+    check('remembering it is vertical', it.short, true);
+    check('with the video id the embed needs', it.videoId, ID);
+    check('the title comes from YouTube', it.title, 'Insane 1v5');
+    check('and the channel is credited', it.clipCreator, 'PhantomACE');
+    ok('with a thumbnail', /i\.ytimg\.com/.test(it.thumbnail));
+    ok('and no file', !it.file);
+  }
+
+  {
+    const env = ytEnv();
+    await post(env, { url: `https://www.youtube.com/watch?v=${ID}` }, as('9'));
+    check('a normal video is not marked short', idx(env)[0].short, false);
+  }
+
+  /* Another channel's video, refused by name — the same rule the Twitch
+     side applies, and the reason a paste cannot put anyone's video here. */
+  {
+    const env = ytEnv({ oembed: { ...OEMBED, author_name: 'SomeoneElse',
+      author_url: 'https://www.youtube.com/@SomeoneElse' } });
+    const r = await post(env, { url: `https://www.youtube.com/shorts/${ID}` }, as('9'));
+    check('another channel is refused', r.status, 400);
+    ok('naming them', /SomeoneElse/.test(r.data.error || ''));
+    check('and nothing is stored', idx(env), []);
+  }
+
+  {
+    const env = ytEnv({ status: 400 });
+    const r = await post(env, { url: `https://www.youtube.com/shorts/${ID}` }, as('9'));
+    check('an id YouTube does not have is refused', r.status, 404);
+  }
+  {
+    const env = ytEnv({ status: 500 });
+    const r = await post(env, { url: `https://www.youtube.com/shorts/${ID}` }, as('9'));
+    check('a YouTube outage is reported as one', r.status, 502);
+  }
+
+  /* Staff only, like everything else that writes to the wall. */
+  {
+    const env = ytEnv();
+    check('a viewer cannot add one', (await post(env, { url: `https://youtu.be/${ID}` }, as('1'))).status, 403);
+  }
+
+  /* The same video twice replaces rather than doubling. */
+  {
+    const env = ytEnv();
+    await post(env, { url: `https://youtu.be/${ID}` }, as('9'));
+    const again = await post(env, { url: `https://www.youtube.com/shorts/${ID}`, title: 'Renamed' }, as('9'));
+    check('the second add replaces', again.data.replaced, true);
+    check('one item', idx(env).length, 1);
+    check('with the new title', idx(env)[0].title, 'Renamed');
+  }
+
+  /* ── the client ── */
+  const js = read('js/pages/media.js');
+  ok('the tile draws the YouTube thumbnail', /item\.type === 'youtube'/.test(js));
+  /* The privacy-enhanced domain sets no cookies until somebody presses
+     play, which is why it is used rather than youtube.com. */
+  ok('the embed uses youtube-nocookie', /youtube-nocookie\.com\/embed\//.test(js));
+  ok('and never plain youtube.com/embed', !/[^-]www\.youtube\.com\/embed\//.test(js));
+  ok('the video id is encoded into the src', /encodeURIComponent\(item\.videoId\)/.test(js));
+  ok('a Short gets a portrait box', /item\.short \? ' is-short'/.test(js));
+
+  const css = read('css/pages/media.css');
+  ok('which the stylesheet makes 9:16', /\.lightbox-clip\.is-short[\s\S]{0,200}aspect-ratio: 9 \/ 16/.test(css));
+
+  /* THE WHITELIST, again. /api/media returns named fields; the clip fields
+     were forgotten once and every tile broke on reload. */
+  const indexSrc = read('functions/api/media/index.js');
+  for (const f of ['videoId', 'short']) {
+    ok(`${f} survives the API`, new RegExp('^\\s*' + f + ':', 'm').test(indexSrc));
+  }
+
+  /* The channel the route checks against must match the one the site links
+     to, or every paste is refused — or worse, none is. */
+  const route = read('functions/api/media/clip.js');
+  const handle = /const YT_CHANNEL = '(@[A-Za-z0-9_.-]+)'/.exec(route);
+  ok('the route names a channel', !!handle);
+  const components = read('js/components.js');
+  ok('and it is the one the site links to',
+    !!handle && components.includes('youtube.com/' + handle[1]));
+}
+
 /* ── Report ─────────────────────────────────────────────────────────── */
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);
