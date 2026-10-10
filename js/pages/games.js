@@ -3,12 +3,12 @@ const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => (
 ));
 
 const GAMES = [
-  { id: 'memory-match', title: 'Memory Match', thumb: '/assets/images/game-memory-match.png', play: () => launchGame('Memory Match', '/games/memory-match/') },
-  { id: 'skull-clicker', title: 'Skull Clicker', thumb: '/assets/images/game-skull-clicker.png', play: () => launchGame('Skull Clicker', '/games/skull-clicker/') },
-  { id: 'commander-bingo', title: 'Commander Bingo', thumb: '/assets/images/game-commander-bingo.png', play: () => launchGame('Commander Bingo', '/games/commander-bingo/'), live: true },
-  { id: 'dino-park', title: 'Dino Park', thumb: '/assets/images/game-dino-park.png', play: () => launchGame('Dino Park', '/games/dino-park/') },
-  { id: 'mana-clash', title: 'Mana Clash', thumb: '/assets/images/game-mana-clash.png', play: () => launchGame('Mana Clash', '/games/mana-clash/'), live: true },
-  { id: 'pham-shock', title: 'PhamShock', thumb: '/assets/images/game-phamshock.png', play: () => launchGame('PhamShock', '/games/phamshock/'), live: true },
+  { id: 'memory-match', title: 'Memory Match', thumb: '/assets/images/game-memory-match.webp', play: () => launchGame('Memory Match', '/games/memory-match/') },
+  { id: 'skull-clicker', title: 'Skull Clicker', thumb: '/assets/images/game-skull-clicker.webp', play: () => launchGame('Skull Clicker', '/games/skull-clicker/') },
+  { id: 'commander-bingo', title: 'Commander Bingo', thumb: '/assets/images/game-commander-bingo.webp', play: () => launchGame('Commander Bingo', '/games/commander-bingo/'), live: true },
+  { id: 'dino-park', title: 'Dino Park', thumb: '/assets/images/game-dino-park.webp', play: () => launchGame('Dino Park', '/games/dino-park/') },
+  { id: 'mana-clash', title: 'Mana Clash', thumb: '/assets/images/game-mana-clash.webp', play: () => launchGame('Mana Clash', '/games/mana-clash/'), live: true },
+  { id: 'pham-shock', title: 'PhamShock', thumb: '/assets/images/game-phamshock.webp', play: () => launchGame('PhamShock', '/games/phamshock/'), live: true },
 ];
 
 function launchGame(title, src) {
