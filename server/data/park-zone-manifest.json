@@ -1,0 +1,152 @@
+{
+  "_comment": [
+    "Zone metadata for the park tile sets: which sets are land (L), water (O),",
+    "both (R) or impassable (X), and how the background studio groups them.",
+    "",
+    "Derived from park-tiles/palette.json, which is gitignored because it ships",
+    "with purchased pack art. This holds NO art and no filenames — only the set",
+    "ids and the walkability flags this project chose.",
+    "",
+    "It exists so test-park-zones can check the server mirror on EVERY machine,",
+    "not only one that has had 1,294 PNGs copied to it. Regenerate after adding",
+    "a tile set: node server/scripts/sync-park-zones.js --write"
+  ],
+  "sets": {
+    "asphalt": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "cloud": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "cobble": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "crosswalk": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "deadforest": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "deciron": {
+      "zone": "X",
+      "kind": "decoration"
+    },
+    "deckelp": {
+      "zone": "X",
+      "kind": "decoration"
+    },
+    "decoreef": {
+      "zone": "X",
+      "kind": "decoration"
+    },
+    "decrock": {
+      "zone": "X",
+      "kind": "decoration"
+    },
+    "decruins": {
+      "zone": "X",
+      "kind": "decoration"
+    },
+    "desert": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "dock": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "dragonscale": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "fenceiron": {
+      "zone": "X",
+      "kind": "fence"
+    },
+    "fencewire": {
+      "zone": "X",
+      "kind": "fence"
+    },
+    "fencewood": {
+      "zone": "X",
+      "kind": "fence"
+    },
+    "jungle": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "marble": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "metal": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "moonlit": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "mud": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "mushroom": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "neon": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "oceanfloor": {
+      "zone": "O",
+      "kind": "water"
+    },
+    "plainfloor": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "prehistoric": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "rust": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "sandmix": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "snow": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "snowpath": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "stone": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "tower": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "volcanic": {
+      "zone": "L",
+      "kind": "ground"
+    },
+    "water": {
+      "zone": "O",
+      "kind": "water"
+    }
+  }
+}

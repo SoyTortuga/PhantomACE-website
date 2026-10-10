@@ -16,16 +16,25 @@
    told their mask is wrong at a cell they painted correctly, with
    nothing on screen to explain it. That is the failure this guards.
 
-   SKIPS WHEN THE PALETTE IS ABSENT. It is gitignored, so a fresh clone
-   or a machine that has not had the art copied to it does not have the
-   file to compare against. Skipping is correct there — the alternative
-   is a suite that fails for everyone who has not copied 1,294 PNGs.
+   IT USED TO SKIP THE COMPARISON when palette.json was absent — which is
+   a fresh clone, CI, and the rig straight after a pull, i.e. everywhere
+   except a machine someone had hand-copied 1,294 PNGs to. The half of
+   this suite that matters therefore almost never ran, and said so in a
+   note that still exited zero.
+
+   The zone metadata is committed now, at server/data/park-zone-manifest
+   .json: set ids and walkability flags, no artwork and no filenames from
+   the pack. The mirror is checked against THAT on every machine. Where
+   the real palette is present it is checked too, so the committed copy
+   cannot quietly go stale — regenerate it with
+   server/scripts/sync-park-zones.js.
    ══════════════════════════════════════════════ */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SET_ZONE, SET_KIND, zoneOfRef, isOverlaySet } from '../../functions/api/park-zones.js';
+import { buildManifest, readManifest, readPalette } from './sync-park-zones.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -71,31 +80,46 @@ const ok = (label, cond) => check(label, !!cond, true);
   }
 }
 
-/* ── And that it matches the real palette, when that is present ──────── */
-if (!fs.existsSync(PALETTE)) {
-  console.log('');
-  console.log('[park-zones] palette.json not on this machine (gitignored pack art) —');
-  console.log('             mirror checked on its own; the comparison was skipped.');
-} else {
-  const pal = JSON.parse(fs.readFileSync(PALETTE, 'utf8'));
-  const real = {};
-  const realKind = {};
-  for (const s of pal.sets) { real[s.id] = s.zone; realKind[s.id] = s.kind || 'ground'; }
+/* ── The mirror against the committed zone table — ALWAYS ────────────── */
+{
+  const manifest = readManifest();
+  ok('the committed zone manifest is present', !!(manifest && manifest.sets));
+  const real = manifest ? manifest.sets : {};
+  ok('and has sets in it', Object.keys(real).length > 5);
 
   check('the mirror has every set the palette does',
         Object.keys(real).filter(id => !(id in SET_ZONE)), []);
   check('and no sets the palette does not',
         Object.keys(SET_ZONE).filter(id => !(id in real)), []);
 
-  const wrongZone = Object.keys(real).filter(id => SET_ZONE[id] !== real[id]);
-  check('every zone matches', wrongZone, []);
-  const wrongKind = Object.keys(realKind).filter(id => SET_KIND[id] !== realKind[id]);
-  check('every kind matches', wrongKind, []);
+  check('every zone matches',
+        Object.keys(real).filter(id => SET_ZONE[id] !== real[id].zone), []);
+  check('every kind matches',
+        Object.keys(real).filter(id => SET_KIND[id] !== real[id].kind), []);
+}
 
-  /* The thing the server actually does with it: resolve a real ref. */
-  const sample = pal.sets[0];
-  check('a real ref resolves to its set zone',
-        zoneOfRef(sample.tiles[0].file.replace('.png', '')), sample.zone);
+/* ── And the committed table against the real one, where it exists ───── */
+{
+  const pal = readPalette();
+  if (!pal) {
+    /* Not a skipped assertion: everything above already ran. This only
+       checks the committed copy has not drifted from the pack art, which
+       needs the pack art. */
+    console.log('');
+    console.log('[park-zones] palette.json is not on this machine (gitignored pack');
+    console.log('             art). The mirror was still checked against the');
+    console.log('             committed manifest; only its freshness is unverified.');
+  } else {
+    const built = buildManifest(pal);
+    const committed = readManifest();
+    check('the committed manifest matches the real palette',
+          JSON.stringify(committed && committed.sets), JSON.stringify(built.sets));
+
+    /* The thing the server actually does with it: resolve a real ref. */
+    const sample = pal.sets[0];
+    check('a real ref resolves to its set zone',
+          zoneOfRef(sample.tiles[0].file.replace('.png', '')), sample.zone);
+  }
 }
 
 console.log('');
