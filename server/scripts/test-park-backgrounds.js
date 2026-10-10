@@ -343,6 +343,53 @@ const good = (over = {}) => ({
   ok('and keeps the ones they made', (mine.backgrounds || []).length >= 8);
 }
 
+/* ══ The game carries through every field it renders ══════════════════
+   loadBackgroundCatalog copies the API's record into the shape the rest of
+   dino-park expects, field by field. A field the composer READS but the
+   loader does not COPY is silently missing -- no error, no console warning,
+   just a background that renders wrong, and only for studio maps, because
+   the built-ins are constructed elsewhere.
+
+   That is exactly what happened: composeTilemap reads `fences` and
+   `bgColor`, the loader copied neither, and so every studio background lost
+   its fence layer and sat on flat black instead of the ground colour its
+   author had picked in the studio's own preview.
+
+   DERIVED, not listed: whatever the composer reads, the loader must copy, so
+   a layer added to the renderer is caught the day it is added. */
+{
+  const game = fs.readFileSync(path.join(REPO, 'games/dino-park/index.html'), 'utf8');
+
+  const composer = (game.match(/function composeTilemap\(entry[\s\S]*?\n\}/) || [''])[0];
+  ok('composeTilemap is found in the game', composer.length > 0);
+  const reads = [...new Set([...composer.matchAll(/entry\.([a-zA-Z]+)/g)].map(m => m[1]))].sort();
+  ok('and it reads at least the tilemap', reads.includes('tilemap'));
+
+  const loader = (game.match(/studioBackgrounds\[bg\.id\] = \{[\s\S]*?\};/) || [''])[0];
+  ok('the catalogue loader is found', loader.length > 0);
+  const copied = new Set([...loader.matchAll(/([a-zA-Z]+):\s*bg\.([a-zA-Z]+)/g)].map(m => m[1]));
+
+  check('every field composeTilemap renders is copied out of the API record',
+    reads.filter(f => !copied.has(f)), []);
+
+  /* And those fields have to survive the API round trip, or copying them in
+     the client is moot. */
+  const e = env();
+  const withFence = good();
+  withFence.fences = Array.from({ length: GRID }, () => row(null));
+  withFence.fences[1][1] = 'fencewood/00';
+  withFence.mask = withFence.mask.map((r, y) => (y === 1 ? r.slice(0, 1) + 'X' + r.slice(2) : r));
+  withFence.bgColor = '#1a0b0b';
+  const saved = await POST(e, withFence, asRole('555', 'sub_tier1'));
+  check('a background with fences and a ground colour saves', saved.status, 200);
+
+  const listed = await (await GET(e, '', as('555'))).json();
+  const mine = (listed.backgrounds || []).find(b => String(b.createdBy) === '555');
+  ok('and comes back in the listing', !!mine);
+  check('with its fences intact', mine && mine.fences && mine.fences[1][1], 'fencewood/00');
+  check('and its ground colour', mine && mine.bgColor, '#1a0b0b');
+}
+
 console.log('');
 if (failures.length) {
   console.log(`[park-backgrounds] ${passed} passed, ${failures.length} FAILED`);

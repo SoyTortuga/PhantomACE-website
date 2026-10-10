@@ -4684,8 +4684,14 @@ async function loadBackgroundCatalog() {
       /* Adapted to the same shape as a built-in entry, so everything
          downstream — zoneAt, the picker, the visit view — asks one
          question and never cares where a background came from. */
+      /* fences AND bgColor ride along. composeTilemap draws the colour
+         first and then ground-then-fences as two layers, so dropping them
+         here rendered every studio background with no fence layer at all
+         and on flat black instead of the author's chosen ground -- the two
+         things the studio's own preview showed them painting. */
       studioBackgrounds[bg.id] = {
         name: bg.name, src: null, mask: bg.mask, tilemap: bg.tilemap,
+        fences: bg.fences, bgColor: bg.bgColor,
       };
     });
     groundCache = null;
