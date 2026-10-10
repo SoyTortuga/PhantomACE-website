@@ -314,6 +314,17 @@ async function season(env) {
   ok('and the season record, non-expiring',
      /prefix: 'r6_season_',[^\n]*expiry: 'none'/.test(registry));
 
+  /* THE RECORD HAS TO BE READ BY SOMETHING. Every finished match updated
+     r6_season_<month> and ?season=1 returned it, but nothing on the site ever
+     called that endpoint -- so the record accumulated, correctly, for nobody.
+     A number kept and never shown is indistinguishable from one not kept. */
+  const dash = fs.readFileSync(path.join(REPO, 'js/pages/overlay-dashboard.js'), 'utf8');
+  ok('the dashboard asks for the season record', /r6-match\?season=1/.test(dash));
+  ok('and puts it on the match chip', /seasonSuffix\(/.test(dash) &&
+     /odR6MatchChip/.test(dash));
+  ok('a failed season read still leaves the live match on the chip',
+     /\.catch\(\(\) => null\)/.test(dash));
+
   const draft = fs.readFileSync(path.join(REPO, 'functions/api/r6-draft.js'), 'utf8');
   ok('the draft can open on the tracked side', /action === 'auto'/.test(draft));
   ok('and refuses rather than guessing when there is none',

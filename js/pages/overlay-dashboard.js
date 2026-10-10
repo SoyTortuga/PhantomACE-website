@@ -1428,17 +1428,36 @@ async function refreshVoteChip() {
 
 /* The match chip, and the overtime row it reveals. Loaded on demand like the
    rest — the overlay panel is the live view, not this. */
+/* THE MONTH'S RECORD, which until now was kept and shown to nobody. Every
+   finished match updates r6_season_<month> and ?season=1 returns it; nothing
+   on the site called it, so it accumulated for no one. It rides the chip the
+   moderator is already watching, and it gives the idle state something to say
+   as well: "No match · 12-5 this month". */
+function seasonSuffix(s) {
+  if (!s || !Number(s.matches)) return '';
+  const w = Number(s.wins) || 0, l = Number(s.losses) || 0;
+  return ' · ' + w + '-' + l + ' this month';
+}
+
 async function refreshR6Match() {
   const chip = document.getElementById('odR6MatchChip');
   const otRow = document.getElementById('odR6OtRow');
   if (!chip) return;
   try {
-    const d = await (await fetch('/api/r6-match', { cache: 'no-store' })).json();
+    /* Together, so the record costs no extra wait. A failed season read must
+       not cost the live match its chip, which is the part being used during a
+       round, so it falls back to no suffix rather than to 'Unavailable'. */
+    const [d, season] = await Promise.all([
+      (await fetch('/api/r6-match', { cache: 'no-store' })).json(),
+      fetch('/api/r6-match?season=1', { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    const rec = seasonSuffix(season);
     if (otRow) otRow.hidden = !d.needsOvertimeSide;
-    if (d.status !== 'live') { chip.textContent = 'No match'; return; }
+    if (d.status !== 'live') { chip.textContent = 'No match' + rec; return; }
     const side = d.side ? (d.side === 'attack' ? 'ATK' : 'DEF') : '???';
     chip.textContent = 'R' + d.round + (d.overtime ? ' OT' : '') +
-      ' · ' + side + ' · ' + d.us + '-' + d.them;
+      ' · ' + side + ' · ' + d.us + '-' + d.them + rec;
   } catch { chip.textContent = 'Unavailable'; }
 }
 
