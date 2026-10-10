@@ -25,15 +25,22 @@ const REWARD_HANDLERS = {
     await queueRedemption(env, userId, 'skull-boost', redemption);
   },
   'theme-unlock': async (env, userId, redemption) => {
-    const inv = await getInventory(env, userId);
     const themeId = 'theme_' + redemption.reward.title.toLowerCase().replace(/\s+/g, '_');
-    if (!inv.items.find(i => i.id === themeId)) {
+    /* mutate(), not get-then-put. Pham Check-in grants event badges into
+       this same row, so a viewer redeeming both in the same moment lost
+       whichever write landed second. The already-own check has to be
+       INSIDE the lock too, or two deliveries of one redemption both read
+       "not owned" and push the theme twice. */
+    await env.MARKETPLACE.mutate(inventoryKey(userId), (current) => {
+      const inv = current || { userId: String(userId), items: [], equips: {} };
+      if (!Array.isArray(inv.items)) inv.items = [];
+      if (inv.items.some(i => i && i.id === themeId)) return undefined;
       inv.items.push({
         id: themeId, game: 'profile', type: 'theme', name: redemption.reward.title,
         rarity: 'rare', consumable: false, grantedAt: Date.now(), source: 'channel-points',
       });
-      await saveInventory(env, userId, inv);
-    }
+      return inv;
+    });
     await queueRedemption(env, userId, 'theme-unlock', redemption);
   },
   /* PHAM CHECK-IN — "I'm here", once per broadcast.
@@ -277,25 +284,29 @@ async function settleRedemption(env, redemption, ok) {
 }
 
 function inventoryKey(userId) { return `inv_${userId}`; }
-async function getInventory(env, userId) {
-  return await env.MARKETPLACE.get(inventoryKey(userId), 'json') || { userId, items: [], equips: {} };
-}
-async function saveInventory(env, userId, inv) {
-  await env.MARKETPLACE.put(inventoryKey(userId), JSON.stringify(inv));
-}
+/* EVERY reward routes through here, which is why it is the one write that
+   had to be locked. Two redemptions arriving together both read the same
+   queue and the second put discarded the first, so a viewer who redeemed
+   twice in a moment saw one of them silently vanish.
 
+   The redemption id is also deduped: Twitch redelivers webhooks, and an
+   unconditional push queued the same redemption again so the site popped it
+   up twice. */
 async function queueRedemption(env, userId, type, redemption) {
   const key = `cp_queue_${userId}`;
-  const queue = await env.MARKETPLACE.get(key, 'json') || [];
-  queue.push({
-    id: redemption.id,
-    type,
-    rewardTitle: redemption.reward.title,
-    userInput: redemption.user_input || '',
-    redeemedAt: Date.now(),
-  });
-  if (queue.length > 20) queue.shift();
-  await env.MARKETPLACE.put(key, JSON.stringify(queue), { expirationTtl: 86400 });
+  await env.MARKETPLACE.mutate(key, (current) => {
+    const queue = Array.isArray(current) ? current : [];
+    if (redemption.id && queue.some(q => q && q.id === redemption.id)) return undefined;
+    queue.push({
+      id: redemption.id,
+      type,
+      rewardTitle: redemption.reward.title,
+      userInput: redemption.user_input || '',
+      redeemedAt: Date.now(),
+    });
+    while (queue.length > 20) queue.shift();
+    return queue;
+  }, { expirationTtl: 86400 });
 }
 
 function mapRewardTitle(title) {
