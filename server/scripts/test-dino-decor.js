@@ -47,7 +47,10 @@ function lift(name) {
 }
 const AB = 'assets/dino-assets/';
 const IC = AB + 'jurassic-dino-320/icons/';
-const { ITEMS, BANDS, MAX_ITEMS } = new Function('IC', 'AB', `
+/* Props curated out of the tile packs live in their own folder rather than
+   the icon pack's, because they did not come from it. */
+const DEC = AB + 'park-decor/';
+const { ITEMS, BANDS, MAX_ITEMS } = new Function('IC', 'AB', 'DEC', `
   ${lift('YARD_ITEM_TYPES')}
   ${lift('YARD_BANDS')}
   ${/const MAX_YARD_ITEMS_BASE = \d+;/.exec(src)[0]}
@@ -56,7 +59,7 @@ const { ITEMS, BANDS, MAX_ITEMS } = new Function('IC', 'AB', `
      used to close the decor catalog as a coin sink. See
      test-dino-expeditions.js for the upgrade itself. */
   return { ITEMS: YARD_ITEM_TYPES, BANDS: YARD_BANDS, MAX_ITEMS: MAX_YARD_ITEMS_BASE };
-`)(IC, AB);
+`)(IC, AB, DEC);
 
 /* ── Every image is really there ─────────────────────────────────────── */
 {

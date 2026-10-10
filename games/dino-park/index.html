@@ -1615,6 +1615,10 @@ const ROSTER = [
 /* ======================== ASSET SYSTEM ======================== */
 const AB = 'assets/dino-assets/';
 const IC = AB + 'jurassic-dino-320/icons/';
+/* Curated props sliced from the tile packs for the yard. Their own
+   folder rather than the icon pack's, because they did not come from
+   it — same gitignored tree, same manual copy to the rig. */
+const DEC = AB + 'park-decor/';
 const EX = AB + 'jurassic-dino-320-expansion160/icons/';
 const BP = AB + 'AncientBeastsPack/';
 /* Rebuilt portraits, tracked in git so they deploy with a pull -- the
@@ -5546,6 +5550,46 @@ const YARD_ITEM_TYPES = [
   { id: 'ghostsad', name: 'Mournful Ghost', src: 'assets/halloween-icons/ghost-sad.png', cost: 80, mood: 5, size: 28, blocks: false, radius: 0, band: 'halloween' },
   { id: 'ghostshout', name: 'Wailing Ghost', src: 'assets/halloween-icons/ghost-shout.png', cost: 80, mood: 5, size: 30, blocks: false, radius: 0, band: 'halloween' },
   { id: 'crystalball', name: 'Crystal Ball', src: 'assets/halloween-icons/crystal-ball.png', cost: 120, mood: 7, size: 28, blocks: false, radius: 0, band: 'halloween' },
+
+  /* ── Reef, rock, ruins and ironwork ──────────────────────────────
+     Sliced from tile packs that are NOT ground: part-transparent art
+     paints as a floating object over a hole when used as terrain, but
+     that is exactly what decor is for. The water pieces carry
+     zone:'water' so they can only go in the pond. */
+  { id: 'coralred', name: 'Red Coral', src: DEC+'coralred.png', cost: 54, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coralorange', name: 'Orange Coral', src: DEC+'coralorange.png', cost: 56, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coralgold', name: 'Gold Coral', src: DEC+'coralgold.png', cost: 58, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coralpink', name: 'Pink Coral', src: DEC+'coralpink.png', cost: 59, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coralblue', name: 'Blue Coral', src: DEC+'coralblue.png', cost: 60, mood: 3, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coralcube', name: 'Cube Coral', src: DEC+'coralcube.png', cost: 64, mood: 4, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coraltube', name: 'Tube Coral', src: DEC+'coraltube.png', cost: 66, mood: 4, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'coralrock', name: 'Reef Rock', src: DEC+'coralrock.png', cost: 68, mood: 4, size: 30, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'kelpgreen', name: 'Kelp', src: DEC+'kelpgreen.png', cost: 24, mood: 2, size: 26, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'kelptall', name: 'Tall Kelp', src: DEC+'kelptall.png', cost: 38, mood: 3, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'kelpbroad', name: 'Broad Kelp', src: DEC+'kelpbroad.png', cost: 42, mood: 3, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'kelpamber', name: 'Amber Kelp', src: DEC+'kelpamber.png', cost: 45, mood: 3, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'kelpgold', name: 'Gold Kelp', src: DEC+'kelpgold.png', cost: 50, mood: 3, size: 28, blocks: false, radius: 0, zone: 'water', band: 'water' },
+  { id: 'outcrop', name: 'Rock Outcrop', src: DEC+'outcrop.png', cost: 100, mood: 6, size: 34, blocks: true, radius: 4.5, band: 'large' },
+  { id: 'snowrock', name: 'Snowy Rock', src: DEC+'snowrock.png', cost: 108, mood: 6, size: 34, blocks: true, radius: 4.5, band: 'large' },
+  { id: 'stonepillar', name: 'Stone Pillar', src: DEC+'stonepillar.png', cost: 118, mood: 7, size: 34, blocks: true, radius: 4, band: 'large' },
+  { id: 'stonearch', name: 'Stone Arch', src: DEC+'stonearch.png', cost: 140, mood: 8, size: 36, blocks: true, radius: 5, band: 'large' },
+  { id: 'stonestack', name: 'Stone Stack', src: DEC+'stonestack.png', cost: 95, mood: 6, size: 32, blocks: true, radius: 4, band: 'large' },
+  { id: 'templedoor', name: 'Temple Door', src: DEC+'templedoor.png', cost: 160, mood: 9, size: 36, blocks: true, radius: 5, band: 'large' },
+  { id: 'templecol', name: 'Temple Column', src: DEC+'templecol.png', cost: 115, mood: 7, size: 34, blocks: true, radius: 4, band: 'large' },
+  { id: 'templecorner', name: 'Temple Corner', src: DEC+'templecorner.png', cost: 85, mood: 5, size: 30, blocks: true, radius: 3.5, band: 'mid' },
+  { id: 'templeblock', name: 'Temple Block', src: DEC+'templeblock.png', cost: 78, mood: 5, size: 28, blocks: true, radius: 3, band: 'mid' },
+  { id: 'templestep', name: 'Temple Step', src: DEC+'templestep.png', cost: 52, mood: 3, size: 26, blocks: false, radius: 0, band: 'ground' },
+  { id: 'pipeelbow', name: 'Pipe Elbow', src: DEC+'pipeelbow.png', cost: 36, mood: 3, size: 24, blocks: false, radius: 0, band: 'mid' },
+  { id: 'pipestraight', name: 'Pipe Run', src: DEC+'pipestraight.png', cost: 26, mood: 2, size: 24, blocks: false, radius: 0, band: 'mid' },
+  { id: 'pipejunct', name: 'Pipe Junction', src: DEC+'pipejunct.png', cost: 48, mood: 3, size: 26, blocks: false, radius: 0, band: 'mid' },
+  { id: 'pipevalve', name: 'Valve', src: DEC+'pipevalve.png', cost: 65, mood: 4, size: 26, blocks: false, radius: 0, band: 'mid' },
+  { id: 'platehatch', name: 'Deck Plate', src: DEC+'platehatch.png', cost: 40, mood: 3, size: 24, blocks: false, radius: 0, band: 'ground' },
+  { id: 'ventgrate', name: 'Vent Grate', src: DEC+'ventgrate.png', cost: 44, mood: 3, size: 24, blocks: false, radius: 0, band: 'ground' },
+  { id: 'plankfloor', name: 'Plank Section', src: DEC+'plankfloor.png', cost: 25, mood: 2, size: 26, blocks: false, radius: 0, band: 'ground' },
+  { id: 'deckhatch', name: 'Deck Hatch', src: DEC+'deckhatch.png', cost: 62, mood: 4, size: 26, blocks: false, radius: 0, band: 'ground' },
+  { id: 'plankrail', name: 'Plank Rail', src: DEC+'plankrail.png', cost: 46, mood: 3, size: 28, blocks: false, radius: 0, band: 'mid' },
+  { id: 'plankway', name: 'Walkway', src: DEC+'plankway.png', cost: 24, mood: 2, size: 26, blocks: false, radius: 0, band: 'ground' },
+  { id: 'dockpost', name: 'Dock Post', src: DEC+'dockpost.png', cost: 70, mood: 4, size: 24, blocks: true, radius: 3, band: 'mid' },
 ];
 /* Display order and labels for the tray. Separate from the item table so
    the catalogue can grow without touching the grouping, and so a band
