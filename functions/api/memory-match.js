@@ -26,6 +26,12 @@ import { SEASON_TZ, weekKey } from './season-time.js';
 
 const GAME_TTL = 3600;
 const MAX_ENTRIES = 50;
+/* Per-player weekly quest state; see recordResult. Three weeks is comfortably
+   past anything a quest could still be counting. */
+const MM_WEEK_PREFIX = 'mmweek_';
+const MM_WEEK_TTL = 21 * 24 * 3600;
+/** The row holding one player's Memory Match week. */
+export function weekKeyFor(userId, wk) { return `${MM_WEEK_PREFIX}${userId}_${wk}`; }
 const MAX_FLIPS = 4000;
 const GAME_PREFIX = 'mm_game_';
 
@@ -214,42 +220,44 @@ async function recordResult(env, player, game) {
     console.error('[memory-match] monthly award settle failed:', err && err.message);
   }
 
+  const now = Date.now();
+  const wk = weekKey(new Date(now));
+
+  /* THIS WEEK, PER PLAYER, WHEREVER THEY RANK.
+     Quest progress used to be stamped onto the leaderboard row, and that
+     board is capped at MAX_ENTRIES — a player outside the cap has no row, so
+     their progress silently did not exist and the weekly quest was
+     unachievable for them. Exactly the shape of the bug `weekBest` was added
+     to fix, one layer down. It lives in its own row now, written for every
+     recorded run by every player: how many ranked games this week and the
+     fewest moves among them. */
+  await env.MARKETPLACE.mutate(weekKeyFor(player.userId, wk), (cur) => {
+    const w = (cur && cur.wk === wk) ? cur : { wk, games: 0, bestMoves: null };
+    w.games = (Number(w.games) || 0) + 1;
+    if (w.bestMoves == null || game.moves < w.bestMoves) w.bestMoves = game.moves;
+    return w;
+  }, { expirationTtl: MM_WEEK_TTL });
+
   let best = game.moves;
   let improved = false;
   await env.MARKETPLACE.mutate(board.key, (current) => {
     const lb = Array.isArray(current) ? current : [];
     const row = lb.find(e => e && String(e.id) === player.userId);
-    const now = Date.now();
-    const wk = weekKey(new Date(now));
-
-    /* THIS WEEK'S BEST, stamped on every run rather than only on a record.
-       `updatedAt` moves only when the score improves — the early return
-       below is exactly that — so a weekly quest reading it was
-       unachievable for anyone already at their target. Reset when the week
-       turns over so last week's run cannot satisfy this week's quest. */
-    const stampWeek = (r) => {
-      if (!r.weekBest || r.weekBest.wk !== wk) r.weekBest = { wk, moves: game.moves };
-      else if (game.moves < r.weekBest.moves) r.weekBest.moves = game.moves;
-    };
 
     if (row) {
       if (game.moves >= row.score) {
         best = row.score;
-        stampWeek(row);
-        /* The week stamp changed even when the score did not, so this can
-           no longer return undefined on a name match — that would discard
-           the stamp and put the quest right back where it was. */
+        /* Nothing to change: the ranking is the ranking, and this player's
+           week is recorded above rather than on this row. */
+        if (row.name === player.displayName) return undefined;
         row.name = player.displayName;
         return lb;
       }
       row.score = game.moves;
       row.name = player.displayName;
       row.updatedAt = now;
-      stampWeek(row);
     } else {
-      const fresh = { id: player.userId, name: player.displayName, score: game.moves, updatedAt: now };
-      stampWeek(fresh);
-      lb.push(fresh);
+      lb.push({ id: player.userId, name: player.displayName, score: game.moves, updatedAt: now });
     }
     improved = true;
     lb.sort((a, b) => (a.score - b.score) || ((a.updatedAt || 0) - (b.updatedAt || 0)));

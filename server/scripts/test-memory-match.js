@@ -26,6 +26,10 @@ import {
 import { weekKey } from '../../functions/api/season-time.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+/* Mirrors MAX_ENTRIES in memory-match.js; the board-cap test below is
+   meaningless if the two drift, so it is checked against the source. */
+const MAX_ENTRIES_EXPECTED = 50;
+
 
 let passed = 0;
 const failures = [];
@@ -184,14 +188,19 @@ async function playPerfect(env, who, gameId, { extraMisses = 0 } = {}) {
   check('perfect game = 20 moves', last.moves, 20);
   check('result recorded', [last.recorded, last.improved, last.board, last.best], [true, true, 'memory-match', 20]);
   check('board written once', env.writes.lb_memory_match, 1);
+  /* A RANKING, and nothing else. The week a quest reads lives in its own
+     per-player row (mmweek_<userId>_<weekKey>), checked below — it was
+     briefly stamped here, but this board caps at 50, so a player outside the
+     cap had no row and therefore no quest progress. */
   check('board holds the server-counted run', stored(env, 'lb_memory_match'), [{
     id: '101', name: 'Ash', score: 20,
     updatedAt: stored(env, 'lb_memory_match')[0].updatedAt,
-    /* This week's best, stamped on every finished run. The weekly quest
-       reads this; it used to read `updatedAt`, which only moves on a new
-       record, so it was unreachable for anyone already at their target. */
-    weekBest: { wk: weekKey(), moves: 20 },
   }]);
+  /* Defaulted, not indexed into: a missing row should be REPORTED with
+     everything else rather than thrown on, killing the rest of the suite. */
+  const wkRow = stored(env, 'mmweek_101_' + weekKey()) || {};
+  check('and the player\u2019s week is recorded in its own row',
+    [wkRow.games, wkRow.bestMoves], [1, 20]);
   check('monthly awards settled before writing', env.claims, 1);
   check('no other size board touched', [env.writes.lb_memory_match_10, env.writes.lb_memory_match_15], [undefined, undefined]);
   ok('only the finishing flip reported done', flips.slice(0, -1).every(f => !f.body.done));
@@ -220,11 +229,14 @@ async function playPerfect(env, who, gameId, { extraMisses = 0 } = {}) {
   flips = await playPerfect(env, 'a', s.body.gameId, { extraMisses: 5 });
   const worse = flips[flips.length - 1].body;
   check('worse run: not improved, best reported', [worse.recorded, worse.improved, worse.best], [true, false, 23]);
-  /* The RANKING is left alone; the week stamp is not, so the write count
-     now counts finished games rather than records. */
+  /* The ranking is left alone and the board is not rewritten — a run that
+     beats nothing changes nothing here. */
   check('worse run leaves the score alone', stored(env, 'lb_memory_match')[0].score, 23);
-  check('worse run still stamps the week', stored(env, 'lb_memory_match')[0].weekBest, { wk: weekKey(), moves: 23 });
-  check('and that is the only reason it wrote again', env.writes.lb_memory_match, 2);
+  check('and does not rewrite the board', env.writes.lb_memory_match, 1);
+  /* It is still counted, though, in the row the quests read. Two games
+     played this week, the better of them 23. */
+  const wk2 = stored(env, 'mmweek_101_' + weekKey()) || {};
+  check('but it IS counted for the week', [wk2.games, wk2.bestMoves], [2, 23]);
 
   s = await post(env, 'a', { action: 'start', set: 'default' });
   flips = await playPerfect(env, 'a', s.body.gameId);
@@ -234,6 +246,43 @@ async function playPerfect(env, who, gameId, { extraMisses = 0 } = {}) {
   const sb = await post(env, 'b', { action: 'start', set: 'default' });
   await playPerfect(env, 'b', sb.body.gameId, { extraMisses: 1 });
   check('sorted ascending', stored(env, 'lb_memory_match').map(e => [e.id, e.score]), [['101', 20], ['202', 21]]);
+}
+
+ok('the test\u2019s copy of the board cap matches the source',
+   new RegExp('MAX_ENTRIES = ' + MAX_ENTRIES_EXPECTED + ';').test(
+     readFileSync(join(here, '..', '..', 'functions/api/memory-match.js'), 'utf8')));
+
+/* ── Off the end of the board, and still counted ────────────────
+   The board keeps MAX_ENTRIES rows. Quest progress was briefly stamped onto
+   the player's row there, so a player who did not make the cut had nowhere
+   for it to live -- their weekly quest was impossible and nothing said so.
+   The weekly row is their own, and this plays a real game to prove the game
+   writes it, not merely that something can read it. */
+{
+  const env = makeEnv();
+  /* Fifty rivals, every one of them better than a perfect 20-pair game.
+     Scores have to be strictly under 20 or the player simply places among
+     them and the cap is never exercised. */
+  env.store.set('lb_memory_match', JSON.stringify(
+    Array.from({ length: MAX_ENTRIES_EXPECTED }, (_, i) => ({
+      id: String(5000 + i), name: 'Rival' + i, score: 10, updatedAt: 1 + i,
+    }))
+  ));
+
+  const s = await post(env, 'a', { action: 'start', set: 'default' });
+  const flips = await playPerfect(env, 'a', s.body.gameId);
+  const last = flips[flips.length - 1].body;
+  check('the game still finishes', last.done, true);
+  check('and is recorded', last.recorded, true);
+
+  const board = stored(env, 'lb_memory_match');
+  check('the board is still capped', board.length, MAX_ENTRIES_EXPECTED);
+  check('and this player did not make it', board.some(e => e.id === '101'), false);
+
+  const week = stored(env, 'mmweek_101_' + weekKey());
+  ok('but their week was recorded anyway', !!week);
+  check('with the game counted and the score kept',
+    [week && week.games, week && week.bestMoves], [1, 20]);
 }
 
 /* ── Forged and replayed flips ──────────────────────────────────────── */

@@ -78,6 +78,16 @@ export const CATALOG = [
      reads 0 and simply cannot be completed. Harmless, and ready to light up. */
   { id: 'wandering-soul', signal: 'room-visits', goal: 3, reward: { type: 'entries', amount: 4 },
     title: 'Wandering Soul', desc: 'Visit 3 Phamily rooms this week.' },
+  /* Playing, as opposed to playing WELL — Steel Trap already rewards the
+     latter and only the best few can reach it. Counted from the per-player
+     weekly row, so it works at any rank. */
+  { id: 'ten-thousand-hands', signal: 'memory-games', goal: 5, reward: { type: 'entries', amount: 3 },
+    title: 'Ten Thousand Hands', desc: 'Finish 5 ranked Memory Match games this week.' },
+  /* The forums are the one community feature a quest can point at, and the
+     count comes from the posts table rather than anything a client says.
+     Deleted posts do not count, so posting and deleting cannot farm it. */
+  { id: 'loose-tongues', signal: 'forum-posts', goal: 3, reward: { type: 'entries', amount: 5 },
+    title: 'Loose Tongues', desc: 'Post 3 times in the forums this week.' },
 ];
 
 const WEEKLY_COUNT = 4;
@@ -144,25 +154,82 @@ async function checkinDays(env, userId, wk) {
 }
 
 /**
- * Did this player clear a board in `maxMoves` or fewer THIS week?
+ * One player's Memory Match week: how many ranked games, and the best of
+ * them. Written by memory-match on every recorded run.
  *
- * Reads `weekBest`, which memory-match stamps on every recorded run.
- * It used to read `updatedAt` and `score` — the all-time record — but
- * `updatedAt` only moves when a run IMPROVES that record, so anyone
- * already at or under the target could never satisfy it however many
- * qualifying games they played. The quest was impossible for exactly the
- * players good enough for it.
+ * THIS USED TO READ THE LEADERBOARD, twice over badly. First it read
+ * `updatedAt`, which only moves when a run IMPROVES the all-time record, so
+ * anyone already at or under the target could never complete Steel Trap
+ * however many qualifying games they played. Then it read a `weekBest` field
+ * stamped onto the leaderboard row — better, but that board is capped at 50
+ * rows, so a player outside the cap had no row and therefore no progress:
+ * the same quest, impossible again, for a different group of people.
  *
- * Rows written before `weekBest` existed simply have none, which reads
- * as "nothing yet this week" — correct, and it fills in on their next
- * game.
+ * A row of their own has neither problem. A player with no row has simply
+ * not played this week.
  */
+async function memoryWeek(env, userId, wk) {
+  try {
+    const { weekKeyFor } = await import('./memory-match.js');
+    const row = await env.MARKETPLACE.get(weekKeyFor(userId, wk), 'json');
+    if (row && row.wk === wk) return row;
+  } catch { /* an unreadable row is "nothing yet", never a 500 */ }
+  return { wk, games: 0, bestMoves: null };
+}
+
 async function memoryBestThisWeek(env, userId, wk, maxMoves) {
-  const board = await env.MARKETPLACE.get('lb_memory_match', 'json');
-  const lb = Array.isArray(board) ? board : [];
-  const row = lb.find(e => e && String(e.id) === String(userId));
-  if (!row || !row.weekBest || row.weekBest.wk !== wk) return 0;
-  return Number(row.weekBest.moves) <= maxMoves ? 1 : 0;
+  const w = await memoryWeek(env, userId, wk);
+  return w.bestMoves != null && Number(w.bestMoves) <= maxMoves ? 1 : 0;
+}
+
+async function memoryGamesThisWeek(env, userId, wk) {
+  return Number((await memoryWeek(env, userId, wk)).games) || 0;
+}
+
+/**
+ * Posts this person made in the forums this week, deleted ones excluded.
+ *
+ * Counted in SQL rather than from anything a client reports. Deleted posts
+ * are left out deliberately — recentPostCount in forum/queries.js counts
+ * them on purpose, because deleting your own spam should not refill a rate
+ * limit, but for a quest that rule would let someone post and delete three
+ * times and collect.
+ *
+ * The forum being unavailable reads as zero, never a 500: a quest page must
+ * not fall over because one signal cannot be reached.
+ */
+async function forumPostsThisWeek(env, userId, wk) {
+  try {
+    const { getPool } = await import('../../server/lib/db.js');
+    const db = getPool();
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n FROM forum_posts
+        WHERE user_id = $1 AND deleted_at IS NULL AND created_at >= $2`,
+      [String(userId), weekStartIso(wk)]
+    );
+    return Number(rows[0] && rows[0].n) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Midnight Pacific on the Monday that opens `wk`, as an ISO instant. */
+function weekStartIso(wk) {
+  const m = /^(\d{4})-W(\d{2})$/.exec(String(wk));
+  if (!m) return new Date(0).toISOString();
+  /* ISO week 1 contains Jan 4th; walk back to its Monday, then add weeks. */
+  const jan4 = new Date(Date.UTC(Number(m[1]), 0, 4, 12));
+  const dow = (jan4.getUTCDay() + 6) % 7;              // Monday = 0
+  const week1Monday = new Date(jan4.getTime() - dow * 86400000);
+  const monday = new Date(week1Monday.getTime() + (Number(m[2]) - 1) * 7 * 86400000);
+  const y = monday.getUTCFullYear();
+  const mo = String(monday.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(monday.getUTCDate()).padStart(2, '0');
+  /* Pacific midnight is 07:00 or 08:00 UTC depending on DST; 08:00 is the
+     later of the two, so using it could MISS an early Monday post. 07:00
+     can at worst include an hour of Sunday evening, which is the safer
+     direction for a reward. */
+  return `${y}-${mo}-${d}T07:00:00.000Z`;
 }
 
 async function roomVisits(env, userId, wk) {
@@ -183,6 +250,8 @@ async function computeProgress(env, userId, wk, quest) {
     case 'watch-hours':  return Math.floor((await watchDaysAndHours(env, userId, wk)).hours);
     case 'memory-best':  return await memoryBestThisWeek(env, userId, wk, (quest.meta && quest.meta.moves) || 24);
     case 'room-visits':  return await roomVisits(env, userId, wk);
+    case 'memory-games': return await memoryGamesThisWeek(env, userId, wk);
+    case 'forum-posts':  return await forumPostsThisWeek(env, userId, wk);
     default:             return 0;
   }
 }

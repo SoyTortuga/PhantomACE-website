@@ -448,6 +448,12 @@ export const FAMILIES = [
      (quest_<userId>_<weekKey>), read by exact key, so the generic singletons
      table is the right home; the handler sets a week-scoped TTL. */
   { prefix: 'quest_',          table: 'singletons',       expiry: 'real' },
+  /* Memory Match, per player per week (mmweek_<userId>_<weekKey>): how many
+     ranked games and the fewest moves among them. Quest state lives HERE and
+     not on lb_memory_match, which is capped at 50 rows -- a player outside
+     the cap has no leaderboard row, so quest progress stored there silently
+     did not exist for them. TTL'd: three weeks is past anything in flight. */
+  { prefix: 'mmweek_',         table: 'singletons',       expiry: 'real' },
   /* Room Crawl visit set per user per week (roomvisits_<userId>_<weekKey>),
      feeds the "visit rooms" quest. Shared by quests.js and rooms-browse.js. */
   { prefix: 'roomvisits_',     table: 'singletons',       expiry: 'real' },

@@ -101,10 +101,20 @@ function seedAll(env) {
   env._store.set(`ci_${UID}`, JSON.stringify({ userId: UID, username: 'Quester', streams }));
   env._store.set(`pt_${UID}_2026-10`, JSON.stringify({
     userId: UID, month: '2026-10', hours: 0, level: 0,
-    claimedRewards: [], claimedMilestones: [], attendance: { '15': 7 }, lastHeartbeat: 0,
+    /* Four days inside W42 (Mon Oct 12 - Sun Oct 18) totalling eight hours,
+       so both watch-shaped quests are satisfied: Faithful wants 4 separate
+       days, Keep the Vigil wants 6 hours. One day of 7 hours covered the
+       hours and not the days, which only started to matter when Faithful
+       rotated into this week. */
+    claimedRewards: [], claimedMilestones: [],
+    attendance: { '13': 2, '14': 2, '15': 2, '16': 2 }, lastHeartbeat: 0,
   }));
   env._store.set(`roomvisits_${UID}_2026-W42`, JSON.stringify({ count: 3 }));
   env._store.set('lb_memory_match', JSON.stringify([{ id: UID, name: 'Quester', score: 20, updatedAt: Date.UTC(2026, 9, 15, 19, 0, 0) }]));
+  /* Steel Trap and Ten Thousand Hands both read the per-player weekly row,
+     not the leaderboard — the board caps at 50, so progress kept there did
+     not exist for anyone outside the cap. */
+  env._store.set(`mmweek_${UID}_2026-W42`, JSON.stringify({ wk: '2026-W42', games: 6, bestMoves: 20 }));
 }
 const ledger = (env, month = monthKey()) => {
   const raw = env._store.get(ledgerKey(UID, month));
@@ -120,8 +130,15 @@ async function main() {
   check('the test week is W42', WK, '2026-W42');
   const active = quests.questsForWeek(WK);
   check('W42 offers four quests', active.length, 4);
-  ok('and includes the minutes-paying quest', active.some(q => q.reward.type === 'minutes'));
-  ok('and at least one entries-paying quest', active.some(q => q.reward.type === 'entries'));
+  /* Both reward kinds exist in the POOL. Asserting it of one week's window
+     made the check break every time the pool grew, which says nothing about
+     whether the rewards work. */
+  ok('the catalogue pays pass minutes somewhere',
+    quests.CATALOG.some(q => q.reward.type === 'minutes'));
+  ok('and giveaway entries somewhere',
+    quests.CATALOG.some(q => q.reward.type === 'entries'));
+  ok('this week pays at least one of them',
+    active.some(q => q.reward.type === 'entries' || q.reward.type === 'minutes'));
 
   /* ── 1. A quest is not complete, and cannot be claimed, until its goal is
      actually met ── */
@@ -132,9 +149,18 @@ async function main() {
     check('unmet: nothing reads complete', g.data.quests.filter(q => q.completed).map(q => q.id), []);
     check('unmet: nothing reads claimed', g.data.quests.filter(q => q.claimed).map(q => q.id), []);
 
-    const claim = await post(env, { action: 'claim', questId: 'answer-call' });
+    /* Whichever quest this week actually offers, rather than a hardcoded id:
+       the rotation moves when the catalogue grows, and a test that names a
+       quest not on offer is testing "No such quest this week" by accident. */
+    const claim = await post(env, { action: 'claim', questId: active[0].id });
     check('unmet: claim is refused', claim.status, 400);
     check('unmet: and says why', claim.data.error, 'Quest not complete yet');
+
+    /* And a quest that is NOT on offer is refused for that reason, which is
+       a different answer and worth keeping distinct. */
+    const offWeek = quests.CATALOG.find(q => !active.some(a => a.id === q.id));
+    const off = await post(env, { action: 'claim', questId: offWeek.id });
+    check('unmet: a quest not offered this week says so', off.data.error, 'No such quest this week');
     check('unmet: no entries were paid', ledger(env), null);
   }
 
@@ -281,15 +307,21 @@ async function main() {
 
     const row = JSON.parse(env._store.get('lb_memory_match')).find(e => e.id === UID);
     check('steel-trap: the all-time record is untouched', row.score, 20);
-    check('steel-trap: and this week is stamped anyway', row.weekBest, { wk: wk41, moves: 20 });
+    /* The week is recorded in the player's OWN row, which exists whatever
+       their rank — the leaderboard caps at 50 and would simply not hold one
+       for most players. */
+    const week = JSON.parse(env._store.get(`mmweek_${UID}_${wk41}`));
+    check('steel-trap: and the week is recorded off the board', [week.games, week.bestMoves], [1, 20]);
 
     const after = (await get(env)).data.quests.find(q => q.id === 'steel-trap');
     check('steel-trap: the quest now completes', after.completed, true);
     check('steel-trap: and pays out', (await post(env, { action: 'claim', questId: 'steel-trap' })).status, 200);
 
-    /* Next week it is a fresh ask: this week's run must not satisfy it. */
-    setNow('2026-10-26T19:00:00Z');
-    check('steel-trap: the clock has rolled to W44', weekKey(), '2026-W44');
+    /* Next week it is a fresh ask: this week's run must not satisfy it.
+       W42, which is the following week and also offers it — the catalogue
+       grew to eight quests, so the rotation's weeks are not what they were. */
+    setNow('2026-10-15T19:00:00Z');
+    check('steel-trap: the clock has rolled to W42', weekKey(), '2026-W42');
     ok('steel-trap: which also offers it', quests.questsForWeek(weekKey()).some(q => q.id === 'steel-trap'));
     check('steel-trap: last week\u2019s run does not carry over',
       (await get(env)).data.quests.find(q => q.id === 'steel-trap').completed, false);
@@ -303,6 +335,84 @@ async function main() {
     check('steel-trap: so it does not complete the quest',
       (await get(slow)).data.quests.find(q => q.id === 'steel-trap').completed, false);
 
+    setNow('2026-10-15T19:00:00Z');
+  }
+
+  /* ── 4c. A PLAYER OFF THE BOARD STILL HAS A WEEK ─────────────────
+     lb_memory_match keeps 50 rows. Quest progress was briefly stamped onto
+     that row, which meant the 51st-best player had nowhere for it to live and
+     the quest was quietly impossible for them -- the same shape as the bug
+     that stamp was added to fix, one layer down. The weekly row is the
+     player's own and exists whatever their rank, so the test is a player with
+     no leaderboard row at all. */
+  {
+    setNow('2026-10-08T19:00:00Z');
+    const wk41 = weekKey();
+    const env = makeEnv();
+
+    /* A full board of fifty other people, none of them this player. */
+    env._store.set('lb_memory_match', JSON.stringify(
+      Array.from({ length: 50 }, (_, i) => ({
+        id: String(2000 + i), name: 'Rival' + i, score: 20 + i, updatedAt: 1,
+      }))
+    ));
+    /* Their own week, recorded off the board. */
+    env._store.set(`mmweek_${UID}_${wk41}`, JSON.stringify({ wk: wk41, games: 2, bestMoves: 22 }));
+
+    const q = (await get(env)).data.quests.find(x => x.id === 'steel-trap');
+    ok('off-board: W41 offers steel-trap', !!q);
+    check('off-board: a player with no leaderboard row still completes it', q.completed, true);
+    check('off-board: and is paid', (await post(env, { action: 'claim', questId: 'steel-trap' })).status, 200);
+    setNow('2026-10-15T19:00:00Z');
+  }
+
+  /* ── 4d. Ten Thousand Hands ─────────────────────────────
+     Playing rather than playing WELL. Steel Trap rewards a near-perfect run
+     and only the best few can reach it; this one asks for five finished games
+     and is reachable by anyone who turns up. Counted by the server, which
+     deals the deck, so there is nothing to forge. */
+  {
+    setNow('2026-10-22T19:00:00Z');
+    const wk = weekKey();
+    ok('hands: W43 offers it', quests.questsForWeek(wk).some(q => q.id === 'ten-thousand-hands'));
+
+    const env = makeEnv();
+    const progress = async () => {
+      const q = (await get(env)).data.quests.find(x => x.id === 'ten-thousand-hands');
+      return [q.progress, q.completed];
+    };
+    check('hands: nothing played reads zero', await progress(), [0, false]);
+
+    env._store.set(`mmweek_${UID}_${wk}`, JSON.stringify({ wk, games: 4, bestMoves: 30 }));
+    check('hands: four games is not five', await progress(), [4, false]);
+
+    env._store.set(`mmweek_${UID}_${wk}`, JSON.stringify({ wk, games: 5, bestMoves: 30 }));
+    check('hands: five completes it, however badly they played', await progress(), [5, true]);
+
+    /* Last week's games are last week's. */
+    env._store.set(`mmweek_${UID}_2026-W42`, JSON.stringify({ wk: '2026-W42', games: 99, bestMoves: 20 }));
+    env._store.delete(`mmweek_${UID}_${wk}`);
+    check('hands: last week does not carry over', await progress(), [0, false]);
+    setNow('2026-10-15T19:00:00Z');
+  }
+
+  /* ── 4e. Loose Tongues ───────────────────────────────
+     The forum count comes from SQL, and there is no database here -- getPool
+     throws, which must read as zero rather than taking the whole quests page
+     down with it. That is the behaviour worth pinning at this level; the
+     query itself is exercised against a real Postgres in the forum suites. */
+  {
+    setNow('2026-11-05T19:00:00Z');
+    const wk = weekKey();
+    ok('tongues: its week offers it', quests.questsForWeek(wk).some(q => q.id === 'loose-tongues'));
+
+    const env = makeEnv();
+    const res = await get(env);
+    check('tongues: the page still answers with no database', res.status, 200);
+    const q = res.data.quests.find(x => x.id === 'loose-tongues');
+    check('tongues: and the signal reads zero rather than throwing', [q.progress, q.completed], [0, false]);
+    check('tongues: it cannot be claimed on nothing',
+      (await post(env, { action: 'claim', questId: 'loose-tongues' })).status, 400);
     setNow('2026-10-15T19:00:00Z');
   }
 
