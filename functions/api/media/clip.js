@@ -27,6 +27,12 @@
 const INDEX_KEY = 'media_index';
 const MAX_INDEX = 500;
 const RECENT_MAX = 30;
+/* Twitch's maximum page. Asked for in full even though only RECENT_MAX are
+   shown, because the list arrives sorted by VIEWS and has to be re-sorted by
+   date — a 30-row page would just be the 30 biggest clips in the window. */
+const RECENT_PAGE = 100;
+/* How far back "recent" reaches before falling back to all-time. */
+const RECENT_DAYS = 30;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -109,8 +115,24 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const data = await helix(env,
-      `clips?broadcaster_id=${encodeURIComponent(env.TWITCH_BROADCASTER_ID)}&first=${RECENT_MAX}`);
+    /* TWITCH SORTS BY VIEW COUNT AND OFFERS NO CHOICE. Get Clips returns its
+       list in descending view count with no sort parameter, so a plain call
+       gives the channel's biggest clips ever — which is what this picker was
+       showing under the word "Recent". The date window is the only lever;
+       the ordering is ours to do. */
+    const base = `clips?broadcaster_id=${encodeURIComponent(env.TWITCH_BROADCASTER_ID)}&first=${RECENT_PAGE}`;
+    const since = new Date(Date.now() - RECENT_DAYS * 86400000).toISOString();
+
+    let data = await helix(env, `${base}&started_at=${encodeURIComponent(since)}`);
+    let window = `${RECENT_DAYS}d`;
+
+    /* A quiet month would leave the picker empty, which is worse than a
+       wrong order. Fall back to all-time — still sorted by date. */
+    if (!(data.data || []).length) {
+      data = await helix(env, base);
+      window = 'all';
+    }
+
     const clips = (data.data || []).map(c => ({
       slug: c.id,
       title: c.title,
@@ -119,7 +141,10 @@ export async function onRequestGet(context) {
       views: c.view_count,
       creator: c.creator_name,
       createdAt: c.created_at,
-    }));
+    }))
+      /* Newest first — the whole point. Twitch's own order is by views. */
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, RECENT_MAX);
 
     /* Which are already on the wall, so the picker can say so rather than
        letting somebody add the same clip twice. */
@@ -131,7 +156,9 @@ export async function onRequestGet(context) {
         .map(i => i.slug);
     } catch { /* the list is still useful without it */ }
 
-    return json({ clips, already });
+    /* The UI says which window these came from, so "Recent" is never a
+       claim the data does not support. */
+    return json({ clips, already, window, days: RECENT_DAYS });
   } catch (err) {
     return json({ error: err.message || 'Could not reach Twitch.' }, 502);
   }

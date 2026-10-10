@@ -303,6 +303,136 @@ const index = (env) => {
     /onclick="loadRecentClips\(\)"/.test(html));
 }
 
+/* ── "Recent clips" is ordered by date, not by views ─────────────────── */
+{
+  /* Twitch hands this list back in DESCENDING VIEW COUNT and offers no sort
+     parameter, so the first version of the picker showed the channel's
+     biggest clips of all time under the word "Recent". The fake below
+     answers the way Twitch does — view-ordered — so a server that just
+     forwarded it would fail here. */
+  const day = 86400000;
+  const twitchOrder = [
+    { id: 'huge',   view_count: 180000, created_at: new Date(Date.now() - 20 * day).toISOString() },
+    { id: 'big',    view_count: 9000,   created_at: new Date(Date.now() - 2 * day).toISOString() },
+    { id: 'middle', view_count: 900,    created_at: new Date(Date.now() - 25 * day).toISOString() },
+    { id: 'small',  view_count: 12,     created_at: new Date(Date.now() - 1 * day).toISOString() },
+  ].map(c => ({
+    ...c, broadcaster_id: BROADCASTER, broadcaster_name: 'PhantomACE',
+    title: c.id, creator_name: 'someone', duration: 30,
+    url: 'https://clips.twitch.tv/' + c.id,
+    thumbnail_url: 'https://x/%{width}x%{height}.jpg',
+  }));
+
+  function recentEnv({ windowed = twitchOrder, all = twitchOrder } = {}) {
+    const store = new Map();
+    store.set('site_moderators', JSON.stringify({ entries: [{ userId: '9' }] }));
+    const urls = [];
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      urls.push(u);
+      if (u.includes('oauth2/token')) {
+        return new Response(JSON.stringify({ access_token: 't', expires_in: 500000 }), { status: 200 });
+      }
+      if (u.includes('helix/clips')) {
+        const data = u.includes('started_at=') ? windowed : all;
+        return new Response(JSON.stringify({ data }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    };
+    return {
+      TWITCH_CLIENT_ID: 'cid', TWITCH_CLIENT_SECRET: 's', TWITCH_BROADCASTER_ID: BROADCASTER,
+      MARKETPLACE: {
+        async get(k, t) { if (!store.has(k)) return null; const r = store.get(k); return t === 'json' ? JSON.parse(r) : r; },
+        async put(k, v) { store.set(k, typeof v === 'string' ? v : JSON.stringify(v)); },
+        async delete(k) { store.delete(k); },
+        async mutate(k, fn) {
+          const cur = store.has(k) ? JSON.parse(store.get(k)) : null;
+          const next = await fn(cur);
+          if (next === undefined) return cur;
+          store.set(k, JSON.stringify(next)); return next;
+        },
+        async listValues() { return []; },
+      },
+      urls,
+    };
+  }
+
+  const recent = async (env) => {
+    const res = await onRequestGet({
+      env,
+      request: new Request('https://phantomace.tv/api/media/clip?recent=1', { headers: as('9') }),
+    });
+    return { status: res.status, data: await res.json() };
+  };
+
+  const env = recentEnv();
+  const r = await recent(env);
+  check('the list comes back', r.status, 200);
+
+  const order = r.data.clips.map(c => c.slug);
+  check('NEWEST FIRST, not biggest first', order, ['small', 'big', 'huge', 'middle']);
+  ok('which is not the order Twitch gave',
+    JSON.stringify(order) !== JSON.stringify(twitchOrder.map(c => c.id)));
+
+  /* The date window is the only lever Twitch offers, so it has to be used. */
+  const clipCalls = env.urls.filter(u => u.includes('helix/clips'));
+  ok('the query is windowed by date', clipCalls.some(u => u.includes('started_at=')));
+  /* And a full page is requested, or the re-sort only reorders the biggest
+     thirty in the window rather than finding the newest. */
+  ok('and asks for a full page to re-sort', clipCalls.some(u => /first=100\b/.test(u)));
+
+  check('the window it used is reported', r.data.window, '30d');
+  ok('with how far back that is', Number(r.data.days) > 0);
+}
+
+/* ── A quiet month falls back rather than showing nothing ────────────── */
+{
+  const day = 86400000;
+  const old = [{
+    id: 'ancient', broadcaster_id: BROADCASTER, broadcaster_name: 'PhantomACE',
+    title: 'ancient', creator_name: 'x', duration: 10, view_count: 5,
+    created_at: new Date(Date.now() - 400 * day).toISOString(),
+    url: 'https://clips.twitch.tv/ancient', thumbnail_url: 'https://x/%{width}x%{height}.jpg',
+  }];
+
+  const store = new Map();
+  store.set('site_moderators', JSON.stringify({ entries: [{ userId: '9' }] }));
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('oauth2/token')) {
+      return new Response(JSON.stringify({ access_token: 't', expires_in: 500000 }), { status: 200 });
+    }
+    if (u.includes('helix/clips')) {
+      /* Nothing in the window, plenty before it. */
+      return new Response(JSON.stringify({ data: u.includes('started_at=') ? [] : old }), { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  };
+  const env = {
+    TWITCH_CLIENT_ID: 'cid', TWITCH_CLIENT_SECRET: 's', TWITCH_BROADCASTER_ID: BROADCASTER,
+    MARKETPLACE: {
+      async get(k, t) { if (!store.has(k)) return null; const r = store.get(k); return t === 'json' ? JSON.parse(r) : r; },
+      async put() {}, async delete() {},
+      async mutate(k, fn) { const n = await fn(null); return n; },
+      async listValues() { return []; },
+    },
+  };
+
+  const res = await onRequestGet({
+    env, request: new Request('https://phantomace.tv/api/media/clip?recent=1', { headers: as('9') }),
+  });
+  const data = await res.json();
+  check('an empty month still returns clips', data.clips.length, 1);
+  check('and says it fell back to all-time', data.window, 'all');
+}
+
+/* ── The picker shows when, and which window ─────────────────────────── */
+{
+  const js = read('js/pages/media.js');
+  ok('each card shows the clip\u2019s date', /formatDate\(c\.createdAt\)/.test(js));
+  ok('and the heading reports the window', /data\.window === 'all'/.test(js));
+}
+
 /* ── Report ─────────────────────────────────────────────────────────── */
 if (failures.length) {
   console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`);

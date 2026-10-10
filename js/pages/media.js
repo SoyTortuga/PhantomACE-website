@@ -425,14 +425,28 @@ async function loadRecentClips() {
       return;
     }
     const already = new Set(data.already || []);
+    /* WHEN, not just how popular. Twitch hands this list back sorted by view
+       count and the server re-sorts it by date; showing the date is what
+       makes that visible rather than something to take on trust. */
     box.innerHTML = clips.map(c => `
       <button type="button" class="clip-card${already.has(c.slug) ? ' is-added' : ''}"
               data-slug="${escapeAttr(c.slug)}" title="${escapeAttr(c.title)}">
         <img src="${escapeAttr(c.thumbnail)}" alt="" loading="lazy">
         <span class="clip-card-title">${escapeHtml(c.title)}</span>
-        <span class="clip-card-meta">${escapeHtml(String(c.views))} views${
+        <span class="clip-card-meta">${escapeHtml(formatDate(c.createdAt))} · ${
+          escapeHtml(String(c.views))} views${
           already.has(c.slug) ? ' · on the wall' : ''}</span>
       </button>`).join('');
+
+    /* Say which window these came from. "Recent" is a claim, and when the
+       last month was quiet the server falls back to all-time — the label
+       should not keep insisting otherwise. */
+    const head = document.querySelector('.clip-recent-head label');
+    if (head) {
+      head.textContent = data.window === 'all'
+        ? 'Clips (nothing in the last ' + (data.days || 30) + ' days)'
+        : 'Recent clips — last ' + (data.days || 30) + ' days';
+    }
 
     box.querySelectorAll('.clip-card').forEach(card => {
       card.addEventListener('click', () => {
