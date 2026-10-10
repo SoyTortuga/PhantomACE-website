@@ -188,7 +188,13 @@ export async function onRequestGet(context) {
   const action = url.searchParams.get('action');
 
   if (action === 'queue') {
-    if (session.role !== 'broadcaster' && session.role !== 'moderator') {
+    /* isModerator, not session.role. The cookie is signed so the field cannot
+       be forged, but it is captured at LOGIN -- a moderator who has since been
+       removed keeps role: 'moderator' until they sign in again, and could go
+       on listing every live code. This was the last handler in the API still
+       trusting the cookie for authorisation; moderators.js explains the rule. */
+    const { isModerator } = await import('./admin/moderators.js');
+    if (!(await isModerator(env, session))) {
       return json({ error: 'Unauthorized' }, 403);
     }
 
@@ -197,8 +203,10 @@ export async function onRequestGet(context) {
     const pending = [];
     const active = [];
 
-    for (const code of queue) {
-      const record = await getCodeRecord(env, code);
+    /* In parallel: the queue is short, but these are independent reads and
+       there is no reason for a staff panel to wait on them one at a time. */
+    const queued = await Promise.all(queue.map(c => getCodeRecord(env, c).catch(() => null)));
+    for (const record of queued) {
       if (record) pending.push({ code: record.code, item: record.item });
     }
 
@@ -211,9 +219,42 @@ export async function onRequestGet(context) {
     const rows = await env.MARKETPLACE.listValues({ prefix: 'item_code_' });
     for (const { value: record } of rows) {
       if (record && record.active && record.expiresAt > now) {
-        active.push({ code: record.code, item: record.item, expiresAt: record.expiresAt });
+        active.push({
+          code: record.code,
+          item: record.item,
+          expiresAt: record.expiresAt,
+          /* WHO IT IS FOR AND WHETHER THEY HAVE IT. Without these the list
+             could not answer the question it exists for: a monthly prize
+             whisper fails, leaderboards.js logs the backup code and carries
+             on, and until now the only way to recover it was to read the
+             rig's log. null means anyone may redeem. */
+          restrictedTo: Array.isArray(record.restrictedTo) ? record.restrictedTo : null,
+          redeemed: Array.isArray(record.redeemedBy) ? record.redeemedBy.length : 0,
+        });
       }
     }
+
+    /* A list of Twitch user ids is not something a person can read, so the
+       restricted ones are resolved to names. Done once over the deduped set
+       rather than per code, and a missing profile just leaves the id. */
+    const ids = [...new Set(active.flatMap(a => a.restrictedTo || []))];
+    if (ids.length) {
+      const profiles = await Promise.all(
+        ids.map(id => env.MARKETPLACE.get(`profile_${id}`, 'json').catch(() => null))
+      );
+      const nameOf = {};
+      ids.forEach((id, i) => {
+        const p = profiles[i];
+        nameOf[id] = (p && (p.displayName || p.login)) || id;
+      });
+      for (const a of active) {
+        if (a.restrictedTo) a.restrictedNames = a.restrictedTo.map(id => nameOf[id] || id);
+      }
+    }
+
+    /* Soonest to expire first: the one about to lapse is the one worth
+       acting on. */
+    active.sort((a, b) => a.expiresAt - b.expiresAt);
 
     return json({ pending, active });
   }
@@ -295,7 +336,10 @@ export async function createItemCode(env, item, opts = {}) {
 }
 
 async function handleCreate(env, session, body) {
-  if (session.role !== 'broadcaster' && session.role !== 'moderator') {
+  /* Minting a code grants an item to whoever redeems it, so this gates on the
+     live moderator list rather than on what the cookie remembers. */
+  const { isModerator } = await import('./admin/moderators.js');
+  if (!(await isModerator(env, session))) {
     return json({ error: 'Unauthorized' }, 403);
   }
 

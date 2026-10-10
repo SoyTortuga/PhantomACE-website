@@ -186,6 +186,17 @@
             </div>
           </div>
 
+          <!-- Live item codes. The queue endpoint has existed since the
+               feature shipped and no page called it, so these were visible
+               only in the database — including the backup code a failed
+               monthly-prize whisper leaves behind, whose only other home is
+               the rig's log. Read-only on purpose. -->
+          <div class="card bot-section bot-grid-full" id="itemCodeSection">
+            <h3>Live Item Codes</h3>
+            <p class="bot-section-desc">Codes that can be redeemed right now — prize codes, raid rewards, anything minted by the site. A code restricted to one person shows their name; that is the backup when a prize whisper does not arrive.</p>
+            <div id="botItemCodes"><p class="bot-muted">Loading&hellip;</p></div>
+          </div>
+
           <div class="card bot-section" id="checkinSection" hidden>
             <h3>Pham Check-Ins</h3>
             <p class="bot-section-desc">Viewers who redeemed Pham Check-In this stream.</p>

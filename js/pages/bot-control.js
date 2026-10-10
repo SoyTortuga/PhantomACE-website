@@ -300,6 +300,86 @@ async function refreshDashboard() {
   }
 }
 
+/* ── Live item codes ─────────────────────────────────────────────────────
+   The one place outside the database where a staff member can see what is
+   redeemable. Most of the time it is empty, which is itself the answer. */
+
+function renderItemCodes(data) {
+  const box = document.getElementById('botItemCodes');
+  if (!box) return;
+
+  if (!data || data.error) {
+    box.innerHTML = '<p class="bot-muted">Could not read item codes' +
+      (data && data.error ? ': ' + escapeBotHtml(data.error) : '.') + '</p>';
+    return;
+  }
+
+  const active = Array.isArray(data.active) ? data.active : [];
+  const pending = Array.isArray(data.pending) ? data.pending : [];
+
+  if (!active.length && !pending.length) {
+    box.innerHTML = '<p class="bot-muted">No codes are live right now.</p>';
+    return;
+  }
+
+  const left = function (ms) {
+    const secs = Math.max(0, Math.round(ms / 1000));
+    if (secs >= 86400) return Math.round(secs / 86400) + 'd left';
+    if (secs >= 3600) return Math.round(secs / 3600) + 'h left';
+    if (secs >= 60) return Math.round(secs / 60) + 'm left';
+    return secs + 's left';
+  };
+
+  let html = '';
+
+  if (active.length) {
+    html += '<ul class="bot-code-list">' + active.map(function (c) {
+      const item = c.item || {};
+      /* Who it is for. A restricted code is the interesting case: it is
+         usually a prize, and the name is what makes it actionable. */
+      let who = '<span class="bot-code-who">anyone</span>';
+      if (c.restrictedTo && c.restrictedTo.length) {
+        const names = (c.restrictedNames && c.restrictedNames.length ? c.restrictedNames : c.restrictedTo);
+        who = '<span class="bot-code-who is-restricted">' +
+          names.map(escapeBotHtml).join(', ') + ' only</span>';
+      }
+      /* Claimed is the difference between "they got it" and "they still
+         need this code". */
+      const state = c.redeemed > 0
+        ? '<span class="bot-code-state is-claimed">claimed</span>'
+        : '<span class="bot-code-state">unclaimed</span>';
+
+      return '<li class="bot-code" data-rarity="' + escapeBotHtml(item.rarity || 'common') + '">' +
+        '<code class="bot-code-code">' + escapeBotHtml(c.code) + '</code>' +
+        '<span class="bot-code-item">' + escapeBotHtml(item.name || item.id || 'Item') + '</span>' +
+        who + state +
+        '<span class="bot-code-left">' + escapeBotHtml(left(c.expiresAt - Date.now())) + '</span>' +
+        '</li>';
+    }).join('') + '</ul>';
+  }
+
+  /* Minted but not activated: waiting on a drop, not on a person. Worth
+     showing because a queue that is growing means drops are not firing. */
+  if (pending.length) {
+    html += '<p class="bot-section-desc">' + pending.length +
+      ' code' + (pending.length === 1 ? '' : 's') +
+      ' minted and waiting to be dropped.</p>';
+  }
+
+  box.innerHTML = html;
+}
+
+async function refreshItemCodes() {
+  const box = document.getElementById('botItemCodes');
+  if (!box) return;
+  try {
+    const res = await fetch('/api/item-codes?action=queue', { credentials: 'same-origin' });
+    renderItemCodes(await res.json());
+  } catch (err) {
+    renderItemCodes({ error: 'could not reach the server' });
+  }
+}
+
 async function fireBotAction(payload, button) {
   const originalText = button ? button.textContent : '';
   if (button) { button.disabled = true; button.textContent = 'Sending...'; }
@@ -1110,6 +1190,7 @@ function initBotControlPanel() {
     });
   }
 
+  refreshItemCodes();
   refreshDashboard();
   initGiveawayPanel();
   initRotationPanel();
@@ -1119,11 +1200,20 @@ function initBotControlPanel() {
      you actually watch while it is live, and its window is only 5 minutes.
      Paused while the tab is hidden — this panel sits open on a machine that
      is also running a stream. */
+  /* Item codes ride the SAME timer rather than starting a second one on a
+     page that sits open beside OBS -- but every third tick, not every one. A
+     prize code lasts a week and a raid code minutes; nothing here changes on
+     a 20-second scale, and the read is a scan of the whole code table. */
+  let tick = 0;
   setInterval(function () {
-    if (!document.hidden) refreshDashboard();
+    if (document.hidden) return;
+    refreshDashboard();
+    if (++tick % 3 === 0) refreshItemCodes();
   }, 20000);
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) refreshDashboard();
+    if (document.hidden) return;
+    refreshDashboard();
+    refreshItemCodes();
   });
 }
 

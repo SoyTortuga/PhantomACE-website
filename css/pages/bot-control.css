@@ -736,6 +736,76 @@
 .bot-drop-code.unregistered { border-color: var(--red); }
 .bot-drop-code.unregistered span { color: var(--red); }
 
+/* ── Live item codes ──────────────────────────
+   Same bones as .bot-drop-code above: a full border, --gray-lo ground,
+   tokens throughout. Rarity tints the code itself, which is the one
+   sanctioned use of those colours. */
+
+.bot-code-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bot-code {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  gap: 10px;
+  align-items: baseline;
+  border: 1px solid var(--border);
+  background: var(--gray-lo);
+  padding: 7px 10px;
+}
+
+.bot-code-code {
+  font-family: var(--font-system);
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  color: var(--text-pri);
+}
+
+/* Rarity, from the tokens. The ONE place these colours are allowed. */
+.bot-code[data-rarity="uncommon"]  .bot-code-code { color: var(--rarity-uncommon); }
+.bot-code[data-rarity="rare"]      .bot-code-code { color: var(--rarity-rare); }
+.bot-code[data-rarity="epic"]      .bot-code-code { color: var(--rarity-epic); }
+.bot-code[data-rarity="legendary"] .bot-code-code { color: var(--rarity-legendary); }
+.bot-code[data-rarity="mythic"]    .bot-code-code { color: var(--rarity-mythic); }
+.bot-code[data-rarity="exclusive"] .bot-code-code { color: var(--exclusive); }
+
+.bot-code-item {
+  color: var(--text-pri);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-code-who,
+.bot-code-state,
+.bot-code-left {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* A code tied to one person is the one worth noticing -- it is usually a
+   prize, and the name is what makes it actionable. */
+.bot-code-who.is-restricted { color: var(--text-sec); }
+
+/* Claimed means they already have it; unclaimed means they still need this
+   code, which is the state a failed whisper leaves behind. */
+.bot-code-state.is-claimed { color: var(--rarity-uncommon); }
+
+@media (max-width: 640px) {
+  .bot-code {
+    grid-template-columns: auto 1fr;
+    row-gap: 4px;
+  }
+}
+
 /* ── Monthly giveaway stats ────────────────── */
 
 .bot-stat-row {
