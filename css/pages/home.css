@@ -1,12 +1,32 @@
 /* Hero */
 .hero {
-  min-height: 100vh;
+  /* No longer a full screen of branding. It is as tall as the live
+     status, the buttons and the stream need, which puts the rest of the
+     page within reach of the first scroll instead of below a 100vh wall. */
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  padding: 80px 24px 60px;
+  padding: clamp(40px, 9vw, 96px) 24px clamp(32px, 6vw, 64px);
+}
+
+/* The branding, behind everything. Centred on the same point the radial
+   gradient is, so the glow sits under the wordmark rather than beside it. */
+.hero-brand {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 24px;
+  pointer-events: none;
+  /* Held back so the foreground reads over it. Not a blur — see the
+     project's CSS rules; this is opacity, which costs nothing per frame. */
+  opacity: 0.5;
 }
 
 .hero-bg {
@@ -32,9 +52,9 @@
 }
 
 .hero-logo {
-  width: clamp(120px, 25vw, 200px);
+  width: clamp(84px, 15vw, 132px);
   height: auto;
-  margin: 0 auto 24px;
+  margin: 0 auto 16px;
   border-radius: 20px;
   mask-image: radial-gradient(ellipse at center, black 55%, transparent 72%);
   -webkit-mask-image: radial-gradient(ellipse at center, black 55%, transparent 72%);
@@ -48,9 +68,9 @@
 }
 
 .hero-title-img {
-  max-width: clamp(300px, 60vw, 700px);
+  max-width: clamp(260px, 52vw, 560px);
   height: auto;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   mix-blend-mode: multiply;
   filter:
     drop-shadow(0 0 8px rgba(255, 0, 0, 0.7))
@@ -78,7 +98,7 @@
   color: var(--text-sec);
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  margin-bottom: 36px;
+  margin-bottom: 0;
   text-shadow: 0 0 20px rgba(255, 0, 0, 0.1);
 }
 
@@ -141,7 +161,7 @@
 
 /* Twitch Embed */
 .hero-embed {
-  margin-top: 48px;
+  margin-top: 28px;
   max-width: 640px;
   margin-left: auto;
   margin-right: auto;

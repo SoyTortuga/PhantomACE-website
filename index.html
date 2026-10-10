@@ -27,13 +27,23 @@
   <!-- Hero -->
   <section class="hero">
     <div class="hero-bg"></div>
+
+    <!-- THE BRANDING IS THE BACKDROP. It used to be stacked as content
+         above the fold, so the first screen was the logo and the wordmark
+         and everything the page is actually for started below them. Still
+         <img> rather than a background-image: the wordmark's look is its
+         drop-shadow glow and its multiply blend against the red, and a
+         background-image gets neither. -->
+    <div class="hero-brand" aria-hidden="true">
+      <img src="/assets/images/phantomace-logo.png" alt="" class="hero-logo">
+      <img src="/assets/images/hero-title.png" alt="" class="hero-title-img">
+      <p class="hero-subtitle">Digital Chaos &amp; Drum Fills</p>
+    </div>
+
     <div class="hero-vignette"></div>
 
     <div class="hero-content">
       <h1 class="sr-only">PhantomACE — Digital Chaos &amp; Drum Fills</h1>
-      <img src="/assets/images/phantomace-logo.png" alt="" class="hero-logo">
-      <img src="/assets/images/hero-title.png" alt="" class="hero-title-img">
-      <p class="hero-subtitle">Digital Chaos & Drum Fills</p>
 
       <div class="hero-live-status" id="heroLiveStatus">
         <div class="hero-live-label">
