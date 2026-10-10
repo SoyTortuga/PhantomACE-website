@@ -49,11 +49,11 @@ function getSession(request) {
 /* Must match the filter bar and the form's own <select> on media.html.
    A category the page cannot filter by is an item nobody will ever see
    except under "All". */
-const CATEGORIES = ['clip', 'screenshot', 'art', 'highlight', 'audio'];
+export const CATEGORIES = ['clip', 'screenshot', 'art', 'highlight', 'audio'];
 
 /* Visibility, lowest first — the same ladder js/auth.js uses. '' means
    everyone, including logged-out visitors. */
-const ROLES = ['visitor', 'follower', 'sub_tier1', 'sub_tier2', 'sub_tier3', 'moderator', 'broadcaster'];
+export const ROLES = ['visitor', 'follower', 'sub_tier1', 'sub_tier2', 'sub_tier3', 'moderator', 'broadcaster'];
 
 export async function onRequestPost(context) {
   const { env, request } = context;

@@ -37,7 +37,7 @@
       <button class="filter-btn" data-filter="art">Art</button>
       <button class="filter-btn" data-filter="highlight">Highlights</button>
       <button class="filter-btn" data-filter="audio">Audio</button>
-      <button class="btn-primary upload-btn role-moderator" id="uploadBtn" onclick="openUploadModal()">+ Upload</button>
+      <button class="btn-primary upload-btn role-moderator" id="uploadBtn" onclick="openUploadModal()">+ Add Media</button>
     </div>
 
     <div class="gallery-grid" id="galleryGrid"></div>
@@ -47,9 +47,20 @@
   <div class="upload-modal" id="uploadModal">
     <div class="upload-modal-content card">
       <div class="upload-modal-header">
-        <h3>Upload Media</h3>
+        <h3 id="uploadModalTitle">Add Media</h3>
         <button class="lightbox-close upload-modal-close" onclick="closeUploadModal()" aria-label="Close">&times;</button>
       </div>
+
+      <!-- Two ways in. A Twitch clip is a reference, not an upload: nothing
+           is stored here and the views stay on the real clip, so it is a
+           different form rather than a file picker that accepts a URL. -->
+      <div class="upload-modes" role="tablist">
+        <button type="button" class="upload-mode active" id="modeFileBtn" role="tab"
+                aria-selected="true" onclick="setUploadMode('file')">Upload a file</button>
+        <button type="button" class="upload-mode" id="modeClipBtn" role="tab"
+                aria-selected="false" onclick="setUploadMode('clip')">Twitch clip</button>
+      </div>
+
       <form id="uploadForm" onsubmit="handleUpload(event)">
         <div class="upload-field">
           <label for="uploadTitle">Title</label>
@@ -91,6 +102,57 @@
           <button type="submit" class="btn-primary" id="uploadSubmitBtn">Upload</button>
         </div>
         <div class="upload-status" id="uploadStatus"></div>
+      </form>
+
+      <!-- Clip mode. Paste a link, or pick one off the channel's recent
+           list — the point of the feature is not having to go and find the
+           URL. -->
+      <form id="clipForm" onsubmit="handleAddClip(event)" hidden>
+        <div class="upload-field">
+          <label for="clipUrl">Clip link</label>
+          <input type="text" id="clipUrl" required
+                 placeholder="https://www.twitch.tv/phantomace/clip/...">
+          <small class="upload-hint">Any Twitch clip link, or just the slug. The title and
+            thumbnail come from Twitch.</small>
+        </div>
+        <div class="upload-field">
+          <label for="clipTitle">Title <span class="upload-optional">(optional)</span></label>
+          <input type="text" id="clipTitle" placeholder="Leave blank to use the clip's own title">
+        </div>
+        <div class="upload-field">
+          <label for="clipCategory">Category</label>
+          <select id="clipCategory" required>
+            <option value="clip">Clip</option>
+            <option value="highlight">Highlight</option>
+          </select>
+        </div>
+        <div class="upload-field">
+          <label for="clipRole">Visibility</label>
+          <select id="clipRole">
+            <option value="">Everyone</option>
+            <option value="follower">Followers+</option>
+            <option value="sub_tier1">Tier 1 Subs+</option>
+            <option value="sub_tier2">Tier 2 Subs+</option>
+            <option value="sub_tier3">Tier 3 Subs+</option>
+            <option value="moderator">Moderators+</option>
+            <option value="broadcaster">Broadcaster Only</option>
+          </select>
+        </div>
+
+        <div class="upload-field">
+          <div class="clip-recent-head">
+            <label>Recent clips</label>
+            <button type="button" class="btn-secondary clip-refresh" id="clipRefreshBtn"
+                    onclick="loadRecentClips()">Load</button>
+          </div>
+          <div class="clip-recent" id="clipRecent"></div>
+        </div>
+
+        <div class="upload-actions">
+          <button type="button" class="btn-secondary" onclick="closeUploadModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="clipSubmitBtn">Add Clip</button>
+        </div>
+        <div class="upload-status" id="clipStatus"></div>
       </form>
     </div>
   </div>

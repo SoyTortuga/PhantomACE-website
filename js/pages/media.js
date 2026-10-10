@@ -73,7 +73,9 @@ function renderItem(item, index) {
   /* Driven by the item's own type rather than by its category. A clip filed
      under Highlights is still a video, and an image filed under Clips is
      still an image — the old check read the category and got both wrong. */
-  const playHtml = item.type === 'video' ? '<div class="gallery-item-play"></div>' : '';
+  /* A Twitch clip plays too, so it gets the same affordance. */
+  const playHtml = (item.type === 'video' || item.type === 'twitch-clip')
+    ? '<div class="gallery-item-play"></div>' : '';
   /* No role-<role> class on the tile. /api/media already left out
      everything this viewer may not see, judged with the moderator list;
      roles.css would hide the rest again by the cookie's role, which says
@@ -88,12 +90,18 @@ function renderItem(item, index) {
      broken tile on this page for every alert sting ever uploaded.
      preload="none" so a gallery of stings costs nothing until one is
      played. */
-  const mediaHtml = item.type === 'video'
-    ? `<video src="${escapeAttr(item.url)}" preload="metadata" muted playsinline></video>`
-    : item.type === 'audio'
-      ? `<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>` +
-        `<audio src="${escapeAttr(item.url)}" controls preload="none"></audio></div>`
-      : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}" loading="lazy">`;
+  /* A Twitch clip is a REFERENCE — nothing of it is stored here. The tile
+     is Twitch's own thumbnail, so the grid costs one image rather than an
+     embedded player per tile; the player appears when it is opened. */
+  const mediaHtml = item.type === 'twitch-clip'
+    ? `<img src="${escapeAttr(item.thumbnail || '')}" alt="${escapeAttr(item.title)}" loading="lazy">` +
+      (item.duration ? `<span class="gallery-item-dur">${escapeHtml(item.duration)}</span>` : '')
+    : item.type === 'video'
+      ? `<video src="${escapeAttr(item.url)}" preload="metadata" muted playsinline></video>`
+      : item.type === 'audio'
+        ? `<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>` +
+          `<audio src="${escapeAttr(item.url)}" controls preload="none"></audio></div>`
+        : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}" loading="lazy">`;
 
   const removeHtml = canManage
     ? `<button class="gallery-item-remove" data-id="${escapeAttr(item.id)}" title="Remove">&times;</button>`
@@ -241,15 +249,33 @@ function updateLightboxContent(item) {
 
   /* Video was rendered as an <img> here, so opening a clip showed a broken
      image icon. The item knows what it is; use it. */
-  content.innerHTML = item.type === 'video'
-    ? `<video src="${escapeAttr(item.url)}" controls autoplay playsinline></video>`
-    : item.type === 'audio'
-      ? `<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>` +
-        `<audio src="${escapeAttr(item.url)}" controls autoplay></audio></div>`
-      : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}">`;
+  /* TWITCH'S OWN PLAYER, so the view counts on the real clip.
+
+     No `sandbox`: CLAUDE.md's sandbox rule is about OUR games, which we
+     control and therefore confine. This is a third-party origin — already
+     isolated by being one — and Twitch's player needs scripts and
+     same-origin for itself, so a sandbox attribute simply breaks it.
+
+     `parent` must name the host serving this page or Twitch refuses to
+     frame at all, so it comes from location.hostname. Hardcoding
+     phantomace.tv would work there and nowhere else, previews included. */
+  content.innerHTML = item.type === 'twitch-clip'
+    ? `<iframe class="lightbox-clip" src="https://clips.twitch.tv/embed?clip=${
+        encodeURIComponent(item.slug)}&parent=${encodeURIComponent(location.hostname)}&autoplay=true"
+        allow="fullscreen" referrerpolicy="strict-origin-when-cross-origin"
+        title="${escapeAttr(item.title)}"></iframe>`
+    : item.type === 'video'
+      ? `<video src="${escapeAttr(item.url)}" controls autoplay playsinline></video>`
+      : item.type === 'audio'
+        ? `<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>` +
+          `<audio src="${escapeAttr(item.url)}" controls autoplay></audio></div>`
+        : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}">`;
   title.textContent = item.title;
+  /* A clip was made by someone, and that is a different fact from who put
+     it on the wall. Both are worth saying. */
   meta.textContent = `${item.category} · ${formatDate(item.uploadedAt)}` +
-    (item.uploadedBy ? ` · ${item.uploadedBy}` : '');
+    (item.clipCreator ? ` · clipped by ${item.clipCreator}` : '') +
+    (item.uploadedBy ? ` · added by ${item.uploadedBy}` : '');
 
   prevBtn.style.display = lightboxIndex > 0 ? '' : 'none';
   nextBtn.style.display = lightboxIndex < filteredItems.length - 1 ? '' : 'none';
@@ -349,6 +375,117 @@ function closeUploadModal() {
   clearUploadForm();
 }
 
+/* ── Twitch clips ────────────────────────────────────────────────────────
+   Adding one meant downloading it off Twitch and uploading the file, which
+   cost the rig the storage and split the view count off the real clip. A
+   clip is a reference now: paste a link, or pick one off the channel's
+   recent list, which is the half that makes it genuinely easier. */
+
+function setUploadMode(mode) {
+  const fileForm = document.getElementById('uploadForm');
+  const clipForm = document.getElementById('clipForm');
+  const fileBtn = document.getElementById('modeFileBtn');
+  const clipBtn = document.getElementById('modeClipBtn');
+  const title = document.getElementById('uploadModalTitle');
+  if (!fileForm || !clipForm) return;
+
+  const clip = mode === 'clip';
+  fileForm.hidden = clip;
+  clipForm.hidden = !clip;
+  if (fileBtn) { fileBtn.classList.toggle('active', !clip); fileBtn.setAttribute('aria-selected', String(!clip)); }
+  if (clipBtn) { clipBtn.classList.toggle('active', clip); clipBtn.setAttribute('aria-selected', String(clip)); }
+  if (title) title.textContent = clip ? 'Add a Twitch Clip' : 'Upload Media';
+}
+
+function clipStatus(text, kind) {
+  const el = document.getElementById('clipStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'upload-status' + (kind ? ' ' + kind : '');
+}
+
+/* The channel's recent clips, to click instead of hunting for a URL. Loaded
+   on demand rather than when the modal opens — it is a Twitch round trip,
+   and the paste box works without it. */
+async function loadRecentClips() {
+  const box = document.getElementById('clipRecent');
+  const btn = document.getElementById('clipRefreshBtn');
+  if (!box) return;
+  box.innerHTML = '<p class="clip-recent-note">Loading…</p>';
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/media/clip?recent=1', { credentials: 'same-origin' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not load clips.');
+
+    const clips = data.clips || [];
+    if (!clips.length) {
+      box.innerHTML = '<p class="clip-recent-note">No clips on the channel yet.</p>';
+      return;
+    }
+    const already = new Set(data.already || []);
+    box.innerHTML = clips.map(c => `
+      <button type="button" class="clip-card${already.has(c.slug) ? ' is-added' : ''}"
+              data-slug="${escapeAttr(c.slug)}" title="${escapeAttr(c.title)}">
+        <img src="${escapeAttr(c.thumbnail)}" alt="" loading="lazy">
+        <span class="clip-card-title">${escapeHtml(c.title)}</span>
+        <span class="clip-card-meta">${escapeHtml(String(c.views))} views${
+          already.has(c.slug) ? ' · on the wall' : ''}</span>
+      </button>`).join('');
+
+    box.querySelectorAll('.clip-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const input = document.getElementById('clipUrl');
+        if (input) input.value = card.dataset.slug;
+        box.querySelectorAll('.clip-card').forEach(c => c.classList.remove('is-picked'));
+        card.classList.add('is-picked');
+        clipStatus('Picked — press Add Clip.', '');
+      });
+    });
+  } catch (err) {
+    box.innerHTML = '';
+    clipStatus(err.message || 'Could not load clips.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function handleAddClip(event) {
+  event.preventDefault();
+  const btn = document.getElementById('clipSubmitBtn');
+  const url = (document.getElementById('clipUrl') || {}).value || '';
+  if (!url.trim()) { clipStatus('Paste a clip link first.', 'error'); return; }
+
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  clipStatus('Checking the clip with Twitch…', '');
+
+  try {
+    const res = await fetch('/api/media/clip', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url.trim(),
+        title: (document.getElementById('clipTitle') || {}).value || '',
+        category: (document.getElementById('clipCategory') || {}).value || 'clip',
+        role: (document.getElementById('clipRole') || {}).value || '',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Could not add the clip.');
+
+    clipStatus(data.replaced ? 'Updated — it was already on the wall.' : 'Added.', 'success');
+    await loadMedia();
+    setTimeout(closeUploadModal, 900);
+  } catch (err) {
+    clipStatus(err.message || 'Could not add the clip.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
+}
+
 function clearUploadForm() {
   const form = document.getElementById('uploadForm');
   const preview = document.getElementById('uploadPreview');
@@ -356,6 +493,15 @@ function clearUploadForm() {
   if (form) form.reset();
   if (preview) preview.innerHTML = '';
   if (status) { status.textContent = ''; status.className = 'upload-status'; }
+
+  /* The clip side as well, or a refused link and a half-loaded picker are
+     still sitting there the next time the modal opens. */
+  const clipForm = document.getElementById('clipForm');
+  if (clipForm) clipForm.reset();
+  const recent = document.getElementById('clipRecent');
+  if (recent) recent.innerHTML = '';
+  clipStatus('', '');
+  setUploadMode('file');
 }
 
 async function handleUpload(e) {

@@ -127,7 +127,9 @@ const CLIENT_PARK = 'games/dino-park/index.html';
    an item nobody sees except under "All" — which is what the comment on
    the server list says, and what happened to audio until recently. */
 {
-  const list = grab('functions/api/media/upload.js', /^const CATEGORIES = \[([^\]]*)\];/m, 'CATEGORIES');
+  /* `export const` now — clip.js imports the list rather than keeping a
+     second copy of it, which is the whole point. */
+  const list = grab('functions/api/media/upload.js', /^export const CATEGORIES = \[([^\]]*)\];/m, 'CATEGORIES');
   const server = [...(list || '').matchAll(/'([a-z]+)'/g)].map(m => m[1]).sort();
 
   const html = read('media.html');
