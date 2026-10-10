@@ -303,7 +303,12 @@
        in the layout editor); hidden until it fires. -->
   <div class="ov-checkin" id="ovCheckin" hidden>
     <div class="ov-checkin-sprite" id="ovCheckinSprite"></div>
-    <div class="ov-checkin-label">Pham Check-In</div>
+    <div class="ov-checkin-text">
+      <div class="ov-checkin-label">Pham Check-In</div>
+      <!-- Only while an event badge window is open; empty and hidden the rest
+           of the time, so the reminder keeps its usual shape. -->
+      <div class="ov-checkin-badge" id="ovCheckinBadge" hidden></div>
+    </div>
   </div>
 
   <!-- Dino hatch: its OWN movable, transparent panel (not the shared Alerts

@@ -243,7 +243,23 @@ export async function onRequestGet(context) {
     /* Check-ins waiting for Twitch to say which broadcast they belong to —
        settled within about a minute (checkin-rewards.js). */
     pending: stored && Array.isArray(stored.pending) ? stored.pending.length : 0,
+    /* AN EVENT BADGE WINDOW, if one is open. Defined as absolute instants in
+       checkin-badges.js weeks before the event and read nowhere but the
+       granting path, so whether there was something to earn tonight was a
+       thing to remember rather than to look at. */
+    eventBadge: null,
   };
+
+  try {
+    const { badgesOpenAt } = await import('../checkin-badges.js');
+    const open = badgesOpenAt();
+    if (open.length) {
+      checkins.eventBadge = { name: open[0].name, rarity: open[0].rarity, until: open[0].to };
+    }
+  } catch (err) {
+    /* A missing badge note must not cost the card its check-in list. */
+    console.error('[dashboard] could not read the badge window:', err && err.message);
+  }
 
   /* The OBS browser-source URL, key included, so it can be copied rather
      than assembled by hand. Broadcaster only: the key is what stops anyone

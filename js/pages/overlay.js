@@ -766,6 +766,16 @@
     if (!panel || !sprite) return;
     clearCheckinTimers();
 
+    /* An event badge is claimable by checking in right now, so say which.
+       Cleared every fire, not only when one is present — a stale name left
+       over from last week's event would be worse than no name at all. */
+    var badgeEl = document.getElementById('ovCheckinBadge');
+    if (badgeEl) {
+      var bname = ev && ev.badge && typeof ev.badge.name === 'string' ? ev.badge.name : '';
+      badgeEl.textContent = bname ? 'Earns: ' + bname : '';
+      badgeEl.hidden = !bname;
+    }
+
     sprite.style.backgroundPositionX = '0px';
     panel.hidden = false;
     void panel.offsetWidth;                 // let the fade restart on a re-fire

@@ -736,6 +736,20 @@
 .bot-drop-code.unregistered { border-color: var(--red); }
 .bot-drop-code.unregistered span { color: var(--red); }
 
+/* ── Event badge window ───────────────────────
+   Shown on the Pham Check-Ins card only while a window is open. A full
+   border, like everything else here — no side rail. */
+
+.bot-badge-window {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--red);
+  background: var(--gray-lo);
+  color: var(--text-pri);
+  font-size: 13px;
+}
+.bot-badge-window b { color: var(--exclusive); }
+
 /* ── Live item codes ──────────────────────────
    Same bones as .bot-drop-code above: a full border, --gray-lo ground,
    tokens throughout. Rarity tints the code itself, which is the one

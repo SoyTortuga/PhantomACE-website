@@ -271,6 +271,64 @@ const pacific = (ms) => new Date(ms).toLocaleString('en-US', {
   ok('the module is declared a non-route', /'api\/checkin-badges\.js'/.test(router));
 }
 
+/* ── Somebody is actually told the window is open ────────────────────── */
+{
+  /* badgesOpenAt was read in one place: the code that grants. So a window
+     could open and close without a viewer having any way to know there was
+     something to earn, and without the broadcaster — who wrote the dates
+     into a source file weeks earlier — being reminded either. */
+
+  const idx = fs.readFileSync(path.join(REPO, 'server/index.js'), 'utf8');
+  ok('the reminder resolves the open badge where the window lives',
+     /badgesOpenAt\(\)/.test(idx));
+  ok('and sends it with the check-in nudge',
+     /type: 'pham-checkin', sound: false, badge/.test(idx));
+  ok('a failure to read it does not cost the reminder',
+     /badge name is a nicety/.test(idx));
+
+  const ov = fs.readFileSync(path.join(REPO, 'js/pages/overlay.js'), 'utf8');
+  ok('the overlay shows the badge name', /ovCheckinBadge/.test(ov));
+  /* Cleared on EVERY fire, not only when one is present: a name left over
+     from last week's event is worse than no name. */
+  ok('and clears it when there is none',
+     /badgeEl.hidden = !bname/.test(ov));
+
+  const html = fs.readFileSync(path.join(REPO, 'overlay.html'), 'utf8');
+  ok('the element exists and starts hidden',
+     /id="ovCheckinBadge" hidden/.test(html));
+
+  /* MARATHON RULE. The stylesheet sets display on this element, which
+     overrides the UA's [hidden] rule — so without an explicit guard the line
+     would stay composited over the live capture once an event ended. */
+  const css = fs.readFileSync(path.join(REPO, 'css/pages/overlay.css'), 'utf8');
+  ok('a hidden badge line reaches display:none',
+     /\.ov-checkin-badge\[hidden\]\s*\{\s*display:\s*none;?\s*\}/.test(css));
+
+  /* And the broadcaster's side. */
+  const dash = fs.readFileSync(path.join(REPO, 'functions/api/bot/dashboard.js'), 'utf8');
+  ok('the dashboard reports an open window', /eventBadge/.test(dash) && /badgesOpenAt/.test(dash));
+
+  const bot = fs.readFileSync(path.join(REPO, 'js/pages/bot-control.js'), 'utf8');
+  ok('Bot Control renders it', /bot-badge-window/.test(bot));
+  ok('including when the channel is offline, which is when it is a reminder',
+     /!c\.pending && !c\.eventBadge/.test(bot));
+  ok('and prints the closing time in Pacific, the form it is announced in',
+     /America\/Los_Angeles/.test(bot));
+}
+
+/* ── The reminder names whichever badge is open, live ─────────────────── */
+{
+  /* Driven through badgesOpenAt itself rather than a copy of the dates, so
+     this follows the catalogue when an event is added. */
+  const open = badgesOpenAt(AGATE.from + 3600000);
+  check('one badge is open mid-window', open.length, 1);
+  ok('and it has a name to announce', typeof open[0].name === 'string' && open[0].name.length > 0);
+  ok('and an end to count toward', Number.isFinite(open[0].to));
+
+  check('nothing is open before it', badgesOpenAt(AGATE.from - 1).length, 0);
+  check('nor after', badgesOpenAt(AGATE.to + 1).length, 0);
+}
+
 /* ── END TO END, through the real webhook ───────────────────────────── */
 {
   /* Everything above tests a pure function and a regex. Neither would have

@@ -168,15 +168,42 @@ html, body {
   filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.5));
 }
 
-.ov-checkin-label {
+/* The label and the badge line stack; the pair sits where the label used to,
+   so the reminder keeps its shape on a layout somebody has already
+   positioned. */
+.ov-checkin-text {
   align-self: flex-end;
   padding-bottom: 14px;
+  min-width: 0;
+}
+
+.ov-checkin-label {
   font-family: 'GodOfWar', serif;
   font-size: 34px;
   color: #fff;
   white-space: nowrap;
   /* A dark outline plus a red glow, so the words hold over a bright scene
      without a panel behind them. */
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+/* Shown ONLY while an event badge window is open — see CHECKIN_BADGES in
+   functions/api/checkin-badges.js. Smaller than the label and under it, so a
+   long badge name cannot widen the panel off whatever it was placed against.
+   The [hidden] guard is explicit because the rule above sets display on the
+   element; without it the UA default would be overridden and a stale line
+   would stay composited over the capture. */
+.ov-checkin-badge[hidden] { display: none; }
+.ov-checkin-badge {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-ui), serif;
+  font-size: 17px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
   text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 0, 0, 0.5);
 }
 

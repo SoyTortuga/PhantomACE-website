@@ -313,7 +313,18 @@ async function main() {
 
     try {
       const { pushOverlayEvent } = await import('../functions/api/overlay/events.js');
-      await pushOverlayEvent(env, { type: 'pham-checkin', sound: false });
+      /* Name the event badge while its window is open. The window is defined
+         in checkin-badges.js and was read nowhere but the granting path, so a
+         viewer had no way to know there was anything to earn by checking in.
+         Resolved here, where the window lives, rather than by giving the
+         overlay another thing to poll. */
+      let badge = null;
+      try {
+        const { badgesOpenAt } = await import('../functions/api/checkin-badges.js');
+        const open = badgesOpenAt();
+        if (open.length) badge = { name: open[0].name, until: open[0].to };
+      } catch { /* a badge name is a nicety; the reminder still fires */ }
+      await pushOverlayEvent(env, { type: 'pham-checkin', sound: false, badge });
     } catch (err) {
       await env.MARKETPLACE.mutate('checkin_reminder', (c) => {
         if (!c || c.lastFiredAt !== claimedAt) return undefined;   // someone else fired

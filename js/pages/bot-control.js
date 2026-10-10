@@ -247,19 +247,38 @@ function renderCheckins(c) {
   if (!section || !box) return;
 
   /* Hidden entirely when offline with nobody checked in — an empty panel on
-     a channel that is not live says nothing worth the space. */
-  if (!c || (!c.live && !c.count && !c.pending)) {
+     a channel that is not live says nothing worth the space. An OPEN BADGE
+     WINDOW is worth the space though, including before going live: it is the
+     thing you would want to have been reminded of. */
+  if (!c || (!c.live && !c.count && !c.pending && !c.eventBadge)) {
     section.hidden = true;
     return;
   }
   section.hidden = false;
+
+  var badgeNote = '';
+  if (c.eventBadge && c.eventBadge.name) {
+    var until = Number(c.eventBadge.until);
+    /* The broadcaster announces these in Pacific, which is the only form
+       worth printing here. */
+    var untilText = Number.isFinite(until)
+      ? new Date(until).toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          weekday: 'short', month: 'short', day: 'numeric',
+          hour: 'numeric', minute: '2-digit',
+        }) + ' PT'
+      : '';
+    badgeNote = '<p class="bot-badge-window">Checking in right now also earns <b>' +
+      escapeBotHtml(c.eventBadge.name) + '</b>' +
+      (untilText ? ', until ' + escapeBotHtml(untilText) : '') + '.</p>';
+  }
 
   const pendingNote = c.pending
     ? '<p class="bot-muted">' + c.pending + ' more waiting for Twitch to confirm the stream — they keep their place.</p>'
     : '';
 
   if (!c.count) {
-    box.innerHTML = '<p class="bot-muted">' +
+    box.innerHTML = badgeNote + '<p class="bot-muted">' +
       (c.live ? 'Live — nobody has checked in yet this stream.' : 'No check-ins.') + '</p>' + pendingNote;
     return;
   }
@@ -274,7 +293,7 @@ function renderCheckins(c) {
       '</li>';
   }).join('');
 
-  box.innerHTML =
+  box.innerHTML = badgeNote +
     '<div class="bot-checkin-count">' + c.count + (c.count === 1 ? ' check-in' : ' check-ins') +
     (c.recent.length < c.count ? ' (showing ' + c.recent.length + ')' : '') + '</div>' +
     '<ul class="bot-checkin-list">' + rows + '</ul>' + pendingNote;

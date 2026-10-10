@@ -150,7 +150,12 @@ ok('the sound is in place', fs.existsSync(path.join(REPO, 'assets/audio/phamChec
 {
   const idx = read('server/index.js');
   ok('the rig tick fires the reminder while live', /if \(s\.live\) \{\s*await fireCheckinReminder/.test(idx));
-  ok('the timer nudge is silent', /pushOverlayEvent\(env, \{ type: 'pham-checkin', sound: false \}\)/.test(idx));
+  /* Matched on the FIELD rather than the whole literal: the event also
+     carries the open event badge now, and an exact-shape regex here was a
+     check on punctuation rather than on the nudge being silent. */
+  ok('the timer nudge is silent',
+     /pushOverlayEvent\(env, \{ type: 'pham-checkin', sound: false[,}]/.test(idx));
+  ok('and names the event badge when a window is open', /badgesOpenAt\(\)/.test(idx));
   ok('it honours the configured interval', /intervalMin[\s\S]*60 \* 1000/.test(idx) && /lastFiredAt/.test(idx));
   /* The stamp used to be committed before the push ran, so a push that threw
      suppressed the reminder for the whole interval with nothing shown -- and
