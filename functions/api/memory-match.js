@@ -22,7 +22,7 @@
    lb_memory_match_10.
    ══════════════════════════════════════════════ */
 
-import { SEASON_TZ } from './season-time.js';
+import { SEASON_TZ, weekKey } from './season-time.js';
 
 const GAME_TTL = 3600;
 const MAX_ENTRIES = 50;
@@ -220,18 +220,36 @@ async function recordResult(env, player, game) {
     const lb = Array.isArray(current) ? current : [];
     const row = lb.find(e => e && String(e.id) === player.userId);
     const now = Date.now();
+    const wk = weekKey(new Date(now));
+
+    /* THIS WEEK'S BEST, stamped on every run rather than only on a record.
+       `updatedAt` moves only when the score improves — the early return
+       below is exactly that — so a weekly quest reading it was
+       unachievable for anyone already at their target. Reset when the week
+       turns over so last week's run cannot satisfy this week's quest. */
+    const stampWeek = (r) => {
+      if (!r.weekBest || r.weekBest.wk !== wk) r.weekBest = { wk, moves: game.moves };
+      else if (game.moves < r.weekBest.moves) r.weekBest.moves = game.moves;
+    };
+
     if (row) {
       if (game.moves >= row.score) {
         best = row.score;
-        if (row.name === player.displayName) return undefined;
+        stampWeek(row);
+        /* The week stamp changed even when the score did not, so this can
+           no longer return undefined on a name match — that would discard
+           the stamp and put the quest right back where it was. */
         row.name = player.displayName;
         return lb;
       }
       row.score = game.moves;
       row.name = player.displayName;
       row.updatedAt = now;
+      stampWeek(row);
     } else {
-      lb.push({ id: player.userId, name: player.displayName, score: game.moves, updatedAt: now });
+      const fresh = { id: player.userId, name: player.displayName, score: game.moves, updatedAt: now };
+      stampWeek(fresh);
+      lb.push(fresh);
     }
     improved = true;
     lb.sort((a, b) => (a.score - b.score) || ((a.updatedAt || 0) - (b.updatedAt || 0)));

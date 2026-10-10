@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 import {
   onRequestGet, onRequestPost, SET_PAIRS, BOARD_BY_PAIRS, setKeyForItemName, dealDeck,
 } from '../../functions/api/memory-match.js';
+import { weekKey } from '../../functions/api/season-time.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -183,7 +184,14 @@ async function playPerfect(env, who, gameId, { extraMisses = 0 } = {}) {
   check('perfect game = 20 moves', last.moves, 20);
   check('result recorded', [last.recorded, last.improved, last.board, last.best], [true, true, 'memory-match', 20]);
   check('board written once', env.writes.lb_memory_match, 1);
-  check('board holds the server-counted run', stored(env, 'lb_memory_match'), [{ id: '101', name: 'Ash', score: 20, updatedAt: stored(env, 'lb_memory_match')[0].updatedAt }]);
+  check('board holds the server-counted run', stored(env, 'lb_memory_match'), [{
+    id: '101', name: 'Ash', score: 20,
+    updatedAt: stored(env, 'lb_memory_match')[0].updatedAt,
+    /* This week's best, stamped on every finished run. The weekly quest
+       reads this; it used to read `updatedAt`, which only moves on a new
+       record, so it was unreachable for anyone already at their target. */
+    weekBest: { wk: weekKey(), moves: 20 },
+  }]);
   check('monthly awards settled before writing', env.claims, 1);
   check('no other size board touched', [env.writes.lb_memory_match_10, env.writes.lb_memory_match_15], [undefined, undefined]);
   ok('only the finishing flip reported done', flips.slice(0, -1).every(f => !f.body.done));
@@ -212,7 +220,11 @@ async function playPerfect(env, who, gameId, { extraMisses = 0 } = {}) {
   flips = await playPerfect(env, 'a', s.body.gameId, { extraMisses: 5 });
   const worse = flips[flips.length - 1].body;
   check('worse run: not improved, best reported', [worse.recorded, worse.improved, worse.best], [true, false, 23]);
-  check('worse run leaves the board alone', [stored(env, 'lb_memory_match')[0].score, env.writes.lb_memory_match], [23, 1]);
+  /* The RANKING is left alone; the week stamp is not, so the write count
+     now counts finished games rather than records. */
+  check('worse run leaves the score alone', stored(env, 'lb_memory_match')[0].score, 23);
+  check('worse run still stamps the week', stored(env, 'lb_memory_match')[0].weekBest, { wk: weekKey(), moves: 23 });
+  check('and that is the only reason it wrote again', env.writes.lb_memory_match, 2);
 
   s = await post(env, 'a', { action: 'start', set: 'default' });
   flips = await playPerfect(env, 'a', s.body.gameId);

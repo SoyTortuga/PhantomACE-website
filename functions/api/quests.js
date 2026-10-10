@@ -143,17 +143,26 @@ async function checkinDays(env, userId, wk) {
   return days.size;
 }
 
-/* The board keeps a player's BEST run and when it was set. A qualifying run
-   recorded this week reads as done; one carried over from an earlier week does
-   not, so the quest rewards playing this week, not a standing record. */
+/**
+ * Did this player clear a board in `maxMoves` or fewer THIS week?
+ *
+ * Reads `weekBest`, which memory-match stamps on every recorded run.
+ * It used to read `updatedAt` and `score` — the all-time record — but
+ * `updatedAt` only moves when a run IMPROVES that record, so anyone
+ * already at or under the target could never satisfy it however many
+ * qualifying games they played. The quest was impossible for exactly the
+ * players good enough for it.
+ *
+ * Rows written before `weekBest` existed simply have none, which reads
+ * as "nothing yet this week" — correct, and it fills in on their next
+ * game.
+ */
 async function memoryBestThisWeek(env, userId, wk, maxMoves) {
   const board = await env.MARKETPLACE.get('lb_memory_match', 'json');
   const lb = Array.isArray(board) ? board : [];
   const row = lb.find(e => e && String(e.id) === String(userId));
-  if (!row) return 0;
-  const when = Number(row.updatedAt) || 0;
-  if (!when || weekKey(new Date(when)) !== wk) return 0;
-  return Number(row.score) <= maxMoves ? 1 : 0;
+  if (!row || !row.weekBest || row.weekBest.wk !== wk) return 0;
+  return Number(row.weekBest.moves) <= maxMoves ? 1 : 0;
 }
 
 async function roomVisits(env, userId, wk) {

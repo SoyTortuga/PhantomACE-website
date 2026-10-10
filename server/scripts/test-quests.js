@@ -212,6 +212,100 @@ async function main() {
     setNow('2026-10-15T19:00:00Z');
   }
 
+  /* ── 4b. STEEL TRAP IS ACHIEVABLE BY THE PEOPLE IT IS FOR ────────────
+     The quest ("clear a 20-pair board in 24 moves or fewer this week") used
+     to be decided from `updatedAt`, which memory-match only moves when a run
+     IMPROVES the record. Anyone whose best was already 24 or fewer could
+     never complete it however many qualifying games they played — it was
+     impossible for exactly the players good enough for it. It now reads
+     `weekBest`, stamped on every recorded run.
+
+     Played through the REAL memory-match handler, because the bug lived in
+     the seam between the two files: a seeded row would have proved nothing
+     about what the game actually writes. */
+  {
+    const { onRequestPost: mmPost } = await import('../../functions/api/memory-match.js');
+
+    /* W41 is one of the weeks steel-trap rotates into; W42 is not. */
+    setNow('2026-10-08T19:00:00Z');
+    const wk41 = weekKey();
+    check('steel-trap: the clock is in W41', wk41, '2026-W41');
+    ok('steel-trap: and W41 offers it', quests.questsForWeek(wk41).some(q => q.id === 'steel-trap'));
+
+    const playPerfectly = async (env, misses = 0) => {
+      const mm = async (body) => {
+        const res = await mmPost({ env, request: new Request('https://t.local/api/memory-match', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie() },
+          body: JSON.stringify(body),
+        }) });
+        return { status: res.status, data: await res.json() };
+      };
+      const start = await mm({ action: 'start', set: 'default' });
+      /* The test can see the deck the client never gets. */
+      const deck = JSON.parse(env._store.get('mm_game_' + UID)).deck;
+      const byPair = {};
+      deck.forEach((p, i) => { (byPair[p] = byPair[p] || []).push(i); });
+      const groups = Object.values(byPair);
+      let seq = 0;
+      const flip = (i) => mm({ action: 'flip', gameId: start.data.gameId, index: i, seq: seq++ });
+      for (let m = 0; m < misses; m++) {
+        await flip(groups[m][0]);
+        await flip(groups[m + 1][0]);
+      }
+      let last = null;
+      for (const [x, y] of groups) {
+        await flip(x);
+        last = await flip(y);
+      }
+      return { start, last };
+    };
+
+    const env = makeEnv();
+
+    /* The dead state exactly: a standing record of 20 — already better than
+       the 24 the quest asks for — set in an earlier week. */
+    env._store.set('lb_memory_match', JSON.stringify([
+      { id: UID, name: 'Quester', score: 20, updatedAt: RealDate.parse('2026-09-24T19:00:00Z') },
+    ]));
+    const before = (await get(env)).data.quests.find(q => q.id === 'steel-trap');
+    check('steel-trap: a standing record alone does not complete it', before.completed, false);
+
+    /* A perfect 20-pair game: 20 moves, which beats the quest's 24 but does
+       NOT beat the stored 20 — the early-return path that never advanced
+       `updatedAt`, and the whole reason the quest was unreachable. */
+    const { start, last } = await playPerfectly(env);
+    check('steel-trap: the game starts on the 20-pair deck', start.data.pairs, 20);
+    ok('steel-trap: the board was cleared', last && last.data.done === true);
+    check('steel-trap: in 20 moves', last.data.moves, 20);
+    check('steel-trap: which did not beat the standing record', last.data.improved, false);
+
+    const row = JSON.parse(env._store.get('lb_memory_match')).find(e => e.id === UID);
+    check('steel-trap: the all-time record is untouched', row.score, 20);
+    check('steel-trap: and this week is stamped anyway', row.weekBest, { wk: wk41, moves: 20 });
+
+    const after = (await get(env)).data.quests.find(q => q.id === 'steel-trap');
+    check('steel-trap: the quest now completes', after.completed, true);
+    check('steel-trap: and pays out', (await post(env, { action: 'claim', questId: 'steel-trap' })).status, 200);
+
+    /* Next week it is a fresh ask: this week's run must not satisfy it. */
+    setNow('2026-10-26T19:00:00Z');
+    check('steel-trap: the clock has rolled to W44', weekKey(), '2026-W44');
+    ok('steel-trap: which also offers it', quests.questsForWeek(weekKey()).some(q => q.id === 'steel-trap'));
+    check('steel-trap: last week\u2019s run does not carry over',
+      (await get(env)).data.quests.find(q => q.id === 'steel-trap').completed, false);
+
+    /* And a run that is genuinely too slow still does not count — the fix
+       must not have turned the quest into "play at all". */
+    setNow('2026-10-08T19:00:00Z');
+    const slow = makeEnv();
+    const slowRun = await playPerfectly(slow, 10);
+    check('steel-trap: the slow run took more than 24 moves', slowRun.last.data.moves, 30);
+    check('steel-trap: so it does not complete the quest',
+      (await get(slow)).data.quests.find(q => q.id === 'steel-trap').completed, false);
+
+    setNow('2026-10-15T19:00:00Z');
+  }
+
   /* ── 5. Logged-out shape: the quests show, progress does not ── */
   {
     const env = makeEnv();
