@@ -221,6 +221,43 @@
 }
 
 /* Event Preview Card */
+/* ── Latest Media preview tiles ───────────────────────────────────────
+   A preview, not the gallery: a square of the thing and its name. The
+   gallery page owns the lightbox and the filtering; this just shows the
+   four most recent and links across. Borders only — no shadow, and no
+   coloured side rail, per the project's CSS rules. */
+.home-media-tile {
+  display: block;
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  background: var(--gray-mid);
+  text-decoration: none;
+  color: var(--text-pri);
+}
+.home-media-tile:hover { border-color: var(--red); }
+.home-media-tile > img,
+.home-media-tile > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.home-media-title {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 7px 9px;
+  font-size: 13px;
+  line-height: 1.3;
+  background: rgba(10, 10, 10, 0.92);
+  border-top: 1px solid var(--border-low);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .event-card {
   padding: 20px;
   position: relative;

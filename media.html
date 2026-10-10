@@ -36,6 +36,7 @@
       <button class="filter-btn" data-filter="screenshot">Screenshots</button>
       <button class="filter-btn" data-filter="art">Art</button>
       <button class="filter-btn" data-filter="highlight">Highlights</button>
+      <button class="filter-btn" data-filter="audio">Audio</button>
       <button class="btn-primary upload-btn role-moderator" id="uploadBtn" onclick="openUploadModal()">+ Upload</button>
     </div>
 
@@ -61,6 +62,7 @@
             <option value="screenshot">Screenshot</option>
             <option value="art">Art</option>
             <option value="highlight">Highlight</option>
+            <option value="audio">Audio</option>
           </select>
         </div>
         <div class="upload-field">
@@ -78,9 +80,9 @@
         <div class="upload-field">
           <label for="uploadFile">File</label>
           <div class="upload-dropzone" id="uploadDropzone">
-            <input type="file" id="uploadFile" accept="image/*,video/*" required>
+            <input type="file" id="uploadFile" accept="image/*,video/*,audio/*" required>
             <p>Drop a file or click to browse</p>
-            <span>Images and video clips accepted</span>
+            <span>Images, video clips and audio accepted</span>
           </div>
         </div>
         <div class="upload-preview" id="uploadPreview"></div>

@@ -84,9 +84,16 @@ function renderItem(item, index) {
   /* Videos have no still to show, so the tile renders the video element
      itself with preload="metadata" — enough for the browser to paint a
      first frame without fetching the whole file for a thumbnail. */
+  /* Audio has no still either, and rendering it as an <img> is what put a
+     broken tile on this page for every alert sting ever uploaded.
+     preload="none" so a gallery of stings costs nothing until one is
+     played. */
   const mediaHtml = item.type === 'video'
     ? `<video src="${escapeAttr(item.url)}" preload="metadata" muted playsinline></video>`
-    : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}" loading="lazy">`;
+    : item.type === 'audio'
+      ? `<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>` +
+        `<audio src="${escapeAttr(item.url)}" controls preload="none"></audio></div>`
+      : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}" loading="lazy">`;
 
   const removeHtml = canManage
     ? `<button class="gallery-item-remove" data-id="${escapeAttr(item.id)}" title="Remove">&times;</button>`
@@ -236,7 +243,10 @@ function updateLightboxContent(item) {
      image icon. The item knows what it is; use it. */
   content.innerHTML = item.type === 'video'
     ? `<video src="${escapeAttr(item.url)}" controls autoplay playsinline></video>`
-    : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}">`;
+    : item.type === 'audio'
+      ? `<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>` +
+        `<audio src="${escapeAttr(item.url)}" controls autoplay></audio></div>`
+      : `<img src="${escapeAttr(item.url)}" alt="${escapeAttr(item.title)}">`;
   title.textContent = item.title;
   meta.textContent = `${item.category} · ${formatDate(item.uploadedAt)}` +
     (item.uploadedBy ? ` · ${item.uploadedBy}` : '');

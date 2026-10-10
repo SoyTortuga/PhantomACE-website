@@ -1044,3 +1044,27 @@ a.notif-item.notif-link:hover .notif-message { color: var(--red); }
 .lb-row.has-banner .lb-name-text.name-fx-exclusive,
 .lb-row.has-banner .lb-name-text.name-fx-halloween-exclusive,
 .lb-row.has-banner .lb-name-text.name-fx-harvest-exclusive { color: var(--exclusive); }
+
+/* ── Audio media tiles ────────────────────────────────────────────────
+   Shared rather than page-local: the Media gallery and the homepage's
+   Latest Media preview both render audio items, and the homepage does
+   not load media.css. Audio became a real category when the overlay's
+   per-alert sound uploader started posting to /api/media. */
+.gallery-audio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  background: var(--gray-mid);
+}
+.gallery-audio-mark {
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--red);
+}
+.gallery-audio audio { width: 100%; max-width: 260px; }

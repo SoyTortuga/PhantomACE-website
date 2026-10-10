@@ -160,7 +160,9 @@ export async function onRequestGet(context) {
       } else {
         console.warn(`[recheck-roles] subscription check unavailable (${subRes.status}) — leaving role as ${role}`);
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[recheck-roles] a Twitch role check threw:', err.message);
+    }
 
     /* THE FIX. Rank is re-applied AFTER the subscription check, because the
        check above sets `role` from the subscription alone.
@@ -187,7 +189,9 @@ export async function onRequestGet(context) {
           const followData = await followRes.json();
           if (followData.data?.length > 0) role = 'follower';
         }
-      } catch {}
+      } catch (err) {
+      console.warn('[recheck-roles] a Twitch role check threw:', err.message);
+    }
     }
 
     /* Nothing could actually be checked. Report the role unchanged and,

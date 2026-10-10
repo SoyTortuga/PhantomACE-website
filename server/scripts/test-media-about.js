@@ -309,6 +309,53 @@ async function saveAbout(env, who, content) {
 /* ── Report ──────────────────────────────────────────────────────────── */
 fs.rmSync(TMP, { recursive: true, force: true });
 
+/* ══ THE CATEGORY LIST IS A THREE-WAY MIRROR ═══════════════════════════
+   upload.js states the invariant in a comment — "Must match the filter
+   bar and the form's own <select> on media.html. A category the page
+   cannot filter by is an item nobody will ever see except under 'All'" —
+   and it was false. `audio` was added server-side when the overlay's
+   per-alert sound uploader started POSTing to /api/media, and the page
+   never learned: no filter, no option, no badge, and the grid rendered
+   anything that was not `video` as an <img>. Every alert sting the
+   broadcaster uploaded sat on the public gallery as a broken image, with
+   no error anywhere, because a broken <img> throws nothing.
+
+   The comment was not enough. This is. */
+{
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const src = fs.readFileSync(path.join(REPO, 'functions/api/media/upload.js'), 'utf8');
+  const page = fs.readFileSync(path.join(REPO, 'media.html'), 'utf8');
+  const css = fs.readFileSync(path.join(REPO, 'css/pages/media.css'), 'utf8');
+  const js = fs.readFileSync(path.join(REPO, 'js/pages/media.js'), 'utf8');
+
+  const m = /const CATEGORIES = \[([^\]]+)\]/.exec(src);
+  ok('the server category list can be read', !!m);
+  const cats = [...(m ? m[1] : '').matchAll(/'([a-z]+)'/g)].map(x => x[1]);
+  ok('and it has entries', cats.length >= 4);
+
+  const missingFilter = cats.filter(c => !new RegExp(`data-filter="${c}"`).test(page));
+  check('every category has a filter button', missingFilter, []);
+
+  const missingOption = cats.filter(c => !new RegExp(`<option value="${c}"`).test(page));
+  check('and an option in the upload form', missingOption, []);
+
+  /* The badge is the chip on each tile. Without a rule the chip renders
+     unstyled, which is how `audio` looked even once it was listed. */
+  const missingBadge = cats.filter(c => !new RegExp(`badge-${c}\\b`).test(css));
+  check('and a badge colour', missingBadge, []);
+
+  /* The renderer branches on item.type, not category — but a category
+     that implies a non-image type needs its own branch or it is drawn as
+     an <img>. audio and video are the two. */
+  ok('the grid renders audio as a player, not an image',
+     /item\.type === 'audio'/.test(js));
+  check('in both the tile and the lightbox',
+        (js.match(/item\.type === 'audio'/g) || []).length, 2);
+
+  /* And the form has to let one be chosen in the first place. */
+  ok('the file input accepts audio', /accept="[^"]*audio\/\*/.test(page));
+}
+
 console.log('');
 if (failures.length) {
   console.log(`[media/about] ${passed} passed, ${failures.length} FAILED`);

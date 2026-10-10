@@ -178,6 +178,8 @@
 .gallery-item-badge.badge-screenshot { color: var(--green); border-color: rgba(0, 204, 102, 0.3); }
 .gallery-item-badge.badge-art { color: var(--text-dim); border-color: var(--border-mid); }
 .gallery-item-badge.badge-highlight { color: var(--amber); border-color: rgba(255, 170, 0, 0.3); }
+.gallery-item-badge.badge-audio { color: var(--text-sec); border-color: var(--border-mid); }
+
 
 /* Role lock icon */
 .gallery-item-lock {

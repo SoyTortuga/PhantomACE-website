@@ -170,7 +170,9 @@ export async function onRequestGet(context) {
             followedAt = followData.data[0].followed_at;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[auth] follow check threw for ${user.login}: ${err.message} — role stays '${role}'`);
+      }
 
       try {
         /* user_id is REQUIRED here, not optional. It was missing, so Twitch
@@ -201,7 +203,20 @@ export async function onRequestGet(context) {
             else { role = 'sub_tier1'; subTier = 1; }
           }
         }
-      } catch {}
+      } catch (err) {
+        /* THE SAME FAILURE THE COMMENT ABOVE DESCRIBES, by the other door.
+           That fix logged the !subRes.ok branch and left this catch bare,
+           so a thrown fetch — DNS, TLS, an abort — or a thrown
+           subRes.json() on a truncated body still assigns the session a
+           rank with nothing in the log.
+
+           This is a fresh login, so `role` is still its 'visitor' /
+           'follower' starting value: a Tier 3 subscriber is minted with 3
+           incubator slots instead of 12, no Phamily boost and every
+           sub-gated control hidden, and the only fix they have is to log
+           out and back in. Worth a line in the log. */
+        console.warn(`[auth] subscription check threw for ${user.login}: ${err.message} — role stays '${role}'`);
+      }
     }
 
     /* An allowlisted moderator outranks their sub tier for display purposes.
