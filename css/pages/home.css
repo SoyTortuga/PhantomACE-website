@@ -252,6 +252,52 @@
   object-fit: cover;
   display: block;
 }
+/* Play mark on anything that plays — a clip, a YouTube video, an uploaded
+   video. Always visible rather than on hover: a Twitch thumbnail is a still
+   frame of gameplay, and without the mark it reads as a screenshot. Drawn
+   with borders, like the gallery's own. */
+.home-media-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: border-color 0.2s;
+}
+.home-media-play::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 7px 0 7px 12px;
+  border-color: transparent transparent transparent #fff;
+  margin-left: 3px;
+}
+.home-media-tile:hover .home-media-play { border-color: var(--red); }
+
+/* A vertical video, marked so the square tile does not imply otherwise. */
+.home-media-tag {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(10, 10, 10, 0.92);
+  border: 1px solid var(--border-mid);
+  font-family: var(--font-system);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--white);
+}
+
 .home-media-title {
   position: absolute;
   left: 0; right: 0; bottom: 0;

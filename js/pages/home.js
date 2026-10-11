@@ -107,10 +107,31 @@
 
   /* ── Latest media ────────────────────────────────────────────────── */
 
+  /* EVERY TYPE /api/media CAN RETURN, NAMED. The fall-through used to be
+     `<img src="item.url">`, which is right for an image and wrong for
+     everything that has no url: a Twitch clip and a YouTube video are
+     REFERENCES — the record carries a thumbnail, a slug or a video id, and
+     no url at all — so both rendered as a broken image with no preview.
+
+     That is the third time a new media type was added and a second renderer
+     was left behind. The guard for it is derived now: test-media-tiles.js
+     reads the types this file names and the types the API can store, and
+     fails when they stop matching. Add a type to the API and this switch
+     has to learn it. */
   function mediaTile(item) {
     var inner;
-    if (item.type === 'video') {
-      inner = '<video src="' + esc(item.url) + '" preload="metadata" muted playsinline></video>';
+    if (item.type === 'twitch-clip' || item.type === 'youtube') {
+      /* Somebody else's thumbnail, which is all we hold. No url to fall
+         back on, so an item without one gets the empty tile rather than a
+         broken-image icon. */
+      inner = item.thumbnail
+        ? '<img src="' + esc(item.thumbnail) + '" alt="' + esc(item.title || '') + '" loading="lazy">'
+        : '';
+      inner += '<span class="home-media-play" aria-hidden="true"></span>';
+      if (item.short) inner += '<span class="home-media-tag">SHORT</span>';
+    } else if (item.type === 'video') {
+      inner = '<video src="' + esc(item.url) + '" preload="metadata" muted playsinline></video>'
+        + '<span class="home-media-play" aria-hidden="true"></span>';
     } else if (item.type === 'audio') {
       inner = '<div class="gallery-audio"><span class="gallery-audio-mark" aria-hidden="true">&#9834;</span>'
         + '<audio src="' + esc(item.url) + '" controls preload="none"></audio></div>';

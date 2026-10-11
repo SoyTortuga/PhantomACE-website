@@ -47,6 +47,14 @@ const ACTIONS = new Set([
   'pin', 'unpin', 'lock', 'unlock', 'delete-thread', 'restore-thread',
   'delete-post', 'restore-post', 'resolve',
 ]);
+
+/* EVERY ACTION HERE TARGETS CONTENT, NEVER A PERSON — there is no mute,
+   no posting restriction and no site ban anywhere in this codebase, and
+   /guidelines is written to that fact. Exported so
+   server/scripts/test-guidelines-honesty.js can hold the page to it: add
+   an action that acts on a USER and that suite goes red, which is the
+   reminder to describe the new power on the page people are judged by. */
+export const ACTIONS_FOR_TEST = ACTIONS;
 const NEEDS_REASON = new Set(['delete-thread', 'delete-post']);
 
 export async function onRequestGet(context) {
