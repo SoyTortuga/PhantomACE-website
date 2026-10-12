@@ -375,6 +375,22 @@
           </div>
 
           <div class="card bot-section">
+            <h3>Notify the Site</h3>
+            <p class="bot-section-desc">Shows in the notification bell for everyone on the site, signed in or not. Not chat &mdash; this is the on-site bell. Drops off on its own after the days you set.</p>
+            <div class="bot-announce-form">
+              <textarea id="siteNotifyText" class="bot-announce-input" maxlength="280" placeholder="e.g. Minecraft is down for maintenance until ~9pm PT"></textarea>
+              <span class="bot-announce-count" id="siteNotifyCount">0 / 280</span>
+              <label class="bot-rotation-interval">Lasts
+                <input type="number" id="siteNotifyDays" min="1" max="30" value="7"> days
+              </label>
+              <button class="btn-primary" id="siteNotifyBtn">Post to Bell</button>
+            </div>
+            <ul class="bot-announce-list" id="siteNotifyList">
+              <li class="bot-muted">Loading&hellip;</li>
+            </ul>
+          </div>
+
+          <div class="card bot-section">
             <h3>Rotating Announcements</h3>
             <p class="bot-section-desc">Messages the bot cycles on a timer while you're live.</p>
 

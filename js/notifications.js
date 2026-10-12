@@ -24,6 +24,50 @@ function hasSessionCookie() {
   return /(?:^|; )pham_session=/.test(document.cookie);
 }
 
+/* ── Site announcements (moderator broadcasts) ───────────────────────
+   A broadcast is ONE server row shown to everyone, read-tracked per device
+   like the live/offline notices. So it is ingested into the SAME local list
+   rather than carried as a third render source: a stable key dedupes it
+   across tabs and reloads, and its server time (not now) decides whether it
+   still counts as unread. Public — this runs signed out too, which is the
+   point of a site-wide notice. */
+function loadAnnouncements() {
+  fetch('/api/announcements', { cache: 'no-store' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      if (!d || !Array.isArray(d.announcements)) return;
+      const list = getNotifications();
+      const have = new Set(list.map(n => n && n.key).filter(Boolean));
+      let added = false;
+      /* Oldest first, so unshift leaves the newest at the top. */
+      d.announcements.slice().reverse().forEach(a => {
+        if (!a || !a.id || !a.message) return;
+        const key = 'ann:' + a.id;
+        if (have.has(key)) return;
+        list.unshift({
+          id: 'n_' + a.id,
+          key,
+          type: 'announcement',
+          message: a.message,
+          /* The author's own time, so "2d ago" is honest and a notice that
+             predates this device's last bell-open does not nag as new. */
+          time: Number(a.createdAt) || Date.now(),
+          by: a.by || '',
+        });
+        added = true;
+      });
+      if (added) {
+        /* Keep the list newest-first; ingest may have interleaved an old
+           broadcast above newer local events. */
+        list.sort((x, y) => (y.time || 0) - (x.time || 0));
+        saveNotifications(list);
+        updateBadge();
+        if (notifPanelOpen) renderNotifPanel();
+      }
+    })
+    .catch(() => {});
+}
+
 function loadServerNotifications() {
   if (!hasSessionCookie()) return;
   fetch('/api/forum/notifications', { cache: 'no-store' })
@@ -178,6 +222,7 @@ function getNotifIcon(type) {
     case 'sub_expiring': return '⏰';
     case 'raid': return '⚔️';
     case 'system': return '🔔';
+    case 'announcement': return '📣';
     case 'reply': return '💬';
     case 'follow': return '🔖';
     case 'mention': return '@';
@@ -224,11 +269,16 @@ function renderNotifPanel() {
     });
     notifications.forEach(n => {
       const unread = n.time > lastRead ? ' notif-unread' : '';
+      /* A broadcast names who posted it, so it does not read as the site
+         itself speaking; other local notices have no author. */
+      const meta = (n.type === 'announcement' && n.by)
+        ? `${escNotifHtml(n.by)} · ${timeAgoNotif(n.time)}`
+        : timeAgoNotif(n.time);
       html += `<div class="notif-item${unread}">
         <span class="notif-icon">${getNotifIcon(n.type)}</span>
         <div class="notif-content">
           <div class="notif-message">${escNotifHtml(n.message)}</div>
-          <div class="notif-time">${timeAgoNotif(n.time)}</div>
+          <div class="notif-time">${meta}</div>
         </div>
       </div>`;
     });
@@ -460,3 +510,4 @@ document.addEventListener('DOMContentLoaded', () => {
    DOM: the bell markup arrives from components.js, and updateBadge() is
    a no-op until it has. */
 document.addEventListener('DOMContentLoaded', loadServerNotifications);
+document.addEventListener('DOMContentLoaded', loadAnnouncements);

@@ -1156,3 +1156,16 @@
 .bot-sub-name { flex: 1; color: var(--text-pri); min-width: 0; }
 .bot-sub-note { flex: none; font-size: 12px; color: var(--text-dim); }
 .bot-sub-row.missing .bot-sub-note { color: var(--red); }
+
+/* Notify the Site — the list of live broadcasts under the compose box */
+.bot-announce-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+}
+.bot-announce-row:first-child { border-top: none; }
+.bot-announce-row .bot-announce-text { flex: 1 1 220px; font-size: 16px; }
+.bot-announce-del { font-size: 12px; }

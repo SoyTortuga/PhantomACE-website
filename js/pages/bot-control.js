@@ -1122,7 +1122,87 @@ function readDropCount() {
   return countEl ? Math.max(1, Math.min(10, parseInt(countEl.value, 10) || 1)) : 1;
 }
 
+/* ── Notify the Site — moderator broadcast to the on-site bell ───────── */
+function initSiteNotify() {
+  var text = document.getElementById('siteNotifyText');
+  var count = document.getElementById('siteNotifyCount');
+  var days = document.getElementById('siteNotifyDays');
+  var btn = document.getElementById('siteNotifyBtn');
+  var listEl = document.getElementById('siteNotifyList');
+  if (!text || !btn || !listEl) return;
+
+  if (count) {
+    text.addEventListener('input', function () {
+      count.textContent = text.value.length + ' / 280';
+    });
+  }
+
+  function render(items) {
+    if (!items.length) {
+      listEl.innerHTML = '<li class="bot-muted">Nothing live right now.</li>';
+      return;
+    }
+    listEl.innerHTML = items.map(function (a) {
+      var when = new Date(a.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return '<li class="bot-announce-row">' +
+        '<span class="bot-announce-text">' + escapeBotHtml(a.message) + '</span>' +
+        '<span class="bot-muted">' + escapeBotHtml(a.by || '') + ' · ' + when + '</span>' +
+        '<button class="btn-secondary bot-announce-del" data-id="' + escapeBotHtml(a.id) + '">Remove</button>' +
+        '</li>';
+    }).join('');
+  }
+
+  function load() {
+    fetch('/api/announcements', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { render((d && d.announcements) || []); })
+      .catch(function () { listEl.innerHTML = '<li class="bot-muted">Could not load.</li>'; });
+  }
+
+  btn.addEventListener('click', function () {
+    var message = text.value.trim();
+    if (!message) { showBotStatus('Type a message before posting.', true); return; }
+    var d = Math.min(30, Math.max(1, Number(days && days.value) || 7));
+    btn.disabled = true;
+    fetch('/api/announcements', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create', message: message, days: d }),
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (res) {
+        if (!res.ok) { showBotStatus(res.data.error || 'Could not post it.', true); return; }
+        text.value = '';
+        if (count) count.textContent = '0 / 280';
+        showBotStatus('Posted to the site bell.', false);
+        load();
+      })
+      .catch(function () { showBotStatus('Network error — it may not have posted.', true); })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  listEl.addEventListener('click', function (e) {
+    var del = e.target.closest ? e.target.closest('.bot-announce-del') : null;
+    if (!del) return;
+    del.disabled = true;
+    fetch('/api/announcements', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: del.getAttribute('data-id') }),
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (res) {
+        if (!res.ok) { showBotStatus(res.data.error || 'Could not remove it.', true); del.disabled = false; return; }
+        load();
+      })
+      .catch(function () { showBotStatus('Network error.', true); del.disabled = false; });
+  });
+
+  load();
+}
+
 function initBotControlPanel() {
+  initSiteNotify();
   document.querySelectorAll('.bot-drop-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var count = readDropCount();

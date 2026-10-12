@@ -81,6 +81,13 @@ export const SINGLETONS = {
      and lose every message the broadcaster had written. */
   announcements:         { table: 'singletons', expiry: 'none' },
 
+  /* Moderator broadcasts to the site bell — one capped list, newest first.
+     expiry 'none': each entry carries its own expiresAt and the route drops
+     stale ones on read, so a hygiene TTL on the row would wrongly erase live
+     notices early. Distinct from `announcements` above, which is the CHAT
+     rotation; these go to the on-site notification bell, not to Twitch. */
+  site_announcements:    { table: 'singletons', expiry: 'none' },
+
   /* Ordered list of recent broadcasts. Streaks need to know what the
      PREVIOUS stream was; without it, a viewer who attended two streams a
      month apart would look consecutive. Written by the server's minute tick
