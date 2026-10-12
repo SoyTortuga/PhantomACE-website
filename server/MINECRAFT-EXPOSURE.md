@@ -198,23 +198,32 @@ unset secret must never mean "open".
 
 ### Syncing it
 
-The feed returns Mojang's own `whitelist.json` shape, so it goes straight into
-the server directory. On the rig, in PowerShell:
+Joining is instant (the site pushes `whitelist add` through Crafty). What
+nothing does on its own is take a **lapsed** subscriber off, because a lapse is
+silence rather than an event. That is the sync's job, and it also catches
+anyone whose instant add failed while Crafty or the server was down.
+
+Install it once, from an elevated PowerShell in the website folder:
 
 ```
-$dir = "C:\CursedWalkingServer\Cursed Walking - 1.20.1 - v3.3(patch) Server Pack"
-$tmp = Join-Path $dir "whitelist.json.new"
-Invoke-WebRequest -Uri "https://phantomace.tv/api/minecraft/whitelist?token=$env:MINECRAFT_WHITELIST_TOKEN" -OutFile $tmp -UseBasicParsing
-Move-Item $tmp (Join-Path $dir "whitelist.json") -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File .\server\scripts\install-minecraft-whitelist-task.ps1
 ```
 
-Then `/whitelist reload` in the server console. Put it on a scheduled task
-(every 10-15 minutes is plenty) so joins and lapses take effect unattended.
+That registers **PhantomACE Minecraft Whitelist Sync**, every 15 minutes as
+SYSTEM, running `sync-minecraft-whitelist.ps1`. Each run fetches the list from
+the site over `127.0.0.1` (the token never leaves the machine), writes
+`whitelist.json` into the Crafty server folder for `CRAFTY_SERVER_ID`, and sends
+`whitelist reload` through Crafty. `enforce-whitelist=true` then removes anyone
+no longer on it. Its log is `server\logs\whitelist-sync.log`.
 
-**Download to a temp file and move it into place, as above.** A half-written
-`whitelist.json` locks everybody out. The route already refuses rather than
-returning a short list when its own read fails, so an interrupted download is
-the one remaining way to truncate that file.
+**It refuses before it writes.** A site that is down, a wrong token, a reply
+that is not a list of real players, or an **empty** list replacing a non-empty
+one all leave the previous file untouched. The empty case would lock everybody
+out and is almost certainly a fault, so it needs `-AllowEmpty` by hand.
+
+**Hand-added names do not survive it.** The sync writes the site's list as the
+whole file, so `whitelist add` typed in the console is undone within 15
+minutes. Everybody who should get in adds themselves at `/minecraft`.
 
 `?meta=1` returns the same list wrapped with a count and how many lapsed
 entries were excluded - the first thing to check when somebody says they
