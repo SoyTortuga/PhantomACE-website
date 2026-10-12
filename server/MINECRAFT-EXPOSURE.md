@@ -10,9 +10,23 @@ the risky parts; neither is interesting to watch.
 
 ## The thing to understand first
 
-Until now the rig had **no inbound port open and its IP in no DNS record
-anywhere**. The Cloudflare Tunnel is outbound-only and Node binds to
-`127.0.0.1`, so there has never been an address for anyone to aim at.
+> **Corrected 2026-10-12.** This document was first written believing the rig
+> was a machine on a connection whose IP had never been published. It is a
+> **shared rack**, and another server on it — OnlySands — publishes
+> `mcv.onlysands.tv` as a plain A record to the rack's public address
+> (`71.34.104.186`, CenturyLink broadband, Portland; its website is behind
+> Cloudflare but the game subdomain is not). So **the address is already
+> public**, and was before PhantomACE's Minecraft server existed.
+>
+> Confirm from the rig with:
+> `(Invoke-RestMethod 'https://api.ipify.org?format=json').ip`
+> If that matches, everything below about "not spending the advantage" is
+> moot — the advantage is already spent, and the decision is a different one.
+> See **Shared rack, shared fate** at the end.
+
+The rig has **no inbound port open and its own IP in no DNS record of ours**.
+The Cloudflare Tunnel is outbound-only and Node binds to `127.0.0.1`, so
+nothing *we* publish points at it.
 
 Minecraft Java is raw TCP. That means:
 
@@ -42,10 +56,11 @@ That last row is the one that matters. A volumetric attack aimed at the home
 IP saturates the same line that serves `phantomace.tv`, and the website goes
 down with the game. **The only defence is that the address stays unknown.**
 
-Which means: never publish an A record for the rig, not even for five minutes
-to test, and never paste the IP into Discord. The rig has never been in DNS,
-so there is no historical record for the lookup services to dig up — that is a
-real advantage and it is spent permanently the first time it leaks.
+Which *would* mean: never publish an A record for the rig. But see the
+correction above — if the rack's address is already in DNS via a neighbour,
+then putting our own record alongside it adds very little, and the useful
+work moves from "keep it secret" to "stop sharing a fate". Read **Shared
+rack, shared fate** before choosing.
 
 ---
 
@@ -161,3 +176,40 @@ remove the router port-forward. The website is unaffected by both.
   username per subscriber and serve a whitelist the server syncs, with lapsed
   subs ageing out on their own. Not built — see the note in
   `server/scripts/sync-tcpshield-firewall.ps1` and ask.
+
+---
+
+## Shared rack, shared fate
+
+The rig is one tenant in a rack behind a single broadband connection, and at
+least one neighbour publishes that connection's IP in DNS.
+
+What follows from that:
+
+- **Option A costs us almost nothing extra.** The address is already out, so
+  an `mc.phantomace.tv` A record beside `mcv.onlysands.tv` is not the moment
+  the secret is lost. That moment has passed.
+- **TCPShield in front of our server alone achieves little for the uplink.**
+  It would still stop direct joins to our port, which is worth having — but
+  the flood risk is a property of the *connection*, and the neighbour's record
+  keeps that address published whatever we do.
+- **The single point of failure is live today.** One saturating attack on that
+  line takes down phantomace.tv, both Minecraft servers, and everything else
+  in the rack. Nothing in this repo can fix that alone.
+
+So the real conversation is with whoever runs OnlySands, and it is about the
+connection rather than about either game server:
+
+1. **Both behind a proxy, or neither.** Half-measures protect nobody, because
+   one published record re-exposes the shared address.
+2. **Their Cloudflare is currently decorative if the web server shares this
+   IP.** `onlysands.tv` is proxied, but `mcv.onlysands.tv` hands out the
+   origin — which is the standard way a Cloudflare origin gets found and hit
+   directly. Worth telling them regardless of what we decide about Minecraft.
+3. **If the rack matters, it wants its own answer** — a business line with
+   upstream DDoS mitigation, or the game servers moved off it — rather than
+   per-service patching.
+
+Until that conversation happens, option A is a reasonable choice here, because
+the exposure it creates already exists. What it is NOT is a safe default to
+reach for again later on a connection that has stayed private.
