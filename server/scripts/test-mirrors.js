@@ -214,6 +214,33 @@ const CLIENT_PARK = 'games/dino-park/index.html';
      state — Mana Clash timers, the scramble clock — for nothing. */
   ok('deploy.ps1 restarts only for server/ or functions/ changes',
     /'server\/\*'[\s\S]{0,40}'functions\/\*'/.test(deploy));
+
+  /* THE BOOT CHECKS ARE ONE LIST IN TWO PLACES. The pre-push hook and the
+     deploy gate ask the same question - will this boot - and must run the
+     same suites to answer it. The deploy once ran the whole suite instead
+     and went red on the rig for want of sharp and Python, neither of which
+     production uses. */
+  const hook = read('githooks/pre-push');
+  const hookList = (/for suite in ([a-z0-9 -]+); do/.exec(hook) || [])[1];
+  const deployList = (/\$BootSuites = @\(([^)]*)\)/.exec(deploy) || [])[1];
+  check('the hook names its boot suites', typeof hookList, 'string');
+  check('deploy.ps1 names its boot suites', typeof deployList, 'string');
+  check('and they are the same suites',
+    (deployList || '').match(/test-[a-z0-9-]+/g),
+    (hookList || '').trim().split(/\s+/));
+
+  /* Every suite on that list must be runnable on the rig, which has Node
+     and the server's own packages and nothing else. A boot check that needs
+     dev tooling would block every deploy, which is the bug this replaced. */
+  const serverPkg = JSON.parse(read('server/package.json'));
+  const rigHas = new Set([...Object.keys(serverPkg.dependencies || {})]);
+  for (const name of (deployList || '').match(/test-[a-z0-9-]+/g) || []) {
+    const src = read('server/scripts/' + name + '.js');
+    const bare = [...src.matchAll(/from '([^'.\/][^']*)'/g)].map(m => m[1]).filter(m => !m.startsWith('node:'));
+    const missing = bare.filter(m => !rigHas.has(m.split('/')[0]));
+    check(`${name} needs nothing the rig lacks`, missing, []);
+    ok(`${name} does not shell out to Python`, !/python/i.test(src));
+  }
 }
 
 /* ── Report ─────────────────────────────────────────────────────────── */

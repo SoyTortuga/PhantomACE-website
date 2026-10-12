@@ -5,7 +5,9 @@
      cd C:\path\to\PhantomACE-Website
      .\server\scripts\deploy.ps1
 
-     -NoTests     skip the suite (don't)
+     -NoTests     skip the boot checks (don't)
+     -FullSuite   run every suite, not just the boot checks - only useful on
+                  a machine with the dev tooling installed (see below)
      -Force       restart even when nothing under server/ or functions/ moved
      -Timeout 90  seconds to wait for the service to come back (default 60)
 
@@ -17,11 +19,21 @@
    clock and the announcement ticker all live in that process, so a needless
    restart drops a game that was mid-round.
 
-   IT REFUSES TO RESTART ONTO A RED SUITE. The boot assertions are fatal by
-   design — a file under functions/ that is neither route nor declared
-   library exits the process — and that is exactly how the site went to
-   SERVICE_PAUSED once already. The suite catches it here, before the
-   service is touched.
+   IT REFUSES TO RESTART ONTO SOMETHING THAT WILL NOT BOOT. The boot
+   assertions are fatal by design — a file under functions/ that is neither
+   route nor declared library exits the process — and that is exactly how
+   the site went to SERVICE_PAUSED once already. The boot checks catch it
+   here, before the service is touched.
+
+   THE BOOT CHECKS, NOT THE WHOLE SUITE. This used to run every suite, and
+   the first real deploy went red on the rig for reasons that had nothing
+   to do with the code: test-skull-raid imports sharp and test-dino-
+   portraits shells out to Python, and the rig has neither — it installs
+   only what the server runs on (dotenv, pg, send). Those suites belong on
+   the machine the code is written on, before the push. The rig's question
+   is narrower: will this boot. So it runs the same two suites the pre-push
+   hook does, which need nothing beyond Node and the server's own packages.
+   -FullSuite runs everything, for a machine that has the dev tooling.
 
    IT PROVES THE DEPLOY LANDED. /api/health reports the commit read from
    .git AT BOOT, so polling it until the sha matches HEAD distinguishes
@@ -38,6 +50,7 @@
 
 param(
   [switch]$NoTests,
+  [switch]$FullSuite,
   [switch]$Force,
   [int]$Timeout = 60,
   [string]$Service = 'phantomace-web',
@@ -95,16 +108,35 @@ if ($changed | Where-Object { $_ -like 'games/dino-park/*' }) {
   Write-Host 'Note: dino-assets/** is gitignored. New art needs a manual copy.' -ForegroundColor Yellow
 }
 
-# ── The suite, before anything is touched ───────────────────────────────
+# ── The checks, before anything is touched ──────────────────────────────
+# MUST MATCH the list in githooks/pre-push; test-mirrors.js checks it.
+$BootSuites = @('test-router-boot', 'test-kv-registry')
+
 if ($NoTests) {
-  Write-Host 'Skipping tests (-NoTests).' -ForegroundColor Yellow
-} else {
-  Step 'Running the suite'
+  Write-Host 'Skipping checks (-NoTests).' -ForegroundColor Yellow
+} elseif ($FullSuite) {
+  Step 'Running the full suite (-FullSuite)'
   node server/scripts/run-all-tests.js
   if (-not $?) {
     Bad ''
     Bad 'Suite is RED. The service has NOT been restarted and is still serving'
     Bad "the old build. To undo the pull:  git reset --hard $before"
+    exit 1
+  }
+} else {
+  Step 'Checking it will boot'
+  $red = @()
+  foreach ($s in $BootSuites) {
+    node --no-warnings "server/scripts/$s.js" | Out-Null
+    if ($LASTEXITCODE -ne 0) { $red += $s } else { Write-Host "  ok  $s" }
+  }
+  if ($red.Count) {
+    Bad ''
+    Bad "Boot check FAILED: $($red -join ', ')"
+    Bad 'This build would not start. The service has NOT been restarted and is'
+    Bad 'still serving the old build. See why with:'
+    foreach ($s in $red) { Bad "  node server/scripts/$s.js" }
+    Bad "To undo the pull:  git reset --hard $before"
     exit 1
   }
 }
