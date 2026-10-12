@@ -252,6 +252,78 @@
   object-fit: cover;
   display: block;
 }
+/* ── Signed-out prompt ───────────────────────────────────────────────
+   Shown only to visitors with no session (js/pages/home.js reveals it).
+   One bordered panel, not a row of cards: it is making a single argument,
+   and a feature grid would bury it. Depth from the border, as everywhere. */
+.home-signin { padding-top: 0; }
+
+.signin-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 24px 26px;
+}
+/* A panel, not a link — no hover lift. */
+.signin-panel:hover { border-color: var(--border-mid); }
+
+.signin-copy { flex: 1 1 380px; min-width: 0; }
+
+.signin-title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  margin: 0 0 6px;
+}
+
+.signin-lead {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--text-sec);
+  margin: 0 0 12px;
+}
+
+.signin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.signin-list li {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+}
+.signin-list strong { color: var(--text-pri); font-weight: 600; }
+
+.signin-action {
+  flex: 0 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+.signin-action .btn-primary { width: 100%; text-align: center; }
+
+.signin-note {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  opacity: 0.8;
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .signin-panel { padding: 18px; gap: 18px; }
+  .signin-title { font-size: 24px; }
+  .signin-action { flex: 1 1 100%; padding-top: 0; }
+}
+
 /* Play mark on anything that plays — a clip, a YouTube video, an uploaded
    video. Always visible rather than on hover: a Twitch thumbnail is a still
    frame of gameplay, and without the mark it reads as a screenshot. Drawn

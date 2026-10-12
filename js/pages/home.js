@@ -172,7 +172,35 @@
     }
   }
 
+  /* ── The signed-out prompt ──────────────────────────────────────────
+     REVEALED, NEVER HIDDEN. The panel ships `hidden` in the markup and is
+     shown only once we know there is no session — the other way round, a
+     logged-in visitor would see "You're not signed in" on every load until
+     the script caught up, which is worse than a signed-out visitor waiting
+     a few milliseconds for it to appear.
+
+     getSession() reads the cookie, so this costs no request and settles
+     before anything is fetched. */
+  function showSignedOutPrompt() {
+    var panel = document.getElementById('homeSignIn');
+    if (!panel) return;
+    var session = null;
+    try {
+      session = typeof getSession === 'function' ? getSession() : null;
+    } catch (e) {
+      /* Only reachable if auth.js did not load — getSession() handles a
+         cookie it cannot verify by returning null, the same answer the
+         server gives, so an unreadable cookie correctly reads as signed
+         out. With no getSession at all we know nothing, so the panel stays
+         hidden rather than guessing at somebody's state. */
+      return;
+    }
+    if (session && session.user_id) return;
+    panel.hidden = false;
+  }
+
   function init() {
+    showSignedOutPrompt();
     loadEvents();
     loadMedia();
   }

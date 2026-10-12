@@ -71,6 +71,30 @@
     </div>
   </section>
 
+  <!-- Signed out only. Hidden in the markup and revealed by js/pages/home.js
+       when there is no session, so a logged-in visitor never sees it flash.
+       Every claim in here is checked against the real handlers by
+       server/scripts/test-signed-out-prompt.js. -->
+  <section class="home-section home-signin" id="homeSignIn" hidden>
+    <div class="signin-panel card">
+      <div class="signin-copy">
+        <h2 class="signin-title">You're not signed in</h2>
+        <p class="signin-lead">Everything here runs on your Twitch account &mdash; no password, no sign-up form, no email. Without it:</p>
+        <ul class="signin-list">
+          <li><strong>Dino Park won't open.</strong> Hatching, breeding and the Dinodex all need somewhere to save.</li>
+          <li><strong>Skull Clicker only saves in this browser.</strong> Clear your history or open it on your phone and the run is gone.</li>
+          <li><strong>Codes dropped in chat can't be redeemed.</strong> They're claimable for five minutes and only by an account.</li>
+          <li><strong>A giveaway entry can never win.</strong> Guests are drawn out before a real prize is handed over.</li>
+          <li><strong>No inventory, cosmetics or Phamily Time.</strong> The watch pass tracks who was actually there.</li>
+        </ul>
+      </div>
+      <div class="signin-action">
+        <button class="btn-primary" type="button" onclick="loginWithTwitch()">Log In with Twitch</button>
+        <p class="signin-note">Takes one click if you're already signed in to Twitch. We never see your password.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- Upcoming Events -->
   <section class="home-section">
     <div class="section-header">Upcoming Events</div>
