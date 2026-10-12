@@ -170,12 +170,55 @@ remove the router port-forward. The website is unaffected by both.
   a box with Postgres and the Node server. Watch site latency on a busy
   evening; if it bites, the fix is moving Minecraft off the rig, which also
   removes the uplink risk entirely.
-- **The whitelist.** Nothing above decides *who* may join. The site already
-  verifies subscriber status at login against `helix/subscriptions/user` using
-  the viewer's own `user:read:subscriptions` scope, so it can hold a Minecraft
-  username per subscriber and serve a whitelist the server syncs, with lapsed
-  subs ageing out on their own. Not built — see the note in
-  `server/scripts/sync-tcpshield-firewall.ps1` and ask.
+- **Resource contention**, above, is the one left.
+
+---
+
+## The subscriber whitelist
+
+Built. Subscribers add their own Minecraft name at **/minecraft**; the server
+pulls the list. Nobody hand-edits `whitelist.json`.
+
+**How a place is kept.** The site has no broadcaster token and so cannot ask
+Twitch whether a sub is still live. Instead, loading `/minecraft` as an
+eligible subscriber stamps the entry, and the feed keeps anyone stamped within
+**7 days**. A lapsed sub simply stops refreshing it and ages out. Nothing has
+to detect the lapse, which is just as well, because nothing here could.
+
+### One-time setup on the rig
+
+Put a long random secret in `server/.env`:
+
+```
+MINECRAFT_WHITELIST_TOKEN=<a long random string>
+```
+
+Restart the service. **With it unset the feed refuses every request** - an
+unset secret must never mean "open".
+
+### Syncing it
+
+The feed returns Mojang's own `whitelist.json` shape, so it goes straight into
+the server directory. On the rig, in PowerShell:
+
+```
+$dir = "C:\CursedWalkingServer\Cursed Walking - 1.20.1 - v3.3(patch) Server Pack"
+$tmp = Join-Path $dir "whitelist.json.new"
+Invoke-WebRequest -Uri "https://phantomace.tv/api/minecraft/whitelist?token=$env:MINECRAFT_WHITELIST_TOKEN" -OutFile $tmp -UseBasicParsing
+Move-Item $tmp (Join-Path $dir "whitelist.json") -Force
+```
+
+Then `/whitelist reload` in the server console. Put it on a scheduled task
+(every 10-15 minutes is plenty) so joins and lapses take effect unattended.
+
+**Download to a temp file and move it into place, as above.** A half-written
+`whitelist.json` locks everybody out. The route already refuses rather than
+returning a short list when its own read fails, so an interrupted download is
+the one remaining way to truncate that file.
+
+`?meta=1` returns the same list wrapped with a count and how many lapsed
+entries were excluded - the first thing to check when somebody says they
+cannot get in.
 
 ---
 

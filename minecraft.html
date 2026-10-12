@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The subscriber-only Cursed Walking Minecraft server - how to install the modpack, join, and put yourself on the whitelist.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Minecraft | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/minecraft.css">
+</head>
+<body data-page="minecraft">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Cursed Walking</h1>
+    <p class="page-hero-subtitle">A modern zombie apocalypse, survived badly, together</p>
+  </section>
+
+  <section class="page-container mc-page">
+
+    <div class="mc-statusbar card" id="mcStatusBar">
+      <span class="mc-pack">
+        <span class="mc-pack-name" id="mcPackName">Cursed Walking</span>
+        <span class="mc-chip" id="mcPackVersion">&mdash;</span>
+      </span>
+      <span class="mc-live" id="mcLive" data-state="unknown">
+        <span class="status-dot"></span>
+        <span id="mcLiveText">Checking&hellip;</span>
+      </span>
+    </div>
+
+    <div class="mc-note" id="mcLoading">Loading&hellip;</div>
+
+    <div class="card mc-card" id="mcGuest" hidden>
+      <h2 class="mc-card-title">Subscribers only</h2>
+      <p class="mc-lead">The server is a subscriber perk, and the whitelist is tied to your Twitch account. Log in and we'll check.</p>
+      <button class="btn-primary" type="button" onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <div class="card mc-card" id="mcNotSub" hidden>
+      <h2 class="mc-card-title">This one's behind the sub</h2>
+      <p class="mc-lead">Cursed Walking is whitelisted to subscribers. Everything else on the site stays open &mdash; this is the one door that doesn't.</p>
+      <p class="mc-hint">Already subscribed? The site reads your role at login, so log out and back in once and it'll pick it up.</p>
+      <div class="mc-actions">
+        <a class="btn-primary" href="https://twitch.tv/phantomace/subscribe" target="_blank" rel="noopener">Subscribe on Twitch</a>
+        <a class="pill-btn" href="/membership/subscriber">What else a sub gets</a>
+      </div>
+    </div>
+
+    <div class="mc-body" id="mcBody" hidden>
+
+      <div class="mc-grid">
+
+        <section class="card mc-card mc-join">
+          <h2 class="mc-card-title">How to join</h2>
+
+          <div class="mc-address">
+            <code id="mcAddress">mc.phantomace.tv</code>
+            <button class="pill-btn" type="button" id="mcCopy">Copy</button>
+          </div>
+          <p class="mc-hint">No port needed &mdash; the address carries it.</p>
+
+          <ol class="mc-steps">
+            <li>
+              <strong>Install the CurseForge app.</strong>
+              It's the launcher that installs modpacks for you.
+              <a href="https://www.curseforge.com/download/app" target="_blank" rel="noopener">Download it here</a>,
+              install, and let it find your Minecraft.
+            </li>
+            <li>
+              <strong>Find the pack.</strong>
+              In CurseForge choose <em>Minecraft</em> &rarr; <em>Browse Modpacks</em> and search
+              <em>Cursed Walking</em>. You want
+              <a id="mcPackLink" href="https://www.curseforge.com/minecraft/modpacks/cursed-walking-a-modern-zombie-apocalypse" target="_blank" rel="noopener">Cursed Walking &mdash; A Modern Zombie Apocalypse</a>.
+              Not the Lite Edition &mdash; that's a different pack and won't connect.
+            </li>
+            <li>
+              <strong>Install version <span id="mcStepVersion">v3.3</span>.</strong>
+              Open the pack's <em>Versions</em> tab and pick that one rather than Install.
+              The server runs one exact build and a mismatch is refused at the door.
+            </li>
+            <li>
+              <strong>Give it memory.</strong>
+              In CurseForge, <em>Settings</em> &rarr; <em>Minecraft</em> &rarr; Allocated Memory,
+              set at least <span id="mcRamMin">4</span> GB
+              (<span id="mcRamRec">6</span> GB if you have it).
+              The default is too low and the pack will crash on load.
+            </li>
+            <li>
+              <strong>Whitelist yourself</strong> in the panel on this page, if you haven't.
+            </li>
+            <li>
+              <strong>Play.</strong> Launch the pack, <em>Multiplayer</em> &rarr; <em>Add Server</em>,
+              paste the address above, and join.
+            </li>
+          </ol>
+        </section>
+
+        <aside class="mc-side">
+
+          <section class="card mc-card mc-whitelist" id="mcWhitelistCard">
+            <h2 class="mc-card-title">Your whitelist spot</h2>
+            <div id="mcWhitelistBody"></div>
+            <div class="mc-status" id="mcWhitelistStatus"></div>
+          </section>
+
+          <section class="card mc-card">
+            <h2 class="mc-card-title">Server info</h2>
+            <dl class="mc-facts">
+              <dt>Pack</dt><dd id="mcFactPack">&mdash;</dd>
+              <dt>Minecraft</dt><dd id="mcFactMc">&mdash;</dd>
+              <dt>Loader</dt><dd id="mcFactLoader">&mdash;</dd>
+              <dt>Address</dt><dd id="mcFactAddress">&mdash;</dd>
+              <dt>Whitelist</dt><dd>Required</dd>
+              <dt>Players</dt><dd id="mcFactPlayers">&mdash;</dd>
+            </dl>
+            <p class="mc-motd" id="mcMotd" hidden></p>
+          </section>
+
+          <section class="card mc-card">
+            <h2 class="mc-card-title">House rules</h2>
+            <p class="mc-lead">It's a survival world we all share. No griefing, no stealing other people's things, no cheats or x-ray.</p>
+            <p class="mc-hint">The <a href="/guidelines">community guidelines</a> apply here the same as anywhere else on the site. A moderator can take your spot off the whitelist.</p>
+          </section>
+
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/minecraft.js" defer></script>
+</body>
+</html>

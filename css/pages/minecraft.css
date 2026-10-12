@@ -1,0 +1,274 @@
+/* ── Cursed Walking (subscriber Minecraft server) ────────────────────
+   House style, not the reference screenshot's: black / grey / red / white,
+   depth from borders, no box-shadow, no side-edge rails, every colour from
+   a token so both themes work. */
+
+.mc-page { max-width: 1100px; padding-bottom: 80px; }
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+
+.mc-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.mc-statusbar:hover { border-color: var(--border-mid); }
+
+.mc-pack { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+.mc-pack-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+}
+
+.mc-chip {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-sec);
+}
+
+.mc-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-system);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+.mc-live .status-dot { background: var(--text-dim); }
+.mc-live[data-state="on"] { color: var(--green); }
+.mc-live[data-state="on"] .status-dot { background: var(--green); }
+.mc-live[data-state="off"] { color: var(--red); }
+.mc-live[data-state="off"] .status-dot { background: var(--red); }
+
+/* ── Layout ──────────────────────────────────────────────────────── */
+
+.mc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.mc-side { display: flex; flex-direction: column; gap: 20px; }
+
+.mc-card { padding: 20px 22px; }
+.mc-card:hover { border-color: var(--border-mid); }
+
+.mc-card-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  margin: 0 0 10px;
+}
+
+.mc-lead {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-sec);
+  margin: 0 0 10px;
+}
+
+.mc-hint {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  opacity: 0.8;
+  margin: 10px 0 0;
+}
+.mc-hint a, .mc-lead a { color: var(--red); }
+
+.mc-note {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.mc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+
+/* ── Address ─────────────────────────────────────────────────────── */
+
+.mc-address {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  background: var(--gray-lo);
+}
+.mc-address code {
+  font-family: var(--font-system);
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  color: var(--white);
+  user-select: all;
+}
+
+/* ── Steps ───────────────────────────────────────────────────────── */
+
+.mc-steps {
+  list-style: none;
+  counter-reset: mcstep;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.mc-steps li {
+  counter-increment: mcstep;
+  position: relative;
+  padding: 12px 0 12px 42px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-sec);
+}
+.mc-steps li::before {
+  content: counter(mcstep);
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--red-dim);
+  border-radius: 50%;
+  font-family: var(--font-system);
+  font-size: 12px;
+  color: var(--red);
+}
+.mc-steps strong { color: var(--text-pri); font-weight: 600; }
+.mc-steps em { color: var(--white); font-style: normal; font-weight: 600; }
+.mc-steps a { color: var(--red); }
+
+/* ── Whitelist panel ─────────────────────────────────────────────── */
+
+.mc-form { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.mc-form input {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 9px 12px;
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  color: var(--text-pri);
+  font-family: var(--font-system);
+  font-size: 14px;
+}
+.mc-form input:focus { outline: none; border-color: var(--red); }
+
+.mc-you {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  background: var(--gray-lo);
+}
+.mc-you-text {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--text-sec);
+}
+.mc-you-text strong { color: var(--white); }
+
+.mc-you-mark {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--green);
+  border-radius: 50%;
+  color: var(--green);
+  font-family: var(--font-system);
+  font-size: 13px;
+}
+.mc-you.is-lapsed .mc-you-mark { border-color: var(--amber); color: var(--amber); }
+
+.mc-status:not(:empty) {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  padding: 12px 0 0;
+}
+.mc-status.ok { color: var(--green); }
+.mc-status.err { color: var(--red); }
+
+/* ── Facts ───────────────────────────────────────────────────────── */
+
+.mc-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 14px;
+  margin: 0;
+}
+.mc-facts dt {
+  font-family: var(--font-system);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.mc-facts dd {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-pri);
+  margin: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  word-break: break-word;
+}
+
+.mc-motd {
+  font-family: var(--font-system);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Narrow ──────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .mc-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .mc-card { padding: 16px; }
+  .mc-card-title { font-size: 21px; }
+  .mc-pack-name { font-size: 19px; }
+  .mc-statusbar { padding: 12px 14px; }
+  .mc-address code { font-size: 15px; }
+  .mc-steps li { padding-left: 36px; font-size: 14px; }
+  .mc-form button { width: 100%; }
+}
