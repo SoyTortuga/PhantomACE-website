@@ -87,8 +87,10 @@ if (-not $?) { Bad 'Pull failed.'; exit 1 }
 
 $after = (git rev-parse HEAD).Trim()
 if ($before -eq $after) {
-  Good 'Already up to date. Nothing to do.'
-  if (-not $Force) { exit 0 }
+  if (-not $Force) { Good 'Already up to date. Nothing to do.'; exit 0 }
+  # Not "nothing to do" - the usual reason for -Force on an up-to-date tree
+  # is a changed server/.env, which only takes effect on a restart.
+  Write-Host 'Already up to date - restarting anyway (-Force).'
 }
 
 # ── What moved decides whether the service must restart ─────────────────
