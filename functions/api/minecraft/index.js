@@ -28,6 +28,8 @@
    can.
    ══════════════════════════════════════════════ */
 
+import { craftyStats, craftyWhitelist, craftyConfig } from './crafty.js';
+
 /** Everything about the server that the page states as fact. */
 export const SERVER = {
   name: 'Cursed Walking',
@@ -170,7 +172,7 @@ export async function onRequestGet(context) {
     you: entryOf(profile),
     join,
     graceDays: GRACE_DAYS,
-    server: await pingServer(),
+    server: await liveStatus(env),
   });
 }
 
@@ -188,15 +190,22 @@ export async function onRequestPost(context) {
   const me = String(session.user_id);
 
   if (body.action === 'leave') {
+    let before = null;
     const after = await env.MARKETPLACE.mutate(`profile_${me}`, (p) => {
+      before = p;
       if (!p) return undefined;
       if (!p.minecraft) return undefined;
       const next = { ...p };
       delete next.minecraft;
       return next;
     });
+    /* Same best-effort push. Removal matters more than addition — somebody
+       asking to be taken off should come off now — but the sync still
+       backstops it. */
+    const name = before && before.minecraft && before.minecraft.name;
+    const pushed = name ? await craftyWhitelist(env, 'remove', name) : { ok: false };
     /* Idempotent on purpose: leaving twice is a double-click, not an error. */
-    return json({ ok: true, you: entryOf(after) });
+    return json({ ok: true, you: entryOf(after), live: pushed.ok });
   }
 
   if (body.action !== 'join') return json({ error: 'Unknown action' }, 400);
@@ -238,7 +247,13 @@ export async function onRequestPost(context) {
   });
 
   if (!after) return json({ error: 'There is no profile to attach that to yet. Log out and back in once.' }, 404);
-  return json({ ok: true, you: entryOf(after) });
+
+  /* Tell the live server now, so they can join immediately rather than at
+     the next file sync. BEST EFFORT: the scheduled sync is the thing that
+     actually guarantees the whitelist, so a panel that is down or not
+     configured must not fail a join that was stored successfully. */
+  const pushed = await craftyWhitelist(env, 'add', resolved.name);
+  return json({ ok: true, you: entryOf(after), live: pushed.ok });
 }
 
 /**
@@ -299,6 +314,26 @@ function readVarint(buf, offset) {
     if (shift > 35) break;
   }
   return null;
+}
+
+/**
+ * Live status, from the panel when it is wired up and from a port ping
+ * otherwise.
+ *
+ * CRAFTY FIRST because a ping cannot tell "stopped" from "crashed" from
+ * "still starting", and those are exactly the states somebody is looking
+ * at this page to understand. The ping remains the fallback so the page
+ * still says something useful before anybody configures a panel.
+ */
+export async function liveStatus(env) {
+  if (craftyConfig(env)) {
+    const viaPanel = await craftyStats(env);
+    if (viaPanel) return viaPanel;
+    /* Configured but unreachable: fall through rather than report the
+       game server down because its management panel is. */
+  }
+  const pinged = await pingServer();
+  return { ...pinged, source: 'ping' };
 }
 
 export async function pingServer(host = SERVER.host, port = SERVER.port, timeoutMs = 2500) {

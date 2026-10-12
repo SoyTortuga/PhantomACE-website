@@ -339,6 +339,81 @@ function mojang({ status = 200, name = 'Notch', id = RAW } = {}) {
   check('nothing is unreadably small', small, []);
 }
 
+/* ── Crafty Controller ───────────────────────────────────────────
+   Optional by construction: unconfigured, everything must behave exactly
+   as it did before it existed. The failure that would hurt is a panel
+   being down taking the whitelist form down with it. */
+{
+  const crafty = await import('../../functions/api/minecraft/crafty.js');
+
+  check('no config means no config', crafty.craftyConfig({}), null);
+  check('a partial config is not a config',
+    crafty.craftyConfig({ CRAFTY_URL: 'https://x:8443', CRAFTY_TOKEN: 't' }), null);
+  check('a nonsense url is refused rather than thrown on',
+    crafty.craftyConfig({ CRAFTY_URL: 'not a url', CRAFTY_TOKEN: 't', CRAFTY_SERVER_ID: 'i' }), null);
+
+  const full = { CRAFTY_URL: 'https://192.168.0.111:8443', CRAFTY_TOKEN: 't', CRAFTY_SERVER_ID: 'abc' };
+  const cfg = crafty.craftyConfig(full);
+  ok('a complete config parses', !!cfg);
+  check('and is strict about TLS unless told otherwise', cfg.insecure, false);
+  check('with the opt-out honoured', crafty.craftyConfig({ ...full, CRAFTY_INSECURE_TLS: '1' }).insecure, true);
+
+  /* UNCONFIGURED IS A SKIP, NOT AN ERROR. */
+  const skipped = await crafty.craftyWhitelist({}, 'add', 'Notch');
+  check('an unconfigured push is skipped', skipped.skipped, 'not-configured');
+  check('and reports no success it did not have', skipped.ok, false);
+
+  /* COMMAND INJECTION. The name is concatenated into a console command,
+     so a space would turn `whitelist add x` into a second command. Mojang
+     validates names today; this refuses to depend on that forever. */
+  const NEWLINE = String.fromCharCode(10);
+  for (const bad of ['a b', 'x; op x', 'x' + NEWLINE + 'op x', '', 'a'.repeat(20)]) {
+    const r = await crafty.craftyWhitelist(full, 'add', bad);
+    check(`${JSON.stringify(bad)} never reaches the console`, r.error, 'bad name');
+  }
+  check('and an unknown action is refused', (await crafty.craftyWhitelist(full, 'op', 'Notch')).error, 'bad action');
+
+  /* The console command's exact shape, which the panel is fussy about. */
+  const src = read('functions/api/minecraft/crafty.js');
+  ok('the command carries no leading slash - the panel says not to',
+    /body: `whitelist \$\{action\} \$\{name\}`/.test(src));
+  ok('it posts to the documented stdin endpoint', /\/api\/v2\/servers\/\$\{encodeURIComponent\(cfg\.serverId\)\}\/stdin/.test(src));
+  ok('as text/plain, which is what the spec accepts', /contentType: 'text\/plain'/.test(src));
+  ok('with a bearer token', /Authorization: `Bearer \$\{cfg\.token\}`/.test(src));
+
+  /* NEVER THE GLOBAL TLS SWITCH. Turning verification off process-wide
+     would also stop verifying Twitch and Mojang.
+     Comments stripped first: crafty.js explains the rule by naming the
+     variable, and the explanation must not fail the check it describes. */
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  ok('TLS is relaxed per-request, never globally', !/NODE_TLS_REJECT_UNAUTHORIZED/.test(code));
+  ok('and only when explicitly opted into', /if \(isHttps && cfg\.insecure\) options\.rejectUnauthorized = false/.test(src));
+
+  /* The library has no handler, so the router would refuse to boot if it
+     were not declared. That has taken the site down before. */
+  ok('it is declared a library in the router',
+    read('server/router.js').includes("'api/minecraft/crafty.js'"));
+}
+
+/* ── A panel that is down must not break the page ────────────────── */
+{
+  mojang();
+  /* Configured, but pointing at nothing listening. */
+  const env = store({ profile_7: { login: 'k' } });
+  env.CRAFTY_URL = 'http://127.0.0.1:9';           // discard port: refuses instantly
+  env.CRAFTY_TOKEN = 't';
+  env.CRAFTY_SERVER_ID = 'abc';
+
+  const r = await post(env, { action: 'join', name: 'Notch' }, session('sub_tier1'));
+  check('a join still succeeds when Crafty is unreachable', r.status, 200);
+  check('the entry is stored regardless', env.map.get('profile_7').minecraft.name, 'Notch');
+  check('and the response is honest that the live push failed', r.body.live, false);
+
+  const left = await post(env, { action: 'leave' }, session('sub_tier1'));
+  check('leaving also survives it', left.status, 200);
+  check('and the entry is gone', env.map.get('profile_7').minecraft, undefined);
+}
+
 /* ── Report ──────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

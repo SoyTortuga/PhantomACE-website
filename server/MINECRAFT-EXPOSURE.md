@@ -256,3 +256,50 @@ connection rather than about either game server:
 Until that conversation happens, option A is a reasonable choice here, because
 the exposure it creates already exists. What it is NOT is a safe default to
 reach for again later on a connection that has stayed private.
+
+---
+
+## Crafty Controller (optional)
+
+With Crafty wired up two things improve, and without it everything below
+still works exactly as described above.
+
+| | Without Crafty | With Crafty |
+|---|---|---|
+| Status on the page | port ping: "answered" or not | stopped / starting / running / **crashed**, with the live player count |
+| A new whitelist entry | applies at the next scheduled sync | `whitelist add` on the console, immediately |
+
+The scheduled file sync stays either way: it is what removes lapsed subs,
+and it is the backstop if the panel is down. A panel that is unreachable
+never fails a join - the entry is stored and the sync picks it up.
+
+### Setting it up
+
+In Crafty: **Profile -> API Keys -> Generate Key**, and give the key the
+**Commands** permission on the Cursed Walking server. Then in `server/.env`:
+
+```
+CRAFTY_URL=https://192.168.0.111:8443
+CRAFTY_TOKEN=<the generated key>
+CRAFTY_SERVER_ID=<the server's UUID, from its URL in the Crafty dashboard>
+CRAFTY_INSECURE_TLS=1
+```
+
+`CRAFTY_INSECURE_TLS=1` is needed because Crafty serves HTTPS on 8443 with
+a **self-signed certificate**, which a strict client refuses. It is opt-in
+and scoped to this one client: the global `NODE_TLS_REJECT_UNAUTHORIZED`
+would stop verifying Twitch and Mojang too, and is never used. Leave it
+out if you give Crafty a real certificate.
+
+Restart the service. If the key or the URL is wrong the page quietly falls
+back to the port ping and the reason is in `server/logs/phantomace-web.out.log`
+prefixed `[crafty]`.
+
+### Whose panel is it
+
+If the Crafty instance belongs to OnlySands rather than to us, this is a
+token into **someone else's** server manager and is theirs to issue, not
+ours to take. Crafty scopes a key per server, so the right ask is a key
+with Commands on the Cursed Walking server only - not a superuser key,
+which several third-party guides suggest and which would hand us their
+whole panel.

@@ -137,7 +137,11 @@
     }
     if (!server.online) {
       live.setAttribute('data-state', 'off');
-      text.textContent = 'Offline';
+      /* The panel can distinguish these; a port ping cannot, and they are
+         the states somebody is on this page to understand. */
+      text.textContent = server.crashed ? 'Crashed — a mod has been told'
+        : server.starting ? 'Starting up…'
+        : 'Offline';
       if (players) players.textContent = '—';
       return;
     }

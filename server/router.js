@@ -38,6 +38,11 @@ export const NON_ROUTE_MODULES = new Set([
      Library, no handler. See functions/api/soft-read.js. */
   'api/soft-read.js',
 
+  /* Crafty Controller client - status and console commands for the
+     Minecraft server. Library, no handler; the only callers are the
+     /api/minecraft routes beside it. */
+  'api/minecraft/crafty.js',
+
   /* What chat can type right now. Library, no handler — the only caller is
      the !commands dispatch in bot/commands.js. */
   'api/bot/chat-help.js',
