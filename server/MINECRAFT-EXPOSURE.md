@@ -273,19 +273,31 @@ The scheduled file sync stays either way: it is what removes lapsed subs,
 and it is the backstop if the panel is down. A panel that is unreachable
 never fails a join - the entry is stored and the sync picks it up.
 
+### Our own instance, on its own port
+
+OnlySands runs their own Crafty on this machine on the default port, 8443.
+Ours is a separate install (`C:\Crafty`) on **8444**, set with
+`"https_port": 8444` in `C:\Crafty\app\config\config.json`, and runs as the
+nssm service **`crafty-phantomace`** so it cannot collide with a service of
+theirs called `crafty`. Two panels, two ports, two services - neither can
+see the other's servers.
+
 ### Setting it up
 
 In Crafty: **Profile -> API Keys -> Generate Key**, and give the key the
 **Commands** permission on the Cursed Walking server. Then in `server/.env`:
 
 ```
-CRAFTY_URL=https://192.168.0.111:8443
+CRAFTY_URL=https://127.0.0.1:8444
 CRAFTY_TOKEN=<the generated key>
 CRAFTY_SERVER_ID=<the server's UUID, from its URL in the Crafty dashboard>
 CRAFTY_INSECURE_TLS=1
 ```
 
-`CRAFTY_INSECURE_TLS=1` is needed because Crafty serves HTTPS on 8443 with
+`127.0.0.1` because the panel and the site are on the same machine, so the
+call never leaves it.
+
+`CRAFTY_INSECURE_TLS=1` is needed because Crafty serves HTTPS with
 a **self-signed certificate**, which a strict client refuses. It is opt-in
 and scoped to this one client: the global `NODE_TLS_REJECT_UNAUTHORIZED`
 would stop verifying Twitch and Mojang too, and is never used. Leave it
