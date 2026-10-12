@@ -366,11 +366,20 @@ export async function pingServer(host = SERVER.host, port = SERVER.port, timeout
       clearTimeout(timer);
       try {
         const s = JSON.parse(payload);
+        const version = (s.version && s.version.name) || '';
+        const max = Number(s.players && s.players.max) || 0;
+        /* STILL LOADING, NOT ONLINE. A server binds its port early and then
+           spends a minute or more loading mods and the world; asked for its
+           status in that window it answers with an empty one — no version,
+           a player cap of 0. Reporting that as online put "Online 0/0" on
+           the page after every restart. A real running server always has a
+           version and a cap, so the absence of both means "starting". */
+        if (!version && !max) return done({ online: false, starting: true });
         done({
           online: true,
           players: Number(s.players && s.players.online) || 0,
-          max: Number(s.players && s.players.max) || 0,
-          version: (s.version && s.version.name) || '',
+          max,
+          version,
           /* The MOTD arrives as either a string or a chat component tree. */
           motd: flattenMotd(s.description).slice(0, 200),
         });

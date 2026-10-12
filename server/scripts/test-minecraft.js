@@ -414,6 +414,81 @@ function mojang({ status = 200, name = 'Notch', id = RAW } = {}) {
   check('and the entry is gone', env.map.get('profile_7').minecraft, undefined);
 }
 
+/* ── The status ping, against a fake server ─────────────────────────
+   Found on the real rig: right after a restart the server has bound its
+   port but is still loading, and answers the status ping with an empty
+   status. That read as "online, 0/0" on the page. A tiny TCP server that
+   speaks just enough of the protocol to answer one status request lets
+   every state be checked without a Minecraft install. */
+{
+  const { pingServer } = await import('../../functions/api/minecraft/index.js');
+  const net = await import('node:net');
+
+  const varint = (n) => {
+    const out = [];
+    let v = n >>> 0;
+    do { let b = v & 0x7f; v >>>= 7; if (v) b |= 0x80; out.push(b); } while (v);
+    return Buffer.from(out);
+  };
+
+  /** Answer the first request with `body` (a string), or with raw bytes. */
+  async function fakeServer(body) {
+    const srv = net.createServer((sock) => {
+      sock.once('data', () => {
+        if (Buffer.isBuffer(body)) { sock.end(body); return; }
+        const str = Buffer.from(body, 'utf8');
+        const inner = Buffer.concat([varint(0x00), varint(str.length), str]);
+        sock.end(Buffer.concat([varint(inner.length), inner]));
+      });
+      sock.on('error', () => {});
+    });
+    await new Promise((res) => srv.listen(0, '127.0.0.1', res));
+    return { port: srv.address().port, close: () => new Promise((res) => srv.close(res)) };
+  }
+
+  async function pingWith(body) {
+    const s = await fakeServer(body);
+    try { return await pingServer('127.0.0.1', s.port, 2000); } finally { await s.close(); }
+  }
+
+  const full = await pingWith(JSON.stringify({
+    version: { name: '1.20.1', protocol: 763 },
+    players: { max: 20, online: 3 },
+    description: { text: 'Cursed Walking', extra: [{ text: ' - subs' }] },
+  }));
+  check('a running server is online', full.online, true);
+  check('with its player count', [full.players, full.max], [3, 20]);
+  check('its version', full.version, '1.20.1');
+  check('and a flattened MOTD', full.motd, 'Cursed Walking - subs');
+
+  /* THE BUG. Port open, status not ready yet. */
+  const loading = await pingWith('{}');
+  check('an empty status is not "online"', loading.online, false);
+  check('it is "starting"', loading.starting, true);
+
+  const descOnly = await pingWith(JSON.stringify({ description: 'A Minecraft Server' }));
+  check('a MOTD with no version or cap is still starting', descOnly.starting, true);
+
+  /* A real server that happens to have nobody on is still online. */
+  const empty = await pingWith(JSON.stringify({ version: { name: '1.20.1' }, players: { max: 20, online: 0 } }));
+  check('online with nobody on is still online', empty.online, true);
+
+  const junk = await pingWith(Buffer.from([0x05, 0x01, 0x02, 0x03, 0x04, 0x05]));
+  check('a non-Minecraft answer is offline, not a crash', junk.online, false);
+
+  /* Nothing listening at all. */
+  const probe = net.createServer();
+  await new Promise((res) => probe.listen(0, '127.0.0.1', res));
+  const deadPort = probe.address().port;
+  await new Promise((res) => probe.close(res));
+  const dead = await pingServer('127.0.0.1', deadPort, 1500);
+  check('a closed port is offline', dead.online, false);
+  ok('and is not mistaken for starting', !dead.starting);
+
+  /* The page has a message for this state, so it is never shown as 0/0. */
+  ok('the page says "Starting up" for it', /server\.starting \? 'Starting up/.test(read('js/pages/minecraft.js')));
+}
+
 /* ── Report ──────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {
