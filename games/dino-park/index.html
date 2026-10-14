@@ -1756,7 +1756,37 @@ const ROSTER = [
   { id:'masto', name:'Mastodon', emoji:'🦣', rarity:'rare', diet:'Herbivore', habitat:'Land', era:'Miocene', desc:'Forest-dwelling cousin of the mammoth. Shorter tusks, thicker build.' },
   { id:'andrew', name:'Andrewsarchus', emoji:'🐗', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Eocene', desc:'Largest land predatory mammal ever. A wolf-shaped nightmare at 6 feet tall.' },
   { id:'entelo', name:'Entelodont', emoji:'🐗', rarity:'uncommon', diet:'Omnivore', habitat:'Land', era:'Eocene', desc:'Hell pig. Bone-crushing jaws on a body built for bad decisions.' },
+
+  /* ── NEW SPECIES — DEFINED BUT DORMANT ──────────────────────────────────
+     A `pending: true` entry has no art yet, so it is hidden everywhere a
+     player would see it: excluded from the Dinodex and its completion counts
+     (see ROSTER_LIVE below) and never rolled by rollSpecies / trade-up. It can
+     never be granted (the server refuses dormant species), so it also never
+     reaches a sprite. Yutyrannus and Gigantopithecus have art on disk and are
+     LIVE. Hand-synced with functions/api/dino-species.js. To go live: drop the
+     PNG at the ASSET_MAP path below and delete `pending` here AND in the
+     server table. */
+  { id:'carchar', name:'Carcharodontosaurus', emoji:'🦖', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Shark-toothed giant of Africa, a rival in size to T. rex itself.' },
+  { id:'titanoboa', name:'Titanoboa', emoji:'🐍', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Land', era:'Paleocene', desc:'The largest snake that ever lived — a 40-foot constrictor of steaming swamps.' },
+  { id:'livyatan', name:'Livyatan', emoji:'🐋', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Water', era:'Miocene', desc:'A sperm whale built like a predator, with teeth over a foot long.' },
+  { id:'sarco', name:'Sarcosuchus', emoji:'🐊', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Water', era:'Cretaceous', desc:'"SuperCroc" — a 40-foot crocodilian that ambushed passing dinosaurs.' },
+  { id:'pliosaur', name:'Pliosaurus', emoji:'🐉', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Water', era:'Jurassic', desc:'Short-necked marine reptile with a bite force rivalling any predator.' },
+  { id:'yuty', name:'Yutyrannus', emoji:'🦖', rarity:'legendary', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'The largest feathered dinosaur known — a shaggy tyrant of the cold.' },
+  { id:'acro', name:'Acrocanthosaurus', emoji:'🦖', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'High-spined apex predator of early Cretaceous North America.' },
+  { id:'tarbo', name:'Tarbosaurus', emoji:'🦖', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Asia\'s answer to T. rex — the tyrant that ruled ancient Mongolia.' },
+  { id:'sucho', name:'Suchomimus', emoji:'🦖', rarity:'epic', pending:true, diet:'Piscivore', habitat:'Land', era:'Cretaceous', desc:'Crocodile-snouted fisher with a low sail and great hooked claws.' },
+  { id:'megalania', name:'Megalania', emoji:'🦎', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Land', era:'Pleistocene', desc:'A monitor lizard the size of a car. Australia\'s venomous giant.' },
+  { id:'gigapith', name:'Gigantopithecus', emoji:'🦍', rarity:'epic', diet:'Herbivore', habitat:'Land', era:'Pleistocene', desc:'The largest ape that ever lived — ten feet of gentle muscle.' },
+  { id:'basilo', name:'Basilosaurus', emoji:'🐋', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Water', era:'Eocene', desc:'An early whale, long and serpentine, that eeled through warm seas.' },
+  { id:'patago', name:'Patagotitan', emoji:'🦕', rarity:'epic', pending:true, diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A titanosaur among the heaviest animals ever to walk the earth.' },
 ];
+
+/* The LIVE roster — every species whose art has landed. The Dinodex and every
+   client-side roll (rollSpecies, trade-up) read this, never ROSTER directly,
+   so a dormant species is invisible and unrollable until its `pending` flag is
+   removed above. ROSTER stays the full table for getRosterById, so the moment
+   a species goes live its sprite/name resolve with no other change. */
+const ROSTER_LIVE = ROSTER.filter(r => !r.pending);
 
 /* ======================== ASSET SYSTEM ======================== */
 const AB = 'assets/dino-assets/';
@@ -1862,6 +1892,24 @@ const ASSET_MAP = {
   masto:    { icon: IC+'prehistoric_mammals/mastodon.png', portrait: PT+'Mastodon.png' },
   andrew:   { icon: IC+'prehistoric_mammals/andrewsarchus.png', portrait: PT+'Andrewsarchus.png' },
   entelo:   { icon: IC+'prehistoric_mammals/entelodont.png', portrait: PT+'Entelodont.png' },
+  /* New species. Icon paths are pre-wired so going live is a one-line flip
+     (remove `pending` in ROSTER + the server table). The pending ones point at
+     PNGs that do not exist yet, which is harmless: a dormant species is never
+     rendered (never discovered, never owned, never rolled). No portraits yet —
+     the detail view falls back to the icon, then to a drawn sprite. */
+  carchar:   { icon: EX+'more_named_species/carcharodontosaurus.png' },
+  titanoboa: { icon: EX+'more_named_species/titanoboa.png' },
+  livyatan:  { icon: EX+'flying_marine_reptiles/livyatan.png' },
+  sarco:     { icon: EX+'flying_marine_reptiles/sarcosuchus.png' },
+  pliosaur:  { icon: EX+'flying_marine_reptiles/pliosaurus.png' },
+  yuty:      { icon: EX+'more_named_species/yutyrannus.png' },
+  acro:      { icon: EX+'more_named_species/acrocanthosaurus.png' },
+  tarbo:     { icon: EX+'more_named_species/tarbosaurus.png' },
+  sucho:     { icon: EX+'more_named_species/suchomimus.png' },
+  megalania: { icon: EX+'more_named_species/megalania.png' },
+  gigapith:  { icon: IC+'prehistoric_mammals/giant_ape.png' },
+  basilo:    { icon: EX+'flying_marine_reptiles/basilosaurus.png' },
+  patago:    { icon: EX+'more_named_species/patagotitan.png' },
 };
 
 const EGG_ASSETS = {
@@ -1991,7 +2039,9 @@ function getMutFilter(specId, mutation) {
 
 function preloadAssets() {
   const urls = new Set();
-  Object.values(ASSET_MAP).forEach(a => { if(a.icon) urls.add(a.icon); if(a.portrait) urls.add(a.portrait); if(a.baby) urls.add(a.baby); });
+  /* LIVE species only — a dormant species' art does not exist yet, so
+     preloading its icon would just 404. Keyed by id through ROSTER_LIVE. */
+  ROSTER_LIVE.forEach(r => { const a = ASSET_MAP[r.id]; if(!a) return; if(a.icon) urls.add(a.icon); if(a.portrait) urls.add(a.portrait); if(a.baby) urls.add(a.baby); });
   Object.values(EGG_ASSETS).forEach(u => urls.add(u));
   DECO_ASSETS.forEach(d => urls.add(d.src));
   urls.forEach(u => { const img = new Image(); img.src = u; });
@@ -4617,7 +4667,7 @@ function getNextStageLabel(d) {
 }
 function getRosterById(id) { return ROSTER.find(r => r.id === id); }
 function rollRarity(w) { const t = Object.values(w).reduce((s,v)=>s+v,0); let r = Math.random()*t; for (const [k,v] of Object.entries(w)) { r-=v; if(r<=0) return k; } return 'common'; }
-function rollSpecies(r) { const p = ROSTER.filter(x => x.rarity === r); return p[Math.floor(Math.random() * p.length)]; }
+function rollSpecies(r) { const p = ROSTER_LIVE.filter(x => x.rarity === r); return p[Math.floor(Math.random() * p.length)]; }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function updateTopBar() { state.level = getLevel(); document.getElementById('coinDisplay').textContent = state.coins; document.getElementById('dinoCountDisplay').textContent = state.park.length; document.getElementById('levelDisplay').textContent = state.level; }
 
@@ -7366,7 +7416,7 @@ function performTradeUp() {
   }
 
   const to = tradeUpRarity(from);
-  const pool = ROSTER.filter(r => r.rarity === to);
+  const pool = ROSTER_LIVE.filter(r => r.rarity === to);
   if (!pool.length) { showToast('Nothing to trade into.'); return; }
   const spec = pool[Math.floor(Math.random() * pool.length)];
 
@@ -7697,7 +7747,7 @@ function sortDex(list, how) {
 function getDexSpeciesStats() {
   const byRarity = {};
   RARITY_ORDER.forEach(r => {
-    const species = ROSTER.filter(s => s.rarity === r);
+    const species = ROSTER_LIVE.filter(s => s.rarity === r);
     byRarity[r] = { total: species.length, found: species.filter(s => state.discovered.includes(s.id)).length };
   });
   return { byRarity };
@@ -7715,7 +7765,7 @@ function getDexMutationTotals() {
   if(!state.discoveredMutations)state.discoveredMutations=[];
   if (!dexMutTotalsCache) {
     const valid = new Set();
-    ROSTER.forEach(spec => {
+    ROSTER_LIVE.forEach(spec => {
       getSpecMutStatus(spec.id).forEach(m => valid.add(spec.id + '_' + m.id));
     });
     dexMutTotalsCache = valid;
@@ -7792,17 +7842,19 @@ function renderDexDetail(specId) {
 
 function renderDinodex() {
   if(!state.discoveredMutations)state.discoveredMutations=[];
-  const discCount = ROSTER.filter(r=>state.discovered.includes(r.id)).length;
+  const discCount = ROSTER_LIVE.filter(r=>state.discovered.includes(r.id)).length;
   const muts = getDexMutationTotals();
 
-  /* TWO COMPLETIONS, because they are two different games. Finding all 85
-     species is a season's work; finding all 1105 mutations is far longer,
-     and a single figure averaging them told a player neither. Species
-     completion sat at 100% here while barely a mutation had been seen. */
+  /* TWO COMPLETIONS, because they are two different games. Finding every live
+     species is a season's work; finding every mutation is far longer, and a
+     single figure averaging them told a player neither. Species completion sat
+     at 100% here while barely a mutation had been seen. Both denominators count
+     only the LIVE roster (ROSTER_LIVE) — dormant species whose art has not yet
+     landed are not shown and must not make 100% unreachable. */
   const pct = (a, b) => b ? Math.floor(a / b * 100) : 0;
   document.getElementById('dexStats').innerHTML = `
-    <div class="dex-stat-card"><div class="dex-stat-val">${discCount}<span style="font-size:11px;color:#fff">/${ROSTER.length}</span></div><div class="dex-stat-lbl">Species</div></div>
-    <div class="dex-stat-card"><div class="dex-stat-val" style="color:${discCount>=ROSTER.length?'#2ecc71':'#fff'}">${pct(discCount, ROSTER.length)}%</div><div class="dex-stat-lbl">Species Complete</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val">${discCount}<span style="font-size:11px;color:#fff">/${ROSTER_LIVE.length}</span></div><div class="dex-stat-lbl">Species</div></div>
+    <div class="dex-stat-card"><div class="dex-stat-val" style="color:${discCount>=ROSTER_LIVE.length?'#2ecc71':'#fff'}">${pct(discCount, ROSTER_LIVE.length)}%</div><div class="dex-stat-lbl">Species Complete</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val">${muts.found}<span style="font-size:11px;color:#fff">/${muts.total}</span></div><div class="dex-stat-lbl">Mutations</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val" style="color:${muts.found>=muts.total?'#2ecc71':'#fff'}">${pct(muts.found, muts.total)}%</div><div class="dex-stat-lbl">Mutations Complete</div></div>
     <div class="dex-stat-card"><div class="dex-stat-val">${state.park.length}</div><div class="dex-stat-lbl">In Park</div></div>
@@ -7828,10 +7880,10 @@ function renderDinodex() {
       </select></label>`;
 
   let filtered;
-  if (dexFilter === 'all') filtered = ROSTER;
-  else if (dexFilter === 'mutated') filtered = ROSTER.filter(r => state.discoveredMutations.some(m => m.startsWith(r.id + '_')));
-  else if (dexFilter === 'owned') filtered = ROSTER.filter(r => state.park.some(d => d.speciesId === r.id));
-  else filtered = ROSTER.filter(r => r.rarity === dexFilter);
+  if (dexFilter === 'all') filtered = ROSTER_LIVE;
+  else if (dexFilter === 'mutated') filtered = ROSTER_LIVE.filter(r => state.discoveredMutations.some(m => m.startsWith(r.id + '_')));
+  else if (dexFilter === 'owned') filtered = ROSTER_LIVE.filter(r => state.park.some(d => d.speciesId === r.id));
+  else filtered = ROSTER_LIVE.filter(r => r.rarity === dexFilter);
 
   filtered = sortDex(filtered, dexSort);
 

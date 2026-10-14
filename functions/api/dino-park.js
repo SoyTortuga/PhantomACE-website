@@ -108,9 +108,14 @@ export async function grantEgg(env, userId, rarity, opts = {}) {
      winner receives must be that dino — not a fresh re-roll. A pin is honoured
      only when it exists AND sits at the requested rarity (so an egg can never be
      filed under the wrong tier); anything else falls back to the uniform
-     in-tier roll, exactly as every existing caller already gets. */
+     in-tier roll, exactly as every existing caller already gets.
+
+     A DORMANT species (pending: true — art not yet landed) is refused even when
+     pinned: it falls back to the uniform in-tier roll over the live pool, so a
+     forced pending id can never be granted and the egg always resolves to a
+     species that actually has a sprite. */
   let speciesId;
-  if (opts.speciesId && SPECIES[opts.speciesId] && SPECIES[opts.speciesId].rarity === rarity) {
+  if (opts.speciesId && SPECIES[opts.speciesId] && SPECIES[opts.speciesId].rarity === rarity && !SPECIES[opts.speciesId].pending) {
     speciesId = opts.speciesId;
   } else {
     speciesId = rollSpeciesId(rarity);

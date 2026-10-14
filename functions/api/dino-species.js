@@ -111,15 +111,57 @@ export const SPECIES = {
   quetz      : { name: "Quetzalcoatlus", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320/icons/dinosaurs/quetzalcoatlus.png" },
   liopl      : { name: "Liopleurodon", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/liopleurodon.png" },
   anomal     : { name: "Anomalocaris", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/anomalocaris.png" },
+
+  /* ── NEW SPECIES — DEFINED BUT DORMANT ──────────────────────────────────
+     Thirteen species added ahead of their art. A `pending: true` entry is
+     DORMANT: it is excluded from ROSTER_BY_RARITY below (so rollSpeciesId can
+     never roll it, which also keeps it out of every hatch/safari/battle pool),
+     and grantEgg refuses it even when a speciesId is pinned. It still carries
+     its final `icon` path so going live is a one-line flip: drop the PNG at
+     that path, delete `pending`, and it is reachable everywhere at once.
+
+     TWO are live already (their PNGs are on disk, previously unused): Yutyrannus
+     and Gigantopithecus. The other eleven wait on art the broadcaster is
+     sourcing; their icon paths are where those PNGs must land. Hand-synced with
+     the client ROSTER + ASSET_MAP in games/dino-park/index.html, same as the
+     rest of this table. */
+  /* legendary */
+  carchar    : { name: "Carcharodontosaurus", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/carcharodontosaurus.png" },
+  titanoboa  : { name: "Titanoboa", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/titanoboa.png" },
+  livyatan   : { name: "Livyatan", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/livyatan.png" },
+  sarco      : { name: "Sarcosuchus", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/sarcosuchus.png" },
+  pliosaur   : { name: "Pliosaurus", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/pliosaurus.png" },
+  yuty       : { name: "Yutyrannus", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/yutyrannus.png" },
+  /* epic */
+  acro       : { name: "Acrocanthosaurus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/acrocanthosaurus.png" },
+  tarbo      : { name: "Tarbosaurus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/tarbosaurus.png" },
+  sucho      : { name: "Suchomimus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/suchomimus.png" },
+  megalania  : { name: "Megalania", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/megalania.png" },
+  gigapith   : { name: "Gigantopithecus", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320/icons/prehistoric_mammals/giant_ape.png" },
+  basilo     : { name: "Basilosaurus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/basilosaurus.png" },
+  patago     : { name: "Patagotitan", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/patagotitan.png" },
 };
+
+/** True for a species that exists in the table but is not yet reachable (its
+    art has not landed). Dormant species never roll, grant, battle, or show a
+    live sprite — see ROSTER_BY_RARITY (excludes them) and grantEgg (refuses a
+    pinned one). Removing the `pending` flag above is what makes one go live. */
+export function isPendingSpecies(id) {
+  return !!(SPECIES[id] && SPECIES[id].pending);
+}
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
-/** rarity -> [speciesId, …], derived from SPECIES so the two never drift. */
+/** rarity -> [speciesId, …], derived from SPECIES so the two never drift.
+    DORMANT species (`pending: true`) are excluded here, and this is the single
+    choke point that keeps them out of every roll: rollSpeciesId, the hatch
+    minigame, the Dino Stream Safari and the battle route's opponent generator
+    all draw from these pools, so a pending species can never be granted or
+    fought until its `pending` flag is removed in the table above. */
 export const ROSTER_BY_RARITY = (() => {
   const by = { common: [], uncommon: [], rare: [], epic: [], legendary: [] };
   for (const [id, s] of Object.entries(SPECIES)) {
-    if (by[s.rarity]) by[s.rarity].push(id);
+    if (by[s.rarity] && !s.pending) by[s.rarity].push(id);
   }
   return by;
 })();

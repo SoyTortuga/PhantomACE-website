@@ -143,6 +143,14 @@ export const MOVES = {
   sky_terror:   { name: 'Sky Terror',      kind: 'attack', power: 46, acc: 0.85, effect: 'stun', chance: 0.40, cd: 2, signature: true },
   abyssal_bite: { name: 'Abyssal Bite',    kind: 'attack', power: 56, acc: 0.80,                          cd: 2, signature: true },
   primordial:   { name: 'Primordial Surge',kind: 'attack', power: 34, acc: 0.90, effect: 'bleed_atkdown', cd: 2, signature: true },
+
+  /* signatures for the new apex legendaries (defined now, reachable only once
+     their species' art lands and `pending` is removed). */
+  serrated_bite:  { name: 'Serrated Bite',  kind: 'attack', power: 50, acc: 0.85, effect: 'bleed',        cd: 2, signature: true },
+  constrict:      { name: 'Constrict',      kind: 'attack', power: 38, acc: 0.90, effect: 'stun', chance: 0.50, cd: 3, signature: true },
+  raking_bite:    { name: 'Raking Bite',    kind: 'attack', power: 52, acc: 0.82, effect: 'lifesteal',    cd: 3, signature: true },
+  death_roll:     { name: 'Death Roll',     kind: 'attack', power: 46, acc: 0.85, effect: 'stun', chance: 0.45, cd: 3, signature: true },
+  crushing_jaws:  { name: 'Crushing Jaws',  kind: 'attack', power: 58, acc: 0.78,                          cd: 2, signature: true },
 };
 
 /** Marquee species → their signature move (added as a 4th option). */
@@ -150,6 +158,8 @@ export const SIGNATURES = {
   trex: 'apex_bite', spino: 'sail_slash', mosa: 'deep_crush', mammoth: 'tusk_charge',
   argent: 'earthshaker', megashark: 'devour', quetz: 'sky_terror', liopl: 'abyssal_bite',
   anomal: 'primordial',
+  carchar: 'serrated_bite', titanoboa: 'constrict', livyatan: 'raking_bite',
+  sarco: 'death_roll', pliosaur: 'crushing_jaws',
 };
 
 /* ── SPECIES → ARCHETYPE ─────────────────────────────────────────────────
@@ -188,6 +198,13 @@ export const SPECIES_ARCHETYPE = {
   /* legendary */
   argent: 'colossus', megashark: 'aquatic', quetz: 'aerial', liopl: 'aquatic',
   anomal: 'aquatic',
+  /* new species (mapped now; the pending ones are unreachable until their art
+     lands and `pending` is removed in dino-species.js — but the invariant
+     "every species has an archetype" holds regardless). */
+  carchar: 'brute', titanoboa: 'striker', livyatan: 'aquatic', sarco: 'aquatic',
+  pliosaur: 'aquatic', yuty: 'brute',
+  acro: 'brute', tarbo: 'brute', sucho: 'striker', megalania: 'striker',
+  gigapith: 'brute', basilo: 'aquatic', patago: 'colossus',
 };
 
 /* A rarity-keyed fallback so an unmapped id still gets a sane role rather

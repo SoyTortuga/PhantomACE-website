@@ -79,8 +79,8 @@ const topKeys = (name) =>
   /* The percentages must divide by the right denominators — species by the
      roster, mutations by the mutation total — or the two readouts are one
      readout with two labels. */
-  ok('species completion divides by the roster',
-     /pct\(discCount, ROSTER\.length\)/.test(page));
+  ok('species completion divides by the LIVE roster',
+     /pct\(discCount, ROSTER_LIVE\.length\)/.test(page));
   ok('mutation completion divides by the mutation total',
      /pct\(muts\.found, muts\.total\)/.test(page));
 }
@@ -88,7 +88,7 @@ const topKeys = (name) =>
 /* ── The total is derived ────────────────────────────────────────────── */
 {
   ok('the wrong ROSTER * 5 total is gone', !/ROSTER\.length \* 5/.test(page));
-  ok('the total walks every species', /ROSTER\.forEach\(spec =>/.test(page));
+  ok('the total walks every live species', /ROSTER_LIVE\.forEach\(spec =>/.test(page));
   ok('and asks getSpecMutStatus what each one has',
      /getSpecMutStatus\(spec\.id\)\.forEach/.test(page));
 
@@ -100,8 +100,17 @@ const topKeys = (name) =>
   /* THE ARITHMETIC, pinned from the source tables rather than from a
      number typed into the game. If a mutation is added anywhere, this
      recomputes and the game recomputes, and they still agree. */
-  const roster = [...block('ROSTER').matchAll(/\{\s*id:'([A-Za-z0-9_]+)'/g)].map(m => m[1]);
-  check('the roster is 85 species', roster.length, 85);
+  /* The roster now carries DORMANT species (pending: true, art not landed).
+     Only the LIVE ones are counted toward completion and walked for the
+     mutation total — the game reads ROSTER_LIVE everywhere a player sees a
+     count, so the arithmetic is pinned against the live roster, not the full
+     table. When the broadcaster un-pends a species (its art lands), the live
+     count and this total both step up together. */
+  const rosterLines = block('ROSTER').split('\n').filter(l => /\{\s*id:'/.test(l));
+  const roster = rosterLines.map(l => /id:'([A-Za-z0-9_]+)'/.exec(l)[1]);
+  const liveRoster = rosterLines.filter(l => !/pending:\s*true/.test(l)).map(l => /id:'([A-Za-z0-9_]+)'/.exec(l)[1]);
+  check('the roster is 98 species (85 original + 13 new)', roster.length, 98);
+  check('of which 87 are live (two of the new ones have art)', liveRoster.length, 87);
 
   const swaps = /\.slice\(0,\s*(\d+)\)/.exec(block('function pickSwaps') || page.slice(
     page.indexOf('function pickSwaps'), page.indexOf('function pickSwaps') + 400));
@@ -113,12 +122,12 @@ const topKeys = (name) =>
 
   const special = new Set(topKeys('SPECIAL_MUTS'));
   const rare = new Set(topKeys('RARE_MUTS'));
-  const withSpecial = roster.filter(id => special.has(id)).length;
-  const withRare = roster.filter(id => rare.has(id)).length;
+  const withSpecial = liveRoster.filter(id => special.has(id)).length;
+  const withRare = liveRoster.filter(id => rare.has(id)).length;
 
-  const total = roster.length * perSpeciesSwaps + withSpecial + withRare
-              + roster.length * globals.length;
-  check('which totals 1105 mutations', total, 1105);
+  const total = liveRoster.length * perSpeciesSwaps + withSpecial + withRare
+              + liveRoster.length * globals.length;
+  check('which totals 1127 mutations across the live roster', total, 1127);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

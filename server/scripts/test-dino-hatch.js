@@ -56,16 +56,22 @@ const dummyDino = (i) => ({ speciesId: 'compy', nickname: 'p' + i, xp: 0 });
 /* ══ Species table integrity ═══════════════════════════════════════════ */
 {
   check('roster has all five tiers', RARITIES.map(r => ROSTER_BY_RARITY[r].length).every(n => n > 0), true);
+  /* The tier pools hold every LIVE species — dormant ones (pending: true, art
+     not yet landed) are deliberately absent so they can never roll. */
   const total = RARITIES.reduce((n, r) => n + ROSTER_BY_RARITY[r].length, 0);
-  check('every species is in exactly one tier pool', total, Object.keys(SPECIES).length);
+  const live = Object.values(SPECIES).filter(s => !s.pending).length;
+  check('every live species is in exactly one tier pool', total, live);
 
-  let rarityMatches = true, hasIcon = true, hasName = true;
+  let rarityMatches = true, pendingExcluded = true, hasIcon = true, hasName = true;
   for (const [id, s] of Object.entries(SPECIES)) {
-    if (!ROSTER_BY_RARITY[s.rarity] || !ROSTER_BY_RARITY[s.rarity].includes(id)) rarityMatches = false;
+    const inPool = !!(ROSTER_BY_RARITY[s.rarity] && ROSTER_BY_RARITY[s.rarity].includes(id));
+    if (s.pending) { if (inPool) pendingExcluded = false; }
+    else if (!inPool) rarityMatches = false;
     if (!s.icon || !s.icon.startsWith('/games/dino-park/assets/dino-assets/') || !s.icon.endsWith('.png')) hasIcon = false;
     if (!s.name) hasName = false;
   }
-  ok('every species is filed under its own rarity', rarityMatches);
+  ok('every live species is filed under its own rarity', rarityMatches);
+  ok('no dormant species leaks into a roll pool', pendingExcluded);
   ok('every species has a site-absolute icon path', hasIcon);
   ok('every species has a name', hasName);
 
