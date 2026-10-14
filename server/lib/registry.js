@@ -381,6 +381,19 @@ export const FAMILIES = [
      nothing to say why. */
   { prefix: 'park_bg_',        table: 'dino_parks',       expiry: 'none' },
 
+  /* Dino Park battles, one row each per player. Both 'none':
+       dino_battle_energy_{userId} — the daily battle pool. The value stamps
+         the Pacific day it belongs to (see season-time.js), and that stamp is
+         the reset rule: a row from a previous day reads as a full pool. A TTL
+         would wipe the pool mid-day, which is the exact bug it avoids.
+       dino_battle_state_{userId} — the one battle in progress. An abandoned
+         fight is self-healed by its own startedAt (BATTLE_TTL_MS in
+         dino-battle), and a forfeit deletes it, so no storage TTL is needed —
+         and a TTL mid-fight would silently end a battle a player was mid-way
+         through. Both live in dino_parks beside the save they settle into. */
+  { prefix: 'dino_battle_energy_', table: 'dino_parks',   expiry: 'none' },
+  { prefix: 'dino_battle_state_',  table: 'dino_parks',   expiry: 'none' },
+
 
   /* A raider's pending raid-boss reward code, per account, claimed in-game.
      'real': it carries a TTL matching the code's redemption window, so an

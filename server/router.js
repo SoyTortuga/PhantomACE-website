@@ -142,6 +142,12 @@ export const NON_ROUTE_MODULES = new Set([
   'api/dino-species.js',
   'api/dino-hatch.js',
 
+  /* The pure turn/stat/move battle engine — stat derivation, archetypes,
+     moves, the seeded resolver and reward calc. Library, no handler;
+     api/dino-battle/index.js is the route that drives it. Covered by
+     server/scripts/test-dino-battle.js. */
+  'api/dino-battle/engine.js',
+
   /* Equipped-cosmetic resolver (name effect / banner variants). Library, no
      handler; the leaderboards route and the forum author choke point consume
      it. Covered by server/scripts/test-cosmetics.js. */

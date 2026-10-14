@@ -573,6 +573,90 @@
       text-decoration: none;
     }
     .market-login-btn:hover { background: #7c3aed; }
+
+    /* ── Battle ──────────────────────────────────────────────────────────
+       Gothic identity: black/grey/red/white only; rarity colours are applied
+       inline and only to signal rarity. No box-shadow, no side-border rails,
+       no backdrop-filter — depth is borders and brightness. */
+    .battle-wrap { max-width: 640px; margin: 0 auto; }
+    .battle-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .battle-energy { display: flex; align-items: center; gap: 5px; }
+    .battle-energy-label { font-size: 12px; color: var(--text-pri); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; }
+    .battle-pip { width: 12px; height: 18px; border-radius: 2px; background: var(--red); border: 1px solid var(--red); }
+    .battle-pip.spent { background: transparent; border-color: var(--border-mid); }
+    .battle-section-title { font-family: var(--font-display, inherit); color: var(--red); font-size: 15px; letter-spacing: 0.04em; margin: 14px 0 8px; text-transform: uppercase; }
+    .battle-hint { color: var(--text-pri); opacity: 0.75; font-size: 13px; margin-bottom: 10px; }
+
+    .battle-dino-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
+    .battle-dino-card {
+      flex: 0 0 auto; width: 104px; background: var(--gray-mid); border: 1px solid var(--border-mid);
+      border-radius: 6px; padding: 8px 6px; text-align: center; cursor: pointer; color: var(--text-pri);
+    }
+    .battle-dino-card:hover { border-color: var(--red); }
+    .battle-dino-card.selected { border-color: var(--red); background: var(--gray-hi); }
+    .battle-dino-card .bd-sprite { height: 44px; display: flex; align-items: center; justify-content: center; }
+    .battle-dino-card .bd-sprite img { max-height: 44px; max-width: 72px; image-rendering: pixelated; }
+    .battle-dino-card .bd-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .battle-dino-card .bd-lv { font-size: 11px; color: var(--text-pri); opacity: 0.8; }
+    .battle-dino-card .bd-arch { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
+
+    .battle-opp-list { display: flex; flex-direction: column; gap: 8px; }
+    .battle-opp-card {
+      display: flex; align-items: center; gap: 10px; background: var(--gray-mid);
+      border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; color: var(--text-pri);
+    }
+    .battle-opp-card.boss { border-color: var(--red); }
+    .battle-opp-sprite { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .battle-opp-sprite img { max-width: 52px; max-height: 52px; image-rendering: pixelated; }
+    .battle-opp-info { flex: 1; min-width: 0; }
+    .battle-opp-name { font-weight: 700; font-size: 14px; }
+    .battle-opp-tier { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.05em; }
+    .battle-opp-stats { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .battle-btn {
+      background: var(--red); color: #fff; border: none; border-radius: 5px; padding: 8px 14px;
+      font-weight: 700; cursor: pointer; font-size: 13px; white-space: nowrap;
+    }
+    .battle-btn:disabled { background: var(--gray-hi); color: var(--text-pri); opacity: 0.5; cursor: not-allowed; }
+    .battle-btn.ghost { background: transparent; border: 1px solid var(--border-mid); color: var(--text-pri); }
+    .battle-btn.ghost:hover { border-color: var(--red); }
+
+    .battle-arena { display: flex; gap: 10px; align-items: stretch; margin-bottom: 12px; }
+    .battle-side { flex: 1; min-width: 0; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 6px; padding: 10px; }
+    .battle-side.foe { border-color: #FF000040; }
+    .battle-side-sprite { height: 70px; display: flex; align-items: center; justify-content: center; }
+    .battle-side-sprite img { max-height: 70px; max-width: 96px; image-rendering: pixelated; }
+    .battle-side-name { font-weight: 700; font-size: 13px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .battle-side-lv { font-size: 11px; text-align: center; opacity: 0.8; margin-bottom: 4px; }
+    .battle-hpbar { height: 12px; background: var(--gray-hi); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-mid); }
+    .battle-hpfill { height: 100%; background: var(--red); transition: width 0.4s ease; }
+    .battle-hptext { font-size: 11px; text-align: center; margin-top: 2px; opacity: 0.85; }
+    .battle-statuses { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-top: 4px; min-height: 16px; }
+    .battle-status-chip { font-size: 10px; padding: 1px 5px; border: 1px solid var(--border-mid); border-radius: 8px; color: var(--text-pri); }
+    .battle-vs { align-self: center; font-family: var(--font-display, inherit); color: var(--red); font-weight: 700; font-size: 18px; }
+
+    .battle-moves { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .battle-move-btn {
+      background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px;
+      text-align: left; cursor: pointer; color: var(--text-pri);
+    }
+    .battle-move-btn:hover:not(:disabled) { border-color: var(--red); }
+    .battle-move-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .battle-move-btn.sig { border-color: var(--red); }
+    .battle-move-name { font-weight: 700; font-size: 13px; }
+    .battle-move-meta { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+
+    .battle-log { background: var(--gray-lo); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; max-height: 150px; overflow-y: auto; margin-bottom: 10px; }
+    .battle-log-line { font-size: 12px; color: var(--text-pri); padding: 2px 0; border-bottom: 1px solid var(--border-mid); }
+    .battle-log-line:last-child { border-bottom: none; }
+    .battle-log-line.turn { color: var(--red); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; }
+
+    .battle-result { text-align: center; padding: 18px 12px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 8px; margin-bottom: 12px; }
+    .battle-result.win { border-color: var(--red); }
+    .battle-result-title { font-family: var(--font-display, inherit); font-size: 24px; letter-spacing: 0.04em; margin-bottom: 6px; }
+    .battle-result.win .battle-result-title { color: var(--red); }
+    .battle-result.loss .battle-result-title { color: var(--text-pri); }
+    .battle-result-rewards { font-size: 14px; color: var(--text-pri); }
+    .battle-actions { display: flex; gap: 8px; justify-content: center; }
     .market-earnings {
       background: #1a1a0a; border: 1px solid #ffaa0040; border-radius: 6px;
       padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center;
@@ -1354,6 +1438,7 @@
   <button class="tab-btn" onclick="switchTab('collection')"><span class="tab-icon">🦕</span>Collection</button>
   <button class="tab-btn" onclick="switchTab('expeditions')"><span class="tab-icon">🧭</span>Expeditions</button>
   <button class="tab-btn" onclick="switchTab('market')"><span class="tab-icon">🏪</span>Market</button>
+  <button class="tab-btn" onclick="switchTab('battle')"><span class="tab-icon">⚔️</span>Battle</button>
   <button class="tab-btn" onclick="switchTab('dinodex')"><span class="tab-icon">📖</span>Dinodex</button>
 </div>
 
@@ -1474,6 +1559,11 @@
 
 <div class="tab-content scrollable" id="tab-market">
   <div id="marketContent"></div>
+</div>
+
+<!-- Battle Tab -->
+<div class="tab-content scrollable" id="tab-battle">
+  <div id="battleContent"></div>
 </div>
 
 <!-- Dinodex Tab -->
@@ -4112,6 +4202,14 @@ function adoptServerGrants(serverState) {
         added.tidied = (added.tidied || 0) + take;
         if (op.by) added.tidiedBy = String(op.by).slice(0, 40);
       }
+    } else if (op.t === 'bxp') {
+      /* Battle XP the server awarded a specific dino. battleXp is
+         server-owned — the client only ever mirrors it here, by uid, so a
+         wholesale save can never originate or inflate it (the grantSeq bump
+         that rode this op is what forces that save to merge first). A dino
+         sold or released since is simply not found, and the op no-ops. */
+      const d = [...state.park, ...state.vault].find(x => x && x.uid === op.uid);
+      if (d) { d.battleXp = Math.max(0, Math.floor(Number(d.battleXp) || 0)) + Math.max(0, Math.floor(Number(op.d) || 0)); added.battleXp = (added.battleXp || 0) + 1; }
     } else if (op.t === 'out') {
       if (op.grantId) markGrantsConsumed([op.grantId]);
       const pi = state.park.findIndex(x => x && x.uid === op.uid);
@@ -4525,7 +4623,7 @@ function updateTopBar() { state.level = getLevel(); document.getElementById('coi
 
 let marketPollInterval = null;
 
-const TAB_ORDER = ['park', 'eggs', 'collection', 'expeditions', 'market', 'dinodex'];
+const TAB_ORDER = ['park', 'eggs', 'collection', 'expeditions', 'market', 'battle', 'dinodex'];
 
 function switchTab(tab) {
   /* RESOLVE BEFORE TEARING DOWN — the order here is the whole fix.
@@ -4552,6 +4650,7 @@ function switchTab(tab) {
   if (tab === 'collection') renderCollection();
   if (tab === 'expeditions') renderExpeditions();
   if (tab === 'market') renderMarketplace();
+  if (tab === 'battle') renderBattle();
   if (tab === 'dinodex') renderDinodex();
 
   // Marketplace is shared/live — a listing another player just bought
@@ -6052,6 +6151,253 @@ async function marketPost(payload) {
 function marketError(data, fallback) {
   if (data && data.error === 'stale') return 'Your park just changed. Try again.';
   return (data && data.error) || fallback;
+}
+
+/* ======================== BATTLE TAB ========================
+   A thin renderer over a server-authoritative engine. The client sends only
+   the chosen move id; the server (functions/api/dino-battle) computes every
+   number and owns the battle state and the rewards. So this holds no combat
+   maths — it draws what the server returns, and the rewards (coins, battle XP)
+   arrive the same way marketplace earnings do: as marketOps the next cloud
+   sync reconciles, never as a number the client adds to itself. */
+const BATTLE_URL = '/api/dino-battle';
+let battleData = null;        // last GET payload (energy, opponents, dinos)
+let battleSelectedUid = null; // which of your dinos is picked to send in
+let battleView = null;        // the active battle's public view, or null
+let battleBusy = false;
+
+function battleEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+async function renderBattle() {
+  const el = document.getElementById('battleContent');
+  if (!el) return;
+  const session = getPlayerSession();
+  if (!session) {
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    el.innerHTML = `
+      <div class="market-login">
+        <div style="font-size:15px;margin-bottom:6px;">⚔️ The Battle Pits</div>
+        <div class="battle-hint">Log in with Twitch to send your dinos into battle — your roster and battle levels follow your account.</div>
+        <a href="/api/auth/twitch?return_to=${returnTo}" target="_top" class="market-login-btn">Login with Twitch</a>
+      </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="battle-hint" style="text-align:center;padding:30px;">Loading the pits…</div>`;
+  try {
+    const res = await fetch(BATTLE_URL);
+    if (!res.ok) { el.innerHTML = `<div class="battle-hint" style="text-align:center;padding:30px;">The pits are closed right now. Try again shortly.</div>`; return; }
+    battleData = await res.json();
+  } catch { el.innerHTML = `<div class="battle-hint" style="text-align:center;padding:30px;">Could not reach the pits.</div>`; return; }
+
+  battleView = battleData.active || null;
+  if (battleView) renderBattleArena();
+  else renderBattleLobby();
+}
+
+function energyPips(energy) {
+  const max = (energy && energy.max) || 5, count = (energy && energy.count) || 0;
+  let pips = '';
+  for (let i = 0; i < max; i++) pips += `<span class="battle-pip${i < count ? '' : ' spent'}"></span>`;
+  return `<div class="battle-energy"><span class="battle-energy-label">Energy</span>${pips}</div>`;
+}
+
+function statLine(s) { return `HP ${s.hp} · ATK ${s.atk} · DEF ${s.def} · SPD ${s.spd}`; }
+
+function renderBattleLobby() {
+  const el = document.getElementById('battleContent');
+  const d = battleData || {};
+  const energy = d.energy || { count: 0, max: 5 };
+  const dinos = Array.isArray(d.dinos) ? d.dinos : [];
+  const opps = Array.isArray(d.opponents) ? d.opponents : [];
+
+  if (battleSelectedUid && !dinos.some(x => x.uid === battleSelectedUid)) battleSelectedUid = null;
+
+  const dinoCards = dinos.length ? dinos.map(x => `
+    <div class="battle-dino-card${x.uid === battleSelectedUid ? ' selected' : ''}" onclick="selectBattleDino('${battleEsc(x.uid)}')">
+      <div class="bd-sprite">${spriteImg(x.speciesId, 44, 'sprite-img', x.mutation)}</div>
+      <div class="bd-name" style="color:${RARITY_COLORS[x.rarity] || 'var(--text-pri)'}">${battleEsc(x.name)}</div>
+      <div class="bd-lv">Battle Lv ${x.battleLevel}</div>
+      <div class="bd-arch">${battleEsc(x.stats.archetype)}</div>
+    </div>`).join('') : `<div class="battle-hint">No dinos ready to fight — hatch one, or bring a dino back from an expedition first.</div>`;
+
+  const canFight = energy.count > 0 && !!battleSelectedUid;
+  const oppCards = opps.map(o => {
+    const boss = o.kind === 'boss';
+    return `
+    <div class="battle-opp-card${boss ? ' boss' : ''}">
+      <div class="battle-opp-sprite">${spriteImg(o.speciesId, 52, 'sprite-img', o.mutation)}</div>
+      <div class="battle-opp-info">
+        <div class="battle-opp-name" style="color:${RARITY_COLORS[o.rarity] || 'var(--text-pri)'}">${battleEsc(o.name)}${boss ? ' 👑' : ''}</div>
+        <div class="battle-opp-tier">${boss ? 'Boss' : 'Tier ' + o.tier} · Lv ${o.level} · ${battleEsc(o.stats.archetype)}</div>
+        <div class="battle-opp-stats">${statLine(o.stats)}</div>
+      </div>
+      <button class="battle-btn" ${canFight ? '' : 'disabled'} onclick="startBattle('${battleEsc(o.id)}')">${boss ? 'Challenge' : 'Fight'}</button>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="battle-wrap">
+      <div class="battle-head">
+        <div class="battle-section-title" style="margin:0;">The Battle Pits</div>
+        ${energyPips(energy)}
+      </div>
+      <div class="battle-hint">${energy.count > 0 ? 'Pick a dino, then a challenger. Each fight spends one energy; the pool refills daily.' : 'Out of energy — the pool refills tomorrow. Come back then.'}</div>
+      <div class="battle-section-title">Your Fighter ${battleSelectedUid ? '' : '— pick one'}</div>
+      <div class="battle-dino-row">${dinoCards}</div>
+      <div class="battle-section-title">Today's Challengers</div>
+      <div class="battle-opp-list">${oppCards}</div>
+    </div>`;
+}
+
+function selectBattleDino(uid) {
+  battleSelectedUid = (battleSelectedUid === uid) ? null : uid;
+  renderBattleLobby();
+}
+
+async function startBattle(opponentId) {
+  if (battleBusy || !battleSelectedUid) return;
+  battleBusy = true;
+  try {
+    const res = await fetch(BATTLE_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start', uid: battleSelectedUid, opponentId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.error || 'Could not start the battle.'); if (data.energy && battleData) { battleData.energy = data.energy; renderBattleLobby(); } return; }
+    battleView = data.battle;
+    if (battleData && data.energy) battleData.energy = data.energy;
+    renderBattleArena();
+  } catch { showToast('Could not reach the pits.'); }
+  finally { battleBusy = false; }
+}
+
+function statusChips(c) {
+  const chips = [];
+  if (c.stun > 0) chips.push('Stunned');
+  if (c.bleedTurns > 0) chips.push('Bleeding');
+  if (c.atkMult > 1) chips.push('Enraged');
+  if (c.atkMult < 1) chips.push('Weakened');
+  if (c.defMult > 1) chips.push('Guarded');
+  if (c.spdMult > 1) chips.push('Hastened');
+  return chips.map(x => `<span class="battle-status-chip">${x}</span>`).join('') || '<span></span>';
+}
+
+function sideHtml(c, cls) {
+  const pct = Math.max(0, Math.round((c.hp / c.maxHp) * 100));
+  return `
+    <div class="battle-side ${cls}">
+      <div class="battle-side-sprite">${spriteImg(c.speciesId, 70, 'sprite-img', c.mutation)}</div>
+      <div class="battle-side-name" style="color:${RARITY_COLORS[c.rarity] || 'var(--text-pri)'}">${battleEsc(c.name)}</div>
+      <div class="battle-side-lv">Lv ${c.level} · ${battleEsc(c.archetype)}</div>
+      <div class="battle-hpbar"><div class="battle-hpfill" style="width:${pct}%"></div></div>
+      <div class="battle-hptext">${c.hp} / ${c.maxHp}</div>
+      <div class="battle-statuses">${statusChips(c)}</div>
+    </div>`;
+}
+
+function battleLogHtml(view) {
+  const lines = [];
+  for (const e of (view.log || [])) {
+    if (e.t === 'hit') lines.push(`${battleEsc(e.by)} used ${battleEsc(e.move)} — ${e.dmg} dmg${e.guarded ? ' (guarded)' : ''}.`);
+    else if (e.t === 'miss') lines.push(`${battleEsc(e.by)} used ${battleEsc(e.move)} — missed!`);
+    else if (e.t === 'defend') lines.push(`${battleEsc(e.who)} used ${battleEsc(e.move)}${e.heal ? ` — healed ${e.heal}` : ''}.`);
+    else if (e.t === 'heal') lines.push(`${battleEsc(e.who)} recovered ${e.amount} HP.`);
+    else if (e.t === 'bleed') lines.push(`${battleEsc(e.who)} bleeds for ${e.dmg}.`);
+    else if (e.t === 'status') lines.push(`${battleEsc(e.who)} is ${battleEsc(e.status)}.`);
+    else if (e.t === 'stunned') lines.push(`${battleEsc(e.who)} is stunned and cannot move!`);
+  }
+  return lines.slice(-24).map(l => `<div class="battle-log-line">${l}</div>`).join('') || '<div class="battle-log-line">The battle begins!</div>';
+}
+
+function renderBattleArena() {
+  const el = document.getElementById('battleContent');
+  const v = battleView;
+  if (!v) { renderBattleLobby(); return; }
+
+  const moves = (v.moves || []).map(m => {
+    const disabled = m.cool > 0;
+    const meta = m.kind === 'attack' ? `PWR ${m.power} · ${Math.round(m.acc * 100)}%${m.effect ? ' · ' + m.effect : ''}` : (m.effect || m.kind);
+    const cd = m.cool > 0 ? ` (${m.cool})` : (m.cd ? ` · CD ${m.cd}` : '');
+    return `<button class="battle-move-btn${m.signature ? ' sig' : ''}" ${disabled ? 'disabled' : ''} onclick="doBattleMove('${battleEsc(m.id)}')">
+      <div class="battle-move-name">${battleEsc(m.name)}${m.signature ? ' ★' : ''}</div>
+      <div class="battle-move-meta">${battleEsc(meta)}${battleEsc(cd)}</div>
+    </button>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="battle-wrap">
+      <div class="battle-arena">
+        ${sideHtml(v.you, 'you')}
+        <div class="battle-vs">VS</div>
+        ${sideHtml(v.foe, 'foe')}
+      </div>
+      <div class="battle-moves">${moves}</div>
+      <div class="battle-log" id="battleLog">${battleLogHtml(v)}</div>
+      <div class="battle-actions">
+        <button class="battle-btn ghost" onclick="forfeitBattle()">Forfeit</button>
+      </div>
+    </div>`;
+  const log = document.getElementById('battleLog');
+  if (log) log.scrollTop = log.scrollHeight;
+}
+
+async function doBattleMove(moveId) {
+  if (battleBusy) return;
+  battleBusy = true;
+  try {
+    const res = await fetch(BATTLE_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'move', moveId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.error || 'That move could not be made.'); return; }
+    battleView = data.battle;
+    if (data.ended) { await finishBattle(data.result); }
+    else renderBattleArena();
+  } catch { showToast('Could not reach the pits.'); }
+  finally { battleBusy = false; }
+}
+
+async function forfeitBattle() {
+  if (battleBusy) return;
+  battleBusy = true;
+  try {
+    const res = await fetch(BATTLE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'forfeit' }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.error || 'Could not forfeit.'); return; }
+    battleView = data.battle;
+    await finishBattle(data.result || { win: false, coins: 0, xp: 0 });
+  } catch { showToast('Could not reach the pits.'); }
+  finally { battleBusy = false; }
+}
+
+/* The win's coins and battle XP were settled into the cloud save server-side
+   (grantSeq bumped), so a forced sync is what pulls them down as marketOps the
+   client reconciles — never a number added here. */
+async function finishBattle(result) {
+  const r = result || { win: false, coins: 0, xp: 0 };
+  try { await doServerSave(); } catch {}
+  updateTopBar();
+  const el = document.getElementById('battleContent');
+  const rewardBits = [];
+  if (r.coins > 0) rewardBits.push(`+${r.coins} coins`);
+  if (r.xp > 0) rewardBits.push(`+${r.xp} battle XP`);
+  if (r.leveledTo) rewardBits.push(`battle level ${r.leveledTo}!`);
+  if (r.eggGranted) rewardBits.push(`a ${battleEsc(r.eggRarity)} egg! 🥚`);
+  el.innerHTML = `
+    <div class="battle-wrap">
+      <div class="battle-result ${r.win ? 'win' : 'loss'}">
+        <div class="battle-result-title">${r.win ? 'Victory!' : 'Defeated'}</div>
+        <div class="battle-result-rewards">${rewardBits.length ? rewardBits.join(' · ') : (r.win ? 'Well fought.' : 'Your dino lives to fight another day.')}</div>
+      </div>
+      <div class="battle-log" id="battleLog">${battleView ? battleLogHtml(battleView) : ''}</div>
+      <div class="battle-actions">
+        <button class="battle-btn" onclick="renderBattle()">Back to the Pits</button>
+      </div>
+    </div>`;
+  const log = document.getElementById('battleLog');
+  if (log) log.scrollTop = log.scrollHeight;
+  battleView = null;
 }
 
 /* ======================== MARKETPLACE TAB ======================== */
