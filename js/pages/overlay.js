@@ -1364,19 +1364,14 @@
      children each update (never appended), and clearPrediction empties it so no
      removed node is retained. The panel reaches display:none via its
      .ov-prediction[hidden] guard in overlay.css. */
-  var PRED_REVEAL_MS = 8000;    // how long the resolved winner stays before hiding
-  var PRED_CANCEL_MS = 3500;    // brief "canceled" note, then hide
-  /* SAFETY CAPS. The panel normally hides on 'end', but an 'end' can fail to
-     arrive — a revoked EventSub subscription, the overlay reloading after it
-     fired, a lost webhook. A panel that never hides also blocks the idle
-     self-reload for the rest of the stream. So every shown state carries its
-     own hide timer (in predTimers, so the next state replaces it):
-       • ACTIVE hides at the prediction's own lock time + a grace (Twitch's
-         window is at most 30 min, so no lock time means 30 min + grace);
-       • LOCKED hides 30 min after the lock. */
+  /* SAFETY CAP. The panel is shown only while the predict window is open and
+     clears the instant it locks (the lock event, or the countdown reaching the
+     lock time). But a lock event can fail to arrive — a revoked EventSub
+     subscription, the overlay reloading, a lost webhook — and a panel that
+     never hides blocks the idle self-reload. So ACTIVE also carries a fallback
+     hide timer at the lock time, capped at Twitch's 30-minute max window for a
+     prediction that somehow carries no lock time. */
   var PRED_WINDOW_MAX_MS = 30 * 60 * 1000;
-  var PRED_LOCK_GRACE_MS = 5 * 60 * 1000;
-  var PRED_LOCKED_MAX_MS = 30 * 60 * 1000;
   var predTimers = [];
   function clearPredTimers() {
     predTimers.forEach(clearInterval);
@@ -1457,39 +1452,10 @@
        sends it `quiet`): close whatever is up, show no reveal. */
     if (ev.quiet) { clearPrediction(); return; }
 
-    if (state === 'end') {
-      var status = String(ev.status || '').toUpperCase();
-      if (status === 'CANCELED') {
-        panel.dataset.state = 'canceled';
-        if (labelEl) labelEl.textContent = 'Canceled';
-        if (timerEl) timerEl.textContent = '';
-        renderPredOutcomes(ev, null);
-        panel.hidden = false;
-        predTimers.push(setTimeout(clearPrediction, PRED_CANCEL_MS));
-      } else {
-        panel.dataset.state = 'resolved';
-        if (labelEl) labelEl.textContent = 'Winner';
-        if (timerEl) timerEl.textContent = '';
-        renderPredOutcomes(ev, ev.winningOutcomeId);
-        panel.hidden = false;
-        predTimers.push(setTimeout(clearPrediction, PRED_REVEAL_MS));
-      }
-      return;
-    }
-
-    if (state === 'lock') {
-      panel.dataset.state = 'locked';
-      if (labelEl) labelEl.textContent = 'Locked';
-      if (timerEl) timerEl.textContent = 'LOCKED';
-      renderPredOutcomes(ev, null);
-      panel.hidden = false;
-      /* No countdown, nothing ticking — only the one safety hide timer,
-         measured from the lock (server clock) and never longer than the cap. */
-      var lockedAt = ev.locksAt ? Date.parse(ev.locksAt) : NaN;
-      var lockedLeft = isFinite(lockedAt) ? lockedAt + PRED_LOCKED_MAX_MS - serverTime() : PRED_LOCKED_MAX_MS;
-      predTimers.push(setTimeout(clearPrediction, Math.max(0, Math.min(PRED_LOCKED_MAX_MS, lockedLeft))));
-      return;
-    }
+    /* The panel lives ONLY for the predict window. The moment Twitch locks the
+       prediction (the time to predict has elapsed) — or it ends/cancels — clear
+       it: no locked state, no result reveal on the overlay. */
+    if (state === 'lock' || state === 'end') { clearPrediction(); return; }
 
     /* begin / progress → ACTIVE */
     panel.dataset.state = 'active';
@@ -1499,9 +1465,11 @@
 
     var locksAt = ev.locksAt ? Date.parse(ev.locksAt) : 0;
     var hasLock = !!locksAt && !Number.isNaN(locksAt);
-    var activeLeft = hasLock ? locksAt - serverTime() + PRED_LOCK_GRACE_MS : PRED_WINDOW_MAX_MS + PRED_LOCK_GRACE_MS;
+    /* Clear exactly when the predict window elapses. The lock event normally
+       does it; this is the fallback if that event is missed. */
+    var activeLeft = hasLock ? locksAt - serverTime() : PRED_WINDOW_MAX_MS;
     predTimers.push(setTimeout(clearPrediction,
-      Math.max(0, Math.min(PRED_WINDOW_MAX_MS + PRED_LOCK_GRACE_MS, activeLeft))));
+      Math.max(0, Math.min(PRED_WINDOW_MAX_MS, activeLeft))));
 
     if (!timerEl) return;
     if (!hasLock) { timerEl.textContent = ''; return; }
@@ -1512,7 +1480,7 @@
          lock time is Twitch's, and the streaming PC's clock may be off. */
       if (panel.hidden) { clearInterval(iv); return; }
       var ms = locksAt - serverTime();
-      if (ms <= 0) { timerEl.textContent = 'Locking…'; clearInterval(iv); return; }
+      if (ms <= 0) { clearPrediction(); return; }   // window elapsed → gone
       var secs = Math.ceil(ms / 1000);
       var mins = Math.floor(secs / 60);
       timerEl.textContent = mins + ':' + String(secs % 60).padStart(2, '0');

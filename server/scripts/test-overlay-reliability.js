@@ -293,48 +293,45 @@ const mk = (ov, seq, type, extra = {}, ageMs = 1000) => ({ seq, type, at: ov.ser
   ok('the oldest cheers are the ones kept (newest dropped)', shown.some(s => /c0 cheered/.test(s)) && !shown.some(s => /c39 cheered/.test(s)));
 }
 
-/* ── PREDICTION PANEL CANNOT STICK ────────────────────────────────────── */
-/* The prediction panel is now driven by the overlay_state SNAPSHOT (overlay
-   #3), not the alert queue — so a reloaded source rehydrates it. The snapshot
-   rides the same poll reply; a prediction slice carries the `ver` it was written
-   at, and the overlay applies it when that ver changes. The stuck-panel safety
-   caps (lock/active hide timers) are unchanged — they fire from showPrediction
-   however the panel was shown. */
+/* ── PREDICTION PANEL: SHOWS ONLY FOR THE PREDICT WINDOW ──────────────── */
+/* The panel is driven by the overlay_state SNAPSHOT (overlay #3) and shows
+   ONLY while the predict window is open. It clears the instant the prediction
+   LOCKS (the window has elapsed) or ends — no locked state, no winner reveal —
+   so it can never stick and block the idle self-reload. An ACTIVE panel also
+   carries a fallback hide timer at its own (server-clock) lock time, in case
+   the lock event never arrives. */
 const OUT = [{ id: 'o1', title: 'Yes', points: 10, users: 1 }, { id: 'o2', title: 'No', points: 5, users: 1 }];
 const predState = (ver, prediction) => ({ ver, prediction: { ver, ...prediction } });
 {
   const ov = boot({ stored: '1' });
   const lockedAt = new Date(ov.serverNow()).toISOString();
   await ov.reply({ events: [], latestSeq: 2, overlayState: predState(1, { state: 'lock', title: 'T', outcomes: OUT, locksAt: lockedAt }) });
-  check('a lock shows the panel', ov.els.ovPrediction.hidden, false);
-  await ov.advance(29 * 60 * 1000);
-  check('still up at 29 minutes', ov.els.ovPrediction.hidden, false);
-  await ov.advance(2 * 60 * 1000);
-  check('hidden by 30 minutes with no end', ov.els.ovPrediction.hidden, true);
+  check('a lock clears the panel at once — the predict window has elapsed', ov.els.ovPrediction.hidden, true);
   check('and its list emptied', ov.els.ovPredOutcomes.children.length, 0);
 }
 {
-  /* ACTIVE with a lock time, PC clock 10 minutes slow: the cap follows the
-     prediction's own (server-clock) window, not the PC's. */
+  /* ACTIVE with a lock time, PC clock 10 minutes slow: it clears at the
+     prediction's own (server-clock) lock time, not the PC's. */
   const ov = boot({ stored: '1', skewMs: -10 * 60 * 1000 });
   const locksAt = new Date(ov.serverNow() + 2 * 60 * 1000).toISOString();
   await ov.reply({ events: [], latestSeq: 2, overlayState: predState(1, { state: 'begin', title: 'T', outcomes: OUT, locksAt }) });
   check('a begin shows the panel', ov.els.ovPrediction.hidden, false);
   ok('its countdown reads the server clock (~2:00, not 12:00)', /^[12]:\d\d$/.test(ov.els.ovPredTimer.textContent));
-  await ov.advance(6 * 60 * 1000);
-  check('still up before lock + grace (7 min)', ov.els.ovPrediction.hidden, false);
-  await ov.advance(90 * 1000);
-  check('an active panel whose lock never came hides at lock + grace', ov.els.ovPrediction.hidden, true);
+  await ov.advance(110 * 1000);
+  check('still up while the window is open', ov.els.ovPrediction.hidden, false);
+  await ov.advance(20 * 1000);
+  check('clears when the predict window elapses (lock event or not)', ov.els.ovPrediction.hidden, true);
 }
 {
-  /* The teardown for a switched-off prediction alert closes the panel without
-     a reveal. The snapshot carries the quiet end on a later ver. */
+  /* An end never shows a reveal — a lock has usually cleared it already, and
+     the end just keeps it hidden. */
   const ov = boot({ stored: '1' });
   await ov.reply({ events: [], latestSeq: 2, overlayState: predState(1, { state: 'lock', title: 'T', outcomes: OUT, locksAt: new Date(ov.serverNow()).toISOString() }) });
+  check('the lock already cleared it', ov.els.ovPrediction.hidden, true);
   await ov.advance(1000);
-  while (ov.requests.length) await ov.reply({ events: [], latestSeq: 3, overlayState: predState(2, { state: 'end', status: 'RESOLVED', quiet: true, title: 'T', outcomes: OUT, winningOutcomeId: 'o1' }) });
-  check('a quiet end hides the panel immediately', ov.els.ovPrediction.hidden, true);
-  check('with no winner reveal', ov.els.ovPrediction.dataset.state, 'locked');
+  while (ov.requests.length) await ov.reply({ events: [], latestSeq: 3, overlayState: predState(2, { state: 'end', status: 'RESOLVED', title: 'T', outcomes: OUT, winningOutcomeId: 'o1' }) });
+  check('a resolved end keeps it hidden', ov.els.ovPrediction.hidden, true);
+  ok('and never entered a winner-reveal state', ov.els.ovPrediction.dataset.state !== 'resolved');
 }
 {
   /* REHYDRATE WITHOUT REPLAYING. A source opening onto an already-resolved
