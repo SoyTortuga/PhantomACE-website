@@ -413,6 +413,63 @@ const T0 = Date.parse('2026-09-19T12:00:00Z');
   ok('the state library is not published as a route', /'api\/ads\/state\.js'/.test(router));
 }
 
+/* ══ The overlay alerts: the ring (during) and the warning (before) ═══════ */
+{
+  const read = (rel) => fs.readFileSync(path.join(REPO, rel), 'utf8');
+  const html = read('overlay.html');
+  const css = read('css/pages/overlay.css');
+  const ov = read('js/pages/overlay.js');
+  const samples = read('js/pages/overlay-samples.js');
+
+  /* The lead is the warning's "fire 2 minutes before" decision — pin it. */
+  check('the warning lead is 2 minutes', WARNING_LEAD_MS, 2 * 60_000);
+
+  /* DURING ring: phamDrum inside a depleting SVG ring, driven by the snapshot. */
+  ok('the ring panel holds the ring + phamDrum',
+    /id="ovAdBreak"[\s\S]*?ovAdBreakRing[\s\S]*?emotes\/phamDrum\.png/.test(html));
+  ok('applyAdBreak drains the ring by stroke-dashoffset',
+    /strokeDashoffset/.test(ov) && /AD_RING_C/.test(ov));
+
+  /* WARNING card: heading + phamPepeHands (distinct from the ring's phamDrum)
+     + sub, bottom-right, self-clearing. */
+  ok('the warning panel exists with its three parts',
+    /id="ovAdWarning"[\s\S]*?Ads Incoming![\s\S]*?emotes\/phamPepeHands\.png[\s\S]*?Subscribe to not miss the action!/.test(html));
+  ok('the warning uses a DIFFERENT emote than the ring',
+    /ovAdWarning[\s\S]*?phamPepeHands/.test(html) && /ovAdBreak[\s\S]*?phamDrum/.test(html));
+  ok('the static warning emote is shaken (transform animation, runs only while shown)',
+    /ov-adwarn-shake/.test(css) && /@keyframes ov-adwarn-shake[\s\S]*?transform:\s*rotate/.test(css));
+  ok('the warning has its [hidden] display:none guard',
+    /\.ov-adwarning\[hidden\]\s*\{\s*display:\s*none/.test(css));
+  ok('the heading uses GodOfWar, the sub uses the body face (readability)',
+    /\.ov-adwarning-title[\s\S]*?font-family:\s*'GodOfWar'/.test(css)
+    && /\.ov-adwarning-sub[\s\S]*?font-family:\s*var\(--font-ui\)/.test(css));
+  ok('legibility over capture is text-shadow, never box-shadow',
+    /\.ov-adwarning-title[\s\S]*?text-shadow:/.test(css));
+
+  /* Marathon-safety + behaviour of the warning driver. It rides the normal
+     events poll (no second fetch), so the overlay test harness that counts
+     polls stays honest. */
+  ok('the warning rides the events poll, not a second fetch',
+    /applyAdWarning\(data\.adView\)/.test(ov) && !/fetch\('\/api\/ad-break'/.test(ov));
+  ok('the server attaches adView to the poll response',
+    /adView,/.test(read('functions/api/overlay/events.js')));
+  ok('it fires once per scheduled break', /lastWarnedNextAdAt/.test(ov) && /v\.nextAdAt !== lastWarnedNextAdAt/.test(ov));
+  ok('it clears itself after 30s', /setTimeout\(hideAdWarning, 30000\)/.test(ov));
+  ok('and never shows while a break is running', /if \(v\.running\)/.test(ov));
+  ok('the warning panel is in the idle list, so it can never wedge the overlay',
+    /IDLE_PANEL_IDS = \[[^\]]*'ovAdWarning'/.test(ov));
+  ok('and the layout route knows the panel', /'ovAdWarning'/.test(read('functions/api/overlay/layout.js')));
+
+  /* No glassmorphism in the ad styles — check the DECLARATION, not the word
+     (the comments legitimately say "not a box-shadow"). */
+  const adCss = css.slice(css.indexOf('.ov-adbreak['), css.indexOf('@keyframes ov-adwarn-in') + 1);
+  check('no backdrop-filter declared in the ad styles', /backdrop-filter\s*:/.test(adCss), false);
+  check('no box-shadow declared in the ad styles', /box-shadow\s*:/.test(adCss), false);
+
+  /* Both are previewable/positionable in the layout editor. */
+  ok('the warning is registered as a sample', /id: 'ovAdWarning'/.test(samples));
+}
+
 /* ── Report ──────────────────────────────────────────────────────────── */
 console.log('');
 if (failures.length) {

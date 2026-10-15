@@ -418,9 +418,22 @@ export async function onRequestGet(context) {
     ? []
     : events.filter(e => e.seq > since);
 
+  /* The ad schedule view, carried on the normal poll so the overlay's "Ads
+     Incoming!" warning needs no second fetch. Best-effort: refreshSchedule is
+     rate-limited (SCHEDULE_TTL_MS) and only runs while an overlay is polling,
+     which is the only time a warning matters. A failure must not break the
+     poll, so it falls back to the cached state, then to null. */
+  let adView = null;
+  try {
+    const { readAdState, refreshSchedule, viewOf } = await import('../ads/state.js');
+    const adState = await refreshSchedule(env).catch(() => readAdState(env));
+    adView = viewOf(adState, Date.now());
+  } catch { /* ad view is optional; leave it null */ }
+
   return new Response(JSON.stringify({
     events: fresh,
     latestSeq,
+    adView,
     /* Sent on every poll, including the first. The page stores what it saw
        on load and reloads only when this differs — so pressing the button
        once reloads every open overlay exactly once, and a page opened

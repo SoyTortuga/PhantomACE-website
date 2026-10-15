@@ -1559,6 +1559,7 @@
      there is no ad_break.end event to clear it. Marathon-safe: one interval,
      bailed the instant the panel is hidden or the time is up. */
   var adTimer = null;
+  var AD_RING_C = 289.03;   // 2*PI*r with r=46, matching the circle in overlay.html
   function clearAdTimer() { if (adTimer) { clearInterval(adTimer); adTimer = null; } }
   function applyAdBreak(a) {
     var panel = document.getElementById('ovAdBreak');
@@ -1566,17 +1567,50 @@
     clearAdTimer();
     var endsAt = a && Number(a.endsAt);
     if (!endsAt || serverTime() >= endsAt) { panel.hidden = true; return; }
-    var timerEl = document.getElementById('ovAdBreakTimer');
+    var ring = document.getElementById('ovAdBreakRing');
+    /* The full span to drain over: the event's own duration, falling back to
+       end-minus-start, never zero (guards a divide). */
+    var totalMs = (Number(a.durationSeconds) > 0 ? Number(a.durationSeconds) * 1000 : 0)
+      || (endsAt - (Number(a.startedAt) || endsAt)) || 1;
     function tick() {
       if (panel.hidden) { clearAdTimer(); return; }           // nothing runs while hidden
       var ms = endsAt - serverTime();
       if (ms <= 0) { panel.hidden = true; clearAdTimer(); return; }
-      var secs = Math.ceil(ms / 1000);
-      if (timerEl) timerEl.textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+      var frac = Math.max(0, Math.min(1, ms / totalMs));      // 1 = full ring, 0 = empty
+      if (ring) ring.style.strokeDashoffset = (AD_RING_C * (1 - frac)).toFixed(1);
     }
     panel.hidden = false;
     tick();
     adTimer = setInterval(tick, 1000);
+  }
+
+  /* AD WARNING — the ~2-minute "Ads Incoming!" heads-up. Twitch has no
+     "ad approaching" event, so this is polled (the server's schedule view),
+     at the overlay's slow idle cadence. It fires ONCE per scheduled break and
+     clears itself after 30s; the running ring owns the break itself, so the
+     warning never shows while a break is live. Marathon-safe: one timeout,
+     cleared on hide; the panel reaches display:none via its [hidden] guard. */
+  var adWarnHideTimer = null;
+  var lastWarnedNextAdAt = 0;
+  function hideAdWarning() {
+    var p = document.getElementById('ovAdWarning');
+    if (p) p.hidden = true;
+    if (adWarnHideTimer) { clearTimeout(adWarnHideTimer); adWarnHideTimer = null; }
+  }
+  /* Driven by the `adView` the normal poll already carries (no extra fetch) —
+     the server attaches the ad schedule view to every events response. */
+  function applyAdWarning(v) {
+    if (!v) return;
+    /* During a break the ring takes over; reset so the NEXT break warns. */
+    if (v.running) { lastWarnedNextAdAt = 0; return; }
+    if (v.warning && v.nextAdAt && v.nextAdAt !== lastWarnedNextAdAt) {
+      lastWarnedNextAdAt = v.nextAdAt;                  // once per scheduled break
+      var p = document.getElementById('ovAdWarning');
+      if (!p) return;
+      p.hidden = false;
+      if (adWarnHideTimer) clearTimeout(adWarnHideTimer);
+      adWarnHideTimer = setTimeout(hideAdWarning, 30000);   // 30s flash
+    }
   }
 
   function applyOverlayState(st) {
@@ -1989,6 +2023,7 @@
            source rehydrates its prediction/hype/ad panels immediately, without
            replaying (see applyOverlayState). */
         applyOverlayState(data.overlayState);
+        applyAdWarning(data.adView);
 
         /* WHAT'S ON STREAM. Publish the one pointer to the game panels every
            poll, including the first-run path that returns just below — so a
@@ -2083,7 +2118,7 @@
   if (Number.isFinite(reloadHoursParam)) RELOAD_AFTER_MS = reloadHoursParam * 3600000;
   var RELOAD_CHECK_MS = 60000;
   var loadedAt = Date.now();
-  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovEggVideo', 'ovPrediction', 'ovHype', 'ovAdBreak'];
+  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovEggVideo', 'ovPrediction', 'ovHype', 'ovAdBreak', 'ovAdWarning'];
 
   /* A panel is down if its poller hid it OR a layout preset switched it off
      (overlay-apply-layout.js forces style.display = 'none' and leaves the

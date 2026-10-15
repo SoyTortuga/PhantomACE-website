@@ -33,7 +33,7 @@ const PANEL_IDS = [
   'ovMc', 'ovCheckin', 'ovPrediction',
   /* Twitch-driven, so they arrive mid-anything and are the likeliest to
      collide with another panel. */
-  'ovHype', 'ovAdBreak',
+  'ovHype', 'ovAdBreak', 'ovAdWarning',
   // stream night modes
   'ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket',
   'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat',

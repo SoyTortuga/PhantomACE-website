@@ -37,10 +37,11 @@ const KEY = 'ad_state';
    minutes to spare. The countdown's accuracy does not depend on it. */
 export const SCHEDULE_TTL_MS = 60_000;
 
-/* How early the warning is considered live. Matches what viewers are used
-   to seeing elsewhere, and is a read-time comparison rather than anything
+/* How early the warning is considered live. The overlay fires the "Ads
+   Incoming!" card when a break first falls inside this window, so it is the
+   warning's lead time: 2 minutes. A read-time comparison, not anything
    scheduled, so changing it needs no migration. */
-export const WARNING_LEAD_MS = 5 * 60_000;
+export const WARNING_LEAD_MS = 2 * 60_000;
 
 /* A break Twitch never closed out. Ad breaks run to 180s at the very most,
    so anything still "running" long past its own endsAt plus this margin is

@@ -93,6 +93,11 @@
       'Counts from the break\u2019s end time, then hides itself',
       'Needs channel:read:ads — inert until the broadcaster grants it',
     ] },
+    { id: 'ovAdWarning', label: 'Ads Incoming', holds: [
+      'A ~2-minute heads-up before an ad break starts',
+      'Fires once, then clears itself after 30 seconds',
+      'Same corner as the Ad Break ring — they never show at once',
+    ] },
     /* ── Stream night modes ──────────────────────────────────────────────
        Each of these is a standing panel that shows while its event runs and
        clears when it ends. They shipped positioned by their own CSS default
@@ -362,8 +367,12 @@
 
   function adBreak() {
     show('ovAdBreak');
-    set('ovAdBreakTimer', '1:30');
+    /* Ring-only now: show it part-drained so the sample reads as a timer. */
+    var ring = $('ovAdBreakRing');
+    if (ring) ring.style.strokeDashoffset = (289.03 * 0.45).toFixed(1);
   }
+
+  function adWarning() { show('ovAdWarning'); }
 
   function prediction() {
     show('ovPrediction');
@@ -573,7 +582,7 @@
 
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
-    checkin(); hatch(); prediction(); hype(); adBreak();
+    checkin(); hatch(); prediction(); hype(); adBreak(); adWarning();
     tithe(); vsc(); wind(); safari(); bracket();
     mtgGuess(); r6Draft(); chatVote(); bingoChat(); memChat();
   }
