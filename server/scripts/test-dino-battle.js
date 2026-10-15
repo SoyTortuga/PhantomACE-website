@@ -5,10 +5,11 @@
      node server/scripts/test-dino-battle.js
 
    What these guard:
-     • stats DERIVED from rarity × archetype × battle level × mutation, never
+     • stats DERIVED from rarity × archetype × level × mutation, never
        hand-authored, with the role orderings that make an archetype mean
-       something;
-     • the battle-level curve and its inverse agreeing (an off-by-one here is
+       something — where the level IS the dino's care level (the shared xp
+       pool), capped for stats at 30 but displayed uncapped;
+     • the care-level curve and its inverse agreeing (an off-by-one here is
        an XP bar that fills against a boundary the level never crosses);
      • every species mapped to a known archetype, every archetype's moveset
        valid, the marquee signatures present;
@@ -20,12 +21,13 @@
      • the PvP-ready SEAM: the engine resolves ANY two teams with ANY pickers,
        with no coupling to PvE's energy/opponents/egg concepts;
      • ENERGY gating — can't battle at zero, regenerates on the Pacific day;
-     • REWARDS scaled to difficulty, a loss paying only training XP, a boss
-       egg rolled off the battle's own RNG;
+     • REWARDS scaled to difficulty, paid as CARE xp into the dino's shared
+       pool (a win levels it exactly as caring does), a loss paying only
+       training XP, a boss egg rolled off the battle's own RNG;
      • SERVER AUTHORITY — a forged "I won / here are 99999 coins" body is
        ignored, an illegal move refused, a settled battle not settleable twice;
-     • the save settlement riding grantSeq + a 'bxp' op so a stale client
-       cannot clobber a payout;
+     • the save settlement riding grantSeq + a 'carexp' op (into xp) so a stale
+       client cannot clobber a payout;
      • the wiring (registry keys, router library decl, the game's battle tab).
    ══════════════════════════════════════════════ */
 
@@ -39,7 +41,7 @@ import {
 import { grantEgg } from '../../functions/api/dino-park.js';
 import {
   ARCHETYPES, MOVES, SIGNATURES, SPECIES_ARCHETYPE,
-  deriveStats, battleLevelFromXp, xpForBattleLevel, battleXpProgress,
+  deriveStats, careLevelFromXp, xpForCareLevel, careXpProgress, CARE_XP_PER_LEVEL,
   archetypeFor, movesetFor, createBattle, stepTurn, resolveToEnd, computeRewards,
   publicView, PICKERS, makeCombatant, activeOf, legalMoves, BOSS_EGG_CHANCE,
 } from '../../functions/api/dino-battle/engine.js';
@@ -93,11 +95,33 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
   const mut = deriveStats({ speciesId: 'trex', rarity: 'epic', level: 5, mutation: 'golden' });
   ok('a mutation raises every stat', mut.hp > plain.hp && mut.atk > plain.atk && mut.def > plain.def && mut.spd > plain.spd);
 
-  /* Battle level grows stats. */
-  const lv1 = deriveStats({ speciesId: 'trex', rarity: 'epic', battleXp: 0 });
+  /* Level grows stats, and the level IS the care level derived from the dino's
+     xp — the same pool caring feeds, no separate battle track. */
+  const lv1 = deriveStats({ speciesId: 'trex', rarity: 'epic', xp: 0 });
   const lv10 = deriveStats({ speciesId: 'trex', rarity: 'epic', level: 10 });
-  ok('a higher battle level derives higher stats', lv10.atk > lv1.atk && lv10.hp > lv1.hp);
-  check('a zero-XP dino is battle level 1', lv1.level, 1);
+  ok('a higher level derives higher stats', lv10.atk > lv1.atk && lv10.hp > lv1.hp);
+  check('a zero-XP dino is level 1', lv1.level, 1);
+
+  /* Combat level === care level: deriveStats reads the dino's care xp through
+     the SAME curve the client's getDinoLevel uses (floor(sqrt(xp/50))+1). */
+  ok('deriveStats level matches the care curve',
+     [0, 50, 200, 800, 5000, 42050].every(xp => deriveStats({ speciesId: 'trex', rarity: 'epic', xp }).level === careLevelFromXp(xp)));
+  check('CARE_XP_PER_LEVEL mirrors the client XP_PER_LEVEL', CARE_XP_PER_LEVEL, 50);
+
+  /* Caring IS combat power: more care xp → a higher level → higher stats,
+     with no battleXp involved. */
+  const cared = deriveStats({ speciesId: 'trex', rarity: 'epic', xp: 5000 });   // care level 11
+  ok('a well-cared dino out-fights a fresh one', cared.atk > lv1.atk && cared.hp > lv1.hp);
+
+  /* The stat multiplier caps at level 30 though the DISPLAYED level keeps
+     climbing: a level-50 dino shows 50 but fights as a 30. */
+  const capped = deriveStats({ speciesId: 'trex', rarity: 'epic', level: 30 });
+  const over = deriveStats({ speciesId: 'trex', rarity: 'epic', level: 50 });
+  check('stats stop growing past the level-30 cap', [over.hp, over.atk, over.def, over.spd], [capped.hp, capped.atk, capped.def, capped.spd]);
+  check('but the displayed level is uncapped', over.level, 50);
+  const bigXp = deriveStats({ speciesId: 'trex', rarity: 'epic', xp: xpForCareLevel(45) });
+  check('a care level past 30 also shows uncapped', bigXp.level, 45);
+  check('and its stats are the capped ones', [bigXp.hp, bigXp.atk], [capped.hp, capped.atk]);
 
   /* Archetype orderings, isolated by using same rarity+level so tier cancels. */
   const brute = deriveStats({ speciesId: 'allo', rarity: 'rare', level: 5 });   // brute
@@ -114,18 +138,18 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
   check('an unknown rarity is treated as common', bogus.hp, deriveStats({ speciesId: 'trex', rarity: 'common', level: 1 }).hp);
 }
 
-/* ══ Battle-level curve round-trips ════════════════════════════════════ */
+/* ══ Care-level curve round-trips ══════════════════════════════════════ */
 {
   const drift = [];
   for (let lv = 1; lv <= 25; lv++) {
-    const at = xpForBattleLevel(lv);
-    if (battleLevelFromXp(at) !== lv) drift.push(`lv ${lv}: xpForBattleLevel=${at} reads back ${battleLevelFromXp(at)}`);
-    if (at > 0 && battleLevelFromXp(at - 1) !== lv - 1) drift.push(`lv ${lv}: one XP short is not ${lv - 1}`);
+    const at = xpForCareLevel(lv);
+    if (careLevelFromXp(at) !== lv) drift.push(`lv ${lv}: xpForCareLevel=${at} reads back ${careLevelFromXp(at)}`);
+    if (at > 0 && careLevelFromXp(at - 1) !== lv - 1) drift.push(`lv ${lv}: one XP short is not ${lv - 1}`);
   }
-  check('every battle-level boundary round-trips', drift, []);
+  check('every care-level boundary round-trips', drift, []);
   const bad = [];
-  for (let xp = 0; xp < 20000; xp += 53) { const p = battleXpProgress(xp); if (!(p >= 0 && p <= 1)) bad.push(`${xp}→${p}`); }
-  check('battle XP progress stays 0..1', bad, []);
+  for (let xp = 0; xp < 20000; xp += 53) { const p = careXpProgress(xp); if (!(p >= 0 && p <= 1)) bad.push(`${xp}→${p}`); }
+  check('care XP progress stays 0..1', bad, []);
 }
 
 /* ══ Archetypes, movesets, signatures ══════════════════════════════════ */
@@ -287,7 +311,7 @@ function seedFor(base, moves, pred) {
 /* ══ ROUTE: energy gating ══════════════════════════════════════════════ */
 const today = dayKey();
 {
-  const park = [{ speciesId: 'compy', mutation: null, uid: 'd1', battleXp: 0 }];
+  const park = [{ speciesId: 'compy', mutation: null, uid: 'd1', xp: 0 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park) }) };
   const g = await (await GET(e, cookie('7'))).json();
   check('a fresh player has a full energy pool', g.energy, { count: 5, max: 5 });
@@ -299,7 +323,7 @@ const today = dayKey();
   /* THE GUARD (mutation check): spending energy is load-bearing. At zero the
      start is refused AND no battle is written — remove the e.count<=0 branch
      and this fails, which is the point. */
-  const park = [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }];
+  const park = [{ speciesId: 'compy', uid: 'd1', xp: 0 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park), ['dino_battle_energy_7']: { day: today, count: 0 } }) };
   const r = await POST(e, { action: 'start', uid: 'd1', opponentId: 'wild_1' }, cookie('7'));
   check('a player at zero energy cannot start', r.status, 400);
@@ -307,7 +331,7 @@ const today = dayKey();
 }
 {
   /* Regenerates on the Pacific day boundary: a previous-day row reads full. */
-  const park = [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }];
+  const park = [{ speciesId: 'compy', uid: 'd1', xp: 0 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park), ['dino_battle_energy_7']: { day: '2000-01-01', count: 0 } }) };
   const g = await (await GET(e, cookie('7'))).json();
   check('a stale-day energy row reads as a fresh pool', g.energy.count, 5);
@@ -317,7 +341,7 @@ const today = dayKey();
 
 /* ══ ROUTE: start / move / server authority / settlement ═══════════════ */
 {
-  const park = [{ speciesId: 'compy', mutation: null, uid: 'd1', battleXp: 0 }];
+  const park = [{ speciesId: 'compy', mutation: null, uid: 'd1', xp: 0 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park) }) };
 
   const s = await (await POST(e, { action: 'start', uid: 'd1', opponentId: 'wild_1' }, cookie('7'))).json();
@@ -338,7 +362,7 @@ const today = dayKey();
      submit a move carrying FORGED win/coins fields. The server must ignore the
      body, compute its own result, and settle exactly that — not 99999. */
   const base = createBattle({
-    a: { team: [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }] },           // skirmisher, fast
+    a: { team: [{ speciesId: 'compy', uid: 'd1', xp: 0 }] },           // skirmisher, fast
     b: { ai: 'aggressive', team: [{ speciesId: 'anky', rarity: 'rare', level: 8 }] },  // tank, slow
     seed: 'win', meta: { tier: 1, level: 3, kind: 'wild', opponentId: 'wild_1' },
   });
@@ -349,7 +373,7 @@ const today = dayKey();
 
   const expect = (() => { const b = clone(base); stepTurn(b, { aMove: 'dart' }); return computeRewards(b); })();
 
-  const park = [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }];
+  const park = [{ speciesId: 'compy', uid: 'd1', xp: 0 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park), ['dino_battle_state_7']: base }) };
 
   const res = await (await POST(e, { action: 'move', moveId: 'dart', win: true, coins: 99999, xp: 99999, battle: { status: 'won' } }, cookie('7'))).json();
@@ -360,9 +384,10 @@ const today = dayKey();
   const save = e.MARKETPLACE.read('dino_park_7').state;
   check('the save gained exactly the computed coins', save.coins, 100 + expect.coins);
   ok('via a coins marketOp the client reconciles', save.marketOps.some(o => o.t === 'coins' && o.d === expect.coins));
-  const bxp = save.marketOps.find(o => o.t === 'bxp' && o.uid === 'd1');
-  ok('battle XP is applied to the exact dino by a bxp op', !!bxp && bxp.d === expect.xp);
-  check('and stamped onto the dino itself', save.park[0].battleXp, expect.xp);
+  const cxp = save.marketOps.find(o => o.t === 'carexp' && o.uid === 'd1');
+  ok('care XP is applied to the exact dino by a carexp op', !!cxp && cxp.d === expect.xp);
+  check('and stacked into the dino\'s shared xp pool', save.park[0].xp, expect.xp);
+  ok('no separate battleXp field is created', save.park[0].battleXp === undefined);
   ok('with grantSeq bumped so a stale save cannot clobber it', save.grantSeq === 1);
   ok('the battle is cleared after settling', !e.MARKETPLACE.read('dino_battle_state_7'));
 
@@ -382,20 +407,20 @@ const today = dayKey();
   const loseRng = seedFor(base, { aMove: 'tail_whip' }, b => b.status === 'lost');
   base.rng = loseRng;
 
-  const park = [{ speciesId: 'anky', uid: 'd1', battleXp: 100 }];
+  const park = [{ speciesId: 'anky', uid: 'd1', xp: 100 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park, { park }), ['dino_battle_state_7']: base }) };
   const res = await (await POST(e, { action: 'move', moveId: 'tail_whip', win: true, coins: 99999 }, cookie('7'))).json();
   check('a forged win on a losing board still loses', res.result.win, false);
   check('a loss mints no coins', res.result.coins, 0);
   const save = e.MARKETPLACE.read('dino_park_7').state;
   check('and the save coins are unchanged', save.coins, 100);
-  ok('a loss still pays a little training XP', save.park[0].battleXp > 100);
+  ok('a loss still pays a little training XP into the shared pool', save.park[0].xp > 100);
 }
 {
   /* Forfeit ends the battle as a loss, settles only training XP, and clears. */
-  const base = createBattle({ a: { team: [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }] }, b: { ai: 'aggressive', team: [{ speciesId: 'anky', rarity: 'rare', level: 8 }] }, seed: 'ff', meta: { tier: 1, level: 3, kind: 'wild', opponentId: 'wild_1' } });
+  const base = createBattle({ a: { team: [{ speciesId: 'compy', uid: 'd1', xp: 0 }] }, b: { ai: 'aggressive', team: [{ speciesId: 'anky', rarity: 'rare', level: 8 }] }, seed: 'ff', meta: { tier: 1, level: 3, kind: 'wild', opponentId: 'wild_1' } });
   base.startedAt = Date.now();
-  const park = [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }];
+  const park = [{ speciesId: 'compy', uid: 'd1', xp: 0 }];
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park), ['dino_battle_state_7']: base }) };
   const res = await (await POST(e, { action: 'forfeit' }, cookie('7'))).json();
   check('forfeit resolves as a loss', res.result.win, false);
@@ -404,10 +429,10 @@ const today = dayKey();
 {
   /* A boss win grants an egg through the existing grantEgg path. Seed a boss
      battle the player wins, with an rng that both wins AND rolls the egg. */
-  const park = [{ speciesId: 'trex', uid: 'd1', rarity: 'epic', battleXp: 5000 }];
+  const park = [{ speciesId: 'trex', uid: 'd1', rarity: 'epic', xp: 5000 }];
   const findBossRng = () => {
     for (let r = 1; r < 60000; r++) {
-      const b = createBattle({ a: { team: [{ speciesId: 'trex', uid: 'd1', rarity: 'epic', battleXp: 5000 }] }, b: { ai: 'aggressive', team: [{ speciesId: 'compy', rarity: 'common', level: 1 }] }, seed: 'boss', meta: { tier: 5, level: 22, kind: 'boss', opponentId: 'boss_5' } });
+      const b = createBattle({ a: { team: [{ speciesId: 'trex', uid: 'd1', rarity: 'epic', xp: 5000 }] }, b: { ai: 'aggressive', team: [{ speciesId: 'compy', rarity: 'common', level: 1 }] }, seed: 'boss', meta: { tier: 5, level: 22, kind: 'boss', opponentId: 'boss_5' } });
       b.b.team[0].hp = 1; b.rng = r;
       const c = clone(b); stepTurn(c, { aMove: 'bite' });
       if (c.status === 'won' && computeRewards(clone(c)).bossEgg) return r;
@@ -416,7 +441,7 @@ const today = dayKey();
   };
   const r = findBossRng();
   ok('a winnable boss turn that also rolls an egg exists', r !== null);
-  const base = createBattle({ a: { team: [{ speciesId: 'trex', uid: 'd1', rarity: 'epic', battleXp: 5000 }] }, b: { ai: 'aggressive', team: [{ speciesId: 'compy', rarity: 'common', level: 1 }] }, seed: 'boss', meta: { tier: 5, level: 22, kind: 'boss', opponentId: 'boss_5' } });
+  const base = createBattle({ a: { team: [{ speciesId: 'trex', uid: 'd1', rarity: 'epic', xp: 5000 }] }, b: { ai: 'aggressive', team: [{ speciesId: 'compy', rarity: 'common', level: 1 }] }, seed: 'boss', meta: { tier: 5, level: 22, kind: 'boss', opponentId: 'boss_5' } });
   base.startedAt = Date.now(); base.b.team[0].hp = 1; base.rng = r;
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: saveRec('7', park, { park }), ['dino_battle_state_7']: base }) };
   const res = await (await POST(e, { action: 'move', moveId: 'bite' }, cookie('7'))).json();
@@ -457,7 +482,7 @@ const today = dayKey();
   ok('and its moveset carries it', SIG_IDS.every(id => movesetFor(id, 'legendary').includes(SIGNATURES[id])));
 
   /* Battle opponents are drawn only from the live pools — no dormant boss. */
-  const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: { userId: '7', state: { saveEpoch: 2, coins: 0, park: [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }], vault: [], eggs: [], discovered: [], marketOps: [], appliedOps: [] } } }) };
+  const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: { userId: '7', state: { saveEpoch: 2, coins: 0, park: [{ speciesId: 'compy', uid: 'd1', xp: 0 }], vault: [], eggs: [], discovered: [], marketOps: [], appliedOps: [] } } }) };
   const g = await (await GET(e, cookie('7'))).json();
   ok('no battle opponent is a dormant species', !g.opponents.some(o => isPendingSpecies(o.speciesId)));
 
@@ -532,7 +557,9 @@ const today = dayKey();
   const game = fs.readFileSync(path.join(REPO, 'games/dino-park/index.html'), 'utf8');
   ok('the game has a Battle tab wired into the nav and tab order', /switchTab\('battle'\)/.test(game) && /'battle', 'dinodex'/.test(game));
   ok('the battle view renders and talks to the route', /function renderBattle/.test(game) && /'\/api\/dino-battle'/.test(game));
-  ok('the client applies the server\'s battle-XP op', /op\.t === 'bxp'/.test(game));
+  ok('the client applies the server\'s care-XP op into the shared xp pool',
+     /op\.t === 'carexp'/.test(game) && /d\.xp = Math\.max\(0, Math\.floor\(Number\(d\.xp\)/.test(game));
+  ok('and folds any legacy battleXp into xp on load', /if \(d\.battleXp !== undefined\)/.test(game) && /delete d\.battleXp/.test(game));
 
   /* The client roster knows the new species and hides dormant ones via a
      ROSTER_LIVE filter, so the Dinodex never renders a broken sprite. */

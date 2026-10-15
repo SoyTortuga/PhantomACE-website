@@ -27,16 +27,19 @@
 import { SPECIES } from '../dino-species.js';
 
 /* ── STAT DERIVATION ────────────────────────────────────────────────────
-   A dino keeps only {speciesId, rarity, mutation, battleXp}. Combat stats
-   are COMPUTED from those every time, never stored, so a rebalance is a
-   constant change here rather than a migration of every save. Four factors
-   multiply:
+   A dino keeps only {speciesId, rarity, mutation, xp}. Combat stats are
+   COMPUTED from those every time, never stored, so a rebalance is a constant
+   change here rather than a migration of every save. Four factors multiply:
 
      rarity tier  — a floor, so a legendary outclasses a common of the same
                     archetype even at level 1;
      archetype    — the per-species role bias (a brute hits, a tank soaks);
-     battle level — derived from battleXp, ~7% per level, uncapped XP but a
-                    stat cap so a veteran can't become unbeatable;
+     level        — THE DINO'S CARE LEVEL, the one the Collection already shows,
+                    derived from its `xp` (the same pool caring feeds). There is
+                    no separate battle level: training a dino by caring for it
+                    and winning fights both raise this one number. ~7% per level,
+                    with the stat multiplier capped at STAT_LEVEL_CAP so a veteran
+                    cannot become unbeatable (the DISPLAYED level may exceed it);
      mutation     — a flat edge for a recoloured variant.
 
    The numbers are tuned so a tended, higher-rarity, higher-level dino wins
@@ -45,35 +48,35 @@ const BASE = { hp: 110, atk: 30, def: 26, spd: 28 };
 
 const TIER_MULT = { common: 1, uncommon: 1.18, rare: 1.4, epic: 1.7, legendary: 2.1 };
 
-/* Per-level growth and the stat-side cap. battleXp itself never caps (the
-   curve below is uncapped); LEVEL_CAP only stops the stat multiplier running
-   away, so levelling past it is cosmetic rather than an auto-win. */
+/* Per-level growth and the stat-side cap. The care level itself is uncapped
+   (a dino can be shown at level 40); STAT_LEVEL_CAP only stops the stat
+   multiplier running away, so levelling past it is cosmetic for combat. */
 const PER_LEVEL = 0.07;
-const LEVEL_CAP = 30;
+const STAT_LEVEL_CAP = 30;
 
 const MUT_MULT = 1.1;
 
-/* battleXp → battle level. Same shape as the game's care-XP curve
-   (floor(sqrt(xp/K))+1) so the two feel consistent, but its OWN pool and its
-   OWN constant: battle level must persist through the monthly reset and must
-   not move when a dino is merely cared for. */
-export const BATTLE_XP_PER_LEVEL = 60;
+/* xp → care level, mirroring the client's getDinoLevel in
+   games/dino-park/index.html: floor(sqrt(xp / CARE_XP_PER_LEVEL)) + 1 with the
+   SAME divisor (XP_PER_LEVEL = 50 there), so the level this engine scales
+   combat off is exactly the level the Collection card shows. UNCAPPED —
+   deriveStats clamps to STAT_LEVEL_CAP for the stat math, not here. */
+export const CARE_XP_PER_LEVEL = 50;
 
-export function battleLevelFromXp(xp) {
+export function careLevelFromXp(xp) {
   const n = Math.max(0, Math.floor(Number(xp) || 0));
-  return Math.min(LEVEL_CAP, Math.floor(Math.sqrt(n / BATTLE_XP_PER_LEVEL)) + 1);
+  return Math.floor(Math.sqrt(n / CARE_XP_PER_LEVEL)) + 1;
 }
 
-/** XP needed to REACH a battle level — inverse of battleLevelFromXp. */
-export function xpForBattleLevel(n) {
-  return Math.pow(Math.max(1, n) - 1, 2) * BATTLE_XP_PER_LEVEL;
+/** XP needed to REACH a care level — inverse of careLevelFromXp. */
+export function xpForCareLevel(n) {
+  return Math.pow(Math.max(1, n) - 1, 2) * CARE_XP_PER_LEVEL;
 }
 
-/** How far through the current battle level, 0..1, for the XP bar. */
-export function battleXpProgress(xp) {
-  const lv = battleLevelFromXp(xp);
-  if (lv >= LEVEL_CAP) return 1;
-  const base = xpForBattleLevel(lv), next = xpForBattleLevel(lv + 1);
+/** How far through the current care level, 0..1, for the XP bar. */
+export function careXpProgress(xp) {
+  const lv = careLevelFromXp(xp);
+  const base = xpForCareLevel(lv), next = xpForCareLevel(lv + 1);
   const cur = Math.max(0, Math.floor(Number(xp) || 0));
   return next === base ? 1 : Math.min(1, Math.max(0, (cur - base) / (next - base)));
 }
@@ -234,18 +237,22 @@ export function movesetFor(speciesId, rarity) {
  * SPECIES table, never from the client). Returns integers, hp doubling as the
  * starting/maximum HP.
  */
-export function deriveStats({ speciesId, rarity, mutation, battleXp, level } = {}) {
+export function deriveStats({ speciesId, rarity, mutation, xp, level } = {}) {
   const r = TIER_MULT[rarity] ? rarity : 'common';
   const tier = TIER_MULT[r];
   const arch = ARCHETYPES[archetypeFor(speciesId, r)] || ARCHETYPES.skirmisher;
-  const lv = level != null ? Math.max(1, Math.min(LEVEL_CAP, Math.floor(level))) : battleLevelFromXp(battleXp);
-  const levelMult = 1 + PER_LEVEL * (lv - 1);
+  /* A player's dino supplies `xp` (its care xp) → its care level; an opponent
+     supplies an explicit `level`. The DISPLAYED level is uncapped; the stat
+     multiplier clamps to STAT_LEVEL_CAP so combat power plateaus. */
+  const displayLevel = level != null ? Math.max(1, Math.floor(level)) : careLevelFromXp(xp);
+  const statLevel = Math.min(STAT_LEVEL_CAP, displayLevel);
+  const levelMult = 1 + PER_LEVEL * (statLevel - 1);
   const mut = mutation ? MUT_MULT : 1;
   const stat = (key) => Math.max(1, Math.round(BASE[key] * arch.bias[key] * tier * levelMult * mut));
   return {
     hp: stat('hp'), maxHp: stat('hp'),
     atk: stat('atk'), def: stat('def'), spd: stat('spd'),
-    level: lv, archetype: archetypeFor(speciesId, r),
+    level: displayLevel, archetype: archetypeFor(speciesId, r),
   };
 }
 
@@ -274,7 +281,7 @@ function nextRand(battle) {
 export function makeCombatant(src) {
   const speciesId = src.speciesId;
   const rarity = src.rarity || (SPECIES[speciesId] && SPECIES[speciesId].rarity) || 'common';
-  const stats = deriveStats({ speciesId, rarity, mutation: src.mutation, battleXp: src.battleXp, level: src.level });
+  const stats = deriveStats({ speciesId, rarity, mutation: src.mutation, xp: src.xp, level: src.level });
   return {
     uid: src.uid || null,
     speciesId, rarity, mutation: src.mutation || null,
@@ -572,12 +579,20 @@ export function resolveToEnd(battle, pickers) {
 }
 
 /* ── REWARDS ────────────────────────────────────────────────────────────
-   Pure, so the route settles coins/XP/eggs from numbers it can re-derive
-   and never trusts the client for a payout. Scaled to opponent difficulty
+   Pure, so the route settles coins/XP/eggs from numbers it can re-derive and
+   never trusts the client for a payout. Scaled to opponent difficulty
    (meta.level/tier); a loss pays only a little "training" XP so energy is the
    real cost; a boss win rolls an egg off the battle's own RNG so the roll is
-   deterministic and testable. */
-const REWARD = { coinBase: 10, coinPerLevel: 2, xpBase: 14, xpPerLevel: 3, bossCoinBonus: 25, lossXp: 4 };
+   deterministic and testable.
+
+   `xp` is CARE XP — the one shared pool caring already feeds (the route adds it
+   to the dino's `xp`), so a win levels a dino exactly as tending it does. The
+   payout is tuned against that curve (careLevelFromXp, ~60 care-xp per live
+   hour of perfect tending): a wild win ≈ 24–73 xp and a boss ≈ 99, so five
+   daily battles are a worthwhile supplement — a boss win is ~1.5 care-hours —
+   while caring over a whole stream stays the steady path, and the quadratic
+   curve + STAT_LEVEL_CAP mean battling alone never walks a dino to the cap. */
+const REWARD = { coinBase: 10, coinPerLevel: 2, xpBase: 18, xpPerLevel: 2, bossCoinBonus: 25, lossXp: 5 };
 export const BOSS_EGG_CHANCE = 0.5;
 
 export function computeRewards(battle) {

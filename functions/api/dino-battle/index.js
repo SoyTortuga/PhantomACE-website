@@ -19,8 +19,9 @@
 
    REWARDS settle against the player's PARK SAVE — the same document grantEgg
    writes — riding the existing grantSeq + marketOps protocol (applyCoins for
-   coins, a 'bxp' op for the dino's battle XP), so a stale client save cannot
-   clobber a payout and the browser reconciles it exactly once. A boss win rolls
+   coins, a 'carexp' op that adds to the dino's shared `xp` pool — the same
+   level caring raises), so a stale client save cannot clobber a payout and the
+   browser reconciles it exactly once. A boss win rolls
    an egg through grantEgg. No leaderboard — per the project's "every mechanic
    is a decision, Dino Park keeps no boards" rule.
    ══════════════════════════════════════════════ */
@@ -30,7 +31,7 @@ import { dayKey } from '../season-time.js';
 import { saveKey, findDinoByUid, applyCoins, pushParkOp, grantEgg } from '../dino-park.js';
 import {
   createBattle, stepTurn, computeRewards, publicView, deriveStats,
-  movesetFor, battleLevelFromXp, battleXpProgress, legalMoves, activeOf, seedToInt, MOVES,
+  movesetFor, careLevelFromXp, careXpProgress, legalMoves, activeOf, seedToInt, MOVES,
 } from './engine.js';
 
 function json(data, status = 200) {
@@ -112,12 +113,12 @@ function eligibleDinos(state) {
     for (const d of (Array.isArray(state[src]) ? state[src] : [])) {
       if (!d || !d.uid || d.busy) continue;                  // out on an expedition, or not yet uid'd — skip
       const rarity = (SPECIES[d.speciesId] && SPECIES[d.speciesId].rarity) || 'common';
-      const bxp = Math.max(0, Math.floor(Number(d.battleXp) || 0));
-      const stats = deriveStats({ speciesId: d.speciesId, rarity, mutation: d.mutation, battleXp: bxp });
+      const xp = Math.max(0, Math.floor(Number(d.xp) || 0));
+      const stats = deriveStats({ speciesId: d.speciesId, rarity, mutation: d.mutation, xp });
       out.push({
         uid: d.uid, speciesId: d.speciesId, rarity, mutation: d.mutation || null,
         name: String(d.nickname || (SPECIES[d.speciesId] && SPECIES[d.speciesId].name) || d.speciesId).slice(0, 32),
-        source: src, battleXp: bxp, battleLevel: battleLevelFromXp(bxp), battleXpProgress: battleXpProgress(bxp),
+        source: src, xp, level: careLevelFromXp(xp), levelProgress: careXpProgress(xp),
         stats: { hp: stats.maxHp, atk: stats.atk, def: stats.def, spd: stats.spd, archetype: stats.archetype },
         moves: movesetFor(d.speciesId, rarity).map(id => ({ id, name: MOVES[id].name })),
       });
@@ -208,7 +209,7 @@ async function startBattle(env, userId, body) {
   const battle = createBattle({
     a: { team: [{
       uid: d.uid, speciesId: d.speciesId, rarity, mutation: d.mutation || null,
-      battleXp: Math.max(0, Math.floor(Number(d.battleXp) || 0)),
+      xp: Math.max(0, Math.floor(Number(d.xp) || 0)),
       name: String(d.nickname || (SPECIES[d.speciesId] && SPECIES[d.speciesId].name) || d.speciesId).slice(0, 32),
     }] },
     b: { ai: opponent.ai, team: [{
@@ -271,9 +272,12 @@ async function forfeit(env, userId) {
 /**
  * Pay the result into the player's park save, riding the grantSeq/marketOps
  * protocol so a stale client save can't clobber it. Coins via applyCoins (the
- * same 'coins' op the marketplace uses), battle XP via a 'bxp' op the client
- * applies to the exact dino by uid. A boss egg is granted through the existing
- * grantEgg path. Returns what to tell the player.
+ * same 'coins' op the marketplace uses); the XP is CARE XP added to the dino's
+ * shared `xp` pool — the same one caring feeds — via a 'carexp' op the client
+ * applies to the exact dino by uid. Because the op is a DELTA applied once, the
+ * client's own caring XP since the last sync is preserved and the win stacks on
+ * top. A boss egg is granted through the existing grantEgg path. Returns what to
+ * tell the player.
  */
 async function settleRewards(env, userId, battle, rewards) {
   const combatant = activeOf(battle.a);
@@ -289,11 +293,11 @@ async function settleRewards(env, userId, battle, rewards) {
     if (rewards.xp > 0 && uid) {
       const found = findDinoByUid(state, uid);
       if (found) {
-        const before = battleLevelFromXp(found.dino.battleXp || 0);
-        found.dino.battleXp = Math.max(0, Math.floor(Number(found.dino.battleXp) || 0)) + rewards.xp;
-        const after = battleLevelFromXp(found.dino.battleXp);
+        const before = careLevelFromXp(found.dino.xp || 0);
+        found.dino.xp = Math.max(0, Math.floor(Number(found.dino.xp) || 0)) + rewards.xp;
+        const after = careLevelFromXp(found.dino.xp);
         if (after > before) out.leveledTo = after;
-        pushParkOp(state, { t: 'bxp', uid, d: rewards.xp });
+        pushParkOp(state, { t: 'carexp', uid, d: rewards.xp });
       }
     }
     if (rewards.coins > 0) applyCoins(state, rewards.coins, 'battle');

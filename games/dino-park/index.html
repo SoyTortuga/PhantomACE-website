@@ -4252,14 +4252,16 @@ function adoptServerGrants(serverState) {
         added.tidied = (added.tidied || 0) + take;
         if (op.by) added.tidiedBy = String(op.by).slice(0, 40);
       }
-    } else if (op.t === 'bxp') {
-      /* Battle XP the server awarded a specific dino. battleXp is
-         server-owned — the client only ever mirrors it here, by uid, so a
-         wholesale save can never originate or inflate it (the grantSeq bump
-         that rode this op is what forces that save to merge first). A dino
-         sold or released since is simply not found, and the op no-ops. */
+    } else if (op.t === 'carexp') {
+      /* Care XP a battle win awarded a specific dino. Combat level IS care
+         level — there is no separate battle pool — so this adds straight into
+         the dino's shared `xp`, the same one caring feeds. Applied as a DELTA
+         exactly once (appliedOps), so caring the client did since the last sync
+         is preserved and the win stacks on top; the grantSeq bump that rode
+         this op forces a stale wholesale save to merge first. A dino sold or
+         released since is simply not found, and the op no-ops. */
       const d = [...state.park, ...state.vault].find(x => x && x.uid === op.uid);
-      if (d) { d.battleXp = Math.max(0, Math.floor(Number(d.battleXp) || 0)) + Math.max(0, Math.floor(Number(op.d) || 0)); added.battleXp = (added.battleXp || 0) + 1; }
+      if (d) { d.xp = Math.max(0, Math.floor(Number(d.xp) || 0)) + Math.max(0, Math.floor(Number(op.d) || 0)); added.carexp = (added.carexp || 0) + 1; }
     } else if (op.t === 'out') {
       if (op.grantId) markGrantsConsumed([op.grantId]);
       const pi = state.park.findIndex(x => x && x.uid === op.uid);
@@ -4501,6 +4503,16 @@ function ensureDinoStats(d) {
     d.xp = care * DINO_XP.care
       + (care >= GROWTH_THRESHOLDS.juvenile ? DINO_XP.stageJuvenile : 0)
       + (care >= GROWTH_THRESHOLDS.adult ? DINO_XP.stageAdult : 0);
+  }
+
+  /* MIGRATION: combat level is now the care level, so the short-lived separate
+     battle pool is folded into the shared `xp` once and removed. The battle
+     feature shipped but was never deployed/played, so this almost never finds
+     anything — it is a one-time safety net, idempotent (the field is deleted),
+     that keeps any test-only battleXp from being silently dropped. */
+  if (d.battleXp !== undefined) {
+    d.xp = Math.max(0, Math.floor(Number(d.xp) || 0)) + Math.max(0, Math.floor(Number(d.battleXp) || 0));
+    delete d.battleXp;
   }
 }
 
@@ -6207,9 +6219,10 @@ function marketError(data, fallback) {
    A thin renderer over a server-authoritative engine. The client sends only
    the chosen move id; the server (functions/api/dino-battle) computes every
    number and owns the battle state and the rewards. So this holds no combat
-   maths — it draws what the server returns, and the rewards (coins, battle XP)
-   arrive the same way marketplace earnings do: as marketOps the next cloud
-   sync reconciles, never as a number the client adds to itself. */
+   maths — it draws what the server returns, and the rewards (coins, and care
+   XP into the dino's shared pool) arrive the same way marketplace earnings do:
+   as marketOps the next cloud sync reconciles, never as a number the client
+   adds to itself. A win raises the same per-dino level caring does. */
 const BATTLE_URL = '/api/dino-battle';
 let battleData = null;        // last GET payload (energy, opponents, dinos)
 let battleSelectedUid = null; // which of your dinos is picked to send in
@@ -6227,7 +6240,7 @@ async function renderBattle() {
     el.innerHTML = `
       <div class="market-login">
         <div style="font-size:15px;margin-bottom:6px;">⚔️ The Battle Pits</div>
-        <div class="battle-hint">Log in with Twitch to send your dinos into battle — your roster and battle levels follow your account.</div>
+        <div class="battle-hint">Log in with Twitch to send your dinos into battle — your roster and their levels follow your account.</div>
         <a href="/api/auth/twitch?return_to=${returnTo}" target="_top" class="market-login-btn">Login with Twitch</a>
       </div>`;
     return;
@@ -6266,7 +6279,7 @@ function renderBattleLobby() {
     <div class="battle-dino-card${x.uid === battleSelectedUid ? ' selected' : ''}" onclick="selectBattleDino('${battleEsc(x.uid)}')">
       <div class="bd-sprite">${spriteImg(x.speciesId, 44, 'sprite-img', x.mutation)}</div>
       <div class="bd-name" style="color:${RARITY_COLORS[x.rarity] || 'var(--text-pri)'}">${battleEsc(x.name)}</div>
-      <div class="bd-lv">Battle Lv ${x.battleLevel}</div>
+      <div class="bd-lv">Lv ${x.level}</div>
       <div class="bd-arch">${battleEsc(x.stats.archetype)}</div>
     </div>`).join('') : `<div class="battle-hint">No dinos ready to fight — hatch one, or bring a dino back from an expedition first.</div>`;
 
@@ -6421,9 +6434,10 @@ async function forfeitBattle() {
   finally { battleBusy = false; }
 }
 
-/* The win's coins and battle XP were settled into the cloud save server-side
+/* The win's coins and care XP were settled into the cloud save server-side
    (grantSeq bumped), so a forced sync is what pulls them down as marketOps the
-   client reconciles — never a number added here. */
+   client reconciles — never a number added here. The XP lands in the dino's
+   shared `xp`, so a win raises the same level caring does. */
 async function finishBattle(result) {
   const r = result || { win: false, coins: 0, xp: 0 };
   try { await doServerSave(); } catch {}
@@ -6431,8 +6445,8 @@ async function finishBattle(result) {
   const el = document.getElementById('battleContent');
   const rewardBits = [];
   if (r.coins > 0) rewardBits.push(`+${r.coins} coins`);
-  if (r.xp > 0) rewardBits.push(`+${r.xp} battle XP`);
-  if (r.leveledTo) rewardBits.push(`battle level ${r.leveledTo}!`);
+  if (r.xp > 0) rewardBits.push(`+${r.xp} XP`);
+  if (r.leveledTo) rewardBits.push(`reached level ${r.leveledTo}!`);
   if (r.eggGranted) rewardBits.push(`a ${battleEsc(r.eggRarity)} egg! 🥚`);
   el.innerHTML = `
     <div class="battle-wrap">
