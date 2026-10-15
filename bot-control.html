@@ -49,16 +49,16 @@
         <a class="btn-secondary" href="/activity">📜 Activity Feed</a>
       </div>
 
-      <section class="bot-group">
-        <h2 class="bot-group-title">Event Subscriptions</h2>
+      <details class="bot-group" data-botgroup="events">
+        <summary class="bot-group-title">Event Subscriptions</summary>
         <div class="card bot-section">
           <p class="bot-section-desc">Which Twitch EventSub subscriptions are registered. Events — and the activity feed — only receive the types marked active. If any are missing, create them on the bot setup page.</p>
           <div class="bot-subs-grid" id="botSubsGrid"><p class="bot-muted">Loading&hellip;</p></div>
         </div>
-      </section>
+      </details>
 
-      <section class="bot-group">
-        <h2 class="bot-group-title">Codes &amp; Drops</h2>
+      <details class="bot-group" data-botgroup="codes" open>
+        <summary class="bot-group-title">Codes &amp; Drops</summary>
         <div class="bot-grid">
 
           <div class="card bot-section" id="poolSection">
@@ -204,10 +204,10 @@
           </div>
 
         </div>
-      </section>
+      </details>
 
-      <section class="bot-group">
-        <h2 class="bot-group-title">Giveaways</h2>
+      <details class="bot-group" data-botgroup="giveaways" open>
+        <summary class="bot-group-title">Giveaways</summary>
         <div class="bot-grid">
 
           <div class="card bot-section bot-grid-full" id="giveawaySection">
@@ -301,10 +301,10 @@
           </div>
 
         </div>
-      </section>
+      </details>
 
-      <section class="bot-group">
-        <h2 class="bot-group-title">Predictions</h2>
+      <details class="bot-group" data-botgroup="predictions" open>
+        <summary class="bot-group-title">Predictions</summary>
         <div class="bot-grid">
 
           <div class="card bot-section bot-grid-full" id="predictionSection">
@@ -357,11 +357,11 @@
           </div>
 
         </div>
-      </section>
+      </details>
 
 
-      <section class="bot-group">
-        <h2 class="bot-group-title">Chat</h2>
+      <details class="bot-group" data-botgroup="chat" open>
+        <summary class="bot-group-title">Chat</summary>
         <div class="bot-grid">
 
           <div class="card bot-section">
@@ -415,10 +415,10 @@
           </div>
 
         </div>
-      </section>
+      </details>
 
-      <section class="bot-group">
-        <h2 class="bot-group-title">Activity &amp; Admin</h2>
+      <details class="bot-group" data-botgroup="admin">
+        <summary class="bot-group-title">Activity &amp; Admin</summary>
         <div class="bot-grid">
 
           <div class="card bot-section bot-grid-full">
@@ -446,7 +446,7 @@
           </div>
 
         </div>
-      </section>
+      </details>
 
     </div>
 

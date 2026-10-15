@@ -1654,6 +1654,31 @@ function showBotDenied(message, offerLogin) {
   if (loginBtn) loginBtn.hidden = !offerLogin;
 }
 
+/* Collapsible groups: native <details> handles the toggle; this only remembers
+   each group's open/closed state per browser so a trimmed-down layout sticks
+   across reloads. Guarded against a blocked localStorage (private windows). */
+function initCollapsibleGroups() {
+  document.querySelectorAll('details.bot-group[data-botgroup]').forEach(function (d) {
+    var key = 'botgroup:' + d.getAttribute('data-botgroup');
+    try {
+      var saved = localStorage.getItem(key);
+      if (saved === 'open') d.open = true;
+      else if (saved === 'closed') d.open = false;
+    } catch (e) {}
+    d.addEventListener('toggle', function () {
+      try { localStorage.setItem(key, d.open ? 'open' : 'closed'); } catch (e) {}
+    });
+  });
+}
+/* Run even if this script loads AFTER DOMContentLoaded already fired (a plain
+   addEventListener would silently never run then, and the persistence would be
+   dead). */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCollapsibleGroups);
+} else {
+  initCollapsibleGroups();
+}
+
 document.addEventListener('DOMContentLoaded', async function () {
   let res;
   try {

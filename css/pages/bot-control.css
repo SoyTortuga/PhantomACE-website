@@ -34,6 +34,25 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Each group is a collapsible <details>; its title is the clickable summary.
+   A text caret shows open/closed — no icon font, no marker. A collapsed group
+   drops its margin so a stack of closed headers sits tight. */
+summary.bot-group-title {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+summary.bot-group-title::-webkit-details-marker { display: none; }
+summary.bot-group-title::before {
+  content: '\25BE';
+  font-size: 13px;
+  color: var(--text-dim);
+}
+details.bot-group:not([open]) > summary.bot-group-title { margin-bottom: 0; }
+details.bot-group:not([open]) > summary.bot-group-title::before { content: '\25B8'; }
+
 /* Smaller min column and tighter gap than the old two-up layout, so a
    group packs more cards per row. `align-items: stretch` makes every card
    in a row the same height — uniform within the group. */
