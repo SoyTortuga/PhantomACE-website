@@ -126,20 +126,20 @@ export const SPECIES = {
      the client ROSTER + ASSET_MAP in games/dino-park/index.html, same as the
      rest of this table. */
   /* legendary */
-  carchar    : { name: "Carcharodontosaurus", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/carcharodontosaurus.png" },
-  titanoboa  : { name: "Titanoboa", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/titanoboa.png" },
-  livyatan   : { name: "Livyatan", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/livyatan.png" },
-  sarco      : { name: "Sarcosuchus", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/sarcosuchus.png" },
-  pliosaur   : { name: "Pliosaurus", rarity: "legendary", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/pliosaurus.png" },
+  carchar    : { name: "Carcharodontosaurus", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/carcharodontosaurus.png" },
+  titanoboa  : { name: "Titanoboa", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/titanoboa.png" },
+  livyatan   : { name: "Livyatan", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/livyatan.png" },
+  sarco      : { name: "Sarcosuchus", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/sarcosuchus.png" },
+  pliosaur   : { name: "Pliosaurus", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/pliosaurus.png" },
   yuty       : { name: "Yutyrannus", rarity: "legendary", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/yutyrannus.png" },
   /* epic */
-  acro       : { name: "Acrocanthosaurus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/acrocanthosaurus.png" },
-  tarbo      : { name: "Tarbosaurus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/tarbosaurus.png" },
-  sucho      : { name: "Suchomimus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/suchomimus.png" },
-  megalania  : { name: "Megalania", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/megalania.png" },
+  acro       : { name: "Acrocanthosaurus", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/acrocanthosaurus.png" },
+  tarbo      : { name: "Tarbosaurus", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/tarbosaurus.png" },
+  sucho      : { name: "Suchomimus", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/suchomimus.png" },
+  megalania  : { name: "Megalania", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/megalania.png" },
   gigapith   : { name: "Gigantopithecus", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320/icons/prehistoric_mammals/giant_ape.png" },
-  basilo     : { name: "Basilosaurus", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/basilosaurus.png" },
-  patago     : { name: "Patagotitan", rarity: "epic", pending: true, icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/patagotitan.png" },
+  basilo     : { name: "Basilosaurus", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/flying_marine_reptiles/basilosaurus.png" },
+  patago     : { name: "Patagotitan", rarity: "epic", icon: "/games/dino-park/assets/dino-assets/jurassic-dino-320-expansion160/icons/more_named_species/patagotitan.png" },
 };
 
 /** True for a species that exists in the table but is not yet reachable (its
@@ -255,6 +255,23 @@ export const PORTRAITS = {
   quetz      : "/games/dino-park/assets/portraits/Quetzalcoatlus.png",
   liopl      : "/games/dino-park/assets/portraits/Liopleurodon.png",
   anomal     : "/games/dino-park/assets/portraits/Anomalocaris.png",
+
+  /* New species' reveal portraits, hand-synced from ASSET_MAP in
+     games/dino-park/index.html. These eleven are the broadcaster's own
+     hand-authored 300x200 landscape art (not pipeline-built). Yutyrannus and
+     Gigantopithecus ship icon-only — they have no portrait art, so they are
+     intentionally absent here and the overlay reveal falls back to their icon. */
+  carchar    : "/games/dino-park/assets/portraits/Carcharodontosaurus.png",
+  titanoboa  : "/games/dino-park/assets/portraits/Titanoboa.png",
+  livyatan   : "/games/dino-park/assets/portraits/Livyatan.png",
+  sarco      : "/games/dino-park/assets/portraits/Sarcosuchus.png",
+  pliosaur   : "/games/dino-park/assets/portraits/Pliosaurus.png",
+  acro       : "/games/dino-park/assets/portraits/Acrocanthosaurus.png",
+  tarbo      : "/games/dino-park/assets/portraits/Tarbosaurus.png",
+  sucho      : "/games/dino-park/assets/portraits/Suchomimus.png",
+  megalania  : "/games/dino-park/assets/portraits/Megalania.png",
+  basilo     : "/games/dino-park/assets/portraits/Basilosaurus.png",
+  patago     : "/games/dino-park/assets/portraits/Patagotitan.png",
 };
 
 /** { name, rarity, icon, portrait } for a species id, or null. */

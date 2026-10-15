@@ -329,9 +329,35 @@ print(json.dumps(out))
   ok('and it is dark, as a black-bodied mutation should be',
      data.ph_lum !== null && data.ph_lum <= 0.25);
 
-  check('the species with no 72 are the two expected',
-        (data.unbased || []).sort(), (data.no_small || []).sort());
+  /* PORTRAITS WITH NO -72x72 BASELINE split into two kinds, and both are
+     exempt from the palette/hue and 72-source gates above for the same reason:
+     there is no 72 to measure them against.
+
+       NO_SMALL — pack species that never had a 72 (Megalodon, Quetzalcoatlus).
+         The build's own list; the game used to fall back to a 32px icon for
+         them, which on a legendary reveal was the most conspicuous place it
+         could happen.
+
+       HAND_AUTHORED — the 13 new species' portraits, supplied by the
+         broadcaster as 300x200 landscape art and placed directly. They did NOT
+         go through tools/build-dino-portraits.py and have no -72x72 pack
+         source, so the palette/72 pipeline contract does not apply to them.
+         Listed explicitly so the exemption is a recorded decision, not a
+         silently growing hole — a future hand-authored portrait is added here
+         on purpose, exactly as NO_SMALL is.
+
+     They are still held to every check that DOES apply: mapped-and-on-disk
+     (above), the filename/size contract and the truncation check (above), and
+     the PhantomACE gate (below, over the whole map). */
+  const HAND_AUTHORED = [
+    'Carcharodontosaurus', 'Titanoboa', 'Livyatan', 'Sarcosuchus', 'Pliosaurus',
+    'Acrocanthosaurus', 'Tarbosaurus', 'Suchomimus', 'Megalania', 'Basilosaurus', 'Patagotitan',
+  ];
+  check('the two pack species with no 72 are still the expected pair',
+        (data.no_small || []).sort(), ['Megalodon', 'Quetzalcoatlus']);
   check('and there are two of them', (data.no_small || []).length, 2);
+  check('every baseline-less portrait is either a pack-72-less species or a declared hand-authored one',
+        (data.unbased || []).sort(), [...new Set([...(data.no_small || []), ...HAND_AUTHORED])].sort());
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

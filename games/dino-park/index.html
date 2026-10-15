@@ -1766,19 +1766,19 @@ const ROSTER = [
      LIVE. Hand-synced with functions/api/dino-species.js. To go live: drop the
      PNG at the ASSET_MAP path below and delete `pending` here AND in the
      server table. */
-  { id:'carchar', name:'Carcharodontosaurus', emoji:'🦖', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Shark-toothed giant of Africa, a rival in size to T. rex itself.' },
-  { id:'titanoboa', name:'Titanoboa', emoji:'🐍', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Land', era:'Paleocene', desc:'The largest snake that ever lived — a 40-foot constrictor of steaming swamps.' },
-  { id:'livyatan', name:'Livyatan', emoji:'🐋', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Water', era:'Miocene', desc:'A sperm whale built like a predator, with teeth over a foot long.' },
-  { id:'sarco', name:'Sarcosuchus', emoji:'🐊', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Water', era:'Cretaceous', desc:'"SuperCroc" — a 40-foot crocodilian that ambushed passing dinosaurs.' },
-  { id:'pliosaur', name:'Pliosaurus', emoji:'🐉', rarity:'legendary', pending:true, diet:'Carnivore', habitat:'Water', era:'Jurassic', desc:'Short-necked marine reptile with a bite force rivalling any predator.' },
+  { id:'carchar', name:'Carcharodontosaurus', emoji:'🦖', rarity:'legendary', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Shark-toothed giant of Africa, a rival in size to T. rex itself.' },
+  { id:'titanoboa', name:'Titanoboa', emoji:'🐍', rarity:'legendary', diet:'Carnivore', habitat:'Land', era:'Paleocene', desc:'The largest snake that ever lived — a 40-foot constrictor of steaming swamps.' },
+  { id:'livyatan', name:'Livyatan', emoji:'🐋', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Miocene', desc:'A sperm whale built like a predator, with teeth over a foot long.' },
+  { id:'sarco', name:'Sarcosuchus', emoji:'🐊', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Cretaceous', desc:'"SuperCroc" — a 40-foot crocodilian that ambushed passing dinosaurs.' },
+  { id:'pliosaur', name:'Pliosaurus', emoji:'🐉', rarity:'legendary', diet:'Carnivore', habitat:'Water', era:'Jurassic', desc:'Short-necked marine reptile with a bite force rivalling any predator.' },
   { id:'yuty', name:'Yutyrannus', emoji:'🦖', rarity:'legendary', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'The largest feathered dinosaur known — a shaggy tyrant of the cold.' },
-  { id:'acro', name:'Acrocanthosaurus', emoji:'🦖', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'High-spined apex predator of early Cretaceous North America.' },
-  { id:'tarbo', name:'Tarbosaurus', emoji:'🦖', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Asia\'s answer to T. rex — the tyrant that ruled ancient Mongolia.' },
-  { id:'sucho', name:'Suchomimus', emoji:'🦖', rarity:'epic', pending:true, diet:'Piscivore', habitat:'Land', era:'Cretaceous', desc:'Crocodile-snouted fisher with a low sail and great hooked claws.' },
-  { id:'megalania', name:'Megalania', emoji:'🦎', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Land', era:'Pleistocene', desc:'A monitor lizard the size of a car. Australia\'s venomous giant.' },
+  { id:'acro', name:'Acrocanthosaurus', emoji:'🦖', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'High-spined apex predator of early Cretaceous North America.' },
+  { id:'tarbo', name:'Tarbosaurus', emoji:'🦖', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Cretaceous', desc:'Asia\'s answer to T. rex — the tyrant that ruled ancient Mongolia.' },
+  { id:'sucho', name:'Suchomimus', emoji:'🦖', rarity:'epic', diet:'Piscivore', habitat:'Land', era:'Cretaceous', desc:'Crocodile-snouted fisher with a low sail and great hooked claws.' },
+  { id:'megalania', name:'Megalania', emoji:'🦎', rarity:'epic', diet:'Carnivore', habitat:'Land', era:'Pleistocene', desc:'A monitor lizard the size of a car. Australia\'s venomous giant.' },
   { id:'gigapith', name:'Gigantopithecus', emoji:'🦍', rarity:'epic', diet:'Herbivore', habitat:'Land', era:'Pleistocene', desc:'The largest ape that ever lived — ten feet of gentle muscle.' },
-  { id:'basilo', name:'Basilosaurus', emoji:'🐋', rarity:'epic', pending:true, diet:'Carnivore', habitat:'Water', era:'Eocene', desc:'An early whale, long and serpentine, that eeled through warm seas.' },
-  { id:'patago', name:'Patagotitan', emoji:'🦕', rarity:'epic', pending:true, diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A titanosaur among the heaviest animals ever to walk the earth.' },
+  { id:'basilo', name:'Basilosaurus', emoji:'🐋', rarity:'epic', diet:'Carnivore', habitat:'Water', era:'Eocene', desc:'An early whale, long and serpentine, that eeled through warm seas.' },
+  { id:'patago', name:'Patagotitan', emoji:'🦕', rarity:'epic', diet:'Herbivore', habitat:'Land', era:'Cretaceous', desc:'A titanosaur among the heaviest animals ever to walk the earth.' },
 ];
 
 /* The LIVE roster — every species whose art has landed. The Dinodex and every
@@ -1897,19 +1897,19 @@ const ASSET_MAP = {
      PNGs that do not exist yet, which is harmless: a dormant species is never
      rendered (never discovered, never owned, never rolled). No portraits yet —
      the detail view falls back to the icon, then to a drawn sprite. */
-  carchar:   { icon: EX+'more_named_species/carcharodontosaurus.png' },
-  titanoboa: { icon: EX+'more_named_species/titanoboa.png' },
-  livyatan:  { icon: EX+'flying_marine_reptiles/livyatan.png' },
-  sarco:     { icon: EX+'flying_marine_reptiles/sarcosuchus.png' },
-  pliosaur:  { icon: EX+'flying_marine_reptiles/pliosaurus.png' },
+  carchar:   { icon: EX+'more_named_species/carcharodontosaurus.png', portrait: PT+'Carcharodontosaurus.png' },
+  titanoboa: { icon: EX+'more_named_species/titanoboa.png', portrait: PT+'Titanoboa.png' },
+  livyatan:  { icon: EX+'flying_marine_reptiles/livyatan.png', portrait: PT+'Livyatan.png' },
+  sarco:     { icon: EX+'flying_marine_reptiles/sarcosuchus.png', portrait: PT+'Sarcosuchus.png' },
+  pliosaur:  { icon: EX+'flying_marine_reptiles/pliosaurus.png', portrait: PT+'Pliosaurus.png' },
   yuty:      { icon: EX+'more_named_species/yutyrannus.png' },
-  acro:      { icon: EX+'more_named_species/acrocanthosaurus.png' },
-  tarbo:     { icon: EX+'more_named_species/tarbosaurus.png' },
-  sucho:     { icon: EX+'more_named_species/suchomimus.png' },
-  megalania: { icon: EX+'more_named_species/megalania.png' },
+  acro:      { icon: EX+'more_named_species/acrocanthosaurus.png', portrait: PT+'Acrocanthosaurus.png' },
+  tarbo:     { icon: EX+'more_named_species/tarbosaurus.png', portrait: PT+'Tarbosaurus.png' },
+  sucho:     { icon: EX+'more_named_species/suchomimus.png', portrait: PT+'Suchomimus.png' },
+  megalania: { icon: EX+'more_named_species/megalania.png', portrait: PT+'Megalania.png' },
   gigapith:  { icon: IC+'prehistoric_mammals/giant_ape.png' },
-  basilo:    { icon: EX+'flying_marine_reptiles/basilosaurus.png' },
-  patago:    { icon: EX+'more_named_species/patagotitan.png' },
+  basilo:    { icon: EX+'flying_marine_reptiles/basilosaurus.png', portrait: PT+'Basilosaurus.png' },
+  patago:    { icon: EX+'more_named_species/patagotitan.png', portrait: PT+'Patagotitan.png' },
 };
 
 const EGG_ASSETS = {

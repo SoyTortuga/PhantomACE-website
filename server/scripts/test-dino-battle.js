@@ -425,69 +425,95 @@ const today = dayKey();
   ok('and an egg actually lands in the incubator', (save.eggs || []).length === 1);
 }
 
-/* ══ NEW SPECIES — defined but dormant ═════════════════════════════════
-   Thirteen species added ahead of their art. Two are live (art on disk);
-   eleven are pending and must be unreachable until their PNG lands. */
+/* ══ NEW SPECIES — all shipped live; the dormant mechanism still guarded ══
+   The thirteen new species shipped WITH their art, so none are pending any
+   more. Two things are asserted: the SHIPPED REALITY (every new species is
+   reachable, zero pending), and the DORMANT MECHANISM itself — isPendingSpecies,
+   the pool-exclusion rule, rollSpeciesId's skip, and grantEgg's refusal — which
+   is still live code a future species may ship behind. With no real dormant
+   member left to test against, the mechanism is exercised with a SYNTHETIC
+   pending species injected into SPECIES and cleaned up afterwards. */
 {
   const NEW_LEGENDARY = ['carchar', 'titanoboa', 'livyatan', 'sarco', 'pliosaur', 'yuty'];
   const NEW_EPIC = ['acro', 'tarbo', 'sucho', 'megalania', 'gigapith', 'basilo', 'patago'];
   const NEW = [...NEW_LEGENDARY, ...NEW_EPIC];
-  const LIVE_NEW = ['yuty', 'gigapith'];
-  const PENDING_NEW = NEW.filter(id => !LIVE_NEW.includes(id));
 
-  /* Present, correctly tiered, and every one mapped to an archetype (the
-     invariant extended to the new roster). */
+  /* ── Shipped reality ── */
   check('all 13 new species are in the table', NEW.filter(id => SPECIES[id]).length, 13);
   check('the six new legendaries are legendary', NEW_LEGENDARY.filter(id => SPECIES[id] && SPECIES[id].rarity === 'legendary').length, 6);
   check('the seven new epics are epic', NEW_EPIC.filter(id => SPECIES[id] && SPECIES[id].rarity === 'epic').length, 7);
+  check('nothing is pending any more', Object.values(SPECIES).filter(s => s.pending).length, 0);
+
+  const pooled = new Set(Object.values(ROSTER_BY_RARITY).flat());
+  ok('every new species is reachable in its tier pool', NEW.every(id => pooled.has(id)));
   const unmappedNew = NEW.filter(id => !ARCHETYPES[SPECIES_ARCHETYPE[id]]);
   check('every new species has a mapped archetype', unmappedNew, []);
+  const missingNewIcon = NEW.filter(id => !fs.existsSync(path.join(REPO, SPECIES[id].icon.replace(/^\//, ''))));
+  check('every new species icon exists on disk', missingNewIcon, []);
 
-  /* The pending flag is exactly where it should be. */
-  check('the two art-on-disk species are live', LIVE_NEW.filter(id => !isPendingSpecies(id)).length, 2);
-  check('the other eleven are dormant', PENDING_NEW.filter(id => isPendingSpecies(id)).length, 11);
-
-  /* Dormant species never enter a roll pool. */
-  const pooled = Object.values(ROSTER_BY_RARITY).flat();
-  ok('no pending species is in any tier pool', !pooled.some(id => isPendingSpecies(id)));
-  ok('the live pools still have members', ROSTER_BY_RARITY.legendary.length >= 6 && ROSTER_BY_RARITY.epic.length >= 13);
-  let rolledPending = false;
-  for (const r of ['legendary', 'epic']) for (let i = 0; i < 500; i++) if (isPendingSpecies(rollSpeciesId(r))) rolledPending = true;
-  ok('rollSpeciesId never rolls a dormant species', !rolledPending);
-
-  /* grantEgg refuses a pinned dormant species and falls back to a live one. */
-  let eggRefusedPending = true, eggAlwaysLive = true;
-  for (let i = 0; i < 12; i++) {
-    const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: { userId: '7', state: { saveEpoch: 2, coins: 0, park: [], vault: [], eggs: [], discovered: [] } } }) };
-    const r = await grantEgg(e, '7', 'legendary', { speciesId: 'carchar' });
-    if (!r.success) { eggRefusedPending = false; break; }
-    if (r.egg.speciesId === 'carchar' || isPendingSpecies(r.egg.speciesId)) eggRefusedPending = false;
-    if (SPECIES[r.egg.speciesId].rarity !== 'legendary' || isPendingSpecies(r.egg.speciesId)) eggAlwaysLive = false;
-  }
-  ok('grantEgg refuses a pinned dormant species', eggRefusedPending);
-  ok('and still grants a live species of that rarity', eggAlwaysLive);
-
-  /* The apex-legendary signatures exist and are reachable once live. */
+  /* The apex-legendary signatures exist and are in their movesets. */
   const SIG_IDS = ['carchar', 'titanoboa', 'livyatan', 'sarco', 'pliosaur'];
   ok('each apex legendary has a signature move', SIG_IDS.every(id => SIGNATURES[id] && MOVES[SIGNATURES[id]] && MOVES[SIGNATURES[id]].signature));
   ok('and its moveset carries it', SIG_IDS.every(id => movesetFor(id, 'legendary').includes(SIGNATURES[id])));
 
-  /* Battle opponents are generated only from live species — no broken boss. */
+  /* Battle opponents are drawn only from the live pools — no dormant boss. */
   const e = { MARKETPLACE: fakeKV({ ['dino_park_7']: { userId: '7', state: { saveEpoch: 2, coins: 0, park: [{ speciesId: 'compy', uid: 'd1', battleXp: 0 }], vault: [], eggs: [], discovered: [], marketOps: [], appliedOps: [] } } }) };
   const g = await (await GET(e, cookie('7'))).json();
   ok('no battle opponent is a dormant species', !g.opponents.some(o => isPendingSpecies(o.speciesId)));
 
-  /* THE ART GATE: every LIVE species' icon points at a file that exists on
-     disk. This passes for the 85 originals plus Yutyrannus and Gigantopithecus,
-     and is the check that proves an art drop is complete before un-pending —
-     a pending species whose PNG has not landed is (correctly) not checked. */
+  /* THE ART GATE: every live species' icon exists on disk. Now covers all 98
+     (85 originals + 13 new), and is what proves any future art drop is complete
+     before a dormant species is flipped live. */
   const missing = [];
   for (const [id, s] of Object.entries(SPECIES)) {
     if (s.pending) continue;
-    const p = path.join(REPO, s.icon.replace(/^\//, ''));
-    if (!fs.existsSync(p)) missing.push(id);
+    if (!fs.existsSync(path.join(REPO, s.icon.replace(/^\//, '')))) missing.push(id);
   }
   check('every live species icon exists on disk', missing, []);
+
+  /* ── The dormant MECHANISM, exercised with a synthetic pending species ──
+     Nothing in the real roster is pending now, so a fake one is injected into
+     SPECIES to prove the guards actually fire, then removed. */
+  const FAKE = '__pending_test__';
+  SPECIES[FAKE] = { name: 'Test Dormant', rarity: 'legendary', pending: true, icon: '/games/dino-park/assets/dino-assets/nonexistent.png' };
+  try {
+    ok('isPendingSpecies flags a dormant species', isPendingSpecies(FAKE) === true);
+    ok('and a live species is not flagged', isPendingSpecies('trex') === false);
+
+    /* The pool-building rule (mirrors ROSTER_BY_RARITY in dino-species.js:
+       include a species only when NOT pending) drops the dormant one while
+       keeping live members of the same tier. */
+    const buildPools = () => {
+      const by = { common: [], uncommon: [], rare: [], epic: [], legendary: [] };
+      for (const [id, s] of Object.entries(SPECIES)) if (by[s.rarity] && !s.pending) by[s.rarity].push(id);
+      return by;
+    };
+    const pools = buildPools();
+    ok('the pooling rule excludes a dormant species', !pools.legendary.includes(FAKE));
+    ok('while keeping live legendaries in the pool', pools.legendary.includes('argent'));
+
+    /* rollSpeciesId never yields a dormant species — it draws from the live
+       pool, which the rule above keeps the dormant one out of. */
+    let rolledPending = false;
+    for (const r of ['legendary', 'epic']) for (let i = 0; i < 500; i++) if (isPendingSpecies(rollSpeciesId(r))) rolledPending = true;
+    ok('rollSpeciesId never rolls a dormant species', !rolledPending);
+
+    /* grantEgg's real guard refuses a pinned dormant species and falls back to
+       a live in-tier roll — exercised against the synthetic pending member. */
+    let eggRefusedPending = true, eggAlwaysLive = true;
+    for (let i = 0; i < 12; i++) {
+      const env = { MARKETPLACE: fakeKV({ ['dino_park_7']: { userId: '7', state: { saveEpoch: 2, coins: 0, park: [], vault: [], eggs: [], discovered: [] } } }) };
+      const r = await grantEgg(env, '7', 'legendary', { speciesId: FAKE });
+      if (!r.success) { eggRefusedPending = false; break; }
+      if (r.egg.speciesId === FAKE || isPendingSpecies(r.egg.speciesId)) eggRefusedPending = false;
+      if (SPECIES[r.egg.speciesId].rarity !== 'legendary') eggAlwaysLive = false;
+    }
+    ok('grantEgg refuses a pinned dormant species', eggRefusedPending);
+    ok('and still grants a live species of that rarity', eggAlwaysLive);
+  } finally {
+    delete SPECIES[FAKE];
+  }
+  ok('the synthetic dormant species is cleaned up', !SPECIES[FAKE] && !isPendingSpecies(FAKE));
 }
 
 /* ══ Wiring ════════════════════════════════════════════════════════════ */

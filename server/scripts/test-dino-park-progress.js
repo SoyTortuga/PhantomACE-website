@@ -100,17 +100,17 @@ const topKeys = (name) =>
   /* THE ARITHMETIC, pinned from the source tables rather than from a
      number typed into the game. If a mutation is added anywhere, this
      recomputes and the game recomputes, and they still agree. */
-  /* The roster now carries DORMANT species (pending: true, art not landed).
-     Only the LIVE ones are counted toward completion and walked for the
-     mutation total — the game reads ROSTER_LIVE everywhere a player sees a
-     count, so the arithmetic is pinned against the live roster, not the full
-     table. When the broadcaster un-pends a species (its art lands), the live
-     count and this total both step up together. */
+  /* The roster is 85 originals + 13 new = 98, and all 13 shipped WITH their
+     art, so every species is live now. The live/dormant split stays honest
+     anyway: completion and the mutation total are pinned against ROSTER_LIVE
+     (species without pending: true), which the game reads everywhere a player
+     sees a count. Should a future species ship dormant, liveRoster drops below
+     the full count and this arithmetic follows it down. */
   const rosterLines = block('ROSTER').split('\n').filter(l => /\{\s*id:'/.test(l));
   const roster = rosterLines.map(l => /id:'([A-Za-z0-9_]+)'/.exec(l)[1]);
   const liveRoster = rosterLines.filter(l => !/pending:\s*true/.test(l)).map(l => /id:'([A-Za-z0-9_]+)'/.exec(l)[1]);
   check('the roster is 98 species (85 original + 13 new)', roster.length, 98);
-  check('of which 87 are live (two of the new ones have art)', liveRoster.length, 87);
+  check('all 98 are live (every new species shipped with art)', liveRoster.length, 98);
 
   const swaps = /\.slice\(0,\s*(\d+)\)/.exec(block('function pickSwaps') || page.slice(
     page.indexOf('function pickSwaps'), page.indexOf('function pickSwaps') + 400));
@@ -127,7 +127,7 @@ const topKeys = (name) =>
 
   const total = liveRoster.length * perSpeciesSwaps + withSpecial + withRare
               + liveRoster.length * globals.length;
-  check('which totals 1127 mutations across the live roster', total, 1127);
+  check('which totals 1248 mutations across the live roster', total, 1248);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

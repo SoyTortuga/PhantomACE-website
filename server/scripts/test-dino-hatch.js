@@ -220,7 +220,14 @@ const dummyDino = (i) => ({ speciesId: 'compy', nickname: 'p' + i, xp: 0 });
   const e = envWith({ dino_park_u1: saveWith({}) });
   const r = await grantDino(e, 'u1', { rarity: 'epic', mutation: 'phantomace', source: 'giftsub' });
   check('a forced mutation is returned for the reveal', r.mutation, 'phantomace');
-  ok('the grant returns a portrait for the reveal', !!(r.portrait && r.portrait.indexOf('/games/dino-park/') === 0));
+  /* The reveal always carries art. Most species have a portrait (asserted
+     deterministically above on speciesMeta); a few — Yutyrannus and
+     Gigantopithecus — are icon-only, so a grant that rolls one carries the
+     icon instead. Either way the reveal is never image-less, and both are
+     /games/dino-park/ paths. */
+  const revealArt = r.portrait || r.icon;
+  ok('the grant returns reveal art (portrait, or icon for icon-only species)',
+     !!(revealArt && revealArt.indexOf('/games/dino-park/') === 0));
   check('the stored park dino carries the mutation', e.MARKETPLACE.read('dino_park_u1').state.park[0].mutation, 'phantomace');
 
   const e2 = envWith({ dino_park_u2: saveWith({}) });
