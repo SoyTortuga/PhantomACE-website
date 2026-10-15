@@ -50,6 +50,18 @@
      lists the movable panels — so it can never claim a panel shows
      something the panel does not, and a new panel documents itself by
      appearing in that one list. */
+  /* The legend is grouped into a few collapsible categories so 20+ panels read
+     as four sections instead of one long scroll. Ordering/positioning still
+     comes from OverlaySamples.PANELS; this only shapes the reference list.
+     Any panel not named here still appears, under "Other" — so a newly added
+     panel can never silently drop out of the editor. */
+  var LEGEND_GROUPS = [
+    { title: 'Twitch events', ids: ['ovHype', 'ovAdBreak', 'ovAdWarning'] },
+    { title: 'Reveals & status', ids: ['ovStage', 'ovHatch', 'ovCheckin', 'ovPrediction'] },
+    { title: 'Core games', ids: ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc'] },
+    { title: 'Stream-night modes', ids: ['ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket', 'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat'] },
+  ];
+
   function renderLegend() {
     /* From the PARENT's copy of the shared samples, loaded on this page, so
        the legend renders immediately without waiting on the iframe. Each card
@@ -57,7 +69,18 @@
     var panels = (window.OverlaySamples && window.OverlaySamples.PANELS) || [];
     var body = document.getElementById('legendBody');
     if (!body) return;
-    body.innerHTML = panels.map(function (p) {
+
+    var byId = {};
+    panels.forEach(function (p) { byId[p.id] = p; });
+    var placed = {};
+    LEGEND_GROUPS.forEach(function (g) { g.ids.forEach(function (id) { placed[id] = true; }); });
+    var orphanIds = panels.filter(function (p) { return !placed[p.id]; }).map(function (p) { return p.id; });
+    var groups = orphanIds.length
+      ? LEGEND_GROUPS.concat([{ title: 'Other', ids: orphanIds }])
+      : LEGEND_GROUPS;
+
+    function card(p) {
+      if (!p) return '';
       var items = (p.holds || []).map(function (h) {
         return '<li>' + escapeHtml(h) + '</li>';
       }).join('');
@@ -65,7 +88,18 @@
         '<div class="lg-head"><span class="lg-name">' + escapeHtml(p.label) + '</span>' +
         '<button class="lg-toggle" data-id="' + escapeHtml(p.id) + '">Shown</button></div>' +
         '<ul>' + items + '</ul></div>';
+    }
+
+    body.innerHTML = groups.map(function (g) {
+      var present = g.ids.filter(function (id) { return byId[id]; });
+      if (!present.length) return '';
+      var cards = present.map(function (id) { return card(byId[id]); }).join('');
+      return '<details class="lg-group" open>' +
+        '<summary class="lg-group-head">' + escapeHtml(g.title) +
+        '<span class="lg-group-count">' + present.length + '</span></summary>' +
+        '<div class="lg-group-body">' + cards + '</div></details>';
     }).join('');
+
     body.querySelectorAll('.lg-toggle').forEach(function (b) {
       b.onclick = function () { togglePanel(b.dataset.id); };
     });

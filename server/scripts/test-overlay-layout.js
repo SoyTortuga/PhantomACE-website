@@ -291,6 +291,15 @@ const good = { ovScramble: { x: 5, y: 70 }, ovMaze: { x: 60, y: 12 } };
   ok('the sample panel ids are exactly the ids the route stores',
      ids.length > 0 && JSON.stringify(ids) === JSON.stringify(storedIds));
 
+  /* The legend is grouped into collapsible categories. Every panel must land
+     in a named group (not silently fall to "Other"), or the condensed legend
+     would quietly lose a panel as the roster grows. */
+  const edSrc = fs.readFileSync(path.join(REPO, 'js/pages/overlay-editor.js'), 'utf8');
+  const groupsBlock = edSrc.match(/var LEGEND_GROUPS = \[([\s\S]*?)\];/);
+  const groupedIds = groupsBlock ? [...groupsBlock[1].matchAll(/'(ov\w+)'/g)].map(m => m[1]).sort() : [];
+  const ungrouped = ids.filter(id => !groupedIds.includes(id));
+  check('every panel is placed in a legend category', ungrouped, []);
+
   /* BOTH LISTS AGREEING IS NOT ENOUGH IF BOTH ARE MISSING THE SAME PANEL.
      That is how the hype bar and the ad countdown stayed unplaceable: real
      top-level panels on the overlay, tracked by the idle check, draggable by

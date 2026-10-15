@@ -93,8 +93,22 @@
   border-radius: 8px; padding: 14px; margin-top: 14px;
 }
 .od-layout .legend h2 { font-size: 13px; color: #ff4444; letter-spacing: 0.05em; margin: 0 0 12px; }
-.od-layout #legendBody {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px;
+/* Grouped into collapsible categories so 20+ panels read as a few sections.
+   Each group is a full-border box (no side-rail, no shadow); its cards grid
+   inside. Carets are plain text, not an icon font. */
+.od-layout #legendBody { display: block; }
+.od-layout .lg-group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+.od-layout .lg-group-head {
+  cursor: pointer; padding: 9px 12px; list-style: none;
+  font-weight: 800; font-size: 13px; letter-spacing: 0.04em; color: var(--text-pri);
+  display: flex; align-items: center; gap: 8px;
+}
+.od-layout .lg-group-head::-webkit-details-marker { display: none; }
+.od-layout .lg-group-head::before { content: '\25B8'; color: var(--text-dim); font-size: 10px; }
+.od-layout .lg-group[open] > .lg-group-head::before { content: '\25BE'; }
+.od-layout .lg-group-count { margin-left: auto; color: var(--text-dim); font-size: 11px; font-weight: 400; }
+.od-layout .lg-group-body {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding: 0 10px 10px;
 }
 .od-layout .lg-panel {
   border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; background: var(--black);
@@ -121,7 +135,7 @@
   .od-layout #presetSelect { max-width: 100%; width: 100%; }
   .od-layout .snap-label { min-height: 42px; }
   .od-layout .status { margin-left: 0; flex: 1 1 100%; }
-  .od-layout #legendBody { grid-template-columns: 1fr; }
+  .od-layout .lg-group-body { grid-template-columns: 1fr; }
 }
 
 /* ── Games on Overlay ──────────────────────────
