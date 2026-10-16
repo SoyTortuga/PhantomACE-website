@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <a href="/media.html" data-page="media">Media</a>
             <a href="/games.html" data-page="games">Games</a>
+            <a href="/daily" data-page="daily">Daily</a>
             <div class="nav-has-sub" data-page="membership">
               <a class="nav-parent" data-page="membership">Phamily</a>
               <div class="nav-submenu">

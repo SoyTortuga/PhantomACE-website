@@ -1,0 +1,296 @@
+/* ══════════════════════════════════════════════
+   Daily Challenges hub — /daily
+
+   Tokened throughout so both themes flip cleanly. Depth from borders only
+   (no box-shadow); done-state signalled with a brighter full border + a red
+   check, never a coloured side-rail. Titles in the display face, body in
+   --font-ui at the 14px base.
+   ══════════════════════════════════════════════ */
+
+.daily-page {
+  padding-top: 8px;
+  padding-bottom: 64px;
+}
+
+.dy-note {
+  text-align: center;
+  color: var(--text-pri);
+  opacity: 0.6;
+  padding: 40px 0;
+  font-family: var(--font-ui);
+}
+
+.dy-card-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+  color: var(--text-pri);
+}
+
+.dy-lead {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  opacity: 0.85;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+/* ── Logged-out prompt ───────────────────────── */
+.dy-guest {
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto 28px;
+}
+
+/* ── Summary: progress + streak + meta ───────── */
+.dy-summary {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+.dy-progress,
+.dy-streak {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.dy-progress-count,
+.dy-streak-num {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  color: var(--text-pri);
+}
+
+.dy-streak-num {
+  color: var(--red);
+}
+
+.dy-progress-label,
+.dy-streak-label {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+.dy-meta {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  line-height: 1.5;
+}
+
+.dy-meta-line strong { color: var(--red); }
+
+.dy-summary.is-clear {
+  border-color: var(--red);
+}
+
+.dy-summary.is-clear .dy-meta-line {
+  color: var(--text-pri);
+}
+
+/* ── The Daily Rite ──────────────────────────── */
+.dy-rite { margin-bottom: 36px; }
+
+.dy-rite-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.dy-rite-icon { font-size: 2rem; line-height: 1; }
+
+.dy-rite-head > div { flex: 1; }
+
+.dy-rite-cat {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  margin: 2px 0 0;
+}
+
+.dy-done-badge {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: var(--red);
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.dy-rite-q {
+  font-family: var(--font-ui);
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: var(--text-pri);
+  margin: 0 0 18px;
+}
+
+.dy-rite-options {
+  display: grid;
+  gap: 10px;
+}
+
+.dy-opt {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  text-align: left;
+  color: var(--text-pri);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dy-opt:hover:not(:disabled) {
+  border-color: var(--red);
+}
+
+.dy-opt:disabled { cursor: default; }
+
+.dy-opt.is-correct {
+  border-color: var(--red);
+  background: var(--red-glow);
+}
+
+/* The player's wrong pick — dim it, don't recolour it into a palette
+   violation; a thin inset marker would be a side-rail, so use opacity + a
+   struck label instead. */
+.dy-opt.is-wrong {
+  opacity: 0.5;
+}
+
+.dy-opt .dy-opt-mark {
+  float: right;
+  font-weight: 700;
+  color: var(--red);
+  margin-left: 10px;
+}
+
+.dy-rite-result {
+  margin-top: 16px;
+  font-family: var(--font-ui);
+  line-height: 1.6;
+  color: var(--text-pri);
+}
+
+.dy-rite-verdict {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.dy-rite-crowd { opacity: 0.7; font-size: 0.92rem; }
+
+.dy-rite-locked {
+  font-family: var(--font-ui);
+  opacity: 0.7;
+  margin: 8px 0 0;
+}
+
+/* ── Section heading ─────────────────────────── */
+.dy-section-title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+  color: var(--text-pri);
+  margin: 0 0 18px;
+}
+
+/* ── Challenge grid ──────────────────────────── */
+.dy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.dy-tile {
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+
+.dy-tile:hover { border-color: var(--red); }
+
+/* Done: a brighter full border + the check badge carry it — no rail, no
+   rarity colour. */
+.dy-tile.is-done { border-color: var(--red); }
+
+.dy-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dy-tile-icon { font-size: 1.6rem; line-height: 1; }
+
+.dy-tile-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--text-pri);
+  margin: 0;
+  flex: 1;
+}
+
+.dy-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-mid);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--text-pri);
+  opacity: 0.4;
+}
+
+.dy-tile.is-done .dy-check {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+  opacity: 1;
+}
+
+.dy-tile-blurb {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  opacity: 0.8;
+  line-height: 1.5;
+  margin: 0 0 16px;
+  flex: 1;
+}
+
+.dy-tile-cta {
+  align-self: flex-start;
+}
+
+@media (max-width: 640px) {
+  .dy-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .dy-meta { grid-column: 1 / -1; }
+}

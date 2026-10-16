@@ -56,6 +56,11 @@ export const NON_ROUTE_MODULES = new Set([
      Library, no handler. Covered by server/scripts/test-ad-break.js. */
   'api/ads/state.js',
 
+  /* Daily Challenges shared framework (markDailyComplete / getDailyState).
+     Library, no handler; the hub (api/daily/index.js) and the Rite
+     (api/daily/rite.js) are the routes. Covered by test-daily.js. */
+  'api/daily/state.js',
+
   /* The shared Twitch app access token. Library, no handler. */
   'api/auth/app-token.js',
 

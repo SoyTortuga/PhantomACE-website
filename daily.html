@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Daily Challenges - one deal, one question, one run a day across PhantomACE's games. Clear them all to build a streak and earn bonus giveaway entries.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Daily Challenges | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/daily.css">
+</head>
+<body data-page="daily">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Daily Challenges</h1>
+    <p class="page-hero-subtitle">One deal, one question, one run a day. Clear them all for the streak.</p>
+  </section>
+
+  <section class="page-container daily-page">
+
+    <div class="dy-note" id="dyLoading">Loading today&hellip;</div>
+
+    <!-- Logged-out: the page still sells itself, but there's no progress to show. -->
+    <div class="card dy-card dy-guest" id="dyGuest" hidden>
+      <h2 class="dy-card-title">Log in to play the dailies</h2>
+      <p class="dy-lead">The dailies track your streak and pay bonus giveaway entries, so they're tied to your Twitch account. The challenges below reset every night.</p>
+      <button class="btn-primary" type="button" onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <!-- Progress + streak summary. -->
+    <div class="dy-summary card" id="dySummary" hidden>
+      <div class="dy-progress">
+        <span class="dy-progress-count"><span id="dyDone">0</span>/<span id="dyTotal">0</span></span>
+        <span class="dy-progress-label">done today</span>
+      </div>
+      <div class="dy-streak">
+        <span class="dy-streak-num" id="dyStreak">0</span>
+        <span class="dy-streak-label">day clear streak</span>
+      </div>
+      <div class="dy-meta" id="dyMeta">
+        <span class="dy-meta-line" id="dyMetaLine">Clear all of today for <strong id="dyMetaEntries">0</strong> bonus giveaway entries.</span>
+      </div>
+    </div>
+
+    <!-- The Daily Rite: one trivia question a day, played inline. -->
+    <section class="card dy-card dy-rite" id="dyRite" hidden>
+      <div class="dy-rite-head">
+        <span class="dy-rite-icon">&#128220;</span>
+        <div>
+          <h2 class="dy-card-title">The Daily Rite</h2>
+          <p class="dy-rite-cat" id="dyRiteCat"></p>
+        </div>
+        <span class="dy-done-badge" id="dyRiteDone" hidden>Answered</span>
+      </div>
+      <p class="dy-rite-q" id="dyRiteQ"></p>
+      <div class="dy-rite-options" id="dyRiteOptions"></div>
+      <div class="dy-rite-result" id="dyRiteResult" hidden></div>
+      <p class="dy-rite-locked" id="dyRiteLocked" hidden>Log in to answer today's Rite.</p>
+    </section>
+
+    <!-- Everything today. -->
+    <h2 class="dy-section-title">Everything today</h2>
+    <div class="dy-grid" id="dyGrid"></div>
+
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/daily.js" defer></script>
+</body>
+</html>

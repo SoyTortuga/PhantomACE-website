@@ -461,6 +461,14 @@ export const FAMILIES = [
   /* Memory Match daily challenge: mm_daily_game_<userId> (in-progress board,
      sliding 1h) and mm_daily_<dayKey> (that day's ranked results, 3d). */
   { prefix: 'mm_daily_',       table: 'singletons',       expiry: 'real' },
+  /* Daily Challenges hub: daily_<userId> is one player's whole picture —
+     today's done list, the cross-game streak, the once-a-day guards and the
+     Rite answer. Persists (expiry 'none'): the streak must survive, and the
+     record self-prunes its done-map to the last few days. */
+  { prefix: 'daily_',          table: 'singletons',       expiry: 'none' },
+  /* The Daily Rite's crowd stat: rite_agg_<dayKey> is one tiny {total,correct}
+     tally per Pacific day. One small row a day; persists for the % history. */
+  { prefix: 'rite_agg_',       table: 'singletons',       expiry: 'none' },
   /* Cosmetic gift bell: a disposable per-recipient queue (gift_inbox_<userId>),
      read-and-cleared on the next inventory load; TTL is the backstop. */
   { prefix: 'gift_inbox_',     table: 'singletons',       expiry: 'real' },

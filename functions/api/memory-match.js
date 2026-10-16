@@ -421,6 +421,14 @@ async function recordDailyResult(env, player, finished) {
     } catch (err) {
       console.error('[memory-match] daily achievement record failed:', err && err.message);
     }
+    /* Report the daily to the cross-game hub so it ticks off and counts toward
+       the clear-everything streak. Idempotent per Pacific day on that side. */
+    try {
+      const { markDailyComplete } = await import('./daily/state.js');
+      await markDailyComplete(env, player.userId, player.displayName, 'memory-match');
+    } catch (err) {
+      console.error('[memory-match] daily hub report failed:', err && err.message);
+    }
   }
 
   const stored = await env.MARKETPLACE.get(key, 'json');
