@@ -36,7 +36,9 @@ import { dayKey } from '../season-time.js';
 export const CHALLENGES = [
   { id: 'daily-rite',   title: 'The Daily Rite', blurb: 'One question from the crypt. One guess.', href: '/daily', icon: '📜' },
   { id: 'memory-match', title: 'Memory Match',   blurb: "Today's deal — one run, same cards for everyone.", href: '/games/memory-match/', icon: '🃏' },
-  // Game dailies append here (dino-rival, skull-curse, mana-seed) as they ship.
+  { id: 'dino-rival',   title: 'Daily Rival',    blurb: 'One beast, same for all. Send your champion.', href: '/games/dino-park/?daily=rival', icon: '🦖' },
+  { id: 'skull-curse',  title: "Today's Curse",  blurb: 'A daily curse for all — run the cursed skull to the quota.', href: '/games/skull-clicker/', icon: '☠️' },
+  { id: 'mana-seed',    title: 'Mana Clash',     blurb: "Today's dice — same roll for everyone, play for the best score.", href: '/games/mana-clash/', icon: '🎲' },
 ];
 
 export const META_ENTRIES = 2;        // giveaway entries for clearing the whole day

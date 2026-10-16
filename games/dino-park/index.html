@@ -657,6 +657,31 @@
     .battle-result.loss .battle-result-title { color: var(--text-pri); }
     .battle-result-rewards { font-size: 14px; color: var(--text-pri); }
     .battle-actions { display: flex; gap: 8px; justify-content: center; }
+
+    /* ── Daily Rival: the once-a-day themed challenger, surfaced atop the pits ── */
+    .rival-panel { max-width: 640px; margin: 0 auto 18px; border: 1px solid var(--red); border-radius: 8px; background: var(--gray-mid); padding: 14px; }
+    .rival-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .rival-title { font-family: var(--font-display, inherit); color: var(--red); font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .rival-badge { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border: 1px solid var(--border-mid); border-radius: 10px; color: var(--text-pri); }
+    .rival-badge.done { border-color: var(--red); color: var(--red); }
+    .rival-sub { font-size: 12px; opacity: 0.75; color: var(--text-pri); margin-bottom: 12px; }
+    .rival-foe { display: flex; gap: 12px; align-items: center; background: var(--gray-lo); border: 1px solid var(--border-mid); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
+    .rival-foe-sprite { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .rival-foe-sprite img { max-width: 64px; max-height: 64px; image-rendering: pixelated; }
+    .rival-foe-info { flex: 1; min-width: 0; }
+    .rival-foe-name { font-weight: 700; font-size: 16px; }
+    .rival-foe-tier { font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; margin: 2px 0; }
+    .rival-foe-stats { font-size: 12px; opacity: 0.9; }
+    .rival-champ-label { font-size: 12px; color: var(--red); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .rival-send { display: flex; justify-content: center; margin-top: 4px; }
+    .rival-outcome { text-align: center; padding: 14px 10px; border: 1px solid var(--border-mid); border-radius: 6px; background: var(--gray-lo); }
+    .rival-outcome.win { border-color: var(--red); }
+    .rival-outcome-title { font-family: var(--font-display, inherit); font-size: 20px; letter-spacing: 0.04em; margin-bottom: 4px; }
+    .rival-outcome.win .rival-outcome-title { color: var(--red); }
+    .rival-outcome-sub { font-size: 13px; color: var(--text-pri); }
+    .rival-log { margin-top: 10px; background: var(--gray-lo); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; max-height: 140px; overflow-y: auto; }
+    .rival-log-line { font-size: 12px; color: var(--text-pri); padding: 2px 0; border-bottom: 1px solid var(--border-mid); }
+    .rival-log-line:last-child { border-bottom: none; }
     .market-earnings {
       background: #1a1a0a; border: 1px solid #ffaa0040; border-radius: 6px;
       padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center;
@@ -1563,6 +1588,7 @@
 
 <!-- Battle Tab -->
 <div class="tab-content scrollable" id="tab-battle">
+  <div id="dailyRivalPanel"></div>
   <div id="battleContent"></div>
 </div>
 
@@ -6232,6 +6258,7 @@ let battleBusy = false;
 function battleEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 async function renderBattle() {
+  renderDailyRival();
   const el = document.getElementById('battleContent');
   if (!el) return;
   const session = getPlayerSession();
@@ -6462,6 +6489,152 @@ async function finishBattle(result) {
   const log = document.getElementById('battleLog');
   if (log) log.scrollTop = log.scrollHeight;
   battleView = null;
+}
+
+/* ======================== DAILY RIVAL ========================
+   Dino Park's entry in the site-wide Daily Challenges. A once-a-day fight
+   against a challenger that is the SAME for everyone (the server seeds it off
+   the Pacific day key). The player's only decision is which of their dinos to
+   commit; the server resolves the whole fight and settles the reward, so this
+   is a thin renderer with no combat maths. One attempt per day, win or lose. */
+const RIVAL_URL = '/api/daily-rival';
+let rivalData = null;
+let rivalSelectedUid = null;
+let rivalBusy = false;
+
+async function renderDailyRival() {
+  const el = document.getElementById('dailyRivalPanel');
+  if (!el) return;
+  const session = getPlayerSession();
+  if (!session) {
+    rivalData = null;
+    const returnTo = encodeURIComponent('/games/dino-park/?daily=rival');
+    el.innerHTML = `
+      <div class="rival-panel">
+        <div class="rival-head"><div class="rival-title">🦖 Daily Rival</div></div>
+        <div class="rival-sub">One challenger stalks the park today — the same beast for every keeper. Log in with Twitch to send a dino against it.</div>
+        <div class="rival-send"><a href="/api/auth/twitch?return_to=${returnTo}" target="_top" class="market-login-btn">Login with Twitch</a></div>
+      </div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="rival-panel">
+      <div class="rival-head"><div class="rival-title">🦖 Daily Rival</div></div>
+      <div class="rival-sub">Rousing today's challenger…</div>
+    </div>`;
+  try {
+    const res = await fetch(RIVAL_URL);
+    if (!res.ok) { el.innerHTML = ''; return; }
+    rivalData = await res.json();
+  } catch { el.innerHTML = ''; return; }
+  drawRivalPanel();
+}
+
+function rivalFoeHtml(r) {
+  return `
+    <div class="rival-foe">
+      <div class="rival-foe-sprite">${spriteImg(r.speciesId, 64, 'sprite-img', r.mutation)}</div>
+      <div class="rival-foe-info">
+        <div class="rival-foe-name" style="color:${RARITY_COLORS[r.rarity] || 'var(--text-pri)'}">${battleEsc(r.name)}${r.mutation ? ' ✨' : ''}</div>
+        <div class="rival-foe-tier">Lv ${r.level} · ${battleEsc(r.rarity)} · ${battleEsc(r.archetype)}</div>
+        <div class="rival-foe-stats">${statLine(r.stats)}</div>
+      </div>
+    </div>`;
+}
+
+function drawRivalPanel() {
+  const el = document.getElementById('dailyRivalPanel');
+  const d = rivalData || {};
+  const r = d.rival;
+  if (!r) { el.innerHTML = ''; return; }
+
+  if (d.record && d.record.fought) {
+    el.innerHTML = `
+      <div class="rival-panel">
+        <div class="rival-head">
+          <div class="rival-title">🦖 Daily Rival</div>
+          <div class="rival-badge done">${d.record.win ? 'Bested' : 'Fought'}</div>
+        </div>
+        <div class="rival-sub">You have faced today's rival. A fresh challenger appears tomorrow.</div>
+        ${rivalFoeHtml(r)}
+        ${rivalOutcomeHtml(d.record)}
+      </div>`;
+    return;
+  }
+
+  const dinos = Array.isArray(d.dinos) ? d.dinos : [];
+  if (rivalSelectedUid && !dinos.some(x => x.uid === rivalSelectedUid)) rivalSelectedUid = null;
+
+  const dinoCards = dinos.length ? dinos.map(x => `
+    <div class="battle-dino-card${x.uid === rivalSelectedUid ? ' selected' : ''}" onclick="selectRivalDino('${battleEsc(x.uid)}')">
+      <div class="bd-sprite">${spriteImg(x.speciesId, 44, 'sprite-img', x.mutation)}</div>
+      <div class="bd-name" style="color:${RARITY_COLORS[x.rarity] || 'var(--text-pri)'}">${battleEsc(x.name)}</div>
+      <div class="bd-lv">Lv ${x.level}</div>
+      <div class="bd-arch">${battleEsc(x.stats.archetype)}</div>
+    </div>`).join('') : `<div class="battle-hint">No dinos ready to fight — hatch one, or bring a dino home from an expedition first.</div>`;
+
+  el.innerHTML = `
+    <div class="rival-panel">
+      <div class="rival-head">
+        <div class="rival-title">🦖 Daily Rival</div>
+        <div class="rival-badge">One attempt</div>
+      </div>
+      <div class="rival-sub">The same challenger faces every keeper today. Pick your champion and commit — you get one fight, win or lose.</div>
+      ${rivalFoeHtml(r)}
+      <div class="rival-champ-label">Your Champion ${rivalSelectedUid ? '' : '— pick one'}</div>
+      <div class="battle-dino-row">${dinoCards}</div>
+      <div class="rival-send">
+        <button class="battle-btn" ${rivalSelectedUid ? '' : 'disabled'} onclick="sendRival()">Face the Rival</button>
+      </div>
+    </div>`;
+}
+
+function rivalOutcomeHtml(rec) {
+  const bits = [];
+  if (rec.coins > 0) bits.push(`+${rec.coins} coins`);
+  if (rec.xp > 0) bits.push(`+${rec.xp} XP`);
+  if (rec.leveledTo) bits.push(`reached level ${rec.leveledTo}!`);
+  const logLines = (rec.log || []).slice(-24).map(l => `<div class="rival-log-line">${battleEsc(l)}</div>`).join('');
+  return `
+    <div class="rival-outcome ${rec.win ? 'win' : 'loss'}">
+      <div class="rival-outcome-title">${rec.win ? 'Victory!' : 'Defeated'}</div>
+      <div class="rival-outcome-sub">${bits.length ? bits.join(' · ') : (rec.win ? 'Well fought.' : 'Your dino lives to fight another day.')}</div>
+    </div>
+    ${logLines ? `<div class="rival-log">${logLines}</div>` : ''}`;
+}
+
+function selectRivalDino(uid) {
+  rivalSelectedUid = (rivalSelectedUid === uid) ? null : uid;
+  drawRivalPanel();
+}
+
+async function sendRival() {
+  if (rivalBusy || !rivalSelectedUid) return;
+  rivalBusy = true;
+  const el = document.getElementById('dailyRivalPanel');
+  try {
+    const res = await fetch(RIVAL_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: rivalSelectedUid }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      /* Already fought today (409): refresh so the stored outcome shows. */
+      if (res.status === 409) { await renderDailyRival(); return; }
+      showToast(data.error || 'Could not reach the rival.');
+      return;
+    }
+    /* The reward was settled into the cloud save (grantSeq bumped); a forced
+       sync pulls it down as marketOps the client reconciles — never a number
+       added here. */
+    try { await doServerSave(); } catch {}
+    updateTopBar();
+    if (data.cleared) showToast('Daily cleared! Check the Daily Challenges hub.');
+    const r = data.result || {};
+    if (rivalData) rivalData.record = { fought: true, win: !!r.win, coins: r.coins || 0, xp: r.xp || 0, leveledTo: r.leveledTo || null, log: r.log || [], championName: data.championName || null };
+    drawRivalPanel();
+  } catch { showToast('Could not reach the rival.'); }
+  finally { rivalBusy = false; }
 }
 
 /* ======================== MARKETPLACE TAB ======================== */
@@ -9782,6 +9955,18 @@ syncCloudSave().then(() => { if (getPlayerSession()) claimEarnings(); });
 try {
   const _visitId = new URLSearchParams(location.search).get('visit');
   if (_visitId && /^[0-9]{1,20}$/.test(_visitId)) setTimeout(() => visitParkById(_visitId), 400);
+} catch (e) { /* no params, nothing to open */ }
+
+/* Daily Challenges deep-link: ?daily=rival (the hub's dino-rival card) lands
+   on the Battle tab with the Daily Rival panel in view. */
+try {
+  if (new URLSearchParams(location.search).get('daily') === 'rival') {
+    setTimeout(() => {
+      switchTab('battle');
+      const el = document.getElementById('dailyRivalPanel');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  }
 } catch (e) { /* no params, nothing to open */ }
 
 setInterval(checkTwitchLive, 60000);

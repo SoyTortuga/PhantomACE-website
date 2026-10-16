@@ -959,6 +959,40 @@
     .click-effect-chaos .click-pop { color: #ffaa00 !important; }
     .click-effect-eternal .click-pop { color: #ff00ff !important; text-shadow: 0 0 6px rgba(255,0,255,0.5); }
     .click-effect-wraith .click-pop { color: #f2f2f2 !important; text-shadow: 0 0 7px rgba(255,255,255,0.55) !important; }
+
+    /* ═══════ TODAY'S CURSE (daily challenge) ═══════ */
+    .curse-panel { padding: 16px 14px; text-align: center; }
+    .curse-day { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+    .curse-name { font-family: var(--font-display); font-size: 26px; color: var(--red); line-height: 1.1; }
+    .curse-blurb { font-size: 14px; color: var(--text-dim); margin: 8px auto 14px; max-width: 420px; line-height: 1.4; }
+    .curse-skull { width: 120px; height: 120px; margin: 4px auto 10px; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; border: 2px solid var(--border-mid);
+      background: radial-gradient(circle at 40% 35%, #2a0b0b, #140000, #000); transition: transform 0.06s, border-color 0.15s; }
+    .curse-skull:hover { border-color: var(--red); }
+    .curse-skull:active { transform: scale(0.94); }
+    .curse-skull img { width: 86px; height: 86px; pointer-events: none; filter: drop-shadow(0 0 6px rgba(255,0,0,0.35)); }
+    .curse-skull.is-done { cursor: default; border-color: var(--border); background: var(--gray-lo); }
+    .curse-track { height: 18px; background: var(--gray-mid); border: 1px solid var(--border-mid); border-radius: 9px;
+      overflow: hidden; margin: 10px auto 6px; max-width: 360px; position: relative; }
+    .curse-track i { display: block; height: 100%; background: var(--red); width: 0; transition: width 0.18s; }
+    .curse-track .curse-preview { position: absolute; top: 0; left: 0; height: 100%; background: rgba(255,0,0,0.3); width: 0; }
+    .curse-track .curse-amt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff; }
+    .curse-target { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+    .curse-rules { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 4px auto 12px; max-width: 420px; }
+    .curse-rule { font-size: 12px; color: var(--text-dim); border: 1px solid var(--border-mid); border-radius: 12px; padding: 3px 10px; }
+    .curse-rule.alert { color: var(--red); border-color: var(--red); }
+    .curse-timer { font-family: var(--font-display); font-size: 22px; color: var(--red); margin: 2px 0 8px; }
+    .curse-timer.safe { color: var(--text-pri); }
+    .curse-reset { margin-top: 6px; padding: 7px 16px; background: var(--gray-lo); color: var(--text-dim);
+      border: 1px solid var(--border-mid); border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .curse-reset:hover { border-color: var(--red); color: var(--red); }
+    .curse-done-badge { font-family: var(--font-display); font-size: 22px; color: var(--red); margin: 10px 0 4px; }
+    .curse-relics { font-size: 14px; color: var(--text-pri); margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+    .curse-relics b { color: var(--red); }
+    .curse-relic-bonus { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+    .curse-login { display: inline-block; margin-top: 10px; padding: 9px 20px; background: var(--red); color: #fff;
+      border-radius: 6px; font-size: 15px; font-weight: 700; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -995,6 +1029,7 @@
 
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('buildings')">Buildings</button>
+      <button class="tab-btn" onclick="switchTab('curse')">☠ Curse</button>
       <button class="tab-btn" onclick="switchTab('upgrades')">Upgrades</button>
       <button class="tab-btn" onclick="switchTab('prestige')">Prestige</button>
       <button class="tab-btn" onclick="switchTab('reaping')">Reaping</button>
@@ -1009,6 +1044,7 @@
     </div>
 
     <div class="tab-content active" id="tab-buildings"></div>
+    <div class="tab-content" id="tab-curse"></div>
     <div class="tab-content" id="tab-upgrades"></div>
     <div class="tab-content" id="tab-prestige"></div>
     <div class="tab-content" id="tab-reaping"></div>
@@ -2158,7 +2194,7 @@
       combo = (now - lastClickAt < 1200) ? Math.min(combo + 1, 100) : 1;
       lastClickAt = now;
 
-      let power = getClickPower().mul(comboMult());
+      let power = getClickPower().mul(comboMult()).mul(curseRelicMult());
       const crit = Math.random() < critChance();
       if (crit) power = power.mul(critMult());
 
@@ -3153,6 +3189,7 @@
     function render() {
       document.getElementById('score').textContent = formatNum(skulls.floor());
       document.getElementById('perSec').textContent = formatNum(getCPS()) + ' per second';
+      if (activeTab === 'curse') renderCurse();
       if (activeTab === 'prestige') renderPrestige();
       if (activeTab === 'reaping') renderReaping();
       if (activeTab === 'pet') renderPet();
@@ -3539,7 +3576,7 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      const tabs = ['buildings','upgrades','prestige','reaping','pet','grimoire','garden','hallowtide','feats','ranks','cosmetics','stats'];
+      const tabs = ['buildings','curse','upgrades','prestige','reaping','pet','grimoire','garden','hallowtide','feats','ranks','cosmetics','stats'];
       document.querySelectorAll('.tab-btn').forEach((btn, i) => {
         const on = tabs[i] === tab;
         btn.classList.toggle('active', on);
@@ -3550,6 +3587,7 @@
       });
       render();
       if (tab === 'ranks') loadRanks();
+      if (tab === 'curse') loadCurse();
     }
 
     /* ═══════ GAME LOOP ═══════ */
@@ -5411,6 +5449,226 @@
       </div>`;
     }
 
+    /* ═══════ TODAY'S CURSE (daily challenge) ═══════
+       A dedicated daily run under a curse that is the SAME for everyone that
+       day. It lives entirely on the server (/api/skull-curse) in its own
+       record — clicking the cursed skull here NEVER earns main-game skulls and
+       NEVER touches the endless/prestige save. The only thing that crosses back
+       is the reward: Cursed Relics, which grant a small permanent click bonus
+       (curseRelicMult, below), read from the server and never persisted. */
+    let curseState = null;          /* last payload: { day, curse, loggedIn, run } */
+    let curseRelics = 0;            /* relic count, drives the click bonus */
+    let cursePending = 0;           /* strikes queued but not yet flushed */
+    let curseFlushing = false;
+    let curseFlushTimer = null;
+
+    const CURSE_RELIC_CLICK_STEP = 0.02;   /* +2% click power per relic … */
+    const CURSE_RELIC_CLICK_CAP = 0.5;     /* … capped at +50% */
+    function curseRelicMult() {
+      return 1 + Math.min(CURSE_RELIC_CLICK_CAP, (curseRelics || 0) * CURSE_RELIC_CLICK_STEP);
+    }
+
+    function curseLoginUrl() { return '/api/auth/twitch?return_to=' + encodeURIComponent(location.pathname + location.search); }
+
+    async function loadCurse() {
+      try {
+        const res = await fetch('/api/skull-curse', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        applyCurse(await res.json());
+      } catch (e) { /* the daily is a bonus, never load-bearing */ }
+    }
+
+    function applyCurse(d) {
+      if (!d) return;
+      /* A day rollover (or first load) resets any optimistic preview. */
+      if (!curseState || !curseState.run || (d.run && curseState.run && d.run.day !== curseState.run.day)) cursePending = 0;
+      curseState = d;
+      if (d.run) curseRelics = d.run.relics || 0;
+      if (activeTab === 'curse') renderCurse();
+    }
+
+    function curseStrike() {
+      if (!curseState || !curseState.loggedIn || !curseState.run || curseState.run.done) return;
+      cursePending++;
+      playSound('click');
+      updateCurseProgress();       /* in-place — never rebuilds the skull element */
+      scheduleCurseFlush();
+    }
+
+    function scheduleCurseFlush() {
+      if (curseFlushTimer || cursePending <= 0) return;
+      curseFlushTimer = setTimeout(flushCurse, 650);
+    }
+
+    async function flushCurse() {
+      curseFlushTimer = null;
+      if (curseFlushing) { scheduleCurseFlush(); return; }
+      const n = cursePending;
+      if (n <= 0) return;
+      cursePending = 0;
+      curseFlushing = true;
+      try {
+        const res = await fetch('/api/skull-curse', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'strike', count: n }),
+        });
+        if (res.ok) {
+          const d = await res.json();
+          const wasDone = !!(curseState && curseState.run && curseState.run.done);
+          if (curseState) { curseState.run = d.run; curseRelics = d.run.relics || 0; }
+          if (d.scattered) showBuffToast('☠️ The pile scattered — begin again!', 'frenzy');
+          if (d.cleared && !wasDone) {
+            showBuffToast('☠️ Curse broken! You earned a Cursed Relic.', 'reap');
+            playSound('feat');
+          }
+          if (activeTab === 'curse') renderCurse();
+        }
+      } catch (e) { /* retry on the next strike */ } finally {
+        curseFlushing = false;
+        if (cursePending > 0) scheduleCurseFlush();
+      }
+    }
+
+    async function resetCurse() {
+      if (!curseState || !curseState.loggedIn || !curseState.run || curseState.run.done) return;
+      cursePending = 0;
+      try {
+        const res = await fetch('/api/skull-curse', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reset' }),
+        });
+        if (res.ok) {
+          const d = await res.json();           /* response carries only { run } */
+          if (curseState && d.run) { curseState.run = d.run; curseRelics = d.run.relics || 0; }
+          if (activeTab === 'curse') renderCurse();
+        }
+      } catch (e) { /* leave the run as it was */ }
+    }
+
+    const CURSE_HELP = 'Each day the Reaper lays a <b>curse</b> — the same one for everyone — with a short, bounded objective. Click the cursed skull to gather bones under the curse\'s rules and reach the <b>target</b>. This is a separate run: it never touches your main skulls or prestige. Break the curse to earn a <b>Cursed Relic</b>, and each relic gives you a permanent <b>+2% click power</b> (up to +50%). One clear per day.';
+
+    /* The tab is rebuilt only when its SHAPE changes (day / login / done /
+       curse) — see the signature below. Manual strikes and flush responses go
+       through updateCurseProgress(), which touches only the bar and the
+       counters in place, so the #curseSkull element is never swapped out from
+       under a rapid clicker. */
+    let curseViewSig = null;
+
+    function renderCurse() {
+      const el = document.getElementById('tab-curse');
+      if (!el) return;
+      const c = (curseState && curseState.curse) || {};
+      const loggedIn = !!(curseState && curseState.loggedIn);
+      const run = (curseState && curseState.run) || {};
+      const done = !!run.done;
+      const sig = (curseState ? (curseState.day || '') : 'none') + '|' + (loggedIn ? 'in' : 'out') + '|' + (done ? 'done' : 'run') + '|' + (c.id || '');
+
+      if (sig === curseViewSig && el.querySelector('.curse-panel')) { updateCurseProgress(); return; }
+      curseViewSig = sig;
+      const head = helpBox('curse', CURSE_HELP);
+
+      if (!curseState) { el.innerHTML = head + '<div class="curse-panel"><div class="curse-blurb">Summoning the curse…</div></div>'; return; }
+
+      if (!loggedIn) {
+        el.innerHTML = head +
+          '<div class="curse-panel">' +
+          '<div class="curse-day">Today\'s Curse</div>' +
+          '<div class="curse-name">' + escSkull(c.name || 'A Curse') + '</div>' +
+          '<div class="curse-blurb">' + escSkull(c.blurb || '') + '</div>' +
+          '<div class="curse-target">Reach <b>' + (c.target || 0) + '</b> bones under the curse to break it.</div>' +
+          '<a class="curse-login" target="_top" href="' + curseLoginUrl() + '">Log in to face the curse</a>' +
+          '</div>';
+        return;
+      }
+
+      const rules = [];
+      if (c.crumbleEvery > 0) rules.push('<span class="curse-rule alert">Every ' + ordinal(c.crumbleEvery) + ' strike crumbles</span>');
+      if (c.decayPerSec > 0) rules.push('<span class="curse-rule alert">Rots ' + c.decayPerSec + '/sec</span>');
+      if (c.deadlineSec > 0) rules.push('<span class="curse-rule alert">' + c.deadlineSec + 's deadline</span>');
+      rules.push('<span class="curse-rule">' + (c.perStrike || 0) + ' bones / strike</span>');
+
+      let body;
+      if (done) {
+        body = '<div class="curse-skull is-done"><img src="/assets/images/skull.png" alt=""></div>' +
+          '<div class="curse-done-badge">☠️ Curse Broken</div>' +
+          '<div class="curse-target">You reached the quota. Return tomorrow for a new curse.</div>';
+      } else {
+        body = '<div class="curse-skull" id="curseSkull"><img src="/assets/images/skull.png" alt="Strike"></div>' +
+          (c.deadlineSec > 0 ? '<div class="curse-timer safe" id="curseTimer">⌛ ' + Math.ceil(curseDeadlineRemaining()) + 's</div>' : '') +
+          '<div class="curse-track">' +
+          '<span class="curse-preview" id="cursePreview" style="width:0%"></span>' +
+          '<i id="curseFill" style="width:0%"></i>' +
+          '<span class="curse-amt" id="curseAmt">0 / ' + (c.target || 0) + '</span>' +
+          '</div>' +
+          '<div class="curse-target" id="curseStrikes"></div>' +
+          '<button class="curse-reset" onclick="resetCurse()">Abandon &amp; restart</button>';
+      }
+
+      el.innerHTML = head +
+        '<div class="curse-panel">' +
+        '<div class="curse-day">Today\'s Curse · ' + escSkull(curseState.day || '') + '</div>' +
+        '<div class="curse-name">' + escSkull(c.name || 'A Curse') + '</div>' +
+        '<div class="curse-blurb">' + escSkull(c.blurb || '') + '</div>' +
+        '<div class="curse-rules">' + rules.join('') + '</div>' +
+        body +
+        '<div class="curse-relics">Cursed Relics: <b id="curseRelicCount">0</b>' +
+        '<div class="curse-relic-bonus">Permanent click power: <b id="curseRelicBonus">+0%</b></div></div>' +
+        '</div>';
+
+      const sk = document.getElementById('curseSkull');
+      if (sk) sk.addEventListener('click', curseStrike);
+      updateCurseProgress();
+    }
+
+    /* Update only the dynamic bits in place; safe to call when the panel is not
+       built or shows the logged-out / done view (the getElementById guards). */
+    function updateCurseProgress() {
+      if (activeTab !== 'curse' || !curseState || !curseState.loggedIn) return;
+      const c = curseState.curse || {};
+      const run = curseState.run || {};
+      const relicBonus = Math.round(Math.min(CURSE_RELIC_CLICK_CAP, (curseRelics || 0) * CURSE_RELIC_CLICK_STEP) * 100);
+      const rc = document.getElementById('curseRelicCount'); if (rc) rc.textContent = curseRelics || 0;
+      const rb = document.getElementById('curseRelicBonus'); if (rb) rb.textContent = '+' + relicBonus + '%';
+      if (run.done) return;
+
+      const target = c.target || 1;
+      const serverBones = Math.min(target, run.bones || 0);
+      const preview = Math.min(target - serverBones, (cursePending || 0) * (c.perStrike || 0));
+      const pct = Math.max(0, Math.min(100, (serverBones / target) * 100));
+      const prevPct = Math.max(0, Math.min(100, ((serverBones + preview) / target) * 100));
+      const fill = document.getElementById('curseFill'); if (fill) fill.style.width = pct + '%';
+      const prev = document.getElementById('cursePreview'); if (prev) prev.style.width = prevPct + '%';
+      const amt = document.getElementById('curseAmt'); if (amt) amt.textContent = Math.floor(serverBones + preview) + ' / ' + target;
+      const st = document.getElementById('curseStrikes');
+      if (st) st.innerHTML = 'Strikes: <b>' + (run.strikes || 0) + '</b>' +
+        (run.failedAttempts > 0 ? ' · Scattered <b>' + run.failedAttempts + '×</b>' : '');
+    }
+
+    function ordinal(n) { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
+    /* Seconds left on a deadline curse, from the run's server start time. */
+    function curseDeadlineRemaining() {
+      if (!curseState || !curseState.curse || !curseState.run) return 0;
+      const d = curseState.curse.deadlineSec || 0;
+      if (!d) return 0;
+      return Math.max(0, d - (Date.now() - (curseState.run.startedAt || Date.now())) / 1000);
+    }
+
+    /* Tick the deadline countdown in place while the Curse tab is open. No full
+       re-render per second — just the timer text — and it bails when nothing is
+       shown, so a backgrounded tab does no work. */
+    setInterval(() => {
+      if (activeTab !== 'curse' || !curseState || !curseState.run || curseState.run.done) return;
+      if (!curseState.curse || !curseState.curse.deadlineSec) return;
+      const t = document.getElementById('curseTimer');
+      if (!t) return;
+      const remain = Math.max(0, Math.ceil(curseDeadlineRemaining()));
+      t.textContent = '⌛ ' + remain + 's';
+      t.classList.toggle('safe', remain > 10);
+    }, 1000);
+
     /* ═══════ INIT ═══════ */
 
     document.getElementById('skullBtn').addEventListener('click', handleClick);
@@ -5460,6 +5718,11 @@
     setInterval(() => { if (!document.hidden) fetchRaidReward(); }, 30000);
     pollTithe();
     setInterval(() => { if (!document.hidden) pollTithe(); }, 5000);
+    /* Load the daily curse once (for the relic click bonus) and refresh it
+       slowly — a day rollover and the relic count are the only things that
+       change under the game, and the Curse tab reloads it on open. */
+    loadCurse();
+    setInterval(() => { if (!document.hidden) loadCurse(); }, 60000);
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
@@ -5467,6 +5730,7 @@
       pollSkullEvent();
       fetchRaidReward();
       pollTithe();
+      loadCurse();
     });
   </script>
 </body>

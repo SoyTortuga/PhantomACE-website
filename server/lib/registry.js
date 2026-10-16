@@ -393,12 +393,25 @@ export const FAMILIES = [
          through. Both live in dino_parks beside the save they settle into. */
   { prefix: 'dino_battle_energy_', table: 'dino_parks',   expiry: 'none' },
   { prefix: 'dino_battle_state_',  table: 'dino_parks',   expiry: 'none' },
+  /* Daily Rival: one row per player (dino_rival_<userId>) holding today's
+     auto-resolved fight result. The in-value `day` stamp is both the
+     once-a-day guard and the reset (a previous day reads as "not fought"), so
+     expiry 'none' like its battle siblings; lives in dino_parks beside the
+     save it settles coins/care-xp into. */
+  { prefix: 'dino_rival_',     table: 'dino_parks',       expiry: 'none' },
 
 
   /* A raider's pending raid-boss reward code, per account, claimed in-game.
      'real': it carries a TTL matching the code's redemption window, so an
      unclaimed one clears itself. Matched after the sc_raid singleton. */
   { prefix: 'sc_raid_reward_',  table: 'singletons',       expiry: 'real' },
+  /* Today's Curse daily: sc_curse_<userId> is the day-scoped cursed run,
+     replaced each day (its in-value day stamp gates one clear per Pacific
+     day) and never touching the main sc_save_; sc_relics_<userId> is the
+     persistent Cursed Relic reward ledger — the only record of it, so it
+     must never expire. Both 'none'. */
+  { prefix: 'sc_curse_',        table: 'singletons',       expiry: 'none' },
+  { prefix: 'sc_relics_',       table: 'singletons',       expiry: 'none' },
   /* Lifetime count of "Summon Raid Boss" redemptions that actually spawned
      a boss, per account -- what the Undead Executioner badge ladder reads.
      'none': this is the only record of it, and it must never reset. */

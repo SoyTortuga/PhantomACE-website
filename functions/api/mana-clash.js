@@ -179,7 +179,7 @@ const DAILY_TTL = 172800;                  // 48h — a day board clears itself
    the day key mixed with the index, finished with a short avalanche so
    adjacent positions don't correlate. Pure — the same (day, i) is always the
    same face, for every player. */
-function streamFace(dayKey, i) {
+export function streamFace(dayKey, i) {
   let h = 2166136261 ^ (i >>> 0);
   for (let k = 0; k < dayKey.length; k++) h = Math.imul(h ^ dayKey.charCodeAt(k), 16777619);
   h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15;
@@ -1612,8 +1612,16 @@ async function settle(env, code, room) {
 
 /* Record a finished Daily run: the solo player's total goes on that day's board
    (first completion only — a replay of the same seed cannot beat your own
-   score), and the achievement engine is told they played today. */
-async function recordDaily(env, room) {
+   score), and the achievement engine is told they played today.
+
+   The DAILY_USER_PREFIX record does double duty: while a run is only in
+   progress it carries `active` (a pointer start-daily resumes rather than
+   re-deals), and here, on completion, it is replaced by the scored result
+   {dayKey, score, name} — which also clears that pointer and gates a second
+   scoring run the same day. A top-level dayKey === today means "already
+   scored"; the in-progress pointer deliberately has no top-level dayKey, so it
+   never trips this gate. */
+export async function recordDaily(env, room) {
   const id = Object.keys(room.players)[0];
   if (!id || !room.dayKey) return;
   const p = room.players[id];
@@ -1635,6 +1643,19 @@ async function recordDaily(env, room) {
   }, { expirationTtl: DAILY_TTL });
 
   await fireAchievement(env, id, { type: 'daily', dayKey: room.dayKey });
+
+  /* Report the daily to the cross-game hub so it ticks off on /daily and counts
+     toward the clear-everything streak. Idempotent per Pacific day on that
+     side, and best-effort — the hub must never fail a recorded run. Mana Clash
+     pays its OWN reward through its day board and achievements, NOT giveaway
+     entries (the framework grants the site-wide meta reward for clearing every
+     daily), so this only reports completion. */
+  try {
+    const { markDailyComplete } = await import('./daily/state.js');
+    await markDailyComplete(env, id, p.displayName, 'mana-seed');
+  } catch (err) {
+    console.error('[mana-clash] daily hub report failed:', err && err.message);
+  }
 }
 
 async function withRoom(env, code, fn) {
@@ -1854,6 +1875,28 @@ export async function onRequestPost(context) {
   if (body.action === 'start-daily') {
     const now = Date.now();
     const dk = seasonDayKey();
+
+    /* Resume, never re-deal. The day's dice are fixed, so abandoning a run and
+       restarting would otherwise let a player replay the same roll for a better
+       score. While a run is only in progress the DAILY_USER_PREFIX record holds
+       an `active` pointer at the live room; we return THAT room rather than
+       minting a new one. Once today's run is scored the record instead carries a
+       top-level dayKey, and a fresh start is a deliberate, unscored "replay for
+       fun" (the recordDaily gate keeps it off the board) — so we only resume
+       while not yet scored. */
+    const u = await env.MARKETPLACE.get(DAILY_USER_PREFIX + userId, 'json');
+    const scoredToday = !!(u && u.dayKey === dk);
+    if (!scoredToday && u && u.active && u.active.dayKey === dk && u.active.code) {
+      const live = await env.MARKETPLACE.get('mc_room_' + u.active.code, 'json');
+      if (live && live.daily && live.dayKey === dk && live.status !== 'finished'
+          && live.players && live.players[userId]) {
+        const { room } = await withRoom(env, u.active.code, () => null);
+        if (room && room.status !== 'finished') {
+          return json({ success: true, code: u.active.code, resumed: true, room: viewFor(room, userId, Date.now()) });
+        }
+      }
+    }
+
     let made = null;
     for (let i = 0; i < 10; i++) {
       const candidate = generateCode();
@@ -1882,6 +1925,19 @@ export async function onRequestPost(context) {
       if (claimed) { made = candidate; break; }
     }
     if (!made) return json({ error: 'Could not start the daily run' }, 500);
+
+    /* Remember the live run so a restart resumes it (above) instead of
+       re-dealing. Only while not yet scored — a for-fun replay must not
+       overwrite the recorded result that gates a second scoring run. The
+       `active` pointer carries no top-level dayKey, so recordDaily still treats
+       the player as not-yet-scored. */
+    if (!scoredToday) {
+      await env.MARKETPLACE.mutate(DAILY_USER_PREFIX + userId, (cur) => {
+        if (cur && cur.dayKey === dk) return undefined;   // scored between reads — leave the result intact
+        return { ...(cur && typeof cur === 'object' ? cur : {}), active: { dayKey: dk, code: made } };
+      });
+    }
+
     /* Start it straight away — a daily run is solo, there is nobody to wait
        for, and the lobby would only be a step between the button and the dice. */
     const { room } = await withRoom(env, made, (r, n) => { startRound(r, n); return null; });
