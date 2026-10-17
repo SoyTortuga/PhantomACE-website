@@ -571,6 +571,18 @@
   white-space: nowrap;
 }
 
+/* On the mobile top bar the trigger sits between the bell and the hamburger,
+   so it shows the AVATAR ONLY. The name, role and title all live inside the
+   account menu it opens anyway — and the full name+title trigger was wide
+   enough to shove the hamburger (the nav menu) clean off the right edge once
+   a viewer logged in, so the menu became unreachable. The menu stays anchored
+   to the avatar (.auth-user-info is position:relative). */
+@media (max-width: 767px) {
+  .auth-user-name,
+  .auth-user-title { display: none; }
+  .auth-user-trigger { padding: 2px; gap: 0; }
+}
+
 /* Hype Train Banner */
 .hype-train-banner {
   background: linear-gradient(90deg, #1a0300 0%, #330000 50%, #1a0300 100%);
