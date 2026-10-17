@@ -2115,6 +2115,21 @@ body.ov-alerting .ov-safari {
   transform: translate(-50%, -50%);
   object-fit: contain;
 }
+/* "Ads Playing" label above the ring. GodOfWar + text-shadow for legibility
+   over the live capture (the overlay's standard treatment, never a box-shadow),
+   centred over the corner ring. */
+.ov-adbreak-label {
+  position: absolute;
+  bottom: 100%;
+  right: 0;                 /* hug the corner — centring would clip off-screen */
+  margin-bottom: 4px;
+  white-space: nowrap;
+  font-family: 'GodOfWar', serif;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--red);
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 0, 0, 0.5);
+}
 
 /* Ad-break WARNING card — same bottom-right corner as the ring. No background:
    legibility over the live capture comes from the text-shadow (the overlay's

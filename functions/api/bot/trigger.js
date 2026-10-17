@@ -220,5 +220,40 @@ export async function onRequestPost(context) {
     return json({ success: true, volume });
   }
 
+  /* ── Ad alert tests ───────────────────────────────────────────────────
+     Prove the overlay renders the "Ads Incoming!" warning and the during-
+     break ring WITHOUT waiting on Twitch's ad schedule. Both write the same
+     ad_state the live path uses, and the overlay's normal events poll picks
+     them up through refreshSchedule+viewOf — so this exercises the real
+     render path, not a mock, and works even while offline.
+
+     WHY THE WARNING TEST STICKS. refreshSchedule serves cached state while
+     scheduleCheckedAt is within its TTL, so stamping it `now` makes the next
+     poll read this fake schedule instead of calling Twitch; after ~60s the
+     real schedule takes back over on its own. The overlay fires the card once
+     (deduped on nextAdAt) and self-clears after 30s. */
+  if (body.action === 'test-ad-warning') {
+    const { readAdState, writeAdState } = await import('../ads/state.js');
+    const now = Date.now();
+    const st = await readAdState(env);
+    st.break = null;   // a running break would suppress the warning
+    st.schedule = { nextAdAt: now + 90_000, durationSeconds: 90, snoozeCount: 0, prerollFreeTime: 0 };
+    st.scheduleCheckedAt = now;
+    await writeAdState(env, st);
+    return json({ success: true });
+  }
+
+  /* A short fake break so the ring is quick to watch drain and then clears
+     itself by arithmetic (there is no ad_break.end event to wait on). */
+  if (body.action === 'test-ad-break') {
+    const { recordBreakBegin } = await import('../ads/state.js');
+    await recordBreakBegin(env, {
+      started_at: new Date().toISOString(),
+      duration_seconds: 30,
+      is_automatic: true,
+    });
+    return json({ success: true });
+  }
+
   return json({ error: 'Invalid action' }, 400);
 }

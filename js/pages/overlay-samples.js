@@ -367,7 +367,8 @@
 
   function adBreak() {
     show('ovAdBreak');
-    /* Ring-only now: show it part-drained so the sample reads as a timer. */
+    /* "Ads Playing" label + drumming emote in the ring; show it part-drained
+       so the sample reads as a timer. */
     var ring = $('ovAdBreakRing');
     if (ring) ring.style.strokeDashoffset = (289.03 * 0.45).toFixed(1);
   }

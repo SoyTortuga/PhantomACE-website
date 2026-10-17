@@ -713,6 +713,37 @@ async function fireTestAlert(type, label, btn) {
   if (btn) btn.disabled = false;
 }
 
+/* The ad alerts aren't queue alerts — they're driven by the ad-schedule view
+   on the events poll — so they get their own action, not test-alert. Each
+   writes the ad_state the live path reads, so pressing it proves the overlay's
+   real render path (warning card / draining ring) works without waiting on a
+   Twitch-scheduled break. */
+var OD_AD_TESTS = [
+  { action: 'test-ad-warning', label: 'Ad Warning' },
+  { action: 'test-ad-break', label: 'Ad Break Ring' },
+];
+
+async function fireAdTest(action, label, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/bot/trigger', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action }),
+    });
+    const d = await res.json().catch(function () { return {}; });
+    if (res.ok && d.success) {
+      showBotStatus('Test "' + label + '" fired — it shows on the overlay within a second and clears itself.', false);
+    } else {
+      showBotStatus(d.error || 'Could not fire that ad test.', true);
+    }
+  } catch {
+    showBotStatus('Network error firing the ad test.', true);
+  }
+  if (btn) btn.disabled = false;
+}
+
 function initTestAlerts() {
   const box = document.getElementById('odTestAlertBtns');
   if (!box) return;
@@ -722,6 +753,13 @@ function initTestAlerts() {
     btn.className = 'btn-secondary od-test-btn';
     btn.textContent = a.label;
     btn.addEventListener('click', function () { fireTestAlert(a.type, a.label, btn); });
+    box.appendChild(btn);
+  });
+  OD_AD_TESTS.forEach(function (a) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary od-test-btn';
+    btn.textContent = a.label;
+    btn.addEventListener('click', function () { fireAdTest(a.action, a.label, btn); });
     box.appendChild(btn);
   });
 }

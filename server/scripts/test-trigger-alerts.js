@@ -13,6 +13,7 @@
    ══════════════════════════════════════════════ */
 
 import * as trigger from '../../functions/api/bot/trigger.js';
+import { readAdState, viewOf, WARNING_LEAD_MS } from '../../functions/api/ads/state.js';
 
 let passed = 0;
 const failures = [];
@@ -147,6 +148,34 @@ const lastEvent = (env) => {
 
   const denied = await post(env, { action: 'alert-toggle', type: 'follow', enabled: false }, '12345');
   check('a viewer cannot change a toggle', denied.status, 403);
+}
+
+/* ── Ad alert tests write the ad_state the overlay poll renders from ───────
+   These confirm the dashboard's "Ad Warning" / "Ad Break Ring" buttons make
+   viewOf() report what the overlay reacts to — proving the firing path end to
+   end without a Twitch-scheduled break. */
+{
+  const env = makeEnv();
+  const res = await post(env, { action: 'test-ad-warning' });
+  check('test-ad-warning succeeds', res.status, 200);
+  const v = viewOf(await readAdState(env), Date.now());
+  check('it puts the next ad inside the warning window', v.warning, true);
+  check('and not mistaken for a running break', v.running, false);
+  ok('with a positive countdown to the ad', v.secondsUntilNext > 0 && v.secondsUntilNext <= WARNING_LEAD_MS / 1000);
+
+  const env2 = makeEnv();
+  const res2 = await post(env2, { action: 'test-ad-break' });
+  check('test-ad-break succeeds', res2.status, 200);
+  const v2 = viewOf(await readAdState(env2), Date.now());
+  check('it reports a break running (the ring shows)', v2.running, true);
+  check('and clears the upcoming-warning so the two never overlap', v2.warning, false);
+  ok('the ring has seconds left to drain', v2.secondsRemaining > 0);
+
+  /* Staff-gated like every other trigger action. */
+  const denied = await post(makeEnv(), { action: 'test-ad-warning' }, '12345');
+  check('a viewer cannot fire the ad warning test', denied.status, 403);
+  const denied2 = await post(makeEnv(), { action: 'test-ad-break' }, '12345');
+  check('a viewer cannot fire the ad break test', denied2.status, 403);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

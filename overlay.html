@@ -357,8 +357,10 @@
   <!-- Ad-break timer. A red ring drains around the drumming phamDrum emote over
        the break's length. Driven by the overlay_state snapshot: it counts down
        from the break's absolute end time and hides itself when it passes (there
-       is no ad_break.end event). Ring-only, no text. -->
+       is no ad_break.end event). The drumming emote sits in the draining ring
+       under an "Ads Playing" label. -->
   <div class="ov-adbreak" id="ovAdBreak" hidden>
+    <div class="ov-adbreak-label">Ads Playing</div>
     <svg class="ov-adbreak-ring" viewBox="0 0 100 100" aria-hidden="true">
       <circle class="ov-adbreak-drain" id="ovAdBreakRing" cx="50" cy="50" r="46"></circle>
     </svg>
