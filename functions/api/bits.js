@@ -1,14 +1,22 @@
 /* ══════════════════════════════════════════════
    BITS POWER-UP → DINO HATCH
 
-   Twitch EventSub webhook for channel.bits.use. The broadcaster chose ONE
-   trigger from this event: a Power-up costing exactly 300 bits rolls the dino
-   hatch minigame once for whoever spent them (dino-hatch.js).
+   Twitch EventSub webhook for channel.bits.use. The broadcaster made a CUSTOM
+   Bits Power-up for the dino hatch (300 bits). Using it rolls the hatch
+   minigame once for whoever spent the bits (dino-hatch.js).
 
-   channel.bits.use fires for BOTH ordinary cheers and Power-ups; event.type
-   distinguishes them ('cheer' vs 'power_up'). Only a 300-bit Power-up hatches —
-   an ordinary cheer of 300 bits does not, and neither does a Power-up of any
-   other size. Everything else is acknowledged and ignored.
+   WHY custom_power_up, NOT power_up. channel.bits.use fires for three kinds of
+   usage, told apart by event.type: 'cheer' (an ordinary cheer), 'power_up' (a
+   BUILT-IN Power-up — message effect / Gigantify an Emote / celebration, whose
+   bit prices Twitch sets and which can't be made into a hatch reward), and
+   'custom_power_up' (a Power-up the broadcaster created). The egg-hatch reward
+   is necessarily a CUSTOM Power-up, so it arrives as type 'custom_power_up'
+   with its name in event.custom_power_up.title — the earlier code only matched
+   'power_up', which is why a 300-bit hatch Power-up never fired. We match the
+   custom Power-up the same way the channel-point reward is matched (by title,
+   so a rename that keeps the word still works), with the 300-bit cost as a
+   fallback signal. An ordinary cheer never hatches. Everything else is acked
+   and ignored.
 
    NEEDS bits:read + the subscription. This subscription is created by the admin
    panel only when the broadcaster has granted bits:read (bot-setup.js), and it
@@ -21,10 +29,21 @@
 
 import { verifyEventSub } from '../../server/lib/eventsub.js';
 
-/* The one Power-up size that hatches. Kept as a named constant because it is a
-   deliberate product decision, not a magic number — a Power-up of any other
-   cost is ignored on purpose. */
+/* The custom Power-up's Bits cost, used only as a FALLBACK match when the
+   title doesn't name the hatch — the broadcaster can reprice the Power-up, so
+   this is a signal, not the gate. */
 const HATCH_POWERUP_BITS = 300;
+
+/* A custom Power-up is the hatch reward when its title names it (matched like
+   the channel-point reward, so a rename keeps working) OR, failing a title,
+   when it costs exactly the hatch price. */
+function isHatchPowerUp(event) {
+  if (!event || event.type !== 'custom_power_up') return false;
+  const title = ((event.custom_power_up && event.custom_power_up.title) || '').toLowerCase();
+  if (/hatch|egg|dino/.test(title)) return true;
+  if (!title && (Number(event.bits) || 0) === HATCH_POWERUP_BITS) return true;
+  return false;
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -55,10 +74,7 @@ export async function onRequestPost(context) {
     const type = body.subscription && body.subscription.type;
 
     if (type === 'channel.bits.use' && event) {
-      const isPowerUp = event.type === 'power_up';
-      const bits = Number(event.bits) || 0;
-
-      if (isPowerUp && bits === HATCH_POWERUP_BITS) {
+      if (isHatchPowerUp(event)) {
         try {
           const { runDinoHatch } = await import('./dino-hatch.js');
           await runDinoHatch(env, {
@@ -89,3 +105,5 @@ export async function onRequestPost(context) {
 
   return json({ ok: true });
 }
+
+export { isHatchPowerUp };

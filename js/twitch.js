@@ -51,7 +51,6 @@ function updateLiveIndicators(status) {
         </div>
         <div class="hero-live-meta">
           ${status.game ? `<span>${status.game}</span>` : ''}
-          ${status.viewers != null ? `<span>${status.viewers.toLocaleString()} viewers</span>` : ''}
         </div>
       `;
     } else {
