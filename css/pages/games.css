@@ -162,9 +162,10 @@
   transition: opacity 0.3s, transform 0.3s;
 }
 
-/* A card with a pixel sprite instead of a banner (Soup, Salad, or Sandwich):
-   hold the same banner aspect so the card height matches its neighbours, and
-   centre the sprite kept crisp rather than stretching it to the width. */
+/* Soup, Salad, or Sandwich's banner is a transparent oval logo, not an opaque
+   full-bleed banner like the others. Hold the same banner aspect so the card
+   height matches its neighbours, and centre the logo on the dark thumb — kept
+   pixel-crisp — rather than stretching it to the width. */
 .game-card-thumb-sprite {
   aspect-ratio: 940 / 330;
   display: flex;
@@ -173,7 +174,7 @@
 }
 .game-card-thumb-sprite img {
   width: auto;
-  height: 74%;
+  height: 100%;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }

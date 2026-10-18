@@ -102,6 +102,12 @@ ok('the buttons use the per-category sprite', /assets\/images\/sss\/'\s*\+\s*cat
 ok('the hero shows the combo tray sprite', /assets\/images\/sss\/tray\.png/.test(html));
 ok('pixel sprites render crisp, not smoothed', /image-rendering:\s*pixelated/.test(css));
 
+/* The game banner on the Games screen card (the 8th slot). */
+ok('the game banner exists', fs.existsSync(path.join(REPO, 'assets/images/game-sss.webp')));
+ok('the Games card shows the banner and links to the page',
+  /assets\/images\/game-sss\.webp/.test(read('games.html'))
+  && /href="\/soup-salad-sandwich"/.test(read('games.html')));
+
 ok('giveaway labels the daily-sss entry source', /daily-sss'\)\s*return/.test(read('giveaway.html')));
 
 /* ══ 2. DETERMINISM ═════════════════════════════ */
