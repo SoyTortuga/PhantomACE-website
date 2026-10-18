@@ -11,6 +11,16 @@
   padding-bottom: 64px;
 }
 
+/* The combo tray under the hero — the whole game in one sprite. Pixel-crisp. */
+.sss-hero-sprite {
+  display: block;
+  margin: 14px auto 0;
+  width: 112px;
+  height: 112px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 .sss-note {
   text-align: center;
   color: var(--text-pri);
@@ -116,6 +126,10 @@
 }
 
 .sss-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-ui);
   font-size: 1rem;
   text-transform: capitalize;
@@ -127,6 +141,19 @@
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
+
+/* Pixel-art food sprites — kept crisp, never smoothed. */
+.sss-choice-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* A called food dims only its losing picks; the sprite on the player's wrong
+   pick fades with the button, the right answer's stays bright. */
+.sss-choice.is-wrong .sss-choice-icon { opacity: 0.6; }
 
 .sss-choice:hover:not(:disabled) { border-color: var(--red); }
 .sss-choice:disabled { cursor: default; }

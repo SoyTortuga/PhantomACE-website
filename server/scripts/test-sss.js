@@ -94,6 +94,14 @@ check('no border-right rail', /border-right\s*:/.test(css), false);
 const js = read('js/pages/sss.js');
 ok('page talks to /api/daily/sss', /\/api\/daily\/sss/.test(js));
 
+/* The food sprites exist and are wired: one per category on the buttons, the
+   combo tray in the hero. Pixel art, so rendering must be kept crisp. */
+['soup', 'salad', 'sandwich', 'tray'].forEach((n) =>
+  ok('sprite assets/images/sss/' + n + '.png exists', fs.existsSync(path.join(REPO, 'assets/images/sss/' + n + '.png'))));
+ok('the buttons use the per-category sprite', /assets\/images\/sss\/'\s*\+\s*cat\s*\+\s*'\.png/.test(js));
+ok('the hero shows the combo tray sprite', /assets\/images\/sss\/tray\.png/.test(html));
+ok('pixel sprites render crisp, not smoothed', /image-rendering:\s*pixelated/.test(css));
+
 ok('giveaway labels the daily-sss entry source', /daily-sss'\)\s*return/.test(read('giveaway.html')));
 
 /* ══ 2. DETERMINISM ═════════════════════════════ */

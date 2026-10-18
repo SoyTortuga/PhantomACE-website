@@ -36,8 +36,10 @@
       else if (cat === food.pick) cls += ' is-wrong';
     }
     return '<button type="button" class="' + cls + '" data-pos="' + food.pos +
-      '" data-cat="' + cat + '"' + (food.answered || !state.loggedIn ? ' disabled' : '') +
-      '>' + cat + '</button>';
+      '" data-cat="' + cat + '"' + (food.answered || !state.loggedIn ? ' disabled' : '') + '>' +
+      '<img class="sss-choice-icon" src="/assets/images/sss/' + cat + '.png" alt="" aria-hidden="true">' +
+      '<span class="sss-choice-label">' + cat + '</span>' +
+      '</button>';
   }
 
   function resultHtml(food) {
