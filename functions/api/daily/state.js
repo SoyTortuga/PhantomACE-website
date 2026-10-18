@@ -39,6 +39,7 @@ export const CHALLENGES = [
   { id: 'dino-rival',   title: 'Daily Rival',    blurb: 'One beast, same for all. Send your champion.', href: '/games/dino-park/?daily=rival', icon: '🦖' },
   { id: 'skull-curse',  title: "Today's Curse",  blurb: 'A daily curse for all — run the cursed skull to the quota.', href: '/games/skull-clicker/', icon: '☠️' },
   { id: 'mana-seed',    title: 'Mana Clash',     blurb: "Today's dice — same roll for everyone, play for the best score.", href: '/games/mana-clash/', icon: '🎲' },
+  { id: 'sss',          title: 'Soup, Salad, or Sandwich', blurb: 'Five foods. Call each one. Every food is one of the three.', href: '/soup-salad-sandwich', icon: '🥪' },
 ];
 
 export const META_ENTRIES = 2;        // giveaway entries for clearing the whole day

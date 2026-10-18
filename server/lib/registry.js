@@ -482,6 +482,11 @@ export const FAMILIES = [
   /* The Daily Rite's crowd stat: rite_agg_<dayKey> is one tiny {total,correct}
      tally per Pacific day. One small row a day; persists for the % history. */
   { prefix: 'rite_agg_',       table: 'singletons',       expiry: 'none' },
+  /* Soup, Salad, or Sandwich daily: sss_<userId> is one player's day-scoped
+     calls (replaced each day by its day stamp, so no TTL needed); sss_agg_<day>
+     is the per-food crowd tally for the % stat. Both small, both persist. */
+  { prefix: 'sss_agg_',        table: 'singletons',       expiry: 'none' },
+  { prefix: 'sss_',            table: 'singletons',       expiry: 'none' },
   /* Cosmetic gift bell: a disposable per-recipient queue (gift_inbox_<userId>),
      read-and-cleared on the next inventory load; TTL is the backstop. */
   { prefix: 'gift_inbox_',     table: 'singletons',       expiry: 'real' },

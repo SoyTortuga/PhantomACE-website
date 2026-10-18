@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Soup, Salad, or Sandwich - the daily. Five foods a day, and every food is exactly one of the three. Call each one by the PhantomACE house ruling.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Soup, Salad, or Sandwich | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/sss.css">
+</head>
+<body data-page="daily">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Soup, Salad, or Sandwich</h1>
+    <p class="page-hero-subtitle">Every food is one of the three. Five a day. Call them.</p>
+  </section>
+
+  <section class="page-container sss-page">
+
+    <div class="sss-note" id="sssLoading">Plating today&hellip;</div>
+
+    <!-- Logged out: the foods still show so the page sells itself. -->
+    <div class="card sss-card sss-guest" id="sssGuest" hidden>
+      <h2 class="sss-card-title">Log in to make the call</h2>
+      <p class="sss-lead">Your calls count toward the daily streak, and a perfect five pays a bonus giveaway entry — so it's tied to your Twitch account. Today's foods are below.</p>
+      <button class="btn-primary" type="button" onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <div class="sss-summary card" id="sssSummary" hidden>
+      <div class="sss-progress">
+        <span class="sss-progress-count"><span id="sssDone">0</span>/<span id="sssTotal">5</span></span>
+        <span class="sss-progress-label">called</span>
+      </div>
+      <div class="sss-score">
+        <span class="sss-score-num" id="sssScore">0</span>
+        <span class="sss-score-label">right</span>
+      </div>
+      <div class="sss-verdict" id="sssVerdict"></div>
+    </div>
+
+    <div class="sss-list" id="sssList"></div>
+
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/sss.js" defer></script>
+</body>
+</html>

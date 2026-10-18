@@ -1,0 +1,165 @@
+/* ══════════════════════════════════════════════
+   Soup, Salad, or Sandwich — /soup-salad-sandwich
+
+   Tokened throughout (both themes flip). Depth from borders only — no
+   box-shadow, no side-rails. A locked call brightens the whole card border
+   and marks the chosen chip; right/wrong read from text, not rarity colour.
+   ══════════════════════════════════════════════ */
+
+.sss-page {
+  padding-top: 8px;
+  padding-bottom: 64px;
+}
+
+.sss-note {
+  text-align: center;
+  color: var(--text-pri);
+  opacity: 0.6;
+  padding: 40px 0;
+  font-family: var(--font-ui);
+}
+
+.sss-card-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+  color: var(--text-pri);
+}
+
+.sss-lead {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  opacity: 0.85;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.sss-guest {
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto 28px;
+}
+
+/* ── Summary bar ─────────────────────────────── */
+.sss-summary {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+.sss-progress,
+.sss-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.sss-progress-count,
+.sss-score-num {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  color: var(--text-pri);
+}
+
+.sss-score-num { color: var(--red); }
+
+.sss-progress-label,
+.sss-score-label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+.sss-verdict {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  line-height: 1.5;
+}
+
+.sss-verdict strong { color: var(--red); }
+
+/* ── Food list ───────────────────────────────── */
+.sss-list {
+  display: grid;
+  gap: 16px;
+}
+
+.sss-item {
+  background: var(--gray-mid);
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+
+.sss-item.is-answered { border-color: var(--red); }
+
+.sss-item-food {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  color: var(--text-pri);
+  margin: 0 0 14px;
+}
+
+.sss-choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.sss-choice {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  text-transform: capitalize;
+  color: var(--text-pri);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 14px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sss-choice:hover:not(:disabled) { border-color: var(--red); }
+.sss-choice:disabled { cursor: default; }
+
+/* The right answer, once locked. */
+.sss-choice.is-correct {
+  border-color: var(--red);
+  background: var(--red-glow);
+  color: var(--text-pri);
+}
+
+/* The player's wrong pick — dimmed, not recoloured (no palette violation). */
+.sss-choice.is-wrong { opacity: 0.45; }
+
+.sss-result {
+  margin-top: 12px;
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  color: var(--text-pri);
+}
+
+.sss-result-verdict {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin-right: 8px;
+}
+
+.sss-result-crowd { opacity: 0.7; font-size: 0.9rem; }
+
+@media (max-width: 560px) {
+  .sss-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .sss-verdict { grid-column: 1 / -1; }
+}
