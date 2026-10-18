@@ -48,7 +48,7 @@ const BANK = [
   ['Cabbage soup', 'soup'], ['Ham and bean soup', 'soup'], ['Turkey soup', 'soup'],
   ['Oxtail soup', 'soup'], ['Consommé', 'soup'], ['Sinigang', 'soup'],
   ['Tom kha gai', 'soup'], ['Kimchi jjigae', 'soup'], ['Oyster stew', 'soup'],
-  ['Jambalaya', 'soup'], ['Smoothie bowl', 'soup'], ['Yogurt parfait', 'soup'],
+  ['Jambalaya', 'soup'], ['Smoothie bowl', 'soup'], ['Yogurt parfait', 'soup'], ['Açaí bowl', 'soup'],
   ["White chicken chili", 'soup'], ["Coffee", 'soup'], ["Iced coffee", 'soup'],
   ["Espresso", 'soup'], ["Black tea", 'soup'], ["Green tea", 'soup'],
   ["Matcha latte", 'soup'], ["Milkshake", 'soup'], ["Smoothie", 'soup'],
@@ -72,7 +72,7 @@ const BANK = [
   ['Pizza', 'sandwich'], ['Hot dog', 'sandwich'], ['Burrito', 'sandwich'],
   ['Taco', 'sandwich'], ['Sushi roll', 'sandwich'], ['Potstickers', 'sandwich'],
   ['Soup dumplings', 'sandwich'], ['Calzone', 'sandwich'], ['Corn dog', 'sandwich'],
-  ['Fruit pie', 'sandwich'], ['French fries', 'sandwich'], ['Casserole', 'sandwich'],
+  ['Fruit pie', 'sandwich'], ['Casserole', 'sandwich'],
   ['Enchiladas', 'sandwich'], ['Stuffed pepper', 'sandwich'], ['Hamburger', 'sandwich'],
   ['Grilled cheese', 'sandwich'], ['BLT', 'sandwich'], ['Sub sandwich', 'sandwich'],
   ['Wrap', 'sandwich'], ['Gyro', 'sandwich'], ['Quesadilla', 'sandwich'],
@@ -101,7 +101,7 @@ const BANK = [
   ['Crepe', 'sandwich'], ['Omelette', 'sandwich'], ['Frittata', 'sandwich'],
   ['Avocado toast', 'sandwich'], ['Bruschetta', 'sandwich'], ['Garlic bread', 'sandwich'],
   ['Pancakes', 'sandwich'], ['Waffles', 'sandwich'], ['French toast', 'sandwich'],
-  ['Onion rings', 'sandwich'], ['Tater tots', 'sandwich'], ['Mozzarella sticks', 'sandwich'],
+  ['Onion rings', 'sandwich'], ['Mozzarella sticks', 'sandwich'],
   ['Chicken pot pie', 'sandwich'], ["Shepherd's pie", 'sandwich'], ['Onigiri', 'sandwich'],
   ['Spam musubi', 'sandwich'],
   ["Tamale", 'sandwich'], ["Stromboli", 'sandwich'], ["Croissant sandwich", 'sandwich'],
@@ -116,8 +116,11 @@ const BANK = [
   ["Dagwood sandwich", 'sandwich'], ["Pan bagnat", 'sandwich'], ["Francesinha", 'sandwich'],
   ["Tea sandwich", 'sandwich'], ["Chiko roll", 'sandwich'], ["Kachori", 'sandwich'],
   ["Siomai", 'sandwich'], ["Wonton", 'sandwich'],
+  /* Group-vs-individual: ONE piece is a sandwich; the bowl/serving is a salad
+     (those live in the salad block). */
+  ["A single ravioli", 'sandwich'], ["A single french fry", 'sandwich'], ["A single tater tot", 'sandwich'],
   // ── Salads (named "___ salad", or a bowl of mixed / chopped things) ──
-  ['Dry cereal', 'salad'], ['Ravioli', 'salad'], ['Nachos', 'salad'],
+  ['Dry cereal', 'salad'], ['Nachos', 'salad'],
   ['Spaghetti', 'salad'],
   ['Poke bowl', 'salad'], ['Chips & salsa', 'salad'], ['Mac & cheese', 'salad'],
   ['Garden salad', 'salad'], ['Fruit salad', 'salad'], ['Trail mix', 'salad'],
@@ -141,7 +144,7 @@ const BANK = [
   ['Gado-gado', 'salad'], ['Seaweed salad', 'salad'], ['Chopped salad', 'salad'],
   ['Fried rice', 'salad'], ['Risotto', 'salad'], ['Paella', 'salad'],
   ['Biryani', 'salad'], ['Mashed potatoes', 'salad'], ['Burrito bowl', 'salad'],
-  ['Açaí bowl', 'salad'], ['Poutine', 'salad'], ['Chili cheese fries', 'salad'],
+  ['Poutine', 'salad'], ['Chili cheese fries', 'salad'],
   ["Pico de gallo", 'salad'], ["Salsa verde", 'salad'], ["Chunky guacamole", 'salad'],
   ["Granola", 'salad'], ["Popcorn", 'salad'], ["Mixed nuts", 'salad'],
   ["Chicken and broccoli stir-fry", 'salad'], ["Beef and broccoli", 'salad'], ["Steamed rice", 'salad'],
@@ -159,6 +162,8 @@ const BANK = [
   ["Beef carpaccio", 'salad'], ["Chicken tenders", 'salad'], ["Hash browns", 'salad'],
   ["Home fries", 'salad'], ["Roasted chickpeas", 'salad'], ["Sunflower seeds", 'salad'],
   ["Cranberry sauce", 'salad'], ["Gorgonzola walnut salad", 'salad'],
+  /* Group servings — one piece of each is a sandwich (see the sandwich block). */
+  ["French fries", 'salad'], ["Tater tots", 'salad'], ["Bowl of ravioli", 'salad'],
 ];
 
 /* xmur3 string hash → 32-bit seed, then mulberry32 for a deterministic PRNG.
