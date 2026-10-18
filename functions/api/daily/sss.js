@@ -48,7 +48,10 @@ const BANK = [
   ['Cabbage soup', 'soup'], ['Ham and bean soup', 'soup'], ['Turkey soup', 'soup'],
   ['Oxtail soup', 'soup'], ['Consommé', 'soup'], ['Sinigang', 'soup'],
   ['Tom kha gai', 'soup'], ['Kimchi jjigae', 'soup'], ['Oyster stew', 'soup'],
-  // ── Sandwiches (a filling held by a bread/starch exterior) ──
+  ['Jambalaya', 'soup'], ['Smoothie bowl', 'soup'], ['Yogurt parfait', 'soup'],
+  // ── Sandwiches (a filling held by a bread/starch exterior; also the
+  //    broadcaster's wider rulings — a baked/folded single dish counts too:
+  //    lasagna, quiche, pot pie, omelette, even fries-adjacent fried bites) ──
   ['Pizza', 'sandwich'], ['Hot dog', 'sandwich'], ['Burrito', 'sandwich'],
   ['Taco', 'sandwich'], ['Sushi roll', 'sandwich'], ['Potstickers', 'sandwich'],
   ['Soup dumplings', 'sandwich'], ['Calzone', 'sandwich'], ['Corn dog', 'sandwich'],
@@ -75,9 +78,18 @@ const BANK = [
   ['Taquito', 'sandwich'], ['Bratwurst', 'sandwich'], ['Sausage roll', 'sandwich'],
   ['Pigs in a blanket', 'sandwich'], ['Torta', 'sandwich'], ['Crunchwrap', 'sandwich'],
   ['Chalupa', 'sandwich'], ['Schnitzel sandwich', 'sandwich'], ['Pretzel dog', 'sandwich'],
+  ['Lasagna', 'sandwich'], ['Quiche', 'sandwich'], ['Empanada', 'sandwich'],
+  ['Samosa', 'sandwich'], ['Spring roll', 'sandwich'], ['Egg roll', 'sandwich'],
+  ['Pierogi', 'sandwich'], ['Pupusa', 'sandwich'], ['Arepa', 'sandwich'],
+  ['Crepe', 'sandwich'], ['Omelette', 'sandwich'], ['Frittata', 'sandwich'],
+  ['Avocado toast', 'sandwich'], ['Bruschetta', 'sandwich'], ['Garlic bread', 'sandwich'],
+  ['Pancakes', 'sandwich'], ['Waffles', 'sandwich'], ['French toast', 'sandwich'],
+  ['Onion rings', 'sandwich'], ['Tater tots', 'sandwich'], ['Mozzarella sticks', 'sandwich'],
+  ['Chicken pot pie', 'sandwich'], ["Shepherd's pie", 'sandwich'], ['Onigiri', 'sandwich'],
+  ['Spam musubi', 'sandwich'],
   // ── Salads (named "___ salad", or a bowl of mixed / chopped things) ──
   ['Dry cereal', 'salad'], ['Ravioli', 'salad'], ['Nachos', 'salad'],
-  ['Quiche', 'salad'], ['Lasagna', 'salad'], ['Spaghetti', 'salad'],
+  ['Spaghetti', 'salad'],
   ['Poke bowl', 'salad'], ['Chips & salsa', 'salad'], ['Mac & cheese', 'salad'],
   ['Garden salad', 'salad'], ['Fruit salad', 'salad'], ['Trail mix', 'salad'],
   ['Charcuterie board', 'salad'], ['Pasta salad', 'salad'], ['Potato salad', 'salad'],
@@ -98,6 +110,9 @@ const BANK = [
   ['Chickpea salad', 'salad'], ['Arugula salad', 'salad'], ['House salad', 'salad'],
   ['Southwest salad', 'salad'], ['Pretzel salad', 'salad'], ['Larb', 'salad'],
   ['Gado-gado', 'salad'], ['Seaweed salad', 'salad'], ['Chopped salad', 'salad'],
+  ['Fried rice', 'salad'], ['Risotto', 'salad'], ['Paella', 'salad'],
+  ['Biryani', 'salad'], ['Mashed potatoes', 'salad'], ['Burrito bowl', 'salad'],
+  ['Açaí bowl', 'salad'], ['Poutine', 'salad'], ['Chili cheese fries', 'salad'],
 ];
 
 /* xmur3 string hash → 32-bit seed, then mulberry32 for a deterministic PRNG.
