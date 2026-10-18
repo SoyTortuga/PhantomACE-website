@@ -1542,10 +1542,17 @@ async function boards(env) {
   const firstB = [...(r2.data.room.you.dice || []), ...(r2.data.room.you.kept || [])].sort();
   check('the daily deals the same dice to everyone that day', firstA, firstB);
 
-  /* Force the run to its last round, banked, then poll: endRoundDaily finishes
-     it, settle records it to the day board. */
+  /* Force the run to its last round, mid-play with the turn banked, then poll:
+     endRoundDaily finishes it, settle records it to the day board. The room
+     must be put back into 'playing' first — the determinism roll above may have
+     busted (a burn ends the solo round), leaving the room in 'intermission',
+     and from there advance() only waits out the intermission clock rather than
+     resolving the round. Whether that first seeded roll busts depends on the
+     day's dice, so a finish that skips this reset passes or fails by the date. */
   const key = 'mc_room_' + code;
   const room = JSON.parse(env._store.get(key));
+  room.status = 'playing';
+  room.intermissionEndsAt = null;
   room.round = 7;
   room.players['101'].total = 4321;
   room.players['101'].turn = { pending: 0, dice: [], kept: [], remaining: 6, awaitingSelection: false, done: 'banked', gained: 0, event: null, deadline: null };
