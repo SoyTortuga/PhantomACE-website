@@ -42,6 +42,12 @@ const BANK = [
   ['Laksa', 'soup'], ['Pozole', 'soup'], ['Menudo', 'soup'], ['Mulligatawny', 'soup'],
   ['Bouillabaisse', 'soup'], ['Cioppino', 'soup'], ['Gumbo', 'soup'], ['Hot pot', 'soup'],
   ['Udon soup', 'soup'], ['Avgolemono', 'soup'],
+  ['Italian wedding soup', 'soup'], ['Cream of chicken soup', 'soup'], ['Chicken and rice soup', 'soup'],
+  ['Cheddar broccoli soup', 'soup'], ['Manhattan clam chowder', 'soup'], ['Corn chowder', 'soup'],
+  ['Potato soup', 'soup'], ['Pumpkin soup', 'soup'], ['Carrot ginger soup', 'soup'],
+  ['Cabbage soup', 'soup'], ['Ham and bean soup', 'soup'], ['Turkey soup', 'soup'],
+  ['Oxtail soup', 'soup'], ['Consommé', 'soup'], ['Sinigang', 'soup'],
+  ['Tom kha gai', 'soup'], ['Kimchi jjigae', 'soup'], ['Oyster stew', 'soup'],
   // ── Sandwiches (a filling held by a bread/starch exterior) ──
   ['Pizza', 'sandwich'], ['Hot dog', 'sandwich'], ['Burrito', 'sandwich'],
   ['Taco', 'sandwich'], ['Sushi roll', 'sandwich'], ['Potstickers', 'sandwich'],
@@ -63,6 +69,12 @@ const BANK = [
   ['Shawarma', 'sandwich'], ['Döner kebab', 'sandwich'], ['Falafel pita', 'sandwich'],
   ['Cuban sandwich', 'sandwich'], ['Monte Cristo', 'sandwich'], ["S'more", 'sandwich'],
   ['Moon pie', 'sandwich'],
+  ['Bacon sandwich', 'sandwich'], ['Ham sandwich', 'sandwich'], ['Turkey sandwich', 'sandwich'],
+  ['Roast beef sandwich', 'sandwich'], ['Pimento cheese sandwich', 'sandwich'], ['Fluffernutter', 'sandwich'],
+  ['Bagel sandwich', 'sandwich'], ['Breakfast burrito', 'sandwich'], ['Chimichanga', 'sandwich'],
+  ['Taquito', 'sandwich'], ['Bratwurst', 'sandwich'], ['Sausage roll', 'sandwich'],
+  ['Pigs in a blanket', 'sandwich'], ['Torta', 'sandwich'], ['Crunchwrap', 'sandwich'],
+  ['Chalupa', 'sandwich'], ['Schnitzel sandwich', 'sandwich'], ['Pretzel dog', 'sandwich'],
   // ── Salads (named "___ salad", or a bowl of mixed / chopped things) ──
   ['Dry cereal', 'salad'], ['Ravioli', 'salad'], ['Nachos', 'salad'],
   ['Quiche', 'salad'], ['Lasagna', 'salad'], ['Spaghetti', 'salad'],
@@ -79,6 +91,13 @@ const BANK = [
   ['Papaya salad', 'salad'], ['Ambrosia salad', 'salad'], ['Cucumber salad', 'salad'],
   ['Beet salad', 'salad'], ['Quinoa salad', 'salad'], ['Couscous salad', 'salad'],
   ['Corn salad', 'salad'], ['Broccoli salad', 'salad'], ['Seven-layer salad', 'salad'],
+  ['Ham salad', 'salad'], ['Crab salad', 'salad'], ['Shrimp salad', 'salad'],
+  ['Seafood salad', 'salad'], ['Pea salad', 'salad'], ['Carrot salad', 'salad'],
+  ['Tomato salad', 'salad'], ['Watermelon salad', 'salad'], ['Jell-O salad', 'salad'],
+  ['Orzo salad', 'salad'], ['Farro salad', 'salad'], ['Lentil salad', 'salad'],
+  ['Chickpea salad', 'salad'], ['Arugula salad', 'salad'], ['House salad', 'salad'],
+  ['Southwest salad', 'salad'], ['Pretzel salad', 'salad'], ['Larb', 'salad'],
+  ['Gado-gado', 'salad'], ['Seaweed salad', 'salad'], ['Chopped salad', 'salad'],
 ];
 
 /* xmur3 string hash → 32-bit seed, then mulberry32 for a deterministic PRNG.
