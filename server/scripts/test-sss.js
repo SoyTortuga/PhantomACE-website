@@ -82,7 +82,7 @@ ok('CHALLENGES includes sss', /id:\s*'sss'/.test(read('functions/api/daily/state
 
 const html = read('soup-salad-sandwich.html');
 ['sssGuest', 'sssSummary', 'sssList'].forEach((id) => ok('page has #' + id, new RegExp('id="' + id + '"').test(html)));
-ok('page uses the shared hero title', /page-hero-title/.test(html));
+ok('page has a hero with an h1', /class="page-hero[^"]*"/.test(html) && /<h1/.test(html));
 ok('page loads its script + stylesheet', /js\/pages\/sss\.js/.test(html) && /css\/pages\/sss\.css/.test(html));
 
 const css = read('css/pages/sss.css');
@@ -99,7 +99,7 @@ ok('page talks to /api/daily/sss', /\/api\/daily\/sss/.test(js));
 ['soup', 'salad', 'sandwich', 'tray'].forEach((n) =>
   ok('sprite assets/images/sss/' + n + '.png exists', fs.existsSync(path.join(REPO, 'assets/images/sss/' + n + '.png'))));
 ok('the buttons use the per-category sprite', /assets\/images\/sss\/'\s*\+\s*cat\s*\+\s*'\.png/.test(js));
-ok('the hero shows the combo tray sprite', /assets\/images\/sss\/tray\.png/.test(html));
+ok('the hero shows the game banner', /sss-hero-banner[\s\S]*game-sss\.webp|game-sss\.webp/.test(html));
 ok('pixel sprites render crisp, not smoothed', /image-rendering:\s*pixelated/.test(css));
 
 /* The game banner on the Games screen card (the 8th slot). */
@@ -119,6 +119,21 @@ check('no food repeats within a day', new Set(foods.map(f => f.bankIndex)).size,
 ok('every food has a valid category', foods.every(f => sss.CATS.includes(f.cat)));
 ok('the set varies across days',
   JSON.stringify(sss.todaysFoods('2026-01-01').map(f => f.food)) !== JSON.stringify(sss.todaysFoods('2026-06-15').map(f => f.food)));
+
+/* Even rotation: across one full cycle every served food is unique — no food
+   recurs until the whole bank (less the <PER_DAY remainder) has been shown. */
+(function rotationNoRepeat() {
+  const cycleLen = Math.floor(sss.SSS_BANK.length / sss.PER_DAY);
+  const seen = [];
+  const base = new Date('2026-01-01T12:00:00Z');
+  for (let k = 0; k < cycleLen; k++) {
+    const d = new Date(base); d.setUTCDate(d.getUTCDate() + k);
+    const key = d.toISOString().slice(0, 10);
+    sss.todaysFoods(key).forEach(f => seen.push(f.bankIndex));
+  }
+  check('a full cycle serves cycleLen*PER_DAY foods', seen.length, cycleLen * sss.PER_DAY);
+  check('with no food repeated inside the cycle', new Set(seen).size, seen.length);
+})();
 
 /* ══ 3. REVEAL ONLY AFTER A CALL ════════════════ */
 await (async function hidesAnswer() {

@@ -11,12 +11,17 @@
   padding-bottom: 64px;
 }
 
-/* The combo tray under the hero — the whole game in one sprite. Pixel-crisp. */
-.sss-hero-sprite {
+/* The banner IS the hero title — it carries the game's name, so there is no
+   separate text heading. Pixel-crisp, capped so it never dwarfs the page. */
+.sss-hero-h1 {
+  margin: 0;
+  line-height: 0;
+}
+.sss-hero-banner {
   display: block;
-  margin: 14px auto 0;
-  width: 112px;
-  height: 112px;
+  margin: 0 auto;
+  width: min(440px, 82vw);
+  height: auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }

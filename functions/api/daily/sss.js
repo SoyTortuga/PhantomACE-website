@@ -21,16 +21,28 @@ export const CATS = ['soup', 'salad', 'sandwich'];
 const PER_DAY = 5;
 
 /* The answer key. [food, category]. The contested calls are the broadcaster's;
-   the clear ones follow the soup→sandwich→salad tree. */
+   everything added since follows the SAME established rulings — liquid in a
+   bowl is a soup, a filling held by a bread/starch exterior is a sandwich, a
+   named "___ salad" or a bowl of mixed/chopped things is a salad. Only foods
+   that are unambiguous under those rulings are added without a fresh call;
+   genuinely contested ones still get dictated before they go in. Append freely
+   — the daily rotation spreads whatever is here evenly (see todaysFoods). */
 const BANK = [
-  // ── Soups ──
+  // ── Soups (liquid / bowl-and-spoon) ──
   ['Cereal (with milk)', 'soup'], ['Oatmeal', 'soup'], ['Ramen', 'soup'],
   ['Chili', 'soup'], ['Beef stew', 'soup'], ['Clam chowder', 'soup'],
   ['Pho', 'soup'], ['French onion soup', 'soup'], ['Lobster bisque', 'soup'],
   ['Gazpacho', 'soup'], ['Tomato soup', 'soup'], ['Miso soup', 'soup'],
   ['Minestrone', 'soup'], ['Split pea soup', 'soup'], ['Egg drop soup', 'soup'],
   ['Borscht', 'soup'], ['Matzo ball soup', 'soup'], ['Congee', 'soup'],
-  // ── Sandwiches ──
+  ['Chicken noodle soup', 'soup'], ['Vegetable soup', 'soup'], ['Butternut squash soup', 'soup'],
+  ['Potato leek soup', 'soup'], ['Wonton soup', 'soup'], ['Hot and sour soup', 'soup'],
+  ['Cream of mushroom soup', 'soup'], ['Lentil soup', 'soup'], ['Black bean soup', 'soup'],
+  ['Beef barley soup', 'soup'], ['Tortilla soup', 'soup'], ['Tom yum', 'soup'],
+  ['Laksa', 'soup'], ['Pozole', 'soup'], ['Menudo', 'soup'], ['Mulligatawny', 'soup'],
+  ['Bouillabaisse', 'soup'], ['Cioppino', 'soup'], ['Gumbo', 'soup'], ['Hot pot', 'soup'],
+  ['Udon soup', 'soup'], ['Avgolemono', 'soup'],
+  // ── Sandwiches (a filling held by a bread/starch exterior) ──
   ['Pizza', 'sandwich'], ['Hot dog', 'sandwich'], ['Burrito', 'sandwich'],
   ['Taco', 'sandwich'], ['Sushi roll', 'sandwich'], ['Potstickers', 'sandwich'],
   ['Soup dumplings', 'sandwich'], ['Calzone', 'sandwich'], ['Corn dog', 'sandwich'],
@@ -41,8 +53,17 @@ const BANK = [
   ['Pop-Tart', 'sandwich'], ['Uncrustable', 'sandwich'], ['Oreo', 'sandwich'],
   ['Ice-cream sandwich', 'sandwich'], ['Club sandwich', 'sandwich'], ['Hot Pocket', 'sandwich'],
   ['Panini', 'sandwich'], ['Bánh mì', 'sandwich'], ['Philly cheesesteak', 'sandwich'],
-  ['PB&J', 'sandwich'],
-  // ── Salads ──
+  ['PB&J', 'sandwich'], ['Cheeseburger', 'sandwich'], ['Slider', 'sandwich'],
+  ['Reuben', 'sandwich'], ['Patty melt', 'sandwich'], ['French dip', 'sandwich'],
+  ['Meatball sub', 'sandwich'], ['Italian sub', 'sandwich'], ['Chicken parm sub', 'sandwich'],
+  ['Lobster roll', 'sandwich'], ["Po'boy", 'sandwich'], ['Muffuletta', 'sandwich'],
+  ['Croque monsieur', 'sandwich'], ['Croque madame', 'sandwich'], ['Breakfast sandwich', 'sandwich'],
+  ['Egg sandwich', 'sandwich'], ['Tuna melt', 'sandwich'], ['Sloppy joe', 'sandwich'],
+  ['Fried chicken sandwich', 'sandwich'], ['Filet-o-Fish', 'sandwich'], ['Pulled pork sandwich', 'sandwich'],
+  ['Shawarma', 'sandwich'], ['Döner kebab', 'sandwich'], ['Falafel pita', 'sandwich'],
+  ['Cuban sandwich', 'sandwich'], ['Monte Cristo', 'sandwich'], ["S'more", 'sandwich'],
+  ['Moon pie', 'sandwich'],
+  // ── Salads (named "___ salad", or a bowl of mixed / chopped things) ──
   ['Dry cereal', 'salad'], ['Ravioli', 'salad'], ['Nachos', 'salad'],
   ['Quiche', 'salad'], ['Lasagna', 'salad'], ['Spaghetti', 'salad'],
   ['Poke bowl', 'salad'], ['Chips & salsa', 'salad'], ['Mac & cheese', 'salad'],
@@ -50,7 +71,14 @@ const BANK = [
   ['Charcuterie board', 'salad'], ['Pasta salad', 'salad'], ['Potato salad', 'salad'],
   ['Coleslaw', 'salad'], ['Caprese salad', 'salad'], ['Caesar salad', 'salad'],
   ['Greek salad', 'salad'], ['Three-bean salad', 'salad'], ['Waldorf salad', 'salad'],
-  ['Tabbouleh', 'salad'],
+  ['Tabbouleh', 'salad'], ['Cobb salad', 'salad'], ['Chef salad', 'salad'],
+  ['Wedge salad', 'salad'], ['Spinach salad', 'salad'], ['Kale salad', 'salad'],
+  ['Taco salad', 'salad'], ['Egg salad', 'salad'], ['Tuna salad', 'salad'],
+  ['Chicken salad', 'salad'], ['Macaroni salad', 'salad'], ['Antipasto salad', 'salad'],
+  ['Niçoise salad', 'salad'], ['Panzanella', 'salad'], ['Fattoush', 'salad'],
+  ['Papaya salad', 'salad'], ['Ambrosia salad', 'salad'], ['Cucumber salad', 'salad'],
+  ['Beet salad', 'salad'], ['Quinoa salad', 'salad'], ['Couscous salad', 'salad'],
+  ['Corn salad', 'salad'], ['Broccoli salad', 'salad'], ['Seven-layer salad', 'salad'],
 ];
 
 /* xmur3 string hash → 32-bit seed, then mulberry32 for a deterministic PRNG.
@@ -69,16 +97,41 @@ function seedFrom(str) {
   };
 }
 
-/** Today's five foods: a seeded shuffle of the bank, first PER_DAY taken, so
-    the set is stable per day and never repeats a food within a day. */
-export function todaysFoods(day = dayKey()) {
-  const rand = seedFrom('sss:' + day);
+/* Fisher–Yates with a seeded PRNG — a deterministic shuffle of the bank. */
+function shuffledIndices(seed) {
+  const rand = seedFrom(seed);
   const idx = BANK.map((_, i) => i);
   for (let i = idx.length - 1; i > 0; i--) {
     const j = rand() % (i + 1);
     const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
   }
-  return idx.slice(0, PER_DAY).map((bankIndex, pos) => ({
+  return idx;
+}
+
+/* Day 0 of the rotation. Whole days since this (Pacific) index the rotation;
+   the exact epoch only sets which slice lands on which date, never anything
+   the player can tell. */
+const EPOCH = '2026-01-01';
+function dayNumber(day) {
+  const ms = Date.parse(day + 'T12:00:00Z') - Date.parse(EPOCH + 'T12:00:00Z');
+  return Math.floor(ms / 86400000);
+}
+
+/**
+ * Today's five foods — an EVEN ROTATION, not an independent daily roll. The
+ * whole bank is shuffled once per cycle and walked PER_DAY at a time, so every
+ * food appears exactly once before any repeats, and each new cycle reshuffles
+ * (seeded by the cycle number) so the order differs year to year. Zero
+ * maintenance: it runs forever off the date, and adding foods just lengthens
+ * the no-repeat window. Still deterministic — same day, same five for everyone.
+ */
+export function todaysFoods(day = dayKey()) {
+  const cycleLen = Math.max(1, Math.floor(BANK.length / PER_DAY));  // full no-repeat days per cycle
+  const dn = dayNumber(day);
+  const cycle = Math.floor(dn / cycleLen);
+  const offset = ((dn % cycleLen) + cycleLen) % cycleLen;           // safe for dates before EPOCH
+  const perm = shuffledIndices('sss-rotation:' + cycle);
+  return perm.slice(offset * PER_DAY, offset * PER_DAY + PER_DAY).map((bankIndex, pos) => ({
     pos, bankIndex, food: BANK[bankIndex][0], cat: BANK[bankIndex][1],
   }));
 }
