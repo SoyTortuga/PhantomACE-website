@@ -162,6 +162,22 @@
   transition: opacity 0.3s, transform 0.3s;
 }
 
+/* A card with a pixel sprite instead of a banner (Soup, Salad, or Sandwich):
+   hold the same banner aspect so the card height matches its neighbours, and
+   centre the sprite kept crisp rather than stretching it to the width. */
+.game-card-thumb-sprite {
+  aspect-ratio: 940 / 330;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.game-card-thumb-sprite img {
+  width: auto;
+  height: 74%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 .game-card:hover .game-card-thumb img {
   transform: scale(1.03);
 }

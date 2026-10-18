@@ -182,16 +182,22 @@
         </div>
       </div>
 
-      <!-- Chaos Trivia -->
-      <div class="card game-card" style="opacity: 0.5;">
+      <!-- Soup, Salad, or Sandwich — the daily. A full-chrome daily page, not
+           an iframe game, so Play navigates there rather than launching the
+           in-page launcher. -->
+      <div class="card game-card" data-game="sss">
+        <div class="game-card-thumb game-card-thumb-sprite">
+          <img src="/assets/images/sss/tray.png" alt="Soup, Salad, or Sandwich" width="128" height="128" loading="lazy" decoding="async">
+          <div class="game-card-thumb-overlay"></div>
+        </div>
         <div class="game-card-body">
-          <div class="game-card-title">Chaos Trivia</div>
-          <div class="game-card-desc">Test your knowledge of PhantomACE lore, stream history, and community memes.</div>
+          <div class="game-card-title">Soup, Salad, or Sandwich</div>
+          <div class="game-card-desc">The daily food court. Five foods, and every one is a soup, a salad, or a sandwich. Make the call &mdash; a perfect five pays a bonus giveaway entry.</div>
           <div class="game-card-footer">
             <div class="game-card-tags">
-              <span class="game-tag game-tag-multiplayer">Multiplayer</span>
+              <span class="game-tag game-tag-puzzle">Daily</span>
             </div>
-            <button class="btn-primary game-play-btn" disabled>Coming Soon</button>
+            <a class="btn-primary game-play-btn" href="/soup-salad-sandwich">Play</a>
           </div>
         </div>
       </div>
