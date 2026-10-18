@@ -95,6 +95,10 @@ const UID = '7';
       { type: 'box', points: 10, blackout: true },
       ...Array.from({ length: 3 }, () => ({ type: 'box', points: 0, blackout: false })),
     ],
+    'sss': [
+      ...Array.from({ length: 49 }, () => ({ type: 'correct' })),   // climbs to 49…
+      { type: 'correct', count: 1 },                               // …then 50: gold
+    ],
   };
 
   for (const [game, events] of Object.entries(GAMES)) {
@@ -197,7 +201,7 @@ const UID = '7';
 /* ── Badge ids are unique, and clear of the hand-minted ones ─────────── */
 {
   const rewards = allRewards();
-  check('twelve badges across the four games', rewards.length, 12);
+  check('fifteen badges across the five games', rewards.length, 15);
   check('every id is unique', rewards.length, new Set(rewards.map(r => r.id)).size);
   ok('every one is a profile badge', rewards.every(r => r.game === 'profile' && r.type === 'badge'));
   ok('each names its artwork', rewards.every(r => r.image === `/assets/badges/${r.id}.png`));
@@ -285,8 +289,8 @@ const UID = '7';
   check('logged out is refused', anon.status, 401);
 
   const all = await get('');
-  check('all four games come back', (all.data.games || []).map(g => g.game),
-    ['memory-match', 'commander-bingo', 'pham-shock', 'mtgbbb']);
+  check('all five games come back', (all.data.games || []).map(g => g.game),
+    ['memory-match', 'commander-bingo', 'pham-shock', 'mtgbbb', 'sss']);
 
   const one = await get('?game=mtgbbb');
   check('one game can be asked for', one.data.game, 'mtgbbb');

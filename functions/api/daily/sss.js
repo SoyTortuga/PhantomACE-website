@@ -338,6 +338,16 @@ export async function onRequestPost(context) {
     return agg;
   });
 
+  /* Climb the badge ladder (bronze/silver/gold at 10/25/50 correct). Fires at
+     most once per food — a re-answer is refused with 409 above, before here.
+     Best-effort: a cosmetic grant must never break answering. */
+  if (correct) {
+    try {
+      const { recordAchievement } = await import('../achievements.js');
+      await recordAchievement(env, 'sss', session.user_id, { type: 'correct' });
+    } catch (err) { console.error('[sss] achievement record failed:', err && err.message); }
+  }
+
   const answeredCount = Object.keys(rec.answers).length;
   const correctCount = Object.values(rec.answers).filter(a => a.correct).length;
   const done = answeredCount === foods.length;

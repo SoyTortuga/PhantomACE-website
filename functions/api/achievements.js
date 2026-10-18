@@ -258,11 +258,54 @@ const MTGBBB = {
   ],
 };
 
+/* ── Soup, Salad, or Sandwich ─────────────────────
+   Fed by the daily route on each CORRECT call (server-graded — the right
+   answer never leaves the server until a call is locked, so a client cannot
+   inflate this). Cumulative correct calls climb a bronze→silver→gold ladder.
+   `count` lets a caller report more than one at once, though today it is one
+   per call. */
+const SSS = {
+  label: 'Soup, Salad, or Sandwich',
+  normalize(p) {
+    p.correct = Number(p.correct) || 0;
+    return p;
+  },
+  apply(p, e) {
+    if (e.type !== 'correct') return false;
+    p.correct += Math.max(1, Math.floor(Number(e.count) || 1));
+    return true;
+  },
+  catalog: [
+    {
+      id: 'sss-bronze', name: 'Bronze Palate',
+      desc: 'Call 10 foods correctly in Soup, Salad, or Sandwich.',
+      reward: badge('sss-bronze', 'Bronze Palate', 'uncommon'),
+      met: (p) => p.correct >= 10,
+      progress: (p) => ({ cur: Math.min(p.correct, 10), goal: 10 }),
+    },
+    {
+      id: 'sss-silver', name: 'Silver Palate',
+      desc: 'Call 25 foods correctly.',
+      reward: badge('sss-silver', 'Silver Palate', 'rare'),
+      met: (p) => p.correct >= 25,
+      progress: (p) => ({ cur: Math.min(p.correct, 25), goal: 25 }),
+    },
+    {
+      id: 'sss-gold', name: 'Golden Palate',
+      desc: 'Call 50 foods correctly.',
+      reward: badge('sss-gold', 'Golden Palate', 'mythic'),
+      met: (p) => p.correct >= 50,
+      progress: (p) => ({ cur: Math.min(p.correct, 50), goal: 50 }),
+    },
+  ],
+};
+
 export const GAMES = Object.freeze({
   'memory-match': MEMORY_MATCH,
   'commander-bingo': COMMANDER_BINGO,
   'pham-shock': PHAM_SHOCK,
   'mtgbbb': MTGBBB,
+  'sss': SSS,
 });
 
 /** Every badge this module can grant — the art manifest, in one place.
