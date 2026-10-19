@@ -186,11 +186,45 @@ export function streamFace(dayKey, i) {
   return FACES[(h >>> 0) % FACES.length];
 }
 
+/* ── One-day scripted rig: 2026-10-20 ─────────────────────────────────────
+   A stream bit for Pacific day 2026-10-20 ONLY. The broadcaster wanted a daily
+   that opens with six straight Mana Burns and finishes on a single lonely 5
+   buried in dead dice. On that one dayKey we deal a fixed script instead of the
+   seeded stream; every other day is byte-for-byte the normal `streamFace`.
+
+   How the script maps onto the 7 daily rounds — each round's turn opens by
+   rolling six dice from this stream at the running `dailyPos`:
+     • A dead hand is W,W,U,U,B,G: no 1, no 5, no trips, not three pairs, so it
+       scores nothing and the round ends in an immediate Mana Burn. The RIG_DEAD
+       tiling makes EVERY six-die opening roll a dead hand.
+     • Rounds 1-6 each bust on that opening roll, so each consumes exactly six
+       positions (0-5, 6-11, … 30-35) with no keep. That lands round 7's opening
+       roll at position 36.
+     • Position 36 is the lone scoring die: a single 5 (R). Round 7 therefore
+       opens as R,W,U,U,B,G — only the 5 scores. Rerolling the five dead dice
+       past it draws more dead faces (positions 42-46) and busts, so the whole
+       run can bank at most that one 50.
+   Remove this block (and the dailyDeal branch) after 2026-10-20. */
+const RIG_DAY = '2026-10-20';
+const RIG_DEAD = ['W', 'W', 'U', 'U', 'B', 'G'];
+function rigFace(i) {
+  if (i === 36) return 'R';                 // round 7's opening die — the single 5
+  return RIG_DEAD[i % RIG_DEAD.length];
+}
+
+/* The face dealt at daily position `i` for `dayKey`: the one-day scripted rig on
+   RIG_DAY, otherwise the ordinary seeded stream. Pure — the same (dayKey, i) is
+   always the same face, for every player. */
+export function dailyDeal(dayKey, i) {
+  if (dayKey === RIG_DAY) return rigFace(i);
+  return streamFace(dayKey, i);
+}
+
 /* Draw `count` dice from the room's daily stream, advancing its position so the
    next roll continues where this one left off. */
 function rollDaily(room, count) {
   const out = [];
-  for (let i = 0; i < count; i++) out.push(streamFace(room.dayKey, room.dailyPos++));
+  for (let i = 0; i < count; i++) out.push(dailyDeal(room.dayKey, room.dailyPos++));
   return out;
 }
 

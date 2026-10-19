@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as scoring from '../../functions/api/mana-clash-scoring.js';
-import { onRequestGet, onRequestPost, viewFor } from '../../functions/api/mana-clash.js';
+import { onRequestGet, onRequestPost, viewFor, streamFace, dailyDeal } from '../../functions/api/mana-clash.js';
 
 let passed = 0;
 const failures = [];
@@ -1563,6 +1563,108 @@ async function boards(env) {
   ok('a finished daily run lands on the day board', (daily.data.board || []).some(e => e.score === 4321));
   check('the player is marked as having played today', daily.data.you.played, true);
   check('the board scores are exposed without ids', daily.data.board.every(e => e.userId === undefined), true);
+}
+
+/* ── One-day scripted rig: 2026-10-20 ─────────────────────────────────────
+   A stream-bit daily for Pacific 2026-10-20 only: six straight Mana Burns,
+   then a round 7 that deals a single scoring 5 among dead dice (the only
+   scorer in the whole run). Every other day must be the untouched seeded
+   stream. Both halves are asserted — the rig fires on the date, and nothing
+   else moves. */
+{
+  const DAY = '2026-10-20';
+
+  /* The pure deal, position by position. Rounds 1-6 bust on their six-die
+     opening roll (positions 0-5, 6-11, … 30-35), so each consumes exactly six
+     positions and round 7 opens at position 36. */
+  for (let round = 0; round < 6; round++) {
+    const base = round * 6;
+    const hand = [0, 1, 2, 3, 4, 5].map(k => dailyDeal(DAY, base + k));
+    ok(`rig round ${round + 1} opens on a dead hand (Mana Burn)`, !scoring.hasAnyScore(hand));
+  }
+
+  /* Round 7's opening roll: a single 5 followed by five dead dice. */
+  const r7 = [36, 37, 38, 39, 40, 41].map(k => dailyDeal(DAY, k));
+  check('rig round 7 is a single 5 among dead dice', r7, ['R', 'W', 'U', 'U', 'B', 'G']);
+  ok('rig round 7 does score', scoring.hasAnyScore(r7));
+  ok('rig round 7 is not a Mana Clash', !scoring.isHotDice(r7));
+  check('only the lone 5 is keepable', scoring.scorableMask(r7),
+    [true, false, false, false, false, false]);
+  check('and the suggested keep is just that 5, worth 50', scoring.bestSelection(r7),
+    { indices: [0], points: 50 });
+
+  /* Rerolling the five dead dice past the 5 (positions 42-46) busts, so a push
+     loses the 50 — the run can bank at most that one 50. */
+  const reroll = [42, 43, 44, 45, 46].map(k => dailyDeal(DAY, k));
+  ok('pushing past the lone 5 busts', !scoring.hasAnyScore(reroll));
+
+  /* Every OTHER day is byte-for-byte the pure seeded stream — the rig must not
+     leak into the days on either side of it. */
+  let drifted = 0;
+  for (const other of ['2026-10-19', '2026-10-21']) {
+    for (let i = 0; i < 60; i++) if (dailyDeal(other, i) !== streamFace(other, i)) drifted++;
+  }
+  check('neighbouring days are the untouched seeded stream', drifted, 0);
+
+  /* And the gate actually fires: the rigged day differs from its own pure
+     stream somewhere (otherwise the test above would pass on a no-op). */
+  let differs = false;
+  for (let i = 0; i < 48; i++) if (dailyDeal(DAY, i) !== streamFace(DAY, i)) { differs = true; break; }
+  ok('the rig actually overrides the stream on 2026-10-20', differs);
+}
+
+/* ── The rig driven through the real roll handler ─────────────────────────
+   The pure deal is asserted above; this proves the handler, fed a room whose
+   dayKey is the rigged day, plays out the bit — round 1 busts, round 7 shows
+   the lone 5 and nothing else, and banking it is the whole run's score. */
+{
+  const env = makeEnv();
+  const s = await post(env, 'a', { action: 'start-daily' });
+  const code = s.data.code;
+  const key = 'mc_room_' + code;
+
+  const freshTurn = () => ({ pending: 0, dice: [], kept: [], remaining: 6,
+    awaitingSelection: false, done: null, gained: null, event: null, deadline: Date.now() + 30000 });
+
+  /* Force this run onto the rigged day at round 1. */
+  let room = JSON.parse(env._store.get(key));
+  room.dayKey = '2026-10-20';
+  room.dailyPos = 0;
+  room.round = 1;
+  room.status = 'playing';
+  room.intermissionEndsAt = null;
+  room.players['101'].total = 0;
+  room.players['101'].turn = freshTurn();
+  env._store.set(key, JSON.stringify(room));
+
+  const r1 = await post(env, 'a', { action: 'roll', code });
+  check('round 1 opens with a Mana Burn', r1.data.room.you.event, 'burn');
+  check('and the burn ends the round', r1.data.room.you.done, 'burned');
+  check('banking nothing', r1.data.room.you.pending, 0);
+
+  /* Jump to round 7 at its opening position (36). */
+  room = JSON.parse(env._store.get(key));
+  room.dayKey = '2026-10-20';
+  room.dailyPos = 36;
+  room.round = 7;
+  room.status = 'playing';
+  room.intermissionEndsAt = null;
+  room.players['101'].total = 0;
+  room.players['101'].turn = freshTurn();
+  env._store.set(key, JSON.stringify(room));
+
+  const r7 = await post(env, 'a', { action: 'roll', code });
+  check('round 7 deals the single 5 among dead dice', r7.data.room.you.dice, ['R', 'W', 'U', 'U', 'B', 'G']);
+  check('only the 5 lights up', r7.data.room.you.scorable, [true, false, false, false, false, false]);
+  check('and it is the pre-selected keep', r7.data.room.you.suggested, [0]);
+
+  const kept = await post(env, 'a', { action: 'keep', code, indices: [0] });
+  check('keeping the lone 5 holds 50', kept.data.room.you.pending, 50);
+  check('with five dead dice left to risk', kept.data.room.you.remaining, 5);
+
+  const banked = await post(env, 'a', { action: 'bank', code });
+  check('banking the 5 is the whole run — 50', banked.data.room.players[0].total, 50);
+  check('and that finishes the daily', banked.data.room.status, 'finished');
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */
