@@ -33,7 +33,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as mc from '../../functions/api/mana-clash.js';
-import { streamFace, recordDaily } from '../../functions/api/mana-clash.js';
+import { streamFace, dailyDeal, recordDaily } from '../../functions/api/mana-clash.js';
 import { getDailyState, readDaily, CHALLENGES } from '../../functions/api/daily/state.js';
 import { dayKey } from '../../functions/api/season-time.js';
 
@@ -135,7 +135,11 @@ await (async function determinismIntegration() {
   const fa = faces(ra), fb = faces(rb);
   ok('both players rolled 6 opening dice', fa.length === 6 && fb.length === 6);
   check('same day → same opening dice for everyone', fa, fb);
-  check('and it matches the pure stream', fa, Array.from({ length: 6 }, (_, i) => streamFace(today, i)));
+  /* The opening roll comes from the canonical daily deal (dailyDeal), which is
+     the pure stream on every normal day and the scripted override on a rigged
+     day (e.g. the 2026-10-20 solo rig) — so compare against that, not the raw
+     streamFace, or the test breaks on the one rigged date. */
+  check('and it matches the daily deal', fa, Array.from({ length: 6 }, (_, i) => dailyDeal(today, i)));
 })();
 
 /* ══ 3. RESUME, NOT RE-DEAL ══════════════════════ */
