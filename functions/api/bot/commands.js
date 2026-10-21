@@ -509,6 +509,30 @@ async function handleChatMessage(env, event, outbox = []) {
     return;
   }
 
+  /* !solo — a chatter smashes the Drum Solo Meter while PhantomACE plays. The
+     whole point is the viewers who only watch: each !solo fills the shared hype
+     meter on a per-chatter cooldown (so crowd size, not one masher, fills it),
+     and the first !solo from each chatter earns their one participation badge
+     join — granted whether or not the meter fills. It is COLLABORATIVE: a filled
+     meter throws a celebration and a shoutout, an expired one just clears. No
+     live solo → a quiet no-op. Silent like !hit / !clash: the overlay meter is
+     the feedback, and a reply per chatter would bury the channel during the busy
+     half-minute the solo is open. A chat-only viewer earns no account reward —
+     only their hit lands on the meter. */
+  if (parsed.command === '!solo') {
+    try {
+      const { soloFromChat } = await import('../drum-solo.js');
+      await soloFromChat(env, {
+        userId: event.chatter_user_id,
+        name: event.chatter_user_name || event.chatter_user_login,
+      });
+    } catch (err) {
+      /* A broken drum solo must not break chat commands. */
+      console.error('[drum-solo/chat]', err.message);
+    }
+    return;
+  }
+
   /* Twitch-plays Memory Match: chat votes the next card to turn over. One
      vote per chatter per window, changeable while it is open. Silent — the
      board is on the overlay and a line per vote would bury the channel. */

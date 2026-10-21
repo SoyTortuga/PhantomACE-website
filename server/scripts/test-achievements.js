@@ -99,6 +99,7 @@ const UID = '7';
       ...Array.from({ length: 49 }, () => ({ type: 'correct' })),   // climbs to 49…
       { type: 'correct', count: 1 },                               // …then 50: gold
     ],
+    'drum-solo': Array.from({ length: 50 }, () => ({ type: 'join' })),   // 50 solos: all four tiers
   };
 
   for (const [game, events] of Object.entries(GAMES)) {
@@ -201,7 +202,7 @@ const UID = '7';
 /* ── Badge ids are unique, and clear of the hand-minted ones ─────────── */
 {
   const rewards = allRewards();
-  check('fifteen badges across the five games', rewards.length, 15);
+  check('nineteen badges across the six games', rewards.length, 19);
   check('every id is unique', rewards.length, new Set(rewards.map(r => r.id)).size);
   ok('every one is a profile badge', rewards.every(r => r.game === 'profile' && r.type === 'badge'));
   ok('each names its artwork', rewards.every(r => r.image === `/assets/badges/${r.id}.png`));
@@ -289,8 +290,8 @@ const UID = '7';
   check('logged out is refused', anon.status, 401);
 
   const all = await get('');
-  check('all five games come back', (all.data.games || []).map(g => g.game),
-    ['memory-match', 'commander-bingo', 'pham-shock', 'mtgbbb', 'sss']);
+  check('all six games come back', (all.data.games || []).map(g => g.game),
+    ['memory-match', 'commander-bingo', 'pham-shock', 'mtgbbb', 'sss', 'drum-solo']);
 
   const one = await get('?game=mtgbbb');
   check('one game can be asked for', one.data.game, 'mtgbbb');

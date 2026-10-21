@@ -172,6 +172,11 @@ export const SINGLETONS = {
   mana_clash_tournament: { table: 'singletons', expiry: 'real' },
   pham_wind_night:       { table: 'singletons', expiry: 'real' },
   dino_safari:           { table: 'singletons', expiry: 'real' },
+  /* The Drum Solo Meter — one chat-filled hype meter at a time (drum-solo.js).
+     'real': the TTL reclaims an abandoned row, and the live status is
+     timestamp-driven (countdown + fill linger) so the panel hides on schedule
+     before the row is even gone. */
+  drum_solo:             { table: 'singletons', expiry: 'real' },
 
   /* Rebuilt from three full-table reads, so cached. 'real' expiry: the row
      going away IS the cache expiring, and a stale board is worse than a

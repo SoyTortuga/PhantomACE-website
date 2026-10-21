@@ -125,6 +125,12 @@
       'Catch countdown & how many have typed !catch',
       'Switches to the winner once caught, then hides',
     ] },
+    { id: 'ovDrum', label: 'Drum Solo Meter', holds: [
+      'A hype meter chat fills with !solo while PhantomACE drums',
+      'The phamDrum emote, a progress bar & a countdown',
+      'Collaborative — fills to a celebration, or just clears quietly',
+      'Shows while a solo runs, then clears',
+    ] },
     { id: 'ovBracket', label: 'Bracket Night', holds: [
       'The single-elimination bracket, round by round',
       'Winners highlighted; the live match outlined',
@@ -436,6 +442,18 @@
     var bar = $('ovWindBar'); if (bar) bar.style.width = '34%';
   }
 
+  /* Mid-fill, not the celebration: the open state is the one on screen for the
+     whole countdown, so a panel positioned against it fits. */
+  function drum() {
+    show('ovDrum');
+    var p = $('ovDrum'); if (p) p.classList.remove('is-filled');
+    set('ovDrumTimer', '18s');
+    var bar = $('ovDrumBar'); if (bar) bar.style.width = '64%';
+    set('ovDrumPct', '64%');
+    set('ovDrumCount', '38 drummers');
+    var note = $('ovDrumNote'); if (note) note.innerHTML = 'Smash <b>!solo</b> to fill the meter!';
+  }
+
   function safari() {
     var panel = $('ovSafari');
     if (!panel) return;
@@ -584,7 +602,7 @@
   function fillAll() {
     alertCard(); scramble(); maze(); mtg(); raidBoss(); bingo(); manaClash();
     checkin(); hatch(); prediction(); hype(); adBreak(); adWarning();
-    tithe(); vsc(); wind(); safari(); bracket();
+    tithe(); vsc(); wind(); drum(); safari(); bracket();
     mtgGuess(); r6Draft(); chatVote(); bingoChat(); memChat();
   }
 

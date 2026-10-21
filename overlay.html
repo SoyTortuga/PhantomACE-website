@@ -378,6 +378,30 @@
     <div class="ov-adwarning-sub">Subscribe to not miss the action!</div>
   </div>
 
+  <!-- Drum Solo Meter: its OWN standing panel, driven by overlay-drum-solo.js.
+       PhantomACE plays a solo; chat smashes !solo to collectively fill the hype
+       meter before the countdown runs out. The phamDrum emote drums beside a
+       progress bar + a countdown. COLLABORATIVE — a filled meter flashes a
+       "FILLED!" celebration (self-clearing); an expired one just hides quietly.
+       A movable panel like the others; hidden until a solo is live. -->
+  <div class="ov-drum" id="ovDrum" hidden>
+    <div class="ov-drum-head">
+      <span class="ov-drum-title">Drum Solo</span>
+      <span class="ov-drum-timer" id="ovDrumTimer"></span>
+    </div>
+    <div class="ov-drum-body">
+      <img class="ov-drum-emote" id="ovDrumEmote" src="/assets/emotes/phamDrum.png" alt="">
+      <div class="ov-drum-meter">
+        <div class="ov-drum-track"><i id="ovDrumBar"></i></div>
+        <div class="ov-drum-readout">
+          <span class="ov-drum-pct" id="ovDrumPct">0%</span>
+          <span class="ov-drum-count" id="ovDrumCount"></span>
+        </div>
+      </div>
+    </div>
+    <div class="ov-drum-note" id="ovDrumNote">Smash <b>!solo</b> to fill the meter!</div>
+  </div>
+
   <script src="/js/pages/overlay-samples.js" defer></script>
   <script src="/js/pages/overlay-apply-layout.js" defer></script>
   <!-- The same reel math the Big Prize Giveaway control panel spins, so a
@@ -402,6 +426,7 @@
   <script src="/js/pages/overlay-tournament.js" defer></script>
   <script src="/js/pages/overlay-pham-wind.js" defer></script>
   <script src="/js/pages/overlay-dino-safari.js" defer></script>
+  <script src="/js/pages/overlay-drum-solo.js" defer></script>
   <script src="/js/pages/overlay-maze.js" defer></script>
   <script src="/js/pages/overlay-layout.js" defer></script>
 </body>

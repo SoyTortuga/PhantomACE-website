@@ -1074,6 +1074,92 @@ html, body {
 @media (prefers-reduced-motion: reduce) { .ov-tithe-track i { transition: none; } }
 
 /* ══════════════════════════════════════════════
+   DRUM SOLO METER — the standing panel.
+
+   Chat fills a hype meter with !solo while PhantomACE drums. A near-solid
+   panel (no blur) with a full border, the phamDrum emote bobbing beside a red
+   progress bar and a countdown. Collaborative: on a fill it turns red/white and
+   flashes the drummer, then the server flips it gone and the panel hides. Tokens
+   only; depth from the border (no box-shadow); the ONLY glow is a drop-shadow on
+   the emote, a non-box element. The bob/glow animations are inert while the
+   panel is display:none (a hidden element does not animate), so nothing runs on
+   an idle marathon overlay.
+   ══════════════════════════════════════════════ */
+.ov-drum[hidden] { display: none; }
+.ov-drum {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: 340px;
+  max-width: 72vw;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 13px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-family: var(--font-ui);
+}
+.ov-drum.is-filled { border-color: var(--red); }
+.ov-drum-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ov-drum-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--red);
+  text-transform: uppercase;
+}
+.ov-drum-timer {
+  font-size: 15px; font-weight: 700; color: var(--white);
+  font-variant-numeric: tabular-nums; flex: none;
+}
+.ov-drum-body { display: flex; align-items: center; gap: 12px; }
+.ov-drum-emote {
+  width: 54px; height: 54px; flex: none;
+  transform-origin: 50% 80%;
+  animation: ov-drum-bob 0.5s ease-in-out infinite;
+}
+.ov-drum.is-filled .ov-drum-emote {
+  animation-duration: 0.24s;
+  filter: drop-shadow(0 0 7px var(--red));
+}
+.ov-drum-meter { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.ov-drum-track {
+  position: relative;
+  width: 100%;
+  height: 18px;
+  background: var(--gray-lo);
+  border: 1px solid var(--gray-hi);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ov-drum-track i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--red);
+  transition: width 0.3s ease;
+}
+.ov-drum.is-filled .ov-drum-track i { background: var(--white); }
+.ov-drum-readout { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ov-drum-pct { font-size: 13px; font-weight: 800; color: var(--white); font-variant-numeric: tabular-nums; }
+.ov-drum.is-filled .ov-drum-pct { color: var(--red); }
+.ov-drum-count { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.ov-drum-note { font-size: 12px; color: var(--text-dim); text-align: center; }
+.ov-drum-note b { color: var(--white); }
+@keyframes ov-drum-bob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-3px) rotate(3deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-drum-track i { transition: none; }
+  .ov-drum-emote { animation: none; }
+}
+
+/* ══════════════════════════════════════════════
    COMMANDER BINGO — the standing panel.
 
    The same furniture as MTGBBB (progress bar, roster count, a board) so the

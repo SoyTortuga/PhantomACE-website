@@ -418,6 +418,8 @@ async function fireBotAction(payload, button) {
         dropegg: 'Egg code dropped to chat.',
         announce: 'Announcement sent to chat.',
         'checkin-alert': 'Pham Check-In alert sent to the overlay.',
+        'drum-start': 'Drum Solo started — chat fills the meter with !solo.',
+        'drum-stop': 'Drum Solo ended.',
       };
       /* data.sent is false when Twitch accepted the request but refused to
          post — AutoMod, a link filter, follower-only mode. Saying "dropped to
@@ -1286,6 +1288,21 @@ function initBotControlPanel() {
         frenzyBtn.disabled = false;
         frenzyBtn.textContent = original;
       }
+    });
+  }
+
+  /* Drum Solo Meter — start/stop go through /api/bot/trigger like every other
+     fireBotAction button, moderator-gated server-side. */
+  const drumStartBtn = document.getElementById('drumSoloStartBtn');
+  if (drumStartBtn) {
+    drumStartBtn.addEventListener('click', function () {
+      fireBotAction({ action: 'drum-start' }, drumStartBtn);
+    });
+  }
+  const drumStopBtn = document.getElementById('drumSoloStopBtn');
+  if (drumStopBtn) {
+    drumStopBtn.addEventListener('click', function () {
+      fireBotAction({ action: 'drum-stop' }, drumStopBtn);
     });
   }
 

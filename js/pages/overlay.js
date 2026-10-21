@@ -2086,7 +2086,7 @@
   if (Number.isFinite(reloadHoursParam)) RELOAD_AFTER_MS = reloadHoursParam * 3600000;
   var RELOAD_CHECK_MS = 60000;
   var loadedAt = Date.now();
-  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovEggVideo', 'ovPrediction', 'ovHype', 'ovAdBreak', 'ovAdWarning'];
+  var IDLE_PANEL_IDS = ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc', 'ovCheckin', 'ovHatch', 'ovEggVideo', 'ovPrediction', 'ovHype', 'ovAdBreak', 'ovAdWarning', 'ovDrum'];
 
   /* A panel is down if its poller hid it OR a layout preset switched it off
      (overlay-apply-layout.js forces style.display = 'none' and leaves the

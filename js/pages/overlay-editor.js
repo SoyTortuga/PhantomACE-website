@@ -59,7 +59,7 @@
     { title: 'Twitch events', ids: ['ovHype', 'ovAdBreak', 'ovAdWarning'] },
     { title: 'Reveals & status', ids: ['ovStage', 'ovHatch', 'ovCheckin', 'ovPrediction'] },
     { title: 'Core games', ids: ['ovScramble', 'ovMaze', 'ovMtg', 'ovRaid', 'ovBingo', 'ovMc'] },
-    { title: 'Stream-night modes', ids: ['ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket', 'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat'] },
+    { title: 'Stream-night modes', ids: ['ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket', 'ovDrum', 'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat'] },
   ];
 
   function renderLegend() {

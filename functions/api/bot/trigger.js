@@ -159,6 +159,29 @@ export async function onRequestPost(context) {
     return json(result, result.success ? 200 : 400);
   }
 
+  /* ── Drum Solo Meter ──────────────────────────────────────────────────
+     Starts/stops the chat-filled hype meter PhantomACE drums over. Start
+     announces it in chat and raises the overlay meter; chat fills it with
+     !solo. Moderator-gated by the same isModerator check above, like every
+     other action here. Optional goal/seconds/cooldownMs overrides are clamped
+     in drum-solo.js; the Bot Control button sends the defaults. */
+  if (body.action === 'drum-start') {
+    const { startDrumSolo } = await import('../drum-solo.js');
+    const result = await startDrumSolo(env, {
+      by: actor,
+      seconds: body.seconds,
+      goal: body.goal,
+      cooldownMs: body.cooldownMs,
+    });
+    return json(result, result.ok ? 200 : 400);
+  }
+
+  if (body.action === 'drum-stop') {
+    const { stopDrumSolo } = await import('../drum-solo.js');
+    const result = await stopDrumSolo(env);
+    return json(result, result.ok ? 200 : 400);
+  }
+
   /* Turn one alert type on or off. Enforced centrally in pushOverlayEvent, so a
      disabled type never reaches the overlay by ANY path (webhook, milestone or
      test-fire). Default is on; this only writes the exceptions. */

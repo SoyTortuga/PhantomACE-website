@@ -300,12 +300,63 @@ const SSS = {
   ],
 };
 
+/* ── Drum Solo Meter ──────────────────────────────
+   Fed by drum-solo.js once per chatter per event, on their FIRST `!solo` — a
+   participation join, granted whether or not the crowd filled the meter (an
+   individual should not lose credit because the room was small; the fill only
+   drives the overlay celebration). Cumulative solos joined climb a four-tier
+   drumline ladder. A chat-only viewer with no account earns nothing — the join
+   is recorded only for logged-in ids, exactly like every other game here. */
+const DRUM_SOLO = {
+  label: 'Drum Solo Meter',
+  normalize(p) {
+    p.solos = Number(p.solos) || 0;
+    return p;
+  },
+  apply(p, e) {
+    if (e.type !== 'join') return false;
+    p.solos += 1;
+    return true;
+  },
+  catalog: [
+    {
+      id: 'solo-bronze', name: 'Snare Line',
+      desc: 'Join 3 drum solos with !solo.',
+      reward: badge('solo-bronze', 'Snare Line', 'uncommon'),
+      met: (p) => p.solos >= 3,
+      progress: (p) => ({ cur: Math.min(p.solos, 3), goal: 3 }),
+    },
+    {
+      id: 'solo-silver', name: 'Tenor Line',
+      desc: 'Join 10 drum solos.',
+      reward: badge('solo-silver', 'Tenor Line', 'rare'),
+      met: (p) => p.solos >= 10,
+      progress: (p) => ({ cur: Math.min(p.solos, 10), goal: 10 }),
+    },
+    {
+      id: 'solo-gold', name: 'Bass Line',
+      desc: 'Join 25 drum solos.',
+      reward: badge('solo-gold', 'Bass Line', 'epic'),
+      met: (p) => p.solos >= 25,
+      progress: (p) => ({ cur: Math.min(p.solos, 25), goal: 25 }),
+    },
+    {
+      id: 'solo-diamond', name: 'Drum Major',
+      desc: 'Join 50 drum solos.',
+      reward: badge('solo-diamond', 'Drum Major', 'mythic'),
+      met: (p) => p.solos >= 50,
+      progress: (p) => ({ cur: Math.min(p.solos, 50), goal: 50 }),
+    },
+  ],
+};
+
 export const GAMES = Object.freeze({
   'memory-match': MEMORY_MATCH,
   'commander-bingo': COMMANDER_BINGO,
   'pham-shock': PHAM_SHOCK,
   'mtgbbb': MTGBBB,
   'sss': SSS,
+  'drum-solo': DRUM_SOLO,
 });
 
 /** Every badge this module can grant — the art manifest, in one place.
@@ -363,6 +414,7 @@ async function grantBadge(env, userId, reward, game) {
  *   recordAchievement(env, 'commander-bingo', uid, { type:'game', bingos, marked })
  *   recordAchievement(env, 'pham-shock',      uid, { type:'match', won })
  *   recordAchievement(env, 'mtgbbb',          uid, { type:'box', points, blackout })
+ *   recordAchievement(env, 'drum-solo',       uid, { type:'join' })
  *
  * NEVER throws into the caller: a cosmetic reward must not be able to break
  * a game write. Guests (no account) are ignored — there is no inventory to

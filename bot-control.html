@@ -186,6 +186,21 @@
             </div>
           </div>
 
+          <!-- Drum Solo Meter. A chat-only mode: start it at the top of a drum
+               solo, the bot announces it, and chat fills a hype meter on the
+               overlay by smashing !solo. Collaborative — a filled meter throws a
+               phamDrum celebration and a shoutout; an expired one just clears.
+               ~30s window, ~60 contributing hits to fill, one hit per chatter
+               every 2.5s so the crowd fills it, not a lone masher. -->
+          <div class="card bot-section" id="drumSoloSection">
+            <h3>Drum Solo Meter</h3>
+            <p class="bot-section-desc">Chat-only hype. Start it when PhantomACE launches into a solo &mdash; the bot calls it out and chat smashes <b>!solo</b> to fill the meter on the overlay. Collaborative: fill it in ~30s for a phamDrum celebration, or it just clears. Everyone who types <b>!solo</b> earns a drumline badge credit (logged-in viewers).</p>
+            <div class="bot-tier-buttons">
+              <button class="btn-primary" id="drumSoloStartBtn" type="button">Start Drum Solo</button>
+              <button class="btn-secondary" id="drumSoloStopBtn" type="button">End</button>
+            </div>
+          </div>
+
           <!-- Live item codes. The queue endpoint has existed since the
                feature shipped and no page called it, so these were visible
                only in the database — including the backup code a failed

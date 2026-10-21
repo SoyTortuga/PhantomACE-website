@@ -35,7 +35,7 @@ const PANEL_IDS = [
      collide with another panel. */
   'ovHype', 'ovAdBreak', 'ovAdWarning',
   // stream night modes
-  'ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket',
+  'ovTithe', 'ovVsc', 'ovWind', 'ovSafari', 'ovBracket', 'ovDrum',
   'ovMtgGuess', 'ovR6Draft', 'ovVote', 'ovBingoChat', 'ovMemChat',
 ];
 
