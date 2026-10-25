@@ -43,6 +43,11 @@ export const SINGLETONS = {
   lb_phamily_time:       { table: 'singletons', expiry: 'none' },
 
   media_index:           { table: 'singletons', expiry: 'none' },
+  /* The Clipper bot's ledger of which Twitch clips it has already turned into
+     vertical Shorts and posted, keyed by slug, so a daily run never re-posts
+     the same clip. 'none' — the record IS the business state, not a cache; an
+     expiry would make the bot repost everything after the TTL. */
+  clipper_posted:        { table: 'singletons', expiry: 'none' },
   about_content:         { table: 'singletons', expiry: 'none' },
   chat_scramble:         { table: 'singletons', expiry: 'none' },
   item_code_queue:       { table: 'singletons', expiry: 'none' },

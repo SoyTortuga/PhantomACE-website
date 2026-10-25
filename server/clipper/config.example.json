@@ -1,0 +1,41 @@
+{
+  "_comment": "Copy to config.json on the rig (or point CLIPPER_CONFIG at it). This file holds NO secrets — a route names a credsEnv and the tokens are read from the service environment as <credsEnv>_CLIENT_ID/_SECRET/_REFRESH_TOKEN (YouTube) or <credsEnv>_CLIENT_KEY/_SECRET/_REFRESH_TOKEN (TikTok). Find a game's gameId by running: node server/clipper/run.js --dry-run  (it logs each clip's game id and name). One account = one route that lists all of its gameIds, so 'perAccount' caps that whole account.",
+
+  "defaults": {
+    "lookbackDays": 365,
+    "perAccount": 2,
+    "minViews": 10,
+    "maxDurationSec": 60,
+    "maxPerRun": 20
+  },
+
+  "routes": [
+    {
+      "label": "Magic: The Gathering",
+      "match": {
+        "gameIds": ["29452"],
+        "gameNames": ["Magic: The Gathering"]
+      },
+      "hashtags": ["#MTG", "#Commander", "#PhantomACE"],
+      "youtube": { "credsEnv": "YT_MTG", "privacy": "public" },
+      "tiktok": { "credsEnv": "TT_MTG", "privacy": "SELF_ONLY" }
+    },
+    {
+      "label": "Minecraft",
+      "match": {
+        "gameIds": ["27471"],
+        "gameNames": ["Minecraft"]
+      },
+      "hashtags": ["#Minecraft", "#PhantomACE"],
+      "youtube": { "credsEnv": "YT_MINECRAFT", "privacy": "public" },
+      "tiktok": { "credsEnv": "TT_MINECRAFT", "privacy": "SELF_ONLY" }
+    }
+  ],
+
+  "fallback": {
+    "label": "PhantomACE",
+    "hashtags": ["#PhantomACE", "#Twitch"],
+    "youtube": { "credsEnv": "YT_MAIN", "privacy": "public" },
+    "tiktok": { "credsEnv": "TT_MAIN", "privacy": "SELF_ONLY" }
+  }
+}

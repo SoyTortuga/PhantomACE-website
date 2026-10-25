@@ -61,6 +61,14 @@ PhantomACE-Demo.zip
 # Python bytecode from tools/ (the atlas builder)
 __pycache__/
 
+# The Clipper bot's on-rig routing config (games → accounts). Per-deployment;
+# the committed template is config.example.json. No secrets live in it (tokens
+# are read from the service environment), but it is deployment-specific.
+server/clipper/config.json
+
+# Clipper run logs written by the scheduled task.
+server/clipper/logs/
+
 # Third-party Claude Code skills installed via `npx skills add`. Kept LOCAL,
 # not committed: `.claude/skills/*` are symlinks into `.agents/` that don't
 # resolve on the rig or other clones, the bundles are third-party code, and
