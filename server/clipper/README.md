@@ -27,6 +27,9 @@ scripts/
 
 ## Setup order (developer)
 
+**→ For the full click-by-click version, follow `SETUP-WALKTHROUGH.md`.**
+The summary below is the shape of it.
+
 Everything except steps 3 and 5 can be done **before the broadcaster is
 involved**. See `SETUP-ROLES.md` for the full split and
 `BROADCASTER-SETUP.md` for the handout.
