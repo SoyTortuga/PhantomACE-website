@@ -16,6 +16,36 @@ render.js         ffmpeg: 16:9 clip → gothic 9:16 Short
 publish/youtube.js  Data API resumable upload (one account per credsEnv)
 publish/tiktok.js   Content Posting API (one account per credsEnv)
 state.js          the `clipper_posted` ledger — never repost a clip
+env-boot.js       loads server/.env (+ --service overlay) for the scripts
+
+scripts/
+  doctor.js         preflight: what is ready, what is missing
+  list-games.js     what is in the clip pool + emit a config.json scaffold
+  oauth-youtube.js  one-time consent → a channel's refresh token
+  oauth-tiktok.js   one-time consent → an account's refresh token
+```
+
+## Setup order (developer)
+
+Everything except steps 3 and 5 can be done **before the broadcaster is
+involved**. See `SETUP-ROLES.md` for the full split and
+`BROADCASTER-SETUP.md` for the handout.
+
+```
+1.  install ffmpeg on the rig
+2.  node server/clipper/scripts/list-games.js            # what games exist
+    node server/clipper/scripts/list-games.js --emit-config > server/clipper/config.json
+    …then edit config.json: merge games onto shared accounts, drop the rest
+3.  (broadcaster) create the destination channels/accounts
+4.  create the Google Cloud OAuth client + the TikTok app
+5.  (broadcaster at the keyboard, ~30 min)
+    node server/clipper/scripts/oauth-youtube.js --name YT_MTG
+    node server/clipper/scripts/oauth-tiktok.js  --name TT_MTG
+    …paste the printed env lines into server/.env
+6.  node server/clipper/scripts/doctor.js                # confirm readiness
+7.  node server/clipper/run.js --dry-run --render        # eyeball a render
+8.  powershell -File server/scripts/install-clipper-task.ps1 -DryRun
+    …then re-run without -DryRun to go live
 ```
 
 ## How selection works
@@ -105,15 +135,19 @@ scripts do). A dry run does not need it.
 
 ## 6. Schedule it (Windows Task Scheduler)
 
-Run daily, e.g. 09:00:
-
 ```
-node C:\path\to\PhantomACE-website\server\clipper\run.js
+powershell -NoProfile -ExecutionPolicy Bypass -File .\server\scripts\install-clipper-task.ps1 -DryRun
 ```
 
-with `DATABASE_URL`, `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`,
-`TWITCH_BROADCASTER_ID`, the per-account `YT_*` / `TT_*`, and (if ffmpeg is not
-on PATH) `FFMPEG_PATH` in the task's environment.
+Registers a daily SYSTEM task that logs to `server/clipper/logs/clipper.log`.
+Start with `-DryRun` (lists, posts nothing), then re-run without it to go live.
+
+The task needs no environment plumbing: `env-boot.js` loads `server/.env`, and
+`--service phantomace-web` (which the installer passes) overlays the
+**production** `DATABASE_URL` from the service's own environment block —
+`server/.env` holds the dev connection string, so this is deliberate and
+matches the other rig scripts. Put the `YT_*` / `TT_*` families and
+`FFMPEG_PATH` in `server/.env`.
 
 ## Running it by hand
 
@@ -122,6 +156,11 @@ node server/clipper/run.js --dry-run            # list the pool + routing, no wo
 node server/clipper/run.js --dry-run --render    # also produce the MP4s to inspect
 node server/clipper/run.js --limit 4             # a real run, cap at 4 this time
 node server/clipper/run.js                        # the normal daily run
+node server/clipper/run.js --service phantomace-web   # against production KV
+
+node server/clipper/scripts/doctor.js            # readiness check
+node server/clipper/scripts/doctor.js --live     # …and really call Twitch
+node server/clipper/scripts/list-games.js        # the pool, by game
 ```
 
 Dry-run renders are left in `CLIPPER_WORK` (default the OS temp dir under

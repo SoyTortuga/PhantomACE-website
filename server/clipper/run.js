@@ -187,6 +187,11 @@ export async function runClipper(env, { configPath, dryRun = false, doRender = f
 /* ── CLI ──────────────────────────────────────────────────────────────── */
 
 async function main() {
+  /* server/.env (+ an optional --service overlay for the production
+     DATABASE_URL) before anything reads process.env. */
+  const { bootEnv, serviceArg } = await import('./env-boot.js');
+  await bootEnv(serviceArg());
+
   const argv = process.argv.slice(2);
   const has = (f) => argv.includes(f);
   const val = (f) => { const i = argv.indexOf(f); return i !== -1 ? argv[i + 1] : undefined; };
@@ -197,9 +202,11 @@ async function main() {
   const configPath = val('--config');
 
   let env;
-  if (dryRun && !doRender && !process.env.DATABASE_URL) {
-    /* A pure listing dry run needs Twitch but not Postgres. */
-    env = { ...process.env };
+  if (dryRun && !process.env.DATABASE_URL) {
+    /* A dry run needs Twitch but not Postgres. It still needs SOME store:
+       getAppToken caches the Twitch app token through env.MARKETPLACE. */
+    const { memoryKv } = await import('./memory-kv.js');
+    env = { ...process.env, MARKETPLACE: memoryKv() };
   } else {
     const { createPool, waitForDatabase } = await import('../lib/db.js');
     const { createKVStore } = await import('../lib/kv.js');
