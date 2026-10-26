@@ -63,6 +63,11 @@ involved**. See `SETUP-ROLES.md` for the full split and
   therefore drains ~2 per account per run.
 - **One account = one route.** If two games share a YouTube channel, list both
   `gameIds` on the same route so the per-account cap covers them together.
+- **`exclude`** lists categories that never leave Twitch (IRL, Just Chatting,
+  Music…). It is checked *before* the routes and *before* the fallback, so a
+  catch-all fallback cannot sweep them up. This is what lets the fallback stay
+  a true catch-all: a new game you start streaming routes itself with no config
+  change, while the excluded categories stay excluded.
 
 ## 1. Prerequisite: ffmpeg on the rig
 

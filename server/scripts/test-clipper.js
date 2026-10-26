@@ -60,6 +60,30 @@ const NOFALL = normalizeConfig({ routes: [CFG_rawRoute()], fallback: null });
 function CFG_rawRoute() { return { label: 'X', match: { gameIds: ['1'] }, youtube: { credsEnv: 'Y' } }; }
 check('no fallback → null', resolveRoute(NOFALL, { gameId: '42' }), null);
 
+/* exclude: beats both the routes and the fallback */
+const EXCL = normalizeConfig({
+  routes: [{ label: 'MTG', match: { gameIds: ['2748'] }, youtube: { credsEnv: 'YT_MTG' } }],
+  fallback: { label: 'Games', youtube: { credsEnv: 'YT_GAMES' } },
+  exclude: { gameIds: ['509672'], gameNames: ['Just Chatting'] },
+});
+check('excluded by gameId → null, not the fallback', resolveRoute(EXCL, { gameId: '509672' }), null);
+check('excluded by gameName (case-insensitive) → null',
+  resolveRoute(EXCL, { gameName: 'JUST CHATTING' }), null);
+check('a non-excluded unmatched game still reaches the fallback',
+  resolveRoute(EXCL, { gameId: '999' }).label, 'Games');
+check('a routed game is unaffected by exclude', resolveRoute(EXCL, { gameId: '2748' }).label, 'MTG');
+check('config without an exclude block still works',
+  resolveRoute(normalizeConfig({ routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }),
+    { gameId: '1' }).label, 'F');
+
+/* an excluded clip must never be selected, even with room in the run */
+const exPool = attachRoutes(
+  [clip('irl1', '509672', 500), clip('mtg1', '2748', 10)],
+  EXCL, new Map([['509672', 'IRL'], ['2748', 'Magic: The Gathering']]));
+check('excluded clip is dropped from selection despite the highest views',
+  selectForRun(exPool, { perAccount: 2, maxPerRun: 20, isPosted: () => false }).map(p => p.slug),
+  ['mtg1']);
+
 throws('route without a destination throws',
   () => normalizeConfig({ routes: [{ label: 'bad', match: {} }] }));
 throws('route without a label throws',

@@ -22,6 +22,12 @@
    localised and gets re-titled. The first route that matches wins; a clip
    that matches nothing falls to `fallback` (and if there is no fallback, it
    is skipped rather than guessed onto some default channel).
+
+   EXCLUDE comes FIRST, before any route or the fallback. It is how a channel
+   says "these categories never leave Twitch" — IRL and Just Chatting being
+   the usual ones. Without it a catch-all fallback would sweep them up, and
+   the alternative (naming every OTHER game explicitly, with no fallback)
+   silently drops any new game the channel starts streaming.
    ══════════════════════════════════════════════ */
 
 import fs from 'node:fs';
@@ -83,8 +89,18 @@ export function normalizeConfig(parsed) {
 
   const routes = Array.isArray(parsed.routes) ? parsed.routes.map(validateRoute) : [];
   const fallback = parsed.fallback ? validateRoute({ ...parsed.fallback, match: parsed.fallback.match || {} }) : null;
+  const exclude = normalizeMatch(parsed.exclude);
 
-  return { defaults, routes, fallback };
+  return { defaults, routes, fallback, exclude };
+}
+
+/** A {gameIds, gameNames} matcher, normalized. Names are lowercased. */
+function normalizeMatch(match) {
+  const m = match || {};
+  return {
+    gameIds: (m.gameIds || []).map(String),
+    gameNames: (m.gameNames || []).map(s => String(s).toLowerCase()),
+  };
 }
 
 function validateRoute(route, i) {
@@ -92,9 +108,7 @@ function validateRoute(route, i) {
   const label = String(route.label || '').trim();
   if (!label) throw new Error(`Clipper route #${i} is missing a "label"`);
 
-  const match = route.match || {};
-  const gameIds = (match.gameIds || []).map(String);
-  const gameNames = (match.gameNames || []).map(s => String(s).toLowerCase());
+  const { gameIds, gameNames } = normalizeMatch(route.match);
 
   /* At least one destination, or the route is a no-op that silently drops a
      game. A route may post to only YouTube or only TikTok. */
@@ -116,13 +130,20 @@ function validateRoute(route, i) {
  * needs no network. `fallback` is used when nothing matches; null if there is
  * none, and the caller then skips the clip.
  *
- * @param {{routes:object[], fallback:(object|null)}} config
+ * @param {{routes:object[], fallback:(object|null), exclude:(object|undefined)}} config
  * @param {{gameId:(string|undefined), gameName:(string|undefined)}} clip
  * @returns {(object|null)}
  */
 export function resolveRoute(config, { gameId, gameName } = {}) {
   const id = gameId != null ? String(gameId) : '';
   const name = gameName ? String(gameName).toLowerCase() : '';
+
+  /* Excluded categories never leave Twitch — checked before the routes AND
+     before the fallback, which is the whole point of the list. */
+  const ex = config.exclude;
+  if (ex && ((id && ex.gameIds.includes(id)) || (name && ex.gameNames.includes(name)))) {
+    return null;
+  }
 
   for (const route of config.routes) {
     if (id && route.match.gameIds.includes(id)) return route;
