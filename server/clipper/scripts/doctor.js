@@ -82,6 +82,15 @@ try {
   OK(`config loaded — ${config.routes.length} route(s)` + (config.fallback ? ' + fallback' : ', no fallback'));
   OK(`${config.defaults.perAccount} post(s) per account per run, ` +
      `${config.defaults.lookbackDays}d lookback, cap ${config.defaults.maxPerRun}/run`);
+  OK(`YouTube publishes ${config.schedule.daysAhead}d ahead at ` +
+     `${config.schedule.times.join(' & ')} ${config.schedule.timezone} (TikTok posts same-day)`);
+  OK(`fresh hits: >=${config.trending.minViews} views within ${config.trending.withinDays}d jump the queue`);
+  /* videos.insert is ~1600 units against a 10,000/day default. */
+  const ytRoutes = [...config.routes, ...(config.fallback ? [config.fallback] : [])].filter(r => r.youtube).length;
+  const units = ytRoutes * config.defaults.perAccount * 1600;
+  (units > 10000 ? NO : OK)(
+    `YouTube quota: ~${units} units/day across ${ytRoutes} channel(s)` +
+    (units > 10000 ? ' — OVER the 10,000/day default' : ' of 10,000'));
 } catch (err) {
   NO(err.message.split('\n')[0]);
   console.log('    → node server/clipper/scripts/list-games.js --emit-config > server/clipper/config.json');

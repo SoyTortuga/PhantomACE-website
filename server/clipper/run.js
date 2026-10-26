@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, resolveRoute } from './config.js';
 import { findClips, resolveGames, downloadClip } from './twitch.js';
 import { renderVertical } from './render.js';
+import { slotsFor } from './schedule.js';
 import { listPosted, recordPosted } from './state.js';
 import * as youtube from './publish/youtube.js';
 import * as tiktok from './publish/tiktok.js';
@@ -54,18 +55,43 @@ export function attachRoutes(clips, config, gameNames) {
 }
 
 /**
+ * Put FRESH HITS first: a clip created within `withinDays` that already has
+ * `minViews` is taking off now, and ranking purely on lifetime views would
+ * bury it under a year-old clip with one more view. Within each tier the
+ * order is still views-desc. Pure.
+ *
+ * @param {object[]} clips
+ * @param {{withinDays:number, minViews:number}} trending
+ * @param {number} [now]
+ */
+export function prioritizeFresh(clips, trending, now = Date.now()) {
+  const cutoff = now - trending.withinDays * 86400000;
+  const fresh = [], rest = [];
+  for (const c of clips) {
+    const at = Date.parse(c.createdAt || '');
+    const isFresh = Number.isFinite(at) && at >= cutoff && (c.views || 0) >= trending.minViews;
+    (isFresh ? fresh : rest).push({ ...c, fresh: isFresh });
+  }
+  const byViews = (a, b) => (b.views || 0) - (a.views || 0);
+  return [...fresh.sort(byViews), ...rest.sort(byViews)];
+}
+
+/**
  * Pick what to post this run: top `perAccount` per route, skipping the already
- * posted, capped at `maxPerRun`. Clips must already be view-desc. Pure.
+ * posted, capped at `maxPerRun`. Fresh hits are considered first. Pure.
  * @param {object[]} routedClips  from attachRoutes
  * @param {object} o
  * @param {number} o.perAccount
  * @param {number} o.maxPerRun
  * @param {(slug:string)=>boolean} o.isPosted
+ * @param {object} [o.trending] omit to keep plain views-desc order
+ * @param {number} [o.now]
  */
-export function selectForRun(routedClips, { perAccount, maxPerRun, isPosted }) {
+export function selectForRun(routedClips, { perAccount, maxPerRun, isPosted, trending, now = Date.now() }) {
+  const ordered = trending ? prioritizeFresh(routedClips, trending, now) : routedClips;
   const perRoute = new Map();
   const picks = [];
-  for (const c of routedClips) {
+  for (const c of ordered) {
     if (!c.route) continue;              // unrouted game, no fallback — skip
     if (isPosted(c.slug)) continue;
     const count = perRoute.get(c.route.label) || 0;
@@ -87,7 +113,9 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
   const out = path.join(jobDir, 'short.mp4');
   fs.mkdirSync(jobDir, { recursive: true });
 
-  log(`"${clip.title}" — ${clip.views} views, game ${clip.gameName || clip.gameId || 'unknown'}`);
+  log(`"${clip.title}" — ${clip.views} views, game ${clip.gameName || clip.gameId || 'unknown'}` +
+    (clip.fresh ? ' [FRESH HIT]' : '') +
+    (clip.publishAt ? ` — YouTube publishes ${clip.publishAt.toISOString()}` : ''));
 
   if (dryRun && !doRender) return { slug: clip.slug, dryRun: true };
 
@@ -101,16 +129,23 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
 
   if (dryRun) return { slug: clip.slug, rendered: out };
 
-  const record = { route: route.label, title: clip.title, youtube: null, tiktok: null };
+  const record = {
+    route: route.label, title: clip.title, fresh: !!clip.fresh,
+    scheduledFor: clip.publishAt ? clip.publishAt.toISOString() : null,
+    youtube: null, tiktok: null,
+  };
 
   if (route.youtube) {
     const creds = youtube.credsFromEnv(env, route.youtube.credsEnv);
     if (!creds) { log(`youtube (${route.youtube.credsEnv}): not configured — skipping`); }
     else {
       try {
-        const r = await youtube.uploadShort({ creds, file: out, title: clip.title, hashtags: route.hashtags, privacy: route.youtube.privacy });
-        record.youtube = { id: r.id, url: r.url };
-        log(`youtube: ${r.url}`);
+        const r = await youtube.uploadShort({
+          creds, file: out, title: clip.title, hashtags: route.hashtags,
+          privacy: route.youtube.privacy, publishAt: clip.publishAt,
+        });
+        record.youtube = { id: r.id, url: r.url, publishAt: r.publishAt };
+        log(`youtube: ${r.url}` + (r.publishAt ? ` (scheduled ${r.publishAt})` : ''));
       } catch (err) { record.youtube = { error: err.message }; log(`youtube FAILED: ${err.message}`); }
     }
   }
@@ -162,9 +197,25 @@ export async function runClipper(env, { configPath, dryRun = false, doRender = f
     perAccount: config.defaults.perAccount,
     maxPerRun,
     isPosted: (slug) => postedSet.has(slug),
+    trending: config.trending,
   });
 
-  console.log(`[clipper] selected ${final.length} clip(s) this run` + (dryRun ? ' (dry run)' : ''));
+  const freshCount = final.filter(c => c.fresh).length;
+  console.log(`[clipper] selected ${final.length} clip(s) this run` +
+    (freshCount ? `, ${freshCount} fresh hit(s)` : '') + (dryRun ? ' (dry run)' : ''));
+
+  /* Each account's picks get that account's slots on the target day, in order.
+     YouTube publishes at those times; TikTok has no scheduling and goes now. */
+  const slotIndex = new Map();
+  for (const clip of final) {
+    const i = slotIndex.get(clip.route.label) || 0;
+    slotIndex.set(clip.route.label, i + 1);
+    clip.publishAt = slotsFor(Date.now(), config.schedule, i + 1)[i];
+  }
+  if (final.length) {
+    console.log(`[clipper] publishing ${config.schedule.daysAhead} day(s) ahead ` +
+      `at ${config.schedule.times.join(', ')} ${config.schedule.timezone}`);
+  }
 
   const workDir = process.env.CLIPPER_WORK || path.join(os.tmpdir(), 'clipper');
   const results = [];
