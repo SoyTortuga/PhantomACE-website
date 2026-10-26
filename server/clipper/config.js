@@ -82,8 +82,15 @@ export function loadConfig(explicitPath) {
   }
 
   let parsed;
-  try { parsed = JSON.parse(raw); }
-  catch (err) { throw new Error(`Clipper config at ${file} is not valid JSON: ${err.message}`); }
+  try {
+    /* Strip a UTF-8 BOM. Windows Notepad still writes one depending on the
+       chosen encoding, and JSON.parse rejects it — giving "Unexpected token"
+       on a file that looks perfect in the editor. This config is expected to
+       be hand-edited on the rig, so eat the BOM rather than explain it. */
+    parsed = JSON.parse(raw.replace(/^\uFEFF/, ''));
+  } catch (err) {
+    throw new Error(`Clipper config at ${file} is not valid JSON: ${err.message}`);
+  }
 
   return normalizeConfig(parsed);
 }

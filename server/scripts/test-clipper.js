@@ -11,7 +11,7 @@
    The actual Helix calls, ffmpeg spawn and uploads are IO and are not covered.
    ══════════════════════════════════════════════ */
 
-import { normalizeConfig, resolveRoute } from '../clipper/config.js';
+import { normalizeConfig, resolveRoute, loadConfig } from '../clipper/config.js';
 import { clipMp4Url } from '../clipper/twitch.js';
 import { buildFilter, ffmpegArgs, wrapTitle, FRAME } from '../clipper/render.js';
 import { buildDescription } from '../clipper/publish/youtube.js';
@@ -84,6 +84,18 @@ const exPool = attachRoutes(
 check('excluded clip is dropped from selection despite the highest views',
   selectForRun(exPool, { perAccount: 2, maxPerRun: 20, isPosted: () => false }).map(p => p.slug),
   ['mtg1']);
+
+/* a Notepad-saved config carries a UTF-8 BOM; it must still load */
+import fsx from 'node:fs';
+import osx from 'node:os';
+import pathx from 'node:path';
+const bomFile = pathx.join(osx.tmpdir(), 'clipper-bom-test.json');
+fsx.writeFileSync(bomFile, '\uFEFF' + JSON.stringify({
+  routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } },
+}), 'utf8');
+check('a config saved with a UTF-8 BOM still parses',
+  loadConfig(bomFile).fallback.label, 'F');
+fsx.unlinkSync(bomFile);
 
 throws('route without a destination throws',
   () => normalizeConfig({ routes: [{ label: 'bad', match: {} }] }));
