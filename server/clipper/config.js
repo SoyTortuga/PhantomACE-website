@@ -36,6 +36,22 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
+/* Publishing cadence. The bot runs daily and dates each upload `daysAhead`
+   out, so the schedule stays a week deep without a quota-busting batch. */
+const SCHEDULE_DEFAULTS = {
+  daysAhead: 7,
+  times: ['10:00', '14:00'],
+  timezone: 'America/Los_Angeles',
+};
+
+/* A clip this new with at least this many views is a FRESH HIT and is
+   scheduled ahead of the backlog — otherwise a year-old clip with one more
+   lifetime view would outrank a clip that is actually taking off right now. */
+const TRENDING_DEFAULTS = {
+  withinDays: 14,
+  minViews: 8,
+};
+
 const DEFAULTS = {
   /* How the selector behaves when the config does not say. */
   lookbackDays: 365,      // how far back the clip pool reaches (12 months)
@@ -90,8 +106,36 @@ export function normalizeConfig(parsed) {
   const routes = Array.isArray(parsed.routes) ? parsed.routes.map(validateRoute) : [];
   const fallback = parsed.fallback ? validateRoute({ ...parsed.fallback, match: parsed.fallback.match || {} }) : null;
   const exclude = normalizeMatch(parsed.exclude);
+  const schedule = normalizeSchedule(parsed.schedule, defaults.perAccount);
+  const trending = { ...TRENDING_DEFAULTS, ...(parsed.trending || {}) };
 
-  return { defaults, routes, fallback, exclude };
+  return { defaults, routes, fallback, exclude, schedule, trending };
+}
+
+/** Validate the publish cadence. */
+function normalizeSchedule(schedule, perAccount) {
+  const s = { ...SCHEDULE_DEFAULTS, ...(schedule || {}) };
+  if (!(s.daysAhead >= 0)) {
+    throw new Error('Clipper config: schedule.daysAhead must be 0 or more');
+  }
+  if (!Array.isArray(s.times) || !s.times.length) {
+    throw new Error('Clipper config: schedule.times must list at least one "HH:MM"');
+  }
+  for (const t of s.times) {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(t))) {
+      throw new Error(`Clipper config: schedule.times entry "${t}" is not HH:MM (24h)`);
+    }
+  }
+  /* Each of an account's posts needs its own slot. Fewer times than
+     perAccount would silently stack two videos on one minute. */
+  if (s.times.length < perAccount) {
+    throw new Error(
+      `Clipper config: schedule.times has ${s.times.length} slot(s) but perAccount is ` +
+      `${perAccount} — add more times, or lower perAccount.`);
+  }
+  try { new Intl.DateTimeFormat('en-US', { timeZone: s.timezone }); }
+  catch { throw new Error(`Clipper config: schedule.timezone "${s.timezone}" is not a known IANA zone`); }
+  return s;
 }
 
 /** A {gameIds, gameNames} matcher, normalized. Names are lowercased. */

@@ -61,6 +61,37 @@ involved**. See `SETUP-ROLES.md` for the full split and
 - Per run the bot posts the top **`perAccount`** (default 2) not-yet-posted
   clips **for each account**, capped at `maxPerRun` total. A 12-month backlog
   therefore drains ~2 per account per run.
+- **Fresh hits jump the queue.** A clip newer than `trending.withinDays` with
+  at least `trending.minViews` is scheduled ahead of the backlog — otherwise a
+  year-old clip with one more lifetime view outranks a clip that is taking off
+  right now.
+
+## Scheduling
+
+The bot runs daily but publishes **a week ahead**: each run uploads that day's
+clips with YouTube's `status.publishAt` set to `schedule.daysAhead` days out,
+at `schedule.times` in `schedule.timezone`. The schedule stays a week deep and
+the broadcaster can see what is queued in YouTube Studio.
+
+**Why not upload a whole week in one go.** `videos.insert` costs ~1600 quota
+units against a 10,000/day default — about six uploads a day. A real weekly
+batch (2 posts x 7 days x 2 accounts = 28 uploads) is ~44,800 units and would
+fail partway through. Uploading daily, dated a week out, gives the same
+schedule depth at ~4 uploads/day. **A third account would put you at ~9,600
+units/day — effectively the ceiling.**
+
+A scheduled upload goes up **private** and YouTube flips it public at the
+instant; the route's `privacy` describes what it becomes, not what it starts
+as. YouTube rejects `publishAt` on an already-public video and ignores it on an
+unlisted one, which would publish a week early with nothing in the response to
+say so — hence the private upload.
+
+**TikTok has no scheduling API**, so TikTok posts same-day. Before the audit
+clears it is a private draft anyway, which the broadcaster publishes whenever
+they like.
+
+The scheduled task's own run time (`-At` on the installer) only decides when
+the bot *works*; it no longer decides when anything goes live.
 - **One account = one route.** If two games share a YouTube channel, list both
   `gameIds` on the same route so the per-account cap covers them together.
 - **`exclude`** lists categories that never leave Twitch (IRL, Just Chatting,

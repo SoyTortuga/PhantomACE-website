@@ -16,6 +16,10 @@
    logs "youtube: not configured" and carries on — the same posture the site
    takes with any unconfigured integration.
 
+   SCHEDULING is YouTube-native: `status.publishAt` on a private upload makes
+   YouTube publish it at that instant, so the bot does not need to stay running
+   or come back. TikTok has no equivalent — see publish/tiktok.js.
+
    #Shorts: a <=60s, <=1080-wide vertical video with #Shorts in the title or
    description is treated as a Short by YouTube. We render 1080×1920 and put the
    tag in the description, so no special endpoint is needed — videos.insert is
@@ -68,10 +72,27 @@ export function buildDescription({ baseText = '', hashtags = [] } = {}) {
  * @param {string[]} [o.hashtags]
  * @param {string} [o.privacy]   'public' | 'unlisted' | 'private'
  * @param {string[]} [o.keywords] video tags
- * @returns {Promise<{id:string, url:string}>}
+ * @param {Date} [o.publishAt]   schedule the video to go live at this instant
+ * @returns {Promise<{id:string, url:string, publishAt:(string|null)}>}
  */
-export async function uploadShort({ creds, file, title, hashtags = [], privacy = 'public', keywords = [] }) {
+export async function uploadShort({ creds, file, title, hashtags = [], privacy = 'public', keywords = [], publishAt = null }) {
   const token = await accessToken(creds);
+
+  /* SCHEDULING REQUIRES privacyStatus 'private'. YouTube rejects publishAt on
+     a video that is already public, and silently ignores it on an unlisted
+     one — the video would simply appear immediately, a week early, with
+     nothing in the response to say the schedule was dropped. So when a
+     publishAt is given the upload goes up private and YouTube flips it public
+     at that instant; the route's configured privacy then describes what it
+     becomes, not what it starts as. */
+  const status = { selfDeclaredMadeForKids: false };
+  if (publishAt) {
+    status.privacyStatus = 'private';
+    status.publishAt = new Date(publishAt).toISOString();
+  } else {
+    status.privacyStatus = privacy;
+  }
+
   const metadata = {
     snippet: {
       title: String(title || 'Clip').slice(0, 100),
@@ -79,7 +100,7 @@ export async function uploadShort({ creds, file, title, hashtags = [], privacy =
       tags: keywords.slice(0, 20),
       categoryId: '20', // Gaming
     },
-    status: { privacyStatus: privacy, selfDeclaredMadeForKids: false },
+    status,
   };
 
   /* Resumable upload: open a session, then PUT the bytes. For a <=60s Short the
@@ -111,5 +132,9 @@ export async function uploadShort({ creds, file, title, hashtags = [], privacy =
     throw new Error(`YouTube upload failed (${putRes.status}): ${(await putRes.text()).slice(0, 300)}`);
   }
   const video = await putRes.json();
-  return { id: video.id, url: `https://www.youtube.com/shorts/${video.id}` };
+  return {
+    id: video.id,
+    url: `https://www.youtube.com/shorts/${video.id}`,
+    publishAt: status.publishAt || null,
+  };
 }

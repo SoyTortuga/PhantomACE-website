@@ -15,7 +15,8 @@ import { normalizeConfig, resolveRoute } from '../clipper/config.js';
 import { clipMp4Url } from '../clipper/twitch.js';
 import { buildFilter, ffmpegArgs, wrapTitle, FRAME } from '../clipper/render.js';
 import { buildDescription } from '../clipper/publish/youtube.js';
-import { selectForRun, attachRoutes } from '../clipper/run.js';
+import { selectForRun, attachRoutes, prioritizeFresh } from '../clipper/run.js';
+import { zonedTimeToUtc, slotsFor } from '../clipper/schedule.js';
 import { wasPosted, recordPosted, listPosted } from '../clipper/state.js';
 
 let passed = 0;
@@ -126,6 +127,82 @@ check('maxPerRun ceiling honoured', capped.length, 3);
 const noFallPool = attachRoutes([clip('z', '999', 10)], NOFALL, new Map([['999', 'Pacman']]));
 check('unrouted + no fallback → not selected',
   selectForRun(noFallPool, { perAccount: 2, maxPerRun: 20, isPosted: () => false }).length, 0);
+
+/* ── schedule: DST-correct wall-clock -> UTC ──────────────────────────── */
+
+const LA = 'America/Los_Angeles';
+check('10:00 PST (winter) is 18:00Z',
+  zonedTimeToUtc(2026, 1, 15, 10, 0, LA).toISOString(), '2026-01-15T18:00:00.000Z');
+check('10:00 PDT (summer) is 17:00Z — the hour DST would silently lose',
+  zonedTimeToUtc(2026, 7, 15, 10, 0, LA).toISOString(), '2026-07-15T17:00:00.000Z');
+check('14:00 PST is 22:00Z',
+  zonedTimeToUtc(2026, 1, 15, 14, 0, LA).toISOString(), '2026-01-15T22:00:00.000Z');
+check('the day after spring-forward is PDT',
+  zonedTimeToUtc(2026, 3, 9, 10, 0, LA).toISOString(), '2026-03-09T17:00:00.000Z');
+check('the day before spring-forward is still PST',
+  zonedTimeToUtc(2026, 3, 7, 10, 0, LA).toISOString(), '2026-03-07T18:00:00.000Z');
+
+const SCHED = { daysAhead: 7, times: ['10:00', '14:00'], timezone: LA };
+const slots = slotsFor(Date.parse('2026-10-26T12:00:00Z'), SCHED, 2);
+check('slots land 7 days out, in slot order',
+  slots.map(d => d.toISOString()),
+  ['2026-11-02T18:00:00.000Z', '2026-11-02T22:00:00.000Z']);
+check('one slot asked for returns one', slotsFor(Date.now(), SCHED, 1).length, 1);
+/* Late UTC on a day is still "today" in Los Angeles, so +7 must not skip a day. */
+check('a late-UTC run still targets the right local date',
+  slotsFor(Date.parse('2026-10-26T23:30:00Z'), SCHED, 1)[0].toISOString(),
+  '2026-11-02T18:00:00.000Z');
+
+/* ── trending: fresh hits jump the backlog ───────────────────────────── */
+
+const NOW = Date.parse('2026-10-26T12:00:00Z');
+const daysAgo = (n) => new Date(NOW - n * 86400000).toISOString();
+function tclip(slug, views, ageDays) {
+  return { slug, gameId: '1', views, title: slug, thumbnailUrl: '', createdAt: daysAgo(ageDays) };
+}
+const TREND = { withinDays: 14, minViews: 8 };
+
+const pool2 = [
+  tclip('old_big', 40, 300),   // the all-time best, but stale
+  tclip('fresh_ok', 12, 3),    // recent and over the bar -> should lead
+  tclip('fresh_weak', 4, 2),   // recent but under minViews -> backlog
+  tclip('old_mid', 20, 200),
+];
+const ordered = prioritizeFresh(pool2, TREND, NOW).map(c => c.slug);
+check('a fresh hit outranks a higher-view stale clip', ordered[0], 'fresh_ok');
+check('the rest stay views-desc behind it', ordered, ['fresh_ok', 'old_big', 'old_mid', 'fresh_weak']);
+check('fresh clips are flagged',
+  prioritizeFresh(pool2, TREND, NOW).filter(c => c.fresh).map(c => c.slug), ['fresh_ok']);
+check('a recent clip under the view bar is not a fresh hit',
+  prioritizeFresh([tclip('x', 7, 1)], TREND, NOW)[0].fresh, false);
+check('an old clip over the view bar is not a fresh hit',
+  prioritizeFresh([tclip('y', 999, 90)], TREND, NOW)[0].fresh, false);
+check('a clip with no createdAt is never fresh',
+  prioritizeFresh([{ slug: 'z', views: 99, createdAt: '' }], TREND, NOW)[0].fresh, false);
+
+/* and that selection actually honours it */
+const trendRouted = attachRoutes(pool2, CFG, new Map([['1', 'Magic: The Gathering']]));
+check('selectForRun schedules the fresh hit first',
+  selectForRun(trendRouted, { perAccount: 2, maxPerRun: 20, isPosted: () => false, trending: TREND, now: NOW })
+    .map(p => p.slug),
+  ['fresh_ok', 'old_big']);
+check('without trending it is plain views-desc',
+  selectForRun(trendRouted, { perAccount: 2, maxPerRun: 20, isPosted: () => false })
+    .map(p => p.slug),
+  ['old_big', 'fresh_ok']);
+
+/* ── schedule config validation ──────────────────────────────────────── */
+
+const SC = normalizeConfig({ routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } });
+check('schedule defaults', SC.schedule.times, ['10:00', '14:00']);
+check('trending defaults', [SC.trending.withinDays, SC.trending.minViews], [14, 8]);
+throws('fewer slots than perAccount throws', () => normalizeConfig({
+  defaults: { perAccount: 3 }, schedule: { times: ['10:00', '14:00'] },
+  routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }));
+throws('a malformed time throws', () => normalizeConfig({
+  schedule: { times: ['25:00'] }, routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }));
+throws('an unknown timezone throws', () => normalizeConfig({
+  schedule: { timezone: 'Mars/Olympus' }, routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }));
 
 /* ── clip MP4 URL derivation ──────────────────────────────────────────── */
 
