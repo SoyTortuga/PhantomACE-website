@@ -1,0 +1,131 @@
+===============================================================
+ CLIP BOT - WHAT YOU NEED TO DO
+===============================================================
+
+Short version: about 5 minutes of your time, twice, and then
+you're done forever.
+
+The bot takes your best Twitch clips, turns them into vertical
+videos, and posts them to YouTube for you. I handle all of it.
+The only thing I can't do for you is approve access to your own
+channels - that has to be you.
+
+
+---------------------------------------------------------------
+ WHAT IT WILL POST
+---------------------------------------------------------------
+
+  Magic: The Gathering clips  ->  PhantomACEMTG
+  All other game clips        ->  PhantomACEtoo
+  IRL / Just Chatting / Music ->  never posted, ever
+
+Two videos per channel per day, picked from your best clips of
+the last year. Anything new that's getting views gets bumped to
+the front of the line.
+
+Videos are scheduled a week ahead, so there's always a queue
+sitting ready. You can see it in YouTube Studio under Content.
+
+
+---------------------------------------------------------------
+ WHAT I NEED FROM YOU
+---------------------------------------------------------------
+
+1. Make sure both channels exist:
+      PhantomACEMTG
+      PhantomACEtoo
+
+2. Approve access to each one. I'll send you a link per channel.
+   Steps are below.
+
+That's everything. I never need your password.
+
+
+---------------------------------------------------------------
+ THE LINK - WHAT TO EXPECT
+---------------------------------------------------------------
+
+*** Do it while you're sat at a computer. The link stops
+*** working after a few minutes. If it expires just tell me and
+*** I'll send a fresh one - no harm done.
+
+1. Open the link I send you.
+
+2. Sign in to the Google account that owns the channel I named.
+   If you've got several Google accounts, open the link in an
+   incognito/private window to be safe.
+
+3. You'll see a warning: "Google hasn't verified this app."
+   This is expected. It says that because it's a tool I built
+   for you, not a public app.
+   Click "Advanced", then "Go to PhantomACE Clipper".
+
+4. Click Allow. The only thing it can do is upload videos to
+   that one channel. It can't read your email, it can't delete
+   anything, it can't touch your other accounts.
+
+5. Your browser will then show an ERROR PAGE - something like
+   "can't reach this site", with 127.0.0.1 in the address bar.
+
+   THIS IS SUPPOSED TO HAPPEN. You haven't broken anything.
+
+6. Copy the WHOLE address out of the address bar and send it
+   to me. That's the bit I need.
+
+Then we do it once more for the other channel.
+
+
+---------------------------------------------------------------
+ AFTER THAT
+---------------------------------------------------------------
+
+Nothing. It runs on its own.
+
+Videos will appear in YouTube Studio marked Scheduled, with a
+date about a week out. They go live on their own at 10am and
+2pm Pacific.
+
+If you ever want to kill a video before it goes live, just
+delete it in YouTube Studio. The bot won't put it back.
+
+
+---------------------------------------------------------------
+ TURNING IT OFF
+---------------------------------------------------------------
+
+You're in control of this, not me.
+
+To cut off access completely, any time, without asking anyone:
+   myaccount.google.com
+   -> Data & privacy
+   -> Third-party apps & services
+   -> PhantomACE Clipper -> Remove access
+
+It stops posting immediately. Tell me if you do that so I'm not
+hunting for a fault that isn't there.
+
+
+---------------------------------------------------------------
+ TIKTOK (later)
+---------------------------------------------------------------
+
+Same idea, but TikTok makes apps go through a review first.
+Until that's approved, anything the bot makes shows up as a
+PRIVATE DRAFT in your TikTok app rather than going live - so
+you get the final say on every one.
+
+YouTube isn't waiting on this. It can start straight away.
+
+
+---------------------------------------------------------------
+ THINGS WORTH KNOWING
+---------------------------------------------------------------
+
+- I never see or need your password.
+- The access is only ever "upload videos to this channel".
+- Everything stays yours - the channels, the videos, the access.
+  If I ever stop working on this, you keep all of it and I lose
+  access, not the other way round.
+- Some clips have game music in them. YouTube occasionally mutes
+  or blocks those. Nothing either of us can do about it - just
+  delete the video if it happens.

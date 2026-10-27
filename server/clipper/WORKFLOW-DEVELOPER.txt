@@ -1,0 +1,213 @@
+===============================================================
+ CLIPPER - DEVELOPER WORKFLOW
+ Twitch clips -> YouTube Shorts (+ TikTok later)
+===============================================================
+
+All commands run from the repo root on the rig:
+   C:\Users\EZiRLS8\Documents\PhantomACE Website
+
+WHAT THE BOT DOES, ONCE RUNNING
+  - Each day it looks at the channel's clips from the last 12 months.
+  - MTG clips      -> PhantomACEMTG
+    every other game -> PhantomACEtoo
+    IRL / Just Chatting / Music -> never posted
+  - It picks the 2 best not-yet-posted clips per channel.
+    A clip under 14 days old with 8+ views jumps the queue.
+  - It renders each to a 1080x1920 vertical Short with the gothic frame.
+  - It uploads to YouTube scheduled to go live 7 DAYS LATER,
+    at 10:00 and 14:00 Pacific.
+  - It records what it posted so nothing is ever posted twice.
+
+
+---------------------------------------------------------------
+ PART 1 - FINISHING SETUP  (where you are now)
+---------------------------------------------------------------
+
+STEP 1. Check you're ready
+---------------------------
+   node server/clipper/scripts/doctor.js
+
+   Want: "0 blocking problems".
+   Both routes showing "..." is expected until step 2 is done.
+
+   Also confirm with the broadcaster that BOTH channels actually
+   exist: PhantomACEMTG and PhantomACEtoo. If one doesn't, the
+   consent screen will authorise whatever channel IS on that
+   account and you won't find out until step 3 prints the name.
+
+
+STEP 2. Send the consent link  (one channel at a time)
+-------------------------------------------------------
+   node server/clipper/scripts/oauth-youtube.js --name YT_MTG --print-url
+
+   Copy the URL it prints. Send it to the broadcaster with the
+   message from WORKFLOW-BROADCASTER.txt.
+
+   *** THE LINK DIES IN A FEW MINUTES AND WORKS ONCE. ***
+   Don't send it until they've said they're at a computer.
+   If it expires, just run the command again - nothing breaks.
+
+   Do ONE channel at a time. Two links in flight is how a token
+   ends up saved under the wrong channel.
+
+
+STEP 3. Exchange what they send back
+-------------------------------------
+   node server/clipper/scripts/oauth-youtube.js --name YT_MTG --code "<the address they sent>"
+
+   Keep the quotes around the address.
+
+   >>> IT PRINTS "AUTHORIZED CHANNEL". READ IT. <<<
+   It must say PhantomACEMTG. A token for the wrong channel is
+   perfectly valid and would silently post to the wrong place.
+   If it's wrong: discard it, have them redo it in an incognito
+   window signed into the right account.
+
+   Then copy the printed line:
+       YT_MTG_REFRESH_TOKEN=.....
+   into server\.env  (notepad server\.env)
+
+
+STEP 4. Repeat for the games channel
+-------------------------------------
+   node server/clipper/scripts/oauth-youtube.js --name YT_GAMES --print-url
+   node server/clipper/scripts/oauth-youtube.js --name YT_GAMES --code "<address>"
+
+   This one must print PhantomACEtoo.
+   Save YT_GAMES_REFRESH_TOKEN= into server\.env
+
+
+STEP 5. Confirm
+----------------
+   node server/clipper/scripts/doctor.js
+
+   Both routes should now show YouTube with a tick.
+   TikTok stays "..." - that's deferred, and skipped at runtime.
+
+
+STEP 6. Watch one before anything goes public
+----------------------------------------------
+   node server/clipper/run.js --dry-run --render
+
+   Renders real Shorts but uploads NOTHING. It prints where each
+   .mp4 was written. OPEN ONE AND WATCH IT. Check the framing,
+   the title text, and the audio.
+
+
+STEP 7. First real post - deliberately just one
+------------------------------------------------
+   node server/clipper/run.js --limit 1 --service phantomace-web
+
+   Then check the channel. The video will be PRIVATE, scheduled
+   to go public in 7 days. That is correct - look in YouTube
+   Studio > Content, not on the public channel page.
+
+
+STEP 8. Turn on the daily schedule
+-----------------------------------
+   Dry run first:
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\server\scripts\install-clipper-task.ps1 -DryRun
+   Start-ScheduledTask -TaskName 'PhantomACE Clipper'
+
+   Read the log:
+   Get-Content server\clipper\logs\clipper.log -Tail 40
+
+   Happy? Install for real:
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\server\scripts\install-clipper-task.ps1
+
+   Done. It now runs every day on its own.
+
+
+---------------------------------------------------------------
+ PART 2 - RUNNING IT  (day to day)
+---------------------------------------------------------------
+
+CHECK ON IT
+   Get-Content server\clipper\logs\clipper.log -Tail 40
+   node server/clipper/scripts/doctor.js
+
+SEE WHAT'S QUEUED
+   YouTube Studio > Content on each channel. Scheduled videos
+   show their publish date. You should always see about a week
+   of them stacked up.
+
+RUN IT BY HAND
+   node server/clipper/run.js --dry-run            (decide only, no work)
+   node server/clipper/run.js --dry-run --render   (render, no upload)
+   node server/clipper/run.js --limit 1 --service phantomace-web
+
+PAUSE IT
+   Disable-ScheduledTask -TaskName 'PhantomACE Clipper'
+   Enable-ScheduledTask  -TaskName 'PhantomACE Clipper'
+
+ADD A NEW GAME
+   Nothing to do. Any game not listed and not excluded goes to
+   PhantomACEtoo automatically.
+
+   To give a game its own channel, add a route in
+   server\clipper\config.json with its gameId, then connect that
+   account with steps 2-4 above.
+
+   To stop a category being posted, add its gameId to "exclude".
+   Find ids with:
+      node server/clipper/scripts/list-games.js
+
+CHANGE POST TIMES / CADENCE
+   server\clipper\config.json:
+     schedule.times      - the two times of day (Pacific)
+     schedule.daysAhead  - how far ahead it schedules (7)
+     defaults.perAccount - posts per channel per day (2)
+     trending.minViews   - what counts as a fresh hit (8)
+   No restart needed; the next run picks it up.
+
+
+---------------------------------------------------------------
+ PART 3 - WHEN SOMETHING BREAKS
+---------------------------------------------------------------
+
+Auth fails about a week after setup
+   The Google consent screen slipped back to "Testing".
+   Must be "In production" or tokens expire after 7 days.
+   Fix it, then redo steps 2-4.
+
+"redirect_uri_mismatch"
+   The URI in Google Cloud > Clients must be exactly:
+      http://127.0.0.1:8790/callback
+
+Google returns no refresh token
+   That account already consented. Revoke the app at
+   myaccount.google.com > Data & privacy > Third-party access,
+   then redo steps 2-4.
+
+Clips posting to the wrong channel
+   A refresh token got saved under the wrong name in server\.env.
+   Redo steps 2-4 for that channel and read the AUTHORIZED
+   CHANNEL line this time.
+
+"Could not derive a video URL from thumbnail"
+   Twitch changed how clip files are addressed. This needs a code
+   change - send me the error.
+
+An account is skipped silently
+   Its three env vars aren't all set. doctor.js names the missing one.
+
+Nothing gets selected
+   Everything eligible is already posted, or minViews is too high.
+   Check with: node server/clipper/scripts/list-games.js
+
+ANYTHING ELSE
+   node server/clipper/scripts/doctor.js --live
+   It names the exact missing file or setting.
+
+
+---------------------------------------------------------------
+ STILL TO DO, WHENEVER
+---------------------------------------------------------------
+ - TikTok: register the app under the BROADCASTER's TikTok
+   account, then submit it for audit. Until it's approved TikTok
+   posts can only be private drafts. See TIKTOK-AUDIT.md.
+   YouTube does not wait on this.
+
+ - A third YouTube channel would put you at ~9,600 of the 10,000
+   daily YouTube quota units. Doable, but that's the ceiling.
+   doctor.js shows the current figure.
