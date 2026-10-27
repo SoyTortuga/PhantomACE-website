@@ -7,9 +7,27 @@
 
      node server/clipper/scripts/oauth-youtube.js --name YT_MTG
 
-   --name   the route's credsEnv (decides which env vars are printed)
-   --port   loopback port (default 8790; must match the OAuth client's
-            registered redirect URI, see below)
+   --name       the route's credsEnv (decides which env vars are printed)
+   --port       loopback port (default 8790; must match the OAuth client's
+                registered redirect URI, see below)
+
+   WITHOUT A CALL. The broadcaster has to click Allow themselves, but they do
+   not have to be sitting next to you. Split it in two:
+
+     node ... oauth-youtube.js --name YT_MTG --print-url
+         prints the consent URL and exits. Send that to the broadcaster.
+     node ... oauth-youtube.js --name YT_MTG --code "<what they send back>"
+         exchanges it. Accepts the whole redirected address or a bare code.
+
+   Their browser will fail to load 127.0.0.1 (nothing is listening on THEIR
+   machine) — that is expected and harmless. The address bar still carries
+   ?code=..., which is the only part that matters.
+
+   THE CODE EXPIRES IN MINUTES and is single use, so they need to send it
+   promptly rather than the next day. If it lapses, just issue a new URL.
+
+   --manual     print the URL and wait here for the pasted address, for when
+                you are both online but not screen-sharing
 
    The client id/secret come from the environment as <name>_CLIENT_ID /
    <name>_CLIENT_SECRET, or from --client-id / --client-secret.
@@ -30,11 +48,14 @@
    silently omits it on every later run, which looks like a broken script.
    ══════════════════════════════════════════════ */
 
-import { captureCode, openBrowser, printEnvBlock, need, argv } from './_oauth-util.js';
+import { captureCode, openBrowser, printEnvBlock, need, argv, ask, codeFromPaste } from './_oauth-util.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
 
 const name = need(argv('--name'), '--name (the route credsEnv, e.g. YT_MTG)');
+const printUrlOnly = process.argv.includes('--print-url');
+const manual = process.argv.includes('--manual');
+const suppliedCode = argv('--code');
 const port = Number(argv('--port', '8790'));
 const redirectUri = `http://127.0.0.1:${port}/callback`;
 
@@ -51,23 +72,47 @@ auth.searchParams.set('scope', SCOPE);
 auth.searchParams.set('access_type', 'offline');
 auth.searchParams.set('prompt', 'consent');
 
-console.log(`\n── YouTube consent for "${name}" ──────────────────────────────`);
-console.log(`Redirect URI (must be registered on the OAuth client):\n  ${redirectUri}\n`);
-console.log('Hand the keyboard to the broadcaster and have them sign in to the');
-console.log('channel these clips should post to, then approve.\n');
-console.log('If the browser does not open, paste this:\n');
-console.log('  ' + auth.toString() + '\n');
+/* --print-url: hand the URL over and stop. Nothing is listening, nothing is
+   waiting; the exchange happens later with --code. */
+if (printUrlOnly) {
+  console.log(`\n── Send this to the broadcaster for "${name}" ─────────────────\n`);
+  console.log(auth.toString());
+  console.log(`\nThey sign in to the channel these clips post to, approve, then copy`);
+  console.log(`the address their browser lands on (it will look like a connection`);
+  console.log(`error — that is fine) and send it back. Then run:\n`);
+  console.log(`  node server/clipper/scripts/oauth-youtube.js --name ${name} --code "<that address>"\n`);
+  console.log(`The code expires within minutes, so exchange it promptly.\n`);
+  process.exit(0);
+}
 
-openBrowser(auth.toString());
+let code;
+if (suppliedCode) {
+  code = codeFromPaste(suppliedCode);
+  if (!code) { console.error('\n✗ No ?code= found in that. Pass the full redirected address or the bare code.\n'); process.exit(1); }
+  console.log(`\n── Exchanging the code for "${name}" ─────────────────────────`);
+} else {
+  console.log(`\n── YouTube consent for "${name}" ──────────────────────────────`);
+  console.log(`Redirect URI (must be registered on the OAuth client):\n  ${redirectUri}\n`);
+  console.log('Have the broadcaster sign in to the channel these clips should');
+  console.log('post to, then approve.\n');
+  console.log('If the browser does not open, paste this:\n');
+  console.log('  ' + auth.toString() + '\n');
 
-const { code } = await captureCode({ port });
+  if (manual) {
+    code = codeFromPaste(await ask('Paste the address they were redirected to (or just the code): '));
+    if (!code) { console.error('\n✗ No ?code= found in that.\n'); process.exit(1); }
+  } else {
+    openBrowser(auth.toString());
+    ({ code } = await captureCode({ port }));
+  }
+}
 console.log('\n✓ Got the authorization code — exchanging it...');
 
 const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
   method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams({
-    code, client_id: clientId, client_secret: clientSecret,
+    code: decodeURIComponent(code), client_id: clientId, client_secret: clientSecret,
     redirect_uri: redirectUri, grant_type: 'authorization_code',
   }),
 });

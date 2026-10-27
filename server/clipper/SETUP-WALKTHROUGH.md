@@ -162,12 +162,40 @@ node server/clipper/scripts/doctor.js
 
 ---
 
-## Phase 4 — The broadcaster session (~30–45 min, together)
+## Phase 4 — Connecting the accounts
 
-Give them `BROADCASTER-SETUP.pdf` beforehand. Screen-share; they sign in, you
-drive. Repeat 4a/4b **once per account**.
+The broadcaster must click "Allow" themselves — that is the one thing that
+cannot be delegated. But they do **not** have to be on a call. Pick either:
 
-### 4a. Each YouTube channel
+### Option 1 — Asynchronous (no call) — RECOMMENDED
+
+For each channel, generate a consent link and send it:
+
+```
+node server/clipper/scripts/oauth-youtube.js --name YT_MTG --print-url
+```
+
+Send that URL. They open it, sign in **to the channel those clips should post
+to**, and approve. Their browser then tries to reach `127.0.0.1` and shows a
+connection error — **this is expected**; the address bar still carries the
+`?code=...`. They copy that whole address and send it back. Then:
+
+```
+node server/clipper/scripts/oauth-youtube.js --name YT_MTG --code "<what they sent>"
+```
+
+⚠ **The code expires within minutes and is single-use.** Agree a window when
+they are at their desk rather than sending it and hoping. If it lapses,
+re-issue with `--print-url`; nothing is harmed.
+
+There is a message template in `BROADCASTER-HANDOFF.md` you can paste to them.
+
+### Option 2 — Together (screen share, ~20 min)
+
+They sit with you; the script opens the browser and captures the redirect
+itself. Repeat 4a/4b **once per account**.
+
+### 4a. Each YouTube channel (together)
 
 ```
 node server/clipper/scripts/oauth-youtube.js --name YT_MTG
