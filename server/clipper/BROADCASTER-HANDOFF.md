@@ -23,24 +23,48 @@ Do them one at a time so the links can't get mixed up.
 
 ## 2. Message to send (template)
 
-> Hey — ready to connect **PhantomACEMTG** to the clips bot. Two minutes, and
-> I need you at a computer right now because the link is time-sensitive.
+Paste the link in where it says, and send. Reword it however you normally talk
+to them — the only bits that matter are *which account to sign into*, and that
+the scary warning and the error page are both supposed to happen.
+
+> Hey! Got the clip bot ready to hook up to **PhantomACEMTG**. Takes about two
+> minutes — but do it when you're actually sat at a computer, the link goes
+> stale pretty fast.
 >
-> 1. Open this link: `<paste the URL>`
-> 2. **Sign in to the Google account that owns PhantomACEMTG** — this is the
->    important bit; if you're signed into a different account, use an incognito
->    window.
-> 3. You'll see a warning saying *"Google hasn't verified this app."* That's
->    expected — it's the tool I built for you. Click **Advanced**, then
->    **Go to PhantomACE Clipper (unsafe)**.
-> 4. Approve the permission (it only allows uploading videos to that channel).
-> 5. Your browser will then show an **error page** — something like "can't
->    reach this site" at an address starting `127.0.0.1`. **That is normal,
->    nothing broke.**
-> 6. Copy the **entire address from the address bar** and send it to me.
+> 1. Open this: `<paste the URL>`
+> 2. Make sure you're signed into the Google account that owns PhantomACEMTG.
+>    If you've got a few accounts floating around, easiest thing is to open it
+>    in an incognito window.
+> 3. Google will throw up a scary-looking *"hasn't verified this app"* screen.
+>    That's just because it's a tool I built for you rather than something
+>    published publicly. Click **Advanced** → **Go to PhantomACE Clipper**.
+> 4. Hit **Allow**. All it can do is upload videos to that one channel.
+> 5. Your browser will then land on an error page — "can't reach this site" or
+>    similar, with `127.0.0.1` in the address. That's meant to happen, you
+>    haven't broken anything.
+> 6. Copy the whole address out of the address bar and send it over. That's the
+>    only bit I need.
 >
-> That's it. I'll handle the rest. You can disconnect this any time from your
-> Google account settings, and I never see your password.
+> That's it, I'll take it from there. You can unhook it whenever you like from
+> your Google account settings, and I never see your password.
+
+For the second channel, same message with **PhantomACEtoo** swapped in.
+
+### TikTok version (later)
+
+Same shape, once the TikTok app exists:
+
+> Hey! Same deal as the YouTube one, this time for TikTok. Two minutes, and
+> again do it while you're at a computer.
+>
+> 1. Open this: `<paste the URL>`
+> 2. Sign in as the TikTok account the clips should post to, and approve it.
+> 3. You'll land on a page that probably looks broken or 404s — that's fine.
+> 4. Copy the whole address from the address bar and send it over.
+>
+> Heads up: until TikTok approves the app, anything it makes shows up as a
+> **private draft** in your TikTok app rather than going live — so you'll get
+> the final say on each one for now.
 
 ## 3. Exchange what they send back (you)
 
