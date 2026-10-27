@@ -12,6 +12,8 @@
                (default http://127.0.0.1:8791/callback)
    --manual    don't run a loopback server; print the URL and wait for the
                redirected address to be pasted back
+   --print-url print the consent URL and exit, to send to the broadcaster
+   --code X    exchange a code (or a whole redirected address) they sent back
 
    TIKTOK IS FUSSIER THAN GOOGLE ABOUT REDIRECTS. Many TikTok apps are only
    allowed to register an https:// callback, in which case a loopback listener
@@ -33,6 +35,8 @@ const SCOPE = 'user.info.basic,video.publish,video.upload';
 
 const name = need(argv('--name'), '--name (the route credsEnv, e.g. TT_MTG)');
 const manual = process.argv.includes('--manual');
+const printUrlOnly = process.argv.includes('--print-url');
+const suppliedCode = argv('--code');
 const port = Number(argv('--port', '8791'));
 const redirectUri = argv('--redirect', `http://127.0.0.1:${port}/callback`);
 
@@ -56,14 +60,24 @@ console.log('account these clips should post to, then approve.\n');
 console.log('If the browser does not open, paste this:\n');
 console.log('  ' + auth.toString() + '\n');
 
-openBrowser(auth.toString());
-
 let code;
-if (manual) {
-  const pasted = await ask('Paste the full address you were redirected to (or just the code): ');
-  code = codeFromPaste(pasted);
+if (printUrlOnly) {
+  console.log(`\n── Send this to the broadcaster for "${name}" ─────────────────\n`);
+  console.log(auth.toString());
+  console.log(`\nThey approve, then send back the address they land on. Then run:\n`);
+  console.log(`  node server/clipper/scripts/oauth-tiktok.js --name ${name} --redirect ${redirectUri} --code "<that address>"\n`);
+  console.log(`The code expires within minutes, so exchange it promptly.\n`);
+  process.exit(0);
+} else if (suppliedCode) {
+  code = codeFromPaste(suppliedCode);
+  if (!code) { console.error('\n✗ No ?code= found in that.\n'); process.exit(1); }
+  console.log(`\n── Exchanging the code for "${name}" ─────────────────────────`);
+} else if (manual) {
+  openBrowser(auth.toString());
+  code = codeFromPaste(await ask('Paste the full address you were redirected to (or just the code): '));
   if (!code) { console.error('\n✗ No ?code= found in that.\n'); process.exit(1); }
 } else {
+  openBrowser(auth.toString());
   ({ code } = await captureCode({ port }));
 }
 console.log('\n✓ Got the authorization code — exchanging it...');
