@@ -1,0 +1,98 @@
+{
+  "_comment": "Copy to config.json on the rig (or point CLIPPER_CONFIG at it). This file holds NO secrets — a route names a credsEnv and the tokens are read from the service environment as <credsEnv>_CLIENT_ID/_SECRET/_REFRESH_TOKEN (YouTube) or <credsEnv>_CLIENT_KEY/_SECRET/_REFRESH_TOKEN (TikTok). Find a game's gameId by running: node server/clipper/run.js --dry-run  (it logs each clip's game id and name). One account = one route that lists all of its gameIds, so 'perAccount' caps that whole account. 'exclude' lists categories that must never be posted anywhere (IRL / Just Chatting / Music are the usual ones) - it is checked before the routes AND before the fallback. 'schedule' sets how far ahead YouTube publishes and at what local times (TikTok has no scheduling API and posts same-day). 'trending' promotes recent clips that are already performing ahead of the backlog.",
+  "defaults": {
+    "lookbackDays": 365,
+    "perAccount": 2,
+    "minViews": 10,
+    "maxDurationSec": 60,
+    "maxPerRun": 20
+  },
+  "schedule": {
+    "daysAhead": 7,
+    "times": [
+      "10:00",
+      "14:00"
+    ],
+    "timezone": "America/Los_Angeles"
+  },
+  "trending": {
+    "withinDays": 14,
+    "minViews": 8
+  },
+  "exclude": {
+    "gameIds": [
+      "509658",
+      "509672",
+      "26936"
+    ],
+    "gameNames": [
+      "Just Chatting",
+      "IRL",
+      "Music"
+    ]
+  },
+  "routes": [
+    {
+      "label": "Magic: The Gathering",
+      "match": {
+        "gameIds": [
+          "29452"
+        ],
+        "gameNames": [
+          "Magic: The Gathering"
+        ]
+      },
+      "hashtags": [
+        "#MTG",
+        "#Commander",
+        "#PhantomACE"
+      ],
+      "youtube": {
+        "credsEnv": "YT_MTG",
+        "privacy": "public"
+      },
+      "tiktok": {
+        "credsEnv": "TT_MTG",
+        "privacy": "SELF_ONLY"
+      }
+    },
+    {
+      "label": "Minecraft",
+      "match": {
+        "gameIds": [
+          "27471"
+        ],
+        "gameNames": [
+          "Minecraft"
+        ]
+      },
+      "hashtags": [
+        "#Minecraft",
+        "#PhantomACE"
+      ],
+      "youtube": {
+        "credsEnv": "YT_MINECRAFT",
+        "privacy": "public"
+      },
+      "tiktok": {
+        "credsEnv": "TT_MINECRAFT",
+        "privacy": "SELF_ONLY"
+      }
+    }
+  ],
+  "fallback": {
+    "label": "PhantomACE",
+    "hashtags": [
+      "#PhantomACE",
+      "#Twitch"
+    ],
+    "youtube": {
+      "credsEnv": "YT_MAIN",
+      "privacy": "public"
+    },
+    "tiktok": {
+      "credsEnv": "TT_MAIN",
+      "privacy": "SELF_ONLY"
+    }
+  }
+}
