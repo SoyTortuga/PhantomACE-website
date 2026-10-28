@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   recordBreakBegin, breakRunningAt, refreshSchedule, viewOf, adsRunning,
-  readAdState, SCHEDULE_TTL_MS, WARNING_LEAD_MS,
+  readAdState, SCHEDULE_TTL_MS, WARNING_LEAD_MS, parseAdTime,
 } from '../../functions/api/ads/state.js';
 import { onRequestPost, onRequestGet } from '../../functions/api/ad-break.js';
 import { signEventSub } from '../lib/eventsub.js';
@@ -468,6 +468,22 @@ const T0 = Date.parse('2026-09-19T12:00:00Z');
 
   /* Both are previewable/positionable in the layout editor. */
   ok('the warning is registered as a sample', /id: 'ovAdWarning'/.test(samples));
+}
+
+/* ── next_ad_at parsing: RFC3339 OR Unix epoch (the warning-killer bug) ── */
+{
+  const iso = '2026-08-01T23:08:18+00:00';
+  check('parses an RFC3339 string', parseAdTime(iso), Date.parse(iso));
+  check('parses a Unix epoch in SECONDS (number) to ms', parseAdTime(1790000000), 1790000000 * 1000);
+  check('parses a Unix epoch in SECONDS (string) to ms', parseAdTime('1790000000'), 1790000000 * 1000);
+  check('leaves a millisecond epoch as-is', parseAdTime(1790000000000), 1790000000000);
+  ok('empty string → NaN (no scheduled ad)', Number.isNaN(parseAdTime('')));
+  ok('0 → NaN (no scheduled ad)', Number.isNaN(parseAdTime(0)));
+  ok('null → NaN', Number.isNaN(parseAdTime(null)));
+  /* The whole point: an integer next_ad_at must NOT blank the schedule. */
+  const now = 1790000000000;
+  const st = { break: null, schedule: { nextAdAt: parseAdTime(Math.floor(now/1000) + 60), durationSeconds: 60 }, scheduleCheckedAt: now };
+  ok('an epoch next_ad_at still yields a live warning', viewOf(st, now).warning === true);
 }
 
 /* ── Report ──────────────────────────────────────────────────────────── */

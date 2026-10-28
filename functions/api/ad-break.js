@@ -16,7 +16,7 @@
    ══════════════════════════════════════════════ */
 
 import { verifyEventSub } from '../../server/lib/eventsub.js';
-import { recordBreakBegin, refreshSchedule, readAdState, viewOf } from './ads/state.js';
+import { recordBreakBegin, refreshSchedule, readAdState, viewOf, debugSchedule } from './ads/state.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -102,6 +102,17 @@ export async function onRequestGet(context) {
      is not an authorisation. */
   const session = getSession(request);
   const full = !!(session && String(session.user_id) === String(env.TWITCH_BROADCASTER_ID));
+
+  /* Broadcaster diagnostic: /api/ad-break?debug=1 shows the raw Twitch ad
+     schedule so "the warning never fires" can be pinned to a cause. Gated to
+     the broadcaster — it exposes monetisation detail and forces a live fetch. */
+  if (full) {
+    let wantsDebug = false;
+    try { wantsDebug = new URL(request.url).searchParams.get('debug') === '1'; } catch { /* no url */ }
+    if (wantsDebug) {
+      return json({ view: viewOf(state, Date.now(), { full: true }), debug: await debugSchedule(env) });
+    }
+  }
 
   return json(viewOf(state, Date.now(), { full }));
 }

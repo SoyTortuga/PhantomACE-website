@@ -106,6 +106,55 @@ export function breakRunningAt(state, now = Date.now()) {
 }
 
 /**
+ * Parse Twitch's next_ad_at. The docs say RFC3339, but the live Get Ad
+ * Schedule endpoint has been observed returning a UNIX epoch (seconds) — and
+ * Date.parse() of an integer yields NaN, which silently blanks the whole
+ * schedule and kills the "Ads Incoming" warning while the during-break ring
+ * (fed by the ISO webhook) keeps working. Accept string ISO, numeric string,
+ * and number (seconds or ms). Empty / 0 → NaN (no scheduled ad).
+ */
+export function parseAdTime(v) {
+  if (v === null || v === undefined || v === '') return NaN;
+  if (typeof v === 'number') return v > 0 ? (v < 1e12 ? v * 1000 : v) : NaN;
+  const s = String(v).trim();
+  if (/^\d+$/.test(s)) { const n = Number(s); return n > 0 ? (n < 1e12 ? n * 1000 : n) : NaN; }
+  return Date.parse(s);
+}
+
+/**
+ * Broadcaster-only diagnostic: force a raw /helix/channels/ads fetch and
+ * report exactly what Twitch returns, so "the warning never fires" can be
+ * pinned to its cause (missing scope → 401; manual ads → empty next_ad_at;
+ * a format flip → raw present but unparsed). No caching, never throws.
+ */
+export async function debugSchedule(env) {
+  const out = { channelLive: null, httpStatus: null, rawNextAdAt: null, rawRow: null, parsedNextAdAt: null, note: null };
+  try { out.channelLive = await isChannelLive(env); } catch { out.channelLive = 'check-failed'; }
+  const token = await getBroadcasterToken(env);
+  if (!token) { out.note = 'no broadcaster token (re-authorise in bot setup)'; return out; }
+  if (!env.TWITCH_BROADCASTER_ID) { out.note = 'TWITCH_BROADCASTER_ID not set'; return out; }
+  try {
+    const res = await fetch(`https://api.twitch.tv/helix/channels/ads?broadcaster_id=${env.TWITCH_BROADCASTER_ID}`,
+      { headers: { Authorization: `Bearer ${token}`, 'Client-Id': env.TWITCH_CLIENT_ID } });
+    out.httpStatus = res.status;
+    if (res.ok) {
+      const data = await res.json();
+      out.rawRow = (data && data.data && data.data[0]) || null;
+      out.rawNextAdAt = out.rawRow ? (out.rawRow.next_ad_at ?? null) : null;
+      out.parsedNextAdAt = out.rawRow ? parseAdTime(out.rawRow.next_ad_at) : null;
+      if (out.httpStatus === 200 && (out.rawNextAdAt === null || out.rawNextAdAt === '' || out.rawNextAdAt === 0)) {
+        out.note = 'next_ad_at is empty — no scheduled/automatic ad (manual ads give no advance warning)';
+      }
+    } else if (res.status === 401) {
+      out.note = '401 — channel:read:ads not granted or token expired; re-authorise in bot setup';
+    } else {
+      out.note = 'helix ' + res.status;
+    }
+  } catch (e) { out.note = 'fetch failed: ' + (e && e.message); }
+  return out;
+}
+
+/**
  * Ask Twitch for the ad schedule, at most once per SCHEDULE_TTL_MS.
  *
  * Returns the state either way. A failed call leaves the previous schedule
@@ -146,7 +195,7 @@ export async function refreshSchedule(env, now = Date.now(), { force = false } =
   }
 
   const row = (data?.data || [])[0] || {};
-  const nextAt = Date.parse(row.next_ad_at || '');
+  const nextAt = parseAdTime(row.next_ad_at);
 
   state.schedule = Number.isNaN(nextAt) ? null : {
     nextAdAt: nextAt,
