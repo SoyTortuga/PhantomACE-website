@@ -42,7 +42,11 @@ import { resolveKey } from '../lib/registry.js';
 import { signEventSub } from '../lib/eventsub.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const read = (p) => fs.readFileSync(path.join(REPO, p), 'utf8');
+/* Line endings normalised on the way in. Git checks these files out with
+   CRLF on Windows, which silently broke the doc parse below: a pattern
+   anchored on "```\n" matched nothing, so the copy-paste block read as
+   empty rather than as a disagreement. */
+const read = (p) => fs.readFileSync(path.join(REPO, p), 'utf8').replace(/\r\n/g, '\n');
 const SECRET = 'test-eventsub-secret';
 
 let passed = 0;
