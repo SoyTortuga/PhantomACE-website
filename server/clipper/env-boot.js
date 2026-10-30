@@ -35,10 +35,19 @@ const ENV_FILE = path.join(HERE, '../.env');
  */
 export async function bootEnv(serviceName) {
   if (fs.existsSync(ENV_FILE)) {
-    const { config } = await import('dotenv');
-    /* dotenv does not override an existing variable, which is the precedence
-       we want: a real environment variable beats the file. */
-    config({ path: ENV_FILE });
+    try {
+      const { config } = await import('dotenv');
+      /* dotenv does not override an existing variable, which is the
+         precedence we want: a real environment variable beats the file. */
+      config({ path: ENV_FILE });
+    } catch {
+      /* dotenv is a dependency of the SERVER, not of these scripts, so a
+         checkout where `npm install` has not been run inside server/ would
+         otherwise crash here — or, worse, report every credential missing
+         however carefully the file was filled in. The format we need is
+         KEY=VALUE, so parse it rather than fail. */
+      loadEnvFile(ENV_FILE);
+    }
   }
 
   if (serviceName) {
@@ -52,6 +61,28 @@ export async function bootEnv(serviceName) {
   }
 
   return process.env;
+}
+
+/**
+ * A minimal KEY=VALUE reader, used only when dotenv is unavailable.
+ * Deliberately literal: no escape processing, so a Windows path keeps its
+ * backslashes. Existing environment variables still win.
+ */
+function loadEnvFile(file) {
+  for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 1) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    /* Strip one matching pair of surrounding quotes, as dotenv does. */
+    if (value.length > 1 && ((value[0] === '"' && value.endsWith('"')) ||
+        (value[0] === "'" && value.endsWith("'")))) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
 }
 
 /** `--service <name>` out of argv, if present. */

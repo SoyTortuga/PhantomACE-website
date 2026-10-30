@@ -30,6 +30,13 @@
    ══════════════════════════════════════════════ */
 
 import { captureCode, openBrowser, printEnvBlock, need, argv, ask, codeFromPaste } from './_oauth-util.js';
+import { bootEnv, serviceArg } from '../env-boot.js';
+
+/* server/.env holds the client id/secret for every credsEnv, so load it
+   before reading them. Without this the script sees only the bare
+   environment and reports the credentials missing however carefully they
+   were filled in — which is exactly what it did. */
+await bootEnv(serviceArg());
 
 const SCOPE = 'user.info.basic,video.publish,video.upload';
 
