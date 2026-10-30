@@ -462,6 +462,9 @@ export const FAMILIES = [
      above. A new prefix needs a line here or every read throws — which is
      exactly how !commands shipped silent. */
   { prefix: 'bot_cooldown_help_',    table: 'cp_queues',  expiry: 'real' },
+  /* Per-asker cooldown for !powerups (the Moon Sweepers Bits Power-up soft
+     gate). Same shape and lifetime as the two above. */
+  { prefix: 'bot_cooldown_powerups_', table: 'cp_queues', expiry: 'real' },
 
   /* Short-lived dedupe markers. Both 'real': the row's presence IS the
      "already seen" answer, so it must stop being visible when the window

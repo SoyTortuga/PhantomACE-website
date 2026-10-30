@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Every Moon Sweepers Bits Power-up on PhantomACE's channel - what each one costs, what it does to the whole lobby, and when buying one does nothing.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Moon Sweepers Power-ups | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/moonsweepers.css">
+</head>
+<body data-page="moonsweepers">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Moon Sweepers Power-ups</h1>
+    <p class="page-hero-subtitle">Bits that reach into the game and ruin everyone's shift, not just his</p>
+  </section>
+
+  <section class="page-container ms-page">
+
+    <div class="ms-statusbar card">
+      <span class="ms-statusbar-label">Power-ups right now</span>
+      <span class="ms-live" id="msLive" data-state="unknown">
+        <span class="status-dot"></span>
+        <span id="msLiveText">Checking&hellip;</span>
+      </span>
+    </div>
+
+    <p class="ms-statusbar-note" id="msLiveNote">
+      They stay buyable in every category &mdash; Twitch gives no way to hide them &mdash; but they only
+      <em>do</em> anything while the stream is on Moon Sweepers. Type <code>!powerups</code> in chat to ask any time.
+    </p>
+
+    <section class="card ms-warn-card">
+      <h2 class="ms-card-title">Read this before you buy a gravity one</h2>
+      <p class="ms-warn-lead">
+        Gravity stacks by <strong>strength</strong>, not by order. A weaker gravity Power-up bought while a
+        stronger one is already running <strong class="ms-warn-strong">does nothing at all</strong> &mdash;
+        2x while 8x is up is 750 Bits for no effect, and nothing refunds it.
+      </p>
+      <p class="ms-warn-lead">
+        A stronger one replaces a weaker one and restarts the 15 minutes. The same one again just restarts
+        its own timer. Look at the stream before you spend.
+      </p>
+    </section>
+
+    <div class="ms-note" id="msLoading">Loading the list&hellip;</div>
+    <div class="ms-note" id="msError" hidden>
+      Couldn't load the list just now. The 21 Power-ups are still there in the Bits menu on the stream.
+    </div>
+
+    <div class="ms-body" id="msBody" hidden>
+
+      <section class="ms-list-head">
+        <h2 class="ms-card-title">All <span id="msCount">21</span>, cheapest first</h2>
+        <p class="ms-hint">
+          Every effect hits <strong>every player in the lobby</strong> running the mod. Timed effects can be
+          cut short by someone buying <strong>Mercy</strong>.
+        </p>
+      </section>
+
+      <ul class="ms-list" id="msList"></ul>
+
+      <section class="ms-notes" id="msNotes"></section>
+
+    </div>
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/moonsweepers.js" defer></script>
+</body>
+</html>

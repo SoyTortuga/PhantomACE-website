@@ -50,6 +50,49 @@ export async function getStreamCategory(env) {
   return { categoryId: null, categoryName: null, title: null, changedAt: 0, changed: null };
 }
 
+/**
+ * Say in chat that the Moon Sweepers Bits Power-ups just opened or closed.
+ *
+ * The wording, the category matcher and the link all live in
+ * powerups/moon-sweepers.js, which is also what the `!powerups` command and
+ * the /moonsweepers page read — so there is one copy of every sentence the
+ * channel says about them. Imported dynamically because that module imports
+ * `getStreamCategory` from this one, and a static cycle between two modules
+ * is a trap waiting for whichever one is loaded first.
+ *
+ * Nothing in here is allowed to throw. See the call site.
+ */
+async function announcePowerupGate(context, env, prevName, nextName) {
+  try {
+    const { categoryTransition, openAnnouncement, closeAnnouncement } =
+      await import('./powerups/moon-sweepers.js');
+
+    const move = categoryTransition(prevName, nextName);
+    if (!move) return;
+
+    const line = move === 'open' ? openAnnouncement() : closeAnnouncement();
+    const { sendChatMessage } = await import('./bot/send-chat.js');
+
+    /* A deferred send that throws leaves NO trace — the webhook has already
+       answered and nothing is listening — so the job carries its own
+       catch-and-log rather than trusting the runtime to report it. */
+    const job = async () => {
+      try {
+        await sendChatMessage(env, line);
+      } catch (err) {
+        console.error('[channel-update] power-up gate announcement failed:', err && err.message);
+      }
+    };
+
+    /* Answer Twitch first where the runtime allows it; await otherwise, so
+       the announcement still goes out under a bare context. */
+    if (context && typeof context.waitUntil === 'function') context.waitUntil(job());
+    else await job();
+  } catch (err) {
+    console.error('[channel-update] power-up gate could not run:', err && err.message);
+  }
+}
+
 export async function onRequestGet(context) {
   const cur = await getStreamCategory(context.env);
   /* 15s: short enough that a mid-stream switch shows up promptly, long enough
@@ -79,12 +122,25 @@ export async function onRequestPost(context) {
     const type = body.subscription && body.subscription.type;
 
     if (type === 'channel.update' && event) {
+      /* Did the diff below actually WRITE, and what was the category called
+         before it did? mutate returns the unchanged record when nothing
+         moved, and that record still carries `changed: 'category'` from
+         whenever the last real switch was — so reading the returned record
+         alone would re-announce the same move on every redelivery. `wrote`
+         separates "something was recorded just now" from "a change is what
+         the stored record happens to describe"; `prevName` is kept because
+         the record only carries prevCategoryName on an id change, and the
+         power-up gate has to notice a NAME moving too. */
+      let wrote = false;
+      let prevName = null;
+      let rec = null;
+
       try {
         const categoryId = event.category_id ? String(event.category_id) : null;
         const categoryName = event.category_name ? String(event.category_name) : null;
         const title = typeof event.title === 'string' ? event.title : null;
 
-        await env.MARKETPLACE.mutate(KEY, (cur) => {
+        rec = await env.MARKETPLACE.mutate(KEY, (cur) => {
           const prev = cur || {};
           /* The whole point of this handler: tell him SWITCHING GAMES apart
              from everything else this event carries. Compared on the id, not
@@ -94,7 +150,13 @@ export async function onRequestPost(context) {
           const categoryChanged = (prev.categoryId || null) !== categoryId;
           const detailsChanged = (prev.title || null) !== title
             || (prev.categoryName || null) !== categoryName;
+          /* Assigned, never accumulated: mutate may run this callback again
+             on a contended write, and a second run must replace these rather
+             than add to them. */
+          wrote = false;
+          prevName = prev.categoryName || null;
           if (!categoryChanged && !detailsChanged) return undefined;  // nothing moved: no write
+          wrote = true;
 
           return {
             categoryId,
@@ -112,6 +174,33 @@ export async function onRequestPost(context) {
         /* Never 500 at Twitch — repeated failures get the subscription
            disabled, which costs more than losing one category change. */
         console.error('[channel-update] could not record the change:', err.message);
+      }
+
+      /* ── THE MOON SWEEPERS SOFT GATE ─────────────────────────────────────
+         Twitch exposes no API to create, enable or disable a custom Bits
+         Power-up, and no way to gate one by category — so the 21 Moon
+         Sweepers Power-ups are buyable while we play anything else, where
+         they do nothing at all. Saying so in chat is the only gate there is.
+
+         GATED ON THE MATCHED STATE MOVING, not on the kind of change. A
+         title edit writes but leaves the state alone, so it says nothing; a
+         redelivery does not write at all, so it says nothing. Driving it off
+         `changed === 'category'` instead looked equivalent and was not: when
+         Twitch RENAMES the category out of the matched name, the gate has
+         genuinely closed while the event reads as 'details', and the close
+         would never have been announced. One line when the Power-ups start
+         mattering, one when they stop, nothing in between.
+
+         NOT gated on the channel being live. Setting the category during
+         pre-stream setup is a real notification, so this can land in an
+         empty chat — which costs nothing, where missing a mid-stream switch
+         would cost viewers Bits. That is the trade, deliberately.
+
+         ENTIRELY BEST-EFFORT. A throw here would 500 at Twitch, and enough
+         of those disable the subscription — which would take the stored
+         category down with it and break far more than one announcement. */
+      if (wrote && rec) {
+        await announcePowerupGate(context, env, prevName, rec.categoryName);
       }
     }
 

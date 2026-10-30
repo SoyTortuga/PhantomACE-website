@@ -24,6 +24,8 @@
    process means one cache.
    ══════════════════════════════════════════════ */
 
+import { isMoonSweepers } from '../powerups/moon-sweepers.js';
+
 /* Per-asker, not global: one person spamming it should silence only
    themselves, exactly as !entries does. */
 export const HELP_COOLDOWN_MS = 30000;
@@ -46,6 +48,12 @@ export const HELP_KEYS = [
   'bingo_current', 'bingo_chat', 'sc_raid', 'bone_tithe', 'mana_clash_vs_chat',
   'pham_wind_night', 'dino_safari', 'mtgbbb_guess', 'r6_draft', 'chat_vote',
   'mm_chat', 'maze_current', 'chat_scramble',
+  /* Not a game: the current category, so !powerups is offered on the one
+     stream where it means anything. Moon Sweepers' Bits Power-ups cannot be
+     switched off by category (Twitch has no such API), so knowing whether
+     they are live is the thing a viewer most needs to be told while we are
+     on it — and nothing to mention at all when we are not. */
+  'stream_category',
 ];
 
 /**
@@ -59,7 +67,7 @@ export const HELP_KEYS = [
 export async function playableNow(env, now = Date.now()) {
   const out = [];
 
-  const [bingoPtr, bingoCard, raid, tithe, clash, wind, safari, guess, draft, vote, mem, maze, scramble] =
+  const [bingoPtr, bingoCard, raid, tithe, clash, wind, safari, guess, draft, vote, mem, maze, scramble, category] =
     await Promise.all(HELP_KEYS.map(k => get(env, k)));
 
   if (bingoPtr && bingoPtr.code) out.push('!bingo');
@@ -87,6 +95,12 @@ export async function playableNow(env, now = Date.now()) {
   if (maze && maze.status === 'active') out.push('up/down/left/right');
   /* 'running' only: during 'reveal' the word is already on screen. */
   if (scramble && scramble.status === 'running') out.push('just type your answer');
+
+  /* Offered only while we are on the game — the Power-ups do nothing
+     anywhere else, so naming the command there would invite Bits spent on
+     nothing. Matched through the owning module so the spelling cannot drift
+     from the one the announcements use. */
+  if (category && isMoonSweepers(category.categoryName)) out.push('!powerups');
 
   return out;
 }

@@ -1,0 +1,192 @@
+/* ── Moon Sweepers Power-ups ──────────────────────────────────────────
+   House style: black / grey / red / white, depth from borders, no
+   box-shadow, no backdrop-filter, no side-edge rails. Every colour comes
+   from a token in variables.css so both the dark and the gothic light
+   theme flip without a second rule. */
+
+.ms-page { max-width: 1000px; padding-bottom: 80px; }
+
+/* ── Live state ──────────────────────────────────────────────────── */
+
+.ms-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+.ms-statusbar:hover { border-color: var(--border-mid); }
+
+.ms-statusbar-label {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+}
+
+.ms-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+.ms-live .status-dot { background: var(--text-dim); }
+.ms-live[data-state="on"] { color: var(--green); }
+.ms-live[data-state="on"] .status-dot { background: var(--green); }
+.ms-live[data-state="off"] { color: var(--red); }
+.ms-live[data-state="off"] .status-dot { background: var(--red); }
+
+.ms-statusbar-note {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  margin: 12px 2px 24px;
+}
+.ms-statusbar-note code {
+  font-family: var(--font-system);
+  font-size: 13px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-sec);
+}
+
+/* ── The warning that costs real Bits ────────────────────────────────
+   Signalled with a full border and a red heading, never a left-edge rail. */
+
+.ms-warn-card {
+  padding: 20px 22px;
+  border-color: var(--red-dim);
+  background: var(--red-glow);
+  margin-bottom: 28px;
+}
+.ms-warn-card:hover { border-color: var(--red); }
+
+.ms-card-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  margin-bottom: 10px;
+}
+.ms-warn-card .ms-card-title { color: var(--red); }
+
+.ms-warn-lead {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-sec);
+}
+.ms-warn-lead + .ms-warn-lead { margin-top: 10px; }
+
+.ms-warn-strong {
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* ── The list ────────────────────────────────────────────────────── */
+
+.ms-list-head { margin-bottom: 16px; }
+
+.ms-hint {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.ms-note {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-dim);
+  padding: 18px 2px;
+}
+
+.ms-list {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  margin: 0 0 36px;
+  padding: 0;
+}
+
+.ms-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--gray-mid);
+  padding: 14px 18px;
+}
+.ms-item:hover { border-color: var(--border-mid); }
+.ms-item-warned { border-color: var(--red-dim); }
+.ms-item-warned:hover { border-color: var(--red); }
+
+.ms-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-bottom: 6px;
+}
+
+.ms-item-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+}
+
+.ms-cost {
+  font-family: var(--font-system);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  padding: 3px 9px;
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  color: var(--text-sec);
+}
+
+.ms-effect {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-sec);
+}
+
+/* ── Behaviour notes ─────────────────────────────────────────────── */
+
+.ms-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.ms-note-card { padding: 18px 20px; }
+.ms-note-card:hover { border-color: var(--border-mid); }
+
+.ms-note-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  margin-bottom: 8px;
+}
+
+.ms-note-body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .ms-statusbar { flex-direction: column; align-items: flex-start; }
+  .ms-card-title { font-size: 21px; }
+  .ms-item-title { font-size: 18px; }
+}

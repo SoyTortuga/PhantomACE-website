@@ -38,6 +38,9 @@ function isAuthorizedSender(env, event) {
    exists to avoid. One person spamming it only silences themselves. */
 const ENTRIES_COOLDOWN_MS = 30000;
 
+/* Same 30s, same reasoning, for !powerups. */
+const POWERUPS_COOLDOWN_MS = 30000;
+
 async function handleEntriesCommand(env, event) {
   const userId = event.chatter_user_id;
   const name = event.chatter_user_name || event.chatter_user_login || 'friend';
@@ -547,6 +550,46 @@ async function handleChatMessage(env, event, outbox = []) {
     } catch (err) {
       /* A broken board must not break chat commands. */
       console.error('[memory-match-chat]', err.message);
+    }
+    return;
+  }
+
+  /* !powerups — are the Moon Sweepers Bits Power-ups worth buying RIGHT NOW?
+     Twitch has no API to enable or disable a custom Power-up and no category
+     gating, so all 21 stay buyable while we play anything else, where they do
+     nothing. This is the soft gate a viewer can ask for on demand, next to the
+     open/close announcements the category change posts by itself.
+
+     IT LINKS RATHER THAN LISTS. Twenty-one titles with costs is several
+     thousand characters against a ~500 limit, so the reply names the cheapest
+     one as a teaser and sends the rest to the page.
+
+     Per-asker cooldown like !entries and !commands: one person spamming it
+     silences only themselves, and the second asker never gets mystified
+     silence. A new cooldown prefix needs a line in server/lib/registry.js or
+     every read throws. */
+  if (parsed.command === '!powerups') {
+    try {
+      /* Both imported HERE, not referenced from the outbox closure —
+         sendChatMessage is not a module-level import in this file, and a
+         ReferenceError inside a deferred job is thrown after this try/catch
+         has returned, so it would be silent. That is how !commands shipped
+         mute twice. */
+      const [{ powerupsReply, arePowerupsLive }, { sendChatMessage }] = await Promise.all([
+        import('../powerups/moon-sweepers.js'),
+        import('./send-chat.js'),
+      ]);
+      const key = `bot_cooldown_powerups_${event.chatter_user_id}`;
+      const last = await env.MARKETPLACE.get(key);
+      if (last && Date.now() - Number(last) < POWERUPS_COOLDOWN_MS) return;
+      await env.MARKETPLACE.put(key, String(Date.now()), { expirationTtl: 60 });
+
+      const live = await arePowerupsLive(env);
+      const line = powerupsReply(live);
+      outbox.push(() => sendChatMessage(env, line));
+    } catch (err) {
+      /* A broken power-up list must not break chat commands. */
+      console.error('[powerups]', err.message);
     }
     return;
   }
