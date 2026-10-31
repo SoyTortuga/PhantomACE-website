@@ -289,6 +289,29 @@ await (async () => {
   check('listPosted carries the record', all[0].youtube.id, 'yt1');
 })();
 
+/* ── the CLI entry guard must be path-correct on Windows ─────────────── */
+
+import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+
+/* `file://${process.argv[1]}` is a Linux-only approximation. On the rig the
+   repo lives under "PhantomACE Website" — argv[1] keeps the space literal and
+   uses backslashes, while import.meta.url percent-encodes it. The two never
+   matched, so run.js loaded, skipped main(), printed nothing and exited 0. */
+const spaced = '/tmp/Phantom ACE Website/run.js';
+check('a path with a space does NOT survive naive concatenation',
+  ('file://' + spaced) === pathToFileURL(spaced).href, false);
+check('pathToFileURL encodes the space',
+  pathToFileURL(spaced).href, 'file:///tmp/Phantom%20ACE%20Website/run.js');
+
+const runSrc = readFileSync(new URL('../clipper/run.js', import.meta.url), 'utf8');
+/* Match the COMPARISON, not the bare template — the comment above the guard
+   quotes the broken form on purpose, to explain it. */
+ok('run.js does not compare against a naive file:// string',
+  !runSrc.includes('=== `file://'));
+ok('run.js guards its entry point with pathToFileURL',
+  runSrc.includes('pathToFileURL(process.argv[1]).href'));
+
 /* ── report ───────────────────────────────────────────────────────────── */
 
 if (failures.length) {
