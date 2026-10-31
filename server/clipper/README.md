@@ -66,6 +66,30 @@ involved**. See `SETUP-ROLES.md` for the full split and
   year-old clip with one more lifetime view outranks a clip that is taking off
   right now.
 
+## Framing and quality
+
+A 16:9 clip laid full-width into a 9:16 frame is only 1080x608 — a third of the
+height, and a 44% horizontal downscale from a 1920-wide source, which is what
+makes gameplay text go soft. `render.zoom` crops the sides first, so what
+remains is both bigger and sharper:
+
+| zoom | gameplay | % of height | horizontal detail | keeps |
+|------|----------|-------------|-------------------|-------|
+| 1.00 | 1080x608  | 32% | 1920->1080, 44% lost | full width |
+| 1.33 | 1080x810  | 42% | 1440->1080, 25% lost | 75% |
+| 1.78 | 1080x1080 | 56% | native crop, 0% lost | 56% |
+
+1.78 is the sharpest possible, but it takes the minimap and killfeed off a
+shooter. **1.33 is the default.** Set it globally under `render`, or per route
+(`"zoom": 1.5`) — MTG's action is central and tolerates more crop than an FPS.
+
+The blurred background still comes from the *uncropped* frame, so the edges
+that get cropped are what bleeds behind the gameplay.
+
+The encoder does **not** force a frame rate: Twitch clips are commonly 60fps and
+Shorts plays 60fps, so forcing 30 was throwing away half the frames of every
+gameplay clip.
+
 ## Scheduling
 
 The bot runs daily but publishes **a week ahead**: each run uploads that day's

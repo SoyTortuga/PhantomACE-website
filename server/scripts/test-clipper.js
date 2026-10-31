@@ -13,7 +13,7 @@
 
 import { normalizeConfig, resolveRoute, loadConfig } from '../clipper/config.js';
 import { clipMp4Url, pickQuality, clipSourceUrl } from '../clipper/twitch.js';
-import { buildFilter, ffmpegArgs, wrapTitle, FRAME } from '../clipper/render.js';
+import { buildFilter, ffmpegArgs, wrapTitle, FRAME, DEFAULT_ZOOM } from '../clipper/render.js';
 import { buildDescription } from '../clipper/publish/youtube.js';
 import { selectForRun, attachRoutes, prioritizeFresh } from '../clipper/run.js';
 import { zonedTimeToUtc, slotsFor } from '../clipper/schedule.js';
@@ -101,6 +101,26 @@ throws('route without a destination throws',
   () => normalizeConfig({ routes: [{ label: 'bad', match: {} }] }));
 throws('route without a label throws',
   () => normalizeConfig({ routes: [{ match: {}, youtube: { credsEnv: 'Y' } }] }));
+/* zoom config: global default, per-route override, range guard */
+const ZCFG = normalizeConfig({
+  render: { zoom: 1.5 },
+  routes: [
+    { label: 'Tight', zoom: 1.78, match: {}, youtube: { credsEnv: 'Y' } },
+    { label: 'Inherits', match: {}, youtube: { credsEnv: 'Y' } },
+  ],
+  fallback: { label: 'F', youtube: { credsEnv: 'Y' } },
+});
+check('global render.zoom is read', ZCFG.render.zoom, 1.5);
+check('a route may override it', ZCFG.routes[0].zoom, 1.78);
+check('a route without one inherits the global', ZCFG.routes[1].zoom, 1.5);
+check('the fallback inherits it too', ZCFG.fallback.zoom, 1.5);
+check('zoom defaults to 1.33 when unset', normalizeConfig({ routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }).render.zoom, 1.33);
+throws('zoom below 1 throws', () => normalizeConfig({ render: { zoom: 0.5 }, routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }));
+throws('zoom above 2 throws', () => normalizeConfig({ render: { zoom: 3 }, routes: [], fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }));
+throws('a bad per-route zoom throws', () => normalizeConfig({
+  routes: [{ label: 'X', zoom: 9, match: {}, youtube: { credsEnv: 'Y' } }],
+  fallback: { label: 'F', youtube: { credsEnv: 'Y' } } }));
+
 throws('bad lookbackDays throws',
   () => normalizeConfig({ defaults: { lookbackDays: 0 }, routes: [] }));
 
@@ -308,7 +328,18 @@ ok('with logo → overlays a scaled logo', fWithLogo.includes('[logo];[vtxt][log
 ok('ends at [vout]', fWithLogo.trim().endsWith('[vout]'));
 ok('without logo → still ends at [vout]', buildFilter({ hasLogo: false }).trim().endsWith('[vout]'));
 
+/* zoom: crop the sides in SOURCE pixels before scaling */
+ok('default zoom crops the sides', fWithLogo.includes(`crop=iw/${DEFAULT_ZOOM}:ih`));
+ok('zoom 1 is a harmless no-op crop', buildFilter({ zoom: 1 }).includes('crop=iw/1:ih'));
+ok('a custom zoom is honoured', buildFilter({ zoom: 1.78 }).includes('crop=iw/1.78:ih'));
+ok('the crop happens before the scale, not after',
+  /crop=iw\/[\d.]+:ih,scale=1080:-2/.test(fWithLogo));
+ok('the blurred background is NOT cropped — it fills from the whole frame',
+  fWithLogo.includes(`[0:v]scale=${FRAME.width}:${FRAME.height}:force_original_aspect_ratio=increase`));
+
 const args = ffmpegArgs({ input: 'in.mp4', output: 'short.mp4', filter: fWithLogo, hasLogo: true, logoFile: 'logo.png', maxDurationSec: 60 });
+ok('does NOT force a frame rate — a 60fps clip stays 60fps', !args.includes('-r'));
+check('encodes at crf 18', args[args.indexOf('-crf') + 1], '18');
 ok('args map the composited video', args.includes('[vout]'));
 ok('args keep audio if present', args.includes('0:a?'));
 ok('args cap duration', args[args.indexOf('-t') + 1] === '60');

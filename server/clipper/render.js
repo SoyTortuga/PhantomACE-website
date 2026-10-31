@@ -39,6 +39,22 @@ export const FRAME = {
   logoHeight: 120,
 };
 
+/* HOW MUCH OF THE SOURCE WIDTH TO KEEP, as a divisor.
+   A 16:9 clip laid full-width into a 9:16 frame is only 1080x608 — a third of
+   the height, and a 44% horizontal downscale from a 1920-wide source, which is
+   what makes gameplay text go soft. Cropping the sides first makes what
+   remains both BIGGER and SHARPER:
+
+     1.00  1080x608   32% of height   1920->1080, 44% lost   full width
+     1.33  1080x810   42% of height   1440->1080, 25% lost   keeps 75%
+     1.78  1080x1080  56% of height   native crop, 0% lost   keeps 56%
+
+   1.78 is the sharpest possible but takes the minimap and killfeed off a
+   shooter. 1.33 is the default: most of the gain, a crop nobody notices.
+   Per-route, because MTG's action is central and tolerates more than an FPS
+   does. */
+export const DEFAULT_ZOOM = 1.33;
+
 /** Greedy word-wrap for drawtext, which does not wrap on its own. Pure. */
 export function wrapTitle(title, maxChars = 24, maxLines = 2) {
   const words = String(title || '').trim().split(/\s+/).filter(Boolean);
@@ -66,12 +82,16 @@ export function wrapTitle(title, maxChars = 24, maxLines = 2) {
  * @param {string}  o.footer   handle text (already escaped-safe; plain ASCII)
  * @returns {string}
  */
-export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@PhantomACE', frame = FRAME } = {}) {
+export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@PhantomACE', frame = FRAME, zoom = DEFAULT_ZOOM } = {}) {
   const { width: W, height: H, bandTop: BT, bandBottom: BB, accent, band, fontSize, logoHeight } = frame;
+  const z = Number(zoom) > 0 ? Number(zoom) : 1;
 
   const bg = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,` +
     `crop=${W}:${H},boxblur=20:2,eq=brightness=-0.38:saturation=0.65[bg]`;
-  const fg = `[0:v]scale=${W}:-2[fg]`;
+  /* Crop the sides BEFORE scaling, in source pixels — `iw` keeps this correct
+     whatever the clip's own resolution is. The blurred background still comes
+     from the uncropped frame, so the edges we remove are what bleeds behind. */
+  const fg = `[0:v]crop=iw/${z}:ih,scale=${W}:-2[fg]`;
 
   /* One chain on the composited frame: centre the clip, lay the bands, the red
      hairlines, then the title (and footer). */
@@ -107,8 +127,9 @@ export function ffmpegArgs({ input, output, filter, hasLogo, logoFile, maxDurati
     '-t', String(maxDurationSec),
     '-filter_complex', filter,
     '-map', '[vout]', '-map', '0:a?',
-    '-r', '30',
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
+    /* NO -r. Twitch clips are commonly 60fps and Shorts plays 60fps; forcing
+       30 threw away half the frames of every gameplay clip. */
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
     '-pix_fmt', 'yuv420p', '-profile:v', 'high',
     '-c:a', 'aac', '-b:a', '160k', '-ar', '44100',
     '-movflags', '+faststart',
@@ -128,6 +149,7 @@ export function ffmpegArgs({ input, output, filter, hasLogo, logoFile, maxDurati
  * @param {string} [o.logoFile] absolute path to the logo PNG (optional)
  * @param {string} [o.footer]   bottom-band handle
  * @param {number} [o.maxDurationSec]
+ * @param {number} [o.zoom]  how much of the source width to keep (see DEFAULT_ZOOM)
  * @param {string} [o.ffmpegPath]
  */
 export async function renderVertical(o) {
@@ -140,7 +162,7 @@ export async function renderVertical(o) {
   const hasLogo = Boolean(o.logoFile && fs.existsSync(o.logoFile));
   if (hasLogo) fs.copyFileSync(o.logoFile, path.join(jobDir, 'logo.png'));
 
-  const filter = buildFilter({ hasLogo, footer: o.footer || '@PhantomACE' });
+  const filter = buildFilter({ hasLogo, footer: o.footer || '@PhantomACE', zoom: o.zoom });
   const args = ffmpegArgs({
     input: path.resolve(o.input),
     output: path.basename(o.output),

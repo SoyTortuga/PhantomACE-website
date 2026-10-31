@@ -124,8 +124,9 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
     input: raw, output: out, title: clip.title,
     fontFile: FONT, logoFile: LOGO, footer: '@PhantomACE',
     maxDurationSec: env.__maxDurationSec || 60,
+    zoom: route.zoom,
   });
-  log(`rendered ${out}`);
+  log(`rendered ${out} (zoom ${route.zoom})`);
 
   if (dryRun) return { slug: clip.slug, rendered: out };
 

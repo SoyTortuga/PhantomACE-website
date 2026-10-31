@@ -114,9 +114,32 @@ export function normalizeConfig(parsed) {
   const fallback = parsed.fallback ? validateRoute({ ...parsed.fallback, match: parsed.fallback.match || {} }) : null;
   const exclude = normalizeMatch(parsed.exclude);
   const schedule = normalizeSchedule(parsed.schedule, defaults.perAccount);
+  const render = normalizeRender(parsed.render);
   const trending = { ...TRENDING_DEFAULTS, ...(parsed.trending || {}) };
 
-  return { defaults, routes, fallback, exclude, schedule, trending };
+  /* A route without its own zoom inherits the global one, so processClip can
+     read route.zoom and never worry about where it came from. */
+  for (const r of [...routes, ...(fallback ? [fallback] : [])]) {
+    if (r.zoom == null) r.zoom = render.zoom;
+  }
+
+  return { defaults, routes, fallback, exclude, schedule, trending, render };
+}
+
+/** Rendering options. `zoom` crops the source sides — see render.js. */
+function normalizeRender(render) {
+  const r = { zoom: 1.33, ...(render || {}) };
+  validateZoom(r.zoom, 'render.zoom');
+  return r;
+}
+
+function validateZoom(zoom, where) {
+  const z = Number(zoom);
+  if (!(z >= 1 && z <= 2)) {
+    throw new Error(
+      `Clipper config: ${where} must be between 1 and 2 (1 = full width, ` +
+      `1.78 = crop to square). Got ${zoom}.`);
+  }
 }
 
 /** Validate the publish cadence. */
@@ -167,8 +190,11 @@ function validateRoute(route, i) {
     throw new Error(`Clipper route "${label}" has neither a youtube nor a tiktok destination`);
   }
 
+  if (route.zoom != null) validateZoom(route.zoom, `route "${label}" zoom`);
+
   return {
     label,
+    zoom: route.zoom != null ? Number(route.zoom) : null,
     match: { gameIds, gameNames },
     hashtags: Array.isArray(route.hashtags) ? route.hashtags.map(String) : [],
     youtube: route.youtube ? { credsEnv: String(route.youtube.credsEnv), privacy: route.youtube.privacy || 'public' } : null,
