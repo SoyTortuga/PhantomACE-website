@@ -119,7 +119,7 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
 
   if (dryRun && !doRender) return { slug: clip.slug, dryRun: true };
 
-  await downloadClip(clip.thumbnailUrl, raw);
+  await downloadClip(clip, raw);
   await renderVertical({
     input: raw, output: out, title: clip.title,
     fontFile: FONT, logoFile: LOGO, footer: '@PhantomACE',
