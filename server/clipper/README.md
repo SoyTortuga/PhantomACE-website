@@ -66,6 +66,70 @@ involved**. See `SETUP-ROLES.md` for the full split and
   year-old clip with one more lifetime view outranks a clip that is taking off
   right now.
 
+## Framing and quality
+
+A 16:9 clip laid full-width into a 9:16 frame is only 1080x608 — a third of the
+height, and a 44% horizontal downscale from a 1920-wide source, which is what
+makes gameplay text go soft. `render.zoom` crops the sides first, so what
+remains is both bigger and sharper:
+
+| zoom | gameplay | % of height | horizontal detail | keeps |
+|------|----------|-------------|-------------------|-------|
+| 1.00 | 1080x608  | 32% | 1920->1080, 44% lost | full width |
+| 1.33 | 1080x810  | 42% | 1440->1080, 25% lost | 75% |
+| 1.78 | 1080x1080 | 56% | native crop, 0% lost | 56% |
+
+1.78 is the sharpest possible, but it takes the minimap and killfeed off a
+shooter. **1.33 is the default.** Set it globally under `render`, or per route
+(`"zoom": 1.5`) — MTG's action is central and tolerates more crop than an FPS.
+
+The blurred background still comes from the *uncropped* frame, so the edges
+that get cropped are what bleeds behind the gameplay.
+
+### Stacked facecam (`layout.mode: "stack"`)
+
+What Twitch's own portrait editor does by hand: facecam on top, gameplay below,
+both full width. It can be automated only because an OBS layout is **fixed** —
+the facecam sits in the same corner every stream, so the region belongs to the
+scene, not the clip. Twitch asks per clip because it serves everybody.
+
+```json
+"layout": {
+  "mode": "stack",
+  "cam":  { "x": 0.76, "y": 0.60, "w": 0.22, "h": 0.30 },
+  "game": { "x": 0.04, "y": 0.06, "w": 0.70, "h": 0.82 },
+  "camShare": 0.33
+}
+```
+
+Regions are **fractions of the source frame**, so they hold at any resolution.
+Each is cover-fitted into its slot — scaled to fill, then centre-cropped — so a
+slot is always exactly filled and nothing is stretched. If a face ends up
+cropped too tightly, widen the `cam` region rather than changing `camShare`.
+
+Don't guess the numbers:
+
+```
+node server/clipper/scripts/layout-preview.js --slug <clipSlug>
+```
+
+writes a frame with a labelled 10% grid. Read the boxes off it, then:
+
+```
+node server/clipper/scripts/layout-preview.js --slug <clipSlug>   --cam 0.76,0.60,0.22,0.30 --game 0.04,0.06,0.70,0.82
+```
+
+draws the regions on the frame and renders three seconds exactly as the bot
+would, then prints the JSON to paste in. Nothing is uploaded or recorded.
+
+Set it per route — each game's scene layout differs. A route with
+`"layout": { "mode": "fill" }` keeps the single centred pane, so the two can
+coexist.
+
+The encoder does **not** force a frame rate: Twitch clips are commonly 60fps and
+Shorts plays 60fps, so forcing 30 was throwing away half the frames of every
+gameplay clip.
+
 ## Scheduling
 
 The bot runs daily but publishes **a week ahead**: each run uploads that day's

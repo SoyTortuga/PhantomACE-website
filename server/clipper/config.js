@@ -114,9 +114,75 @@ export function normalizeConfig(parsed) {
   const fallback = parsed.fallback ? validateRoute({ ...parsed.fallback, match: parsed.fallback.match || {} }) : null;
   const exclude = normalizeMatch(parsed.exclude);
   const schedule = normalizeSchedule(parsed.schedule, defaults.perAccount);
+  const render = normalizeRender(parsed.render);
   const trending = { ...TRENDING_DEFAULTS, ...(parsed.trending || {}) };
 
-  return { defaults, routes, fallback, exclude, schedule, trending };
+  /* A route without its own zoom inherits the global one, so processClip can
+     read route.zoom and never worry about where it came from. */
+  for (const r of [...routes, ...(fallback ? [fallback] : [])]) {
+    if (r.zoom == null) r.zoom = render.zoom;
+    if (r.layout === undefined) r.layout = render.layout;
+  }
+
+  return { defaults, routes, fallback, exclude, schedule, trending, render };
+}
+
+/** Rendering options. `zoom` crops the source sides — see render.js. */
+function normalizeRender(render) {
+  const r = { zoom: 1.33, ...(render || {}) };
+  validateZoom(r.zoom, 'render.zoom');
+  r.layout = normalizeLayout(r.layout, 'render.layout');
+  return r;
+}
+
+/**
+ * The framing. null (or mode "fill") is the single centred pane; "stack" is
+ * facecam above gameplay, which needs both regions.
+ */
+function normalizeLayout(layout, where) {
+  if (!layout || layout.mode === 'fill') return null;
+  if (layout.mode !== 'stack') {
+    throw new Error(`Clipper config: ${where}.mode must be "fill" or "stack", got "${layout.mode}"`);
+  }
+  for (const part of ['cam', 'game']) {
+    if (!layout[part]) throw new Error(`Clipper config: ${where} is "stack" but has no "${part}" region`);
+    validateRect(layout[part], `${where}.${part}`);
+  }
+  const camShare = layout.camShare ?? 0.33;
+  if (!(camShare > 0.05 && camShare < 0.95)) {
+    throw new Error(`Clipper config: ${where}.camShare must be between 0.05 and 0.95, got ${camShare}`);
+  }
+  return { mode: 'stack', cam: layout.cam, game: layout.game, camShare };
+}
+
+/** A region of the source frame, as fractions. Must actually be inside it. */
+function validateRect(rect, where) {
+  for (const k of ['x', 'y', 'w', 'h']) {
+    const v = Number(rect[k]);
+    if (!(v >= 0 && v <= 1)) {
+      throw new Error(`Clipper config: ${where}.${k} must be a fraction between 0 and 1, got ${rect[k]}`);
+    }
+  }
+  if (!(Number(rect.w) > 0 && Number(rect.h) > 0)) {
+    throw new Error(`Clipper config: ${where} has zero width or height`);
+  }
+  /* Catches the easy mistake of giving x,y,w,h as pixels, or a box that runs
+     off the right/bottom edge — either silently crops to nothing. */
+  if (Number(rect.x) + Number(rect.w) > 1.0001 || Number(rect.y) + Number(rect.h) > 1.0001) {
+    throw new Error(
+      `Clipper config: ${where} runs outside the frame ` +
+      `(x+w=${(Number(rect.x) + Number(rect.w)).toFixed(3)}, ` +
+      `y+h=${(Number(rect.y) + Number(rect.h)).toFixed(3)}; both must be <= 1)`);
+  }
+}
+
+function validateZoom(zoom, where) {
+  const z = Number(zoom);
+  if (!(z >= 1 && z <= 2)) {
+    throw new Error(
+      `Clipper config: ${where} must be between 1 and 2 (1 = full width, ` +
+      `1.78 = crop to square). Got ${zoom}.`);
+  }
 }
 
 /** Validate the publish cadence. */
@@ -167,8 +233,17 @@ function validateRoute(route, i) {
     throw new Error(`Clipper route "${label}" has neither a youtube nor a tiktok destination`);
   }
 
+  if (route.zoom != null) validateZoom(route.zoom, `route "${label}" zoom`);
+  /* undefined = inherit the global; an explicit value (including a "fill"
+     that normalizes to null) overrides it. */
+  const layout = route.layout === undefined
+    ? undefined
+    : normalizeLayout(route.layout, `route "${label}" layout`);
+
   return {
     label,
+    zoom: route.zoom != null ? Number(route.zoom) : null,
+    layout,
     match: { gameIds, gameNames },
     hashtags: Array.isArray(route.hashtags) ? route.hashtags.map(String) : [],
     youtube: route.youtube ? { credsEnv: String(route.youtube.credsEnv), privacy: route.youtube.privacy || 'public' } : null,
