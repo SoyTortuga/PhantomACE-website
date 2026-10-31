@@ -124,9 +124,9 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
     input: raw, output: out, title: clip.title,
     fontFile: FONT, logoFile: LOGO, footer: '@PhantomACE',
     maxDurationSec: env.__maxDurationSec || 60,
-    zoom: route.zoom,
+    zoom: route.zoom, layout: route.layout,
   });
-  log(`rendered ${out} (zoom ${route.zoom})`);
+  log(`rendered ${out} (${route.layout ? 'stacked cam+game' : `zoom ${route.zoom}`})`);
 
   if (dryRun) return { slug: clip.slug, rendered: out };
 

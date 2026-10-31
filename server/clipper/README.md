@@ -86,6 +86,46 @@ shooter. **1.33 is the default.** Set it globally under `render`, or per route
 The blurred background still comes from the *uncropped* frame, so the edges
 that get cropped are what bleeds behind the gameplay.
 
+### Stacked facecam (`layout.mode: "stack"`)
+
+What Twitch's own portrait editor does by hand: facecam on top, gameplay below,
+both full width. It can be automated only because an OBS layout is **fixed** —
+the facecam sits in the same corner every stream, so the region belongs to the
+scene, not the clip. Twitch asks per clip because it serves everybody.
+
+```json
+"layout": {
+  "mode": "stack",
+  "cam":  { "x": 0.76, "y": 0.60, "w": 0.22, "h": 0.30 },
+  "game": { "x": 0.04, "y": 0.06, "w": 0.70, "h": 0.82 },
+  "camShare": 0.33
+}
+```
+
+Regions are **fractions of the source frame**, so they hold at any resolution.
+Each is cover-fitted into its slot — scaled to fill, then centre-cropped — so a
+slot is always exactly filled and nothing is stretched. If a face ends up
+cropped too tightly, widen the `cam` region rather than changing `camShare`.
+
+Don't guess the numbers:
+
+```
+node server/clipper/scripts/layout-preview.js --slug <clipSlug>
+```
+
+writes a frame with a labelled 10% grid. Read the boxes off it, then:
+
+```
+node server/clipper/scripts/layout-preview.js --slug <clipSlug>   --cam 0.76,0.60,0.22,0.30 --game 0.04,0.06,0.70,0.82
+```
+
+draws the regions on the frame and renders three seconds exactly as the bot
+would, then prints the JSON to paste in. Nothing is uploaded or recorded.
+
+Set it per route — each game's scene layout differs. A route with
+`"layout": { "mode": "fill" }` keeps the single centred pane, so the two can
+coexist.
+
 The encoder does **not** force a frame rate: Twitch clips are commonly 60fps and
 Shorts plays 60fps, so forcing 30 was throwing away half the frames of every
 gameplay clip.

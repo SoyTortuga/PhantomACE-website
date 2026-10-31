@@ -55,6 +55,31 @@ export const FRAME = {
    does. */
 export const DEFAULT_ZOOM = 1.33;
 
+/* THE STACKED LAYOUT — facecam on top, gameplay below.
+
+   What Twitch's own portrait editor does by hand, done once in config. It can
+   be automated only because an OBS layout is FIXED: the facecam sits in the
+   same corner every stream, so the region is a property of the scene, not of
+   the clip. Twitch asks per clip because it serves everybody.
+
+   Regions are FRACTIONS of the source frame (0-1), so they hold whatever
+   resolution the clip is. Each is cover-fitted into its slot: scaled to fill,
+   then centre-cropped. A face cropped too tightly is fixed by widening the
+   `cam` region, not by changing the slot — the same move as dragging Twitch's
+   box.
+
+   camShare is the fraction of the content height (between the bands) the
+   facecam takes. */
+export const DEFAULT_CAM_SHARE = 0.33;
+
+/** Even numbers only — libx264 needs them. */
+const even = (n) => Math.max(2, Math.round(n / 2) * 2);
+
+/** `crop=` arguments for a fractional region of the source. */
+function cropOf(r) {
+  return `crop=iw*${r.w}:ih*${r.h}:iw*${r.x}:ih*${r.y}`;
+}
+
 /** Greedy word-wrap for drawtext, which does not wrap on its own. Pure. */
 export function wrapTitle(title, maxChars = 24, maxLines = 2) {
   const words = String(title || '').trim().split(/\s+/).filter(Boolean);
@@ -82,12 +107,16 @@ export function wrapTitle(title, maxChars = 24, maxLines = 2) {
  * @param {string}  o.footer   handle text (already escaped-safe; plain ASCII)
  * @returns {string}
  */
-export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@PhantomACE', frame = FRAME, zoom = DEFAULT_ZOOM } = {}) {
+export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@PhantomACE', frame = FRAME, zoom = DEFAULT_ZOOM, layout = null } = {}) {
   const { width: W, height: H, bandTop: BT, bandBottom: BB, accent, band, fontSize, logoHeight } = frame;
   const z = Number(zoom) > 0 ? Number(zoom) : 1;
 
   const bg = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,` +
     `crop=${W}:${H},boxblur=20:2,eq=brightness=-0.38:saturation=0.65[bg]`;
+
+  if (layout && layout.mode === 'stack') {
+    return stackChain(frame, bg, layout, { hasLogo, hasFooter, footer });
+  }
   /* Crop the sides BEFORE scaling, in source pixels — `iw` keeps this correct
      whatever the clip's own resolution is. The blurred background still comes
      from the uncropped frame, so the edges we remove are what bleeds behind. */
@@ -116,6 +145,46 @@ export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@Phant
   } else {
     chain += `[vout]`;
   }
+  return chain;
+}
+
+/**
+ * Facecam above gameplay, both full width, inside the gothic bands.
+ * Each region is cover-fitted into its slot — scale to fill, then centre-crop
+ * — so a slot is always exactly filled and nothing is stretched.
+ */
+function stackChain(frame, bg, layout, { hasLogo, hasFooter, footer }) {
+  const { width: W, height: H, bandTop: BT, bandBottom: BB, accent, band, fontSize, logoHeight } = frame;
+  const contentH = H - BT - BB;
+  const camH = even(contentH * (layout.camShare ?? DEFAULT_CAM_SHARE));
+  const gameH = even(contentH - camH);
+
+  const fit = (rect, h) =>
+    `[0:v]${cropOf(rect)},scale=${W}:${h}:force_original_aspect_ratio=increase,crop=${W}:${h}`;
+
+  const draws = [
+    `[s1][game]overlay=0:${BT + camH}`,
+    `drawbox=x=0:y=0:w=${W}:h=${BT}:t=fill:color=${band}`,
+    `drawbox=x=0:y=${H}-${BB}:w=${W}:h=${BB}:t=fill:color=${band}`,
+    `drawbox=x=0:y=${BT}-4:w=${W}:h=4:t=fill:color=${accent}`,
+    `drawbox=x=0:y=${H}-${BB}:w=${W}:h=4:t=fill:color=${accent}`,
+    /* A hairline where the two panes meet — a horizontal rule, the same
+       border-top the bands use, never a side rail. */
+    `drawbox=x=0:y=${BT + camH}-2:w=${W}:h=4:t=fill:color=${accent}`,
+    `drawtext=fontfile=font.ttf:textfile=title.txt:fontsize=${fontSize}:fontcolor=white:` +
+      `x=(w-text_w)/2:y=${hasLogo ? 170 : 110}:line_spacing=14`,
+  ];
+  if (hasFooter) {
+    draws.push(
+      `drawtext=fontfile=font.ttf:text='${footer}':fontsize=40:fontcolor=white:` +
+      `x=(w-text_w)/2:y=${H}-${Math.round(BB / 2)}-20`);
+  }
+
+  let chain = `${bg};${fit(layout.cam, camH)}[cam];${fit(layout.game, gameH)}[game];` +
+    `[bg][cam]overlay=0:${BT}[s1];${draws.join(',')}`;
+  chain += hasLogo
+    ? `[vtxt];[1:v]scale=-1:${logoHeight}[logo];[vtxt][logo]overlay=(W-w)/2:40[vout]`
+    : `[vout]`;
   return chain;
 }
 
@@ -162,7 +231,9 @@ export async function renderVertical(o) {
   const hasLogo = Boolean(o.logoFile && fs.existsSync(o.logoFile));
   if (hasLogo) fs.copyFileSync(o.logoFile, path.join(jobDir, 'logo.png'));
 
-  const filter = buildFilter({ hasLogo, footer: o.footer || '@PhantomACE', zoom: o.zoom });
+  const filter = buildFilter({
+    hasLogo, footer: o.footer || '@PhantomACE', zoom: o.zoom, layout: o.layout,
+  });
   const args = ffmpegArgs({
     input: path.resolve(o.input),
     output: path.basename(o.output),

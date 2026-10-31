@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to config.json on the rig (or point CLIPPER_CONFIG at it). This file holds NO secrets — a route names a credsEnv and the tokens are read from the service environment as <credsEnv>_CLIENT_ID/_SECRET/_REFRESH_TOKEN (YouTube) or <credsEnv>_CLIENT_KEY/_SECRET/_REFRESH_TOKEN (TikTok). Find a game's gameId by running: node server/clipper/run.js --dry-run  (it logs each clip's game id and name). One account = one route that lists all of its gameIds, so 'perAccount' caps that whole account. 'exclude' lists categories that must never be posted anywhere (IRL / Just Chatting / Music are the usual ones) - it is checked before the routes AND before the fallback. 'schedule' sets how far ahead YouTube publishes and at what local times (TikTok has no scheduling API and posts same-day). 'trending' promotes recent clips that are already performing ahead of the backlog. 'render.zoom' crops the source sides before scaling so gameplay fills more of the 9:16 frame and stays sharper: 1.0 = full width (smallest/softest), 1.33 = default, 1.78 = crop to square (sharpest, but loses the outer 44% - too much for a shooter's HUD). A route may override it with its own 'zoom'.",
+  "_comment": "Copy to config.json on the rig (or point CLIPPER_CONFIG at it). This file holds NO secrets — a route names a credsEnv and the tokens are read from the service environment as <credsEnv>_CLIENT_ID/_SECRET/_REFRESH_TOKEN (YouTube) or <credsEnv>_CLIENT_KEY/_SECRET/_REFRESH_TOKEN (TikTok). Find a game's gameId by running: node server/clipper/run.js --dry-run  (it logs each clip's game id and name). One account = one route that lists all of its gameIds, so 'perAccount' caps that whole account. 'exclude' lists categories that must never be posted anywhere (IRL / Just Chatting / Music are the usual ones) - it is checked before the routes AND before the fallback. 'schedule' sets how far ahead YouTube publishes and at what local times (TikTok has no scheduling API and posts same-day). 'trending' promotes recent clips that are already performing ahead of the backlog. 'render.zoom' crops the source sides before scaling so gameplay fills more of the 9:16 frame and stays sharper: 1.0 = full width (smallest/softest), 1.33 = default, 1.78 = crop to square (sharpest, but loses the outer 44% - too much for a shooter's HUD). A route may override it with its own 'zoom'. 'render.layout' mode 'stack' puts the facecam above the gameplay, like Twitch's own portrait editor: 'cam' and 'game' are regions of the SOURCE frame as fractions (0-1), found with scripts/layout-preview.js, and 'camShare' is how much of the height the facecam takes. Omit it (or mode 'fill') for the single centred pane. Per route, since each scene layout differs.",
   "defaults": {
     "lookbackDays": 365,
     "perAccount": 2,
@@ -20,7 +20,23 @@
     "minViews": 8
   },
   "render": {
-    "zoom": 1.33
+    "zoom": 1.33,
+    "layout": {
+      "mode": "stack",
+      "cam": {
+        "x": 0.76,
+        "y": 0.6,
+        "w": 0.22,
+        "h": 0.3
+      },
+      "game": {
+        "x": 0.04,
+        "y": 0.06,
+        "w": 0.7,
+        "h": 0.82
+      },
+      "camShare": 0.33
+    }
   },
   "exclude": {
     "gameIds": [
