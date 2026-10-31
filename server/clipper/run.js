@@ -30,7 +30,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { loadConfig, resolveRoute } from './config.js';
 import { findClips, resolveGames, downloadClip } from './twitch.js';
@@ -272,6 +272,13 @@ async function main() {
   process.exit(0);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/* "Was this file run directly?" — via pathToFileURL, NOT string concatenation.
+   `file://${process.argv[1]}` is a Linux-only approximation: on Windows argv[1]
+   is a backslash path with a drive letter, and any space in it stays literal
+   where import.meta.url percent-encodes it. On the rig
+   (C:\Users\...\PhantomACE Website\...) the two never matched, so running
+   run.js printed nothing at all and exited 0 — the module loaded, main() was
+   skipped, and there was no error to go looking for. */
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => { console.error(`[clipper] fatal: ${err.stack || err.message}`); process.exit(1); });
 }
