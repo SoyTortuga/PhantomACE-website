@@ -10,13 +10,119 @@
    `thumbnail_url`. Twitch sorts the list by views and offers no other order,
    so we ask for a page over a date window and keep the top ones.
 
-   THE DOWNLOAD IS THE UNOFFICIAL PART. Helix has no "download this clip"
-   endpoint. The source MP4 lives at a URL derivable from the thumbnail: the
-   thumbnail is `<base>-preview-<WxH>.jpg`, and the video is `<base>.mp4`. This
-   is well known and stable in practice but is NOT a documented contract — if
-   Twitch changes the thumbnail scheme this is the first thing to break, and
-   downloadClip() throws loudly rather than posting a broken file.
+   ┌──────────────────────────────────────────────────────────────────┐
+   │ THE DOWNLOAD IS THE UNOFFICIAL PART — READ BEFORE CHANGING IT.   │
+   └──────────────────────────────────────────────────────────────────┘
+
+   Helix has no "download this clip" endpoint, and the file cannot be derived
+   from anything Helix returns. Twitch serves clips from a separate CDN under
+   a SIGNED url:
+
+     https://<cdn>/nauth/<uuid>/landscape/<codec>/<quality>/index.mp4
+       ?token={...,"expires":...}&sig=<hmac>
+
+   The signature is Twitch's, and it expires, so no amount of string
+   manipulation produces a working link. The url has to be ASKED FOR.
+
+   clipSourceUrl() asks Twitch's GQL endpoint — the one its own web player
+   uses — with Twitch's public web client id. This is UNDOCUMENTED and is not
+   part of the Helix contract the rest of this file relies on. It is used here
+   deliberately and with the broadcaster's agreement, because it is the only
+   way to automate posting their own clips. Expect it to break one day;
+   downloadClip() throws loudly rather than posting a broken file, so the run
+   fails visibly instead of uploading something wrong.
+
+   If it does break, this is the ONLY function that needs replacing.
+
+   A clip on the OLD cdn still derives from its thumbnail (`-preview-` →
+   `.mp4`), so clipMp4Url() is kept as a fallback for those.
    ══════════════════════════════════════════════ */
+
+/* Twitch's public web client id — the one its own site ships. Not ours, and
+   not a secret; it is what identifies a request as coming from the player. */
+const GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+const GQL_ENDPOINT = 'https://gql.twitch.tv/gql';
+
+/* The persisted-query hash for VideoAccessToken_Clip. Twitch can rotate it,
+   so a rejection falls through to sending the query text instead. */
+const CLIP_TOKEN_HASH = '36b89d2507fce29e5ca551df756d27c1cfe079e2609642b4390aa4c35796eb11';
+
+const CLIP_TOKEN_QUERY = `query ClipAccess($slug: ID!) {
+  clip(slug: $slug) {
+    playbackAccessToken(params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) {
+      signature
+      value
+    }
+    videoQualities { frameRate quality sourceURL }
+  }
+}`;
+
+/**
+ * The best quality at or below 1080. Pure.
+ *
+ * The renderer scales to 1080 wide, so a 1440/2160 source is only a slower
+ * download and a slower decode for no visible gain. Highest-first otherwise.
+ *
+ * @param {{quality:string, frameRate:number, sourceURL:string}[]} qualities
+ */
+export function pickQuality(qualities) {
+  const sorted = [...(qualities || [])]
+    .filter(q => q && q.sourceURL)
+    .sort((a, b) => (Number(b.quality) || 0) - (Number(a.quality) || 0));
+  if (!sorted.length) return null;
+  return sorted.find(q => (Number(q.quality) || 0) <= 1080) || sorted[sorted.length - 1];
+}
+
+/**
+ * Ask Twitch for a playable, signed url for one clip.
+ *
+ * @param {string} slug
+ * @param {object} [opts]
+ * @param {typeof fetch} [opts.fetchImpl] injected for tests
+ * @returns {Promise<string>}
+ */
+export async function clipSourceUrl(slug, { fetchImpl = fetch } = {}) {
+  const post = (body) => fetchImpl(GQL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Client-ID': GQL_CLIENT_ID, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  /* Persisted query first (what the player sends), then the query text if
+     Twitch has rotated the hash out from under us. */
+  let clip = await readClip(await post([{
+    operationName: 'VideoAccessToken_Clip',
+    variables: { slug },
+    extensions: { persistedQuery: { version: 1, sha256Hash: CLIP_TOKEN_HASH } },
+  }]));
+
+  if (!clip) {
+    clip = await readClip(await post({ query: CLIP_TOKEN_QUERY, variables: { slug } }));
+  }
+  if (!clip) throw new Error(`Twitch GQL returned no clip for "${slug}" (it may be deleted)`);
+
+  const token = clip.playbackAccessToken;
+  if (!token || !token.signature || !token.value) {
+    throw new Error(`Twitch GQL returned no playback token for "${slug}"`);
+  }
+  const best = pickQuality(clip.videoQualities);
+  if (!best) throw new Error(`Twitch GQL listed no video qualities for "${slug}"`);
+
+  /* The signature and token ride as query parameters on the CDN url. */
+  const url = new URL(best.sourceURL);
+  url.searchParams.set('sig', token.signature);
+  url.searchParams.set('token', token.value);
+  return url.toString();
+}
+
+/** Pull `clip` out of either response shape, or null if it is not there. */
+async function readClip(res) {
+  if (!res || !res.ok) return null;
+  let body;
+  try { body = await res.json(); } catch { return null; }
+  const payload = Array.isArray(body) ? body[0] : body;
+  return (payload && payload.data && payload.data.clip) || null;
+}
 
 import fs from 'node:fs';
 import { pipeline } from 'node:stream/promises';
@@ -109,21 +215,42 @@ export function clipMp4Url(thumbnailUrl) {
 }
 
 /**
+ * Where to fetch a clip's video from: a signed url from GQL, or — for a clip
+ * still on the old cdn — one derived from its thumbnail.
+ *
+ * @param {{slug:string, thumbnailUrl:string}} clip
+ * @param {object} [opts] passed through to clipSourceUrl (tests inject fetch)
+ */
+export async function resolveClipUrl(clip, opts = {}) {
+  try {
+    return await clipSourceUrl(clip.slug, opts);
+  } catch (err) {
+    /* Old-cdn clips still derive. Worth trying before giving up, but say so:
+       if GQL has stopped working this is the line that explains the run. */
+    const derived = clipMp4Url(clip.thumbnailUrl);
+    if (derived) {
+      console.warn(`[clipper] ${clip.slug}: GQL failed (${err.message}) — falling back to the thumbnail url`);
+      return derived;
+    }
+    throw err;
+  }
+}
+
+/**
  * Download a clip's source MP4 to a file.
- * @param {string} thumbnailUrl the clip's Helix thumbnail_url
+ * @param {{slug:string, thumbnailUrl:string}} clip
  * @param {string} destPath where to write the .mp4
  */
-export async function downloadClip(thumbnailUrl, destPath) {
-  const mp4 = clipMp4Url(thumbnailUrl);
-  if (!mp4) {
-    throw new Error(`Could not derive a video URL from thumbnail: ${thumbnailUrl}`);
-  }
+export async function downloadClip(clip, destPath) {
+  const mp4 = await resolveClipUrl(clip);
   const res = await fetch(mp4);
   if (!res.ok || !res.body) {
-    throw new Error(`Clip download failed (${res.status}) for ${mp4}`);
+    throw new Error(`Clip download failed (${res.status}) for ${clip.slug}`);
   }
   await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(destPath));
   const { size } = fs.statSync(destPath);
-  if (size < 1024) throw new Error(`Downloaded clip is suspiciously small (${size} bytes) — ${mp4}`);
-  return { path: destPath, bytes: size, source: mp4 };
+  if (size < 1024) {
+    throw new Error(`Downloaded clip is suspiciously small (${size} bytes) — ${clip.slug}`);
+  }
+  return { path: destPath, bytes: size };
 }

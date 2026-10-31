@@ -207,10 +207,15 @@ Dry-run renders are left in `CLIPPER_WORK` (default the OS temp dir under
 
 ## Caveats
 
-- **Clip download is unofficial.** Helix has no download endpoint; the source
-  MP4 is derived from the clip's thumbnail URL. Stable in practice, but the
-  first thing to break if Twitch changes that scheme — `twitch.js` throws
-  loudly rather than posting a broken file.
+- **Clip download is unofficial.** Helix has no download endpoint, and the file
+  cannot be derived from anything Helix returns: Twitch serves clips from a
+  separate CDN under a **signed, expiring** url. So `twitch.js` asks Twitch's
+  **GQL endpoint** — the one its own web player uses — with Twitch's public web
+  client id. This is undocumented, used deliberately and with the broadcaster's
+  agreement, and is the only way to automate posting their own clips. Expect it
+  to break one day; `downloadClip()` throws loudly rather than posting a broken
+  file, and `clipSourceUrl()` is the only function that would need replacing.
+  (Clips still on the old CDN derive from their thumbnail, kept as a fallback.)
 - **Audio/music:** clips may contain copyrighted game/stream audio. YouTube and
   TikTok may mute or block such Shorts. Nothing here strips or replaces audio.
 - The bot never reposts a clip once recorded; clearing `clipper_posted` in KV

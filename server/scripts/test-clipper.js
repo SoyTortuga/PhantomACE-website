@@ -12,7 +12,7 @@
    ══════════════════════════════════════════════ */
 
 import { normalizeConfig, resolveRoute, loadConfig } from '../clipper/config.js';
-import { clipMp4Url } from '../clipper/twitch.js';
+import { clipMp4Url, pickQuality, clipSourceUrl } from '../clipper/twitch.js';
 import { buildFilter, ffmpegArgs, wrapTitle, FRAME } from '../clipper/render.js';
 import { buildDescription } from '../clipper/publish/youtube.js';
 import { selectForRun, attachRoutes, prioritizeFresh } from '../clipper/run.js';
@@ -222,6 +222,75 @@ check('derive mp4 from thumbnail',
   clipMp4Url('https://clips-media-assets2.twitch.tv/AbCdEf-preview-480x272.jpg'),
   'https://clips-media-assets2.twitch.tv/AbCdEf.mp4');
 check('thumbnail without -preview- → null', clipMp4Url('https://x/y.jpg'), null);
+
+/* ── GQL clip source: quality choice and signed-url assembly ─────────── */
+
+const QUALITIES = [
+  { quality: '360', frameRate: 30, sourceURL: 'https://cdn/x/360/index.mp4' },
+  { quality: '1080', frameRate: 60, sourceURL: 'https://cdn/x/1080/index.mp4' },
+  { quality: '720', frameRate: 60, sourceURL: 'https://cdn/x/720/index.mp4' },
+];
+check('picks 1080 when offered', pickQuality(QUALITIES).quality, '1080');
+check('ignores anything above 1080 — the render is 1080 wide anyway',
+  pickQuality([{ quality: '2160', sourceURL: 'a' }, { quality: '720', sourceURL: 'b' }]).quality, '720');
+check('falls back to the lowest when everything exceeds 1080',
+  pickQuality([{ quality: '2160', sourceURL: 'a' }, { quality: '1440', sourceURL: 'b' }]).quality, '1440');
+check('skips entries with no sourceURL',
+  pickQuality([{ quality: '1080' }, { quality: '720', sourceURL: 'b' }]).quality, '720');
+check('no qualities -> null', pickQuality([]), null);
+
+/* A fake GQL endpoint: records what was sent, answers like Twitch. */
+function fakeGql(payload, { failPersisted = false } = {}) {
+  const calls = [];
+  const impl = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url, body, clientId: init.headers['Client-ID'] });
+    const isPersisted = Array.isArray(body);
+    if (isPersisted && failPersisted) return { ok: true, json: async () => [{ errors: [{ message: 'PersistedQueryNotFound' }] }] };
+    return { ok: true, json: async () => (isPersisted ? [payload] : payload) };
+  };
+  return { impl, calls };
+}
+
+const GOOD = { data: { clip: {
+  playbackAccessToken: { signature: 'SIG123', value: '{"expires":1}' },
+  videoQualities: QUALITIES,
+} } };
+
+await (async () => {
+  const { impl, calls } = fakeGql(GOOD);
+  const url = await clipSourceUrl('MySlug', { fetchImpl: impl });
+  const u = new URL(url);
+  check('uses the 1080 source', u.origin + u.pathname, 'https://cdn/x/1080/index.mp4');
+  check('attaches the signature', u.searchParams.get('sig'), 'SIG123');
+  check('attaches the token', u.searchParams.get('token'), '{"expires":1}');
+  check('sends Twitch\u2019s web client id', calls[0].clientId, 'kimne78kx3ncx6brgo4mv6wki5h1ko');
+  check('asks for the right slug', calls[0].body[0].variables.slug, 'MySlug');
+  check('tries the persisted query first', Array.isArray(calls[0].body), true);
+  check('one call is enough when it works', calls.length, 1);
+})();
+
+await (async () => {
+  /* Twitch rotates the persisted hash -> fall through to the query text. */
+  const { impl, calls } = fakeGql(GOOD, { failPersisted: true });
+  const url = await clipSourceUrl('MySlug', { fetchImpl: impl });
+  ok('still resolves when the persisted hash is rejected', url.includes('sig=SIG123'));
+  check('falls back to sending the query text', typeof calls[1].body.query, 'string');
+})();
+
+await (async () => {
+  const dead = async () => ({ ok: true, json: async () => [{ data: { clip: null } }] });
+  let msg = '';
+  try { await clipSourceUrl('Gone', { fetchImpl: dead }); } catch (e) { msg = e.message; }
+  ok('a deleted clip fails loudly rather than silently', msg.includes('no clip'));
+})();
+
+await (async () => {
+  const noToken = async () => ({ ok: true, json: async () => [{ data: { clip: { videoQualities: QUALITIES } } }] });
+  let msg = '';
+  try { await clipSourceUrl('X', { fetchImpl: noToken }); } catch (e) { msg = e.message; }
+  ok('a missing playback token fails loudly', msg.includes('playback token'));
+})();
 
 /* ── ffmpeg filtergraph ───────────────────────────────────────────────── */
 
