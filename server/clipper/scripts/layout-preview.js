@@ -68,6 +68,8 @@ if (!input) {
   const slug = arg('--slug');
   if (!slug) {
     console.error('\n✗ Give --slug <clipSlug> or --input <file.mp4>.');
+    console.error('  Add --zoom 1.2 to preview the single-pane layout,');
+    console.error('  or --cam/--game to preview the stacked one.');
     console.error('  Slugs are printed by: node server/clipper/run.js --dry-run\n');
     process.exit(2);
   }
@@ -90,6 +92,29 @@ if (!fs.existsSync(input)) { console.error(`\n✗ No such file: ${input}\n`); pr
 
 const cam = rect(arg('--cam'), 'cam');
 const game = rect(arg('--game'), 'game');
+const zoomArg = arg('--zoom');
+
+/* ── --zoom: preview the SINGLE-PANE (fill) layout ───────────────────── */
+if (zoomArg && (!cam || !game)) {
+  const zoom = Number(zoomArg);
+  const preview = named(`fill${String(zoom).replace('.', '_')}`, 'mp4');
+  await renderVertical({
+    input: path.resolve(input), output: preview,
+    title: arg('--title', 'Layout preview'),
+    fontFile: path.join(ROOT, 'assets/fonts/GODOFWAR.TTF'),
+    logoFile: path.join(ROOT, 'assets/images/phantomace-logo.png'),
+    zoom, layout: null,
+    maxDurationSec: Number(arg('--seconds', '3')),
+  });
+  const still = named(`FILL${String(zoom).replace('.', '_')}`, 'png');
+  spawnSync(FFMPEG, ['-y', '-i', preview, '-frames:v', '1', still], { encoding: 'utf8' });
+  console.log(`\n[layout] ${still}   <- single pane, zoom ${zoom}`);
+  console.log(`[layout] ${preview}\n`);
+  console.log('Whole frame, no facecam pane. Paste into the route:\n');
+  console.log(JSON.stringify({ layout: { mode: 'fill' }, zoom }, null, 2));
+  console.log('');
+  process.exit(0);
+}
 
 /* ── no regions yet: hand back a grid to read them off ───────────────── */
 if (!cam || !game) {
