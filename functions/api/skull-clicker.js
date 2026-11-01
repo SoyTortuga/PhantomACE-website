@@ -143,12 +143,18 @@ function readSeason(raw) {
 /* Ensure the season board is for the current month, clearing it when the
    month has turned. Display-only: no winners are prized — the board simply
    starts fresh for the new month's race. */
+/* ONE-TIME GLOBAL HARD RESET stamp (ms). Clients wipe every save older than this
+   on load (see GLOBAL_HARD_RESET_AT in games/skull-clicker/index.html — keep the
+   two equal). The season board is cleared once to match, and submissions from a
+   client that hasn't taken the wipe yet are ignored so stale tabs can't refill it. */
+const GLOBAL_HARD_RESET_AT = 1793571045128;
+
 async function rolloverSeason(env) {
   const cur = monthKeyUTC(new Date());
   let s = readSeason(await env.MARKETPLACE.get(SEASON_KEY, 'json'));
-  if (s.month === cur) return s;
+  if (s.month === cur && s.hardResetAt === GLOBAL_HARD_RESET_AT) return s;
 
-  s = { month: cur, entries: [] };
+  s = { month: cur, entries: [], hardResetAt: GLOBAL_HARD_RESET_AT };
   await env.MARKETPLACE.put(SEASON_KEY, JSON.stringify(s));
   return s;
 }
@@ -337,6 +343,10 @@ export async function onRequestPost(context) {
      already barred from prizes). Accept the submit so the client doesn't error;
      rank nothing. */
   if (isGuest(player.id)) return json({ success: true, updated: false, guest: true });
+
+  /* A client that hasn't taken the global hard reset is still carrying pre-wipe
+     progress; its numbers must not reach either board. */
+  if ((Number(body.resetAt) || 0) < GLOBAL_HARD_RESET_AT) return json({ success: true, updated: false, stale: true });
 
   /* Big-number score: travels as a string + scoreLog (log10). Rank/compare by
      scoreLog, store the string. A JSON'd Infinity arrives as null → log 0 → rejected;

@@ -5185,7 +5185,7 @@
           method: 'POST', keepalive: true,
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ action: 'submit-score', score: lifeStr, scoreLog: lifeLog, seasonScore: seasonStr, seasonScoreLog: seasonLog, prestige, ascensions, ...player })
+          body: JSON.stringify({ action: 'submit-score', score: lifeStr, scoreLog: lifeLog, seasonScore: seasonStr, seasonScoreLog: seasonLog, prestige, ascensions, resetAt, ...player })
         });
       } catch(e) {}
     }
@@ -5684,7 +5684,24 @@
     try { const ba = localStorage.getItem('sc_buyAmount'); if (ba) buyAmount = ba === 'max' ? 'max' : (parseInt(ba, 10) || 1); } catch(e) {}
     try { soundOn = localStorage.getItem('sc_sound') === '1'; } catch(e) {}
 
+    /* ONE-TIME GLOBAL HARD RESET. Every save whose resetAt predates this stamp is
+       erased in full on its next load — run, prestige, ascensions, blooms, unlocks,
+       feats. The fresh save is stamped with it, so the server's resetAt-first merge
+       (identical on both sides) hands it to any stale tab or second device instead
+       of letting old progress come back. Keep in sync with GLOBAL_HARD_RESET_AT in
+       functions/api/skull-clicker.js. */
+    const GLOBAL_HARD_RESET_AT = 1793571045128;
+    function applyGlobalHardReset() {
+      if ((Number(resetAt) || 0) >= GLOBAL_HARD_RESET_AT) return;
+      const now = Date.now();
+      applyState({ resetAt: GLOBAL_HARD_RESET_AT, seasonEpoch: null, startTime: now, savedAt: now });
+      save();
+      const banner = document.getElementById('offlineBanner');
+      if (banner) banner.innerHTML = '<div class="offline-banner" onclick="this.remove()">💀 Skull Clicker has been fully reset. Everyone starts fresh — your best score stays on the all-time leaderboard. Click to dismiss.</div>';
+    }
+
     load();
+    applyGlobalHardReset();
     /* Settle local vs server save FIRST, then evaluate the season epoch against the
        adopted state — so the reset acts on the final save and its stamped wipe is
        what gets pushed back up (the server merge then accepts the newer epoch). */
