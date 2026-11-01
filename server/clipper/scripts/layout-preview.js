@@ -66,7 +66,17 @@ if (!input) {
   const { downloadClip } = await import('../twitch.js');
   input = path.join(outDir, 'source.mp4');
   console.log(`[layout] downloading ${slug}...`);
-  await downloadClip({ slug, thumbnailUrl: '' }, input);
+  try {
+    await downloadClip({ slug, thumbnailUrl: '' }, input);
+  } catch (err) {
+    /* A mistyped slug is the common case and does not deserve a stack trace
+       (nor the libuv assertion node prints when one escapes top-level await). */
+    console.error(`\n✗ ${err.message}\n`);
+    console.error('  Check the slug loads at https://clips.twitch.tv/' + slug);
+    console.error('  Current slugs:  node server/clipper/run.js --dry-run');
+    console.error('  Copy it from the terminal rather than reading it off a screenshot.\n');
+    process.exit(1);
+  }
 }
 if (!fs.existsSync(input)) { console.error(`\n✗ No such file: ${input}\n`); process.exit(2); }
 
@@ -81,8 +91,11 @@ if (!cam || !game) {
   for (let i = 1; i < 10; i++) {
     lines.push(`drawbox=x=iw*${i / 10}:y=0:w=2:h=ih:color=0xFF0000@0.55:t=fill`);
     lines.push(`drawbox=x=0:y=ih*${i / 10}:w=iw:h=2:color=0xFF0000@0.55:t=fill`);
-    lines.push(`drawtext=text='${(i / 10).toFixed(1)}':fontfile=font.ttf:fontsize=28:fontcolor=yellow:x=iw*${i / 10}+6:y=8`);
-    lines.push(`drawtext=text='${(i / 10).toFixed(1)}':fontfile=font.ttf:fontsize=28:fontcolor=yellow:x=8:y=ih*${i / 10}+4`);
+    /* drawtext does NOT define iw/ih — inside it the frame is w/h. Using iw
+       here is a parse error ("Undefined constant"), not a silent misplacement,
+       so the whole grid fails to render. drawbox above does take iw/ih. */
+    lines.push(`drawtext=text='${(i / 10).toFixed(1)}':fontfile=font.ttf:fontsize=28:fontcolor=yellow:x=w*${i / 10}+6:y=8`);
+    lines.push(`drawtext=text='${(i / 10).toFixed(1)}':fontfile=font.ttf:fontsize=28:fontcolor=yellow:x=8:y=h*${i / 10}+4`);
   }
   fs.copyFileSync(path.join(ROOT, 'assets/fonts/Grenze.ttf'), path.join(outDir, 'font.ttf'));
   const r = spawnSync(FFMPEG, ['-y', '-i', path.resolve(input), '-frames:v', '1',
@@ -106,7 +119,7 @@ fs.copyFileSync(path.join(ROOT, 'assets/fonts/Grenze.ttf'), path.join(outDir, 'f
 
 const draw = (r, colour, label) => [
   `drawbox=x=iw*${r.x}:y=ih*${r.y}:w=iw*${r.w}:h=ih*${r.h}:color=${colour}:t=5`,
-  `drawtext=text='${label}':fontfile=font.ttf:fontsize=34:fontcolor=${colour}:x=iw*${r.x}+10:y=ih*${r.y}+10`,
+  `drawtext=text='${label}':fontfile=font.ttf:fontsize=34:fontcolor=${colour}:x=w*${r.x}+10:y=h*${r.y}+10`,
 ].join(',');
 
 let r = spawnSync(FFMPEG, ['-y', '-i', path.resolve(input), '-frames:v', '1',
