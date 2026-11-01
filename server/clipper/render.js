@@ -28,16 +28,33 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
+/* BAND HEIGHTS ARE CONTENT, NOT DECORATION.
+   They were 320 + 300 = 620px of a 1920-tall frame — nearly a third of the
+   Short — to hold a logo, a title and one line of handle. Every pixel spent
+   on them is taken from the gameplay. Trimmed to what the type actually
+   needs: the logo and a two-line title above, the handle below. That returns
+   190px to the panes. Overridable per config if a route wants more or less
+   chrome. */
 export const FRAME = {
   width: 1080,
   height: 1920,
-  bandTop: 320,       // top band height (logo + title)
-  bandBottom: 300,    // bottom band height (handle)
+  bandTop: 280,       // top band height (logo + title)
+  bandBottom: 150,    // bottom band height (handle)
   accent: '0xFF0000', // the one red hairline
   band: '0x0A0A0A@0.96',
   fontSize: 52,
-  logoHeight: 120,
+  logoHeight: 100,
 };
+
+/** FRAME with any per-config band overrides applied. */
+export function frameWith(bands) {
+  if (!bands) return FRAME;
+  return {
+    ...FRAME,
+    bandTop: bands.top ?? FRAME.bandTop,
+    bandBottom: bands.bottom ?? FRAME.bandBottom,
+  };
+}
 
 /* HOW MUCH OF THE SOURCE WIDTH TO KEEP, as a divisor.
    A 16:9 clip laid full-width into a 9:16 frame is only 1080x608 — a third of
@@ -107,7 +124,8 @@ export function wrapTitle(title, maxChars = 24, maxLines = 2) {
  * @param {string}  o.footer   handle text (already escaped-safe; plain ASCII)
  * @returns {string}
  */
-export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@PhantomACE', frame = FRAME, zoom = DEFAULT_ZOOM, layout = null } = {}) {
+export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@PhantomACE', frame = FRAME, zoom = DEFAULT_ZOOM, layout = null, bands = null } = {}) {
+  frame = bands ? frameWith(bands) : frame;
   const { width: W, height: H, bandTop: BT, bandBottom: BB, accent, band, fontSize, logoHeight } = frame;
   const z = Number(zoom) > 0 ? Number(zoom) : 1;
 
@@ -131,17 +149,17 @@ export function buildFilter({ hasLogo = true, hasFooter = true, footer = '@Phant
     `drawbox=x=0:y=${BT}-4:w=${W}:h=4:t=fill:color=${accent}`,
     `drawbox=x=0:y=${H}-${BB}:w=${W}:h=4:t=fill:color=${accent}`,
     `drawtext=fontfile=font.ttf:textfile=title.txt:fontsize=${fontSize}:fontcolor=white:` +
-      `x=(w-text_w)/2:y=${hasLogo ? 170 : 110}:line_spacing=14`,
+      `x=(w-text_w)/2:y=${hasLogo ? 140 : 90}:line_spacing=14`,
   ];
   if (hasFooter) {
     draws.push(
       `drawtext=fontfile=font.ttf:text='${footer}':fontsize=40:fontcolor=white:` +
-      `x=(w-text_w)/2:y=${H}-${Math.round(BB / 2)}-20`);
+      `x=(w-text_w)/2:y=${H}-${Math.round(BB / 2)}-24`);
   }
 
   let chain = `${bg};${fg};${draws.join(',')}`;
   if (hasLogo) {
-    chain += `[vtxt];[1:v]scale=-1:${logoHeight}[logo];[vtxt][logo]overlay=(W-w)/2:40[vout]`;
+    chain += `[vtxt];[1:v]scale=-1:${logoHeight}[logo];[vtxt][logo]overlay=(W-w)/2:24[vout]`;
   } else {
     chain += `[vout]`;
   }
@@ -172,18 +190,18 @@ function stackChain(frame, bg, layout, { hasLogo, hasFooter, footer }) {
        border-top the bands use, never a side rail. */
     `drawbox=x=0:y=${BT + camH}-2:w=${W}:h=4:t=fill:color=${accent}`,
     `drawtext=fontfile=font.ttf:textfile=title.txt:fontsize=${fontSize}:fontcolor=white:` +
-      `x=(w-text_w)/2:y=${hasLogo ? 170 : 110}:line_spacing=14`,
+      `x=(w-text_w)/2:y=${hasLogo ? 140 : 90}:line_spacing=14`,
   ];
   if (hasFooter) {
     draws.push(
       `drawtext=fontfile=font.ttf:text='${footer}':fontsize=40:fontcolor=white:` +
-      `x=(w-text_w)/2:y=${H}-${Math.round(BB / 2)}-20`);
+      `x=(w-text_w)/2:y=${H}-${Math.round(BB / 2)}-24`);
   }
 
   let chain = `${bg};${fit(layout.cam, camH)}[cam];${fit(layout.game, gameH)}[game];` +
     `[bg][cam]overlay=0:${BT}[s1];${draws.join(',')}`;
   chain += hasLogo
-    ? `[vtxt];[1:v]scale=-1:${logoHeight}[logo];[vtxt][logo]overlay=(W-w)/2:40[vout]`
+    ? `[vtxt];[1:v]scale=-1:${logoHeight}[logo];[vtxt][logo]overlay=(W-w)/2:24[vout]`
     : `[vout]`;
   return chain;
 }
@@ -233,6 +251,7 @@ export async function renderVertical(o) {
 
   const filter = buildFilter({
     hasLogo, footer: o.footer || '@PhantomACE', zoom: o.zoom, layout: o.layout,
+    bands: o.bands,
   });
   const args = ffmpegArgs({
     input: path.resolve(o.input),

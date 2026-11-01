@@ -361,13 +361,21 @@ ok('crops the game region in source fractions', fStack.includes('crop=iw*0.7:ih*
 ok('cover-fits each pane rather than stretching it',
   (fStack.match(/force_original_aspect_ratio=increase/g) || []).length === 3); // bg + cam + game
 ok('cam sits directly under the top band', fStack.includes(`[bg][cam]overlay=0:${FRAME.bandTop}`));
-/* content 1920-320-300 = 1300; cam 0.33 -> 430 (even); game 870 */
-ok('game sits directly under the cam', fStack.includes(`[s1][game]overlay=0:${FRAME.bandTop + 430}`));
-ok('a hairline divides the two panes', fStack.includes(`y=${FRAME.bandTop + 430}-2`));
+/* Derived from FRAME, not hardcoded: the band heights are tuning values and
+   a test that pins them breaks on every adjustment without catching a bug. */
+const CONTENT_H = FRAME.height - FRAME.bandTop - FRAME.bandBottom;
+const CAM_H = Math.max(2, Math.round(CONTENT_H * 0.33 / 2) * 2);
+const GAME_H = Math.max(2, Math.round((CONTENT_H - CAM_H) / 2) * 2);
+ok('game sits directly under the cam', fStack.includes(`[s1][game]overlay=0:${FRAME.bandTop + CAM_H}`));
+ok('a hairline divides the two panes', fStack.includes(`y=${FRAME.bandTop + CAM_H}-2`));
 ok('still ends at [vout]', fStack.trim().endsWith('[vout]'));
 ok('no side rails, shadows or blur boxes sneak in', !/shadow|backdrop|gblur/.test(fStack));
 ok('the panes exactly fill the space between the bands',
-  430 + 870 === FRAME.height - FRAME.bandTop - FRAME.bandBottom);
+  CAM_H + GAME_H === CONTENT_H);
+/* The bands must leave most of the frame to the content — they held 620px of
+   1920 (a third of the Short) to carry a logo, a title and one handle. */
+ok('the bands take under a quarter of the frame',
+  (FRAME.bandTop + FRAME.bandBottom) / FRAME.height < 0.25);
 ok('fill mode is unaffected by the layout work', buildFilter({ hasLogo: true }).includes('crop=iw/'));
 ok('mode "fill" explicitly is still the single pane',
   buildFilter({ hasLogo: true, layout: { mode: 'fill' } }).includes('crop=iw/'));

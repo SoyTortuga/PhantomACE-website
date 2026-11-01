@@ -132,7 +132,21 @@ function normalizeRender(render) {
   const r = { zoom: 1.33, ...(render || {}) };
   validateZoom(r.zoom, 'render.zoom');
   r.layout = normalizeLayout(r.layout, 'render.layout');
+  r.bands = normalizeBands(r.bands);
   return r;
+}
+
+/** Band heights in output pixels. Every pixel here is taken from the panes. */
+function normalizeBands(bands) {
+  if (!bands) return null;
+  for (const k of ['top', 'bottom']) {
+    if (bands[k] == null) continue;
+    const v = Number(bands[k]);
+    if (!(v >= 0 && v <= 600)) {
+      throw new Error(`Clipper config: render.bands.${k} must be 0-600 px, got ${bands[k]}`);
+    }
+  }
+  return { top: bands.top ?? null, bottom: bands.bottom ?? null };
 }
 
 /**
