@@ -455,11 +455,16 @@ import { readFileSync } from 'node:fs';
    repo lives under "PhantomACE Website" — argv[1] keeps the space literal and
    uses backslashes, while import.meta.url percent-encodes it. The two never
    matched, so run.js loaded, skipped main(), printed nothing and exited 0. */
+/* Assert the PROPERTY, not a literal url: on Windows pathToFileURL resolves a
+   leading-slash path against the current drive ("file:///C:/tmp/..."), so a
+   hardcoded POSIX string fails there — in a test whose whole point is Windows
+   paths. */
 const spaced = '/tmp/Phantom ACE Website/run.js';
+const spacedUrl = pathToFileURL(spaced).href;
 check('a path with a space does NOT survive naive concatenation',
-  ('file://' + spaced) === pathToFileURL(spaced).href, false);
-check('pathToFileURL encodes the space',
-  pathToFileURL(spaced).href, 'file:///tmp/Phantom%20ACE%20Website/run.js');
+  ('file://' + spaced) === spacedUrl, false);
+ok('pathToFileURL encodes the space', spacedUrl.includes('Phantom%20ACE%20Website'));
+ok('the naive form leaves the space literal', ('file://' + spaced).includes('Phantom ACE Website'));
 
 const runSrc = readFileSync(new URL('../clipper/run.js', import.meta.url), 'utf8');
 /* Match the COMPARISON, not the bare template — the comment above the guard
