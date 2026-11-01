@@ -124,7 +124,7 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
     input: raw, output: out, title: clip.title,
     fontFile: FONT, logoFile: LOGO, footer: '@PhantomACE',
     maxDurationSec: env.__maxDurationSec || 60,
-    zoom: route.zoom, layout: route.layout,
+    zoom: route.zoom, layout: route.layout, bands: env.__bands,
   });
   log(`rendered ${out} (${route.layout ? 'stacked cam+game' : `zoom ${route.zoom}`})`);
 
@@ -177,6 +177,7 @@ async function processClip(env, clip, { workDir, dryRun, doRender }) {
 export async function runClipper(env, { configPath, dryRun = false, doRender = false, limit } = {}) {
   const config = loadConfig(configPath);
   env.__maxDurationSec = config.defaults.maxDurationSec;
+  env.__bands = config.render.bands;
   const maxPerRun = limit || config.defaults.maxPerRun;
 
   const pool = await findClips(env, {

@@ -134,6 +134,7 @@ await renderVertical({
   fontFile: path.join(ROOT, 'assets/fonts/GODOFWAR.TTF'),
   logoFile: path.join(ROOT, 'assets/images/phantomace-logo.png'),
   layout: { mode: 'stack', cam, game, camShare },
+  bands: arg('--bands') ? (([t, b]) => ({ top: Number(t), bottom: Number(b) }))(arg('--bands').split(',')) : null,
   maxDurationSec: Number(arg('--seconds', '3')),
 });
 
