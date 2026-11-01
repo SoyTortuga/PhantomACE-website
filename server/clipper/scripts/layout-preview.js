@@ -54,6 +54,14 @@ function rect(spec, name) {
 const outDir = arg('--out', path.join(os.tmpdir(), 'clipper-layout'));
 fs.mkdirSync(outDir, { recursive: true });
 
+/* Outputs carry the clip's name. Writing GRID.png every run means an image
+   viewer that caches by filename — Windows Photos does — shows yesterday's
+   frame while you squint at it wondering why the crop will not move. A
+   distinct name per clip makes that impossible. */
+const tag = (arg('--slug') || path.basename(arg('--input') || 'clip', '.mp4'))
+  .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+const named = (base, ext) => path.join(outDir, `${base}-${tag}.${ext}`);
+
 /* ── get a clip to look at ───────────────────────────────────────────── */
 let input = arg('--input');
 if (!input) {
@@ -64,7 +72,7 @@ if (!input) {
     process.exit(2);
   }
   const { downloadClip } = await import('../twitch.js');
-  input = path.join(outDir, 'source.mp4');
+  input = named('source', 'mp4');
   console.log(`[layout] downloading ${slug}...`);
   try {
     await downloadClip({ slug, thumbnailUrl: '' }, input);
@@ -85,7 +93,7 @@ const game = rect(arg('--game'), 'game');
 
 /* ── no regions yet: hand back a grid to read them off ───────────────── */
 if (!cam || !game) {
-  const grid = path.join(outDir, 'GRID.png');
+  const grid = named('GRID', 'png');
   /* A line every 10%, labelled along the top and down the left. */
   const lines = [];
   for (let i = 1; i < 10; i++) {
@@ -114,7 +122,7 @@ if (!cam || !game) {
 
 /* ── regions given: draw them, then render what the bot would make ───── */
 const camShare = Number(arg('--cam-share', '0.33'));
-const boxes = path.join(outDir, 'BOXES.png');
+const boxes = named('BOXES', 'png');
 fs.copyFileSync(path.join(ROOT, 'assets/fonts/Grenze.ttf'), path.join(outDir, 'font.ttf'));
 
 const draw = (r, colour, label) => [
@@ -127,7 +135,7 @@ let r = spawnSync(FFMPEG, ['-y', '-i', path.resolve(input), '-frames:v', '1',
   path.basename(boxes)], { cwd: outDir, encoding: 'utf8' });
 if (r.status !== 0) { console.error(r.stderr.slice(-1500)); process.exit(1); }
 
-const preview = path.join(outDir, 'preview.mp4');
+const preview = named('preview', 'mp4');
 await renderVertical({
   input: path.resolve(input), output: preview,
   title: arg('--title', 'Layout preview'),
@@ -138,8 +146,14 @@ await renderVertical({
   maxDurationSec: Number(arg('--seconds', '3')),
 });
 
-console.log(`\n[layout] ${boxes}      <- the regions drawn on the frame`);
-console.log(`[layout] ${preview}   <- what the bot would produce\n`);
+/* A still of the result, so checking it is one click and not a second
+   ffmpeg incantation. */
+const still = named('RESULT', 'png');
+spawnSync(FFMPEG, ['-y', '-i', preview, '-frames:v', '1', still], { encoding: 'utf8' });
+
+console.log(`\n[layout] ${boxes}   <- the regions drawn on the source frame`);
+console.log(`[layout] ${still}  <- the finished Short, as a still`);
+console.log(`[layout] ${preview}  <- the finished Short, moving\n`);
 console.log('Happy with it? Paste into the route in server/clipper/config.json:\n');
 console.log(JSON.stringify({ layout: { mode: 'stack', cam, game, camShare } }, null, 2));
 console.log('');
