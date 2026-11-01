@@ -1,4 +1,4 @@
-# ══════════════════════════════════════════════
+﻿# ==============================================
 #  Register the Clipper bot as a Windows scheduled task.
 #
 #  Run ONCE from an ELEVATED PowerShell:
@@ -10,7 +10,7 @@
 #     -Service "..."     the service whose environment supplies the PRODUCTION
 #                        DATABASE_URL (default phantomace-web). server\.env
 #                        holds the DEV connection string, so the run must take
-#                        the production one from the service block — the same
+#                        the production one from the service block -- the same
 #                        rule every other maintenance script here follows.
 #     -DryRun            install a task that only lists what it WOULD post.
 #                        Good for the first day; re-run without it to go live.
@@ -19,9 +19,9 @@
 #  rendering video is heavy and must not share a process with the site, and a
 #  crashed site should not stop (or be stopped by) clip posting.
 #
-#  Not :00 or :30 by default — those minutes are the busiest on any shared
+#  Not :00 or :30 by default -- those minutes are the busiest on any shared
 #  scheduler, and nothing here is time-critical.
-# ══════════════════════════════════════════════
+# ==============================================
 
 [CmdletBinding()]
 param(
@@ -76,7 +76,7 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Principal $principal -Settings $settings -Force | Out-Null
 
 Write-Host ""
-Write-Host "Registered '$TaskName' — daily at $At" -ForegroundColor Green
+Write-Host "Registered '$TaskName' -- daily at $At" -ForegroundColor Green
 if ($DryRun) { Write-Host "  DRY RUN mode: it will list, not post. Re-run without -DryRun to go live." -ForegroundColor Yellow }
 Write-Host "  node   : $node"
 Write-Host "  script : $runner $flags"
