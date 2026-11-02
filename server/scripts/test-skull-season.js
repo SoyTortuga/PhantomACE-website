@@ -41,8 +41,12 @@ function fakeKV(seed = {}) {
   };
 }
 const cookie = (id) => ({ Cookie: 'pham_session=' + encodeURIComponent(JSON.stringify({ user_id: id, display_name: 'U' + id })) });
+/* Every submit carries `resetAt` so it reads as a client that HAS taken the
+   one-time global hard reset (GLOBAL_HARD_RESET_AT in skull-clicker.js). Without
+   it the handler correctly ignores the submit as pre-wipe and nothing reaches
+   either board. An individual call can still override it to test that path. */
 const POST = (e, body, h) => onRequestPost({ env: e, request: new Request('https://x/api/skull-clicker', {
-  method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify(body) }) });
+  method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify({ resetAt: Date.now(), ...body }) }) });
 const GET = (e, qs) => onRequestGet({ env: e, request: new Request('https://x/api/skull-clicker?' + qs) });
 
 const thisMonth = monthKey();   /* the season calendar (SEASON_TZ), same as the handler */

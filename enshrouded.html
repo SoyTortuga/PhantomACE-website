@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>try{if(localStorage.getItem("pham-theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The subscriber Enshrouded server - how to join, the address, and the password.">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <title>Enshrouded | PhantomACE</title>
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/roles.css">
+  <link rel="stylesheet" href="/css/pages/enshrouded.css">
+</head>
+<body data-page="enshrouded">
+
+  <div id="site-header"></div>
+
+  <section class="page-hero">
+    <h1 class="page-hero-title">Enshrouded</h1>
+    <p class="page-hero-subtitle">The subscriber server &mdash; build, burn, and get lost in the fog together</p>
+  </section>
+
+  <section class="page-container ens-page">
+
+    <div class="ens-note" id="ensLoading">Loading&hellip;</div>
+
+    <!-- Nothing set up yet (broadcaster hasn't filled the details in). -->
+    <div class="card ens-card" id="ensUnset" hidden>
+      <h2 class="ens-card-title">Not up yet</h2>
+      <p class="ens-lead">The server details haven't been published. Check back once PhantomACE has it running.</p>
+    </div>
+
+    <!-- Logged out. -->
+    <div class="card ens-card ens-guest" id="ensGuest" hidden>
+      <h2 class="ens-card-title">Subscribers only</h2>
+      <p class="ens-lead">The password is a subscriber perk, so it's tied to your Twitch account. Log in and we'll check.</p>
+      <button class="btn-primary" type="button" onclick="loginWithTwitch()">Log In with Twitch</button>
+    </div>
+
+    <!-- Logged in, not a subscriber. -->
+    <div class="card ens-card" id="ensNotSub" hidden>
+      <h2 class="ens-card-title">This one's behind the sub</h2>
+      <p class="ens-lead">The Enshrouded server is whitelisted by password, and the password goes to subscribers. Everything else on the site stays open.</p>
+      <p class="ens-hint">Already subscribed? The site reads your role at login &mdash; log out and back in once and it'll pick it up.</p>
+      <div class="ens-actions">
+        <a class="btn-primary" href="https://twitch.tv/phantomace/subscribe" target="_blank" rel="noopener">Subscribe on Twitch</a>
+        <a class="pill-btn" href="/membership/subscriber">What else a sub gets</a>
+      </div>
+    </div>
+
+    <!-- Subscriber view: the goods. -->
+    <div class="ens-body" id="ensBody" hidden>
+      <div class="ens-grid">
+
+        <section class="card ens-card ens-join">
+          <h2 class="ens-card-title">How to join</h2>
+
+          <div class="ens-field">
+            <span class="ens-field-label">Server address</span>
+            <div class="ens-copyrow">
+              <code id="ensAddress">&mdash;</code>
+              <button class="pill-btn" type="button" id="ensCopyAddress">Copy</button>
+            </div>
+          </div>
+
+          <div class="ens-field">
+            <span class="ens-field-label">Password</span>
+            <div class="ens-copyrow">
+              <code id="ensPassword">&mdash;</code>
+              <button class="pill-btn" type="button" id="ensRevealPassword">Reveal</button>
+              <button class="pill-btn" type="button" id="ensCopyPassword">Copy</button>
+            </div>
+            <p class="ens-hint">Keep it to yourself &mdash; Enshrouded has no per-player whitelist, so anyone with this password is in.</p>
+          </div>
+
+          <ol class="ens-steps">
+            <li><strong>Own Enshrouded on Steam</strong> and have it updated to the current version. A version mismatch is refused at the door.</li>
+            <li>In game, open <em>Play</em> &rarr; <em>Servers</em> &rarr; <em>Add Server</em> (or the Favourites tab).</li>
+            <li><strong>Paste the address above</strong>, including the port.</li>
+            <li><strong>Enter the password</strong> when prompted, then create or pick your character.</li>
+          </ol>
+        </section>
+
+        <aside class="ens-side">
+          <section class="card ens-card">
+            <h2 class="ens-card-title">Server info</h2>
+            <dl class="ens-facts">
+              <dt>Name</dt><dd id="ensFactName">&mdash;</dd>
+              <dt>Address</dt><dd id="ensFactAddress">&mdash;</dd>
+              <dt>Slots</dt><dd id="ensFactSlots">&mdash;</dd>
+              <dt>Access</dt><dd>Subscribers</dd>
+            </dl>
+            <p class="ens-notes" id="ensNotes" hidden></p>
+          </section>
+
+          <section class="card ens-card">
+            <h2 class="ens-card-title">House rules</h2>
+            <p class="ens-lead">It's a shared world. Don't tear down other people's builds, don't empty their chests, and don't grief the map.</p>
+            <p class="ens-hint">The <a href="/guidelines">community guidelines</a> apply here like anywhere else. The password can be changed at any time.</p>
+          </section>
+        </aside>
+      </div>
+    </div>
+
+    <!-- Broadcaster / moderator only. -->
+    <section class="card ens-card ens-admin role-moderator" id="ensAdmin" hidden>
+      <h2 class="ens-card-title">Server settings</h2>
+      <p class="ens-hint">Only you and the mods see this. These are what the page shows subscribers &mdash; changing the password here does <strong>not</strong> change it on the server; update <code>enshrouded_server.json</code> too.</p>
+      <div class="ens-form">
+        <label class="ens-label">Server name<input class="ens-input" id="ensInName" type="text" maxlength="80" placeholder="PhantomACE - Enshrouded"></label>
+        <label class="ens-label">Address<input class="ens-input" id="ensInAddress" type="text" maxlength="200" placeholder="ens.phantomace.tv:15637"></label>
+        <label class="ens-label">Password<input class="ens-input" id="ensInPassword" type="text" maxlength="200" placeholder="the Subscriber group password"></label>
+        <label class="ens-label">Slots<input class="ens-input" id="ensInSlots" type="number" min="1" max="16" value="16"></label>
+        <label class="ens-label">Notes (optional)<input class="ens-input" id="ensInNotes" type="text" maxlength="500" placeholder="anything subscribers should know"></label>
+      </div>
+      <div class="ens-actions">
+        <button class="btn-primary" type="button" id="ensSave">Save</button>
+        <span class="ens-status" id="ensAdminStatus"></span>
+      </div>
+    </section>
+
+  </section>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/cosmetic-variants.js" defer></script>
+  <script src="/js/auth.js" defer></script>
+  <script src="/js/components.js" defer></script>
+  <script src="/js/member-search.js" defer></script>
+  <script src="/js/nav.js" defer></script>
+  <script src="/js/notifications.js" defer></script>
+  <script src="/js/twitch.js" defer></script>
+  <script src="/js/pages/enshrouded.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+/* ══════════════════════════════════════════════
+   Enshrouded — /enshrouded
+
+   Tokened throughout so both themes flip. Depth from borders only (no
+   box-shadow), no side-rails, no blur. The password row is the one piece of
+   real UI here: masked until revealed, never pre-rendered into markup.
+   ══════════════════════════════════════════════ */
+
+.ens-page {
+  padding-top: 8px;
+  padding-bottom: 64px;
+}
+
+.ens-note {
+  text-align: center;
+  color: var(--text-pri);
+  opacity: 0.6;
+  padding: 40px 0;
+  font-family: var(--font-ui);
+}
+
+.ens-card { margin-bottom: 20px; }
+
+.ens-card-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+  color: var(--text-pri);
+}
+
+.ens-lead {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  opacity: 0.85;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+
+.ens-hint {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-pri);
+  opacity: 0.65;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.ens-guest { text-align: center; max-width: 560px; margin: 0 auto 28px; }
+
+.ens-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* ── Layout ──────────────────────────────────── */
+.ens-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .ens-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Address / password rows ─────────────────── */
+.ens-field { margin-bottom: 18px; }
+
+.ens-field-label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+.ens-copyrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ens-copyrow code {
+  font-family: var(--font-system);
+  font-size: 1rem;
+  color: var(--text-pri);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 10px 14px;
+  word-break: break-all;
+}
+
+/* ── Steps ───────────────────────────────────── */
+.ens-steps {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  line-height: 1.6;
+  margin: 18px 0 0;
+  padding-left: 20px;
+}
+
+.ens-steps li { margin-bottom: 10px; }
+
+/* ── Facts ───────────────────────────────────── */
+.ens-facts {
+  font-family: var(--font-ui);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  color: var(--text-pri);
+}
+
+.ens-facts dt {
+  opacity: 0.6;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ens-facts dd { margin: 0; word-break: break-all; }
+
+.ens-notes {
+  font-family: var(--font-ui);
+  color: var(--text-pri);
+  opacity: 0.8;
+  line-height: 1.5;
+  margin: 14px 0 0;
+  border-top: 1px solid var(--border-mid);
+  padding-top: 12px;
+}
+
+/* ── Admin form ──────────────────────────────── */
+.ens-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.ens-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  color: var(--text-pri);
+}
+
+.ens-input {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-pri);
+  background: var(--gray-lo);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.ens-input:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.ens-status {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--text-pri);
+  opacity: 0.8;
+}

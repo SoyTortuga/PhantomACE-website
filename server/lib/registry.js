@@ -93,6 +93,11 @@ export const SINGLETONS = {
      rotation; these go to the on-site notification bell, not to Twitch. */
   site_announcements:    { table: 'singletons', expiry: 'none' },
 
+  /* Enshrouded server details (name/address/slots/notes + the shared join
+     password). One singleton, set by the broadcaster. Persists: the password
+     is the only record of what the rig is configured with. */
+  enshrouded_config:     { table: 'singletons', expiry: 'none' },
+
   /* Ordered list of recent broadcasts. Streaks need to know what the
      PREVIOUS stream was; without it, a viewer who attended two streams a
      month apart would look consecutive. Written by the server's minute tick

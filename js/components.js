@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <a href="/room-crawl.html">Room Crawl</a>
                 <a href="/phamily-time.html">Phamily Time</a>
                 <a href="/minecraft">Minecraft</a>
+                <a href="/enshrouded">Enshrouded</a>
                 <a href="/community-leaderboards.html">Leaderboards</a>
               </div>
             </div>
