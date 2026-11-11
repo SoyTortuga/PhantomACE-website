@@ -1581,6 +1581,21 @@
     }
   }
 
+  /* CATEGORY-DRIVEN PRESET SWAP, applied LIVE. The poll carries only the
+     layout's version; when it differs from what is on screen we re-fetch the
+     layout once and re-apply it in place. No reload, so no blank frame on
+     stream — and an unchanged layout costs one integer compare per poll.
+     OverlayLayout.refresh() guards its own concurrency, so a burst of polls
+     while the fetch is in flight cannot stack requests. */
+  function applyLayoutVer(v) {
+    var ver = Number(v) || 0;
+    if (!ver) return;
+    var L = window.OverlayLayout;
+    if (!L || typeof L.refresh !== 'function' || typeof L.version !== 'function') return;
+    if (L.version() === ver) return;
+    L.refresh();
+  }
+
   function applyOverlayState(st) {
     var first = !seenOverlayState;
     seenOverlayState = true;
@@ -1992,6 +2007,7 @@
            replaying (see applyOverlayState). */
         applyOverlayState(data.overlayState);
         applyAdWarning(data.adView);
+        applyLayoutVer(data.layoutVer);
 
         /* WHAT'S ON STREAM. Publish the one pointer to the game panels every
            poll, including the first-run path that returns just below — so a

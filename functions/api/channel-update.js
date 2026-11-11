@@ -176,6 +176,27 @@ export async function onRequestPost(context) {
         console.error('[channel-update] could not record the change:', err.message);
       }
 
+      /* ── CATEGORY-BOUND OVERLAY PRESET ───────────────────────────────────
+         A layout preset can be bound to a category (Music -> "Drumstream");
+         when the category moves, that preset goes live, and where nothing is
+         bound the fallback preset takes over so a game overlay never outstays
+         its game. Driven off `wrote`, so a redelivery does nothing — and
+         idempotent regardless: activateForCategory writes nothing when the
+         right preset is already active, so a title-only edit costs one read.
+         Best-effort: the overlay must never be able to fail this webhook. */
+      if (wrote && rec) {
+        try {
+          const { activateForCategory } = await import('./overlay/layout.js');
+          const swap = await activateForCategory(env, rec.categoryName);
+          if (swap && swap.changed) {
+            console.log('[channel-update] overlay preset -> "' + swap.active
+              + '" for category "' + (rec.categoryName || '(none)') + '"');
+          }
+        } catch (err) {
+          console.error('[channel-update] overlay preset switch failed:', err && err.message);
+        }
+      }
+
       /* ── THE MOON SWEEPERS SOFT GATE ─────────────────────────────────────
          Twitch exposes no API to create, enable or disable a custom Bits
          Power-up, and no way to gate one by category — so the 21 Moon

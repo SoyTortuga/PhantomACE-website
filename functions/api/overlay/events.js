@@ -430,10 +430,22 @@ export async function onRequestGet(context) {
     adView = viewOf(adState, Date.now());
   } catch { /* ad view is optional; leave it null */ }
 
+  /* The layout VERSION — one number, bumped by any preset edit or swap. The
+     overlay watches it and re-fetches the layout only when it moves, so a
+     category-driven preset swap lands live without reloading the OBS source
+     (and an unchanged layout costs nothing but this integer). */
+  let layoutVer = 0;
+  try {
+    const { layoutVersion } = await import('./layout.js');
+    const lv = await layoutVersion(env);
+    layoutVer = (lv && lv.ver) || 0;
+  } catch { /* optional; 0 means "never re-apply" */ }
+
   return new Response(JSON.stringify({
     events: fresh,
     latestSeq,
     adView,
+    layoutVer,
     /* Sent on every poll, including the first. The page stores what it saw
        on load and reloads only when this differs — so pressing the button
        once reloads every open overlay exactly once, and a page opened

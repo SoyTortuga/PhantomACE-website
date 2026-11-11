@@ -104,12 +104,15 @@ function cleanName(n) {
 function normalizeDoc(rec) {
   if (rec && rec.presets && typeof rec.presets === 'object') {
     const active = rec.active && rec.presets[rec.active] ? rec.active : (Object.keys(rec.presets)[0] || '');
-    return { active, presets: rec.presets };
+    /* A fallback naming a deleted preset is dropped rather than kept dangling. */
+    const fallback = rec.fallback && rec.presets[rec.fallback] ? rec.fallback : '';
+    return { active, presets: rec.presets, fallback, updatedAt: Number(rec.updatedAt) || 0 };
   }
   if (rec && rec.panels && typeof rec.panels === 'object' && Object.keys(rec.panels).length) {
-    return { active: 'Default', presets: { Default: { panels: rec.panels, updatedAt: rec.updatedAt, updatedBy: rec.updatedBy } } };
+    return { active: 'Default', fallback: '', updatedAt: Number(rec.updatedAt) || 0,
+      presets: { Default: { panels: rec.panels, updatedAt: rec.updatedAt, updatedBy: rec.updatedBy } } };
   }
-  return { active: '', presets: {} };
+  return { active: '', presets: {}, fallback: '', updatedAt: 0 };
 }
 
 function activePanels(doc) {
@@ -118,7 +121,50 @@ function activePanels(doc) {
 }
 
 async function saveDoc(env, doc) {
-  await env.MARKETPLACE.put(KEY, JSON.stringify({ active: doc.active, presets: doc.presets, updatedAt: Date.now() }));
+  /* updatedAt doubles as the layout VERSION. Every change bumps it -- a
+     preset edit AND a plain activate -- so the live overlay can watch one
+     number on its poll and re-apply only when something actually moved. */
+  const updatedAt = Math.max(Date.now(), (Number(doc.updatedAt) || 0) + 1);
+  await env.MARKETPLACE.put(KEY, JSON.stringify({
+    active: doc.active, presets: doc.presets, fallback: doc.fallback || '', updatedAt,
+  }));
+  doc.updatedAt = updatedAt;
+  return updatedAt;
+}
+
+/** The layout version, for the events poll. Cheap: one read, no Twitch call. */
+export async function layoutVersion(env) {
+  const doc = normalizeDoc(await env.MARKETPLACE.get(KEY, 'json'));
+  return { ver: doc.updatedAt || 0, active: doc.active || '' };
+}
+
+/**
+ * Make the preset BOUND to a Twitch category live. Called by the
+ * channel.update webhook when the category moves.
+ *
+ * Matching is case- and whitespace-insensitive, so "music" binds "Music".
+ * With no binding for the new category the FALLBACK preset takes over (if one
+ * is set), which is what stops a game overlay outstaying its game; with no
+ * fallback either, whatever is live is left alone rather than blanked.
+ */
+export async function activateForCategory(env, categoryName) {
+  const want = String(categoryName == null ? '' : categoryName).trim().toLowerCase();
+  const doc = normalizeDoc(await env.MARKETPLACE.get(KEY, 'json'));
+
+  let target = '';
+  if (want) {
+    for (const [name, preset] of Object.entries(doc.presets)) {
+      const bound = String((preset && preset.category) || '').trim().toLowerCase();
+      if (bound && bound === want) { target = name; break; }
+    }
+  }
+  const matched = !!target;
+  if (!target && doc.fallback && doc.presets[doc.fallback]) target = doc.fallback;
+
+  if (!target || target === doc.active) return { changed: false, active: doc.active, matched };
+  doc.active = target;
+  await saveDoc(env, doc);
+  return { changed: true, active: target, matched };
 }
 
 export async function onRequestGet(context) {
@@ -134,12 +180,13 @@ export async function onRequestGet(context) {
   /* The editor asks for every preset; everyone else (the live overlay) gets
      only the active one's panels, in the shape apply-layout already reads. */
   if (staff && new URL(request.url).searchParams.get('full')) {
-    return json({ full: true, active: doc.active, presets: doc.presets, staff: true });
+    return json({ full: true, active: doc.active, presets: doc.presets, fallback: doc.fallback || '', staff: true });
   }
   return json({
     panels: activePanels(doc),
     active: doc.active,
     presets: Object.keys(doc.presets),
+    ver: doc.updatedAt || 0,
     staff,
   });
 }
@@ -169,12 +216,41 @@ export async function onRequestPost(context) {
     return ok();
   }
 
+  /* ── Bind a preset to a Twitch category (empty string unbinds) ── */
+  if (body.action === 'bind') {
+    const name = cleanName(body.name);
+    if (!doc.presets[name]) return json({ error: 'No such preset.' }, 404);
+    const category = String(body.category == null ? '' : body.category).trim().slice(0, 80);
+    /* One category binds one preset, or a switch would be a coin toss. */
+    if (category) {
+      const low = category.toLowerCase();
+      for (const [other, p] of Object.entries(doc.presets)) {
+        if (other !== name && String((p && p.category) || '').trim().toLowerCase() === low) {
+          return json({ error: `"${category}" is already bound to the "${other}" preset.` }, 400);
+        }
+      }
+    }
+    doc.presets[name].category = category;
+    await saveDoc(env, doc);
+    return ok({ bound: { name, category } });
+  }
+
+  /* ── Set the preset used when no binding matches (empty clears it) ── */
+  if (body.action === 'fallback') {
+    const name = cleanName(body.name);
+    if (name && !doc.presets[name]) return json({ error: 'No such preset.' }, 404);
+    doc.fallback = name;
+    await saveDoc(env, doc);
+    return ok({ fallback: doc.fallback });
+  }
+
   /* ── Delete a preset (active falls back to another) ── */
   if (body.action === 'delete') {
     const name = cleanName(body.name);
     if (!doc.presets[name]) return json({ error: 'No such preset.' }, 404);
     delete doc.presets[name];
     if (doc.active === name) doc.active = Object.keys(doc.presets)[0] || '';
+    if (doc.fallback === name) doc.fallback = '';
     await saveDoc(env, doc);
     return ok();
   }
@@ -182,7 +258,10 @@ export async function onRequestPost(context) {
   /* ── Reset one preset's panels to the defaults (kept, just cleared) ── */
   if (body.action === 'reset') {
     const name = cleanName(body.name) || doc.active;
-    if (name && doc.presets[name]) { doc.presets[name] = { panels: {}, updatedAt: Date.now(), updatedBy: by }; }
+    if (name && doc.presets[name]) {
+      const keepCat = doc.presets[name].category || '';
+      doc.presets[name] = { panels: {}, category: keepCat, updatedAt: Date.now(), updatedBy: by };
+    }
     await saveDoc(env, doc);
     return ok({ panels: {} });
   }
@@ -197,7 +276,10 @@ export async function onRequestPost(context) {
     }
     const checked = validatePanels(body.panels);
     if (checked.error) return json({ error: checked.error }, 400);
-    doc.presets[name] = { panels: checked.panels, updatedAt: Date.now(), updatedBy: by };
+    /* Keep the category binding: a save rewrites the preset wholesale and
+       would otherwise silently unbind it. */
+    const keepCat = (doc.presets[name] && doc.presets[name].category) || '';
+    doc.presets[name] = { panels: checked.panels, category: keepCat, updatedAt: Date.now(), updatedBy: by };
     if (!doc.active) doc.active = name;   /* first preset becomes live */
     await saveDoc(env, doc);
     return ok({ panels: checked.panels, saved: name });

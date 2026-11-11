@@ -41,6 +41,8 @@
   /* Multi-preset state. `presets` mirrors the server: name -> { panels }.
      `activeName` is the live one; `currentName` is the one being edited. */
   var presets = {};
+  /* The preset used when the live category matches no binding. */
+  var fallbackName = '';
   var activeName = '';
   var currentName = '';
 
@@ -177,6 +179,7 @@
     }
     presets = data.presets || {};
     activeName = data.active || '';
+    fallbackName = data.fallback || '';
     /* Always have something to edit: fall back to a fresh, unsaved Default. */
     currentName = activeName || Object.keys(presets)[0] || 'Default';
     if (!presets[currentName]) presets[currentName] = { panels: {} };
@@ -215,6 +218,27 @@
     }).join('') || '<option>Default</option>';
     var tag = document.getElementById('liveTag');
     tag.textContent = activeName ? ('Live: ' + activeName) : 'No preset is live yet';
+    renderBindBar(names);
+  }
+
+  /* The category binding for the preset being edited, plus the fallback. A
+     bound preset goes live by itself when the stream switches to that
+     category; the fallback takes over when nothing matches. */
+  function renderBindBar(names) {
+    var input = document.getElementById('bindCategory');
+    if (input) input.value = (presets[currentName] && presets[currentName].category) || '';
+    var sel = document.getElementById('fallbackSelect');
+    if (sel) {
+      sel.innerHTML = '<option value="">— none —</option>' + names.map(function (n) {
+        return '<option value="' + escapeHtml(n) + '"' + (n === fallbackName ? ' selected' : '') + '>'
+          + escapeHtml(n) + '</option>';
+      }).join('');
+    }
+  }
+
+  function setBindStatus(msg) {
+    var el = document.getElementById('bindStatus');
+    if (el) el.textContent = msg || '';
   }
 
   /* Switch which preset is being edited: reload the iframe to a clean slate,
@@ -410,6 +434,36 @@
     if (snapToggle) snapToggle.onchange = function () { snapOn = snapToggle.checked; updateSnapGrid(); };
 
     document.getElementById('presetSelect').onchange = function (e) { selectPreset(e.target.value); };
+
+    var bindBtn = document.getElementById('bindBtn');
+    if (bindBtn) bindBtn.onclick = async function () {
+      var input = document.getElementById('bindCategory');
+      var category = (input && input.value || '').trim();
+      if (!presets[currentName] || !presets[currentName].panels) {
+        setBindStatus('Save the preset first, then bind it.'); return;
+      }
+      try {
+        var r = await post({ action: 'bind', name: currentName, category: category });
+        if (!r.ok) { setBindStatus(r.data.error || 'Could not bind'); return; }
+        presets[currentName].category = category;
+        setBindStatus(category
+          ? ('"' + currentName + '" goes live by itself in "' + category + '".')
+          : ('"' + currentName + '" is no longer bound to a category.'));
+      } catch (e) { setBindStatus('Failed: ' + e.message); }
+    };
+
+    var fbSel = document.getElementById('fallbackSelect');
+    if (fbSel) fbSel.onchange = async function (e) {
+      var name = e.target.value;
+      try {
+        var r = await post({ action: 'fallback', name: name });
+        if (!r.ok) { setBindStatus(r.data.error || 'Could not set the fallback'); return; }
+        fallbackName = r.data.fallback || '';
+        setBindStatus(fallbackName
+          ? ('"' + fallbackName + '" takes over when no binding matches.')
+          : 'No fallback: an unbound category leaves the live preset alone.');
+      } catch (err) { setBindStatus('Failed: ' + err.message); }
+    };
 
     document.getElementById('newBtn').onclick = function () {
       var name = (prompt('Name the new preset (e.g. "Gaming", "Bingo night"):') || '').trim().slice(0, 40);

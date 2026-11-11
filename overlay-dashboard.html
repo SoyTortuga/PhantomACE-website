@@ -324,6 +324,16 @@
               <span id="liveTag"></span>
             </div>
             <div class="bar">
+              <label style="font-size:13px">Auto-switch to this preset when the category is:
+                <input id="bindCategory" class="btn" type="text" maxlength="80" placeholder="e.g. Music" style="font-weight:400">
+              </label>
+              <button class="btn" id="bindBtn">Bind</button>
+              <label style="font-size:13px">Fallback preset:
+                <select id="fallbackSelect" class="btn"></select>
+              </label>
+              <span class="status" id="bindStatus"></span>
+            </div>
+            <div class="bar">
               <button class="btn btn-primary" id="saveBtn">Save Layout</button>
               <button class="btn" id="reloadBtn">Revert</button>
               <button class="btn btn-danger" id="resetBtn">Reset to defaults</button>
