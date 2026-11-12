@@ -40,7 +40,12 @@ const MONTHLY_WINNER_PREFIX = 'giveaway_monthly_winner_';
 export const LEGACY_MONTHLY_WINNER_KEY = 'giveaway_monthly_winner';
 
 /* Last month may only be drawn on days 1..7 of the new (Pacific) month. */
-export const MONTHLY_GRACE_DAYS = 7;
+/* Raised 7 -> 14 after October 2026 was missed: a week is easy to lose to a
+   break, and once the window shut there was NO way to draw that month at all,
+   so its ledger would simply have gone unawarded. Everything downstream reads
+   this (the refusal text and the panel's "drawable through day N" both use
+   grace.lastDay), so this line is the only thing to change. */
+export const MONTHLY_GRACE_DAYS = 14;
 
 /* How long a send-monthly-code claim holds the record before it lapses. */
 const SEND_LOCK_MS = 60000;

@@ -397,13 +397,14 @@ const stored = (env, month) => { const raw = env._store.get(winnerKey(month)); r
 /* ══ HARDENING: per-month records, sent-guard, grace window ═════════════
    Fixed instants on the Pacific season calendar, injected as context.now:
      DAY2      2026-10-02 12:00 PT  — grace open, cur 2026-10, prev 2026-09
-     DAY7_LATE 2026-10-07 23:30 PT  — still day 7 (UTC already says the 8th)
-     DAY8      2026-10-08 00:30 PT  — grace closed
-     DAY8_NOON 2026-10-08 12:00 PT */
+     DAY14_LATE 2026-10-14 23:30 PT — still day 14 (UTC already says the 15th)
+     DAY15      2026-10-15 00:30 PT — grace closed
+     DAY15_NOON 2026-10-15 12:00 PT
+   October 2026 is entirely PDT (UTC-7), so each PT instant is +7h in UTC. */
 const DAY2 = Date.UTC(2026, 9, 2, 19, 0, 0);
-const DAY7_LATE = Date.UTC(2026, 9, 8, 6, 30, 0);
-const DAY8 = Date.UTC(2026, 9, 8, 7, 30, 0);
-const DAY8_NOON = Date.UTC(2026, 9, 8, 19, 0, 0);
+const DAY14_LATE = Date.UTC(2026, 9, 15, 6, 30, 0);
+const DAY15 = Date.UTC(2026, 9, 15, 7, 30, 0);
+const DAY15_NOON = Date.UTC(2026, 9, 15, 19, 0, 0);
 const CUR = '2026-10', PREV = '2026-09';
 const MOD = '777';
 const withMod = (env) => env._store.set('site_moderators', JSON.stringify({ entries: [{ userId: MOD, displayName: 'mod' }] }));
@@ -443,32 +444,32 @@ const withMod = (env) => env._store.set('site_moderators', JSON.stringify({ entr
   check('the forced re-draw is logged as forced', [log[0].reroll, log[0].forced], [true, true]);
 }
 
-/* ── Last month is drawable only through day 7, Pacific ─────────────── */
+/* ── Last month is drawable only through day 14, Pacific ────────────── */
 {
   const env = makeEnv();
   seedLedger(env, PREV, { olduser: 4 });
   seedLedger(env, CUR, { newuser: 2 });
 
-  const late7 = await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY7_LATE);
-  check('day 7 at 23:30 PT (already the 8th in UTC) is still in the window', late7.status, 200);
+  const late7 = await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY14_LATE);
+  check('day 14 at 23:30 PT (already the 15th in UTC) is still in the window', late7.status, 200);
   check('and draws last month', stored(env, PREV).month, PREV);
 
   const env2 = makeEnv();
   seedLedger(env2, PREV, { olduser: 4 });
-  const day8 = await post(env2, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY8);
-  check('day 8 at 00:30 PT refuses last month', day8.status, 400);
+  const day8 = await post(env2, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY15);
+  check('day 15 at 00:30 PT refuses last month', day8.status, 400);
   const day8Body = await day8.json();
-  ok('saying the window closed', day8Body.graceClosed === true && /closed after day 7/.test(day8Body.error));
+  ok('saying the window closed', day8Body.graceClosed === true && /closed after day 14/.test(day8Body.error));
   ok('and nothing was written', !stored(env2, PREV));
-  check('day 8 noon refuses it too', (await post(env2, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY8_NOON)).status, 400);
-  check('even the broadcaster forcing', (await post(env2, { action: 'draw-monthly', month: PREV, force: true }, BROADCASTER, DAY8_NOON)).status, 400);
+  check('day 15 noon refuses it too', (await post(env2, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY15_NOON)).status, 400);
+  check('even the broadcaster forcing', (await post(env2, { action: 'draw-monthly', month: PREV, force: true }, BROADCASTER, DAY15_NOON)).status, 400);
   check('two months back is never drawable', (await post(env2, { action: 'draw-monthly', month: '2026-08' }, BROADCASTER, DAY2)).status, 400);
 
   const g2 = await (await getPanel(env2, DAY2)).json();
   check('status on day 2: grace open', [g2.monthlyGrace.open, g2.monthlyGrace.day, g2.monthlyGrace.month, g2.monthlyGrace.current], [true, 2, PREV, CUR]);
   check('and last month\'s pool is offered', g2.monthlyPrev && g2.monthlyPrev.totalEntries, 4);
-  const g8 = await (await getPanel(env2, DAY8)).json();
-  check('status on day 8: grace closed', g8.monthlyGrace.open, false);
+  const g8 = await (await getPanel(env2, DAY15)).json();
+  check('status on day 15: grace closed', g8.monthlyGrace.open, false);
   check('and last month\'s pool is no longer offered', g8.monthlyPrev, null);
 }
 
@@ -500,7 +501,7 @@ const withMod = (env) => env._store.set('site_moderators', JSON.stringify({ entr
   ok('without shipping the 48-name reel strip', !('reveal' in panel.monthlyWinner) && panel.monthlyWinner.replayable === true);
   check('re-roll count is surfaced', panel.monthlyWinner.rerolls, 1);
 
-  const day8 = await (await getPanel(env, DAY8_NOON)).json();
+  const day8 = await (await getPanel(env, DAY15_NOON)).json();
   check('after grace a SENT last-month winner drops off the panel', day8.monthlyPrevWinner, null);
 
   /* Replay targets the month asked for, else the most recent draw. */
@@ -516,10 +517,10 @@ const withMod = (env) => env._store.set('site_moderators', JSON.stringify({ entr
 {
   const env = makeEnv({ pools: { mythic: 2 } });
   seedLedger(env, PREV, { olduser: 4 });
-  await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY7_LATE);
-  const day8 = await (await getPanel(env, DAY8_NOON)).json();
-  check('an undelivered prize does not vanish on day 8', day8.monthlyPrevWinner && day8.monthlyPrevWinner.username, 'olduser');
-  const send = await (await post(env, { action: 'send-monthly-code', month: PREV }, BROADCASTER, DAY8_NOON)).json();
+  await post(env, { action: 'draw-monthly', month: PREV }, BROADCASTER, DAY14_LATE);
+  const day8 = await (await getPanel(env, DAY15_NOON)).json();
+  check('an undelivered prize does not vanish on day 15', day8.monthlyPrevWinner && day8.monthlyPrevWinner.username, 'olduser');
+  const send = await (await post(env, { action: 'send-monthly-code', month: PREV }, BROADCASTER, DAY15_NOON)).json();
   check('and its code can still be sent', [send.success, send.month], [true, PREV]);
 }
 

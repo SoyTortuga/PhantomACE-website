@@ -629,7 +629,7 @@ function renderMonthlyWinner(which, w) {
   panel.hidden = false;
 }
 
-/* "Draw Last Month" exists only during the grace window (days 1..7 of the
+/* "Draw Last Month" exists only during the grace window (day 1 .. MONTHLY_GRACE_DAYS of the
    new month, Pacific) and only when that month had entrants. The server is
    the authority — it refuses the draw outside the window — this mirrors it. */
 function renderMonthlyPrev(p, grace) {
